@@ -120,7 +120,8 @@ gohai --collector.platform --no-collector.cloud
 
 | Collector             | Key       | Description                  | Default |
 | --------------------- | --------- | ---------------------------- | ------- |
-| [command](command.md) | `command` | Process snapshot (ps output) | ✅      |
+| [process](process.md) | `process` | Process list (PID, name, user, cmdline) | ✅      |
+| [command](command.md) | `command` | Full `ps` output (Ohai command/ps parity) | ✅      |
 | [sysconf](sysconf.md) | `sysconf` | POSIX sysconf values         | ✅      |
 
 ## Collector Dependencies
