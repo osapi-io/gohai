@@ -27,7 +27,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
+)
+
+var (
+	_ collector.Collector = (*users.Linux)(nil)
+	_ collector.Collector = (*users.Darwin)(nil)
 )
 
 type UsersPublicTestSuite struct {
@@ -39,23 +45,54 @@ func TestUsersPublicTestSuite(t *testing.T) {
 }
 
 func (s *UsersPublicTestSuite) TestNew() {
-	c := users.New()
-	s.Equal("users", c.Name())
-	s.Equal(true, c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
 
-func (s *UsersPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = users.New()
-}
-
-func (s *UsersPublicTestSuite) TestCollect() {
-	c := users.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	_, ok := got.(*users.Info)
-	s.True(ok)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := users.New()
+			s.Equal("users", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*users.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*users.Linux)
+				s.True(ok)
+			}
+		})
+	}
+}
+
+// TestCollectOnHost exercises the real gopsutil-backed listSessions
+// bridge. gopsutil's UserStat values aren't unit-constructable;
+// asserts shape only.
+func (s *UsersPublicTestSuite) TestCollectOnHost() {
+	tests := []struct{ name string }{
+		{name: "host enumerates without error"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := users.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*users.Info)
+			s.Require().True(ok)
+			s.NotNil(info)
+		})
+	}
 }
