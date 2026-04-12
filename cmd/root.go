@@ -26,16 +26,30 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/spf13/cobra"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
-// Execute runs the gohai CLI. Called from main.go.
+// Execute runs the gohai CLI. Called from main.go. Matches OSAPI's
+// cmd/root.go pattern: context.WithCancel bound to SIGINT/SIGTERM so
+// Ctrl-C cancels in-flight collection cleanly.
 func Execute() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
 	cmd := newRootCommand()
-	if err := cmd.Execute(); err != nil {
+	if err := cmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
@@ -64,7 +78,7 @@ func newRootCommand() *cobra.Command {
 			if listCollectors {
 				return printCollectorList(c.OutOrStdout())
 			}
-			return runCollect(c.OutOrStdout(), enabled, disabled, pretty, flat)
+			return runCollect(c.Context(), c.OutOrStdout(), enabled, disabled, pretty, flat)
 		},
 	}
 
@@ -78,6 +92,7 @@ func newRootCommand() *cobra.Command {
 }
 
 func runCollect(
+	ctx context.Context,
 	out io.Writer,
 	enabled, disabled *flagSet,
 	pretty, flat bool,
@@ -94,7 +109,7 @@ func runCollect(
 	if err != nil {
 		return err
 	}
-	facts, err := g.Collect(context.Background())
+	facts, err := g.Collect(ctx)
 	if err != nil {
 		return err
 	}

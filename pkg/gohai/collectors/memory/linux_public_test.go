@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
@@ -41,61 +38,69 @@ func TestMemoryLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(MemoryLinuxPublicTestSuite))
 }
 
-func (s *MemoryLinuxPublicTestSuite) TestCollectFromGopsutil() {
-	okVM := func(_ context.Context) (*mem.VirtualMemoryStat, error) {
-		return &mem.VirtualMemoryStat{
-			Total:       16 * 1024 * 1024 * 1024,
-			Available:   8 * 1024 * 1024 * 1024,
-			Used:        8 * 1024 * 1024 * 1024,
-			UsedPercent: 50.0,
-			Free:        4 * 1024 * 1024 * 1024,
-			Buffers:     1024,
-			Cached:      2048,
-		}, nil
-	}
-	okSwap := func(_ context.Context) (*mem.SwapMemoryStat, error) {
-		return &mem.SwapMemoryStat{
-			Total:       2 * 1024 * 1024 * 1024,
-			Used:        1024,
-			Free:        2*1024*1024*1024 - 1024,
-			UsedPercent: 0.1,
-		}, nil
-	}
-	zeroSwap := func(_ context.Context) (*mem.SwapMemoryStat, error) {
-		return &mem.SwapMemoryStat{}, nil
-	}
-	nilSwap := func(_ context.Context) (*mem.SwapMemoryStat, error) {
-		return nil, nil
-	}
-
+func (s *MemoryLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		vmFn     func(context.Context) (*mem.VirtualMemoryStat, error)
-		swapFn   func(context.Context) (*mem.SwapMemoryStat, error)
-		wantErr  bool
-		wantSwap bool
+		name    string
+		info    *memory.Info
+		fnErr   error
+		wantErr bool
+		want    memory.Info
 	}{
-		{"happy path with swap", okVM, okSwap, false, true},
-		{"happy path zero swap", okVM, zeroSwap, false, false},
-		{"happy path nil swap", okVM, nilSwap, false, false},
 		{
-			"vm error",
-			func(_ context.Context) (*mem.VirtualMemoryStat, error) { return nil, errors.New("boom") },
-			okSwap,
-			true,
-			false,
+			name: "fully populated with swap",
+			info: &memory.Info{
+				Total: 17179869184, Available: 8589934592, Used: 8589934592,
+				UsedPercent: 50.0, Free: 4294967296, Buffers: 1048576, Cached: 4194304,
+				Swap: &memory.Swap{
+					Total:       2147483648,
+					Used:        1024,
+					Free:        2147482624,
+					UsedPercent: 0.0001,
+				},
+			},
+			want: memory.Info{
+				Total: 17179869184, Available: 8589934592, Used: 8589934592,
+				UsedPercent: 50.0, Free: 4294967296, Buffers: 1048576, Cached: 4194304,
+				Swap: &memory.Swap{
+					Total:       2147483648,
+					Used:        1024,
+					Free:        2147482624,
+					UsedPercent: 0.0001,
+				},
+			},
 		},
 		{
-			"swap error",
-			okVM,
-			func(_ context.Context) (*mem.SwapMemoryStat, error) { return nil, errors.New("boom") },
-			true,
-			false,
+			name: "no swap",
+			info: &memory.Info{
+				Total:       8589934592,
+				Used:        4294967296,
+				Free:        4294967296,
+				UsedPercent: 50.0,
+			},
+			want: memory.Info{
+				Total:       8589934592,
+				Used:        4294967296,
+				Free:        4294967296,
+				UsedPercent: 50.0,
+			},
+		},
+		{
+			name:    "gopsutil error propagated",
+			fnErr:   errors.New("mem error"),
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := memory.CollectFromGopsutil(context.Background(), tt.vmFn, tt.swapFn)
+			c := &memory.Linux{
+				ReadFn: func(context.Context) (*memory.Info, error) {
+					if tt.fnErr != nil {
+						return nil, tt.fnErr
+					}
+					return tt.info, nil
+				},
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -103,20 +108,7 @@ func (s *MemoryLinuxPublicTestSuite) TestCollectFromGopsutil() {
 			s.Require().NoError(err)
 			info, ok := got.(*memory.Info)
 			s.Require().True(ok)
-			s.NotZero(info.Total)
-			if tt.wantSwap {
-				s.NotNil(info.Swap)
-			} else {
-				s.Nil(info.Swap)
-			}
+			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *MemoryLinuxPublicTestSuite) TestCollectDefault() {
-	got, err := memory.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*memory.Info)
-	s.Require().True(ok)
-	s.NotZero(info.Total)
 }

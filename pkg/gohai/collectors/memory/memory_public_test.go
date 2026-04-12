@@ -27,7 +27,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
+)
+
+var (
+	_ collector.Collector = (*memory.Linux)(nil)
+	_ collector.Collector = (*memory.Darwin)(nil)
 )
 
 type MemoryPublicTestSuite struct {
@@ -39,24 +45,55 @@ func TestMemoryPublicTestSuite(t *testing.T) {
 }
 
 func (s *MemoryPublicTestSuite) TestNew() {
-	c := memory.New()
-	s.Equal("memory", c.Name())
-	s.Equal(true, c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
 
-func (s *MemoryPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = memory.New()
-}
-
-func (s *MemoryPublicTestSuite) TestCollect() {
-	c := memory.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	info, ok := got.(*memory.Info)
-	s.Require().True(ok)
-	s.NotZero(info.Total)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := memory.New()
+			s.Equal("memory", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*memory.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*memory.Linux)
+				s.True(ok)
+			}
+		})
+	}
+}
+
+// TestCollectOnHost exercises the real gopsutil-backed readMemory
+// bridge. gopsutil's mem.VirtualMemoryStat + SwapMemoryStat aren't
+// unit-constructable. Asserts shape only — actual byte values depend
+// on the test host.
+func (s *MemoryPublicTestSuite) TestCollectOnHost() {
+	tests := []struct{ name string }{
+		{name: "host reports non-zero total memory"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := memory.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*memory.Info)
+			s.Require().True(ok)
+			s.NotZero(info.Total)
+		})
+	}
 }

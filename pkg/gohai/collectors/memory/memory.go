@@ -18,22 +18,29 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package memory collects virtual and swap memory facts.
+// Package memory collects virtual and swap memory usage.
 package memory
 
 import (
 	"context"
+
+	"github.com/shirou/gopsutil/v4/mem"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds memory usage data.
+// Info holds memory usage data. Byte-valued fields are native bytes —
+// Ohai emits kB-suffixed strings; we chose bytes for Go ergonomics,
+// documented as a deliberate deviation in docs/collectors/memory.md.
 type Info struct {
 	Total       uint64  `json:"total"` // bytes
 	Available   uint64  `json:"available"`
 	Used        uint64  `json:"used"`
 	UsedPercent float64 `json:"used_percent"`
 	Free        uint64  `json:"free"`
-	Buffers     uint64  `json:"buffers,omitempty"`
-	Cached      uint64  `json:"cached,omitempty"`
+	Buffers     uint64  `json:"buffers,omitempty"` // Linux only
+	Cached      uint64  `json:"cached,omitempty"`  // Linux only
 	Swap        *Swap   `json:"swap,omitempty"`
 }
 
@@ -45,32 +52,50 @@ type Swap struct {
 	UsedPercent float64 `json:"used_percent"`
 }
 
-// Collector implements the collector.Collector interface for memory facts.
-type Collector struct{}
-
-// New returns a new memory Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every memory variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "memory".
-func (c *Collector) Name() string {
-	return "memory"
+type base struct{}
+
+func (base) Name() string           { return "memory" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the memory variant for the host OS.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
-
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers memory facts.
-func (c *Collector) Collect(
+// readMemory is the production bridge to gopsutil. Combines the
+// VirtualMemory + SwapMemory calls and maps into our Info.
+func readMemory(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+) (*Info, error) {
+	vm, err := mem.VirtualMemoryWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	info := &Info{
+		Total:       vm.Total,
+		Available:   vm.Available,
+		Used:        vm.Used,
+		UsedPercent: vm.UsedPercent,
+		Free:        vm.Free,
+		Buffers:     vm.Buffers,
+		Cached:      vm.Cached,
+	}
+	if sm, err := mem.SwapMemoryWithContext(ctx); err == nil && sm.Total > 0 {
+		info.Swap = &Swap{
+			Total:       sm.Total,
+			Used:        sm.Used,
+			Free:        sm.Free,
+			UsedPercent: sm.UsedPercent,
+		}
+	}
+	return info, nil
 }
