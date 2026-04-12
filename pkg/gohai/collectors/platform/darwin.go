@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,34 +22,72 @@ package platform
 
 import (
 	"context"
-	"fmt"
+	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, host.InfoWithContext)
+// Darwin collects platform identification on macOS. Wraps gopsutil
+// for the basic name/version/family and extends with `sw_vers
+// -productVersionExtra` for the RSR patch version Ohai exposes as
+// platform_version_extra.
+type Darwin struct {
+	base
+
+	HostInfoFn func(context.Context) (*host.InfoStat, error)
+	// RunCmdFn invokes an OS command and returns its stdout. Injectable
+	// for tests — production uses exec.Command.
+	RunCmdFn func(name string, args ...string) ([]byte, error)
 }
 
-// collectWithHost is the testable core: it accepts a function matching
-// gopsutil's host.InfoWithContext so tests can stub the system call.
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+// NewDarwin returns a Darwin variant wired to gopsutil + exec.Command.
+func NewDarwin() *Darwin {
+	return &Darwin{
+		HostInfoFn: host.InfoWithContext,
+		RunCmdFn:   runSwVers,
 	}
-	return &Info{
-		OS:           runtime.GOOS,
-		Name:         info.Platform,
-		Version:      info.PlatformVersion,
-		Family:       "mac_os_x",
-		Architecture: info.KernelArch,
-		Build:        info.KernelVersion,
-	}, nil
+}
+
+// runSwVers wraps exec.Command for sw_vers. Named helper so the
+// factory assigns a function reference (no closure body to cover).
+func runSwVers(
+	name string,
+	args ...string,
+) ([]byte, error) {
+	return exec.Command(name, args...).Output()
+}
+
+// Collect returns platform Info. Probes sw_vers -productVersionExtra
+// to pick up RSR patch suffixes (e.g. "(a)" on macOS 14.4.1 (a)).
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	h, err := d.HostInfoFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	info := &Info{OS: runtime.GOOS, Architecture: runtime.GOARCH}
+	if h != nil {
+		info.Name = canonicalizePlatform(h.Platform)
+		info.Version = h.PlatformVersion
+		info.Family = h.PlatformFamily
+		info.Build = h.KernelVersion
+	}
+	if extra := readVersionExtra(d.RunCmdFn); extra != "" {
+		info.VersionExtra = extra
+	}
+	return info, nil
+}
+
+// readVersionExtra reads `sw_vers -productVersionExtra`. Returns empty
+// string on any failure — RSR version is optional and absent on most
+// macOS versions.
+func readVersionExtra(
+	run func(string, ...string) ([]byte, error),
+) string {
+	out, err := run("sw_vers", "-productVersionExtra")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }

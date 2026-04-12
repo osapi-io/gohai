@@ -22,7 +22,8 @@
 package process
 
 import (
-	"context"
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds a snapshot of running processes.
@@ -31,41 +32,80 @@ type Info struct {
 	Processes []Process `json:"processes,omitempty"`
 }
 
-// Process is a single process snapshot entry. Fields that can't be read
-// (e.g., permission-denied for another user's process) are left empty.
+// Process is a single process snapshot entry. Fields that can't be
+// read (permission-denied for another user's process, zombie parents,
+// etc.) are left empty rather than erroring.
 type Process struct {
-	PID      int32  `json:"pid"`
-	Name     string `json:"name,omitempty"`
-	Username string `json:"username,omitempty"`
-	Cmdline  string `json:"cmdline,omitempty"`
+	PID       int32  `json:"pid"`
+	PPID      int32  `json:"ppid,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Username  string `json:"username,omitempty"`
+	CmdLine   string `json:"cmd_line,omitempty"`   // OCSF-style: process.cmd_line
+	State     string `json:"state,omitempty"`      // R/S/D/Z/T/I (Linux proc/status)
+	StartTime uint64 `json:"start_time,omitempty"` // unix timestamp (seconds)
 }
 
-// Collector implements the collector.Collector interface.
-type Collector struct{}
-
-// New returns a new process Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every process variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "process".
-func (c *Collector) Name() string {
-	return "process"
+type base struct{}
+
+func (base) Name() string           { return "process" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the process variant for the host OS. gopsutil's process
+// package works cross-platform — both variants share identical logic,
+// split for pattern uniformity.
+func New() Collector {
+	switch platform.Detect() {
+	case "darwin":
+		return NewDarwin()
+	default:
+		return NewLinux()
+	}
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
+// ProcSnapshot is the subset of *gopsutil.Process methods we consume.
+// Defined as an interface so Collect() can be tested with mock procs
+// without constructing real gopsutil Process values (which require a
+// live /proc/<pid> directory).
+type ProcSnapshot interface {
+	Pid() int32
+	Ppid() (int32, error)
+	Name() (string, error)
+	Username() (string, error)
+	Cmdline() (string, error)
+	Status() ([]string, error)
+	CreateTime() (int64, error)
 }
 
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers process facts.
-func (c *Collector) Collect(
-	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+// snapshotOf converts a ProcSnapshot into our Process struct. Missing
+// fields (access denied, zombie parent, etc.) remain zero-valued.
+func snapshotOf(
+	p ProcSnapshot,
+) Process {
+	out := Process{PID: p.Pid()}
+	if ppid, err := p.Ppid(); err == nil {
+		out.PPID = ppid
+	}
+	if n, err := p.Name(); err == nil {
+		out.Name = n
+	}
+	if u, err := p.Username(); err == nil {
+		out.Username = u
+	}
+	if cl, err := p.Cmdline(); err == nil {
+		out.CmdLine = cl
+	}
+	if st, err := p.Status(); err == nil && len(st) > 0 {
+		out.State = st[0]
+	}
+	if ct, err := p.CreateTime(); err == nil && ct > 0 {
+		// gopsutil returns ms since epoch; convert to seconds.
+		out.StartTime = uint64(ct / 1000)
+	}
+	return out
 }

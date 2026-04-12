@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,33 +22,40 @@ package platform
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, host.InfoWithContext)
+// Linux collects platform identification on Linux hosts.
+// Wraps gopsutil.host.Info and applies Ohai's platform-ID remap so
+// distro names are canonical (amzn→amazon, rhel→redhat, etc.).
+type Linux struct {
+	base
+
+	HostInfoFn func(context.Context) (*host.InfoStat, error)
 }
 
-// collectWithHost is the testable core: it accepts a function matching
-// gopsutil's host.InfoWithContext so tests can stub the system call.
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
+// NewLinux returns a Linux variant wired to gopsutil.
+func NewLinux() *Linux {
+	return &Linux{HostInfoFn: host.InfoWithContext}
+}
+
+// Collect returns platform Info. Applies canonicalizePlatform to the
+// platform name so consumers get a stable identifier.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	h, err := l.HostInfoFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+		return nil, err
+	}
+	if h == nil {
+		return &Info{OS: runtime.GOOS, Architecture: runtime.GOARCH}, nil
 	}
 	return &Info{
 		OS:           runtime.GOOS,
-		Name:         info.Platform,
-		Version:      info.PlatformVersion,
-		Family:       info.PlatformFamily,
-		Architecture: info.KernelArch,
+		Name:         canonicalizePlatform(h.Platform),
+		Version:      h.PlatformVersion,
+		Family:       h.PlatformFamily,
+		Architecture: runtime.GOARCH,
 	}, nil
 }

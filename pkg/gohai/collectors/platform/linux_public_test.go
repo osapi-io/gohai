@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,6 +23,7 @@ package platform_test
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 
 	"github.com/shirou/gopsutil/v4/host"
@@ -41,61 +40,98 @@ func TestPlatformLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(PlatformLinuxPublicTestSuite))
 }
 
-func (s *PlatformLinuxPublicTestSuite) TestCollectWithHost() {
+func (s *PlatformLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
+		hostFn  func(context.Context) (*host.InfoStat, error)
 		wantErr bool
 		want    platform.Info
 	}{
 		{
-			name: "ubuntu 24.04",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
+			name: "ubuntu reports as ubuntu (no remap)",
+			hostFn: func(_ context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{
 					Platform:        "ubuntu",
 					PlatformVersion: "24.04",
 					PlatformFamily:  "debian",
-					KernelArch:      "x86_64",
 				}, nil
 			},
 			want: platform.Info{
-				OS:           "linux",
-				Name:         "ubuntu",
-				Version:      "24.04",
-				Family:       "debian",
-				Architecture: "x86_64",
+				OS: runtime.GOOS, Name: "ubuntu", Version: "24.04",
+				Family: "debian", Architecture: runtime.GOARCH,
 			},
 		},
 		{
-			name: "rhel 9",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
+			name: "amzn remaps to amazon",
+			hostFn: func(_ context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform:        "amzn",
+					PlatformVersion: "2023",
+					PlatformFamily:  "rhel",
+				}, nil
+			},
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "amazon", Version: "2023",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "rhel remaps to redhat",
+			hostFn: func(_ context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{
 					Platform:        "rhel",
-					PlatformVersion: "9.3",
+					PlatformVersion: "9.4",
 					PlatformFamily:  "rhel",
-					KernelArch:      "aarch64",
 				}, nil
 			},
 			want: platform.Info{
-				OS:           "linux",
-				Name:         "rhel",
-				Version:      "9.3",
-				Family:       "rhel",
-				Architecture: "aarch64",
+				OS: runtime.GOOS, Name: "redhat", Version: "9.4",
+				Family: "rhel", Architecture: runtime.GOARCH,
 			},
 		},
 		{
-			name: "host.Info error",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return nil, errors.New("boom")
+			name: "sles remaps to suse",
+			hostFn: func(_ context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform:        "sles",
+					PlatformVersion: "15-SP5",
+					PlatformFamily:  "suse",
+				}, nil
 			},
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "suse", Version: "15-SP5",
+				Family: "suse", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "ol remaps to oracle",
+			hostFn: func(_ context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform:        "ol",
+					PlatformVersion: "8.9",
+					PlatformFamily:  "rhel",
+				}, nil
+			},
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "oracle", Version: "8.9",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name:   "nil info yields minimal Info",
+			hostFn: func(_ context.Context) (*host.InfoStat, error) { return nil, nil },
+			want:   platform.Info{OS: runtime.GOOS, Architecture: runtime.GOARCH},
+		},
+		{
+			name:    "host.Info error propagated",
+			hostFn:  func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 	}
-
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := platform.CollectWithHost(context.Background(), tt.stub)
+			c := &platform.Linux{HostInfoFn: tt.hostFn}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -108,10 +144,7 @@ func (s *PlatformLinuxPublicTestSuite) TestCollectWithHost() {
 	}
 }
 
-func (s *PlatformLinuxPublicTestSuite) TestCollectReal() {
-	got, err := platform.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*platform.Info)
-	s.Require().True(ok)
-	s.NotEmpty(info.Architecture)
+func (s *PlatformLinuxPublicTestSuite) TestNewLinuxWiresUp() {
+	c := platform.NewLinux()
+	s.NotNil(c.HostInfoFn)
 }
