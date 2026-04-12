@@ -58,7 +58,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 | [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | ✅ (stdlib) |
 | [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | 🚧          |
 | [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | 🚧          |
-| [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | 🚧          |
+| [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | ✅ (stdlib) |
 | [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ (gopsutil) |
 | [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | ✅ (stdlib) |
 | [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | ✅ (stdlib) |

@@ -29,6 +29,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
@@ -65,6 +66,7 @@ type Facts struct {
 	Timezone       *timezone.Info       `json:"timezone,omitempty"`
 	RootGroup      *rootgroup.Info      `json:"root_group,omitempty"`
 	Shells         *shells.Info         `json:"shells,omitempty"`
+	Fips           *fips.Info           `json:"fips,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -153,6 +155,9 @@ func (f *Facts) countPopulated() int {
 	if f.Shells != nil {
 		n++
 	}
+	if f.Fips != nil {
+		n++
+	}
 	return n
 }
 
@@ -227,6 +232,10 @@ func (f *Facts) set(
 	case "shells":
 		if v, ok := result.(*shells.Info); ok {
 			f.Shells = v
+		}
+	case "fips":
+		if v, ok := result.(*fips.Info); ok {
+			f.Fips = v
 		}
 	}
 }

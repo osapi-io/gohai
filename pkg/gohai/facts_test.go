@@ -28,6 +28,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
@@ -58,6 +59,7 @@ func usersInfoPtr() *users.Info           { return &users.Info{} }
 func timezoneInfoPtr() *timezone.Info     { return &timezone.Info{} }
 func rootGroupInfoPtr() *rootgroup.Info   { return &rootgroup.Info{} }
 func shellsInfoPtr() *shells.Info         { return &shells.Info{} }
+func fipsInfoPtr() *fips.Info             { return &fips.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -164,8 +166,9 @@ func (s *FactsTestSuite) TestCountPopulated() {
 				Timezone:       timezoneInfoPtr(),
 				RootGroup:      rootGroupInfoPtr(),
 				Shells:         shellsInfoPtr(),
+				Fips:           fipsInfoPtr(),
 			},
-			want: 16,
+			want: 17,
 		},
 	}
 	for _, tt := range tests {
