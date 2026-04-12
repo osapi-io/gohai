@@ -41,27 +41,47 @@ func TestRootGroupLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(RootGroupLinuxPublicTestSuite))
 }
 
-func (s *RootGroupLinuxPublicTestSuite) TestCollectFromFunc() {
+func (s *RootGroupLinuxPublicTestSuite) TestCollectFromFuncs() {
+	rootUser := &user.User{Username: "root", Uid: "0", Gid: "0"}
+	rootGroup := &user.Group{Gid: "0", Name: "root"}
+	customGroup := &user.Group{Gid: "1000", Name: "wheel"}
+	customRootUser := &user.User{Username: "root", Uid: "0", Gid: "1000"}
+
 	tests := []struct {
-		name    string
-		lookup  func(string) (*user.Group, error)
-		wantErr bool
-		want    string
+		name        string
+		lookupUser  func(string) (*user.User, error)
+		lookupGroup func(string) (*user.Group, error)
+		wantErr     bool
+		want        string
 	}{
 		{
-			name:   "root group named root",
-			lookup: func(string) (*user.Group, error) { return &user.Group{Gid: "0", Name: "root"}, nil },
-			want:   "root",
+			name:        "root user → root group (standard Linux)",
+			lookupUser:  func(string) (*user.User, error) { return rootUser, nil },
+			lookupGroup: func(string) (*user.Group, error) { return rootGroup, nil },
+			want:        "root",
 		},
 		{
-			name:    "lookup error propagated",
-			lookup:  func(string) (*user.Group, error) { return nil, errors.New("no such group") },
-			wantErr: true,
+			name:        "root user primary gid customized to non-zero",
+			lookupUser:  func(string) (*user.User, error) { return customRootUser, nil },
+			lookupGroup: func(string) (*user.Group, error) { return customGroup, nil },
+			want:        "wheel",
+		},
+		{
+			name:        "user lookup error propagated",
+			lookupUser:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
+			lookupGroup: func(string) (*user.Group, error) { return rootGroup, nil },
+			wantErr:     true,
+		},
+		{
+			name:        "group lookup error propagated",
+			lookupUser:  func(string) (*user.User, error) { return rootUser, nil },
+			lookupGroup: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
+			wantErr:     true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info, err := rootgroup.CollectFromFunc(tt.lookup)
+			info, err := rootgroup.CollectFromFuncs(tt.lookupUser, tt.lookupGroup)
 			if tt.wantErr {
 				s.Error(err)
 				return

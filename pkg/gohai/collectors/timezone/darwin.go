@@ -35,11 +35,10 @@ var readlinkFn = os.Readlink
 // nowFn returns the current time. Swappable for tests.
 var nowFn = time.Now
 
-// localtimePath is the symlink whose target names the timezone.
-const localtimePath = "/etc/localtime"
-
-// zoneinfoPrefix is stripped from the symlink target to yield the IANA name.
-const zoneinfoPrefix = "/var/db/timezone/zoneinfo/"
+const (
+	localtimePath  = "/etc/localtime"
+	zoneinfoPrefix = "/var/db/timezone/zoneinfo/"
+)
 
 func collect(
 	_ context.Context,

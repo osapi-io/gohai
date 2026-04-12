@@ -25,6 +25,7 @@ package shells
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -52,6 +53,9 @@ func collectFromFunc(
 ) (*Info, error) {
 	rc, err := open(etcShellsPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return &Info{Paths: []string{}}, nil
+		}
 		return nil, fmt.Errorf("open %s: %w", etcShellsPath, err)
 	}
 	defer func() { _ = rc.Close() }()
@@ -68,6 +72,9 @@ func parseShells(
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if !strings.HasPrefix(line, "/") {
 			continue
 		}
 		info.Paths = append(info.Paths, line)

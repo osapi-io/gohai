@@ -28,23 +28,33 @@ import (
 	"os/user"
 )
 
-// lookupFn looks up a group by GID. Swappable for tests.
-var lookupFn = user.LookupGroupId
+// lookupUserFn looks up a user by name. Swappable for tests.
+var lookupUserFn = user.Lookup
+
+// lookupGroupFn looks up a group by GID. Swappable for tests.
+var lookupGroupFn = user.LookupGroupId
 
 func collect(
 	_ context.Context,
 ) (any, error) {
-	return collectFromFunc(lookupFn)
+	return collectFromFuncs(lookupUserFn, lookupGroupFn)
 }
 
-// collectFromFunc resolves the group name for GID 0 via the supplied lookup
-// function. Returns an error if the lookup fails.
-func collectFromFunc(
-	lookup func(string) (*user.Group, error),
+// collectFromFuncs resolves the primary group name for the root user via
+// a two-hop lookup: user "root" → its primary GID → group name. On
+// macOS/BSD the answer is typically "wheel". Matches Ohai's defensive
+// resolution and is correct even if root's primary GID isn't 0.
+func collectFromFuncs(
+	lookupUser func(string) (*user.User, error),
+	lookupGroup func(string) (*user.Group, error),
 ) (*Info, error) {
-	g, err := lookup("0")
+	u, err := lookupUser("root")
 	if err != nil {
-		return nil, fmt.Errorf("lookup gid 0: %w", err)
+		return nil, fmt.Errorf("lookup user root: %w", err)
+	}
+	g, err := lookupGroup(u.Gid)
+	if err != nil {
+		return nil, fmt.Errorf("lookup gid %s: %w", u.Gid, err)
 	}
 	return &Info{Name: g.Name}, nil
 }

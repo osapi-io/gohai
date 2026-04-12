@@ -23,6 +23,6 @@
 package rootgroup
 
 var (
-	Collect         = collect
-	CollectFromFunc = collectFromFunc
+	Collect          = collect
+	CollectFromFuncs = collectFromFuncs
 )

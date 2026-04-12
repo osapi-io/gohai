@@ -25,6 +25,7 @@ package shells_test
 import (
 	"errors"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -78,6 +79,11 @@ func (s *ShellsLinuxPublicTestSuite) TestParseShells() {
 			content: "  /bin/bash  \n\t/bin/sh\t\n",
 			want:    []string{"/bin/bash", "/bin/sh"},
 		},
+		{
+			name:    "non-absolute entries skipped",
+			content: "/bin/sh\nnologin\nbash\n/bin/zsh\n",
+			want:    []string{"/bin/sh", "/bin/zsh"},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -112,9 +118,16 @@ func (s *ShellsLinuxPublicTestSuite) TestCollectFromFunc() {
 			want: []string{"/bin/sh", "/bin/bash"},
 		},
 		{
-			name:    "open error propagated",
-			open:    func(string) (io.ReadCloser, error) { return nil, errors.New("no such file") },
+			name:    "other open error propagated",
+			open:    func(string) (io.ReadCloser, error) { return nil, errors.New("permission denied") },
 			wantErr: true,
+		},
+		{
+			name: "missing /etc/shells soft-misses to empty list",
+			open: func(string) (io.ReadCloser, error) {
+				return nil, os.ErrNotExist
+			},
+			want: []string{},
 		},
 	}
 	for _, tt := range tests {

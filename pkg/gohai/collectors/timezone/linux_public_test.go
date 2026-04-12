@@ -45,10 +45,13 @@ func (s *TimezoneLinuxPublicTestSuite) TestCollectFromFuncs() {
 	now := func() time.Time {
 		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PDT", -7*3600))
 	}
+	missingReadlink := func(string) (string, error) { return "", errors.New("not a symlink") }
+	missingReadFile := func(string) ([]byte, error) { return nil, errors.New("not found") }
 
 	tests := []struct {
 		name       string
 		readlink   func(string) (string, error)
+		readFile   func(string) ([]byte, error)
 		wantName   string
 		wantAbbrev string
 		wantOffset int
@@ -56,21 +59,32 @@ func (s *TimezoneLinuxPublicTestSuite) TestCollectFromFuncs() {
 		{
 			name:       "symlink points to IANA zone",
 			readlink:   func(string) (string, error) { return "/usr/share/zoneinfo/America/Los_Angeles", nil },
+			readFile:   missingReadFile,
 			wantName:   "America/Los_Angeles",
-			wantAbbrev: "PDT",
-			wantOffset: -7 * 3600,
-		},
-		{
-			name:       "readlink error leaves name empty",
-			readlink:   func(string) (string, error) { return "", errors.New("not found") },
-			wantName:   "",
 			wantAbbrev: "PDT",
 			wantOffset: -7 * 3600,
 		},
 		{
 			name:       "target without zoneinfo prefix passed through",
 			readlink:   func(string) (string, error) { return "UTC", nil },
+			readFile:   missingReadFile,
 			wantName:   "UTC",
+			wantAbbrev: "PDT",
+			wantOffset: -7 * 3600,
+		},
+		{
+			name:       "readlink fails, falls back to /etc/timezone",
+			readlink:   missingReadlink,
+			readFile:   func(string) ([]byte, error) { return []byte("Europe/Berlin\n"), nil },
+			wantName:   "Europe/Berlin",
+			wantAbbrev: "PDT",
+			wantOffset: -7 * 3600,
+		},
+		{
+			name:       "both sources missing leaves name empty",
+			readlink:   missingReadlink,
+			readFile:   missingReadFile,
+			wantName:   "",
 			wantAbbrev: "PDT",
 			wantOffset: -7 * 3600,
 		},
@@ -78,7 +92,7 @@ func (s *TimezoneLinuxPublicTestSuite) TestCollectFromFuncs() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info := timezone.CollectFromFuncs(tt.readlink, now)
+			info := timezone.CollectFromFuncs(tt.readlink, tt.readFile, now)
 			s.Equal(tt.wantName, info.Name)
 			s.Equal(tt.wantAbbrev, info.Abbrev)
 			s.Equal(tt.wantOffset, info.Offset)

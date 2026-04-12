@@ -32,34 +32,54 @@ import (
 // readlinkFn reads the target of a symbolic link. Swappable for tests.
 var readlinkFn = os.Readlink
 
+// readFileFn reads a file's contents. Swappable for tests.
+var readFileFn = os.ReadFile
+
 // nowFn returns the current time. Swappable for tests.
 var nowFn = time.Now
 
-// localtimePath is the symlink whose target names the timezone.
-const localtimePath = "/etc/localtime"
-
-// zoneinfoPrefix is stripped from the symlink target to yield the IANA name.
-const zoneinfoPrefix = "/usr/share/zoneinfo/"
+const (
+	localtimePath  = "/etc/localtime"
+	timezonePath   = "/etc/timezone"
+	zoneinfoPrefix = "/usr/share/zoneinfo/"
+)
 
 func collect(
 	_ context.Context,
 ) (any, error) {
-	return collectFromFuncs(readlinkFn, nowFn), nil
+	return collectFromFuncs(readlinkFn, readFileFn, nowFn), nil
 }
 
-// collectFromFuncs assembles Info from a readlink function and a clock.
-// Never returns an error: a missing /etc/localtime leaves Name empty while
-// Abbrev/Offset still come from the clock.
+// collectFromFuncs assembles Info from a readlink function, a file-reader,
+// and a clock. Never returns an error — any missing source leaves the
+// affected field empty while the others still populate.
+//
+// Name resolution order:
+//  1. /etc/localtime symlink target (systemd-style hosts)
+//  2. /etc/timezone file contents (Debian/Ubuntu style, or container
+//     images that copy zoneinfo files instead of symlinking)
 func collectFromFuncs(
 	readlink func(string) (string, error),
+	readFile func(string) ([]byte, error),
 	now func() time.Time,
 ) *Info {
 	info := &Info{}
 	abbrev, offset := now().Zone()
 	info.Abbrev = abbrev
 	info.Offset = offset
-	if target, err := readlink(localtimePath); err == nil {
-		info.Name = strings.TrimPrefix(target, zoneinfoPrefix)
-	}
+	info.Name = resolveName(readlink, readFile)
 	return info
+}
+
+func resolveName(
+	readlink func(string) (string, error),
+	readFile func(string) ([]byte, error),
+) string {
+	if target, err := readlink(localtimePath); err == nil {
+		return strings.TrimPrefix(target, zoneinfoPrefix)
+	}
+	if b, err := readFile(timezonePath); err == nil {
+		return strings.TrimSpace(string(b))
+	}
+	return ""
 }
