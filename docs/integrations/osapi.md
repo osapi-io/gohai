@@ -22,7 +22,7 @@ contract between the two projects.
 | `ServiceMgr`          | [`init`](../collectors/init.md)                     | `init.Info.Name` (`systemd`, `openrc`, `launchd`) | 🚧 planned     |
 | `PackageMgr`          | [`package_mgr`](../collectors/package_mgr.md)       | `package_mgr.Info.Name` (`apt`, `dnf`, `brew`, …) | 🚧 planned     |
 | `Containerized`       | [`virtualization`](../collectors/virtualization.md) | `virtualization.Info.Role == "guest"`             | ✅ implemented |
-| `Interfaces`          | [`network`](../collectors/network.md)               | `network.Info.Interfaces`                         | 🚧 planned     |
+| `Interfaces`          | [`network`](../collectors/network.md)               | `network.Info.Interfaces`                         | ✅ implemented |
 | `PrimaryInterface`    | [`network`](../collectors/network.md)               | `network.Info.DefaultInterface`                   | 🚧 planned     |
 | `Routes`              | [`network`](../collectors/network.md)               | `network.Info.Routes`                             | 🚧 planned     |
 | `Facts` (custom map)  | —                                                   | OSAPI-layer concern (user-supplied)               | N/A            |
