@@ -18,11 +18,19 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package disk collects per-device disk I/O counters.
+// Package disk collects per-device disk I/O counters (node_exporter-style).
+// Ohai has no equivalent plugin — block-device *metadata* lives under
+// linux/block_device.rb in Ohai, which we target with a future gohai
+// `block_device` collector. This collector is I/O counters only.
 package disk
 
 import (
 	"context"
+
+	"github.com/shirou/gopsutil/v4/disk"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds per-device disk I/O counters.
@@ -42,32 +50,46 @@ type Device struct {
 	IoTime     uint64 `json:"io_time,omitempty"`
 }
 
-// Collector implements the collector.Collector interface.
-type Collector struct{}
-
-// New returns a new disk Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every disk variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "disk".
-func (c *Collector) Name() string {
-	return "disk"
+type base struct{}
+
+func (base) Name() string           { return "disk" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the disk variant for the host OS.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
-
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers disk I/O facts.
-func (c *Collector) Collect(
+// listIOCounters is the production bridge to gopsutil. Named function
+// so factories can assign by reference (no closure body to cover).
+func listIOCounters(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+) ([]Device, error) {
+	m, err := disk.IOCountersWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Device, 0, len(m))
+	for _, s := range m {
+		out = append(out, Device{
+			Name:       s.Name,
+			ReadCount:  s.ReadCount,
+			WriteCount: s.WriteCount,
+			ReadBytes:  s.ReadBytes,
+			WriteBytes: s.WriteBytes,
+			ReadTime:   s.ReadTime,
+			WriteTime:  s.WriteTime,
+			IoTime:     s.IoTime,
+		})
+	}
+	return out, nil
 }

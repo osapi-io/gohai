@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,48 +20,25 @@
 
 package disk
 
-import (
-	"context"
-	"fmt"
-	"sort"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/disk"
-)
+// Darwin collects disk I/O counters on macOS via gopsutil (IOKit).
+type Darwin struct {
+	base
 
-var ioCountersFn = disk.IOCountersWithContext
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, ioCountersFn)
+	DevicesFn func(context.Context) ([]Device, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	fn func(context.Context, ...string) (map[string]disk.IOCountersStat, error),
-) (any, error) {
-	counters, err := fn(ctx)
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{DevicesFn: listIOCounters}
+}
+
+// Collect returns per-device I/O counters.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	devs, err := d.DevicesFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("disk.IOCounters: %w", err)
+		return nil, err
 	}
-	names := make([]string, 0, len(counters))
-	for n := range counters {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	devices := make([]Device, 0, len(names))
-	for _, n := range names {
-		c := counters[n]
-		devices = append(devices, Device{
-			Name:       c.Name,
-			ReadCount:  c.ReadCount,
-			WriteCount: c.WriteCount,
-			ReadBytes:  c.ReadBytes,
-			WriteBytes: c.WriteBytes,
-			ReadTime:   c.ReadTime,
-			WriteTime:  c.WriteTime,
-			IoTime:     c.IoTime,
-		})
-	}
-	return &Info{Devices: devices}, nil
+	return &Info{Devices: devs}, nil
 }

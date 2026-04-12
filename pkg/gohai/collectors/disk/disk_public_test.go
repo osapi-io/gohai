@@ -27,7 +27,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
+)
+
+var (
+	_ collector.Collector = (*disk.Linux)(nil)
+	_ collector.Collector = (*disk.Darwin)(nil)
 )
 
 type DiskPublicTestSuite struct {
@@ -39,23 +45,55 @@ func TestDiskPublicTestSuite(t *testing.T) {
 }
 
 func (s *DiskPublicTestSuite) TestNew() {
-	c := disk.New()
-	s.Equal("disk", c.Name())
-	s.Equal(true, c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
 
-func (s *DiskPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = disk.New()
-}
-
-func (s *DiskPublicTestSuite) TestCollect() {
-	c := disk.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	_, ok := got.(*disk.Info)
-	s.True(ok)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := disk.New()
+			s.Equal("disk", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*disk.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*disk.Linux)
+				s.True(ok)
+			}
+		})
+	}
+}
+
+// TestCollectOnHost exercises the real gopsutil-backed listIOCounters
+// bridge. gopsutil's disk.IOCounters return values aren't
+// unit-constructable; this is the only place we touch the real host.
+// We only assert shape, not specific device names.
+func (s *DiskPublicTestSuite) TestCollectOnHost() {
+	tests := []struct{ name string }{
+		{name: "host enumerates without error"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := disk.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*disk.Info)
+			s.Require().True(ok)
+			s.NotNil(info)
+		})
+	}
 }

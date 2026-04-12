@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	gdisk "github.com/shirou/gopsutil/v4/disk"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
@@ -41,33 +38,52 @@ func TestDiskDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(DiskDarwinPublicTestSuite))
 }
 
-func (s *DiskDarwinPublicTestSuite) TestCollectFromGopsutil() {
-	two := func(_ context.Context, _ ...string) (map[string]gdisk.IOCountersStat, error) {
-		return map[string]gdisk.IOCountersStat{
-			"sda": {Name: "sda", ReadCount: 100, WriteCount: 50, ReadBytes: 4096, WriteBytes: 8192},
-			"sdb": {Name: "sdb", ReadCount: 10, WriteCount: 5},
-		}, nil
-	}
-	empty := func(_ context.Context, _ ...string) (map[string]gdisk.IOCountersStat, error) {
-		return map[string]gdisk.IOCountersStat{}, nil
-	}
-	errFn := func(_ context.Context, _ ...string) (map[string]gdisk.IOCountersStat, error) {
-		return nil, errors.New("boom")
-	}
-
+func (s *DiskDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		fn      func(context.Context, ...string) (map[string]gdisk.IOCountersStat, error)
+		devs    []disk.Device
+		fnErr   error
 		wantErr bool
-		wantLen int
+		want    disk.Info
 	}{
-		{"two devices sorted", two, false, 2},
-		{"empty", empty, false, 0},
-		{"error", errFn, true, 0},
+		{
+			name: "disk0 snapshot",
+			devs: []disk.Device{
+				{
+					Name:       "disk0",
+					ReadCount:  200,
+					WriteCount: 100,
+					ReadBytes:  204800,
+					WriteBytes: 102400,
+				},
+			},
+			want: disk.Info{Devices: []disk.Device{
+				{
+					Name:       "disk0",
+					ReadCount:  200,
+					WriteCount: 100,
+					ReadBytes:  204800,
+					WriteBytes: 102400,
+				},
+			}},
+		},
+		{
+			name:    "iokit error propagated",
+			fnErr:   errors.New("iokit unavailable"),
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := disk.CollectFromGopsutil(context.Background(), tt.fn)
+			c := &disk.Darwin{
+				DevicesFn: func(context.Context) ([]disk.Device, error) {
+					if tt.fnErr != nil {
+						return nil, tt.fnErr
+					}
+					return tt.devs, nil
+				},
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -75,18 +91,7 @@ func (s *DiskDarwinPublicTestSuite) TestCollectFromGopsutil() {
 			s.Require().NoError(err)
 			info, ok := got.(*disk.Info)
 			s.Require().True(ok)
-			s.Len(info.Devices, tt.wantLen)
-			if tt.wantLen == 2 {
-				s.Equal("sda", info.Devices[0].Name) // sorted
-				s.Equal("sdb", info.Devices[1].Name)
-			}
+			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *DiskDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := disk.Collect(context.Background())
-	s.Require().NoError(err)
-	_, ok := got.(*disk.Info)
-	s.True(ok)
 }
