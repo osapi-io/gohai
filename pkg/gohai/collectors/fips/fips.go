@@ -23,7 +23,8 @@
 package fips
 
 import (
-	"context"
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds FIPS mode state.
@@ -50,33 +51,23 @@ type Policy struct {
 	FIPSEffective bool   `json:"fips_effective"` // true if Name starts with "FIPS"
 }
 
-// Collector implements the collector.Collector interface.
-type Collector struct{}
-
-// New returns a new fips Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every fips variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "fips".
-func (c *Collector) Name() string {
-	return "fips"
-}
+type base struct{}
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
+func (base) Name() string           { return "fips" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
 
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect reports FIPS kernel mode. Implementation lives in linux.go /
-// darwin.go / other.go.
-func (c *Collector) Collect(
-	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+// New returns the fips variant for the host OS. Only Linux reports
+// FIPS mode — matches Ohai, which only provides the plugin on :linux
+// and :windows. macOS has no kernel-level FIPS toggle equivalent.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }

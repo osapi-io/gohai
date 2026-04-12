@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -40,7 +38,8 @@ func TestFipsDarwinPublicTestSuite(t *testing.T) {
 }
 
 func (s *FipsDarwinPublicTestSuite) TestCollect() {
-	got, err := fips.Collect(context.Background())
+	c := fips.NewDarwin()
+	got, err := c.Collect(context.Background())
 	s.Require().NoError(err)
-	s.Nil(got)
+	s.Nil(got, "darwin fips Collect returns nil (matches Ohai — no :darwin handler)")
 }

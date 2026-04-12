@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,7 +24,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 )
@@ -36,70 +33,59 @@ const (
 	policyPath = "/etc/crypto-policies/config"
 )
 
-var openFn = func(path string) (io.ReadCloser, error) {
-	return os.Open(path)
+// Linux collects FIPS mode on Linux hosts. Reads the kernel flag
+// directly from /proc (equivalent to Ohai's OpenSSL.fips_mode call on
+// Linux) and additionally probes /etc/crypto-policies/config for the
+// 140-3 user-space policy signal Ohai doesn't capture.
+type Linux struct {
+	base
+
+	ReadFileFn func(string) ([]byte, error)
 }
 
-func collect(
-	_ context.Context,
-) (any, error) {
-	return collectFromFunc(openFn)
+// NewLinux returns a Linux variant wired to os.ReadFile.
+func NewLinux() *Linux {
+	return &Linux{ReadFileFn: os.ReadFile}
 }
 
-func collectFromFunc(
-	open func(string) (io.ReadCloser, error),
-) (*Info, error) {
+// Collect reads both the kernel flag and (if present) the crypto-policies
+// file. Missing policy file is expected on non-RHEL/Fedora hosts and
+// omits the Policy field rather than erroring.
+func (l *Linux) Collect(_ context.Context) (any, error) {
 	info := &Info{}
 
-	kernel, err := readKernelFlag(open)
+	kernel, err := readKernelFlag(l.ReadFileFn)
 	if err != nil {
 		return nil, err
 	}
 	info.Kernel = kernel
 
-	info.Policy = readCryptoPolicy(open)
+	info.Policy = readCryptoPolicy(l.ReadFileFn)
 
 	return info, nil
 }
 
 func readKernelFlag(
-	open func(string) (io.ReadCloser, error),
+	readFile func(string) ([]byte, error),
 ) (Kernel, error) {
-	rc, err := open(fipsPath)
+	b, err := readFile(fipsPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return Kernel{}, nil
 		}
-		return Kernel{}, fmt.Errorf("open %s: %w", fipsPath, err)
-	}
-	defer func() { _ = rc.Close() }()
-	return parseFips(rc)
-}
-
-func parseFips(
-	r io.Reader,
-) (Kernel, error) {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return Kernel{}, fmt.Errorf("read fips: %w", err)
+		return Kernel{}, fmt.Errorf("read %s: %w", fipsPath, err)
 	}
 	return Kernel{Enabled: strings.TrimSpace(string(b)) == "1"}, nil
 }
 
 // readCryptoPolicy returns nil on hosts without /etc/crypto-policies
-// (Debian/Ubuntu, older RHEL, Alpine, etc.). A missing file is not an
-// error — it just means the distro doesn't ship the crypto-policies
-// framework. Read errors other than not-exist also return nil; we'd
-// rather omit the field than fail the whole collector.
+// (Debian/Ubuntu, older RHEL, Alpine, etc.). Missing or unreadable
+// file → nil (we'd rather omit the field than fail the whole
+// collector).
 func readCryptoPolicy(
-	open func(string) (io.ReadCloser, error),
+	readFile func(string) ([]byte, error),
 ) *Policy {
-	rc, err := open(policyPath)
-	if err != nil {
-		return nil
-	}
-	defer func() { _ = rc.Close() }()
-	b, err := io.ReadAll(rc)
+	b, err := readFile(policyPath)
 	if err != nil {
 		return nil
 	}

@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,11 +22,21 @@ package fips
 
 import "context"
 
-// collect on macOS returns nil. Matches Ohai, which only provides `fips`
-// on :linux and :windows. macOS has no kernel-level FIPS mode equivalent
-// to Linux's /proc/sys/crypto/fips_enabled.
-func collect(
-	_ context.Context,
-) (any, error) {
+// Darwin reports no FIPS data on macOS. Apple's CoreCrypto module is
+// FIPS 140-validated by Apple but there's no kernel-level runtime
+// toggle equivalent to Linux's /proc/sys/crypto/fips_enabled.
+// Collect() returns nil for the facts.Fips field to match Ohai
+// (which only provides fips on :linux and :windows).
+type Darwin struct {
+	base
+}
+
+// NewDarwin returns a Darwin variant.
+func NewDarwin() *Darwin {
+	return &Darwin{}
+}
+
+// Collect returns nil — no FIPS facts on darwin.
+func (d *Darwin) Collect(_ context.Context) (any, error) {
 	return nil, nil
 }
