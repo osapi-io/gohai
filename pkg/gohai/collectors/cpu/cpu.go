@@ -23,48 +23,82 @@ package cpu
 
 import (
 	"context"
+
+	"github.com/shirou/gopsutil/v4/cpu"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds CPU topology and feature data.
+// Info holds CPU information. Includes aggregate facts (total logical,
+// physical cores, socket count) plus model/feature data from the first
+// CPU (assumed homogeneous — accurate for ~99% of hosts).
 type Info struct {
 	Total     int      `json:"total"`                // logical CPU count
+	Real      int      `json:"real"`                 // physical socket count
 	Cores     int      `json:"cores"`                // physical core count
 	ModelName string   `json:"model_name,omitempty"` // human-readable CPU name
-	VendorID  string   `json:"vendor_id,omitempty"`  // e.g., "GenuineIntel", "AuthenticAMD", "Apple"
+	VendorID  string   `json:"vendor_id,omitempty"`
 	Family    string   `json:"family,omitempty"`
 	Model     string   `json:"model,omitempty"`
 	Stepping  int32    `json:"stepping,omitempty"`
 	Mhz       float64  `json:"mhz,omitempty"`
-	CacheSize int32    `json:"cache_size,omitempty"`
+	CacheSize int32    `json:"cache_size,omitempty"` // KB
 	Flags     []string `json:"flags,omitempty"`
 }
 
-// Collector implements the collector.Collector interface for CPU facts.
-type Collector struct{}
-
-// New returns a new CPU Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every cpu variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "cpu".
-func (c *Collector) Name() string {
-	return "cpu"
+type base struct{}
+
+func (base) Name() string           { return "cpu" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the cpu variant for the host OS.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
-
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers CPU facts.
-func (c *Collector) Collect(
+// readCPU is the production bridge to gopsutil.
+func readCPU(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+) (*Info, error) {
+	stats, err := cpu.InfoWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	info := &Info{}
+	// Total logical CPUs.
+	if logical, err := cpu.CountsWithContext(ctx, true); err == nil {
+		info.Total = logical
+	}
+	// Physical socket count — distinct PhysicalID values. On macOS
+	// gopsutil returns one InfoStat, so sockets == 1.
+	sockets := map[string]struct{}{}
+	var totalCores int32
+	for _, s := range stats {
+		sockets[s.PhysicalID] = struct{}{}
+		totalCores += s.Cores
+	}
+	info.Real = len(sockets)
+	info.Cores = int(totalCores)
+	if len(stats) > 0 {
+		s := stats[0]
+		info.ModelName = s.ModelName
+		info.VendorID = s.VendorID
+		info.Family = s.Family
+		info.Model = s.Model
+		info.Stepping = s.Stepping
+		info.Mhz = s.Mhz
+		info.CacheSize = s.CacheSize
+		info.Flags = s.Flags
+	}
+	return info, nil
 }
