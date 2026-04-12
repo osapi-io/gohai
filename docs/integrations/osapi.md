@@ -79,8 +79,8 @@ func Collect(
 ```
 
 No collector sub-package imports — the typed fields on `gohai.Facts` give you
-direct access. Each field is a `nil`-check before use (collector was disabled
-or failed).
+direct access. Each field is a `nil`-check before use (collector was disabled or
+failed).
 
 ### Serialized handoff (agent → server)
 
