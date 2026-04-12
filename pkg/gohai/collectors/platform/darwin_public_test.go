@@ -59,6 +59,7 @@ func (s *PlatformDarwinPublicTestSuite) TestCollectWithHost() {
 				}, nil
 			},
 			want: platform.Info{
+				OS:           "darwin",
 				Name:         "darwin",
 				Version:      "14.4.1",
 				Family:       "mac_os_x",

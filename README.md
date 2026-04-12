@@ -122,6 +122,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [package_mgr](docs/collectors/package_mgr.md)      | Active package manager (apt, dnf, brew, etc.)  | ✅      | 🚧          |
 | [packages](docs/collectors/packages.md)            | Installed packages (apt, yum, brew, etc.)      | ❌      | 🚧          |
 | [languages](docs/collectors/languages.md)          | Go, Python, Ruby, Node, Rust, Java, etc.       | ❌      | 🚧          |
 | [docker](docs/collectors/docker.md)                | Running containers, images, Docker info        | ❌      | 🚧          |
@@ -235,6 +236,17 @@ func main() {
 | [🎛️ Profiles](docs/features/profiles.md)                      | Predefined collector sets (minimal, standard, full) |
 | [📊 Ohai Compatibility](docs/features/ohai-compat.md)         | Output format compatible with Chef Ohai        |
 | [🔌 SDK Integration](docs/features/sdk.md)                    | Import as a Go package for OSAPI and others    |
+
+## 🔗 Integrations
+
+Primary consumers of the gohai SDK:
+
+| Integration                                       | What it consumes                                               |
+| ------------------------------------------------- | -------------------------------------------------------------- |
+| [OSAPI](docs/integrations/osapi.md)               | Maps `job.FactsRegistration` → gohai collector fields          |
+
+The OSAPI integration doc is the authoritative mapping of OSAPI fact fields
+to gohai collectors — keep it in sync with any `Info` struct changes.
 
 ## 📖 Documentation
 

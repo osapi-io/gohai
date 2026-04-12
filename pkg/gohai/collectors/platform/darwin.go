@@ -25,6 +25,7 @@ package platform
 import (
 	"context"
 	"fmt"
+	"runtime"
 
 	"github.com/shirou/gopsutil/v4/host"
 )
@@ -46,6 +47,7 @@ func collectWithHost(
 		return nil, fmt.Errorf("host.Info: %w", err)
 	}
 	return &Info{
+		OS:           runtime.GOOS,
 		Name:         info.Platform,
 		Version:      info.PlatformVersion,
 		Family:       "mac_os_x",

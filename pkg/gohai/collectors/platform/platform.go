@@ -29,11 +29,12 @@ import (
 
 // Info holds platform identification data.
 type Info struct {
-	Name         string `json:"name"`
-	Version      string `json:"version"`
-	Family       string `json:"family"`
-	Architecture string `json:"architecture"`
-	Build        string `json:"build,omitempty"`
+	OS           string `json:"os"`              // runtime.GOOS: "linux", "darwin", "windows"
+	Name         string `json:"name"`            // distro/product: "ubuntu", "rhel", "darwin"
+	Version      string `json:"version"`         // "24.04", "14.4.1"
+	Family       string `json:"family"`          // "debian", "rhel", "mac_os_x"
+	Architecture string `json:"architecture"`    // "amd64", "arm64"
+	Build        string `json:"build,omitempty"` // kernel build (macOS)
 }
 
 // Collector implements the collector.Collector interface for platform facts.
