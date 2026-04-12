@@ -54,14 +54,13 @@ func (s *CPULinuxPublicTestSuite) TestCollectFromGopsutil() {
 			Flags:     []string{"sse", "sse2"},
 		}}, nil
 	}
-	okCounts := func(logical bool) func(context.Context, bool) (int, error) {
+	okCounts := func(_ bool) func(context.Context, bool) (int, error) {
 		return func(_ context.Context, l bool) (int, error) {
 			if l {
 				return 8, nil
 			}
 			return 4, nil
 		}
-		_ = logical
 	}
 
 	tests := []struct {
