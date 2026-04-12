@@ -52,25 +52,95 @@ the collector's Data Sources doc.
 
 **Decision order for each collector:**
 
-1. **Prefer a well-maintained Go library** — saves time, handles edge cases.
-   Standard picks: [gopsutil][] (CPU/memory/disk/network/host/process),
-   [ghw][] (hardware detail), [procfs][] (raw `/proc`, `/sys`),
-   [go-sysinfo][] (alternative host info). **Extend if needed, don't
-   replace.**
-2. **Prefer official provider SDKs** for cloud collectors (aws-sdk-go,
-   google.golang.org/cloud, azure-sdk-for-go) or plain `net/http` to IMDS
-   endpoints for smaller binaries.
-3. **Composite approach** when needed — combine multiple sources (library
-   + our own direct reads for fields the library doesn't expose).
-4. **Roll our own thin parser** when the data is simple (single file or
-   command) and no library covers the domain.
-5. **Fall back to porting [Ohai's Ruby plugin][ohai-plugins]** when no Go
-   library covers the domain. Ohai has solved the edge cases for every major
-   OS/distro; our job is translate, not re-discover.
+1. **[ghw][]** — canonical for physical hardware topology: CPU NUMA
+   + arch-aware counts, memory DIMMs/page-sizes, block devices with
+   UUID/label/unmounted, network drivers/speed, DMI (baseboard / BIOS
+   / chassis / product), GPU, PCI. Use ghw first for anything about
+   static hardware shape.
+2. **[gopsutil][]** — canonical for dynamic runtime state: memory
+   free/available/used, disk I/O counters, network I/O counters,
+   process enumeration, sessions (utmp), virtualization detection,
+   host info. Use gopsutil for anything that changes per collection.
+3. **[go-sysinfo][]** — alternative for host / platform / kernel
+   where gopsutil is weaker. Evaluate case-by-case; don't stack both
+   for the same fact.
+4. **[procfs][]** — raw Linux `/proc` and `/sys` parsing when none
+   of the above cover a field. Preferred over rolling our own scanner.
+5. **Official provider SDKs** (aws-sdk-go, google.golang.org/cloud,
+   azure-sdk-for-go) for cloud collectors; plain `net/http` to IMDS
+   endpoints when the SDK is too heavy.
+6. **Our own extension** — last resort. ONLY the fields the
+   libraries above don't expose. Extensions read files via
+   `vfs.Filesystem` and shell out via `executor.Executor` (Phase 1,
+   WIP) so tests never touch the real host.
+7. **[Ohai's Ruby plugin][ohai-plugins] as methodology reference
+   only** — NOT an import. We read Ohai to learn WHICH edge cases
+   exist (fallback chains, distro quirks, retries). We then check
+   whether ghw/gopsutil/stdlib already cover them. Only the residual
+   gap becomes our extension code.
 
 **We learn from, but don't directly import, [node_exporter][]** — their
 collectors are a gold reference for tricky Linux `/proc` and `/sys` parsing
 (Apache-2 licensed). Read, understand, rewrite in our style.
+
+### Library-first principle
+
+**Never roll your own parsing when a library covers it.** If gopsutil
+reads `/proc/meminfo` already, we don't write a second `/proc/meminfo`
+parser — we surface the fields gopsutil already exposes on our typed
+`Info`. If ghw enumerates block devices with UUID/label, we don't
+shell out to `lsblk`.
+
+Before implementing or extending a collector, verify in this order:
+
+1. Does our primary library for this collector expose the field?
+   (Check the library's Go source, not docs. Docs may undersell.)
+2. If no: does a secondary library (the next one down in the Decision
+   order) expose it?
+3. If still no: we need an extension. The extension uses
+   `vfs.Filesystem` for file reads and `executor.Executor` for exec
+   calls — never plain `os.ReadFile` / `exec.Command` in collector
+   Collect methods (Phase 1 constraint once those abstractions land).
+
+### Per-collector library stack
+
+Primary library for each collector. Changes require a PR updating
+this table with rationale.
+
+| Collector       | Primary             | Candidate migration / supplement       |
+| --------------- | ------------------- | -------------------------------------- |
+| cpu             | gopsutil            | ghw/cpu for NUMA/topology/arch-math    |
+| memory          | gopsutil            | ghw/memory for hugepages/page-sizes    |
+| filesystem      | gopsutil            | ghw/block for UUID/label/unmounted     |
+| disk            | gopsutil            | ghw/block for device metadata          |
+| network         | gopsutil            | ghw/net for driver/speed               |
+| hostname        | gopsutil + stdlib   | —                                      |
+| platform        | gopsutil            | go-sysinfo alternative considered      |
+| uptime          | gopsutil            | —                                      |
+| kernel          | `x/sys/unix` + stdlib | —                                    |
+| load            | gopsutil            | —                                      |
+| process         | gopsutil            | — (ghw doesn't do processes)           |
+| users (sessions)| gopsutil (utmp)     | supplement with loginctl via executor  |
+| virtualization  | gopsutil            | go-sysinfo has some                    |
+| fips            | stdlib              | No library covers                      |
+| machine_id      | gopsutil + stdlib   | stdlib fallback chain                  |
+| shard           | stdlib + machine_id | —                                      |
+| init            | stdlib              | `/proc/1/comm`                         |
+| os_release      | stdlib              | Our own parser                         |
+| lsb             | stdlib              | supplement with `lsb_release` via executor |
+| shells          | stdlib              | —                                      |
+| timezone        | stdlib              | —                                      |
+| root_group      | stdlib (`os/user`)  | —                                      |
+| package_mgr     | stdlib exec         | executor-based                         |
+| dmi (planned)   | **ghw**             | baseboard + BIOS + chassis + product   |
+| gpu (planned)   | **ghw**             | —                                      |
+| pci (planned)   | **ghw**             | —                                      |
+| block_device (planned) | **ghw**      | —                                      |
+
+New collectors must justify library choice in their PR.
+Migrations (gopsutil → ghw, etc.) need their own issue labeled
+`library-migration` + `collector:<name>` with: current coverage,
+candidate coverage, migration plan.
 
 ### Cross-platform compilation — no build tags (osapi pattern)
 
