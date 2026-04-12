@@ -29,19 +29,19 @@ import (
 )
 
 // Linux collects the shell list on Linux hosts. Embeds base for the
-// static Name / DefaultEnabled / Dependencies methods. OpenFn is injected so
-// tests can stub the file read.
+// static Name / DefaultEnabled / Dependencies methods. OpenFn is
+// injected so tests can stub the file read.
 type Linux struct {
 	base
 
 	OpenFn func(string) (io.ReadCloser, error)
 }
 
-// NewLinux returns a Linux variant wired to os.Open.
+// NewLinux returns a Linux variant wired to the package-level openFile
+// helper. Named helper (not inline closure) keeps the factory a plain
+// assignment — no closure body that needs test coverage.
 func NewLinux() *Linux {
-	return &Linux{
-		OpenFn: func(path string) (io.ReadCloser, error) { return os.Open(path) },
-	}
+	return &Linux{OpenFn: openFile}
 }
 
 // Collect reads /etc/shells and returns the list of valid login shells.

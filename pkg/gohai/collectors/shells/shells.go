@@ -26,6 +26,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -72,6 +73,16 @@ func New() Collector {
 	default:
 		return NewLinux()
 	}
+}
+
+// openFile opens a file and returns it as io.ReadCloser. Named helper
+// at package scope so NewLinux/NewDarwin can assign it as a function
+// reference without a closure — keeps coverage honest (no closure body
+// to exercise in tests).
+func openFile(
+	path string,
+) (io.ReadCloser, error) {
+	return os.Open(path)
 }
 
 // parseShells parses /etc/shells format: one path per line. Skips

@@ -21,6 +21,9 @@
 package shells_test
 
 import (
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -54,6 +57,24 @@ func (s *ShellsPublicTestSuite) TestNew() {
 func (s *ShellsPublicTestSuite) TestImplementsCollectorInterface() {
 	var _ collector.Collector = shells.NewLinux()
 	var _ collector.Collector = shells.NewDarwin()
+}
+
+// TestOpenFileHelper verifies the package's openFile bridge function —
+// the one-line wrapper that adapts *os.File to io.ReadCloser. Uses a
+// test-owned temp file (never touches /etc/shells or any real host
+// path), then reads through the collector's wired OpenFn.
+func (s *ShellsPublicTestSuite) TestOpenFileHelper() {
+	dir := s.T().TempDir()
+	path := filepath.Join(dir, "shells")
+	s.Require().NoError(os.WriteFile(path, []byte("/bin/sh\n"), 0o644))
+
+	c := shells.NewLinux()
+	rc, err := c.OpenFn(path)
+	s.Require().NoError(err)
+	defer func() { _ = rc.Close() }()
+	b, err := io.ReadAll(rc)
+	s.Require().NoError(err)
+	s.Equal("/bin/sh\n", string(b))
 }
 
 // TestNewDispatch verifies every platform-detect branch returns the

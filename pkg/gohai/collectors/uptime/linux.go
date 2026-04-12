@@ -30,6 +30,10 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
+// procUptimePath is /proc/uptime. Two fields: uptime seconds and
+// aggregate idle seconds across all CPUs.
+const procUptimePath = "/proc/uptime"
+
 // Linux collects uptime + idle on Linux. Wraps gopsutil.host.Info for
 // uptime/boot time and extends with /proc/uptime for aggregate CPU
 // idle time (which gopsutil doesn't expose). Matches Ohai's idletime.
@@ -38,16 +42,18 @@ type Linux struct {
 
 	// HostInfoFn is gopsutil's host.InfoWithContext.
 	HostInfoFn func(context.Context) (*host.InfoStat, error)
-	// ReadProcUptimeFn reads /proc/uptime. On non-linux hosts this
-	// returns ErrNotExist and idle fields stay empty.
-	ReadProcUptimeFn func() ([]byte, error)
+	// ReadFileFn reads a file. Wired to os.ReadFile; tests inject a
+	// stub that returns canned /proc/uptime content.
+	ReadFileFn func(string) ([]byte, error)
 }
 
 // NewLinux returns a Linux variant wired to gopsutil + os.ReadFile.
+// No closures — both injected fields are bare function references, so
+// tests cover the wiring without any real file system interaction.
 func NewLinux() *Linux {
 	return &Linux{
-		HostInfoFn:       host.InfoWithContext,
-		ReadProcUptimeFn: func() ([]byte, error) { return os.ReadFile("/proc/uptime") },
+		HostInfoFn: host.InfoWithContext,
+		ReadFileFn: os.ReadFile,
 	}
 }
 
@@ -65,7 +71,7 @@ func (l *Linux) Collect(ctx context.Context) (any, error) {
 		BootTime: info.BootTime,
 		Human:    HumanDuration(info.Uptime),
 	}
-	if idle, ok := readIdleSeconds(l.ReadProcUptimeFn); ok {
+	if idle, ok := readIdleSeconds(l.ReadFileFn); ok {
 		out.IdleSeconds = idle
 		out.IdleHuman = HumanDuration(idle)
 	}
@@ -76,9 +82,9 @@ func (l *Linux) Collect(ctx context.Context) (any, error) {
 // idle seconds across all CPU cores). Returns (0, false) on any failure
 // — idle is best-effort.
 func readIdleSeconds(
-	read func() ([]byte, error),
+	read func(string) ([]byte, error),
 ) (uint64, bool) {
-	b, err := read()
+	b, err := read(procUptimePath)
 	if err != nil {
 		return 0, false
 	}

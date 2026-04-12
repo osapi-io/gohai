@@ -85,16 +85,10 @@ func (s *RootGroupDarwinPublicTestSuite) TestCollect() {
 	}
 }
 
-func (s *RootGroupDarwinPublicTestSuite) TestNewDarwinWiresUpRealLookups() {
+// TestNewDarwinWiresUp confirms the factory wires os/user lookups into
+// the struct — no real user lookups in unit tests.
+func (s *RootGroupDarwinPublicTestSuite) TestNewDarwinWiresUp() {
 	c := rootgroup.NewDarwin()
-	s.Require().NotNil(c.LookupUserFn)
-	s.Require().NotNil(c.LookupGroupFn)
-
-	u, err := c.LookupUserFn("root")
-	s.Require().NoError(err)
-	s.Equal("root", u.Username)
-
-	g, err := c.LookupGroupFn("0")
-	s.Require().NoError(err)
-	s.NotEmpty(g.Name)
+	s.NotNil(c.LookupUserFn)
+	s.NotNil(c.LookupGroupFn)
 }

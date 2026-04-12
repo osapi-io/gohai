@@ -38,11 +38,11 @@ type Darwin struct {
 	OpenFn func(string) (io.ReadCloser, error)
 }
 
-// NewDarwin returns a Darwin variant wired to os.Open.
+// NewDarwin returns a Darwin variant wired to the package-level openFile
+// helper. Named helper (not inline closure) keeps the factory a plain
+// assignment.
 func NewDarwin() *Darwin {
-	return &Darwin{
-		OpenFn: func(path string) (io.ReadCloser, error) { return os.Open(path) },
-	}
+	return &Darwin{OpenFn: openFile}
 }
 
 // Collect reads /etc/shells and returns the list of valid login shells.

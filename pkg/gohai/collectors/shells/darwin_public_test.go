@@ -109,16 +109,9 @@ func (s *ShellsDarwinPublicTestSuite) TestCollect() {
 	}
 }
 
-// TestNewDarwinWiresUpRealOpen exercises the real os.Open closure the
-// factory wires in.
-func (s *ShellsDarwinPublicTestSuite) TestNewDarwinWiresUpRealOpen() {
+// TestNewDarwinWiresUpOpenFn confirms the factory wires the package's
+// openFile helper into OpenFn.
+func (s *ShellsDarwinPublicTestSuite) TestNewDarwinWiresUpOpenFn() {
 	c := shells.NewDarwin()
-	s.Require().NotNil(c.OpenFn)
-
-	rc, err := c.OpenFn("/dev/null")
-	s.Require().NoError(err)
-	s.Require().NoError(rc.Close())
-
-	_, err = c.OpenFn("/gohai-test-does-not-exist/shells")
-	s.Error(err)
+	s.NotNil(c.OpenFn)
 }

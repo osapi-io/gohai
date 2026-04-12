@@ -133,19 +133,10 @@ func (s *ShellsLinuxPublicTestSuite) TestCollect() {
 	}
 }
 
-// TestNewLinuxWiresUpRealOpen exercises the real os.Open closure the
-// factory wires in, proving it works on an existing path and propagates
-// errors on a missing one.
-func (s *ShellsLinuxPublicTestSuite) TestNewLinuxWiresUpRealOpen() {
+// TestNewLinuxWiresUpOpenFn confirms the factory wires the package's
+// openFile helper into OpenFn — no closure body to cover, no real
+// filesystem access needed.
+func (s *ShellsLinuxPublicTestSuite) TestNewLinuxWiresUpOpenFn() {
 	c := shells.NewLinux()
-	s.Require().NotNil(c.OpenFn)
-
-	// Happy path: /dev/null exists on every POSIX system.
-	rc, err := c.OpenFn("/dev/null")
-	s.Require().NoError(err)
-	s.Require().NoError(rc.Close())
-
-	// Error path: path that definitely doesn't exist.
-	_, err = c.OpenFn("/gohai-test-does-not-exist/shells")
-	s.Error(err)
+	s.NotNil(c.OpenFn)
 }
