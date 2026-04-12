@@ -10,17 +10,17 @@ Reports the unique machine identifier (from `/etc/machine-id` on Linux,
 
 ## Collected Fields
 
-| Field | Type   | Description                            |
-| ----- | ------ | -------------------------------------- |
-| `id`  | string | Machine identifier (typically a UUID)  |
+| Field | Type   | Description                           |
+| ----- | ------ | ------------------------------------- |
+| `id`  | string | Machine identifier (typically a UUID) |
 
 ## Platform Support
 
-| Platform | Source                             | Supported |
-| -------- | ---------------------------------- | --------- |
-| Linux    | `gopsutil/v4/host.InfoWithContext` (reads `/etc/machine-id`) | ✅ |
-| macOS    | `gopsutil/v4/host.InfoWithContext` (reads `IOPlatformUUID`) | ✅ |
-| Other    | Returns `nil`                      | —         |
+| Platform | Source                                                       | Supported |
+| -------- | ------------------------------------------------------------ | --------- |
+| Linux    | `gopsutil/v4/host.InfoWithContext` (reads `/etc/machine-id`) | ✅        |
+| macOS    | `gopsutil/v4/host.InfoWithContext` (reads `IOPlatformUUID`)  | ✅        |
+| Other    | Returns `nil`                                                | —         |
 
 ## Example Output
 
@@ -45,4 +45,5 @@ None.
 
 ## Backing library
 
-[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) — BSD-3.
+[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
+BSD-3.

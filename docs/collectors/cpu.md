@@ -11,26 +11,26 @@ package.
 
 ## Collected Fields
 
-| Field        | Type     | Description                                           |
-| ------------ | -------- | ----------------------------------------------------- |
-| `total`      | int      | Logical CPU count                                     |
-| `cores`      | int      | Physical core count                                   |
-| `model_name` | string   | Human-readable CPU name (e.g., `Intel Core i7-10700K`) |
+| Field        | Type     | Description                                                |
+| ------------ | -------- | ---------------------------------------------------------- |
+| `total`      | int      | Logical CPU count                                          |
+| `cores`      | int      | Physical core count                                        |
+| `model_name` | string   | Human-readable CPU name (e.g., `Intel Core i7-10700K`)     |
 | `vendor_id`  | string   | CPU vendor (e.g., `GenuineIntel`, `AuthenticAMD`, `Apple`) |
-| `family`     | string   | CPU family                                            |
-| `model`      | string   | CPU model number                                      |
-| `stepping`   | int32    | Silicon stepping                                      |
-| `mhz`        | float64  | Clock speed in MHz                                    |
-| `cache_size` | int32    | Cache size (KB)                                       |
-| `flags`      | []string | CPU feature flags (e.g., `sse`, `avx`, `aes`)         |
+| `family`     | string   | CPU family                                                 |
+| `model`      | string   | CPU model number                                           |
+| `stepping`   | int32    | Silicon stepping                                           |
+| `mhz`        | float64  | Clock speed in MHz                                         |
+| `cache_size` | int32    | Cache size (KB)                                            |
+| `flags`      | []string | CPU feature flags (e.g., `sse`, `avx`, `aes`)              |
 
 ## Platform Support
 
-| Platform | Source                                         | Supported |
-| -------- | ---------------------------------------------- | --------- |
-| Linux    | `gopsutil/v4/cpu.InfoWithContext` + `CountsWithContext` | ✅ |
-| macOS    | `gopsutil/v4/cpu.InfoWithContext` + `CountsWithContext` | ✅ |
-| Other    | Returns `nil`                                  | —         |
+| Platform | Source                                                  | Supported |
+| -------- | ------------------------------------------------------- | --------- |
+| Linux    | `gopsutil/v4/cpu.InfoWithContext` + `CountsWithContext` | ✅        |
+| macOS    | `gopsutil/v4/cpu.InfoWithContext` + `CountsWithContext` | ✅        |
+| Other    | Returns `nil`                                           | —         |
 
 ## Example Output
 
@@ -66,4 +66,5 @@ None.
 
 ## Backing library
 
-[`github.com/shirou/gopsutil/v4/cpu`](https://github.com/shirou/gopsutil) — BSD-3.
+[`github.com/shirou/gopsutil/v4/cpu`](https://github.com/shirou/gopsutil) —
+BSD-3.

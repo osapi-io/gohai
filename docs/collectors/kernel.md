@@ -55,4 +55,5 @@ None.
 
 ## Backing library
 
-[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) — BSD-3.
+[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
+BSD-3.

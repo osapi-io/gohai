@@ -51,7 +51,10 @@ func (s *VirtLinuxPublicTestSuite) TestCollectWithHost() {
 		{
 			name: "docker guest",
 			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{VirtualizationSystem: "docker", VirtualizationRole: "guest"}, nil
+				return &host.InfoStat{
+					VirtualizationSystem: "docker",
+					VirtualizationRole:   "guest",
+				}, nil
 			},
 			want: virtualization.Info{System: "docker", Role: "guest"},
 		},

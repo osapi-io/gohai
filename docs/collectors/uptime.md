@@ -4,17 +4,17 @@
 
 ## Description
 
-Reports system uptime (seconds since boot) and boot time (unix timestamp),
-plus a human-readable uptime string. Wraps
+Reports system uptime (seconds since boot) and boot time (unix timestamp), plus
+a human-readable uptime string. Wraps
 [gopsutil's `host.Info`](https://pkg.go.dev/github.com/shirou/gopsutil/v4/host).
 
 ## Collected Fields
 
-| Field       | Type   | Description                                   |
-| ----------- | ------ | --------------------------------------------- |
-| `seconds`   | uint64 | Seconds since boot                            |
-| `boot_time` | uint64 | Unix timestamp (seconds) of system boot       |
-| `human`     | string | Human-readable uptime (e.g., `3d 4h 12m 5s`)  |
+| Field       | Type   | Description                                  |
+| ----------- | ------ | -------------------------------------------- |
+| `seconds`   | uint64 | Seconds since boot                           |
+| `boot_time` | uint64 | Unix timestamp (seconds) of system boot      |
+| `human`     | string | Human-readable uptime (e.g., `3d 4h 12m 5s`) |
 
 ## Platform Support
 
@@ -56,4 +56,5 @@ None.
 
 ## Backing library
 
-[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) — BSD-3.
+[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
+BSD-3.

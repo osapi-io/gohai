@@ -95,10 +95,30 @@ func (s *HostnameLinuxPublicTestSuite) TestDefaultFqdnLookup() {
 		input  string
 		want   string
 	}{
-		{"cname trimmed of trailing dot", func(_ string) (string, error) { return "web01.example.com.", nil }, "web01", "web01.example.com"},
-		{"cname without trailing dot", func(_ string) (string, error) { return "web01.example.com", nil }, "web01", "web01.example.com"},
-		{"empty cname falls back to input", func(_ string) (string, error) { return "", nil }, "solo", "solo"},
-		{"lookup error falls back to input", func(_ string) (string, error) { return "", errors.New("dns") }, "bad", "bad"},
+		{
+			"cname trimmed of trailing dot",
+			func(_ string) (string, error) { return "web01.example.com.", nil },
+			"web01",
+			"web01.example.com",
+		},
+		{
+			"cname without trailing dot",
+			func(_ string) (string, error) { return "web01.example.com", nil },
+			"web01",
+			"web01.example.com",
+		},
+		{
+			"empty cname falls back to input",
+			func(_ string) (string, error) { return "", nil },
+			"solo",
+			"solo",
+		},
+		{
+			"lookup error falls back to input",
+			func(_ string) (string, error) { return "", errors.New("dns") },
+			"bad",
+			"bad",
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -121,7 +141,11 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 			name:    "success with fqdn",
 			stub:    func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: "web01"}, nil },
 			resolve: func(_ string) string { return "web01.example.com" },
-			want:    &hostname.Info{Hostname: "web01", FQDN: "web01.example.com", Domain: "example.com"},
+			want: &hostname.Info{
+				Hostname: "web01",
+				FQDN:     "web01.example.com",
+				Domain:   "example.com",
+			},
 		},
 		{
 			name:    "success without domain",

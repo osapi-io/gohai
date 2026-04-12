@@ -51,7 +51,11 @@ func (s *KernelDarwinPublicTestSuite) TestCollectWithHost() {
 		{
 			name: "success",
 			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{OS: "darwin", KernelVersion: "1.2.3", KernelArch: "arm64"}, nil
+				return &host.InfoStat{
+					OS:            "darwin",
+					KernelVersion: "1.2.3",
+					KernelArch:    "arm64",
+				}, nil
 			},
 			want: kernel.Info{OS: "darwin", Version: "1.2.3", Arch: "arm64"},
 		},

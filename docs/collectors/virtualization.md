@@ -4,18 +4,18 @@
 
 ## Description
 
-Detects hypervisor / container runtime presence. Reports whether the host is
-a guest (inside a VM or container) or a host (running a hypervisor). Wraps
+Detects hypervisor / container runtime presence. Reports whether the host is a
+guest (inside a VM or container) or a host (running a hypervisor). Wraps
 [gopsutil's `host.Info`](https://pkg.go.dev/github.com/shirou/gopsutil/v4/host)
 which handles detection across kvm, xen, vmware, virtualbox, docker, lxc,
 podman, and more.
 
 ## Collected Fields
 
-| Field    | Type   | Description                                                          |
-| -------- | ------ | -------------------------------------------------------------------- |
-| `system` | string | Detected system (e.g., `docker`, `kvm`, `xen`, `vmware`, `vbox`)     |
-| `role`   | string | `host` or `guest`; empty on bare metal                               |
+| Field    | Type   | Description                                                      |
+| -------- | ------ | ---------------------------------------------------------------- |
+| `system` | string | Detected system (e.g., `docker`, `kvm`, `xen`, `vmware`, `vbox`) |
+| `role`   | string | `host` or `guest`; empty on bare metal                           |
 
 Both fields are empty when no virtualization is detected.
 
@@ -68,4 +68,5 @@ None.
 
 ## Backing library
 
-[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) — BSD-3.
+[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
+BSD-3.

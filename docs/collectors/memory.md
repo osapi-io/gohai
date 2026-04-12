@@ -63,4 +63,5 @@ None.
 
 ## Backing library
 
-[`github.com/shirou/gopsutil/v4/mem`](https://github.com/shirou/gopsutil) — BSD-3.
+[`github.com/shirou/gopsutil/v4/mem`](https://github.com/shirou/gopsutil) —
+BSD-3.

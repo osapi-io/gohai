@@ -53,7 +53,11 @@ func (s *UptimeLinuxPublicTestSuite) TestCollectWithHost() {
 			stub: func(_ context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{Uptime: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000}, nil
 			},
-			want: uptime.Info{Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s"},
+			want: uptime.Info{
+				Seconds:  3*3600 + 12*60 + 5,
+				BootTime: 1_700_000_000,
+				Human:    "3h 12m 5s",
+			},
 		},
 		{
 			name:    "host.Info error",

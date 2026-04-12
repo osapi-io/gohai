@@ -54,7 +54,12 @@ func (s *MemoryLinuxPublicTestSuite) TestCollectFromGopsutil() {
 		}, nil
 	}
 	okSwap := func(_ context.Context) (*mem.SwapMemoryStat, error) {
-		return &mem.SwapMemoryStat{Total: 2 * 1024 * 1024 * 1024, Used: 1024, Free: 2*1024*1024*1024 - 1024, UsedPercent: 0.1}, nil
+		return &mem.SwapMemoryStat{
+			Total:       2 * 1024 * 1024 * 1024,
+			Used:        1024,
+			Free:        2*1024*1024*1024 - 1024,
+			UsedPercent: 0.1,
+		}, nil
 	}
 	zeroSwap := func(_ context.Context) (*mem.SwapMemoryStat, error) {
 		return &mem.SwapMemoryStat{}, nil
@@ -73,8 +78,20 @@ func (s *MemoryLinuxPublicTestSuite) TestCollectFromGopsutil() {
 		{"happy path with swap", okVM, okSwap, false, true},
 		{"happy path zero swap", okVM, zeroSwap, false, false},
 		{"happy path nil swap", okVM, nilSwap, false, false},
-		{"vm error", func(_ context.Context) (*mem.VirtualMemoryStat, error) { return nil, errors.New("boom") }, okSwap, true, false},
-		{"swap error", okVM, func(_ context.Context) (*mem.SwapMemoryStat, error) { return nil, errors.New("boom") }, true, false},
+		{
+			"vm error",
+			func(_ context.Context) (*mem.VirtualMemoryStat, error) { return nil, errors.New("boom") },
+			okSwap,
+			true,
+			false,
+		},
+		{
+			"swap error",
+			okVM,
+			func(_ context.Context) (*mem.SwapMemoryStat, error) { return nil, errors.New("boom") },
+			true,
+			false,
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
