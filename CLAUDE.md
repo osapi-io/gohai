@@ -344,7 +344,7 @@ just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
   Use the osapi-style per-OS struct pattern (no build tags). See
   `pkg/gohai/collectors/shells/` for the canonical reference.
   - `<name>.go` — `Info` struct, `Collector` interface, `base` struct
-    (holds shared `Name()`/`Tier()`/`Dependencies()`), `New()` factory
+    (holds shared `Name()`/`DefaultEnabled()`/`Dependencies()`), `New()` factory
     that dispatches on `platform.Detect()`, and any cross-OS helpers
     (shared parsing, shared constants).
   - `linux.go` — `type Linux struct { base; <injectable fns> }` with
@@ -364,7 +364,7 @@ just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
   branch without importing gopsutil. `hostInfoFn` is private, exposed
   only to platform's own tests via `export_test.go`.
 - **`internal/collector/`** — Collector interface + registry plumbing
-  - `collector.go` — `Collector` interface, `Tier` type
+  - `collector.go` — `Collector` interface
   - `registry.go` — `Registry` (register, resolve deps, run concurrently)
 
 ## Code Standards (MANDATORY)
@@ -390,8 +390,8 @@ func FunctionName(
 Zero-parameter functions stay single-line:
 
 ```go
-func (t Tier) String() string {
-    return "core"
+func (base) Name() string {
+    return "cpu"
 }
 ```
 
@@ -536,13 +536,13 @@ type Collector interface {
     collector.Collector
 }
 
-// base holds the identity (Name/Tier/Dependencies) common to every
-// per-OS variant. Embedded in Linux, Darwin, Debian, etc.
+// base holds the identity (Name/DefaultEnabled/Dependencies) common
+// to every per-OS variant. Embedded in Linux, Darwin, Debian, etc.
 type base struct{}
 
-func (base) Name() string                   { return "cpu" }
-func (base) Tier() collector.Tier           { return collector.TierCore }
-func (base) Dependencies() []string         { return nil }
+func (base) Name() string           { return "cpu" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
 
 // New returns the cpu variant appropriate to the host OS.
 func New() Collector {
@@ -633,7 +633,7 @@ func builtinCollectors() []collector.Collector {
 
 **`<name>_public_test.go`** — package-level tests:
 
-- `TestNew` → calls `New()`, asserts `Name()`/`Tier()`/`Dependencies()`
+- `TestNew` → calls `New()`, asserts `Name()`/`DefaultEnabled()`/`Dependencies()`
   on the returned interface.
 - `TestImplementsCollectorInterface` → compile-time check that every
   per-OS struct satisfies `collector.Collector`.
