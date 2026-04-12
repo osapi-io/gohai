@@ -69,6 +69,11 @@ func New() Collector {
 	return NewLinux()
 }
 
+// processesFn is the injection seam for gopsutil's
+// process.ProcessesWithContext. Kept private so importers don't
+// transitively need gopsutil. Swapped via SetProcessesFn.
+var processesFn = process.ProcessesWithContext
+
 // listProcesses is the production bridge to gopsutil. Factored as a
 // named function so factories can assign it as a plain function
 // reference (no closure body). Tests inject a stub and don't touch
@@ -76,7 +81,7 @@ func New() Collector {
 func listProcesses(
 	ctx context.Context,
 ) ([]Process, error) {
-	ps, err := process.ProcessesWithContext(ctx)
+	ps, err := processesFn(ctx)
 	if err != nil {
 		return nil, err
 	}

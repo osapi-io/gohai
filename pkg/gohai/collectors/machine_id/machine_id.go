@@ -22,9 +22,35 @@
 package machineid
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/shirou/gopsutil/v4/host"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 )
+
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+// Kept private so importers don't transitively need gopsutil. Swapped
+// via SetHostInfoFn (export_test.go).
+var hostInfoFn = host.InfoWithContext
+
+// readHostID is the production bridge. Wraps the private gopsutil call
+// and returns just the HostID string — callers never see gopsutil
+// types.
+func readHostID(
+	ctx context.Context,
+) (string, error) {
+	info, err := hostInfoFn(ctx)
+	if err != nil {
+		return "", fmt.Errorf("host.Info: %w", err)
+	}
+	if info == nil {
+		return "", nil
+	}
+	return info.HostID, nil
+}
 
 // Info holds the machine ID.
 type Info struct {

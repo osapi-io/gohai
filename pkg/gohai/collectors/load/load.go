@@ -22,6 +22,11 @@
 package load
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/shirou/gopsutil/v4/load"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 )
@@ -58,4 +63,23 @@ func New() Collector {
 	default:
 		return NewLinux()
 	}
+}
+
+// avgFn is the injection seam for gopsutil's load.AvgWithContext.
+// Kept private — never exposed on the public SDK surface so callers
+// don't transitively need to depend on gopsutil types. Swapped in
+// tests via SetAvgFn (export_test.go).
+var avgFn = load.AvgWithContext
+
+// readAverages is the production bridge. Wraps the private gopsutil
+// call and maps its result onto our Info type — callers of the
+// collector never see gopsutil types.
+func readAverages(
+	ctx context.Context,
+) (*Info, error) {
+	a, err := avgFn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load.Avg: %w", err)
+	}
+	return &Info{One: a.Load1, Five: a.Load5, Fifteen: a.Load15}, nil
 }

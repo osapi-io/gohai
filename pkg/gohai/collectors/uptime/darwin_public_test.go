@@ -25,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
@@ -42,28 +41,24 @@ func TestUptimeDarwinPublicTestSuite(t *testing.T) {
 func (s *UptimeDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		hostFn  func(context.Context) (*host.InfoStat, error)
+		baseFn  func(context.Context) (*uptime.Info, error)
 		wantErr bool
 		want    uptime.Info
 	}{
 		{
-			name: "darwin host returns uptime + boot time, no idle field",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{Uptime: 7200, BootTime: 1_700_000_000}, nil
-			},
-			want: uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
+			name:   "uptime returned",
+			baseFn: func(context.Context) (*uptime.Info, error) { return &uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"}, nil },
+			want:   uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
 		},
 		{
-			name: "host.Info error propagated",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) {
-				return nil, errors.New("boom")
-			},
+			name:    "BaseFn error propagated",
+			baseFn:  func(context.Context) (*uptime.Info, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &uptime.Darwin{HostInfoFn: tt.hostFn}
+			c := &uptime.Darwin{BaseFn: tt.baseFn}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

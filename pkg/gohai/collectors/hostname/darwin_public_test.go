@@ -25,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
@@ -42,7 +41,7 @@ func TestHostnameDarwinPublicTestSuite(t *testing.T) {
 func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
-		hostFn       func(context.Context) (*host.InfoStat, error)
+		shortFn      func(context.Context) (string, error)
 		osHostnameFn func() (string, error)
 		lookupHost   func(string) ([]string, error)
 		lookupAddr   func(string) ([]string, error)
@@ -51,7 +50,7 @@ func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:         "canonical macOS host with DNS",
-			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: "johns-mbp"}, nil },
+			shortFn:      func(context.Context) (string, error) { return "johns-mbp", nil },
 			osHostnameFn: func() (string, error) { return "johns-mbp.local", nil },
 			lookupHost:   func(string) ([]string, error) { return []string{"192.168.1.42"}, nil },
 			lookupAddr:   func(string) ([]string, error) { return []string{"johns-mbp.local."}, nil },
@@ -62,15 +61,15 @@ func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "no DNS falls back to short name",
-			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: "laptop"}, nil },
+			shortFn:      func(context.Context) (string, error) { return "laptop", nil },
 			osHostnameFn: func() (string, error) { return "laptop", nil },
 			lookupHost:   func(string) ([]string, error) { return nil, errors.New("no host") },
 			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
 			want:         hostname.Info{Hostname: "laptop", MachineName: "laptop", FQDN: "laptop"},
 		},
 		{
-			name:         "host.Info error propagated",
-			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name:         "short hostname error propagated",
+			shortFn:      func(context.Context) (string, error) { return "", errors.New("boom") },
 			osHostnameFn: func() (string, error) { return "", nil },
 			lookupHost:   func(string) ([]string, error) { return nil, nil },
 			lookupAddr:   func(string) ([]string, error) { return nil, nil },
@@ -80,10 +79,10 @@ func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			c := &hostname.Darwin{
-				HostInfoFn:   tt.hostFn,
-				OSHostnameFn: tt.osHostnameFn,
-				LookupHostFn: tt.lookupHost,
-				LookupAddrFn: tt.lookupAddr,
+				ShortHostnameFn: tt.shortFn,
+				OSHostnameFn:    tt.osHostnameFn,
+				LookupHostFn:    tt.lookupHost,
+				LookupAddrFn:    tt.lookupAddr,
 			}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {

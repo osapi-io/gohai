@@ -67,12 +67,17 @@ func New() Collector {
 	return NewLinux()
 }
 
+// usersFn is the injection seam for gopsutil's host.UsersWithContext.
+// Kept private so importers don't transitively need gopsutil. Swapped
+// via SetUsersFn.
+var usersFn = host.UsersWithContext
+
 // listSessions is the production bridge to gopsutil (which reads
 // utmp on Linux / utmpx on macOS).
 func listSessions(
 	ctx context.Context,
 ) ([]Session, error) {
-	us, err := host.UsersWithContext(ctx)
+	us, err := usersFn(ctx)
 	if err != nil {
 		return nil, err
 	}

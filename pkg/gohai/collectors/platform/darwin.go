@@ -23,35 +23,28 @@ package platform
 import (
 	"context"
 	"os/exec"
-	"runtime"
 	"strings"
-
-	"github.com/shirou/gopsutil/v4/host"
 )
 
-// Darwin collects platform identification on macOS. Wraps gopsutil
-// for the basic name/version/family and extends with `sw_vers
-// -productVersionExtra` for the RSR patch version Ohai exposes as
-// platform_version_extra.
+// Darwin collects platform identification on macOS. ReadFn is typed in
+// our *Info so importers don't need gopsutil; RunCmdFn wraps
+// exec.Command for the sw_vers -productVersionExtra call.
 type Darwin struct {
 	base
 
-	HostInfoFn func(context.Context) (*host.InfoStat, error)
-	// RunCmdFn invokes an OS command and returns its stdout. Injectable
-	// for tests — production uses exec.Command.
+	ReadFn   func(context.Context) (*Info, string, error)
 	RunCmdFn func(name string, args ...string) ([]byte, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil + exec.Command.
+// NewDarwin returns a Darwin variant wired to production bridges.
 func NewDarwin() *Darwin {
 	return &Darwin{
-		HostInfoFn: host.InfoWithContext,
-		RunCmdFn:   runSwVers,
+		ReadFn:   readPlatform,
+		RunCmdFn: runSwVers,
 	}
 }
 
-// runSwVers wraps exec.Command for sw_vers. Named helper so the
-// factory assigns a function reference (no closure body to cover).
+// runSwVers wraps exec.Command for sw_vers.
 func runSwVers(
 	name string,
 	args ...string,
@@ -59,20 +52,14 @@ func runSwVers(
 	return exec.Command(name, args...).Output()
 }
 
-// Collect returns platform Info. Probes sw_vers -productVersionExtra
-// to pick up RSR patch suffixes (e.g. "(a)" on macOS 14.4.1 (a)).
+// Collect returns platform Info with Build set from the kernel version
+// and VersionExtra populated from sw_vers -productVersionExtra.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	h, err := d.HostInfoFn(ctx)
+	info, kernelVer, err := d.ReadFn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	info := &Info{OS: runtime.GOOS, Architecture: runtime.GOARCH}
-	if h != nil {
-		info.Name = canonicalizePlatform(h.Platform)
-		info.Version = h.PlatformVersion
-		info.Family = h.PlatformFamily
-		info.Build = h.KernelVersion
-	}
+	info.Build = kernelVer
 	if extra := readVersionExtra(d.RunCmdFn); extra != "" {
 		info.VersionExtra = extra
 	}

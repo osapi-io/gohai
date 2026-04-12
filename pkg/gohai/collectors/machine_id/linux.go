@@ -24,8 +24,6 @@ import (
 	"context"
 	"os"
 	"strings"
-
-	"github.com/shirou/gopsutil/v4/host"
 )
 
 // dbusMachineIDPath is the pre-systemd machine-id location Ohai reads
@@ -33,16 +31,19 @@ import (
 // hosts that ship dbus without systemd.
 const dbusMachineIDPath = "/var/lib/dbus/machine-id"
 
-// Linux resolves the machine ID on Linux hosts. Wraps gopsutil's
-// host.Info (which reads /etc/machine-id → /sys/class/dmi/id/product_uuid
-// → /proc/sys/kernel/random/boot_id) and extends with a
-// /var/lib/dbus/machine-id fallback so pre-systemd Debian hosts
-// without DMI still get a stable ID.
+// Linux resolves the machine ID on Linux hosts. Wraps readHostID
+// (gopsutil's host.Info internally, which reads /etc/machine-id →
+// /sys/class/dmi/id/product_uuid → /proc/sys/kernel/random/boot_id)
+// and extends with a /var/lib/dbus/machine-id fallback so pre-systemd
+// Debian hosts without DMI still get a stable ID. HostIDFn returns
+// our `string` so importers don't need gopsutil in their module
+// graph.
 type Linux struct {
 	base
 
-	// HostInfoFn wraps gopsutil.host.InfoWithContext.
-	HostInfoFn func(context.Context) (*host.InfoStat, error)
+	// HostIDFn returns the upstream host ID (gopsutil-backed in
+	// production).
+	HostIDFn func(context.Context) (string, error)
 	// ReadFileFn reads a file. Used for the /var/lib/dbus/machine-id
 	// fallback. Wired to os.ReadFile; tests inject stubs.
 	ReadFileFn func(string) ([]byte, error)
@@ -51,7 +52,7 @@ type Linux struct {
 // NewLinux returns a Linux variant wired to gopsutil + os.ReadFile.
 func NewLinux() *Linux {
 	return &Linux{
-		HostInfoFn: host.InfoWithContext,
+		HostIDFn:   readHostID,
 		ReadFileFn: os.ReadFile,
 	}
 }
@@ -62,12 +63,12 @@ func NewLinux() *Linux {
 // mirrors Ohai's fallback chain without re-implementing gopsutil's
 // existing work.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	info, err := l.HostInfoFn(ctx)
+	id, err := l.HostIDFn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if info != nil && info.HostID != "" {
-		return &Info{ID: info.HostID}, nil
+	if id != "" {
+		return &Info{ID: id}, nil
 	}
 	// gopsutil returned empty — try the pre-systemd dbus location
 	// before reporting unknown.

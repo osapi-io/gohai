@@ -20,42 +20,27 @@
 
 package platform
 
-import (
-	"context"
-	"runtime"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
-
-// Linux collects platform identification on Linux hosts.
-// Wraps gopsutil.host.Info and applies Ohai's platform-ID remap so
-// distro names are canonical (amzn→amazon, rhel→redhat, etc.).
+// Linux collects platform identification on Linux hosts. ReadFn is
+// typed in our *Info so importers don't need gopsutil.
 type Linux struct {
 	base
 
-	HostInfoFn func(context.Context) (*host.InfoStat, error)
+	ReadFn func(context.Context) (*Info, string, error)
 }
 
-// NewLinux returns a Linux variant wired to gopsutil.
+// NewLinux returns a Linux variant wired to the production bridge.
 func NewLinux() *Linux {
-	return &Linux{HostInfoFn: host.InfoWithContext}
+	return &Linux{ReadFn: readPlatform}
 }
 
-// Collect returns platform Info. Applies canonicalizePlatform to the
-// platform name so consumers get a stable identifier.
+// Collect returns platform Info. Linux discards the raw kernel-version
+// string from readPlatform — Build is macOS-only.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	h, err := l.HostInfoFn(ctx)
+	info, _, err := l.ReadFn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if h == nil {
-		return &Info{OS: runtime.GOOS, Architecture: runtime.GOARCH}, nil
-	}
-	return &Info{
-		OS:           runtime.GOOS,
-		Name:         canonicalizePlatform(h.Platform),
-		Version:      h.PlatformVersion,
-		Family:       h.PlatformFamily,
-		Architecture: runtime.GOARCH,
-	}, nil
+	return info, nil
 }

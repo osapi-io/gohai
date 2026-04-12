@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/shirou/gopsutil/v4/mem"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
@@ -85,7 +86,7 @@ func (s *MemoryLinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("mem error"),
 			wantErr: true,
 		},
@@ -109,6 +110,79 @@ func (s *MemoryLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*memory.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *MemoryLinuxPublicTestSuite) TestReadMemory() {
+	tests := []struct {
+		name      string
+		vmFn      func(context.Context) (*mem.VirtualMemoryStat, error)
+		swapFn    func(context.Context) (*mem.SwapMemoryStat, error)
+		wantErr   bool
+		wantTotal uint64
+		wantSwap  bool
+	}{
+		{
+			name: "virtual + swap populated",
+			vmFn: func(context.Context) (*mem.VirtualMemoryStat, error) {
+				return &mem.VirtualMemoryStat{Total: 100, Used: 50, Free: 50}, nil
+			},
+			swapFn: func(context.Context) (*mem.SwapMemoryStat, error) {
+				return &mem.SwapMemoryStat{Total: 10, Used: 1, Free: 9}, nil
+			},
+			wantTotal: 100,
+			wantSwap:  true,
+		},
+		{
+			name: "swap error omits swap field",
+			vmFn: func(context.Context) (*mem.VirtualMemoryStat, error) {
+				return &mem.VirtualMemoryStat{Total: 100}, nil
+			},
+			swapFn: func(context.Context) (*mem.SwapMemoryStat, error) {
+				return nil, errors.New("swap failed")
+			},
+			wantTotal: 100,
+			wantSwap:  false,
+		},
+		{
+			name: "zero swap omits swap field",
+			vmFn: func(context.Context) (*mem.VirtualMemoryStat, error) {
+				return &mem.VirtualMemoryStat{Total: 100}, nil
+			},
+			swapFn: func(context.Context) (*mem.SwapMemoryStat, error) {
+				return &mem.SwapMemoryStat{Total: 0}, nil
+			},
+			wantTotal: 100,
+			wantSwap:  false,
+		},
+		{
+			name: "virtual memory error propagated",
+			vmFn: func(context.Context) (*mem.VirtualMemoryStat, error) {
+				return nil, errors.New("vm failed")
+			},
+			swapFn:  func(context.Context) (*mem.SwapMemoryStat, error) { return nil, nil },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restoreVM := memory.SetVirtualMemoryFn(tt.vmFn)
+			defer restoreVM()
+			restoreSwap := memory.SetSwapMemoryFn(tt.swapFn)
+			defer restoreSwap()
+			got, err := memory.ReadMemory(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.wantTotal, got.Total)
+			if tt.wantSwap {
+				s.NotNil(got.Swap)
+			} else {
+				s.Nil(got.Swap)
+			}
 		})
 	}
 }

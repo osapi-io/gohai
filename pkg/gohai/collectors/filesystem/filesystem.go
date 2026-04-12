@@ -70,6 +70,15 @@ func New() Collector {
 	return NewLinux()
 }
 
+// partitionsFn is the injection seam for gopsutil's
+// disk.PartitionsWithContext. Kept private so importers don't
+// transitively need gopsutil. Swapped via SetPartitionsFn.
+var partitionsFn = disk.PartitionsWithContext
+
+// usageFn is the injection seam for gopsutil's disk.UsageWithContext.
+// Kept private alongside partitionsFn. Swapped via SetUsageFn.
+var usageFn = disk.UsageWithContext
+
 // listMounts is the production bridge to gopsutil. Enumerates
 // partitions and fetches usage (capacity + inodes) for each. Per-mount
 // usage failures (permission denied, stale NFS, etc.) skip usage
@@ -77,7 +86,7 @@ func New() Collector {
 func listMounts(
 	ctx context.Context,
 ) ([]Mount, error) {
-	parts, err := disk.PartitionsWithContext(ctx, true)
+	parts, err := partitionsFn(ctx, true)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +98,7 @@ func listMounts(
 			Fstype:     p.Fstype,
 			Opts:       p.Opts,
 		}
-		if u, err := disk.UsageWithContext(ctx, p.Mountpoint); err == nil {
+		if u, err := usageFn(ctx, p.Mountpoint); err == nil {
 			m.Total = u.Total
 			m.Used = u.Used
 			m.Free = u.Free

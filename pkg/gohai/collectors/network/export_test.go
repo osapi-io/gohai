@@ -18,32 +18,36 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package machineid
+package network
 
-import "context"
+import (
+	"context"
 
-// Darwin resolves the machine ID on macOS. Wraps readHostID
-// (gopsutil.host.Info internally, which on darwin reads
-// `IOPlatformUUID` from IOKit — the correct, stable hardware
-// identifier Apple intends for this purpose). HostIDFn returns our
-// `string` so importers don't need gopsutil in their module graph.
-type Darwin struct {
-	base
+	"github.com/shirou/gopsutil/v4/net"
+)
 
-	HostIDFn func(context.Context) (string, error)
+// ReadInterfaces exposes the private readInterfaces bridge to the
+// external network_test package.
+var ReadInterfaces = readInterfaces
+
+// SetInterfacesFn swaps the private gopsutil net.InterfacesWithContext
+// call backing readInterfaces. Returns a restore func the caller must
+// defer.
+func SetInterfacesFn(
+	fn func(context.Context) (net.InterfaceStatList, error),
+) (restore func()) {
+	orig := interfacesFn
+	interfacesFn = fn
+	return func() { interfacesFn = orig }
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
-func NewDarwin() *Darwin {
-	return &Darwin{HostIDFn: readHostID}
-}
-
-// Collect returns the machine ID. gopsutil's darwin path is
-// correct — no extension needed.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	id, err := d.HostIDFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{ID: id}, nil
+// SetIOCountersFn swaps the private gopsutil net.IOCountersWithContext
+// call backing readInterfaces. Returns a restore func the caller must
+// defer.
+func SetIOCountersFn(
+	fn func(context.Context, bool) ([]net.IOCountersStat, error),
+) (restore func()) {
+	orig := ioCountersFn
+	ioCountersFn = fn
+	return func() { ioCountersFn = orig }
 }

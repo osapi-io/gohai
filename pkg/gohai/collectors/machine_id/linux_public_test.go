@@ -42,51 +42,45 @@ func TestMachineIDLinuxPublicTestSuite(t *testing.T) {
 func (s *MachineIDLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name       string
-		hostFn     func(context.Context) (*host.InfoStat, error)
+		hostIDFn   func(context.Context) (string, error)
 		readFileFn func(string) ([]byte, error)
 		wantErr    bool
 		wantID     string
 	}{
 		{
 			name:       "gopsutil returns /etc/machine-id → use it",
-			hostFn:     func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{HostID: "gopsutil-id"}, nil },
+			hostIDFn:   func(context.Context) (string, error) { return "gopsutil-id", nil },
 			readFileFn: func(string) ([]byte, error) { return nil, errors.New("should not be called") },
 			wantID:     "gopsutil-id",
 		},
 		{
 			name:       "gopsutil empty, dbus fallback wins",
-			hostFn:     func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{HostID: ""}, nil },
+			hostIDFn:   func(context.Context) (string, error) { return "", nil },
 			readFileFn: func(string) ([]byte, error) { return []byte("dbus-id\n"), nil },
 			wantID:     "dbus-id",
 		},
 		{
 			name:       "gopsutil empty, dbus missing → empty ID (no error)",
-			hostFn:     func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{HostID: ""}, nil },
+			hostIDFn:   func(context.Context) (string, error) { return "", nil },
 			readFileFn: func(string) ([]byte, error) { return nil, errors.New("not found") },
 			wantID:     "",
 		},
 		{
 			name:       "gopsutil empty, dbus whitespace-only → empty ID",
-			hostFn:     func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{HostID: ""}, nil },
+			hostIDFn:   func(context.Context) (string, error) { return "", nil },
 			readFileFn: func(string) ([]byte, error) { return []byte("   \n"), nil },
 			wantID:     "",
 		},
 		{
-			name:       "gopsutil nil info treated as empty",
-			hostFn:     func(_ context.Context) (*host.InfoStat, error) { return nil, nil },
-			readFileFn: func(string) ([]byte, error) { return []byte("dbus-id\n"), nil },
-			wantID:     "dbus-id",
-		},
-		{
-			name:       "gopsutil error propagated",
-			hostFn:     func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name:       "gopsutil error wrapped and returned",
+			hostIDFn:   func(context.Context) (string, error) { return "", errors.New("boom") },
 			readFileFn: func(string) ([]byte, error) { return nil, errors.New("ignored") },
 			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &machineid.Linux{HostInfoFn: tt.hostFn, ReadFileFn: tt.readFileFn}
+			c := &machineid.Linux{HostIDFn: tt.hostIDFn, ReadFileFn: tt.readFileFn}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -96,6 +90,44 @@ func (s *MachineIDLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*machineid.Info)
 			s.Require().True(ok)
 			s.Equal(tt.wantID, info.ID)
+		})
+	}
+}
+
+func (s *MachineIDLinuxPublicTestSuite) TestReadHostID() {
+	tests := []struct {
+		name    string
+		hostFn  func(context.Context) (*host.InfoStat, error)
+		wantErr bool
+		want    string
+	}{
+		{
+			name:   "success returns HostID",
+			hostFn: func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{HostID: "abc123"}, nil },
+			want:   "abc123",
+		},
+		{
+			name:   "nil info returns empty",
+			hostFn: func(context.Context) (*host.InfoStat, error) { return nil, nil },
+			want:   "",
+		},
+		{
+			name:    "gopsutil error wrapped and returned",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := machineid.SetHostInfoFn(tt.hostFn)
+			defer restore()
+			got, err := machineid.ReadHostID(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

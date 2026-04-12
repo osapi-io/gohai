@@ -52,7 +52,7 @@ func (s *CPUDarwinPublicTestSuite) TestCollect() {
 			want: cpu.Info{Total: 12, Real: 1, Cores: 10, ModelName: "Apple M2 Pro"},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("sysctl error"),
 			wantErr: true,
 		},

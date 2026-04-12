@@ -57,7 +57,7 @@ func (s *VirtualizationLinuxPublicTestSuite) TestCollect() {
 			want: virtualization.Info{},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("virt detect error"),
 			wantErr: true,
 		},

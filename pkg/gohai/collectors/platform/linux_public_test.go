@@ -43,94 +43,26 @@ func TestPlatformLinuxPublicTestSuite(t *testing.T) {
 func (s *PlatformLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		hostFn  func(context.Context) (*host.InfoStat, error)
+		readFn  func(context.Context) (*platform.Info, string, error)
 		wantErr bool
 		want    platform.Info
 	}{
 		{
-			name: "ubuntu reports as ubuntu (no remap)",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform:        "ubuntu",
-					PlatformVersion: "24.04",
-					PlatformFamily:  "debian",
-				}, nil
+			name: "ubuntu info returned (Build discarded on Linux)",
+			readFn: func(context.Context) (*platform.Info, string, error) {
+				return &platform.Info{OS: "linux", Name: "ubuntu", Version: "24.04", Family: "debian", Architecture: "amd64"}, "6.1.0", nil
 			},
-			want: platform.Info{
-				OS: runtime.GOOS, Name: "ubuntu", Version: "24.04",
-				Family: "debian", Architecture: runtime.GOARCH,
-			},
+			want: platform.Info{OS: "linux", Name: "ubuntu", Version: "24.04", Family: "debian", Architecture: "amd64"},
 		},
 		{
-			name: "amzn remaps to amazon",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform:        "amzn",
-					PlatformVersion: "2023",
-					PlatformFamily:  "rhel",
-				}, nil
-			},
-			want: platform.Info{
-				OS: runtime.GOOS, Name: "amazon", Version: "2023",
-				Family: "rhel", Architecture: runtime.GOARCH,
-			},
-		},
-		{
-			name: "rhel remaps to redhat",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform:        "rhel",
-					PlatformVersion: "9.4",
-					PlatformFamily:  "rhel",
-				}, nil
-			},
-			want: platform.Info{
-				OS: runtime.GOOS, Name: "redhat", Version: "9.4",
-				Family: "rhel", Architecture: runtime.GOARCH,
-			},
-		},
-		{
-			name: "sles remaps to suse",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform:        "sles",
-					PlatformVersion: "15-SP5",
-					PlatformFamily:  "suse",
-				}, nil
-			},
-			want: platform.Info{
-				OS: runtime.GOOS, Name: "suse", Version: "15-SP5",
-				Family: "suse", Architecture: runtime.GOARCH,
-			},
-		},
-		{
-			name: "ol remaps to oracle",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform:        "ol",
-					PlatformVersion: "8.9",
-					PlatformFamily:  "rhel",
-				}, nil
-			},
-			want: platform.Info{
-				OS: runtime.GOOS, Name: "oracle", Version: "8.9",
-				Family: "rhel", Architecture: runtime.GOARCH,
-			},
-		},
-		{
-			name:   "nil info yields minimal Info",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) { return nil, nil },
-			want:   platform.Info{OS: runtime.GOOS, Architecture: runtime.GOARCH},
-		},
-		{
-			name:    "host.Info error propagated",
-			hostFn:  func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name:    "ReadFn error propagated",
+			readFn:  func(context.Context) (*platform.Info, string, error) { return nil, "", errors.New("boom") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &platform.Linux{HostInfoFn: tt.hostFn}
+			c := &platform.Linux{ReadFn: tt.readFn}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -140,6 +72,77 @@ func (s *PlatformLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*platform.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *PlatformLinuxPublicTestSuite) TestReadPlatform() {
+	tests := []struct {
+		name       string
+		fn         func(context.Context) (*host.InfoStat, error)
+		wantErr    bool
+		want       platform.Info
+		wantKernel string
+	}{
+		{
+			name: "ubuntu with remap",
+			fn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{Platform: "ubuntu", PlatformVersion: "24.04", PlatformFamily: "debian", KernelVersion: "6.1.0"}, nil
+			},
+			want:       platform.Info{OS: runtime.GOOS, Name: "ubuntu", Version: "24.04", Family: "debian", Architecture: runtime.GOARCH},
+			wantKernel: "6.1.0",
+		},
+		{
+			name: "amzn remaps to amazon",
+			fn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{Platform: "amzn", PlatformVersion: "2023", PlatformFamily: "rhel"}, nil
+			},
+			want: platform.Info{OS: runtime.GOOS, Name: "amazon", Version: "2023", Family: "rhel", Architecture: runtime.GOARCH},
+		},
+		{
+			name: "rhel remaps to redhat",
+			fn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{Platform: "rhel", PlatformVersion: "9.4", PlatformFamily: "rhel"}, nil
+			},
+			want: platform.Info{OS: runtime.GOOS, Name: "redhat", Version: "9.4", Family: "rhel", Architecture: runtime.GOARCH},
+		},
+		{
+			name: "sles remaps to suse",
+			fn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{Platform: "sles", PlatformVersion: "15-SP5", PlatformFamily: "suse"}, nil
+			},
+			want: platform.Info{OS: runtime.GOOS, Name: "suse", Version: "15-SP5", Family: "suse", Architecture: runtime.GOARCH},
+		},
+		{
+			name: "ol remaps to oracle",
+			fn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{Platform: "ol", PlatformVersion: "8.9", PlatformFamily: "rhel"}, nil
+			},
+			want: platform.Info{OS: runtime.GOOS, Name: "oracle", Version: "8.9", Family: "rhel", Architecture: runtime.GOARCH},
+		},
+		{
+			name: "nil info yields minimal Info",
+			fn:   func(context.Context) (*host.InfoStat, error) { return nil, nil },
+			want: platform.Info{OS: runtime.GOOS, Architecture: runtime.GOARCH},
+		},
+		{
+			name:    "gopsutil error wrapped and returned",
+			fn:      func(context.Context) (*host.InfoStat, error) { return nil, errors.New("host.Info failed") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := platform.SetHostInfoFn(tt.fn)
+			defer restore()
+			got, kernel, err := platform.ReadPlatform(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, *got)
+			s.Equal(tt.wantKernel, kernel)
 		})
 	}
 }

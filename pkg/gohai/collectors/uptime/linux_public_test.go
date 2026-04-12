@@ -40,40 +40,37 @@ func TestUptimeLinuxPublicTestSuite(t *testing.T) {
 }
 
 func (s *UptimeLinuxPublicTestSuite) TestCollect() {
-	okHost := func(_ context.Context) (*host.InfoStat, error) {
-		return &host.InfoStat{Uptime: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000}, nil
+	okBase := func(context.Context) (*uptime.Info, error) {
+		return &uptime.Info{Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s"}, nil
 	}
 
 	tests := []struct {
 		name     string
-		hostFn   func(context.Context) (*host.InfoStat, error)
+		baseFn   func(context.Context) (*uptime.Info, error)
 		readFile func(string) ([]byte, error)
 		wantErr  bool
 		want     uptime.Info
 	}{
 		{
 			name:     "3h up + idle parsed",
-			hostFn:   okHost,
+			baseFn:   okBase,
 			readFile: func(string) ([]byte, error) { return []byte("12345.67 9876.54\n"), nil },
 			want: uptime.Info{
-				Seconds:     3*3600 + 12*60 + 5,
-				BootTime:    1_700_000_000,
-				Human:       "3h 12m 5s",
-				IdleSeconds: 9876,
-				IdleHuman:   "2h 44m 36s",
+				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				IdleSeconds: 9876, IdleHuman: "2h 44m 36s",
 			},
 		},
 		{
 			name:     "missing /proc/uptime omits idle",
-			hostFn:   okHost,
+			baseFn:   okBase,
 			readFile: func(string) ([]byte, error) { return nil, errors.New("not found") },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
 			},
 		},
 		{
-			name:     "malformed /proc/uptime (one field) omits idle",
-			hostFn:   okHost,
+			name:     "malformed /proc/uptime omits idle",
+			baseFn:   okBase,
 			readFile: func(string) ([]byte, error) { return []byte("12345.67\n"), nil },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
@@ -81,7 +78,7 @@ func (s *UptimeLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "unparseable idle field omits",
-			hostFn:   okHost,
+			baseFn:   okBase,
 			readFile: func(string) ([]byte, error) { return []byte("12345.67 xyz\n"), nil },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
@@ -89,22 +86,22 @@ func (s *UptimeLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "negative idle omits",
-			hostFn:   okHost,
+			baseFn:   okBase,
 			readFile: func(string) ([]byte, error) { return []byte("12345.67 -1.0\n"), nil },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
 			},
 		},
 		{
-			name:     "host.Info error propagated",
-			hostFn:   func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name:     "BaseFn error propagated",
+			baseFn:   func(context.Context) (*uptime.Info, error) { return nil, errors.New("boom") },
 			readFile: func(string) ([]byte, error) { return []byte("1 1\n"), nil },
 			wantErr:  true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &uptime.Linux{HostInfoFn: tt.hostFn, ReadFileFn: tt.readFile}
+			c := &uptime.Linux{BaseFn: tt.baseFn, ReadFileFn: tt.readFile}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -114,6 +111,41 @@ func (s *UptimeLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*uptime.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *UptimeLinuxPublicTestSuite) TestReadBase() {
+	tests := []struct {
+		name    string
+		fn      func(context.Context) (*host.InfoStat, error)
+		wantErr bool
+		want    uptime.Info
+	}{
+		{
+			name: "success maps gopsutil InfoStat",
+			fn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{Uptime: 7200, BootTime: 1_700_000_000}, nil
+			},
+			want: uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
+		},
+		{
+			name:    "gopsutil error wrapped and returned",
+			fn:      func(context.Context) (*host.InfoStat, error) { return nil, errors.New("host.Info failed") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := uptime.SetHostInfoFn(tt.fn)
+			defer restore()
+			got, err := uptime.ReadBase(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, *got)
 		})
 	}
 }

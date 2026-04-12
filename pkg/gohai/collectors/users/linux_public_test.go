@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
@@ -63,7 +64,7 @@ func (s *UsersLinuxPublicTestSuite) TestCollect() {
 			want: users.Info{LoggedIn: []users.Session{}},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("utmp error"),
 			wantErr: true,
 		},
@@ -87,6 +88,41 @@ func (s *UsersLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*users.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *UsersLinuxPublicTestSuite) TestListSessions() {
+	tests := []struct {
+		name    string
+		fn      func(context.Context) ([]host.UserStat, error)
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name: "success maps UserStat",
+			fn: func(context.Context) ([]host.UserStat, error) {
+				return []host.UserStat{{User: "john", Terminal: "pts/0", Host: "10.0.0.1", Started: 1712908800}}, nil
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "gopsutil error wrapped and returned",
+			fn:      func(context.Context) ([]host.UserStat, error) { return nil, errors.New("utmp failed") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := users.SetUsersFn(tt.fn)
+			defer restore()
+			got, err := users.ListSessions(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Len(got, tt.wantLen)
 		})
 	}
 }

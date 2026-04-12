@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	gpdisk "github.com/shirou/gopsutil/v4/disk"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
@@ -79,7 +80,7 @@ func (s *FilesystemLinuxPublicTestSuite) TestCollect() {
 			want:   filesystem.Info{Mounts: []filesystem.Mount{}},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("mounts error"),
 			wantErr: true,
 		},
@@ -103,6 +104,68 @@ func (s *FilesystemLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*filesystem.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *FilesystemLinuxPublicTestSuite) TestListMounts() {
+	okParts := []gpdisk.PartitionStat{
+		{Device: "/dev/sda1", Mountpoint: "/", Fstype: "ext4", Opts: []string{"rw"}},
+	}
+
+	tests := []struct {
+		name         string
+		partitionsFn func(context.Context, bool) ([]gpdisk.PartitionStat, error)
+		usageFn      func(context.Context, string) (*gpdisk.UsageStat, error)
+		wantErr      bool
+		wantLen      int
+		wantTotal    uint64
+	}{
+		{
+			name: "success populates usage",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return okParts, nil
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
+				return &gpdisk.UsageStat{Total: 100, Used: 50, Free: 50}, nil
+			},
+			wantLen:   1,
+			wantTotal: 100,
+		},
+		{
+			name: "usage error keeps mount without usage",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return okParts, nil
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
+				return nil, errors.New("usage failed")
+			},
+			wantLen:   1,
+			wantTotal: 0,
+		},
+		{
+			name: "partitions error propagated",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return nil, errors.New("partitions failed")
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) { return nil, nil },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restoreP := filesystem.SetPartitionsFn(tt.partitionsFn)
+			defer restoreP()
+			restoreU := filesystem.SetUsageFn(tt.usageFn)
+			defer restoreU()
+			got, err := filesystem.ListMounts(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Len(got, tt.wantLen)
+			s.Equal(tt.wantTotal, got[0].Total)
 		})
 	}
 }

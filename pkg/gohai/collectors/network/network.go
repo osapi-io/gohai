@@ -89,16 +89,25 @@ func New() Collector {
 	return NewLinux()
 }
 
+// interfacesFn is the injection seam for gopsutil's
+// net.InterfacesWithContext. Kept private so importers don't
+// transitively need gopsutil. Swapped via SetInterfacesFn.
+var interfacesFn = net.InterfacesWithContext
+
+// ioCountersFn is the injection seam for gopsutil's
+// net.IOCountersWithContext. Swapped via SetIOCountersFn.
+var ioCountersFn = net.IOCountersWithContext
+
 // readInterfaces is the production bridge to gopsutil. Enumerates
 // interfaces and merges per-interface I/O counters (matched by name).
 func readInterfaces(
 	ctx context.Context,
 ) ([]Interface, error) {
-	ifs, err := net.InterfacesWithContext(ctx)
+	ifs, err := interfacesFn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	counts, _ := net.IOCountersWithContext(ctx, true)
+	counts, _ := ioCountersFn(ctx, true)
 	countersByName := map[string]*Counters{}
 	for _, c := range counts {
 		countersByName[c.Name] = &Counters{

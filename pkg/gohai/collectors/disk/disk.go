@@ -69,12 +69,17 @@ func New() Collector {
 	return NewLinux()
 }
 
+// ioCountersFn is the injection seam for gopsutil's
+// disk.IOCountersWithContext. Kept private so importers don't
+// transitively need gopsutil. Swapped via SetIOCountersFn.
+var ioCountersFn = disk.IOCountersWithContext
+
 // listIOCounters is the production bridge to gopsutil. Named function
 // so factories can assign by reference (no closure body to cover).
 func listIOCounters(
 	ctx context.Context,
 ) ([]Device, error) {
-	m, err := disk.IOCountersWithContext(ctx)
+	m, err := ioCountersFn(ctx)
 	if err != nil {
 		return nil, err
 	}

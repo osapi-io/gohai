@@ -18,32 +18,36 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package machineid
+package memory
 
-import "context"
+import (
+	"context"
 
-// Darwin resolves the machine ID on macOS. Wraps readHostID
-// (gopsutil.host.Info internally, which on darwin reads
-// `IOPlatformUUID` from IOKit — the correct, stable hardware
-// identifier Apple intends for this purpose). HostIDFn returns our
-// `string` so importers don't need gopsutil in their module graph.
-type Darwin struct {
-	base
+	"github.com/shirou/gopsutil/v4/mem"
+)
 
-	HostIDFn func(context.Context) (string, error)
+// ReadMemory exposes the private readMemory bridge to the external
+// memory_test package.
+var ReadMemory = readMemory
+
+// SetVirtualMemoryFn swaps the private gopsutil
+// mem.VirtualMemoryWithContext call backing readMemory. Returns a
+// restore func the caller must defer.
+func SetVirtualMemoryFn(
+	fn func(context.Context) (*mem.VirtualMemoryStat, error),
+) (restore func()) {
+	orig := virtualMemoryFn
+	virtualMemoryFn = fn
+	return func() { virtualMemoryFn = orig }
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
-func NewDarwin() *Darwin {
-	return &Darwin{HostIDFn: readHostID}
-}
-
-// Collect returns the machine ID. gopsutil's darwin path is
-// correct — no extension needed.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	id, err := d.HostIDFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{ID: id}, nil
+// SetSwapMemoryFn swaps the private gopsutil mem.SwapMemoryWithContext
+// call backing readMemory. Returns a restore func the caller must
+// defer.
+func SetSwapMemoryFn(
+	fn func(context.Context) (*mem.SwapMemoryStat, error),
+) (restore func()) {
+	orig := swapMemoryFn
+	swapMemoryFn = fn
+	return func() { swapMemoryFn = orig }
 }

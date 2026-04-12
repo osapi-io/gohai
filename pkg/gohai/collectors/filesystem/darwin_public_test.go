@@ -72,7 +72,7 @@ func (s *FilesystemDarwinPublicTestSuite) TestCollect() {
 			}},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("getfsstat failed"),
 			wantErr: true,
 		},

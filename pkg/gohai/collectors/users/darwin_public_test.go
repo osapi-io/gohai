@@ -54,7 +54,7 @@ func (s *UsersDarwinPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("utmpx error"),
 			wantErr: true,
 		},

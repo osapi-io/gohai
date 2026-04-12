@@ -23,7 +23,10 @@
 package uptime
 
 import (
+	"context"
 	"fmt"
+
+	"github.com/shirou/gopsutil/v4/host"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
@@ -49,10 +52,7 @@ func (base) Name() string           { return "uptime" }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 
-// New returns the uptime collector variant for the host OS. Both
-// variants wrap gopsutil's host.Info; the Linux variant additionally
-// parses /proc/uptime for the idle-time field that gopsutil doesn't
-// expose.
+// New returns the uptime collector variant for the host OS.
 func New() Collector {
 	switch platform.Detect() {
 	case "darwin":
@@ -60,6 +60,27 @@ func New() Collector {
 	default:
 		return NewLinux()
 	}
+}
+
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+// Private — never leaked through a public Fn field. Swapped in tests
+// via SetHostInfoFn (export_test.go).
+var hostInfoFn = host.InfoWithContext
+
+// readBase wraps the private gopsutil call and maps the result onto
+// our *Info so consumers of the collector never see gopsutil types.
+func readBase(
+	ctx context.Context,
+) (*Info, error) {
+	h, err := hostInfoFn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("host.Info: %w", err)
+	}
+	return &Info{
+		Seconds:  h.Uptime,
+		BootTime: h.BootTime,
+		Human:    HumanDuration(h.Uptime),
+	}, nil
 }
 
 // HumanDuration formats a second count as "Xd Yh Zm Ws" (omitting zero

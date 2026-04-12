@@ -18,32 +18,30 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package machineid
+package cpu
 
-import "context"
+import (
+	"context"
 
-// Darwin resolves the machine ID on macOS. Wraps readHostID
-// (gopsutil.host.Info internally, which on darwin reads
-// `IOPlatformUUID` from IOKit — the correct, stable hardware
-// identifier Apple intends for this purpose). HostIDFn returns our
-// `string` so importers don't need gopsutil in their module graph.
-type Darwin struct {
-	base
+	"github.com/shirou/gopsutil/v4/cpu"
+)
 
-	HostIDFn func(context.Context) (string, error)
+// ReadCPU exposes the private readCPU bridge to the external cpu_test
+// package.
+var ReadCPU = readCPU
+
+// SetInfoFn swaps the private gopsutil cpu.InfoWithContext call backing
+// readCPU. Returns a restore func the caller must defer.
+func SetInfoFn(fn func(context.Context) ([]cpu.InfoStat, error)) (restore func()) {
+	orig := infoFn
+	infoFn = fn
+	return func() { infoFn = orig }
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
-func NewDarwin() *Darwin {
-	return &Darwin{HostIDFn: readHostID}
-}
-
-// Collect returns the machine ID. gopsutil's darwin path is
-// correct — no extension needed.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	id, err := d.HostIDFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{ID: id}, nil
+// SetCountsFn swaps the private gopsutil cpu.CountsWithContext call
+// backing readCPU. Returns a restore func the caller must defer.
+func SetCountsFn(fn func(context.Context, bool) (int, error)) (restore func()) {
+	orig := countsFn
+	countsFn = fn
+	return func() { countsFn = orig }
 }

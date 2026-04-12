@@ -22,54 +22,38 @@ package uptime
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/shirou/gopsutil/v4/host"
 )
 
 // procUptimePath is /proc/uptime. Two fields: uptime seconds and
 // aggregate idle seconds across all CPUs.
 const procUptimePath = "/proc/uptime"
 
-// Linux collects uptime + idle on Linux. Wraps gopsutil.host.Info for
-// uptime/boot time and extends with /proc/uptime for aggregate CPU
-// idle time (which gopsutil doesn't expose). Matches Ohai's idletime.
+// Linux collects uptime + idle on Linux. BaseFn is typed in our *Info
+// so importers don't need gopsutil; ReadFileFn is stdlib.
 type Linux struct {
 	base
 
-	// HostInfoFn is gopsutil's host.InfoWithContext.
-	HostInfoFn func(context.Context) (*host.InfoStat, error)
-	// ReadFileFn reads a file. Wired to os.ReadFile; tests inject a
-	// stub that returns canned /proc/uptime content.
+	BaseFn     func(context.Context) (*Info, error)
 	ReadFileFn func(string) ([]byte, error)
 }
 
-// NewLinux returns a Linux variant wired to gopsutil + os.ReadFile.
-// No closures — both injected fields are bare function references, so
-// tests cover the wiring without any real file system interaction.
+// NewLinux returns a Linux variant wired to the production bridges.
 func NewLinux() *Linux {
 	return &Linux{
-		HostInfoFn: host.InfoWithContext,
+		BaseFn:     readBase,
 		ReadFileFn: os.ReadFile,
 	}
 }
 
-// Collect returns uptime facts. Uses gopsutil for Seconds/BootTime
-// (works on any OS) and our own /proc/uptime parse for IdleSeconds
-// (Linux-specific; silently omitted on other OSes since the file
-// doesn't exist).
+// Collect returns uptime facts. Uses BaseFn for Seconds/BootTime and
+// layers idle on top via /proc/uptime.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	info, err := l.HostInfoFn(ctx)
+	out, err := l.BaseFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
-	}
-	out := &Info{
-		Seconds:  info.Uptime,
-		BootTime: info.BootTime,
-		Human:    HumanDuration(info.Uptime),
+		return nil, err
 	}
 	if idle, ok := readIdleSeconds(l.ReadFileFn); ok {
 		out.IdleSeconds = idle

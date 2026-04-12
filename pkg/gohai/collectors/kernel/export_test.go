@@ -18,32 +18,22 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package machineid
+package kernel
 
-import "context"
+import "golang.org/x/sys/unix"
 
-// Darwin resolves the machine ID on macOS. Wraps readHostID
-// (gopsutil.host.Info internally, which on darwin reads
-// `IOPlatformUUID` from IOKit — the correct, stable hardware
-// identifier Apple intends for this purpose). HostIDFn returns our
-// `string` so importers don't need gopsutil in their module graph.
-type Darwin struct {
-	base
+// BytesToString exposes the private bytesToString helper to the
+// external kernel_test package.
+var BytesToString = bytesToString
 
-	HostIDFn func(context.Context) (string, error)
-}
+// DefaultUname exposes the private defaultUname helper.
+var DefaultUname = defaultUname
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
-func NewDarwin() *Darwin {
-	return &Darwin{HostIDFn: readHostID}
-}
-
-// Collect returns the machine ID. gopsutil's darwin path is
-// correct — no extension needed.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	id, err := d.HostIDFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{ID: id}, nil
+// SetUnameSyscall swaps the private unix.Uname binding used by
+// defaultUname for the duration of a test. Returns a restore func the
+// caller must defer.
+func SetUnameSyscall(fn func(*unix.Utsname) error) (restore func()) {
+	orig := unameSyscall
+	unameSyscall = fn
+	return func() { unameSyscall = orig }
 }

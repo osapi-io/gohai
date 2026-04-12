@@ -23,8 +23,10 @@ package process_test
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
+	gpprocess "github.com/shirou/gopsutil/v4/process"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
@@ -104,6 +106,46 @@ func (s *ProcessLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*process.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *ProcessLinuxPublicTestSuite) TestListProcesses() {
+	// NewProcess with our own PID yields a valid gopsutil Process whose
+	// field readers succeed — exercises the success branch of
+	// snapshotFromGopsutil.
+	ownPID := int32(os.Getpid())
+	tests := []struct {
+		name    string
+		fn      func(context.Context) ([]*gpprocess.Process, error)
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name: "success wraps gopsutil processes",
+			fn: func(context.Context) ([]*gpprocess.Process, error) {
+				p, _ := gpprocess.NewProcess(ownPID)
+				return []*gpprocess.Process{p}, nil
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "gopsutil error wrapped and returned",
+			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("processes failed") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := process.SetProcessesFn(tt.fn)
+			defer restore()
+			got, err := process.ListProcesses(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Len(got, tt.wantLen)
 		})
 	}
 }

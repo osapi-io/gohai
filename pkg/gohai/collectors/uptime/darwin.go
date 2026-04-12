@@ -20,37 +20,22 @@
 
 package uptime
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
-
-// Darwin collects uptime on macOS. Wraps gopsutil.host.Info.
-// No idle-time equivalent — macOS doesn't expose an aggregate CPU idle
-// counter equivalent to Linux's /proc/uptime[1].
+// Darwin collects uptime on macOS. No idle-time equivalent. BaseFn is
+// typed in our *Info so importers don't need gopsutil.
 type Darwin struct {
 	base
 
-	HostInfoFn func(context.Context) (*host.InfoStat, error)
+	BaseFn func(context.Context) (*Info, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant wired to the production bridge.
 func NewDarwin() *Darwin {
-	return &Darwin{HostInfoFn: host.InfoWithContext}
+	return &Darwin{BaseFn: readBase}
 }
 
-// Collect returns uptime facts. IdleSeconds/IdleHuman stay empty on
-// darwin (no kernel-level aggregate idle counter).
+// Collect returns uptime facts.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	info, err := d.HostInfoFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
-	}
-	return &Info{
-		Seconds:  info.Uptime,
-		BootTime: info.BootTime,
-		Human:    HumanDuration(info.Uptime),
-	}, nil
+	return d.BaseFn(ctx)
 }

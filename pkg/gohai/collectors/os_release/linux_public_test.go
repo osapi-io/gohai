@@ -91,6 +91,20 @@ UBUNTU_CODENAME=noble
 			content: "# some comment\n\nmalformed\nID=\"quoted\"\n",
 			want:    osrelease.Info{ID: "quoted"},
 		},
+		{
+			name: "build/variant fields populated (Fedora-style)",
+			content: `ID=fedora
+BUILD_ID=40.20240416.0
+VARIANT="Workstation Edition"
+VARIANT_ID=workstation
+`,
+			want: osrelease.Info{
+				ID:        "fedora",
+				BuildID:   "40.20240416.0",
+				Variant:   "Workstation Edition",
+				VariantID: "workstation",
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {

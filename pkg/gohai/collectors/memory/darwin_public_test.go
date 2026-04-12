@@ -62,7 +62,7 @@ func (s *MemoryDarwinPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("mach vm error"),
 			wantErr: true,
 		},

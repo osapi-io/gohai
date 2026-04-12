@@ -179,3 +179,24 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 		})
 	}
 }
+
+func (s *PackageMgrPublicTestSuite) TestProbe() {
+	tests := []struct {
+		name    string
+		binary  string
+		wantAbs bool
+	}{
+		{"present binary resolves to absolute path", "sh", true},
+		{"missing binary returns empty", "definitely-not-a-real-binary-xyz123", false},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got := packagemgr.Probe(tt.binary)
+			if tt.wantAbs {
+				s.NotEmpty(got)
+			} else {
+				s.Empty(got)
+			}
+		})
+	}
+}

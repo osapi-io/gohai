@@ -33,6 +33,27 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+// Kept private so importers don't transitively need gopsutil. Swapped
+// via SetHostInfoFn (export_test.go).
+var hostInfoFn = host.InfoWithContext
+
+// readShortHostname is the production bridge. Wraps the private
+// gopsutil call and returns just the short hostname string — callers
+// never see gopsutil types.
+func readShortHostname(
+	ctx context.Context,
+) (string, error) {
+	h, err := hostInfoFn(ctx)
+	if err != nil {
+		return "", fmt.Errorf("host.Info: %w", err)
+	}
+	if h == nil {
+		return "", nil
+	}
+	return h.Hostname, nil
+}
+
 // Info holds hostname identification data.
 type Info struct {
 	Hostname    string `json:"hostname"`               // short hostname (e.g., "web01")
@@ -66,7 +87,8 @@ func New() Collector {
 }
 
 // resolve performs the host-identity lookups:
-//   - Hostname: short name from gopsutil host.Info.
+//   - Hostname: short name from gopsutil host.Info (via injected
+//     shortHostnameFn).
 //   - MachineName: raw os.Hostname (whatever the kernel returns — may
 //     or may not be FQDN depending on OS configuration).
 //   - FQDN: forward+reverse DNS canonicalization (matches `hostname -f`
@@ -76,19 +98,16 @@ func New() Collector {
 // Injectable so tests don't need DNS.
 func resolve(
 	ctx context.Context,
-	hostInfoFn func(context.Context) (*host.InfoStat, error),
+	shortHostnameFn func(context.Context) (string, error),
 	osHostnameFn func() (string, error),
 	lookupHostFn func(string) ([]string, error),
 	lookupAddrFn func(string) ([]string, error),
 ) (*Info, error) {
-	info := &Info{}
-	h, err := hostInfoFn(ctx)
+	short, err := shortHostnameFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+		return nil, err
 	}
-	if h != nil {
-		info.Hostname = h.Hostname
-	}
+	info := &Info{Hostname: short}
 	if raw, err := osHostnameFn(); err == nil {
 		info.MachineName = raw
 	}

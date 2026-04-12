@@ -18,32 +18,35 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package machineid
+package filesystem
 
-import "context"
+import (
+	"context"
 
-// Darwin resolves the machine ID on macOS. Wraps readHostID
-// (gopsutil.host.Info internally, which on darwin reads
-// `IOPlatformUUID` from IOKit — the correct, stable hardware
-// identifier Apple intends for this purpose). HostIDFn returns our
-// `string` so importers don't need gopsutil in their module graph.
-type Darwin struct {
-	base
+	"github.com/shirou/gopsutil/v4/disk"
+)
 
-	HostIDFn func(context.Context) (string, error)
+// ListMounts exposes the private listMounts bridge to the external
+// filesystem_test package.
+var ListMounts = listMounts
+
+// SetPartitionsFn swaps the private gopsutil disk.PartitionsWithContext
+// call backing listMounts. Returns a restore func the caller must
+// defer.
+func SetPartitionsFn(
+	fn func(context.Context, bool) ([]disk.PartitionStat, error),
+) (restore func()) {
+	orig := partitionsFn
+	partitionsFn = fn
+	return func() { partitionsFn = orig }
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
-func NewDarwin() *Darwin {
-	return &Darwin{HostIDFn: readHostID}
-}
-
-// Collect returns the machine ID. gopsutil's darwin path is
-// correct — no extension needed.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	id, err := d.HostIDFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{ID: id}, nil
+// SetUsageFn swaps the private gopsutil disk.UsageWithContext call
+// backing listMounts. Returns a restore func the caller must defer.
+func SetUsageFn(
+	fn func(context.Context, string) (*disk.UsageStat, error),
+) (restore func()) {
+	orig := usageFn
+	usageFn = fn
+	return func() { usageFn = orig }
 }

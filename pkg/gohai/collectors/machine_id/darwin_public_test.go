@@ -25,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
@@ -41,30 +40,30 @@ func TestMachineIDDarwinPublicTestSuite(t *testing.T) {
 
 func (s *MachineIDDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		hostFn  func(context.Context) (*host.InfoStat, error)
-		wantErr bool
-		wantID  string
+		name     string
+		hostIDFn func(context.Context) (string, error)
+		wantErr  bool
+		wantID   string
 	}{
 		{
-			name:   "gopsutil returns IOPlatformUUID",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{HostID: "iokit-uuid-1234"}, nil },
-			wantID: "iokit-uuid-1234",
+			name:     "gopsutil returns IOPlatformUUID",
+			hostIDFn: func(context.Context) (string, error) { return "iokit-uuid-1234", nil },
+			wantID:   "iokit-uuid-1234",
 		},
 		{
-			name:   "gopsutil nil info yields empty ID (no error)",
-			hostFn: func(_ context.Context) (*host.InfoStat, error) { return nil, nil },
-			wantID: "",
+			name:     "empty ID yields empty ID (no error)",
+			hostIDFn: func(context.Context) (string, error) { return "", nil },
+			wantID:   "",
 		},
 		{
-			name:    "gopsutil error propagated",
-			hostFn:  func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			name:     "gopsutil error wrapped and returned",
+			hostIDFn: func(context.Context) (string, error) { return "", errors.New("boom") },
+			wantErr:  true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &machineid.Darwin{HostInfoFn: tt.hostFn}
+			c := &machineid.Darwin{HostIDFn: tt.hostIDFn}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

@@ -66,12 +66,16 @@ func New() Collector {
 	return NewLinux()
 }
 
+// unameSyscall is the injection seam for unix.Uname. Tests swap this
+// via export_test.go to force the error branch of defaultUname.
+var unameSyscall = unix.Uname
+
 // defaultUname invokes unix.Uname (works on any unix-like OS) and
 // converts the fixed-length byte arrays to Go strings. Shared by both
 // Linux and Darwin factories.
 func defaultUname() (name, release, version, machine string, err error) {
 	var u unix.Utsname
-	if err = unix.Uname(&u); err != nil {
+	if err = unameSyscall(&u); err != nil {
 		return "", "", "", "", fmt.Errorf("uname: %w", err)
 	}
 	return bytesToString(u.Sysname[:]),

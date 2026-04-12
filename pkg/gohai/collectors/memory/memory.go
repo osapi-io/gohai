@@ -71,12 +71,21 @@ func New() Collector {
 	return NewLinux()
 }
 
+// virtualMemoryFn is the injection seam for gopsutil's
+// mem.VirtualMemoryWithContext. Kept private so importers don't
+// transitively need gopsutil. Swapped via SetVirtualMemoryFn.
+var virtualMemoryFn = mem.VirtualMemoryWithContext
+
+// swapMemoryFn is the injection seam for gopsutil's
+// mem.SwapMemoryWithContext. Swapped via SetSwapMemoryFn.
+var swapMemoryFn = mem.SwapMemoryWithContext
+
 // readMemory is the production bridge to gopsutil. Combines the
 // VirtualMemory + SwapMemory calls and maps into our Info.
 func readMemory(
 	ctx context.Context,
 ) (*Info, error) {
-	vm, err := mem.VirtualMemoryWithContext(ctx)
+	vm, err := virtualMemoryFn(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +98,7 @@ func readMemory(
 		Buffers:     vm.Buffers,
 		Cached:      vm.Cached,
 	}
-	if sm, err := mem.SwapMemoryWithContext(ctx); err == nil && sm.Total > 0 {
+	if sm, err := swapMemoryFn(ctx); err == nil && sm.Total > 0 {
 		info.Swap = &Swap{
 			Total:       sm.Total,
 			Used:        sm.Used,

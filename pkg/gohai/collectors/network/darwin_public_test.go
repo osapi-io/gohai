@@ -56,7 +56,7 @@ func (s *NetworkDarwinPublicTestSuite) TestCollect() {
 			}},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("net error"),
 			wantErr: true,
 		},

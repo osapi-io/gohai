@@ -66,17 +66,26 @@ func New() Collector {
 	return NewLinux()
 }
 
+// infoFn is the injection seam for gopsutil's cpu.InfoWithContext.
+// Kept private so importers don't transitively need gopsutil. Swapped
+// in tests via SetInfoFn (export_test.go).
+var infoFn = cpu.InfoWithContext
+
+// countsFn is the injection seam for gopsutil's cpu.CountsWithContext.
+// Kept private alongside infoFn. Swapped via SetCountsFn.
+var countsFn = cpu.CountsWithContext
+
 // readCPU is the production bridge to gopsutil.
 func readCPU(
 	ctx context.Context,
 ) (*Info, error) {
-	stats, err := cpu.InfoWithContext(ctx)
+	stats, err := infoFn(ctx)
 	if err != nil {
 		return nil, err
 	}
 	info := &Info{}
 	// Total logical CPUs.
-	if logical, err := cpu.CountsWithContext(ctx, true); err == nil {
+	if logical, err := countsFn(ctx, true); err == nil {
 		info.Total = logical
 	}
 	// Physical socket count — distinct PhysicalID values. On macOS

@@ -40,13 +40,11 @@ func TestHostnameLinuxPublicTestSuite(t *testing.T) {
 }
 
 func (s *HostnameLinuxPublicTestSuite) TestCollect() {
-	okHost := func(_ context.Context) (*host.InfoStat, error) {
-		return &host.InfoStat{Hostname: "web01"}, nil
-	}
+	okShort := func(context.Context) (string, error) { return "web01", nil }
 
 	tests := []struct {
 		name         string
-		hostFn       func(context.Context) (*host.InfoStat, error)
+		shortFn      func(context.Context) (string, error)
 		osHostnameFn func() (string, error)
 		lookupHost   func(string) ([]string, error)
 		lookupAddr   func(string) ([]string, error)
@@ -55,7 +53,7 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:         "canonical case: short name + reverse DNS",
-			hostFn:       okHost,
+			shortFn:      okShort,
 			osHostnameFn: func() (string, error) { return "web01", nil },
 			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
 			lookupAddr:   func(string) ([]string, error) { return []string{"web01.example.com."}, nil },
@@ -68,7 +66,7 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "no DNS resolution falls back to short name",
-			hostFn:       okHost,
+			shortFn:      okShort,
 			osHostnameFn: func() (string, error) { return "laptop", nil },
 			lookupHost:   func(string) ([]string, error) { return nil, errors.New("no such host") },
 			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
@@ -76,7 +74,7 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "reverse lookup fails falls back to short name",
-			hostFn:       okHost,
+			shortFn:      okShort,
 			osHostnameFn: func() (string, error) { return "web01", nil },
 			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
 			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("no PTR") },
@@ -84,7 +82,7 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "reverse lookup empty falls back to short name",
-			hostFn:       okHost,
+			shortFn:      okShort,
 			osHostnameFn: func() (string, error) { return "web01", nil },
 			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
 			lookupAddr:   func(string) ([]string, error) { return nil, nil },
@@ -92,23 +90,15 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "empty short name skips FQDN resolution",
-			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: ""}, nil },
+			shortFn:      func(context.Context) (string, error) { return "", nil },
 			osHostnameFn: func() (string, error) { return "", errors.New("no hostname") },
 			lookupHost:   func(string) ([]string, error) { return nil, errors.New("unused") },
 			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
 			want:         hostname.Info{},
 		},
 		{
-			name:         "nil host info treated as empty",
-			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return nil, nil },
-			osHostnameFn: func() (string, error) { return "", errors.New("no hostname") },
-			lookupHost:   func(string) ([]string, error) { return nil, errors.New("unused") },
-			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
-			want:         hostname.Info{},
-		},
-		{
-			name:         "host.Info error propagated",
-			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name:         "short hostname error propagated",
+			shortFn:      func(context.Context) (string, error) { return "", errors.New("boom") },
 			osHostnameFn: func() (string, error) { return "", nil },
 			lookupHost:   func(string) ([]string, error) { return nil, nil },
 			lookupAddr:   func(string) ([]string, error) { return nil, nil },
@@ -118,10 +108,10 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			c := &hostname.Linux{
-				HostInfoFn:   tt.hostFn,
-				OSHostnameFn: tt.osHostnameFn,
-				LookupHostFn: tt.lookupHost,
-				LookupAddrFn: tt.lookupAddr,
+				ShortHostnameFn: tt.shortFn,
+				OSHostnameFn:    tt.osHostnameFn,
+				LookupHostFn:    tt.lookupHost,
+				LookupAddrFn:    tt.lookupAddr,
 			}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
@@ -132,6 +122,44 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*hostname.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *HostnameLinuxPublicTestSuite) TestReadShortHostname() {
+	tests := []struct {
+		name    string
+		hostFn  func(context.Context) (*host.InfoStat, error)
+		wantErr bool
+		want    string
+	}{
+		{
+			name:   "success returns Hostname field",
+			hostFn: func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: "web01"}, nil },
+			want:   "web01",
+		},
+		{
+			name:   "nil info returns empty string",
+			hostFn: func(context.Context) (*host.InfoStat, error) { return nil, nil },
+			want:   "",
+		},
+		{
+			name:    "gopsutil error wrapped and returned",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := hostname.SetHostInfoFn(tt.hostFn)
+			defer restore()
+			got, err := hostname.ReadShortHostname(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

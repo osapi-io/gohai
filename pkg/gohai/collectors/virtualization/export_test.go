@@ -18,32 +18,19 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package machineid
+package virtualization
 
 import "context"
 
-// Darwin resolves the machine ID on macOS. Wraps readHostID
-// (gopsutil.host.Info internally, which on darwin reads
-// `IOPlatformUUID` from IOKit — the correct, stable hardware
-// identifier Apple intends for this purpose). HostIDFn returns our
-// `string` so importers don't need gopsutil in their module graph.
-type Darwin struct {
-	base
+// Detect exposes the private detect bridge to the external
+// virtualization_test package.
+var Detect = detect
 
-	HostIDFn func(context.Context) (string, error)
-}
-
-// NewDarwin returns a Darwin variant wired to gopsutil.
-func NewDarwin() *Darwin {
-	return &Darwin{HostIDFn: readHostID}
-}
-
-// Collect returns the machine ID. gopsutil's darwin path is
-// correct — no extension needed.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	id, err := d.HostIDFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{ID: id}, nil
+// SetHostVirtualization swaps the private gopsutil call backing
+// detect() for the duration of a test. Returns a restore func the
+// caller must defer.
+func SetHostVirtualization(fn func(context.Context) (string, string, error)) (restore func()) {
+	orig := hostVirtualization
+	hostVirtualization = fn
+	return func() { hostVirtualization = orig }
 }

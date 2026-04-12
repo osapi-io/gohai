@@ -22,6 +22,7 @@ package virtualization_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -96,6 +97,43 @@ func (s *VirtualizationPublicTestSuite) TestCollectOnHost() {
 			info, ok := got.(*virtualization.Info)
 			s.Require().True(ok)
 			s.NotNil(info)
+		})
+	}
+}
+
+func (s *VirtualizationPublicTestSuite) TestDetect() {
+	tests := []struct {
+		name     string
+		fn       func(context.Context) (string, string, error)
+		wantErr  bool
+		wantInfo *virtualization.Info
+	}{
+		{
+			name: "success returns mapped Info",
+			fn: func(context.Context) (string, string, error) {
+				return "kvm", "guest", nil
+			},
+			wantInfo: &virtualization.Info{System: "kvm", Role: "guest"},
+		},
+		{
+			name: "error wrapped and returned",
+			fn: func(context.Context) (string, string, error) {
+				return "", "", errors.New("boom")
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := virtualization.SetHostVirtualization(tt.fn)
+			defer restore()
+			info, err := virtualization.Detect(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.wantInfo, info)
 		})
 	}
 }

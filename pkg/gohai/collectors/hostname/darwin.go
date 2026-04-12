@@ -24,34 +24,33 @@ import (
 	"context"
 	"net"
 	"os"
-
-	"github.com/shirou/gopsutil/v4/host"
 )
 
 // Darwin collects hostname facts on macOS. Same wiring as Linux — the
 // underlying syscalls are cross-platform. Separate struct type
 // preserves the osapi dispatch pattern and lets macOS diverge if Apple
-// introduces an API change.
+// introduces an API change. ShortHostnameFn is typed in our `string`
+// so importers don't need gopsutil in their module graph.
 type Darwin struct {
 	base
 
-	HostInfoFn   func(context.Context) (*host.InfoStat, error)
-	OSHostnameFn func() (string, error)
-	LookupHostFn func(string) ([]string, error)
-	LookupAddrFn func(string) ([]string, error)
+	ShortHostnameFn func(context.Context) (string, error)
+	OSHostnameFn    func() (string, error)
+	LookupHostFn    func(string) ([]string, error)
+	LookupAddrFn    func(string) ([]string, error)
 }
 
 // NewDarwin returns a Darwin variant wired to stdlib + gopsutil.
 func NewDarwin() *Darwin {
 	return &Darwin{
-		HostInfoFn:   host.InfoWithContext,
-		OSHostnameFn: os.Hostname,
-		LookupHostFn: net.LookupHost,
-		LookupAddrFn: net.LookupAddr,
+		ShortHostnameFn: readShortHostname,
+		OSHostnameFn:    os.Hostname,
+		LookupHostFn:    net.LookupHost,
+		LookupAddrFn:    net.LookupAddr,
 	}
 }
 
 // Collect returns hostname facts.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	return resolve(ctx, d.HostInfoFn, d.OSHostnameFn, d.LookupHostFn, d.LookupAddrFn)
+	return resolve(ctx, d.ShortHostnameFn, d.OSHostnameFn, d.LookupHostFn, d.LookupAddrFn)
 }

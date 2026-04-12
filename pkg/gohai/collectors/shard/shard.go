@@ -31,12 +31,38 @@
 package shard
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+
+	"github.com/shirou/gopsutil/v4/host"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 )
+
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+// Private — never leaked through a public Fn field. Swapped in tests
+// via SetHostInfoFn (export_test.go).
+var hostInfoFn = host.InfoWithContext
+
+// readMachineUUID wraps the private gopsutil call and returns the
+// macOS IOPlatformUUID as a plain string so importers don't see
+// gopsutil types. Returns empty string + wrapped error when gopsutil
+// fails (caller may choose to treat empty as "no stable ID available"
+// and still compute a hostname-only seed).
+func readMachineUUID(
+	ctx context.Context,
+) (string, error) {
+	h, err := hostInfoFn(ctx)
+	if err != nil {
+		return "", err
+	}
+	if h == nil {
+		return "", nil
+	}
+	return h.HostID, nil
+}
 
 // Info holds the derived shard seed.
 type Info struct {

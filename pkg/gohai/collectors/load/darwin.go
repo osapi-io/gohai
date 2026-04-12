@@ -20,31 +20,22 @@
 
 package load
 
-import (
-	"context"
-	"fmt"
-
-	"github.com/shirou/gopsutil/v4/load"
-)
+import "context"
 
 // Darwin collects load averages on macOS. Reads kernel sysctl
 // `vm.loadavg` via gopsutil.
 type Darwin struct {
 	base
 
-	AvgFn func(context.Context) (*load.AvgStat, error)
+	ReadFn func(context.Context) (*Info, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant wired to the production bridge.
 func NewDarwin() *Darwin {
-	return &Darwin{AvgFn: load.AvgWithContext}
+	return &Darwin{ReadFn: readAverages}
 }
 
 // Collect returns the load averages.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	a, err := d.AvgFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("load.Avg: %w", err)
-	}
-	return &Info{One: a.Load1, Five: a.Load5, Fifteen: a.Load15}, nil
+	return d.ReadFn(ctx)
 }

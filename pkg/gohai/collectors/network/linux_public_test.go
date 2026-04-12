@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	gpnet "github.com/shirou/gopsutil/v4/net"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
@@ -66,7 +67,7 @@ func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 			}},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("net interfaces error"),
 			wantErr: true,
 		},
@@ -90,6 +91,62 @@ func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*network.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *NetworkLinuxPublicTestSuite) TestReadInterfaces() {
+	okIfs := gpnet.InterfaceStatList{
+		{Name: "eth0", MTU: 1500, HardwareAddr: "02:42:ac:11:00:02", Flags: []string{"up"}, Addrs: gpnet.InterfaceAddrList{{Addr: "10.0.0.5/24"}}},
+	}
+
+	tests := []struct {
+		name        string
+		ifsFn       func(context.Context) (gpnet.InterfaceStatList, error)
+		countersFn  func(context.Context, bool) ([]gpnet.IOCountersStat, error)
+		wantErr     bool
+		wantLen     int
+		wantCounter bool
+	}{
+		{
+			name:        "interfaces + counters merged",
+			ifsFn:       func(context.Context) (gpnet.InterfaceStatList, error) { return okIfs, nil },
+			countersFn:  func(context.Context, bool) ([]gpnet.IOCountersStat, error) { return []gpnet.IOCountersStat{{Name: "eth0", BytesSent: 100, BytesRecv: 200}}, nil },
+			wantLen:     1,
+			wantCounter: true,
+		},
+		{
+			name:        "counters error tolerated",
+			ifsFn:       func(context.Context) (gpnet.InterfaceStatList, error) { return okIfs, nil },
+			countersFn:  func(context.Context, bool) ([]gpnet.IOCountersStat, error) { return nil, errors.New("counters failed") },
+			wantLen:     1,
+			wantCounter: false,
+		},
+		{
+			name:       "interfaces error propagated",
+			ifsFn:      func(context.Context) (gpnet.InterfaceStatList, error) { return nil, errors.New("interfaces failed") },
+			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) { return nil, nil },
+			wantErr:    true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restoreI := network.SetInterfacesFn(tt.ifsFn)
+			defer restoreI()
+			restoreC := network.SetIOCountersFn(tt.countersFn)
+			defer restoreC()
+			got, err := network.ReadInterfaces(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Len(got, tt.wantLen)
+			if tt.wantCounter {
+				s.NotNil(got[0].Counters)
+			} else {
+				s.Nil(got[0].Counters)
+			}
 		})
 	}
 }

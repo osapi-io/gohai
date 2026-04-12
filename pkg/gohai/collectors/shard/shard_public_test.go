@@ -113,7 +113,7 @@ func (s *ShardPublicTestSuite) TestCollectLinux() {
 			s.Require().NoError(err)
 			info, ok := got.(*shard.Info)
 			s.Require().True(ok)
-			s.Len(info.Seed, 64) // hex-encoded SHA-256 = 64 chars
+			s.Len(info.Seed, 64)
 		})
 	}
 }
@@ -132,28 +132,77 @@ func (s *ShardPublicTestSuite) TestCollectLinuxDeterministic() {
 
 func (s *ShardPublicTestSuite) TestCollectDarwin() {
 	tests := []struct {
-		name    string
-		info    *host.InfoStat
-		infoErr error
-		host    string
+		name     string
+		midFn    func(context.Context) (string, error)
+		hostname string
 	}{
-		{"IOPlatformUUID + hostname", &host.InfoStat{HostID: "uuid-1234"}, nil, "johns-mac"},
-		{"host.Info error → empty machine_id", nil, errors.New("boom"), "johns-mac"},
-		{"nil info → empty machine_id", nil, nil, "johns-mac"},
+		{
+			"IOPlatformUUID + hostname",
+			func(context.Context) (string, error) { return "uuid-1234", nil },
+			"johns-mac",
+		},
+		{
+			"MachineIDFn error → empty machine_id, seed still computes",
+			func(context.Context) (string, error) { return "", errors.New("boom") },
+			"johns-mac",
+		},
+		{
+			"empty machine_id (nil info upstream) → seed still computes",
+			func(context.Context) (string, error) { return "", nil },
+			"johns-mac",
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			c := &shard.Darwin{
-				HostInfoFn: func(context.Context) (*host.InfoStat, error) {
-					return tt.info, tt.infoErr
-				},
-				HostnameFn: func() (string, error) { return tt.host, nil },
+				MachineIDFn: tt.midFn,
+				HostnameFn:  func() (string, error) { return tt.hostname, nil },
 			}
 			got, err := c.Collect(context.Background())
 			s.Require().NoError(err)
 			info, ok := got.(*shard.Info)
 			s.Require().True(ok)
 			s.Len(info.Seed, 64)
+		})
+	}
+}
+
+func (s *ShardPublicTestSuite) TestReadMachineUUID() {
+	tests := []struct {
+		name    string
+		fn      func(context.Context) (*host.InfoStat, error)
+		wantErr bool
+		want    string
+	}{
+		{
+			name: "success returns HostID",
+			fn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{HostID: "uuid-abcd"}, nil
+			},
+			want: "uuid-abcd",
+		},
+		{
+			name: "nil info returns empty",
+			fn:   func(context.Context) (*host.InfoStat, error) { return nil, nil },
+			want: "",
+		},
+		{
+			name:    "gopsutil error returned",
+			fn:      func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := shard.SetHostInfoFn(tt.fn)
+			defer restore()
+			got, err := shard.ReadMachineUUID(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

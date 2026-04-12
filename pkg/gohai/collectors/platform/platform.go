@@ -22,9 +22,43 @@
 package platform
 
 import (
+	"context"
+	"runtime"
+
+	"github.com/shirou/gopsutil/v4/host"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	plat "github.com/osapi-io/gohai/internal/platform"
 )
+
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+// Kept private so importers don't transitively need gopsutil. Swapped
+// via SetHostInfoFn (export_test.go).
+var hostInfoFn = host.InfoWithContext
+
+// readPlatform is the production bridge. Wraps the private gopsutil
+// call and returns a pre-populated *Info plus the raw KernelVersion
+// string that Darwin consumes as Build (Linux's Info does not carry
+// Build; it discards the kernel string). OS/Architecture are always
+// set from runtime; Name/Version/Family come from gopsutil when
+// available. Per-OS Collect wrappers layer additional fields
+// (VersionExtra on darwin) on top of the returned Info.
+func readPlatform(
+	ctx context.Context,
+) (*Info, string, error) {
+	info := &Info{OS: runtime.GOOS, Architecture: runtime.GOARCH}
+	h, err := hostInfoFn(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	if h == nil {
+		return info, "", nil
+	}
+	info.Name = canonicalizePlatform(h.Platform)
+	info.Version = h.PlatformVersion
+	info.Family = h.PlatformFamily
+	return info, h.KernelVersion, nil
+}
 
 // Info holds platform identification data.
 type Info struct {

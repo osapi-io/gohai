@@ -24,33 +24,33 @@ import (
 	"context"
 	"net"
 	"os"
-
-	"github.com/shirou/gopsutil/v4/host"
 )
 
-// Linux collects hostname facts on Linux. Wraps gopsutil.host.Info
-// (short hostname), os.Hostname (machine_name), net.LookupHost +
-// net.LookupAddr (FQDN canonicalization via reverse DNS).
+// Linux collects hostname facts on Linux. Wraps readShortHostname
+// (gopsutil.host.Info internally), os.Hostname (machine_name),
+// net.LookupHost + net.LookupAddr (FQDN canonicalization via reverse
+// DNS). ShortHostnameFn is typed in our `string` so importers don't
+// need gopsutil in their module graph.
 type Linux struct {
 	base
 
-	HostInfoFn   func(context.Context) (*host.InfoStat, error)
-	OSHostnameFn func() (string, error)
-	LookupHostFn func(string) ([]string, error)
-	LookupAddrFn func(string) ([]string, error)
+	ShortHostnameFn func(context.Context) (string, error)
+	OSHostnameFn    func() (string, error)
+	LookupHostFn    func(string) ([]string, error)
+	LookupAddrFn    func(string) ([]string, error)
 }
 
 // NewLinux returns a Linux variant wired to stdlib + gopsutil.
 func NewLinux() *Linux {
 	return &Linux{
-		HostInfoFn:   host.InfoWithContext,
-		OSHostnameFn: os.Hostname,
-		LookupHostFn: net.LookupHost,
-		LookupAddrFn: net.LookupAddr,
+		ShortHostnameFn: readShortHostname,
+		OSHostnameFn:    os.Hostname,
+		LookupHostFn:    net.LookupHost,
+		LookupAddrFn:    net.LookupAddr,
 	}
 }
 
 // Collect returns hostname facts.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	return resolve(ctx, l.HostInfoFn, l.OSHostnameFn, l.LookupHostFn, l.LookupAddrFn)
+	return resolve(ctx, l.ShortHostnameFn, l.OSHostnameFn, l.LookupHostFn, l.LookupAddrFn)
 }

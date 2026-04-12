@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	gpdisk "github.com/shirou/gopsutil/v4/disk"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
@@ -61,7 +62,7 @@ func (s *DiskLinuxPublicTestSuite) TestCollect() {
 			want: disk.Info{Devices: []disk.Device{}},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("boom"),
 			wantErr: true,
 		},
@@ -85,6 +86,45 @@ func (s *DiskLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*disk.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *DiskLinuxPublicTestSuite) TestListIOCounters() {
+	tests := []struct {
+		name    string
+		fn      func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error)
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name: "success maps counters",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return map[string]gpdisk.IOCountersStat{
+					"sda": {Name: "sda", ReadCount: 100, WriteCount: 50, ReadBytes: 1024, WriteBytes: 512},
+				}, nil
+			},
+			wantLen: 1,
+		},
+		{
+			name: "gopsutil error wrapped and returned",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return nil, errors.New("iocounters failed")
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := disk.SetIOCountersFn(tt.fn)
+			defer restore()
+			got, err := disk.ListIOCounters(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Len(got, tt.wantLen)
 		})
 	}
 }

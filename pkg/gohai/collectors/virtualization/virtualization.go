@@ -63,11 +63,17 @@ func New() Collector {
 	return NewLinux()
 }
 
+// hostVirtualization is the injection seam for gopsutil's
+// host.VirtualizationWithContext. Tests swap this to exercise both the
+// success and error branches of detect on any host OS without hitting
+// the real syscall.
+var hostVirtualization = host.VirtualizationWithContext
+
 // detect is the production bridge to gopsutil's host.VirtualizationWithContext.
 func detect(
 	ctx context.Context,
 ) (*Info, error) {
-	system, role, err := host.VirtualizationWithContext(ctx)
+	system, role, err := hostVirtualization(ctx)
 	if err != nil {
 		return nil, err
 	}

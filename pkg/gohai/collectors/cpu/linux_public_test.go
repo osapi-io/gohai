@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	gpcpu "github.com/shirou/gopsutil/v4/cpu"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
@@ -62,7 +63,7 @@ func (s *CPULinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "gopsutil error propagated",
+			name:    "gopsutil error wrapped and returned",
 			fnErr:   errors.New("cpuinfo error"),
 			wantErr: true,
 		},
@@ -86,6 +87,61 @@ func (s *CPULinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*cpu.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
+		})
+	}
+}
+
+func (s *CPULinuxPublicTestSuite) TestReadCPU() {
+	okStats := []gpcpu.InfoStat{{
+		PhysicalID: "0", Cores: 8, ModelName: "Intel(R) Xeon(R) CPU",
+		VendorID: "GenuineIntel", Family: "6", Model: "85",
+		Stepping: 7, Mhz: 2400, CacheSize: 25600,
+		Flags: []string{"fpu", "vme"},
+	}}
+
+	tests := []struct {
+		name      string
+		infoFn    func(context.Context) ([]gpcpu.InfoStat, error)
+		countsFn  func(context.Context, bool) (int, error)
+		wantErr   bool
+		wantTotal int
+		wantCores int
+	}{
+		{
+			name:      "success maps stats",
+			infoFn:    func(context.Context) ([]gpcpu.InfoStat, error) { return okStats, nil },
+			countsFn:  func(context.Context, bool) (int, error) { return 16, nil },
+			wantTotal: 16,
+			wantCores: 8,
+		},
+		{
+			name:      "counts error ignored, info still populated",
+			infoFn:    func(context.Context) ([]gpcpu.InfoStat, error) { return okStats, nil },
+			countsFn:  func(context.Context, bool) (int, error) { return 0, errors.New("counts failed") },
+			wantTotal: 0,
+			wantCores: 8,
+		},
+		{
+			name:     "info error propagated",
+			infoFn:   func(context.Context) ([]gpcpu.InfoStat, error) { return nil, errors.New("info failed") },
+			countsFn: func(context.Context, bool) (int, error) { return 0, nil },
+			wantErr:  true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restoreInfo := cpu.SetInfoFn(tt.infoFn)
+			defer restoreInfo()
+			restoreCounts := cpu.SetCountsFn(tt.countsFn)
+			defer restoreCounts()
+			got, err := cpu.ReadCPU(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.wantTotal, got.Total)
+			s.Equal(tt.wantCores, got.Cores)
 		})
 	}
 }
