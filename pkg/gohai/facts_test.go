@@ -35,6 +35,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
@@ -54,6 +55,7 @@ func networkInfoPtr() *network.Info       { return &network.Info{} }
 func processInfoPtr() *process.Info       { return &process.Info{} }
 func usersInfoPtr() *users.Info           { return &users.Info{} }
 func timezoneInfoPtr() *timezone.Info     { return &timezone.Info{} }
+func rootGroupInfoPtr() *rootgroup.Info   { return &rootgroup.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -158,8 +160,9 @@ func (s *FactsTestSuite) TestCountPopulated() {
 				Process:        processInfoPtr(),
 				Users:          usersInfoPtr(),
 				Timezone:       timezoneInfoPtr(),
+				RootGroup:      rootGroupInfoPtr(),
 			},
-			want: 14,
+			want: 15,
 		},
 	}
 	for _, tt := range tests {

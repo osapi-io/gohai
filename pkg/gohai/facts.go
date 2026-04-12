@@ -36,6 +36,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
@@ -61,6 +62,7 @@ type Facts struct {
 	Process        *process.Info        `json:"process,omitempty"`
 	Users          *users.Info          `json:"users,omitempty"`
 	Timezone       *timezone.Info       `json:"timezone,omitempty"`
+	RootGroup      *rootgroup.Info      `json:"root_group,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -143,6 +145,9 @@ func (f *Facts) countPopulated() int {
 	if f.Timezone != nil {
 		n++
 	}
+	if f.RootGroup != nil {
+		n++
+	}
 	return n
 }
 
@@ -209,6 +214,10 @@ func (f *Facts) set(
 	case "timezone":
 		if v, ok := result.(*timezone.Info); ok {
 			f.Timezone = v
+		}
+	case "root_group":
+		if v, ok := result.(*rootgroup.Info); ok {
+			f.RootGroup = v
 		}
 	}
 }

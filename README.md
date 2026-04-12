@@ -60,7 +60,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 | [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | 🚧          |
 | [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | 🚧          |
 | [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ (gopsutil) |
-| [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | 🚧          |
+| [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | ✅ (stdlib) |
 | [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | 🚧          |
 | [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | 🚧          |
 
