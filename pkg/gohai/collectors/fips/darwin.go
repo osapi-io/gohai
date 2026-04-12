@@ -24,11 +24,11 @@ package fips
 
 import "context"
 
-// collect on macOS always reports disabled. macOS's Apple CoreCrypto
-// module is FIPS 140-validated by Apple, but there is no user-toggleable
-// runtime flag equivalent to Linux's /proc/sys/crypto/fips_enabled.
+// collect on macOS returns nil. Matches Ohai, which only provides `fips`
+// on :linux and :windows. macOS has no kernel-level FIPS mode equivalent
+// to Linux's /proc/sys/crypto/fips_enabled.
 func collect(
 	_ context.Context,
 ) (any, error) {
-	return &Info{Enabled: false}, nil
+	return nil, nil
 }

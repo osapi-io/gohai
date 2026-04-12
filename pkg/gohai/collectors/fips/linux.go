@@ -49,7 +49,7 @@ func collectFromFunc(
 	rc, err := open(fipsPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return &Info{Enabled: false}, nil
+			return &Info{}, nil
 		}
 		return nil, fmt.Errorf("open %s: %w", fipsPath, err)
 	}
@@ -64,5 +64,5 @@ func parseFips(
 	if err != nil {
 		return nil, fmt.Errorf("read fips: %w", err)
 	}
-	return &Info{Enabled: strings.TrimSpace(string(b)) == "1"}, nil
+	return &Info{Kernel: Kernel{Enabled: strings.TrimSpace(string(b)) == "1"}}, nil
 }

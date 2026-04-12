@@ -71,7 +71,7 @@ func (s *FipsLinuxPublicTestSuite) TestParseFips() {
 				return
 			}
 			s.Require().NoError(err)
-			s.Equal(tt.want, info.Enabled)
+			s.Equal(tt.want, info.Kernel.Enabled)
 		})
 	}
 }
@@ -123,7 +123,7 @@ func (s *FipsLinuxPublicTestSuite) TestCollectFromFunc() {
 				return
 			}
 			s.Require().NoError(err)
-			s.Equal(tt.want, info.Enabled)
+			s.Equal(tt.want, info.Kernel.Enabled)
 		})
 	}
 }

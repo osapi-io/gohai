@@ -42,7 +42,5 @@ func TestFipsDarwinPublicTestSuite(t *testing.T) {
 func (s *FipsDarwinPublicTestSuite) TestCollect() {
 	got, err := fips.Collect(context.Background())
 	s.Require().NoError(err)
-	info, ok := got.(*fips.Info)
-	s.Require().True(ok)
-	s.False(info.Enabled)
+	s.Nil(got)
 }

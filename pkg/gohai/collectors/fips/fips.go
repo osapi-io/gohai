@@ -18,7 +18,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package fips reports whether the kernel is running in FIPS 140 mode.
+// Package fips reports whether the kernel is running in FIPS mode
+// (FIPS 140-2 / 140-3).
 package fips
 
 import (
@@ -27,8 +28,14 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Info holds FIPS mode state.
+// Info holds FIPS mode state. Shape matches Ohai's `fips.kernel.enabled`
+// for JSON compatibility.
 type Info struct {
+	Kernel Kernel `json:"kernel"`
+}
+
+// Kernel holds the kernel-level FIPS mode flag.
+type Kernel struct {
 	Enabled bool `json:"enabled"`
 }
 

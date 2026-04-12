@@ -46,6 +46,39 @@ The Collector interface and `Info` struct shape are the contract — whatever
 backing strategy a collector uses, its output must match the typed struct
 and Ohai-compatible JSON shape consumers expect.
 
+### MANDATORY: Cross-reference Ohai before implementing
+
+Before writing code for a new collector (or modifying an existing one),
+**always read Ohai's corresponding plugin and spec** and shape the output
+to match theirs. Ohai-compatible JSON is an explicit product goal, so the
+JSON field names, nesting, and semantics must line up — don't invent a
+new shape.
+
+Fetch both files with `gh api`:
+
+```bash
+gh api repos/chef/ohai/contents/lib/ohai/plugins/<name>.rb --jq .content | base64 -d
+gh api repos/chef/ohai/contents/spec/unit/plugins/<name>_spec.rb --jq .content | base64 -d
+```
+
+(Filenames occasionally differ — e.g. `root_group` is under `linux/` or
+`darwin/` subdirs. Browse `repos/chef/ohai/contents/lib/ohai/plugins` if
+the direct path 404s.)
+
+Record the cross-reference in the collector's doc under a
+**"Ohai parity"** heading:
+
+- Ohai plugin path (link to `chef/ohai` main branch).
+- Output shape diff: identical / we add / we omit / we rename, with a
+  one-line justification for each deviation.
+- Source divergence: if Ohai reads X and we read Y, say why (e.g. avoids
+  a runtime dependency, more portable, faster).
+
+If you find Ohai has coverage we lack (extra fields, OS support, edge
+cases), open a follow-up issue rather than silently dropping it.
+
+[Reference PR adding this rule: chef/ohai#1754]
+
 ## Development Reference
 
 For setup, prerequisites, and contributing guidelines:

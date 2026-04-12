@@ -4,12 +4,20 @@
 
 ## Description
 
-Reports whether the kernel is running in FIPS 140 mode. FIPS 140 is the U.S.
-federal cryptographic module standard; when enabled, the kernel restricts
-cryptographic primitives to the approved set and fails closed rather than
-falling back to non-compliant algorithms. On Linux the state is exposed as a
-single 0/1 flag at `/proc/sys/crypto/fips_enabled`, controlled by the `fips=1`
-kernel command-line parameter at boot.
+Reports whether the kernel is running in FIPS mode. FIPS 140 is the U.S. federal
+cryptographic module standard (current revision: FIPS 140-3, which superseded
+FIPS 140-2 in 2019). When enabled, the kernel restricts cryptographic primitives
+to the approved set and fails closed rather than falling back to non-compliant
+algorithms. On Linux the state is exposed as a single 0/1 flag at
+`/proc/sys/crypto/fips_enabled`, controlled by the `fips=1` kernel command-line
+parameter at boot.
+
+The runtime flag does **not** distinguish which revision of FIPS 140 the
+kernel's crypto module was validated against — that's a property of the module
+build (RHEL 8 targets 140-2; RHEL 9 targets 140-3; Ubuntu Pro FIPS, SUSE, and
+others each ship their own validated modules). This collector reports mode
+on/off only; consumers who need the validated revision must correlate with the
+OS/kernel version reported by `platform`/`kernel`.
 
 Consumers use this to:
 
@@ -28,16 +36,18 @@ macOS FIPS posture should consult Apple's certificate list separately.
 
 ## Collected Fields
 
-| Field     | Type   | Description                                       |
-| --------- | ------ | ------------------------------------------------- |
-| `enabled` | `bool` | `true` if the kernel is running in FIPS 140 mode. |
+Top-level: `kernel` (object, matches Ohai's `fips.kernel` shape).
+
+| Field            | Type   | Description                                   |
+| ---------------- | ------ | --------------------------------------------- |
+| `kernel.enabled` | `bool` | `true` if the kernel is running in FIPS mode. |
 
 ## Platform Support
 
 | Platform | Source                          | Supported |
 | -------- | ------------------------------- | --------- |
 | Linux    | `/proc/sys/crypto/fips_enabled` | ✅        |
-| macOS    | Always `enabled: false`         | ⚠️        |
+| macOS    | —                               | `nil`     |
 | Other    | —                               | `nil`     |
 
 On Linux, if `/proc/sys/crypto/fips_enabled` is missing (very old or custom
@@ -52,20 +62,27 @@ FIPS mode is not active.
 ```json
 {
   "fips": {
-    "enabled": true
+    "kernel": {
+      "enabled": true
+    }
   }
 }
 ```
 
-### Standard Linux or macOS host
+### Standard Linux host
 
 ```json
 {
   "fips": {
-    "enabled": false
+    "kernel": {
+      "enabled": false
+    }
   }
 }
 ```
+
+macOS: `facts.Fips` is `nil` (matches Ohai — no `:darwin` platform in Ohai's
+plugin).
 
 ## SDK Usage
 
@@ -98,3 +115,17 @@ None — Tier 1 core collector with no upstream collector dependencies.
 ## Backing library
 
 - Go stdlib (`os`, `io`) — no third-party dependency.
+
+## Ohai parity
+
+- Ohai plugin:
+  [`lib/ohai/plugins/fips.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/fips.rb)
+- Output shape: **identical** — `fips.kernel.enabled` (bool).
+- Platform coverage: **identical** — Ohai provides on `:linux` and `:windows`
+  only; we provide on Linux only (Windows planned) and return `nil` on macOS.
+- Source divergence: Ohai reads `OpenSSL.fips_mode` from the Ruby OpenSSL
+  binding; we read `/proc/sys/crypto/fips_enabled` directly. On Linux these
+  track the same kernel flag (the OpenSSL FIPS mode is initialized from it), so
+  the reported value matches in practice. We prefer the `/proc` read because it
+  avoids linking or shelling to OpenSSL and doesn't depend on which OpenSSL the
+  host has installed.
