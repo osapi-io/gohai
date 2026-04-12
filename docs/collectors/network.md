@@ -54,6 +54,50 @@ Per-interface:
 | macOS    | `gopsutil/v4/net.Interfaces` + `net.IOCounters` | ✅        |
 | Other    | Returns `nil`                                   | —         |
 
+## Example Output
+
+```json
+{
+  "network": {
+    "interfaces": [
+      {
+        "name": "eth0",
+        "mtu": 1500,
+        "hardware_addr": "02:42:ac:11:00:02",
+        "flags": ["up", "broadcast", "multicast"],
+        "addresses": [
+          { "addr": "10.0.0.5/24" },
+          { "addr": "fe80::42:acff:fe11:2/64" }
+        ],
+        "counters": {
+          "bytes_sent": 1048576,
+          "bytes_recv": 10485760,
+          "packets_sent": 2048,
+          "packets_recv": 8192
+        }
+      }
+    ]
+  }
+}
+```
+
+## SDK Usage
+
+```go
+import (
+    "context"
+
+    "github.com/osapi-io/gohai/pkg/gohai"
+)
+
+g, _ := gohai.New(gohai.WithCollectors("network"))
+facts, _ := g.Collect(context.Background())
+
+for _, iface := range facts.Network.Interfaces {
+    fmt.Printf("%s (%s): %d addrs\n", iface.Name, iface.HardwareAddr, len(iface.Addresses))
+}
+```
+
 ## Enable/Disable
 
 ```bash

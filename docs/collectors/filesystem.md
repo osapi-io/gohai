@@ -35,6 +35,47 @@ Per-mount:
 | macOS    | `gopsutil/v4/disk.Partitions` + `disk.Usage` | ✅        |
 | Other    | Returns `nil`                                | —         |
 
+## Example Output
+
+```json
+{
+  "filesystem": {
+    "mounts": [
+      {
+        "device": "/dev/sda1",
+        "mountpoint": "/",
+        "fstype": "ext4",
+        "opts": ["rw", "relatime"],
+        "total": 107374182400,
+        "used": 53687091200,
+        "free": 53687091200,
+        "used_percent": 50.0,
+        "inodes_total": 6553600,
+        "inodes_used": 129384,
+        "inodes_free": 6424216
+      }
+    ]
+  }
+}
+```
+
+## SDK Usage
+
+```go
+import (
+    "context"
+
+    "github.com/osapi-io/gohai/pkg/gohai"
+)
+
+g, _ := gohai.New(gohai.WithCollectors("filesystem"))
+facts, _ := g.Collect(context.Background())
+
+for _, m := range facts.Filesystem.Mounts {
+    fmt.Printf("%s on %s: %.1f%% used\n", m.Device, m.Mountpoint, m.UsedPercent)
+}
+```
+
 ## Enable/Disable
 
 ```bash

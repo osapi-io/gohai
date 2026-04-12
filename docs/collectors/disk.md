@@ -35,6 +35,44 @@ Per-device:
 | macOS    | `gopsutil/v4/disk.IOCountersWithContext` | ✅        |
 | Other    | Returns `nil`                            | —         |
 
+## Example Output
+
+```json
+{
+  "disk": {
+    "devices": [
+      {
+        "name": "sda",
+        "read_count": 152341,
+        "write_count": 98234,
+        "read_bytes": 9823746048,
+        "write_bytes": 4123498752,
+        "read_time": 482013,
+        "write_time": 182947,
+        "io_time": 623481
+      }
+    ]
+  }
+}
+```
+
+## SDK Usage
+
+```go
+import (
+    "context"
+
+    "github.com/osapi-io/gohai/pkg/gohai"
+)
+
+g, _ := gohai.New(gohai.WithCollectors("disk"))
+facts, _ := g.Collect(context.Background())
+
+for _, d := range facts.Disk.Devices {
+    fmt.Printf("%s: %d reads, %d writes\n", d.Name, d.ReadCount, d.WriteCount)
+}
+```
+
 ## Enable/Disable
 
 ```bash

@@ -50,6 +50,22 @@ Collects virtual and swap memory usage. Wraps
 }
 ```
 
+## SDK Usage
+
+```go
+import (
+    "context"
+
+    "github.com/osapi-io/gohai/pkg/gohai"
+)
+
+g, _ := gohai.New(gohai.WithCollectors("memory"))
+facts, _ := g.Collect(context.Background())
+
+m := facts.Memory
+fmt.Printf("%.1f%% used (%d / %d bytes)\n", m.UsedPercent, m.Used, m.Total)
+```
+
 ## Enable/Disable
 
 ```bash

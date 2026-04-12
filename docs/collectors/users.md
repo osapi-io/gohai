@@ -33,6 +33,45 @@ Per-session:
 | macOS    | `gopsutil/v4/host.UsersWithContext` | ✅        |
 | Other    | Returns `nil`                       | —         |
 
+## Example Output
+
+```json
+{
+  "users": {
+    "logged_in": [
+      {
+        "user": "john",
+        "terminal": "pts/0",
+        "host": "192.168.1.5",
+        "started": 1712908800
+      },
+      {
+        "user": "root",
+        "terminal": "tty1",
+        "started": 1712900000
+      }
+    ]
+  }
+}
+```
+
+## SDK Usage
+
+```go
+import (
+    "context"
+
+    "github.com/osapi-io/gohai/pkg/gohai"
+)
+
+g, _ := gohai.New(gohai.WithCollectors("users"))
+facts, _ := g.Collect(context.Background())
+
+for _, s := range facts.Users.LoggedIn {
+    fmt.Printf("%s on %s from %s\n", s.User, s.Terminal, s.Host)
+}
+```
+
 ## Enable/Disable
 
 ```bash

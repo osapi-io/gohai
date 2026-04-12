@@ -32,6 +32,21 @@ Reports the unique machine identifier (from `/etc/machine-id` on Linux,
 }
 ```
 
+## SDK Usage
+
+```go
+import (
+    "context"
+
+    "github.com/osapi-io/gohai/pkg/gohai"
+)
+
+g, _ := gohai.New(gohai.WithCollectors("machine_id"))
+facts, _ := g.Collect(context.Background())
+
+fmt.Println(facts.MachineID.ID)
+```
+
 ## Enable/Disable
 
 ```bash
