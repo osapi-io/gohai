@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,61 +20,25 @@
 
 package network
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/net"
-)
+// Darwin collects network facts on macOS via gopsutil.
+type Darwin struct {
+	base
 
-var (
-	interfacesFn = net.InterfacesWithContext
-	ioCountersFn = net.IOCountersWithContext
-)
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, interfacesFn, ioCountersFn)
+	InterfacesFn func(context.Context) ([]Interface, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	ifaceFn func(context.Context) (net.InterfaceStatList, error),
-	ioFn func(context.Context, bool) ([]net.IOCountersStat, error),
-) (any, error) {
-	ifaces, err := ifaceFn(ctx)
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{InterfacesFn: readInterfaces}
+}
+
+// Collect returns network Info.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	ifs, err := d.InterfacesFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("net.Interfaces: %w", err)
+		return nil, err
 	}
-	counters, err := ioFn(ctx, true)
-	if err != nil {
-		return nil, fmt.Errorf("net.IOCounters: %w", err)
-	}
-	countersByName := make(map[string]net.IOCountersStat, len(counters))
-	for _, c := range counters {
-		countersByName[c.Name] = c
-	}
-	out := &Info{Interfaces: make([]Interface, 0, len(ifaces))}
-	for _, ifs := range ifaces {
-		i := Interface{
-			Name:         ifs.Name,
-			MTU:          ifs.MTU,
-			HardwareAddr: ifs.HardwareAddr,
-			Flags:        ifs.Flags,
-		}
-		for _, a := range ifs.Addrs {
-			i.Addresses = append(i.Addresses, Address{Addr: a.Addr})
-		}
-		if c, ok := countersByName[ifs.Name]; ok {
-			i.Counters = &Counters{
-				BytesSent: c.BytesSent, BytesRecv: c.BytesRecv,
-				PacketsSent: c.PacketsSent, PacketsRecv: c.PacketsRecv,
-				Errin: c.Errin, Errout: c.Errout,
-				Dropin: c.Dropin, Dropout: c.Dropout,
-			}
-		}
-		out.Interfaces = append(out.Interfaces, i)
-	}
-	return out, nil
+	return &Info{Interfaces: ifs}, nil
 }

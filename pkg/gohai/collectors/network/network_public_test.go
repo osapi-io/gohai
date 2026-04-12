@@ -27,7 +27,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
+)
+
+var (
+	_ collector.Collector = (*network.Linux)(nil)
+	_ collector.Collector = (*network.Darwin)(nil)
 )
 
 type NetworkPublicTestSuite struct {
@@ -39,23 +45,53 @@ func TestNetworkPublicTestSuite(t *testing.T) {
 }
 
 func (s *NetworkPublicTestSuite) TestNew() {
-	c := network.New()
-	s.Equal("network", c.Name())
-	s.Equal(true, c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
 
-func (s *NetworkPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = network.New()
-}
-
-func (s *NetworkPublicTestSuite) TestCollect() {
-	c := network.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	_, ok := got.(*network.Info)
-	s.True(ok)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := network.New()
+			s.Equal("network", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*network.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			}
+		})
+	}
+}
+
+// TestCollectOnHost exercises the real gopsutil-backed readInterfaces
+// bridge. Real net.Interfaces aren't unit-constructable.
+func (s *NetworkPublicTestSuite) TestCollectOnHost() {
+	tests := []struct{ name string }{
+		{name: "host enumerates at least the loopback interface"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := network.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*network.Info)
+			s.Require().True(ok)
+			s.NotEmpty(info.Interfaces)
+		})
+	}
 }

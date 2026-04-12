@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	gnet "github.com/shirou/gopsutil/v4/net"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
@@ -41,58 +38,50 @@ func TestNetworkLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(NetworkLinuxPublicTestSuite))
 }
 
-func (s *NetworkLinuxPublicTestSuite) TestCollectFromGopsutil() {
-	ifacesOk := func(_ context.Context) (gnet.InterfaceStatList, error) {
-		return gnet.InterfaceStatList{
-			{
-				Index:        1,
-				Name:         "eth0",
-				MTU:          1500,
-				HardwareAddr: "aa:bb:cc:dd:ee:ff",
-				Flags:        []string{"up"},
-				Addrs:        []gnet.InterfaceAddr{{Addr: "10.0.0.5"}},
-			},
-			{
-				Index: 2,
-				Name:  "lo",
-				MTU:   65536,
-				Flags: []string{"up", "loopback"},
-				Addrs: []gnet.InterfaceAddr{{Addr: "127.0.0.1"}},
-			},
-		}, nil
-	}
-	ioOk := func(_ context.Context, _ bool) ([]gnet.IOCountersStat, error) {
-		return []gnet.IOCountersStat{
-			{Name: "eth0", BytesSent: 1000, BytesRecv: 2000, PacketsSent: 10, PacketsRecv: 20},
-		}, nil
-	}
-
+func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		ifaceFn func(context.Context) (gnet.InterfaceStatList, error)
-		ioFn    func(context.Context, bool) ([]gnet.IOCountersStat, error)
+		ifs     []network.Interface
+		fnErr   error
 		wantErr bool
-		wantLen int
+		want    network.Info
 	}{
-		{"happy path with counters", ifacesOk, ioOk, false, 2},
 		{
-			"interfaces error",
-			func(_ context.Context) (gnet.InterfaceStatList, error) { return nil, errors.New("boom") },
-			ioOk,
-			true,
-			0,
+			name: "eth0 with addresses and counters",
+			ifs: []network.Interface{
+				{
+					Name: "eth0", MTU: 1500, HardwareAddr: "02:42:ac:11:00:02",
+					Flags:     []string{"up", "broadcast"},
+					Addresses: []network.Address{{Addr: "10.0.0.5/24"}},
+					Counters:  &network.Counters{BytesSent: 100, BytesRecv: 200},
+				},
+			},
+			want: network.Info{Interfaces: []network.Interface{
+				{
+					Name: "eth0", MTU: 1500, HardwareAddr: "02:42:ac:11:00:02",
+					Flags:     []string{"up", "broadcast"},
+					Addresses: []network.Address{{Addr: "10.0.0.5/24"}},
+					Counters:  &network.Counters{BytesSent: 100, BytesRecv: 200},
+				},
+			}},
 		},
 		{
-			"io counters error",
-			ifacesOk,
-			func(_ context.Context, _ bool) ([]gnet.IOCountersStat, error) { return nil, errors.New("boom") },
-			true,
-			0,
+			name:    "gopsutil error propagated",
+			fnErr:   errors.New("net interfaces error"),
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := network.CollectFromGopsutil(context.Background(), tt.ifaceFn, tt.ioFn)
+			c := &network.Linux{
+				InterfacesFn: func(context.Context) ([]network.Interface, error) {
+					if tt.fnErr != nil {
+						return nil, tt.fnErr
+					}
+					return tt.ifs, nil
+				},
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -100,18 +89,7 @@ func (s *NetworkLinuxPublicTestSuite) TestCollectFromGopsutil() {
 			s.Require().NoError(err)
 			info, ok := got.(*network.Info)
 			s.Require().True(ok)
-			s.Len(info.Interfaces, tt.wantLen)
-			if tt.wantLen > 0 {
-				s.NotNil(info.Interfaces[0].Counters) // eth0 has counters
-				s.Nil(info.Interfaces[1].Counters)    // lo doesn't
-			}
+			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *NetworkLinuxPublicTestSuite) TestCollectDefault() {
-	got, err := network.Collect(context.Background())
-	s.Require().NoError(err)
-	_, ok := got.(*network.Info)
-	s.True(ok)
 }
