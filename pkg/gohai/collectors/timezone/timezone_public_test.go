@@ -41,7 +41,7 @@ func TestTimezonePublicTestSuite(t *testing.T) {
 func (s *TimezonePublicTestSuite) TestNew() {
 	c := timezone.New()
 	s.Equal("timezone", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

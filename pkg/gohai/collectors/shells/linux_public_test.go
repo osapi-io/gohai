@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,6 +21,7 @@
 package shells_test
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -47,98 +46,106 @@ type stringReadCloser struct{ *strings.Reader }
 
 func (stringReadCloser) Close() error { return nil }
 
-// erroringReader fails on every Read.
+// erroringReader fails on every Read — used to exercise the scanner
+// error path.
 type erroringReader struct{}
 
 func (erroringReader) Read([]byte) (int, error) { return 0, errors.New("read fail") }
 
-func (s *ShellsLinuxPublicTestSuite) TestParseShells() {
+type erroringReadCloser struct{ erroringReader }
+
+func (erroringReadCloser) Close() error { return nil }
+
+func (s *ShellsLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		content string
-		want    []string
-		wantErr bool
-	}{
-		{
-			name:    "canonical /etc/shells",
-			content: "# comment line\n/bin/sh\n/bin/bash\n\n/usr/bin/zsh\n",
-			want:    []string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"},
-		},
-		{
-			name:    "empty file",
-			content: "",
-			want:    []string{},
-		},
-		{
-			name:    "only comments and blanks",
-			content: "# only comments\n\n   \n",
-			want:    []string{},
-		},
-		{
-			name:    "whitespace trimmed",
-			content: "  /bin/bash  \n\t/bin/sh\t\n",
-			want:    []string{"/bin/bash", "/bin/sh"},
-		},
-		{
-			name:    "non-absolute entries skipped",
-			content: "/bin/sh\nnologin\nbash\n/bin/zsh\n",
-			want:    []string{"/bin/sh", "/bin/zsh"},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			info, err := shells.ParseShells(strings.NewReader(tt.content))
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.want, info.Paths)
-		})
-	}
-}
-
-func (s *ShellsLinuxPublicTestSuite) TestParseShellsReadError() {
-	_, err := shells.ParseShells(erroringReader{})
-	s.Error(err)
-}
-
-func (s *ShellsLinuxPublicTestSuite) TestCollectFromFunc() {
-	tests := []struct {
-		name    string
-		open    func(string) (io.ReadCloser, error)
+		openFn  func(string) (io.ReadCloser, error)
 		wantErr bool
 		want    []string
 	}{
 		{
-			name: "success",
-			open: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{strings.NewReader("/bin/sh\n/bin/bash\n")}, nil
+			name: "canonical /etc/shells",
+			openFn: func(string) (io.ReadCloser, error) {
+				return stringReadCloser{
+					strings.NewReader("# comment\n/bin/sh\n/bin/bash\n\n/usr/bin/zsh\n"),
+				}, nil
 			},
-			want: []string{"/bin/sh", "/bin/bash"},
+			want: []string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"},
 		},
 		{
-			name:    "other open error propagated",
-			open:    func(string) (io.ReadCloser, error) { return nil, errors.New("permission denied") },
-			wantErr: true,
+			name: "non-absolute entries skipped",
+			openFn: func(string) (io.ReadCloser, error) {
+				return stringReadCloser{
+					strings.NewReader("/bin/sh\nnologin\nbash\n/bin/zsh\n"),
+				}, nil
+			},
+			want: []string{"/bin/sh", "/bin/zsh"},
 		},
 		{
-			name: "missing /etc/shells soft-misses to empty list",
-			open: func(string) (io.ReadCloser, error) {
+			name: "whitespace trimmed",
+			openFn: func(string) (io.ReadCloser, error) {
+				return stringReadCloser{strings.NewReader("  /bin/bash  \n\t/bin/sh\t\n")}, nil
+			},
+			want: []string{"/bin/bash", "/bin/sh"},
+		},
+		{
+			name: "empty file",
+			openFn: func(string) (io.ReadCloser, error) {
+				return stringReadCloser{strings.NewReader("")}, nil
+			},
+			want: []string{},
+		},
+		{
+			name: "missing file soft-misses",
+			openFn: func(string) (io.ReadCloser, error) {
 				return nil, os.ErrNotExist
 			},
 			want: []string{},
 		},
+		{
+			name: "other open error propagated",
+			openFn: func(string) (io.ReadCloser, error) {
+				return nil, errors.New("permission denied")
+			},
+			wantErr: true,
+		},
+		{
+			name: "read error propagated",
+			openFn: func(string) (io.ReadCloser, error) {
+				return erroringReadCloser{}, nil
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info, err := shells.CollectFromFunc(tt.open)
+			c := &shells.Linux{OpenFn: tt.openFn}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
 			}
 			s.Require().NoError(err)
+			info, ok := got.(*shells.Info)
+			s.Require().True(ok)
 			s.Equal(tt.want, info.Paths)
 		})
 	}
+}
+
+// TestNewLinuxWiresUpRealOpen exercises the real os.Open closure the
+// factory wires in, proving it works on an existing path and propagates
+// errors on a missing one.
+func (s *ShellsLinuxPublicTestSuite) TestNewLinuxWiresUpRealOpen() {
+	c := shells.NewLinux()
+	s.Require().NotNil(c.OpenFn)
+
+	// Happy path: /dev/null exists on every POSIX system.
+	rc, err := c.OpenFn("/dev/null")
+	s.Require().NoError(err)
+	s.Require().NoError(rc.Close())
+
+	// Error path: path that definitely doesn't exist.
+	_, err = c.OpenFn("/gohai-test-does-not-exist/shells")
+	s.Error(err)
 }

@@ -41,7 +41,7 @@ func TestRootGroupPublicTestSuite(t *testing.T) {
 func (s *RootGroupPublicTestSuite) TestNew() {
 	c := rootgroup.New()
 	s.Equal("root_group", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

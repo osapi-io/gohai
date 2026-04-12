@@ -41,7 +41,7 @@ func TestCPUPublicTestSuite(t *testing.T) {
 func (s *CPUPublicTestSuite) TestNew() {
 	c := cpu.New()
 	s.Equal("cpu", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

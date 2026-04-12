@@ -41,7 +41,7 @@ func TestNetworkPublicTestSuite(t *testing.T) {
 func (s *NetworkPublicTestSuite) TestNew() {
 	c := network.New()
 	s.Equal("network", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

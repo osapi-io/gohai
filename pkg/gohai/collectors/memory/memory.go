@@ -23,8 +23,6 @@ package memory
 
 import (
 	"context"
-
-	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // Info holds memory usage data.
@@ -60,9 +58,9 @@ func (c *Collector) Name() string {
 	return "memory"
 }
 
-// Tier returns TierCore.
-func (c *Collector) Tier() collector.Tier {
-	return collector.TierCore
+// DefaultEnabled returns true — collector is on by default.
+func (c *Collector) DefaultEnabled() bool {
+	return true
 }
 
 // Dependencies returns no dependencies.

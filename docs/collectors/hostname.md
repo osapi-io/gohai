@@ -79,7 +79,7 @@ gohai --no-collector.hostname   # disable
 
 ## Dependencies
 
-None — Tier 1 core collector with no upstream collector dependencies.
+None.
 
 ## Backing library
 

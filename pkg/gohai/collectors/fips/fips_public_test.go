@@ -41,7 +41,7 @@ func TestFipsPublicTestSuite(t *testing.T) {
 func (s *FipsPublicTestSuite) TestNew() {
 	c := fips.New()
 	s.Equal("fips", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

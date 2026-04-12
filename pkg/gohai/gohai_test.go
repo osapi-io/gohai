@@ -46,8 +46,8 @@ func (c *cycleCollector) Name() string {
 	return c.name
 }
 
-func (c *cycleCollector) Tier() collector.Tier {
-	return collector.TierCore
+func (c *cycleCollector) DefaultEnabled() bool {
+	return true
 }
 
 func (c *cycleCollector) Dependencies() []string {

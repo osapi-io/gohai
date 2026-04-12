@@ -29,9 +29,12 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-// HostInfoFn is the function used to retrieve host information. Override
-// in tests to simulate different platforms.
-var HostInfoFn = host.Info
+// hostInfoFn is the gopsutil call used to retrieve host information.
+// Private to the package — do not leak gopsutil types into callers.
+// Collector tests that need to force a specific Detect() result should
+// swap platform.Detect directly (a var, see below) rather than stubbing
+// this.
+var hostInfoFn = host.Info
 
 // debianFamily lists distributions that share the debian provider
 // implementations (apt, systemd, netplan). Matches OSAPI's list.
@@ -58,6 +61,8 @@ var rhelFamily = map[string]bool{
 }
 
 // Detect returns the OS family name used to pick a collector variant.
+// Swappable in tests so collector unit tests can force any dispatch
+// branch without importing gopsutil.
 //
 // Return values:
 //   - "darwin" on macOS
@@ -74,8 +79,16 @@ var rhelFamily = map[string]bool{
 //	case "rhel":    return NewRHEL()
 //	default:        return NewLinux()
 //	}
-func Detect() string {
-	info, _ := HostInfoFn()
+//
+// Tests override with:
+//
+//	orig := platform.Detect
+//	defer func() { platform.Detect = orig }()
+//	platform.Detect = func() string { return "darwin" }
+var Detect = detect
+
+func detect() string {
+	info, _ := hostInfoFn()
 	if info == nil {
 		return ""
 	}

@@ -45,17 +45,17 @@ func (s *RegistryPublicTestSuite) SetupTest() {
 }
 
 type fakeCollector struct {
-	name string
-	tier collector.Tier
-	deps []string
+	name           string
+	defaultEnabled bool
+	deps           []string
 }
 
 func (f *fakeCollector) Name() string {
 	return f.name
 }
 
-func (f *fakeCollector) Tier() collector.Tier {
-	return f.tier
+func (f *fakeCollector) DefaultEnabled() bool {
+	return f.defaultEnabled
 }
 
 func (f *fakeCollector) Dependencies() []string {
@@ -76,8 +76,8 @@ func (e *errCollector) Name() string {
 	return e.name
 }
 
-func (e *errCollector) Tier() collector.Tier {
-	return collector.TierCore
+func (e *errCollector) DefaultEnabled() bool {
+	return true
 }
 
 func (e *errCollector) Dependencies() []string {
@@ -98,17 +98,17 @@ func (s *RegistryPublicTestSuite) TestRegister() {
 	}{
 		{
 			name:      "registers a new collector",
-			collector: &fakeCollector{name: "alpha", tier: collector.TierCore},
+			collector: &fakeCollector{name: "alpha", defaultEnabled: true},
 			wantErr:   false,
 		},
 		{
 			name:      "rejects empty name",
-			collector: &fakeCollector{name: "", tier: collector.TierCore},
+			collector: &fakeCollector{name: "", defaultEnabled: true},
 			wantErr:   true,
 		},
 		{
 			name:      "rejects duplicate registration",
-			collector: &fakeCollector{name: "dup", tier: collector.TierCore},
+			collector: &fakeCollector{name: "dup", defaultEnabled: true},
 			wantErr:   true,
 		},
 	}
@@ -148,7 +148,7 @@ func (s *RegistryPublicTestSuite) TestGet() {
 			reg := collector.NewRegistry()
 			if tt.register {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: tt.lookup, tier: collector.TierCore}))
+					NoError(reg.Register(&fakeCollector{name: tt.lookup, defaultEnabled: true}))
 			}
 			_, ok := reg.Get(tt.lookup)
 			s.Equal(tt.wantOK, ok)
@@ -157,8 +157,8 @@ func (s *RegistryPublicTestSuite) TestGet() {
 }
 
 func (s *RegistryPublicTestSuite) TestNames() {
-	s.Require().NoError(s.reg.Register(&fakeCollector{name: "b", tier: collector.TierCore}))
-	s.Require().NoError(s.reg.Register(&fakeCollector{name: "a", tier: collector.TierCore}))
+	s.Require().NoError(s.reg.Register(&fakeCollector{name: "b", defaultEnabled: true}))
+	s.Require().NoError(s.reg.Register(&fakeCollector{name: "a", defaultEnabled: true}))
 	names := s.reg.Names()
 	sort.Strings(names)
 	s.Equal([]string{"a", "b"}, names)
@@ -209,13 +209,13 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 		s.Run(tt.name, func() {
 			reg := collector.NewRegistry()
 			s.Require().
-				NoError(reg.Register(&fakeCollector{name: "core1", tier: collector.TierCore}))
+				NoError(reg.Register(&fakeCollector{name: "core1", defaultEnabled: true}))
 			s.Require().
-				NoError(reg.Register(&fakeCollector{name: "core2", tier: collector.TierCore}))
+				NoError(reg.Register(&fakeCollector{name: "core2", defaultEnabled: true}))
 			s.Require().
-				NoError(reg.Register(&fakeCollector{name: "ext", tier: collector.TierExtended}))
+				NoError(reg.Register(&fakeCollector{name: "ext", defaultEnabled: true}))
 			s.Require().
-				NoError(reg.Register(&fakeCollector{name: "opt", tier: collector.TierOptIn}))
+				NoError(reg.Register(&fakeCollector{name: "opt", defaultEnabled: false}))
 
 			got, err := reg.Selected(tt.enable, tt.disable)
 			if tt.wantErr {
@@ -246,11 +246,11 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "orders by dependency",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "a", tier: collector.TierCore}))
+					NoError(reg.Register(&fakeCollector{name: "a", defaultEnabled: true}))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "b", tier: collector.TierCore, deps: []string{"a"}}))
+					NoError(reg.Register(&fakeCollector{name: "b", defaultEnabled: true, deps: []string{"a"}}))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "c", tier: collector.TierCore, deps: []string{"b"}}))
+					NoError(reg.Register(&fakeCollector{name: "c", defaultEnabled: true, deps: []string{"b"}}))
 			},
 			names:       []string{"a", "b", "c"},
 			wantResults: []string{"a", "b", "c"},
@@ -259,9 +259,9 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "auto-includes dependencies",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "a", tier: collector.TierOptIn}))
+					NoError(reg.Register(&fakeCollector{name: "a", defaultEnabled: false}))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "b", tier: collector.TierOptIn, deps: []string{"a"}}))
+					NoError(reg.Register(&fakeCollector{name: "b", defaultEnabled: false, deps: []string{"a"}}))
 			},
 			names:       []string{"b"},
 			wantResults: []string{"a", "b"},
@@ -270,9 +270,9 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "detects cycle",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "a", tier: collector.TierCore, deps: []string{"b"}}))
+					NoError(reg.Register(&fakeCollector{name: "a", defaultEnabled: true, deps: []string{"b"}}))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "b", tier: collector.TierCore, deps: []string{"a"}}))
+					NoError(reg.Register(&fakeCollector{name: "b", defaultEnabled: true, deps: []string{"a"}}))
 			},
 			names:   []string{"a", "b"},
 			wantErr: true,
@@ -281,7 +281,7 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "missing dependency errors",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "a", tier: collector.TierCore, deps: []string{"missing"}}))
+					NoError(reg.Register(&fakeCollector{name: "a", defaultEnabled: true, deps: []string{"missing"}}))
 			},
 			names:   []string{"a"},
 			wantErr: true,
@@ -291,7 +291,7 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			setup: func(reg *collector.Registry) {
 				s.Require().NoError(reg.Register(&errCollector{name: "bad"}))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "good", tier: collector.TierCore}))
+					NoError(reg.Register(&fakeCollector{name: "good", defaultEnabled: true}))
 			},
 			names:        []string{"bad", "good"},
 			wantResults:  []string{"good"},

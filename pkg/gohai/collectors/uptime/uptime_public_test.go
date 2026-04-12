@@ -41,7 +41,7 @@ func TestUptimePublicTestSuite(t *testing.T) {
 func (s *UptimePublicTestSuite) TestNew() {
 	c := uptime.New()
 	s.Equal("uptime", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

@@ -23,8 +23,6 @@ package disk
 
 import (
 	"context"
-
-	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // Info holds per-device disk I/O counters.
@@ -57,9 +55,9 @@ func (c *Collector) Name() string {
 	return "disk"
 }
 
-// Tier returns TierExtended.
-func (c *Collector) Tier() collector.Tier {
-	return collector.TierExtended
+// DefaultEnabled returns true — collector is on by default.
+func (c *Collector) DefaultEnabled() bool {
+	return true
 }
 
 // Dependencies returns no dependencies.

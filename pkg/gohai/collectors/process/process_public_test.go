@@ -41,7 +41,7 @@ func TestProcessPublicTestSuite(t *testing.T) {
 func (s *ProcessPublicTestSuite) TestNew() {
 	c := process.New()
 	s.Equal("process", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

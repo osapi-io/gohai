@@ -41,7 +41,7 @@ func TestDiskPublicTestSuite(t *testing.T) {
 func (s *DiskPublicTestSuite) TestNew() {
 	c := disk.New()
 	s.Equal("disk", c.Name())
-	s.Equal(collector.TierExtended, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

@@ -21,12 +21,12 @@
 package shells_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
 )
 
@@ -38,26 +38,55 @@ func TestShellsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ShellsPublicTestSuite))
 }
 
+// TestNew verifies the factory returns a collector whose interface
+// contract matches what the registry expects. The actual OS-specific
+// type it returns depends on the test host; on dev machines it will be
+// *shells.Linux or *shells.Darwin.
 func (s *ShellsPublicTestSuite) TestNew() {
 	c := shells.New()
 	s.Equal("shells", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 
+// TestImplementsCollectorInterface confirms both variants satisfy
+// collector.Collector (compile-time check).
 func (s *ShellsPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = shells.New()
+	var _ collector.Collector = shells.NewLinux()
+	var _ collector.Collector = shells.NewDarwin()
 }
 
-func (s *ShellsPublicTestSuite) TestCollect() {
-	c := shells.New()
-	got, err := c.Collect(context.Background())
-	if err != nil {
-		return // /etc/shells absent on host is OK
+// TestNewDispatch verifies every platform-detect branch returns the
+// expected concrete type. Stubs platform.Detect directly (a swappable
+// var) so this test needs no gopsutil import — the gopsutil dependency
+// stays sealed inside internal/platform.
+func (s *ShellsPublicTestSuite) TestNewDispatch() {
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
+
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string // "linux" or "darwin"
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux (no shells-specific debian variant)", "debian", "linux"},
+		{"rhel dispatches to Linux (no shells-specific rhel variant)", "rhel", "linux"},
+		{"arch dispatches to Linux (generic)", "arch", "linux"},
+		{"empty (unknown) dispatches to Linux", "", "linux"},
 	}
-	if got == nil {
-		return
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			got := shells.New()
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := got.(*shells.Darwin)
+				s.True(ok, "expected *shells.Darwin")
+			case "linux":
+				_, ok := got.(*shells.Linux)
+				s.True(ok, "expected *shells.Linux")
+			}
+		})
 	}
-	_, ok := got.(*shells.Info)
-	s.True(ok)
 }

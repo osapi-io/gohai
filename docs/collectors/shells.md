@@ -7,37 +7,39 @@
 Reports the list of valid login shells installed on the host, as listed in
 `/etc/shells`. This file is maintained by the system package manager (and
 sometimes edited by operators) and is the authoritative source consulted by
-`login(1)`, `chsh(1)`, FTP daemons, and other tools that need to decide whether
-a given shell is "legitimate" — a user whose `passwd` entry points to a shell
-not in `/etc/shells` is typically treated as non-interactive.
+`login(1)`, `chsh(1)`, FTP daemons, and other tools that need to decide
+whether a given shell is "legitimate" — a user whose `passwd` entry points
+to a shell not in `/etc/shells` is typically treated as non-interactive.
 
 Consumers use this to:
 
 - Enumerate which shells can be assigned as a login shell (fleet inventory,
   policy compliance — e.g. "is `/bin/zsh` available on this host?").
 - Drive remediation tooling that installs a missing shell before `chsh`.
-- Spot drift across a fleet (hosts where `/etc/shells` has been hand-edited or
-  pruned).
+- Spot drift across a fleet (hosts where `/etc/shells` has been hand-edited
+  or pruned).
 
-Comments (lines beginning with `#`) and blank lines are stripped; leading and
-trailing whitespace on each entry is trimmed.
+Comments (lines beginning with `#`) and blank lines are stripped; leading
+and trailing whitespace on each entry is trimmed. Non-absolute entries
+(anything that doesn't start with `/`) are ignored — matches Ohai's strict
+`/`-prefix filter.
 
 ## Collected Fields
 
-| Field   | Type       | Description                                          |
-| ------- | ---------- | ---------------------------------------------------- |
-| `paths` | `[]string` | Absolute paths to valid login shells, in file order. |
+| Field   | Type       | Description                                          | OCSF mapping |
+| ------- | ---------- | ---------------------------------------------------- | ------------ |
+| `paths` | `[]string` | Absolute paths to valid login shells, in file order. | No direct OCSF equivalent — OCSF has `user.shell` per-user but no host-level shell inventory object. Treated as a gohai extension. |
 
 ## Platform Support
 
-| Platform | Source        | Supported |
-| -------- | ------------- | --------- |
-| Linux    | `/etc/shells` | ✅        |
-| macOS    | `/etc/shells` | ✅        |
-| Other    | —             | `nil`     |
+| Platform | Supported |
+| -------- | --------- |
+| Linux    | ✅        |
+| macOS    | ✅        |
+| Other    | Empty list |
 
-If `/etc/shells` is missing (uncommon, but possible on minimal containers),
-`Collect` returns an error and the field is left `nil` on `Facts`.
+Missing `/etc/shells` (distroless/scratch containers) soft-misses to an
+empty list rather than erroring — matches Ohai's `file_exist?` gate.
 
 ## Example Output
 
@@ -77,6 +79,16 @@ If `/etc/shells` is missing (uncommon, but possible on minimal containers),
 }
 ```
 
+### Minimal container without /etc/shells
+
+```json
+{
+  "shells": {
+    "paths": []
+  }
+}
+```
+
 ## SDK Usage
 
 ```go
@@ -103,7 +115,17 @@ gohai --no-collector.shells   # disable
 
 ## Dependencies
 
-None — Tier 1 core collector with no upstream collector dependencies.
+None.
+
+## Data Sources
+
+| Platform | What we read  | Ohai plugin ([`shells.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/shells.rb)) | Alignment |
+| -------- | ------------- | ---- | --------- |
+| Linux    | `/etc/shells` | `/etc/shells` via `file_open` + line iteration; `line[0] == "/"` filter | **Identical.** Same file, same `/`-prefix filter, same soft-miss on missing file. |
+| macOS    | `/etc/shells` | Same (no `:darwin`-specific code path in Ohai — same plugin runs). | **Identical.** |
+
+**Known gaps:** None. Ohai's logic is fully mirrored. Non-absolute
+entries are rejected to match Ohai's `line[0] == "/"` filter.
 
 ## Backing library
 

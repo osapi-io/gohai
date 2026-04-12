@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,10 +18,15 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package shells
+package platform
 
-var (
-	Collect         = collect
-	CollectFromFunc = collectFromFunc
-	ParseShells     = parseShells
-)
+import "github.com/shirou/gopsutil/v4/host"
+
+// SetHostInfoFn swaps the private gopsutil call used by detect() for
+// the duration of a test. Only this package's own tests — which live in
+// platform_test — use this; collector tests should swap Detect instead.
+func SetHostInfoFn(fn func() (*host.InfoStat, error)) (restore func()) {
+	orig := hostInfoFn
+	hostInfoFn = fn
+	return func() { hostInfoFn = orig }
+}

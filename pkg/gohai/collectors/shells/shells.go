@@ -23,42 +23,79 @@
 package shells
 
 import (
-	"context"
+	"bufio"
+	"fmt"
+	"io"
+	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
+
+// etcShellsPath is the canonical location of the installed-shells list.
+// Same path on Linux and macOS — both follow POSIX convention.
+const etcShellsPath = "/etc/shells"
 
 // Info holds the list of valid login shells.
 type Info struct {
 	Paths []string `json:"paths"`
 }
 
-// Collector implements the collector.Collector interface.
-type Collector struct{}
-
-// New returns a new shells Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every shells variant satisfies.
+// Exposed so the New() factory's return type is explicit.
+type Collector interface {
+	collector.Collector
 }
+
+// base holds the fields every OS variant has in common. Per-OS structs
+// embed this so they don't each have to re-declare Name /
+// DefaultEnabled / Dependencies — those values are identical
+// regardless of OS.
+type base struct{}
 
 // Name returns "shells".
-func (c *Collector) Name() string {
-	return "shells"
-}
+func (base) Name() string { return "shells" }
 
-// Tier returns TierCore.
-func (c *Collector) Tier() collector.Tier {
-	return collector.TierCore
-}
+// DefaultEnabled returns true — shells is on by default.
+func (base) DefaultEnabled() bool { return true }
 
 // Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
+func (base) Dependencies() []string { return nil }
+
+// New returns the shells collector variant appropriate to the detected
+// host OS. osapi-style dispatch — per-OS structs live in linux.go and
+// darwin.go and each implement Collect themselves.
+func New() Collector {
+	switch platform.Detect() {
+	case "darwin":
+		return NewDarwin()
+	default:
+		return NewLinux()
+	}
 }
 
-// Collect reads /etc/shells and returns the list of valid login shells.
-func (c *Collector) Collect(
-	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+// parseShells parses /etc/shells format: one path per line. Skips
+// comments (`#...`), blank lines, and non-absolute entries (matches
+// Ohai's filter — only `/`-prefixed paths are treated as shell entries).
+// Format is POSIX and identical across Linux and macOS, so this helper
+// is shared by both variants.
+func parseShells(
+	r io.Reader,
+) (*Info, error) {
+	info := &Info{Paths: []string{}}
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if !strings.HasPrefix(line, "/") {
+			continue
+		}
+		info.Paths = append(info.Paths, line)
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("read shells: %w", err)
+	}
+	return info, nil
 }

@@ -41,7 +41,7 @@ func TestVirtualizationPublicTestSuite(t *testing.T) {
 func (s *VirtualizationPublicTestSuite) TestNew() {
 	c := virtualization.New()
 	s.Equal("virtualization", c.Name())
-	s.Equal(collector.TierExtended, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

@@ -41,7 +41,7 @@ func TestUsersPublicTestSuite(t *testing.T) {
 func (s *UsersPublicTestSuite) TestNew() {
 	c := users.New()
 	s.Equal("users", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

@@ -116,45 +116,67 @@ func (s *PlatformPublicTestSuite) TestDetect() {
 		},
 	}
 
-	orig := platform.HostInfoFn
-	defer func() { platform.HostInfoFn = orig }()
-
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.HostInfoFn = tt.infoFn
+			restore := platform.SetHostInfoFn(tt.infoFn)
+			defer restore()
 			s.Equal(tt.want, platform.Detect())
 		})
 	}
 }
 
 func (s *PlatformPublicTestSuite) TestIsLinux() {
-	orig := platform.HostInfoFn
-	defer func() { platform.HostInfoFn = orig }()
-
 	tests := []struct {
 		name   string
 		infoFn func() (*host.InfoStat, error)
 		want   bool
 	}{
-		{"ubuntu is linux", func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil }, true},
-		{"arch is linux", func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "arch"}, nil }, true},
-		{"darwin is not linux", func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil }, false},
+		{
+			"ubuntu is linux",
+			func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil },
+			true,
+		},
+		{
+			"arch is linux",
+			func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "arch"}, nil },
+			true,
+		},
+		{
+			"darwin is not linux",
+			func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil },
+			false,
+		},
 		{"empty not linux", func() (*host.InfoStat, error) { return nil, nil }, false},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.HostInfoFn = tt.infoFn
+			restore := platform.SetHostInfoFn(tt.infoFn)
+			defer restore()
 			s.Equal(tt.want, platform.IsLinux())
 		})
 	}
 }
 
 func (s *PlatformPublicTestSuite) TestIsDarwin() {
-	orig := platform.HostInfoFn
-	defer func() { platform.HostInfoFn = orig }()
-
-	platform.HostInfoFn = func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil }
+	restore := platform.SetHostInfoFn(func() (*host.InfoStat, error) {
+		return &host.InfoStat{OS: "darwin"}, nil
+	})
 	s.True(platform.IsDarwin())
-	platform.HostInfoFn = func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil }
+	restore()
+
+	restore = platform.SetHostInfoFn(func() (*host.InfoStat, error) {
+		return &host.InfoStat{Platform: "ubuntu"}, nil
+	})
 	s.False(platform.IsDarwin())
+	restore()
+}
+
+// TestDetectVarSwappable verifies callers (collector tests) can swap
+// the Detect function directly without importing gopsutil.
+func (s *PlatformPublicTestSuite) TestDetectVarSwappable() {
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
+
+	platform.Detect = func() string { return "darwin" }
+	s.Equal("darwin", platform.Detect())
 }

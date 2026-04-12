@@ -41,7 +41,7 @@ func TestPlatformPublicTestSuite(t *testing.T) {
 func (s *PlatformPublicTestSuite) TestNew() {
 	c := platform.New()
 	s.Equal("platform", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

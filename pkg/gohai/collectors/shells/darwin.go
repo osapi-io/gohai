@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,35 +21,38 @@
 package shells
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strings"
 )
 
-// openFn opens a file for reading. Swappable for tests.
-var openFn = func(path string) (io.ReadCloser, error) {
-	return os.Open(path)
+// Darwin collects the shell list on macOS hosts. /etc/shells on macOS
+// ships with a small curated set (/bin/bash, /bin/zsh, /bin/sh, etc.)
+// and is managed by the OS installer. Embeds base for Name / Tier /
+// Dependencies. OpenFn is injected so tests can stub the file read.
+type Darwin struct {
+	base
+
+	OpenFn func(string) (io.ReadCloser, error)
 }
 
-// etcShellsPath is the canonical location of the installed-shells list.
-const etcShellsPath = "/etc/shells"
+// NewDarwin returns a Darwin variant wired to os.Open.
+func NewDarwin() *Darwin {
+	return &Darwin{
+		OpenFn: func(path string) (io.ReadCloser, error) { return os.Open(path) },
+	}
+}
 
-func collect(
+// Collect reads /etc/shells and returns the list of valid login shells.
+// Behavior matches Linux: missing file soft-misses to an empty list.
+// Kept as a separate implementation rather than a shared helper so
+// darwin can diverge freely if Apple ever changes /etc/shells handling.
+func (d *Darwin) Collect(
 	_ context.Context,
 ) (any, error) {
-	return collectFromFunc(openFn)
-}
-
-// collectFromFunc opens /etc/shells via the supplied opener, parses it into
-// a list of shell paths, and returns the Info.
-func collectFromFunc(
-	open func(string) (io.ReadCloser, error),
-) (*Info, error) {
-	rc, err := open(etcShellsPath)
+	rc, err := d.OpenFn(etcShellsPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &Info{Paths: []string{}}, nil
@@ -60,27 +61,4 @@ func collectFromFunc(
 	}
 	defer func() { _ = rc.Close() }()
 	return parseShells(rc)
-}
-
-// parseShells parses /etc/shells format: one path per line, comments
-// start with '#', blank lines ignored.
-func parseShells(
-	r io.Reader,
-) (*Info, error) {
-	info := &Info{Paths: []string{}}
-	sc := bufio.NewScanner(r)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if !strings.HasPrefix(line, "/") {
-			continue
-		}
-		info.Paths = append(info.Paths, line)
-	}
-	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("read shells: %w", err)
-	}
-	return info, nil
 }

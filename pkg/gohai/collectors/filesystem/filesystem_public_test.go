@@ -41,7 +41,7 @@ func TestFilesystemPublicTestSuite(t *testing.T) {
 func (s *FilesystemPublicTestSuite) TestNew() {
 	c := filesystem.New()
 	s.Equal("filesystem", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

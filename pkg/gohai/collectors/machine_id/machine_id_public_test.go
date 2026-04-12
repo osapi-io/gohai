@@ -41,7 +41,7 @@ func TestMachineIDPublicTestSuite(t *testing.T) {
 func (s *MachineIDPublicTestSuite) TestNew() {
 	c := machineid.New()
 	s.Equal("machine_id", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

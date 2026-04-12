@@ -41,7 +41,7 @@ func TestMemoryPublicTestSuite(t *testing.T) {
 func (s *MemoryPublicTestSuite) TestNew() {
 	c := memory.New()
 	s.Equal("memory", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

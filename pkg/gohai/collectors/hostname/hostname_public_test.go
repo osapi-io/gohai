@@ -41,7 +41,7 @@ func TestHostnamePublicTestSuite(t *testing.T) {
 func (s *HostnamePublicTestSuite) TestNew() {
 	c := hostname.New()
 	s.Equal("hostname", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
+	s.Equal(true, c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 

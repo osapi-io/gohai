@@ -302,18 +302,29 @@ just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
   - `facts.go` — `Facts` struct with `Data map[string]any` and JSON/Flat methods
   - `options.go` — functional options (`WithEnabled`, `WithDisabled`, `WithCollectors`)
   - `registry.go` — `PublicRegistry` used by CLI for flag enumeration
-- **`pkg/gohai/collectors/<name>/`** — Public per-collector sub-packages
-  - `<name>.go` — `Info` struct and `Collector` implementation
-  - `linux.go` / `darwin.go` / `other.go` — build-tagged OS implementations.
-    **Always separate files** — keep `darwin.go` distinct from `linux.go`
-    even when code is byte-identical. Uniform layout > tiny duplication.
-  - `linux_export_test.go` / `darwin_export_test.go` — exposes private
-    symbols to public tests (`var X = x`). Requires an explicit
-    `//go:build linux` or `//go:build darwin` tag (filename does not
-    auto-tag because the suffix isn't `_<GOOS>`).
-  - `<name>_public_test.go` — package-level public tests
-  - `linux_public_test.go` / `darwin_public_test.go` — OS-specific public
-    tests (filename auto-tags; explicit `//go:build` tag also present)
+- **`pkg/gohai/collectors/<name>/`** — Public per-collector sub-packages.
+  Use the osapi-style per-OS struct pattern (no build tags). See
+  `pkg/gohai/collectors/shells/` for the canonical reference.
+  - `<name>.go` — `Info` struct, `Collector` interface, `base` struct
+    (holds shared `Name()`/`Tier()`/`Dependencies()`), `New()` factory
+    that dispatches on `platform.Detect()`, and any cross-OS helpers
+    (shared parsing, shared constants).
+  - `linux.go` — `type Linux struct { base; <injectable fns> }` with
+    `NewLinux()` and `(l *Linux) Collect(ctx)` method. **No build tag.**
+  - `darwin.go` — `type Darwin struct { base; <injectable fns> }` with
+    `NewDarwin()` and `(d *Darwin) Collect(ctx)` method. **No build tag.**
+  - `debian.go` / `rhel.go` (only when distro genuinely diverges) — same
+    pattern, added to the `New()` dispatch switch.
+  - `<name>_public_test.go` — tests New()/base methods + `TestNewDispatch`
+    that swaps `platform.Detect` to exercise every dispatch branch
+    regardless of host OS. **Never import gopsutil in these tests.**
+  - `linux_public_test.go` — tests the `Linux` struct's `Collect` with
+    injected stubs. **No build tag.**
+  - `darwin_public_test.go` — tests the `Darwin` struct's `Collect`. **No build tag.**
+- **`internal/platform/`** — OS/distro detection wrapping gopsutil.
+  `Detect()` is a swappable `var` so collector tests can force any
+  branch without importing gopsutil. `hostInfoFn` is private, exposed
+  only to platform's own tests via `export_test.go`.
 - **`internal/collector/`** — Collector interface + registry plumbing
   - `collector.go` — `Collector` interface, `Tier` type
   - `registry.go` — `Registry` (register, resolve deps, run concurrently)
@@ -399,16 +410,43 @@ When committing via Claude Code, end with:
 
 ## Adding a New Collector
 
-When adding a new collector (e.g., `cpu`), follow these steps. The `platform`
-collector at `pkg/gohai/collectors/platform/` is the reference implementation
-— copy its file layout exactly.
+**Reference implementation:** `pkg/gohai/collectors/shells/`. Copy its
+file layout and patterns exactly.
+
+### Done-definition (every collector, every time)
+
+Before marking a collector complete, every item below must be true:
+
+1. **Analyzed Ohai's plugin + spec** for HOW it collects (data sources,
+   distro edge cases, fallback chains). Our collection logic mirrors
+   theirs — we inherit their years of bug fixes. Deviations are
+   documented and justified.
+2. **Checked OCSF schema** ([schema.ocsf.io](https://schema.ocsf.io/))
+   for canonical field names. OCSF mappings recorded in the collector
+   doc's Collected Fields table. When OCSF has a field we could emit
+   but don't, either add it or note why.
+3. **osapi per-OS struct pattern** — no build tags, factory dispatch
+   on `platform.Detect()`, per-OS structs each implementing Collect.
+4. **100% test coverage.** `go tool cover -func=/tmp/cov.out | grep -v '100.0%'`
+   returns nothing for the collector's files.
+5. **Collector tests do NOT import gopsutil** — stub `platform.Detect`
+   directly. Compile-time enforcement.
+6. **`docs/collectors/<name>.md`** has all sections per the doc
+   template below, including the **OCSF mapping column** in Collected
+   Fields and the **Data Sources** section comparing our read vs.
+   Ohai's.
+7. **README.md** row flipped to `✅ (<backing>)`.
+8. **Lint clean**, `just go::vet` returns 0 issues.
+9. **Commit message** explains the "why" — what Ohai/OCSF
+   cross-references drove the implementation, what extensions over the
+   upstream library we added, any deliberate deviations.
 
 ### Step 1: Create the sub-package
 
-Path: `pkg/gohai/collectors/<name>/` (public — consumers like OSAPI need to
+Path: `pkg/gohai/collectors/<name>/` (public — consumers like OSAPI
 import `Info` structs directly).
 
-### Step 2: `<name>.go` — Info struct and Collector
+### Step 2: `<name>.go` — top-level factory + shared surface
 
 ```go
 // (MIT header)
@@ -419,155 +457,101 @@ import (
     "context"
 
     "github.com/osapi-io/gohai/internal/collector"
+    "github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds CPU information collected from the system.
+// Info holds CPU information. Field names follow OCSF where applicable.
 type Info struct {
-    Total     int      `json:"total"`
-    Cores     int      `json:"cores"`
-    ModelName string   `json:"model_name,omitempty"`
-    Flags     []string `json:"flags,omitempty"`
+    Total     int      `json:"total"`                // OCSF: device.cpu_count
+    Cores     int      `json:"cores"`                // OCSF: device.cpu_cores
+    ModelName string   `json:"model_name,omitempty"` // no OCSF
+    Flags     []string `json:"flags,omitempty"`      // no OCSF
 }
 
-// Collector implements collector.Collector for CPU facts.
-type Collector struct{}
-
-// New returns a new CPU Collector.
-func New() *Collector {
-    return &Collector{}
+// Collector is the public interface every cpu variant satisfies.
+type Collector interface {
+    collector.Collector
 }
 
-// Name returns "cpu".
-func (c *Collector) Name() string {
-    return "cpu"
-}
+// base holds the identity (Name/Tier/Dependencies) common to every
+// per-OS variant. Embedded in Linux, Darwin, Debian, etc.
+type base struct{}
 
-// Tier returns the collector's tier (TierCore, TierExtended, TierOptIn).
-func (c *Collector) Tier() collector.Tier {
-    return collector.TierCore
-}
+func (base) Name() string                   { return "cpu" }
+func (base) Tier() collector.Tier           { return collector.TierCore }
+func (base) Dependencies() []string         { return nil }
 
-// Dependencies returns upstream collectors this one depends on.
-func (c *Collector) Dependencies() []string {
-    return nil
-}
-
-// Collect gathers CPU facts. Implementation lives in linux.go / darwin.go.
-func (c *Collector) Collect(
-    ctx context.Context,
-) (any, error) {
-    return collect(ctx)
-}
-```
-
-### Step 3: OS-specific implementations
-
-Follow the library decision order (see "Implementation Methodology" above).
-Wrap gopsutil / ghw / procfs / cloud SDK and reshape the output.
-
-#### Linux distro-family branching
-
-Go build tags split by `GOOS` (linux/darwin/windows) — they **cannot** split
-by Linux distro family (debian/rhel/suse/arch/alpine). Family branching
-happens at **runtime** by reading `platform.Family` (debian, rhel, fedora,
-amazon, suse, arch, alpine, mac_os_x).
-
-**Default: runtime switch inside `linux.go`.** Readable top-down, easy to
-test by injecting a probe/parse function.
-
-```go
-//go:build linux
-
-func collect(
-    ctx context.Context,
-) (any, error) {
-    family := detectFamily(ctx) // read /etc/os-release or call gopsutil
-    name, path := detectLinuxManager(family, probeBinary)
-    return &Info{Name: name, Path: path}, nil
-}
-
-func detectLinuxManager(
-    family string,
-    probe func(string) (name, path string),
-) (string, string) {
-    switch family {
+// New returns the cpu variant appropriate to the host OS.
+func New() Collector {
+    switch platform.Detect() {
+    case "darwin":
+        return NewDarwin()
     case "debian":
-        return probe("apt")
-    case "rhel", "fedora", "amazon":
-        if n, p := probe("dnf"); n != "" {
-            return n, p
-        }
-        return probe("yum")
-    case "suse":
-        return probe("zypper")
-    case "arch":
-        return probe("pacman")
-    case "alpine":
-        return probe("apk")
+        return NewDebian() // only if debian diverges; else drop this case
+    case "rhel":
+        return NewRHEL()   // only if rhel diverges; else drop this case
+    default:
+        return NewLinux()
     }
-    return "", ""
 }
+
+// Cross-OS helpers (shared parsers, shared constants) live here too.
 ```
 
-**When to split into family files:** if a Linux collector's per-family
-branches exceed ~50 lines each, split into sibling files for readability.
-Every family file must have an explicit `//go:build linux` tag (filename
-alone doesn't auto-tag for families; only for GOOS):
+### Step 3: Per-OS struct implementations (no build tags)
 
-```
-package_mgr/
-  package_mgr.go
-  linux.go              # dispatcher — switches on Family, calls collectDebian / collectRhel / ...
-  linux_debian.go       # //go:build linux — debian-specific collector logic
-  linux_rhel.go         # //go:build linux
-  linux_suse.go         # //go:build linux
-  darwin.go
-  other.go
-```
+Each file declares a struct for that OS, embeds `base`, and implements
+`Collect`. Injectable fields (function types) make tests independent of
+the host OS.
 
-**Getting `platform.Family` inside a collector.** Our `Collect(ctx) (any,
-error)` signature doesn't receive prior collector results. Two options:
-
-1. **Re-detect locally** (simple — call gopsutil's `host.Info()` or parse
-   `/etc/os-release`). gopsutil caches so the extra call is cheap. Default
-   to this.
-2. **Change the Collector interface** to accept prior results. Avoid unless
-   we have a concrete perf reason — it's an API break.
-
-**`linux.go`** (build-tagged `//go:build linux`):
+**`linux.go`:**
 
 ```go
-// (MIT header)
-// Use a testable core that accepts the library function as a parameter
-// so tests can stub the system call.
-func collect(
-    ctx context.Context,
-) (any, error) {
-    return collectWithInfo(ctx, cpu.InfoWithContext)
+// (MIT header) — NO //go:build tag
+
+package cpu
+
+import (
+    "context"
+
+    "github.com/shirou/gopsutil/v4/cpu"
+)
+
+// Linux collects CPU facts on generic Linux hosts.
+type Linux struct {
+    base
+
+    // InfoFn is gopsutil's cpu.InfoWithContext. Injectable for tests.
+    InfoFn func(context.Context) ([]cpu.InfoStat, error)
 }
 
-func collectWithInfo(
-    ctx context.Context,
-    fn func(context.Context) ([]cpu.InfoStat, error),
-) (any, error) {
-    // wrap library, return *Info
+// NewLinux returns a Linux variant wired to gopsutil.
+func NewLinux() *Linux {
+    return &Linux{InfoFn: cpu.InfoWithContext}
+}
+
+// Collect wraps gopsutil and extends with any fields the library lacks.
+// See "Implementation Methodology — Extend upstream, don't replace".
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+    stats, err := l.InfoFn(ctx)
+    if err != nil { return nil, err }
+    info := &Info{ /* mapped from stats */ }
+
+    // Extension: add fields gopsutil doesn't expose (e.g., vulnerabilities
+    // map from /sys/devices/system/cpu/vulnerabilities/).
+    info.Vulnerabilities = readVulnerabilities()
+
+    return info, nil
 }
 ```
 
-**`darwin.go`** — same shape, possibly same code if the library is
-cross-platform. **Always keep `darwin.go` and `linux.go` as separate
-files** even when code is byte-identical. Uniform layout across collectors
-is more valuable than saving ~30 lines of duplication.
+**`darwin.go`** — same pattern, `type Darwin struct`, `NewDarwin()`, its
+own `Collect`. No build tag. Runtime gracefully handles Linux-only paths
+(they just don't exist on darwin).
 
-**`other.go`** (build-tagged `//go:build !linux && !darwin`):
-
-```go
-func collect(
-    _ context.Context,
-) (any, error) {
-    return nil, nil
-}
-```
+**`debian.go` / `rhel.go`** — add **only** when the distro genuinely
+diverges from generic Linux (e.g., `package_mgr` needs apt vs dnf).
+Otherwise the generic `Linux` variant covers all non-darwin.
 
 ### Step 4: Register in `pkg/gohai/gohai.go`
 
@@ -577,82 +561,82 @@ Add to the `builtinCollectors()` slice:
 func builtinCollectors() []collector.Collector {
     return []collector.Collector{
         platform.New(),
-        cpu.New(),  // <-- add here
+        cpu.New(), // <-- add here
     }
 }
 ```
 
-Import the sub-package at the top of `gohai.go`.
+### Step 5: Tests — 100% coverage, no gopsutil leaks
 
-### Step 5: Tests — 100% coverage required
+**`<name>_public_test.go`** — package-level tests:
 
-**`linux_export_test.go` / `darwin_export_test.go`** — expose private
-symbols (usually `Collect` and `CollectWithInfo`) so public tests can
-exercise them:
+- `TestNew` → calls `New()`, asserts `Name()`/`Tier()`/`Dependencies()`
+  on the returned interface.
+- `TestImplementsCollectorInterface` → compile-time check that every
+  per-OS struct satisfies `collector.Collector`.
+- `TestNewDispatch` → stubs `platform.Detect` (a swappable `var`) to
+  force every branch (darwin/debian/rhel/linux-generic) and asserts the
+  factory returns the right concrete type. **No gopsutil import.**
+
+**`linux_public_test.go`** — tests the `Linux` struct directly with
+injected stubs:
 
 ```go
-//go:build linux
-
-// (MIT header)
-package cpu
-
-var (
-    Collect         = collect
-    CollectWithInfo = collectWithInfo
-)
+c := &cpu.Linux{InfoFn: fakeInfoFn}
+got, err := c.Collect(context.Background())
 ```
 
-**`<name>_public_test.go`** — package-level public tests
-(`package cpu_test`):
+Table-driven scenarios covering happy path, error path, edge cases.
 
-- Test `New()` returns the right Name, Tier, Dependencies
-- Test `Collect()` satisfies the `collector.Collector` interface
-- Test the real `Collect()` runs without error on the current OS
+**`darwin_public_test.go`** — same for `Darwin` struct.
 
-**`linux_public_test.go` / `darwin_public_test.go`** — OS-specific public
-tests that stub the library call via the exported `CollectWithInfo`:
+No build tags on any test file. `go test ./...` on any dev OS runs
+every test.
 
-- Table-driven scenarios covering happy path + error path
-- Happy path returns the expected `*Info` with field values mapped correctly
-- Error path (stub returns `error`) confirms error is propagated
-
-**Coverage target: 100%.** Run:
+**Coverage check:**
 
 ```bash
 go test ./... -coverprofile=/tmp/cov.out
 go tool cover -func=/tmp/cov.out | grep -v '100.0%'
 ```
 
-Should return nothing (except `main`/`cmd` which are `.coverignore`d).
-
 ### Step 6: Update the collector doc
 
-Edit `docs/collectors/<name>.md` (already a stub). Fill in:
+`docs/collectors/<name>.md` must contain, in order:
 
-- Status: Implemented ✅
-- Description
-- Collected Fields table
-- Platform Support table (sources used on each OS)
-- Example Output (JSON) for Linux and macOS
-- SDK Usage snippet
-- Enable/Disable flags
-- Dependencies
-- Backing library + license
+- `# <Name>` and **Status:** Implemented ✅
+- **Description** — what the fact is, why consumers want it, typical
+  values on Linux vs macOS.
+- **Signals** (only for complex collectors where multiple fields
+  answer different questions — see `docs/collectors/fips.md` for
+  reference).
+- **Collected Fields** — markdown table with columns: Field, Type,
+  Description, **OCSF mapping**. Every field gets an OCSF row
+  (`os.kernel_release`, `network_interface.mac`, etc.) or explicit
+  "No OCSF equivalent" with one-line reason.
+- **Platform Support** — table.
+- **Example Output** — realistic JSON for Linux and macOS.
+- **SDK Usage** — Go snippet using `gohai.New(...).Collect(ctx)`.
+- **Enable/Disable** — CLI flags.
+- **Dependencies** — other collectors.
+- **Data Sources** — table: Platform | What we read | Ohai plugin +
+  what it reads | Alignment. Plus a "Known gaps" line.
+- **Backing library** — the Go library (or "stdlib") we wrap.
 
-Use `docs/collectors/platform.md` as the template.
+Use `docs/collectors/shells.md` as the canonical template.
 
 ### Step 7: Update README.md
 
-Flip the "Implemented" column from 🚧 to ✅ (plus the library name if you
-wrapped one, e.g., `✅ (gopsutil)`).
+Flip the "Implemented" column from 🚧 to ✅ (with the library in
+parentheses: `✅ (gopsutil)`, `✅ (stdlib)`).
 
 ### Step 8: Verify
 
 ```bash
-go build ./...                                                       # compiles
-go test ./... -count=1                                               # tests pass
-go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint run   # 0 issues
-go run . --collector.<name> --pretty                                 # CLI works
+go build ./...
+go test ./... -count=1
+just go::vet
+go run . --collector.<name> --pretty
 ```
 
 ### Step 9: Commit
@@ -660,7 +644,10 @@ go run . --collector.<name> --pretty                                 # CLI works
 ```
 feat(<name>): add <name> collector
 
-Wraps <library> to collect <what>. Supports Linux and macOS.
+Wraps <library> for the core collection, extending with <X> that the
+library doesn't expose (mirrors Ohai's <Y> behavior). Field names
+follow OCSF conventions where applicable (<list>). Supports Linux and
+macOS with platform.Detect() dispatch.
 ```
 
 [Chef Ohai]: https://docs.chef.io/ohai/

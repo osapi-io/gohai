@@ -124,7 +124,7 @@ gohai --no-collector.fips   # disable
 
 ## Dependencies
 
-None — Tier 1 core collector with no upstream collector dependencies.
+None.
 
 ## Data Sources
 
