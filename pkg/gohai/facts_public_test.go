@@ -100,9 +100,9 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
     "domain": "example.com"
   },
   "kernel": {
-    "os": "linux",
-    "version": "6.8.0-31-generic",
-    "arch": "x86_64"
+    "name": "Linux",
+    "release": "6.8.0-31-generic",
+    "machine": "x86_64"
   },
   "cpu": {
     "total": 8,
@@ -145,9 +145,9 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 			name: "kernel typed fields",
 			check: func(f *gohai.Facts) {
 				s.Require().NotNil(f.Kernel)
-				s.Equal("linux", f.Kernel.OS)
-				s.Equal("6.8.0-31-generic", f.Kernel.Version)
-				s.Equal("x86_64", f.Kernel.Arch)
+				s.Equal("Linux", f.Kernel.Name)
+				s.Equal("6.8.0-31-generic", f.Kernel.Release)
+				s.Equal("x86_64", f.Kernel.Machine)
 			},
 		},
 		{

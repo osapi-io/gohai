@@ -27,7 +27,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+)
+
+var (
+	_ collector.Collector = (*kernel.Linux)(nil)
+	_ collector.Collector = (*kernel.Darwin)(nil)
 )
 
 type KernelPublicTestSuite struct {
@@ -39,24 +45,55 @@ func TestKernelPublicTestSuite(t *testing.T) {
 }
 
 func (s *KernelPublicTestSuite) TestNew() {
-	c := kernel.New()
-	s.Equal("kernel", c.Name())
-	s.Equal(true, c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
 
-func (s *KernelPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = kernel.New()
-}
-
-func (s *KernelPublicTestSuite) TestCollect() {
-	c := kernel.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	info, ok := got.(*kernel.Info)
-	s.Require().True(ok)
-	s.NotEmpty(info.OS)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := kernel.New()
+			s.Equal("kernel", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*kernel.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*kernel.Linux)
+				s.True(ok)
+			}
+		})
+	}
+}
+
+// TestCollectOnHost exercises the real syscall.Uname via the wired
+// UnameFn. Asserts shape — specific values vary by test host.
+func (s *KernelPublicTestSuite) TestCollectOnHost() {
+	tests := []struct{ name string }{
+		{name: "host reports non-empty uname fields"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := kernel.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*kernel.Info)
+			s.Require().True(ok)
+			s.NotEmpty(info.Name)
+			s.NotEmpty(info.Release)
+			s.NotEmpty(info.Machine)
+		})
+	}
 }

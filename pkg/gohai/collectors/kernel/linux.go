@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23,31 +21,74 @@
 package kernel
 
 import (
+	"bufio"
 	"context"
-	"fmt"
-
-	"github.com/shirou/gopsutil/v4/host"
+	"os"
+	"strconv"
+	"strings"
 )
 
-var hostInfoFn = host.InfoWithContext
+const procModulesPath = "/proc/modules"
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn)
+// Linux collects kernel facts on Linux using syscall.Uname plus
+// /proc/modules for loaded module data. UnameFn and ReadFileFn are
+// injected so tests cover every branch without touching the real host.
+type Linux struct {
+	base
+
+	UnameFn    func() (name, release, version, machine string, err error)
+	ReadFileFn func(string) ([]byte, error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+// NewLinux returns a Linux variant wired to real syscalls / os.ReadFile.
+func NewLinux() *Linux {
+	return &Linux{
+		UnameFn:    defaultUname,
+		ReadFileFn: os.ReadFile,
 	}
-	return &Info{
-		OS:      info.OS,
-		Version: info.KernelVersion,
-		Arch:    info.KernelArch,
-	}, nil
+}
+
+// Collect returns kernel Info. Module parsing failures yield an empty
+// Modules map rather than failing the whole collector.
+func (l *Linux) Collect(_ context.Context) (any, error) {
+	name, release, version, machine, err := l.UnameFn()
+	if err != nil {
+		return nil, err
+	}
+	info := &Info{
+		Name:    name,
+		Release: release,
+		Version: version,
+		Machine: machine,
+	}
+	if b, err := l.ReadFileFn(procModulesPath); err == nil {
+		info.Modules = parseProcModules(b)
+	}
+	return info, nil
+}
+
+// parseProcModules turns /proc/modules contents into our Module map.
+// Format per line:
+//
+//	<name> <size> <refcount> [<used_by>] <state> <offset>
+func parseProcModules(
+	b []byte,
+) map[string]Module {
+	out := map[string]Module{}
+	sc := bufio.NewScanner(strings.NewReader(string(b)))
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) < 3 {
+			continue
+		}
+		m := Module{}
+		if sz, err := strconv.ParseUint(fields[1], 10, 64); err == nil {
+			m.Size = sz
+		}
+		if rc, err := strconv.Atoi(fields[2]); err == nil {
+			m.RefCount = rc
+		}
+		out[fields[0]] = m
+	}
+	return out
 }

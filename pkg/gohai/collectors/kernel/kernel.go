@@ -18,46 +18,78 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package kernel collects kernel version and architecture facts.
+// Package kernel collects kernel identification and loaded-module facts.
 package kernel
 
 import (
-	"context"
+	"fmt"
+
+	"golang.org/x/sys/unix"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds kernel identification data.
+// Info holds kernel identification data. Field semantics follow POSIX
+// uname(1) — matches Ohai and OCSF.
 type Info struct {
-	OS      string `json:"os"`      // kernel OS name: "linux", "darwin"
-	Version string `json:"version"` // kernel release (e.g., "6.8.0-generic", "23.4.0")
-	Arch    string `json:"arch"`    // kernel architecture (e.g., "x86_64", "arm64")
+	Name    string            `json:"name"`              // uname -s: "Linux", "Darwin"
+	Release string            `json:"release"`           // uname -r: "5.15.0-47-generic" (OCSF: os.kernel_release)
+	Version string            `json:"version,omitempty"` // uname -v: build string
+	Machine string            `json:"machine"`           // uname -m: "x86_64", "aarch64"
+	Modules map[string]Module `json:"modules,omitempty"` // loaded kernel modules (Linux only)
 }
 
-// Collector implements the collector.Collector interface for kernel facts.
-type Collector struct{}
-
-// New returns a new kernel Collector.
-func New() *Collector {
-	return &Collector{}
+// Module describes a loaded kernel module.
+type Module struct {
+	Size     uint64 `json:"size,omitempty"`     // bytes
+	RefCount int    `json:"refcount,omitempty"` // instances currently loaded
+	Version  string `json:"version,omitempty"`  // from /sys/module/<m>/version when present
 }
 
-// Name returns "kernel".
-func (c *Collector) Name() string {
-	return "kernel"
+// Collector is the public interface every kernel variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
+type base struct{}
+
+func (base) Name() string           { return "kernel" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the kernel variant for the host OS.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
+// defaultUname invokes unix.Uname (works on any unix-like OS) and
+// converts the fixed-length byte arrays to Go strings. Shared by both
+// Linux and Darwin factories.
+func defaultUname() (name, release, version, machine string, err error) {
+	var u unix.Utsname
+	if err = unix.Uname(&u); err != nil {
+		return "", "", "", "", fmt.Errorf("uname: %w", err)
+	}
+	return bytesToString(u.Sysname[:]),
+		bytesToString(u.Release[:]),
+		bytesToString(u.Version[:]),
+		bytesToString(u.Machine[:]),
+		nil
 }
 
-// Collect gathers kernel facts. Implementation lives in unix.go / other.go.
-func (c *Collector) Collect(
-	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+// bytesToString trims trailing NUL bytes from a C-style fixed-length
+// byte array and returns the Go string.
+func bytesToString(
+	b []byte,
+) string {
+	for i, c := range b {
+		if c == 0 {
+			return string(b[:i])
+		}
+	}
+	return string(b)
 }
