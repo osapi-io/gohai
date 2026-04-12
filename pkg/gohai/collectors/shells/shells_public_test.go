@@ -33,6 +33,13 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
 )
 
+// Compile-time assertions that each per-OS struct satisfies
+// collector.Collector.
+var (
+	_ collector.Collector = (*shells.Linux)(nil)
+	_ collector.Collector = (*shells.Darwin)(nil)
+)
+
 type ShellsPublicTestSuite struct {
 	suite.Suite
 }
@@ -41,47 +48,10 @@ func TestShellsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ShellsPublicTestSuite))
 }
 
-// TestNew verifies the factory returns a collector whose interface
-// contract matches what the registry expects. The actual OS-specific
-// type it returns depends on the test host; on dev machines it will be
-// *shells.Linux or *shells.Darwin.
+// TestNew covers the factory: identity methods inherited from base
+// (Name/DefaultEnabled/Dependencies) plus dispatch to the right
+// concrete type per platform.Detect() value.
 func (s *ShellsPublicTestSuite) TestNew() {
-	c := shells.New()
-	s.Equal("shells", c.Name())
-	s.Equal(true, c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
-
-// TestImplementsCollectorInterface confirms both variants satisfy
-// collector.Collector (compile-time check).
-func (s *ShellsPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = shells.NewLinux()
-	var _ collector.Collector = shells.NewDarwin()
-}
-
-// TestOpenFileHelper verifies the package's openFile bridge function —
-// the one-line wrapper that adapts *os.File to io.ReadCloser. Uses a
-// test-owned temp file (never touches /etc/shells or any real host
-// path), then reads through the collector's wired OpenFn.
-func (s *ShellsPublicTestSuite) TestOpenFileHelper() {
-	dir := s.T().TempDir()
-	path := filepath.Join(dir, "shells")
-	s.Require().NoError(os.WriteFile(path, []byte("/bin/sh\n"), 0o644))
-
-	c := shells.NewLinux()
-	rc, err := c.OpenFn(path)
-	s.Require().NoError(err)
-	defer func() { _ = rc.Close() }()
-	b, err := io.ReadAll(rc)
-	s.Require().NoError(err)
-	s.Equal("/bin/sh\n", string(b))
-}
-
-// TestNewDispatch verifies every platform-detect branch returns the
-// expected concrete type. Stubs platform.Detect directly (a swappable
-// var) so this test needs no gopsutil import — the gopsutil dependency
-// stays sealed inside internal/platform.
-func (s *ShellsPublicTestSuite) TestNewDispatch() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
@@ -91,23 +61,70 @@ func (s *ShellsPublicTestSuite) TestNewDispatch() {
 		wantKind string // "linux" or "darwin"
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux (no shells-specific debian variant)", "debian", "linux"},
-		{"rhel dispatches to Linux (no shells-specific rhel variant)", "rhel", "linux"},
-		{"arch dispatches to Linux (generic)", "arch", "linux"},
-		{"empty (unknown) dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
-			got := shells.New()
+			c := shells.New()
+			s.Equal("shells", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
-				_, ok := got.(*shells.Darwin)
-				s.True(ok, "expected *shells.Darwin")
+				_, ok := c.(*shells.Darwin)
+				s.True(ok)
 			case "linux":
-				_, ok := got.(*shells.Linux)
-				s.True(ok, "expected *shells.Linux")
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
 			}
+		})
+	}
+}
+
+// TestOpenFileHelper covers the package's openFile bridge (one-line
+// wrapper os.Open → io.ReadCloser) via a test-owned tempfile. Does
+// not touch any real host path.
+func (s *ShellsPublicTestSuite) TestOpenFileHelper() {
+	tests := []struct {
+		name        string
+		setup       func(dir string) string
+		wantErr     bool
+		wantContent string
+	}{
+		{
+			name: "opens existing file and reads content",
+			setup: func(dir string) string {
+				p := filepath.Join(dir, "shells")
+				s.Require().NoError(os.WriteFile(p, []byte("/bin/sh\n"), 0o644))
+				return p
+			},
+			wantContent: "/bin/sh\n",
+		},
+		{
+			name:    "nonexistent path returns error",
+			setup:   func(dir string) string { return filepath.Join(dir, "missing") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			dir := s.T().TempDir()
+			path := tt.setup(dir)
+			c := shells.NewLinux()
+			rc, err := c.OpenFn(path)
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			defer func() { _ = rc.Close() }()
+			b, err := io.ReadAll(rc)
+			s.Require().NoError(err)
+			s.Equal(tt.wantContent, string(b))
 		})
 	}
 }

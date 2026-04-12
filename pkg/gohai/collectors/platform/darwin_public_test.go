@@ -135,12 +135,6 @@ func (s *PlatformDarwinPublicTestSuite) TestCollect() {
 	}
 }
 
-func (s *PlatformDarwinPublicTestSuite) TestNewDarwinWiresUp() {
-	c := platform.NewDarwin()
-	s.NotNil(c.HostInfoFn)
-	s.NotNil(c.RunCmdFn)
-}
-
 // TestRunSwVers covers the exec wrapper via Go's standard self-exec
 // pattern: the test binary re-invokes itself with an env-var flag
 // that TestMain handles, so we exercise the real

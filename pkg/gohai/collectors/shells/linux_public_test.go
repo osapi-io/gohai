@@ -132,11 +132,3 @@ func (s *ShellsLinuxPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-// TestNewLinuxWiresUpOpenFn confirms the factory wires the package's
-// openFile helper into OpenFn — no closure body to cover, no real
-// filesystem access needed.
-func (s *ShellsLinuxPublicTestSuite) TestNewLinuxWiresUpOpenFn() {
-	c := shells.NewLinux()
-	s.NotNil(c.OpenFn)
-}

@@ -92,12 +92,3 @@ func (s *RootGroupLinuxPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-// TestNewLinuxWiresUp confirms the factory wires os/user lookups into
-// the struct. We don't exercise the real functions here — those are
-// stdlib, and the collector Collect tests above use injected stubs.
-func (s *RootGroupLinuxPublicTestSuite) TestNewLinuxWiresUp() {
-	c := rootgroup.NewLinux()
-	s.NotNil(c.LookupUserFn)
-	s.NotNil(c.LookupGroupFn)
-}

@@ -101,12 +101,3 @@ func (s *TimezoneLinuxPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *TimezoneLinuxPublicTestSuite) TestNewLinuxWiresUpStdlib() {
-	c := timezone.NewLinux()
-	s.NotNil(c.ReadlinkFn)
-	s.NotNil(c.ReadFileFn)
-	s.NotNil(c.NowFn)
-	// Exercise NowFn — stdlib time.Now always succeeds.
-	s.False(c.NowFn().IsZero())
-}

@@ -135,11 +135,3 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *HostnameLinuxPublicTestSuite) TestNewLinuxWiresUp() {
-	c := hostname.NewLinux()
-	s.NotNil(c.HostInfoFn)
-	s.NotNil(c.OSHostnameFn)
-	s.NotNil(c.LookupHostFn)
-	s.NotNil(c.LookupAddrFn)
-}

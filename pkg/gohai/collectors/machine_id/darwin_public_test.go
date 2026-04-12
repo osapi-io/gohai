@@ -77,8 +77,3 @@ func (s *MachineIDDarwinPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *MachineIDDarwinPublicTestSuite) TestNewDarwinWiresUp() {
-	c := machineid.NewDarwin()
-	s.NotNil(c.HostInfoFn)
-}

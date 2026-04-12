@@ -30,6 +30,11 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 )
 
+var (
+	_ collector.Collector = (*fips.Linux)(nil)
+	_ collector.Collector = (*fips.Darwin)(nil)
+)
+
 type FipsPublicTestSuite struct {
 	suite.Suite
 }
@@ -39,18 +44,6 @@ func TestFipsPublicTestSuite(t *testing.T) {
 }
 
 func (s *FipsPublicTestSuite) TestNew() {
-	c := fips.New()
-	s.Equal("fips", c.Name())
-	s.True(c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
-
-func (s *FipsPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = fips.NewLinux()
-	var _ collector.Collector = fips.NewDarwin()
-}
-
-func (s *FipsPublicTestSuite) TestNewDispatch() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
@@ -68,13 +61,16 @@ func (s *FipsPublicTestSuite) TestNewDispatch() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
-			got := fips.New()
+			c := fips.New()
+			s.Equal("fips", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
-				_, ok := got.(*fips.Darwin)
+				_, ok := c.(*fips.Darwin)
 				s.True(ok)
 			case "linux":
-				_, ok := got.(*fips.Linux)
+				_, ok := c.(*fips.Linux)
 				s.True(ok)
 			}
 		})

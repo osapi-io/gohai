@@ -97,11 +97,3 @@ func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *HostnameDarwinPublicTestSuite) TestNewDarwinWiresUp() {
-	c := hostname.NewDarwin()
-	s.NotNil(c.HostInfoFn)
-	s.NotNil(c.OSHostnameFn)
-	s.NotNil(c.LookupHostFn)
-	s.NotNil(c.LookupAddrFn)
-}

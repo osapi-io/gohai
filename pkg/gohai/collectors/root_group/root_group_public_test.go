@@ -30,6 +30,11 @@ import (
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
 )
 
+var (
+	_ collector.Collector = (*rootgroup.Linux)(nil)
+	_ collector.Collector = (*rootgroup.Darwin)(nil)
+)
+
 type RootGroupPublicTestSuite struct {
 	suite.Suite
 }
@@ -39,18 +44,6 @@ func TestRootGroupPublicTestSuite(t *testing.T) {
 }
 
 func (s *RootGroupPublicTestSuite) TestNew() {
-	c := rootgroup.New()
-	s.Equal("root_group", c.Name())
-	s.True(c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
-
-func (s *RootGroupPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = rootgroup.NewLinux()
-	var _ collector.Collector = rootgroup.NewDarwin()
-}
-
-func (s *RootGroupPublicTestSuite) TestNewDispatch() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
@@ -68,14 +61,17 @@ func (s *RootGroupPublicTestSuite) TestNewDispatch() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
-			got := rootgroup.New()
+			c := rootgroup.New()
+			s.Equal("root_group", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
-				_, ok := got.(*rootgroup.Darwin)
-				s.True(ok, "expected *rootgroup.Darwin")
+				_, ok := c.(*rootgroup.Darwin)
+				s.True(ok)
 			case "linux":
-				_, ok := got.(*rootgroup.Linux)
-				s.True(ok, "expected *rootgroup.Linux")
+				_, ok := c.(*rootgroup.Linux)
+				s.True(ok)
 			}
 		})
 	}

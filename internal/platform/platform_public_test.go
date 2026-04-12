@@ -38,11 +38,15 @@ func TestPlatformPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(PlatformPublicTestSuite))
 }
 
+// TestDetect covers the Detect function across every family-mapping
+// branch and every fallback path. Also includes a row exercising the
+// swappable-var contract that collector tests rely on.
 func (s *PlatformPublicTestSuite) TestDetect() {
 	tests := []struct {
-		name   string
-		infoFn func() (*host.InfoStat, error)
-		want   string
+		name     string
+		infoFn   func() (*host.InfoStat, error)
+		override func() string // non-nil swaps platform.Detect directly
+		want     string
 	}{
 		{
 			name:   "ubuntu → debian",
@@ -95,7 +99,7 @@ func (s *PlatformPublicTestSuite) TestDetect() {
 			want:   "alpine",
 		},
 		{
-			name:   "suse passes through (not in rhel family despite similarity)",
+			name:   "suse passes through (not rhel family)",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "suse"}, nil },
 			want:   "suse",
 		},
@@ -114,10 +118,24 @@ func (s *PlatformPublicTestSuite) TestDetect() {
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "Ubuntu"}, nil },
 			want:   "debian",
 		},
+		{
+			name:     "Detect var is swappable by callers without gopsutil",
+			override: func() string { return "custom" },
+			want:     "custom",
+		},
 	}
+
+	origDetect := platform.Detect
+	defer func() { platform.Detect = origDetect }()
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			if tt.override != nil {
+				platform.Detect = tt.override
+				s.Equal(tt.want, platform.Detect())
+				platform.Detect = origDetect
+				return
+			}
 			restore := platform.SetHostInfoFn(tt.infoFn)
 			defer restore()
 			s.Equal(tt.want, platform.Detect())
@@ -158,25 +176,28 @@ func (s *PlatformPublicTestSuite) TestIsLinux() {
 }
 
 func (s *PlatformPublicTestSuite) TestIsDarwin() {
-	restore := platform.SetHostInfoFn(func() (*host.InfoStat, error) {
-		return &host.InfoStat{OS: "darwin"}, nil
-	})
-	s.True(platform.IsDarwin())
-	restore()
-
-	restore = platform.SetHostInfoFn(func() (*host.InfoStat, error) {
-		return &host.InfoStat{Platform: "ubuntu"}, nil
-	})
-	s.False(platform.IsDarwin())
-	restore()
-}
-
-// TestDetectVarSwappable verifies callers (collector tests) can swap
-// the Detect function directly without importing gopsutil.
-func (s *PlatformPublicTestSuite) TestDetectVarSwappable() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
-	platform.Detect = func() string { return "darwin" }
-	s.Equal("darwin", platform.Detect())
+	tests := []struct {
+		name   string
+		infoFn func() (*host.InfoStat, error)
+		want   bool
+	}{
+		{
+			"darwin is darwin",
+			func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil },
+			true,
+		},
+		{
+			"ubuntu is not darwin",
+			func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil },
+			false,
+		},
+		{"empty not darwin", func() (*host.InfoStat, error) { return nil, nil }, false},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := platform.SetHostInfoFn(tt.infoFn)
+			defer restore()
+			s.Equal(tt.want, platform.IsDarwin())
+		})
+	}
 }

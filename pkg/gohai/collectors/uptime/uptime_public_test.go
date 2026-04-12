@@ -30,6 +30,11 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 )
 
+var (
+	_ collector.Collector = (*uptime.Linux)(nil)
+	_ collector.Collector = (*uptime.Darwin)(nil)
+)
+
 type UptimePublicTestSuite struct {
 	suite.Suite
 }
@@ -39,18 +44,6 @@ func TestUptimePublicTestSuite(t *testing.T) {
 }
 
 func (s *UptimePublicTestSuite) TestNew() {
-	c := uptime.New()
-	s.Equal("uptime", c.Name())
-	s.True(c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
-
-func (s *UptimePublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = uptime.NewLinux()
-	var _ collector.Collector = uptime.NewDarwin()
-}
-
-func (s *UptimePublicTestSuite) TestNewDispatch() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
@@ -68,13 +61,16 @@ func (s *UptimePublicTestSuite) TestNewDispatch() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
-			got := uptime.New()
+			c := uptime.New()
+			s.Equal("uptime", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
-				_, ok := got.(*uptime.Darwin)
+				_, ok := c.(*uptime.Darwin)
 				s.True(ok)
 			case "linux":
-				_, ok := got.(*uptime.Linux)
+				_, ok := c.(*uptime.Linux)
 				s.True(ok)
 			}
 		})

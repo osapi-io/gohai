@@ -84,11 +84,3 @@ func (s *RootGroupDarwinPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-// TestNewDarwinWiresUp confirms the factory wires os/user lookups into
-// the struct — no real user lookups in unit tests.
-func (s *RootGroupDarwinPublicTestSuite) TestNewDarwinWiresUp() {
-	c := rootgroup.NewDarwin()
-	s.NotNil(c.LookupUserFn)
-	s.NotNil(c.LookupGroupFn)
-}

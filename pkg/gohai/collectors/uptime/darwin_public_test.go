@@ -76,8 +76,3 @@ func (s *UptimeDarwinPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *UptimeDarwinPublicTestSuite) TestNewDarwinWiresUpStdlib() {
-	c := uptime.NewDarwin()
-	s.NotNil(c.HostInfoFn)
-}

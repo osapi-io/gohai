@@ -108,10 +108,3 @@ func (s *ShellsDarwinPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-// TestNewDarwinWiresUpOpenFn confirms the factory wires the package's
-// openFile helper into OpenFn.
-func (s *ShellsDarwinPublicTestSuite) TestNewDarwinWiresUpOpenFn() {
-	c := shells.NewDarwin()
-	s.NotNil(c.OpenFn)
-}

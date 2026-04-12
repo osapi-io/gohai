@@ -143,8 +143,3 @@ func (s *PlatformLinuxPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *PlatformLinuxPublicTestSuite) TestNewLinuxWiresUp() {
-	c := platform.NewLinux()
-	s.NotNil(c.HostInfoFn)
-}

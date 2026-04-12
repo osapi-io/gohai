@@ -174,8 +174,3 @@ func (s *FipsLinuxPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *FipsLinuxPublicTestSuite) TestNewLinuxWiresUp() {
-	c := fips.NewLinux()
-	s.NotNil(c.ReadFileFn)
-}

@@ -30,6 +30,11 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 )
 
+var (
+	_ collector.Collector = (*timezone.Linux)(nil)
+	_ collector.Collector = (*timezone.Darwin)(nil)
+)
+
 type TimezonePublicTestSuite struct {
 	suite.Suite
 }
@@ -39,18 +44,6 @@ func TestTimezonePublicTestSuite(t *testing.T) {
 }
 
 func (s *TimezonePublicTestSuite) TestNew() {
-	c := timezone.New()
-	s.Equal("timezone", c.Name())
-	s.True(c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
-
-func (s *TimezonePublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = timezone.NewLinux()
-	var _ collector.Collector = timezone.NewDarwin()
-}
-
-func (s *TimezonePublicTestSuite) TestNewDispatch() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
@@ -68,14 +61,17 @@ func (s *TimezonePublicTestSuite) TestNewDispatch() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
-			got := timezone.New()
+			c := timezone.New()
+			s.Equal("timezone", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
-				_, ok := got.(*timezone.Darwin)
-				s.True(ok, "expected *timezone.Darwin")
+				_, ok := c.(*timezone.Darwin)
+				s.True(ok)
 			case "linux":
-				_, ok := got.(*timezone.Linux)
-				s.True(ok, "expected *timezone.Linux")
+				_, ok := c.(*timezone.Linux)
+				s.True(ok)
 			}
 		})
 	}

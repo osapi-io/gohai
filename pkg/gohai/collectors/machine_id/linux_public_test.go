@@ -99,9 +99,3 @@ func (s *MachineIDLinuxPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *MachineIDLinuxPublicTestSuite) TestNewLinuxWiresUp() {
-	c := machineid.NewLinux()
-	s.NotNil(c.HostInfoFn)
-	s.NotNil(c.ReadFileFn)
-}

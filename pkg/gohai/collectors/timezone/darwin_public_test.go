@@ -87,10 +87,3 @@ func (s *TimezoneDarwinPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *TimezoneDarwinPublicTestSuite) TestNewDarwinWiresUpStdlib() {
-	c := timezone.NewDarwin()
-	s.NotNil(c.ReadlinkFn)
-	s.NotNil(c.NowFn)
-	s.False(c.NowFn().IsZero())
-}

@@ -30,6 +30,11 @@ import (
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
 )
 
+var (
+	_ collector.Collector = (*machineid.Linux)(nil)
+	_ collector.Collector = (*machineid.Darwin)(nil)
+)
+
 type MachineIDPublicTestSuite struct {
 	suite.Suite
 }
@@ -39,18 +44,6 @@ func TestMachineIDPublicTestSuite(t *testing.T) {
 }
 
 func (s *MachineIDPublicTestSuite) TestNew() {
-	c := machineid.New()
-	s.Equal("machine_id", c.Name())
-	s.True(c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
-
-func (s *MachineIDPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = machineid.NewLinux()
-	var _ collector.Collector = machineid.NewDarwin()
-}
-
-func (s *MachineIDPublicTestSuite) TestNewDispatch() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
@@ -68,13 +61,16 @@ func (s *MachineIDPublicTestSuite) TestNewDispatch() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
-			got := machineid.New()
+			c := machineid.New()
+			s.Equal("machine_id", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
-				_, ok := got.(*machineid.Darwin)
+				_, ok := c.(*machineid.Darwin)
 				s.True(ok)
 			case "linux":
-				_, ok := got.(*machineid.Linux)
+				_, ok := c.(*machineid.Linux)
 				s.True(ok)
 			}
 		})

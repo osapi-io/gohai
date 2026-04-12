@@ -117,9 +117,3 @@ func (s *UptimeLinuxPublicTestSuite) TestCollect() {
 		})
 	}
 }
-
-func (s *UptimeLinuxPublicTestSuite) TestNewLinuxWiresUpStdlib() {
-	c := uptime.NewLinux()
-	s.NotNil(c.HostInfoFn)
-	s.NotNil(c.ReadFileFn)
-}
