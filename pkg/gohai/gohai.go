@@ -33,6 +33,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
@@ -144,6 +145,7 @@ func builtinCollectors() []collector.Collector {
 		virtualization.New(),
 		machineid.New(),
 		cpu.New(),
+		load.New(),
 		memory.New(),
 		filesystem.New(),
 		disk.New(),

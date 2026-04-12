@@ -166,7 +166,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [users](docs/collectors/users.md)                  | passwd/group data, current user                | ✅      | ⚠️ (gopsutil; logged-in only) |
+| [users](docs/collectors/users.md)                  | passwd/group data, current user                | ✅      | ⚠️         |
 | [sessions](docs/collectors/sessions.md)            | Logged-in sessions (`loginctl`)                | ✅      | 🚧          |
 
 ### 🐧 Linux-Specific
@@ -192,6 +192,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
 | [process](docs/collectors/process.md)              | Process list (PID, name, user, cmdline)        | ✅      | ✅ |
+| [load](docs/collectors/load.md)                    | Load averages (1/5/15-minute)                  | ✅      | ✅         |
 | [command](docs/collectors/command.md)              | Full `ps` output (Ohai command/ps parity)      | ✅      | 🚧          |
 | [sysconf](docs/collectors/sysconf.md)             | POSIX sysconf values                           | ✅      | 🚧          |
 
@@ -271,7 +272,16 @@ to gohai collectors — keep it in sync with any `Info` struct changes.
 
 ## 📖 Documentation
 
-See the [package documentation][] on pkg.go.dev for API details.
+- [Collectors reference](docs/collectors/README.md) — one doc per collector
+  with fields, OCSF mappings, and Ohai source alignment.
+- [Features](docs/features/README.md) — SDK surface, concurrency model,
+  dependency resolution, OCSF + Ohai schema, profiles.
+- [Integrations](docs/integrations/osapi.md) — how downstream services consume
+  the SDK.
+- [Development](docs/development.md) — prerequisites, setup, testing, commit
+  conventions.
+- [Contributing](docs/contributing.md) — PR workflow.
+- [Package documentation][] on pkg.go.dev — generated API reference.
 
 ## 🤝 Contributing
 

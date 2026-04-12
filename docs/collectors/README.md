@@ -132,6 +132,7 @@ struct layout follow OCSF.
 | Collector             | Key       | Description                               | Default |
 | --------------------- | --------- | ----------------------------------------- | ------- |
 | [process](process.md) | `process` | Process list (PID, name, user, cmdline)   | ✅      |
+| [load](load.md)       | `load`    | Load averages (1/5/15-minute)             | ✅      |
 | [command](command.md) | `command` | Full `ps` output (Ohai command/ps parity) | ✅      |
 | [sysconf](sysconf.md) | `sysconf` | POSIX sysconf values                      | ✅      |
 

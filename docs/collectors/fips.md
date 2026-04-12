@@ -41,11 +41,11 @@ validated revision should correlate with `platform`/`kernel`.
 
 ## Collected Fields
 
-| Field                   | Type   | Description                                                                    |
-| ----------------------- | ------ | ------------------------------------------------------------------------------ |
-| `kernel.enabled`        | `bool` | `true` if the kernel flag `/proc/sys/crypto/fips_enabled` is `1`.              |
-| `policy.name`           | string | Active crypto policy (e.g. `FIPS`, `FIPS:OSPP`, `DEFAULT`). Omitted if absent. |
-| `policy.fips_effective` | `bool` | `true` if the policy name starts with `FIPS`.                                  |
+| Field                   | Type   | Description                                                                    | OCSF mapping    |
+| ----------------------- | ------ | ------------------------------------------------------------------------------ | --------------- |
+| `kernel.enabled`        | `bool` | `true` if the kernel flag `/proc/sys/crypto/fips_enabled` is `1`.              | No direct OCSF. |
+| `policy.name`           | string | Active crypto policy (e.g. `FIPS`, `FIPS:OSPP`, `DEFAULT`). Omitted if absent. | No direct OCSF. |
+| `policy.fips_effective` | `bool` | `true` if the policy name starts with `FIPS`.                                  | No direct OCSF. |
 
 ## Platform Support
 
@@ -128,7 +128,7 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                                                  | Ohai equivalent                                                                                                              | Alignment                                                                                                                                                                                                                                             |
+| Platform | What we read                                                                  | Ohai plugin                                                                                                                  | Alignment                                                                                                                                                                                                                                             |
 | -------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Linux    | `/proc/sys/crypto/fips_enabled` (bool) + `/etc/crypto-policies/config` (name) | [`fips.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/fips.rb) — `OpenSSL.fips_mode` from Ruby OpenSSL binding | Ohai reads the library-level FIPS flag; on Linux it's initialized from the same kernel flag we read, so `kernel.enabled` matches their `kernel.enabled`. We additionally probe `crypto-policies` to catch 140-3 post-boot drift, which Ohai does not. |
 | macOS    | —                                                                             | Ohai has no `:darwin` handler                                                                                                | Parity (both return nothing).                                                                                                                                                                                                                         |

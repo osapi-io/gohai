@@ -33,6 +33,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
@@ -62,6 +63,7 @@ type Facts struct {
 	Virtualization *virtualization.Info `json:"virtualization,omitempty"`
 	MachineID      *machineid.Info      `json:"machine_id,omitempty"`
 	CPU            *cpu.Info            `json:"cpu,omitempty"`
+	Load           *load.Info           `json:"load,omitempty"`
 	Memory         *memory.Info         `json:"memory,omitempty"`
 	Filesystem     *filesystem.Info     `json:"filesystem,omitempty"`
 	Disk           *disk.Info           `json:"disk,omitempty"`
@@ -136,6 +138,9 @@ func (f *Facts) countPopulated() int {
 		n++
 	}
 	if f.CPU != nil {
+		n++
+	}
+	if f.Load != nil {
 		n++
 	}
 	if f.Memory != nil {
@@ -221,6 +226,10 @@ func (f *Facts) set(
 	case "cpu":
 		if v, ok := result.(*cpu.Info); ok {
 			f.CPU = v
+		}
+	case "load":
+		if v, ok := result.(*load.Info); ok {
+			f.Load = v
 		}
 	case "memory":
 		if v, ok := result.(*memory.Info); ok {
