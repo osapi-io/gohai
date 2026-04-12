@@ -36,6 +36,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
@@ -141,5 +142,6 @@ func builtinCollectors() []collector.Collector {
 		network.New(),
 		process.New(),
 		users.New(),
+		timezone.New(),
 	}
 }

@@ -35,6 +35,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
@@ -52,6 +53,7 @@ func diskInfoPtr() *disk.Info             { return &disk.Info{} }
 func networkInfoPtr() *network.Info       { return &network.Info{} }
 func processInfoPtr() *process.Info       { return &process.Info{} }
 func usersInfoPtr() *users.Info           { return &users.Info{} }
+func timezoneInfoPtr() *timezone.Info     { return &timezone.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -140,7 +142,7 @@ func (s *FactsTestSuite) TestCountPopulated() {
 		{"empty", &Facts{}, 0},
 		{"platform only", &Facts{Platform: &platform.Info{}}, 1},
 		{
-			name: "all thirteen fields populated",
+			name: "all fields populated",
 			facts: &Facts{
 				Platform:       &platform.Info{},
 				Hostname:       hostnameInfoPtr(),
@@ -155,8 +157,9 @@ func (s *FactsTestSuite) TestCountPopulated() {
 				Network:        networkInfoPtr(),
 				Process:        processInfoPtr(),
 				Users:          usersInfoPtr(),
+				Timezone:       timezoneInfoPtr(),
 			},
-			want: 13,
+			want: 14,
 		},
 	}
 	for _, tt := range tests {
