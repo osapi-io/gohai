@@ -71,13 +71,13 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 | [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | ✅ |
 | [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | ✅ |
 | [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | ✅ |
-| [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | 🚧          |
-| [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | 🚧          |
+| [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | ✅         |
+| [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | ✅         |
 | [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | ✅ |
 | [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ |
 | [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | ✅ |
 | [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | ✅ |
-| [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | 🚧          |
+| [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | ✅         |
 
 ### ⚙️ Hardware
 
@@ -141,7 +141,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [package_mgr](docs/collectors/package_mgr.md)      | Active package manager (apt, dnf, brew, etc.)  | ✅      | 🚧          |
+| [package_mgr](docs/collectors/package_mgr.md)      | Active package manager (apt, dnf, brew, etc.)  | ✅      | ✅         |
 | [packages](docs/collectors/packages.md)            | Installed packages (apt, yum, brew, etc.)      | ❌      | 🚧          |
 | [languages](docs/collectors/languages.md)          | Go, Python, Ruby, Node, Rust, Java, etc.       | ❌      | 🚧          |
 | [docker](docs/collectors/docker.md)                | Running containers, images, Docker info        | ❌      | 🚧          |
@@ -158,7 +158,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [lsb](docs/collectors/lsb.md)                     | Linux Standard Base release info               | ✅      | 🚧          |
+| [lsb](docs/collectors/lsb.md)                     | Linux Standard Base release info               | ✅      | ✅         |
 | [hostnamectl](docs/collectors/hostnamectl.md)      | `hostnamectl` output                           | ✅      | 🚧          |
 | [sysctl](docs/collectors/sysctl.md)               | Kernel parameters via `sysctl`                 | ✅      | 🚧          |
 | [systemd_paths](docs/collectors/systemd_paths.md)  | Systemd path directories                       | ✅      | 🚧          |
