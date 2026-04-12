@@ -59,6 +59,30 @@ See the [Adding a New Collector](../CLAUDE.md#adding-a-new-collector) guide in
 CLAUDE.md for the full checklist: types, implementation, registration, tests,
 docs, and README update.
 
+### Implementation methodology
+
+gohai is an **SDK first** — a library consumed by [OSAPI][osapi] and other Go
+services. The CLI is a thin wrapper. Design choices should optimize for the
+importer.
+
+Each collector **wraps** a well-maintained backing source rather than
+reimplementing OS parsing. Decision order:
+
+1. Prefer an existing Go library ([gopsutil][], [ghw][], [procfs][],
+   [go-sysinfo][]).
+2. Prefer an official provider SDK for cloud collectors, or `net/http` to IMDS
+   endpoints.
+3. Composite approach combining multiple sources.
+4. Roll our own thin parser for simple data (one file, one command).
+5. Fall back to porting [Ohai's Ruby plugin][ohai-plugins] when no Go library
+   covers the domain.
+
+Use [node_exporter][] as a reference for tricky Linux `/proc`/`/sys` parsing —
+read, learn, rewrite in our style (don't import their code directly).
+
+Whatever backing strategy you pick, shape the output into the collector's typed
+`Info` struct so the JSON output stays Ohai-compatible.
+
 ## Setup
 
 Fetch shared justfiles and install all dependencies:
@@ -155,3 +179,10 @@ be reasonable to split it in a few). Git squash and rebase is your friend!
 [golangci-lint]: https://golangci-lint.run
 [Conventional Commits]: https://www.conventionalcommits.org
 [prettier]: https://prettier.io
+[osapi]: https://github.com/osapi-io/osapi
+[gopsutil]: https://github.com/shirou/gopsutil
+[ghw]: https://github.com/jaypipes/ghw
+[procfs]: https://github.com/prometheus/procfs
+[go-sysinfo]: https://github.com/elastic/go-sysinfo
+[node_exporter]: https://github.com/prometheus/node_exporter
+[ohai-plugins]: https://github.com/chef/ohai/tree/main/lib/ohai/plugins

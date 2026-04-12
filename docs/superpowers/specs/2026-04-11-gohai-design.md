@@ -2,10 +2,22 @@
 
 ## Overview
 
-gohai is a Go-based system information collector inspired by Chef Ohai. It
-collects comprehensive system facts via a pluggable collector architecture
-with node_exporter-style flag toggling. It is both a standalone CLI tool and
-a Go library/SDK for integration with OSAPI and other consumers.
+**gohai is an SDK first.** It is a Go library that OSAPI and other consumers
+import to collect typed system facts, with a standalone CLI (`gohai`) shipped
+as a thin wrapper over the same SDK. The SDK surface — not the CLI — is the
+primary product.
+
+gohai is inspired by Chef Ohai: pluggable collectors, comprehensive facts,
+Ohai-compatible JSON output. Unlike Ohai (Ruby) or Facter (Ruby), gohai is a
+Go-native library designed to be embedded in Go services.
+
+### Primary consumers
+
+- **OSAPI** — imports `pkg/gohai` to enable fact-based routing, guards,
+  discovery, and inventory features.
+- **`gohai` CLI** — ad-hoc human use; thin wrapper around the SDK.
+- **Other Go services** — exporters, inventory tools, compliance scanners,
+  agents that need typed system facts.
 
 ## Goals
 
@@ -21,30 +33,129 @@ a Go library/SDK for integration with OSAPI and other consumers.
   testify/suite and table-driven patterns.
 - **OSAPI conventions**: follows osapi-orchestrator code standards (multi-line
   signatures, public/internal test split, golangci-lint, conventional commits).
+- **Leverage existing libraries**: wrap battle-tested Go system libraries
+  rather than reimplement OS parsing from scratch. gohai's value is the
+  unified API, Ohai-compatible output, and pluggable collector model — not
+  re-solving `/proc` parsing.
+
+## Library Strategy
+
+Each collector chooses the backing library that best fits its domain. The
+Collector interface is the abstraction boundary — consumers of the SDK never
+see the backing library. The public `Info` structs are shaped to match Ohai's
+output format, not the backing library's data model.
+
+### Recommended libraries
+
+| Library                                                  | Best for                                                 | License  |
+| -------------------------------------------------------- | -------------------------------------------------------- | -------- |
+| [gopsutil](https://github.com/shirou/gopsutil)           | CPU, memory, disk, filesystem, network, process, uptime, users, host, virtualization detection | BSD-3    |
+| [ghw](https://github.com/jaypipes/ghw)                   | GPU, PCI, SCSI, block devices, DMI (BIOS/baseboard/chassis), NUMA topology | Apache-2 |
+| [procfs](https://github.com/prometheus/procfs)           | Raw `/proc` and `/sys` parsing for Linux-specific facts (interrupts, ipc, mdadm, sysctl, block_device, etc.) | Apache-2 |
+| [go-sysinfo](https://github.com/elastic/go-sysinfo)      | Alternative host info; rich per-process detail           | Apache-2 |
+| [node_exporter source](https://github.com/prometheus/node_exporter) | Reference for tricky Linux parsing patterns — read, learn, rewrite in our style (don't import code directly) | Apache-2 |
+| Cloud provider SDKs or `net/http` to IMDS endpoints      | ec2, gce, azure, digital_ocean, openstack, etc.          | varies   |
+| Port Ohai's Ruby plugins                                 | Fallback when no Go library covers the domain            | Apache-2 (reference) |
+| Roll our own thin parsers                                | selinux, packages (apt/yum/brew), services (systemctl), docker (docker info), languages (runtime --version probes), lsb | —        |
+
+### Picking a backing strategy per collector
+
+The recommended libraries above are a starting point, not a closed list. Each
+collector is free to pull in whatever library best serves its domain —
+especially for cloud providers (AWS SDK, Google Cloud SDK, Azure SDK, etc.),
+container runtimes (Docker SDK, containerd, CRI), and specialized domains
+(libvirt-go, go-smbios, etc.).
+
+Decision order for each collector:
+
+1. **Prefer a well-maintained Go library** when one exists and covers the
+   data we need. Saves time, handles edge cases, typically cross-platform.
+2. **Prefer an official provider SDK** for cloud collectors where feasible
+   (aws-sdk-go for ec2, google.golang.org/cloud for gce, etc.). Alternatively
+   plain `net/http` to IMDS endpoints for smaller binary size.
+3. **Composite approach** — combine multiple sources, e.g., gopsutil for
+   base data plus supplementary `/proc/self/cgroup` checks for fine detail.
+4. **Roll our own thin parser** when the data is simple (single file or
+   command) and a library would be over-engineering.
+5. **Fall back to porting [Ohai's Ruby plugin](https://github.com/chef/ohai/tree/main/lib/ohai/plugins)**
+   — when no Go library covers a specific data domain (especially
+   Linux-specific `/proc`/`/sys` detail like `interrupts`, `mdadm`, `tc`,
+   `livepatch`, or niche cloud providers), reproduce Ohai's Ruby
+   implementation in Go. Ohai has already solved the edge cases for every
+   major OS/distro; our job is translate, not re-discover.
+
+The Collector interface and `Info` struct shape are the contract — whatever
+backing strategy a collector uses, its output must match the typed struct
+and Ohai-compatible JSON shape.
+
+### Example: platform collector
+
+```go
+// internal/collector/platform/linux.go (or pkg/gohai/collectors/platform/)
+import "github.com/shirou/gopsutil/v4/host"
+
+func collect(ctx context.Context) (any, error) {
+    info, err := host.InfoWithContext(ctx)
+    if err != nil {
+        return nil, fmt.Errorf("host.Info: %w", err)
+    }
+    return &Info{
+        Name:         info.Platform,        // "ubuntu"
+        Version:      info.PlatformVersion, // "24.04"
+        Family:       info.PlatformFamily,  // "debian"
+        Architecture: info.KernelArch,      // "arm64"
+    }, nil
+}
+```
+
+The same gopsutil `host.Info` call also feeds the `hostname`, `uptime`,
+`kernel`, and `machine_id` collectors — each extracting its relevant fields
+into its own typed `Info` struct.
 
 ## Architecture
 
 ### Package Structure
 
+Collector sub-packages live under `pkg/gohai/collectors/` (not `internal/`) so
+that external consumers — notably OSAPI — can import the typed `Info` structs
+directly for type-safe fact access.
+
 ```
-cmd/gohai/                     # CLI entrypoint (Cobra)
-  main.go                      # Cobra root command, flag registration
-pkg/gohai/                     # Public SDK
-  gohai.go                     # Gohai struct, New(), Collect()
-  facts.go                     # Facts struct with typed fields for all collectors
-  options.go                   # Functional options (WithCollectors, etc.)
-  registry.go                  # Public registry API (collector enable/disable)
-internal/collector/            # Collector interface + implementations
-  collector.go                 # Collector interface, Tier type
-  registry.go                  # Internal registry (register, resolve deps, run)
-  platform/                    # One sub-package per collector
-    platform.go                # Info struct + Collector implementation
-    platform_linux.go          # Linux-specific collection (build-tagged)
-    platform_darwin.go         # macOS-specific collection (build-tagged)
-    platform_test.go           # Internal tests
-    platform_public_test.go    # Public interface tests
-  ...                          # Same pattern for all 65 collectors
+cmd/gohai/                          # CLI entrypoint (Cobra)
+  main.go                           # Cobra root command, flag registration
+  flags.go                          # Dynamic --collector.<name> flag registration
+  output.go                         # JSON / pretty / flat output writers
+pkg/gohai/                          # Public SDK
+  gohai.go                          # Gohai struct, New(), Collect()
+  facts.go                          # Facts struct with typed fields per collector
+  options.go                        # Functional options (WithCollectors, etc.)
+  registry.go                       # Public registry API
+  collectors/                       # PUBLIC collector sub-packages
+    platform/
+      platform.go                   # Info struct (PUBLIC); Collector impl
+      linux.go                      # Linux-specific collection (build-tagged)
+      darwin.go                     # macOS-specific collection (build-tagged)
+      other.go                      # Fallback for other OSes
+      export_linux_test.go          # Exposes private symbols for linux tests
+      export_darwin_test.go         # Exposes private symbols for darwin tests
+      platform_public_test.go       # Package-level public tests
+      linux_public_test.go          # Linux-specific public tests (build-tagged)
+      darwin_public_test.go         # macOS-specific public tests (build-tagged)
+    cpu/                            # Same pattern for every collector
+      cpu.go
+      linux.go
+      darwin.go
+      ...
+    ...                             # One sub-package per collector
+internal/collector/                 # Collector interface + registry plumbing
+  collector.go                      # Collector interface, Tier type
+  registry.go                       # Registry (register, resolve deps, run)
 ```
+
+**Why `pkg/gohai/collectors/` and not `internal/`:** external consumers like
+OSAPI need to import typed `Info` structs (e.g., `platform.Info`, `cpu.Info`)
+to do type-safe fact access. Go's `internal/` rule would prevent that. Only
+the interface/registry plumbing stays in `internal/`.
 
 ### Collector Interface
 
@@ -77,29 +188,79 @@ The internal registry handles:
 4. **Concurrent Execution**: collectors at the same dependency level run in
    parallel
 
-### Facts Struct
+### Facts Struct and Data Layer
 
 The public `Facts` struct in `pkg/gohai/facts.go` has a typed field for every
-collector:
+collector. Each collector emits its own JSON sub-document; gohai composes the
+enabled sub-documents into one larger Ohai-style document.
 
 ```go
 type Facts struct {
     Platform       *platform.Info       `json:"platform,omitempty"`
     CPU            *cpu.Info            `json:"cpu,omitempty"`
     Memory         *memory.Info         `json:"memory,omitempty"`
+    Network        *network.Info        `json:"network,omitempty"`
     // ... one field per collector
     CollectTime    time.Time            `json:"collect_time"`
-    CollectDuration time.Duration       `json:"collect_duration"`
+    CollectDuration time.Duration       `json:"collect_duration_ns"`
 }
-
-func (f *Facts) JSON() ([]byte, error)        // nested JSON
-func (f *Facts) PrettyJSON() ([]byte, error)  // indented JSON
-func (f *Facts) Flat() map[string]any         // dot-separated keys
 ```
+
+Fields for disabled collectors are `nil` and omitted from JSON (via
+`omitempty`). Only enabled collectors contribute to the output document.
+
+### Three ways for consumers to access facts
+
+**(a) Typed Go access — the osapi integration path**
+
+```go
+facts, _ := g.Collect(ctx)
+fmt.Println(facts.Platform.Name)    // "ubuntu"
+fmt.Println(facts.CPU.Total)        // 8
+fmt.Println(facts.Memory.Total)     // 34359738368
+```
+
+**(b) Full Ohai-compatible nested JSON — the CLI path**
+
+```go
+json, _ := facts.JSON()        // compact
+pretty, _ := facts.PrettyJSON() // indented
+```
+
+**(c) Per-component JSON — for partial consumption**
+
+```go
+platformJSON, _ := facts.ComponentJSON("platform")
+cpuJSON, _      := facts.ComponentJSON("cpu")
+```
+
+**(d) Flat dot-separated map — for quick lookups and templating**
+
+```go
+flat := facts.Flat()
+flat["platform.name"]     // "ubuntu"
+flat["cpu.total"]         // 8
+facts.Get("platform.name") // shorthand for flat["platform.name"]
+```
+
+### Output composition
+
+Each collector produces a self-contained JSON sub-document via its typed
+`Info` struct's `json` tags. gohai composes the final document by including
+only the sub-documents for collectors that are enabled and successfully ran.
+This means:
+
+- Disabled collectors → their field is `nil` → omitted via `omitempty`
+- Failed collectors → their field is `nil` → omitted via `omitempty`
+- Successful collectors → their field holds the typed `Info` struct →
+  serialized as its JSON representation
 
 ### CLI
 
-Cobra-based with node_exporter-style flags:
+Cobra-based ([github.com/spf13/cobra](https://github.com/spf13/cobra)) with
+node_exporter-style flags. Cobra is the project's standard CLI framework —
+matches osapi-io conventions and provides dynamic flag registration from the
+collector registry:
 
 ```
 gohai                                    # all default collectors

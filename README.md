@@ -11,9 +11,21 @@
 
 # gohai
 
-A Go-based system information collector inspired by [Chef Ohai][] — collects
-comprehensive system facts via a pluggable collector architecture. Use it as
-a standalone CLI or import it as a library in your Go applications.
+**gohai is an SDK-first Go library** for collecting comprehensive system
+facts, inspired by [Chef Ohai][]. Import it into your Go application for
+typed access to system facts — or use the standalone `gohai` CLI, a thin
+wrapper over the same SDK.
+
+Each collector wraps a well-maintained backing source ([gopsutil][],
+[ghw][], [procfs][], cloud SDKs) and reshapes its output into Ohai-compatible
+JSON. gohai's value is the unified API, typed Go structs, and pluggable
+collector model — not reimplementing `/proc` parsing from scratch.
+
+### Primary consumer
+
+gohai is built to be embedded in [OSAPI][] and other Go services that need
+typed system facts for routing, guards, discovery, inventory, and
+compliance. The CLI is a convenience — the SDK is the product.
 
 ## 📦 Install
 
@@ -32,117 +44,120 @@ go get github.com/osapi-io/gohai
 65 collectors across 9 categories. Collectors are individually toggled using
 node_exporter-style flags — some enabled by default, others opt-in.
 
+Implementation status legend: ✅ = implemented and tested, ⚠️ = partial
+support (e.g., Linux only), 🚧 = planned but not yet built.
+
 ### 🖥️ System
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [platform](docs/collectors/platform.md)            | OS name, version, family, architecture             | ✅      |
-| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name               | ✅      |
-| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                       | ✅      |
-| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time              | ✅      |
-| [timezone](docs/collectors/timezone.md)            | System timezone                                    | ✅      |
-| [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)                   | ✅      |
-| [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)        | ✅      |
-| [fips](docs/collectors/fips.md)                    | FIPS mode detection                                | ✅      |
-| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                     | ✅      |
-| [root_group](docs/collectors/root_group.md)        | Root user's primary group                          | ✅      |
-| [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`                | ✅      |
-| [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity     | ✅      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [platform](docs/collectors/platform.md)            | OS name, version, family, architecture         | ✅      | ✅ (gopsutil) |
+| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name           | ✅      | 🚧          |
+| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | 🚧          |
+| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | 🚧          |
+| [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | 🚧          |
+| [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | 🚧          |
+| [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | 🚧          |
+| [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | 🚧          |
+| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | 🚧          |
+| [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | 🚧          |
+| [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | 🚧          |
+| [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | 🚧          |
 
 ### ⚙️ Hardware
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology          | ✅      |
-| [memory](docs/collectors/memory.md)                | Total, free, swap, buffers, cached, hugepages      | ✅      |
-| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                           | ✅      |
-| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type           | ✅      |
-| [dmi](docs/collectors/dmi.md)                      | BIOS, system manufacturer, serial, UUID            | ✅      |
-| [gpu](docs/collectors/gpu.md)                      | GPU model, driver, memory                          | ✅      |
-| [pci](docs/collectors/pci.md)                      | PCI devices (`lspci`)                              | ✅      |
-| [scsi](docs/collectors/scsi.md)                    | SCSI devices                                       | ✅      |
-| [hardware](docs/collectors/hardware.md)            | macOS hardware profile, battery, storage           | ✅      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | 🚧          |
+| [memory](docs/collectors/memory.md)                | Total, free, swap, buffers, cached, hugepages  | ✅      | 🚧          |
+| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | 🚧          |
+| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | 🚧          |
+| [dmi](docs/collectors/dmi.md)                      | BIOS, system manufacturer, serial, UUID        | ✅      | 🚧          |
+| [gpu](docs/collectors/gpu.md)                      | GPU model, driver, memory                      | ✅      | 🚧          |
+| [pci](docs/collectors/pci.md)                      | PCI devices (`lspci`)                          | ✅      | 🚧          |
+| [scsi](docs/collectors/scsi.md)                    | SCSI devices                                   | ✅      | 🚧          |
+| [hardware](docs/collectors/hardware.md)            | macOS hardware profile, battery, storage       | ✅      | 🚧          |
 
 ### 🌐 Network
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, routes, DNS, counters       | ✅      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, routes, DNS, counters   | ✅      | 🚧          |
 
 ### ☁️ Cloud
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [cloud](docs/collectors/cloud.md)                  | Aggregated cloud provider info                     | ✅      |
-| [ec2](docs/collectors/ec2.md)                      | AWS EC2 instance metadata (IMDS)                   | ✅      |
-| [gce](docs/collectors/gce.md)                      | Google Compute Engine metadata                     | ✅      |
-| [azure](docs/collectors/azure.md)                  | Azure instance metadata (IMDS)                     | ✅      |
-| [digital_ocean](docs/collectors/digital_ocean.md)  | DigitalOcean droplet metadata                      | ✅      |
-| [openstack](docs/collectors/openstack.md)          | OpenStack instance metadata                        | ✅      |
-| [alibaba](docs/collectors/alibaba.md)              | Alibaba Cloud ECS metadata                         | ✅      |
-| [rackspace](docs/collectors/rackspace.md)          | Rackspace server metadata                          | ✅      |
-| [linode](docs/collectors/linode.md)                | Linode instance metadata                           | ✅      |
-| [oci](docs/collectors/oci.md)                      | Oracle Cloud instance metadata                     | ✅      |
-| [scaleway](docs/collectors/scaleway.md)            | Scaleway instance metadata                         | ✅      |
-| [softlayer](docs/collectors/softlayer.md)          | IBM SoftLayer metadata                             | ✅      |
-| [eucalyptus](docs/collectors/eucalyptus.md)        | Eucalyptus instance metadata                       | ✅      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [cloud](docs/collectors/cloud.md)                  | Aggregated cloud provider info                 | ✅      | 🚧          |
+| [ec2](docs/collectors/ec2.md)                      | AWS EC2 instance metadata (IMDS)               | ✅      | 🚧          |
+| [gce](docs/collectors/gce.md)                      | Google Compute Engine metadata                 | ✅      | 🚧          |
+| [azure](docs/collectors/azure.md)                  | Azure instance metadata (IMDS)                 | ✅      | 🚧          |
+| [digital_ocean](docs/collectors/digital_ocean.md)  | DigitalOcean droplet metadata                  | ✅      | 🚧          |
+| [openstack](docs/collectors/openstack.md)          | OpenStack instance metadata                    | ✅      | 🚧          |
+| [alibaba](docs/collectors/alibaba.md)              | Alibaba Cloud ECS metadata                     | ✅      | 🚧          |
+| [rackspace](docs/collectors/rackspace.md)          | Rackspace server metadata                      | ✅      | 🚧          |
+| [linode](docs/collectors/linode.md)                | Linode instance metadata                       | ✅      | 🚧          |
+| [oci](docs/collectors/oci.md)                      | Oracle Cloud instance metadata                 | ✅      | 🚧          |
+| [scaleway](docs/collectors/scaleway.md)            | Scaleway instance metadata                     | ✅      | 🚧          |
+| [softlayer](docs/collectors/softlayer.md)          | IBM SoftLayer metadata                         | ✅      | 🚧          |
+| [eucalyptus](docs/collectors/eucalyptus.md)        | Eucalyptus instance metadata                   | ✅      | 🚧          |
 
 ### 🔮 Virtualization
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection         | ✅      |
-| [vmware](docs/collectors/vmware.md)                | VMware guest tools data                            | ✅      |
-| [virtualbox](docs/collectors/virtualbox.md)        | VirtualBox guest additions data                    | ✅      |
-| [libvirt](docs/collectors/libvirt.md)              | Libvirt domain information                         | ✅      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection     | ✅      | 🚧          |
+| [vmware](docs/collectors/vmware.md)                | VMware guest tools data                        | ✅      | 🚧          |
+| [virtualbox](docs/collectors/virtualbox.md)        | VirtualBox guest additions data                | ✅      | 🚧          |
+| [libvirt](docs/collectors/libvirt.md)              | Libvirt domain information                     | ✅      | 🚧          |
 
 ### 🔒 Security
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [selinux](docs/collectors/selinux.md)              | SELinux status, policy, contexts                   | ✅      |
-| [ssh](docs/collectors/ssh.md)                      | Host keys (RSA, ECDSA, ED25519)                    | ❌      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [selinux](docs/collectors/selinux.md)              | SELinux status, policy, contexts               | ✅      | 🚧          |
+| [ssh](docs/collectors/ssh.md)                      | Host keys (RSA, ECDSA, ED25519)                | ❌      | 🚧          |
 
 ### 📦 Software
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [packages](docs/collectors/packages.md)            | Installed packages (apt, yum, brew, etc.)          | ❌      |
-| [languages](docs/collectors/languages.md)          | Go, Python, Ruby, Node, Rust, Java, etc.           | ❌      |
-| [docker](docs/collectors/docker.md)                | Running containers, images, Docker info            | ❌      |
-| [services](docs/collectors/services.md)            | Systemd service states                             | ❌      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [packages](docs/collectors/packages.md)            | Installed packages (apt, yum, brew, etc.)      | ❌      | 🚧          |
+| [languages](docs/collectors/languages.md)          | Go, Python, Ruby, Node, Rust, Java, etc.       | ❌      | 🚧          |
+| [docker](docs/collectors/docker.md)                | Running containers, images, Docker info        | ❌      | 🚧          |
+| [services](docs/collectors/services.md)            | Systemd service states                         | ❌      | 🚧          |
 
 ### 👥 Users & Sessions
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [users](docs/collectors/users.md)                  | passwd/group data, current user                    | ✅      |
-| [sessions](docs/collectors/sessions.md)            | Logged-in sessions (`loginctl`)                    | ✅      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [users](docs/collectors/users.md)                  | passwd/group data, current user                | ✅      | 🚧          |
+| [sessions](docs/collectors/sessions.md)            | Logged-in sessions (`loginctl`)                | ✅      | 🚧          |
 
 ### 🐧 Linux-Specific
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [lsb](docs/collectors/lsb.md)                     | Linux Standard Base release info                   | ✅      |
-| [hostnamectl](docs/collectors/hostnamectl.md)      | `hostnamectl` output                               | ✅      |
-| [sysctl](docs/collectors/sysctl.md)               | Kernel parameters via `sysctl`                     | ✅      |
-| [systemd_paths](docs/collectors/systemd_paths.md)  | Systemd path directories                          | ✅      |
-| [interrupts](docs/collectors/interrupts.md)        | IRQ stats, SMP affinity                            | ✅      |
-| [ipc](docs/collectors/ipc.md)                      | IPC limits and status                              | ✅      |
-| [livepatch](docs/collectors/livepatch.md)          | Kernel livepatch status                            | ✅      |
-| [mdadm](docs/collectors/mdadm.md)                  | Software RAID arrays                              | ✅      |
-| [tc](docs/collectors/tc.md)                        | Traffic control (qdisc) info                       | ✅      |
-| [grub2](docs/collectors/grub2.md)                  | GRUB2 environment variables                        | ✅      |
-| [zpools](docs/collectors/zpools.md)                | ZFS pool status                                    | ✅      |
-| [rpm](docs/collectors/rpm.md)                      | RPM macros and config                              | ✅      |
-| [block_device](docs/collectors/block_device.md)    | Block device attributes from sysfs                 | ✅      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [lsb](docs/collectors/lsb.md)                     | Linux Standard Base release info               | ✅      | 🚧          |
+| [hostnamectl](docs/collectors/hostnamectl.md)      | `hostnamectl` output                           | ✅      | 🚧          |
+| [sysctl](docs/collectors/sysctl.md)               | Kernel parameters via `sysctl`                 | ✅      | 🚧          |
+| [systemd_paths](docs/collectors/systemd_paths.md)  | Systemd path directories                       | ✅      | 🚧          |
+| [interrupts](docs/collectors/interrupts.md)        | IRQ stats, SMP affinity                        | ✅      | 🚧          |
+| [ipc](docs/collectors/ipc.md)                      | IPC limits and status                          | ✅      | 🚧          |
+| [livepatch](docs/collectors/livepatch.md)          | Kernel livepatch status                        | ✅      | 🚧          |
+| [mdadm](docs/collectors/mdadm.md)                  | Software RAID arrays                           | ✅      | 🚧          |
+| [tc](docs/collectors/tc.md)                        | Traffic control (qdisc) info                   | ✅      | 🚧          |
+| [grub2](docs/collectors/grub2.md)                  | GRUB2 environment variables                    | ✅      | 🚧          |
+| [zpools](docs/collectors/zpools.md)                | ZFS pool status                                | ✅      | 🚧          |
+| [rpm](docs/collectors/rpm.md)                      | RPM macros and config                          | ✅      | 🚧          |
+| [block_device](docs/collectors/block_device.md)    | Block device attributes from sysfs             | ✅      | 🚧          |
 
 ### 🔧 Miscellaneous
 
-| Collector                                          | Description                                        | Default |
-| -------------------------------------------------- | -------------------------------------------------- | ------- |
-| [command](docs/collectors/command.md)              | Process snapshot (`ps` output)                     | ✅      |
-| [sysconf](docs/collectors/sysconf.md)             | POSIX sysconf values                               | ✅      |
+| Collector                                          | Description                                    | Default | Implemented |
+| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
+| [command](docs/collectors/command.md)              | Process snapshot (`ps` output)                 | ✅      | 🚧          |
+| [sysconf](docs/collectors/sysconf.md)             | POSIX sysconf values                           | ✅      | 🚧          |
 
 ## 🎯 Usage
 
@@ -236,5 +251,9 @@ submitting a PR.
 The [MIT][] License.
 
 [Chef Ohai]: https://docs.chef.io/ohai/
+[OSAPI]: https://github.com/osapi-io/osapi
+[gopsutil]: https://github.com/shirou/gopsutil
+[ghw]: https://github.com/jaypipes/ghw
+[procfs]: https://github.com/prometheus/procfs
 [package documentation]: https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai
 [MIT]: LICENSE
