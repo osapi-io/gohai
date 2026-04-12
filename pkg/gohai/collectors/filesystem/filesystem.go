@@ -18,11 +18,17 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package filesystem collects mounted filesystem data.
+// Package filesystem collects mounted filesystem data with capacity,
+// usage, and inode stats.
 package filesystem
 
 import (
 	"context"
+
+	"github.com/shirou/gopsutil/v4/disk"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds mounted filesystem data.
@@ -45,32 +51,54 @@ type Mount struct {
 	InodesFree  uint64   `json:"inodes_free,omitempty"`
 }
 
-// Collector implements the collector.Collector interface.
-type Collector struct{}
-
-// New returns a new filesystem Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every filesystem variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "filesystem".
-func (c *Collector) Name() string {
-	return "filesystem"
+type base struct{}
+
+func (base) Name() string           { return "filesystem" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the filesystem variant for the host OS.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
-
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers filesystem facts.
-func (c *Collector) Collect(
+// listMounts is the production bridge to gopsutil. Enumerates
+// partitions and fetches usage (capacity + inodes) for each. Per-mount
+// usage failures (permission denied, stale NFS, etc.) skip usage
+// fields but keep the mount in the output.
+func listMounts(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+) ([]Mount, error) {
+	parts, err := disk.PartitionsWithContext(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Mount, 0, len(parts))
+	for _, p := range parts {
+		m := Mount{
+			Device:     p.Device,
+			Mountpoint: p.Mountpoint,
+			Fstype:     p.Fstype,
+			Opts:       p.Opts,
+		}
+		if u, err := disk.UsageWithContext(ctx, p.Mountpoint); err == nil {
+			m.Total = u.Total
+			m.Used = u.Used
+			m.Free = u.Free
+			m.UsedPercent = u.UsedPercent
+			m.InodesTotal = u.InodesTotal
+			m.InodesUsed = u.InodesUsed
+			m.InodesFree = u.InodesFree
+		}
+		out = append(out, m)
+	}
+	return out, nil
 }

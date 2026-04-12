@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,46 +20,26 @@
 
 package filesystem
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/disk"
-)
+// Linux collects mounted filesystem data on Linux via gopsutil
+// (which reads /proc/mounts + statfs).
+type Linux struct {
+	base
 
-var (
-	partitionsFn = disk.PartitionsWithContext
-	usageFn      = disk.UsageWithContext
-)
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, partitionsFn, usageFn)
+	MountsFn func(context.Context) ([]Mount, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	partFn func(context.Context, bool) ([]disk.PartitionStat, error),
-	usageFnArg func(context.Context, string) (*disk.UsageStat, error),
-) (any, error) {
-	parts, err := partFn(ctx, false)
+// NewLinux returns a Linux variant wired to gopsutil.
+func NewLinux() *Linux {
+	return &Linux{MountsFn: listMounts}
+}
+
+// Collect returns filesystem Info.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	mounts, err := l.MountsFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("disk.Partitions: %w", err)
-	}
-	mounts := make([]Mount, 0, len(parts))
-	for _, p := range parts {
-		m := Mount{Device: p.Device, Mountpoint: p.Mountpoint, Fstype: p.Fstype, Opts: p.Opts}
-		if u, uerr := usageFnArg(ctx, p.Mountpoint); uerr == nil && u != nil {
-			m.Total = u.Total
-			m.Used = u.Used
-			m.Free = u.Free
-			m.UsedPercent = u.UsedPercent
-			m.InodesTotal = u.InodesTotal
-			m.InodesUsed = u.InodesUsed
-			m.InodesFree = u.InodesFree
-		}
-		mounts = append(mounts, m)
+		return nil, err
 	}
 	return &Info{Mounts: mounts}, nil
 }
