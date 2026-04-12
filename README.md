@@ -54,6 +54,21 @@ As a library dependency:
 go get github.com/osapi-io/gohai
 ```
 
+## ✨ Features
+
+| Feature                                                       | Description                                    |
+| ------------------------------------------------------------- | ---------------------------------------------- |
+| [🔌 Pluggable Collectors](docs/features/collectors.md)        | Enable/disable individual fact collectors      |
+| [🏗️ Typed Structs](docs/features/typed-structs.md)            | Strongly-typed Go structs for all facts        |
+| [📄 JSON Output](docs/features/json-output.md)                | Nested JSON output for CLI and programmatic use |
+| [🗺️ Flat Map Access](docs/features/flat-map.md)               | Dot-separated key-value access                 |
+| [🐧 Cross-Platform](docs/features/cross-platform.md)          | Linux primary, macOS best-effort               |
+| [🔗 Collector Dependencies](docs/features/dependencies.md)    | Automatic dependency resolution between facts  |
+| [⚡ Concurrent Collection](docs/features/concurrency.md)      | Collectors run concurrently; dependency graph resolves order when any collector declares deps. |
+| [🎛️ Profiles](docs/features/profiles.md)                      | Predefined collector sets (minimal, standard, full) |
+| [📊 OCSF Schema + Ohai Sources](docs/features/ocsf-ohai.md)   | Field names follow [OCSF](https://schema.ocsf.io/); data sources mirror Chef Ohai's plugins |
+| [🔌 SDK Integration](docs/features/sdk.md)                    | Import as a Go package for OSAPI and others    |
+
 ## 🔌 Collectors
 
 65 collectors across 9 categories. Collectors are individually toggled using
@@ -242,20 +257,6 @@ func main() {
 }
 ```
 
-## ✨ Features
-
-| Feature                                                       | Description                                    |
-| ------------------------------------------------------------- | ---------------------------------------------- |
-| [🔌 Pluggable Collectors](docs/features/collectors.md)        | Enable/disable individual fact collectors      |
-| [🏗️ Typed Structs](docs/features/typed-structs.md)            | Strongly-typed Go structs for all facts        |
-| [📄 JSON Output](docs/features/json-output.md)                | Nested JSON output for CLI and programmatic use |
-| [🗺️ Flat Map Access](docs/features/flat-map.md)               | Dot-separated key-value access                 |
-| [🐧 Cross-Platform](docs/features/cross-platform.md)          | Linux primary, macOS best-effort               |
-| [🔗 Collector Dependencies](docs/features/dependencies.md)    | Automatic dependency resolution between facts  |
-| [⚡ Concurrent Collection](docs/features/concurrency.md)      | Parallel collection with dependency ordering   |
-| [🎛️ Profiles](docs/features/profiles.md)                      | Predefined collector sets (minimal, standard, full) |
-| [📊 Ohai Compatibility](docs/features/ohai-compat.md)         | Output format compatible with Chef Ohai        |
-| [🔌 SDK Integration](docs/features/sdk.md)                    | Import as a Go package for OSAPI and others    |
 
 ## 🔗 Integrations
 

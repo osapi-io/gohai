@@ -4,36 +4,37 @@
 
 ## Description
 
-Per-device disk I/O counters (read/write counts, bytes, and times). Wraps
-[gopsutil's `disk.IOCounters`](https://pkg.go.dev/github.com/shirou/gopsutil/v4/disk).
+Reports per-device disk I/O counters (read/write counts, bytes, and latency).
+Equivalent to what `iostat` shows at the block-device layer — useful for
+detecting saturated disks, unbalanced I/O across NVMe devices, and trending
+storage workload over time.
 
-Note: this collector reports I/O statistics only. For physical device metadata
-(model, vendor, size) a future `block_device` collector will wrap `ghw/block`.
+Note: this collector reports **I/O counters only**. Physical device metadata
+(model, vendor, serial, rotational, block sizes) will come from a forthcoming
+`block_device` collector that wraps `ghw/block` — tracked separately. Ohai
+splits these the same way.
 
 ## Collected Fields
 
-Top-level: `devices []Device`.
+| Field per device | Type   | Description                                   | OCSF mapping    |
+| ---------------- | ------ | --------------------------------------------- | --------------- |
+| `name`           | string | Device name (e.g. `sda`, `nvme0n1`, `disk0`). | No direct OCSF. |
+| `read_count`     | uint64 | Number of completed reads.                    | No direct OCSF. |
+| `write_count`    | uint64 | Number of completed writes.                   | No direct OCSF. |
+| `read_bytes`     | uint64 | Bytes read.                                   | No direct OCSF. |
+| `write_bytes`    | uint64 | Bytes written.                                | No direct OCSF. |
+| `read_time`      | uint64 | Time spent reading (ms).                      | No direct OCSF. |
+| `write_time`     | uint64 | Time spent writing (ms).                      | No direct OCSF. |
+| `io_time`        | uint64 | Time with in-flight I/O (ms).                 | No direct OCSF. |
 
-Per-device:
-
-| Field         | Type   | Description                  |
-| ------------- | ------ | ---------------------------- |
-| `name`        | string | Device name (e.g., `sda`)    |
-| `read_count`  | uint64 | Number of reads              |
-| `write_count` | uint64 | Number of writes             |
-| `read_bytes`  | uint64 | Bytes read                   |
-| `write_bytes` | uint64 | Bytes written                |
-| `read_time`   | uint64 | Time spent reading (ms)      |
-| `write_time`  | uint64 | Time spent writing (ms)      |
-| `io_time`     | uint64 | Time with in-flight I/O (ms) |
+Top level: `devices: []Device`.
 
 ## Platform Support
 
-| Platform | Source                                   | Supported |
-| -------- | ---------------------------------------- | --------- |
-| Linux    | `gopsutil/v4/disk.IOCountersWithContext` | ✅        |
-| macOS    | `gopsutil/v4/disk.IOCountersWithContext` | ✅        |
-| Other    | Returns `nil`                            | —         |
+| Platform | Supported                     |
+| -------- | ----------------------------- |
+| Linux    | ✅ (parses `/proc/diskstats`) |
+| macOS    | ✅ (IOKit via gopsutil)       |
 
 ## Example Output
 
@@ -59,17 +60,10 @@ Per-device:
 ## SDK Usage
 
 ```go
-import (
-    "context"
-
-    "github.com/osapi-io/gohai/pkg/gohai"
-)
-
 g, _ := gohai.New(gohai.WithCollectors("disk"))
 facts, _ := g.Collect(context.Background())
-
 for _, d := range facts.Disk.Devices {
-    fmt.Printf("%s: %d reads, %d writes\n", d.Name, d.ReadCount, d.WriteCount)
+    fmt.Printf("%s: %d reads / %d writes\n", d.Name, d.ReadCount, d.WriteCount)
 }
 ```
 
@@ -84,7 +78,17 @@ gohai --no-collector.disk   # disable
 
 None.
 
+## Data Sources
+
+| Platform | What we read                                               | Ohai plugin                                                                                                                                                                    | Alignment                                                                                                                                                                                    |
+| -------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | gopsutil `disk.IOCountersWithContext` (`/proc/diskstats`). | No Ohai equivalent — Ohai's `linux/block_device.rb` reports sysfs device metadata (model, rotational, block sizes) which is the future gohai `block_device` collector's scope. | **Gohai extension.** Ohai doesn't track I/O counters; we do so consumers can reason about storage workload without running `iostat`. Node_exporter's `diskstats` collector is the reference. |
+| macOS    | gopsutil `disk.IOCountersWithContext` (IOKit).             | —                                                                                                                                                                              | Same gohai-native scope.                                                                                                                                                                     |
+
+**Known gaps:** None at this collector's scope. Physical device metadata is out
+of scope; see the planned `block_device` collector.
+
 ## Backing library
 
-[`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil) —
-BSD-3.
+- [`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil) —
+  BSD-3.
