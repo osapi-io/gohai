@@ -10,15 +10,15 @@ Install tools using [mise][]:
 mise install
 ```
 
-- **[Go][]** — gohai is written in Go. We always support the latest two major
-  Go versions, so make sure your version is recent enough.
+- **[Go][]** — gohai is written in Go. We always support the latest two major Go
+  versions, so make sure your version is recent enough.
 - **[just][]** — Task runner used for building, testing, formatting, and other
   development workflows. Install with `brew install just`.
 
 ### Claude Code
 
-If you use [Claude Code][] for development, install these plugins from the
-default marketplace:
+If you use [Claude Code][] for development, install these plugins from the default
+marketplace:
 
 ```
 /plugin install commit-commands@claude-plugins-official
@@ -58,6 +58,30 @@ docs/
 See the [Adding a New Collector](../CLAUDE.md#adding-a-new-collector) guide in
 CLAUDE.md for the full checklist: types, implementation, registration, tests,
 docs, and README update.
+
+### Implementation methodology
+
+gohai is an **SDK first** — a library consumed by [OSAPI][osapi] and other Go
+services. The CLI is a thin wrapper. Design choices should optimize for the
+importer.
+
+Each collector **wraps** a well-maintained backing source rather than
+reimplementing OS parsing. Decision order:
+
+1. Prefer an existing Go library ([gopsutil][], [ghw][], [procfs][],
+   [go-sysinfo][]).
+2. Prefer an official provider SDK for cloud collectors, or `net/http` to IMDS
+   endpoints.
+3. Composite approach combining multiple sources.
+4. Roll our own thin parser for simple data (one file, one command).
+5. Fall back to porting [Ohai's Ruby plugin][ohai-plugins] when no Go library
+   covers the domain.
+
+Use [node_exporter][] as a reference for tricky Linux `/proc`/`/sys` parsing —
+read, learn, rewrite in our style (don't import their code directly).
+
+Whatever backing strategy you pick, shape the output into the collector's typed
+`Info` struct so the JSON output stays Ohai-compatible.
 
 ## Setup
 
@@ -100,8 +124,8 @@ go test -run TestName -v ./internal/collector/platform/...  # Run a single test
 
 ### Test file conventions
 
-- Public tests: `*_public_test.go` in test package
-  (`package platform_test`) for exported functions.
+- Public tests: `*_public_test.go` in test package (`package platform_test`) for
+  exported functions.
 - Use `testify/suite` with table-driven patterns.
 - Table-driven structure with `validateFunc` callbacks.
 - **One suite method per function under test.** All scenarios for a function
@@ -120,9 +144,9 @@ just ready   # generate, docs::fmt, go::fmt, go::vet
 
 ## Branching
 
-All changes should be developed on feature branches. Create a branch from
-`main` using the naming convention `type/short-description`, where `type`
-matches the [Conventional Commits][] type:
+All changes should be developed on feature branches. Create a branch from `main`
+using the naming convention `type/short-description`, where `type` matches the
+[Conventional Commits][] type:
 
 - `feat/add-cpu-collector`
 - `fix/memory-parsing-error`
@@ -140,8 +164,7 @@ Follow [Conventional Commits][] with the 50/72 rule:
 - **Subject line**: max 50 characters, imperative mood, capitalized, no period
 - **Body**: wrap at 72 characters, separated from subject by a blank line
 - **Format**: `type(scope): description`
-- **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`,
-  `chore`
+- **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
 - Summarize the "what" and "why", not the "how"
 
 Try to write meaningful commit messages and avoid having too many commits on a
@@ -156,3 +179,10 @@ be reasonable to split it in a few). Git squash and rebase is your friend!
 [golangci-lint]: https://golangci-lint.run
 [Conventional Commits]: https://www.conventionalcommits.org
 [prettier]: https://prettier.io
+[osapi]: https://github.com/osapi-io/osapi
+[gopsutil]: https://github.com/shirou/gopsutil
+[ghw]: https://github.com/jaypipes/ghw
+[procfs]: https://github.com/prometheus/procfs
+[go-sysinfo]: https://github.com/elastic/go-sysinfo
+[node_exporter]: https://github.com/prometheus/node_exporter
+[ohai-plugins]: https://github.com/chef/ohai/tree/main/lib/ohai/plugins

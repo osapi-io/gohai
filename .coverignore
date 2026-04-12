@@ -1,2 +1,4 @@
-/gen/
+/cmd/
 /examples/
+/gen/
+main.go

@@ -5,10 +5,46 @@ code in this repository.
 
 ## Project Overview
 
-Go-based system information collector inspired by [Chef Ohai][] — collects
-comprehensive system facts via a pluggable collector architecture with
-node_exporter-style flag toggling. Usable as a standalone CLI or as a Go
-library/SDK for integration with [OSAPI][].
+**gohai is an SDK first.** It is a Go library that [OSAPI][] and other Go
+services import to collect typed system facts, with a standalone CLI
+(`gohai`) shipped as a thin wrapper over the same SDK. When making design
+decisions, always optimize for the importer's experience first; the CLI is
+secondary.
+
+Inspired by [Chef Ohai][] — pluggable collectors, comprehensive facts, and
+Ohai-compatible JSON output — but designed to be embedded in Go services
+rather than run as a standalone agent.
+
+## Implementation Methodology
+
+**We are a wrapper and aggregator, not a re-implementor.** Each collector's
+job is to wrap a well-maintained backing source (Go library, provider SDK, or
+a thin file/command parser) and reshape its output into our typed `Info`
+struct for Ohai-compatible JSON.
+
+**Decision order for each collector:**
+
+1. **Prefer a well-maintained Go library** — saves time, handles edge cases.
+   Standard picks: [gopsutil][] (CPU/memory/disk/network/host/process),
+   [ghw][] (hardware detail), [procfs][] (raw `/proc`, `/sys`),
+   [go-sysinfo][] (alternative host info).
+2. **Prefer official provider SDKs** for cloud collectors (aws-sdk-go,
+   google.golang.org/cloud, azure-sdk-for-go) or plain `net/http` to IMDS
+   endpoints for smaller binaries.
+3. **Composite approach** when needed — combine multiple sources.
+4. **Roll our own thin parser** when the data is simple (single file or
+   command) and a library would be over-engineering.
+5. **Fall back to porting [Ohai's Ruby plugin][ohai-plugins]** when no Go
+   library covers the domain. Ohai has solved the edge cases for every major
+   OS/distro; our job is translate, not re-discover.
+
+**We learn from, but don't directly import, [node_exporter][]** — their
+collectors are a gold reference for tricky Linux `/proc` and `/sys` parsing
+(Apache-2 licensed). Read, understand, rewrite in our style.
+
+The Collector interface and `Info` struct shape are the contract — whatever
+backing strategy a collector uses, its output must match the typed struct
+and Ohai-compatible JSON shape consumers expect.
 
 ## Development Reference
 
@@ -26,29 +62,50 @@ just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
 
 ## Package Structure
 
-- **`cmd/gohai/`** — CLI entrypoint
-  - Cobra-based CLI with node_exporter-style `--collector.<name>` /
-    `--no-collector.<name>` flags
+- **`main.go`** — repo-root entry point; just calls `cmd.Execute()`
+- **`cmd/`** — Cobra CLI: `root.go`, `flags.go`, `output.go`
 - **`pkg/gohai/`** — Public SDK
-  - `Gohai` struct, `New()`, `Collect()`, functional options
-  - Typed result structs (`Facts`, per-collector info types)
-  - Registry for collector enable/disable
-- **`internal/collector/`** — Collector implementations (not exported)
-  - `Collector` interface definition
-  - One sub-package per collector (`platform/`, `cpu/`, `memory/`, etc.)
-  - Each collector returns a strongly-typed struct
+  - `gohai.go` — `Gohai` struct, `New()`, `Collect()`
+  - `facts.go` — `Facts` struct with `Data map[string]any` and JSON/Flat methods
+  - `options.go` — functional options (`WithEnabled`, `WithDisabled`, `WithCollectors`)
+  - `registry.go` — `PublicRegistry` used by CLI for flag enumeration
+- **`pkg/gohai/collectors/<name>/`** — Public per-collector sub-packages
+  - `<name>.go` — `Info` struct and `Collector` implementation
+  - `linux.go` / `darwin.go` / `other.go` — build-tagged OS implementations
+  - `export_linux_test.go` / `export_darwin_test.go` — exposes private
+    symbols to public tests (`var X = x`)
+  - `<name>_public_test.go` — package-level public tests
+  - `linux_public_test.go` / `darwin_public_test.go` — OS-specific public
+    tests (build-tagged)
+- **`internal/collector/`** — Collector interface + registry plumbing
+  - `collector.go` — `Collector` interface, `Tier` type
+  - `registry.go` — `Registry` (register, resolve deps, run concurrently)
 
 ## Code Standards (MANDATORY)
 
+### File Headers
+
+Every `.go` file MUST start with the MIT license header — see any existing
+Go file in the repo for the exact format. Build-tagged files put `//go:build`
+on line 1, blank line, then the header.
+
 ### Function Signatures
 
-ALL function signatures MUST use multi-line format:
+Functions with parameters MUST use multi-line format:
 
 ```go
 func FunctionName(
     param1 type1,
     param2 type2,
 ) (returnType, error) {
+}
+```
+
+Zero-parameter functions stay single-line:
+
+```go
+func (t Tier) String() string {
+    return "core"
 }
 ```
 
@@ -105,100 +162,205 @@ When committing via Claude Code, end with:
 
 ## Adding a New Collector
 
-When adding a new collector (e.g., `gpu`), follow these steps in order.
-Every collector must ship with tests, docs, and typed structs.
+When adding a new collector (e.g., `cpu`), follow these steps. The `platform`
+collector at `pkg/gohai/collectors/platform/` is the reference implementation
+— copy its file layout exactly.
 
-### Step 1: Collector Types
+### Step 1: Create the sub-package
 
-Create `internal/collector/gpu/gpu.go` with the typed result struct and
-`Collector` interface implementation:
+Path: `pkg/gohai/collectors/<name>/` (public — consumers like OSAPI need to
+import `Info` structs directly).
+
+### Step 2: `<name>.go` — Info struct and Collector
 
 ```go
-package gpu
+// (MIT header)
+// Package cpu collects CPU topology and feature facts.
+package cpu
 
-// Info holds GPU information collected from the system.
+import (
+    "context"
+
+    "github.com/osapi-io/gohai/internal/collector"
+)
+
+// Info holds CPU information collected from the system.
 type Info struct {
-    Devices []Device `json:"devices"`
+    Total     int      `json:"total"`
+    Cores     int      `json:"cores"`
+    ModelName string   `json:"model_name,omitempty"`
+    Flags     []string `json:"flags,omitempty"`
 }
 
-// Device represents a single GPU.
-type Device struct {
-    Model  string `json:"model"`
-    Driver string `json:"driver"`
-    Memory string `json:"memory"`
-}
-```
-
-### Step 2: Collector Implementation
-
-Implement the `Collector` interface:
-
-```go
-// Collector collects GPU information.
+// Collector implements collector.Collector for CPU facts.
 type Collector struct{}
 
-// Name returns the collector name.
-func (c *Collector) Name() string {
-    return "gpu"
+// New returns a new CPU Collector.
+func New() *Collector {
+    return &Collector{}
 }
 
-// Collect gathers GPU facts from the system.
+// Name returns "cpu".
+func (c *Collector) Name() string {
+    return "cpu"
+}
+
+// Tier returns the collector's tier (TierCore, TierExtended, TierOptIn).
+func (c *Collector) Tier() collector.Tier {
+    return collector.TierCore
+}
+
+// Dependencies returns upstream collectors this one depends on.
+func (c *Collector) Dependencies() []string {
+    return nil
+}
+
+// Collect gathers CPU facts. Implementation lives in linux.go / darwin.go.
 func (c *Collector) Collect(
     ctx context.Context,
-) (*Info, error) {
-    // Platform-specific implementation
+) (any, error) {
+    return collect(ctx)
 }
 ```
 
-### Step 3: Register the Collector
+### Step 3: OS-specific implementations
 
-Add the collector to the registry in `internal/collector/registry.go`
-with its default-enabled/disabled state and tier.
+Follow the library decision order (see "Implementation Methodology" above).
+Wrap gopsutil / ghw / procfs / cloud SDK and reshape the output.
 
-### Step 4: Add Facts Field
-
-Add the typed field to `pkg/gohai/facts.go`:
+**`linux.go`** (build-tagged `//go:build linux`):
 
 ```go
-type Facts struct {
-    // ...existing fields...
-    GPU *gpu.Info `json:"gpu,omitempty"`
+// (MIT header)
+// Use a testable core that accepts the library function as a parameter
+// so tests can stub the system call.
+func collect(
+    ctx context.Context,
+) (any, error) {
+    return collectWithInfo(ctx, cpu.InfoWithContext)
+}
+
+func collectWithInfo(
+    ctx context.Context,
+    fn func(context.Context) ([]cpu.InfoStat, error),
+) (any, error) {
+    // wrap library, return *Info
 }
 ```
 
-### Step 5: Tests
+**`darwin.go`** — same shape, possibly same call if the library is
+cross-platform. Factor out a shared `unix.go` if linux and darwin do the
+same thing.
 
-Two test files:
+**`other.go`** (build-tagged `//go:build !linux && !darwin`):
 
-**`internal/collector/gpu/gpu_test.go`** — internal tests for collection
-logic, parsing, edge cases.
+```go
+func collect(
+    _ context.Context,
+) (any, error) {
+    return nil, nil
+}
+```
 
-**`internal/collector/gpu/gpu_public_test.go`** — public tests verifying
-the collector interface contract.
+### Step 4: Register in `pkg/gohai/gohai.go`
 
-Target 100% coverage on both files.
+Add to the `builtinCollectors()` slice:
 
-### Step 6: Collector Doc
+```go
+func builtinCollectors() []collector.Collector {
+    return []collector.Collector{
+        platform.New(),
+        cpu.New(),  // <-- add here
+    }
+}
+```
 
-Create `docs/collectors/gpu.md` with:
+Import the sub-package at the top of `gohai.go`.
 
+### Step 5: Tests — 100% coverage required
+
+**`export_linux_test.go` / `export_darwin_test.go`** — expose private
+symbols (usually `Collect` and `CollectWithInfo`) so public tests can
+exercise them:
+
+```go
+//go:build linux
+
+// (MIT header)
+package cpu
+
+var (
+    Collect         = collect
+    CollectWithInfo = collectWithInfo
+)
+```
+
+**`<name>_public_test.go`** — package-level public tests
+(`package cpu_test`):
+
+- Test `New()` returns the right Name, Tier, Dependencies
+- Test `Collect()` satisfies the `collector.Collector` interface
+- Test the real `Collect()` runs without error on the current OS
+
+**`linux_public_test.go` / `darwin_public_test.go`** — OS-specific public
+tests that stub the library call via the exported `CollectWithInfo`:
+
+- Table-driven scenarios covering happy path + error path
+- Happy path returns the expected `*Info` with field values mapped correctly
+- Error path (stub returns `error`) confirms error is propagated
+
+**Coverage target: 100%.** Run:
+
+```bash
+go test ./... -coverprofile=/tmp/cov.out
+go tool cover -func=/tmp/cov.out | grep -v '100.0%'
+```
+
+Should return nothing (except `main`/`cmd` which are `.coverignore`d).
+
+### Step 6: Update the collector doc
+
+Edit `docs/collectors/<name>.md` (already a stub). Fill in:
+
+- Status: Implemented ✅
 - Description
-- Collected fields table
-- Platform support (Linux, macOS)
-- Example output (JSON)
-- Enable/disable flags
+- Collected Fields table
+- Platform Support table (sources used on each OS)
+- Example Output (JSON) for Linux and macOS
+- SDK Usage snippet
+- Enable/Disable flags
+- Dependencies
+- Backing library + license
+
+Use `docs/collectors/platform.md` as the template.
 
 ### Step 7: Update README.md
 
-Add the collector to the appropriate tier table in README.md.
+Flip the "Implemented" column from 🚧 to ✅ (plus the library name if you
+wrapped one, e.g., `✅ (gopsutil)`).
 
 ### Step 8: Verify
 
 ```bash
-go build ./...                    # compiles
-go test ./... -count=1            # tests pass
-go run ./cmd/gohai                # CLI works
+go build ./...                                                       # compiles
+go test ./... -count=1                                               # tests pass
+go tool github.com/golangci/golangci-lint/v2/cmd/golangci-lint run   # 0 issues
+go run . --collector.<name> --pretty                                 # CLI works
+```
+
+### Step 9: Commit
+
+```
+feat(<name>): add <name> collector
+
+Wraps <library> to collect <what>. Supports Linux and macOS.
 ```
 
 [Chef Ohai]: https://docs.chef.io/ohai/
 [OSAPI]: https://github.com/osapi-io/osapi
+[gopsutil]: https://github.com/shirou/gopsutil
+[ghw]: https://github.com/jaypipes/ghw
+[procfs]: https://github.com/prometheus/procfs
+[go-sysinfo]: https://github.com/elastic/go-sysinfo
+[node_exporter]: https://github.com/prometheus/node_exporter
+[ohai-plugins]: https://github.com/chef/ohai/tree/main/lib/ohai/plugins

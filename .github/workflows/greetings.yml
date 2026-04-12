@@ -14,12 +14,12 @@ jobs:
     - uses: actions/first-interaction@v3
       if: env.month != 'Oct'
       with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        issue-message: 'Thank you for your first issue! 😊🕹️'
-        pr-message: 'Thank you for contributing to this project! 😊🕹️'
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        issue_message: 'Thank you for your first issue! 😊🕹️'
+        pr_message: 'Thank you for contributing to this project! 😊🕹️'
     - uses: actions/first-interaction@v3
       if: env.month == 'Oct'
       with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        issue-message: 'Thank you for your first issue! Happy Hacktoberfest!!! 🎃👕🕹️'
-        pr-message: 'Thank you for contributing to this project. Happy Hacktoberfest!!! 🎃👕🕹️'
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        issue_message: 'Thank you for your first issue! Happy Hacktoberfest!!! 🎃👕🕹️'
+        pr_message: 'Thank you for contributing to this project. Happy Hacktoberfest!!! 🎃👕🕹️'
