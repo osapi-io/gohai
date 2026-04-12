@@ -44,7 +44,32 @@ collectors are a gold reference for tricky Linux `/proc` and `/sys` parsing
 
 The Collector interface and `Info` struct shape are the contract — whatever
 backing strategy a collector uses, its output must match the typed struct
-and Ohai-compatible JSON shape consumers expect.
+and consumer expectations.
+
+### Field naming
+
+Collector JSON field names use `snake_case`. For the specific names,
+follow this precedence:
+
+1. **[OCSF](https://ocsf.io/)** (Open Cybersecurity Schema Framework) —
+   when a field we collect has a canonical OCSF name, use it. OCSF is
+   the industry schema for asset/observability/security data, backed by
+   AWS and Splunk, and aligning means our output feeds SIEMs and
+   inventory tools without translation. Examples: `process.cmd_line`
+   (not `cmdline`), `network_interface.mac` (not `hardware_addr`),
+   `os.kernel_release` (not `kernel_version`).
+2. **Industry standard** — when OCSF doesn't cover the field, use
+   whatever node_exporter / systemd / Prometheus exporters have
+   standardized on. Example: filesystem `mountpoint` / `fstype` follow
+   node_exporter, not Ohai's `mount` / `fs_type`.
+3. **Ohai's name** — only when OCSF and industry standards are silent
+   AND Ohai has a clear, meaningful name.
+4. **Our own name** — last resort. Use a Go-idiomatic snake_case form.
+
+**Do not mirror Ohai's JSON shape.** Ohai is for data-source reference
+(collection approach, distro edge cases) — not field names or struct
+layout. Ruby Mash ↔ Go struct translation isn't worthwhile to pin
+byte-for-byte.
 
 ### MANDATORY: Cross-reference Ohai's data sources before implementing
 
@@ -71,8 +96,11 @@ Filenames occasionally differ — many plugins live under OS subdirs
 (`linux/`, `darwin/`, `windows/`). Browse
 `repos/chef/ohai/contents/lib/ohai/plugins` if the direct path 404s.
 
-Every collector doc **must** carry a standard **"Data Sources"** section
-with this shape:
+Every collector doc **must** carry a standard **"Data Sources"** section.
+Complex collectors that emit multiple derived facts answering different
+questions also get a **"Signals"** section.
+
+**Data Sources** (required on every doc):
 
 ```md
 ## Data Sources
@@ -86,10 +114,30 @@ with this shape:
 one-line plan (add-now or tracked follow-up).
 ```
 
-This keeps docs consistent across collectors and makes it obvious at a
-glance whether we're leveraging Ohai's hard-won knowledge or flying
-solo. If Ohai has coverage we lack, either add it in the same PR or open
-a tracked issue — don't silently drop it.
+**Signals** (required on complex collectors like `fips` where multiple
+fields answer different consumer questions; omit for simple collectors
+like `shells` or `root_group` where the fact is a single value).
+
+Use a prose list immediately after the Description section:
+
+```md
+The collector reports N related signals:
+
+- `<field>` — what it means, what source it comes from, what question
+  it answers for the consumer.
+- `<field>` — same, including when this signal and the one above can
+  disagree and what that disagreement tells you.
+```
+
+Signals are about **meaning**, not structure. Use them whenever a
+consumer can reasonably ask "which of these fields should I look at for
+X?" — the Signals section answers that before they have to read the
+field table.
+
+This keeps docs consistent and makes it obvious at a glance whether
+we're leveraging Ohai's hard-won knowledge or flying solo. If Ohai has
+coverage we lack, either add it in the same PR or open a tracked issue
+— don't silently drop it.
 
 [Reference PR adding this rule: chef/ohai#1754]
 
