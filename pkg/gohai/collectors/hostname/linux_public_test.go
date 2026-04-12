@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,133 +39,91 @@ func TestHostnameLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(HostnameLinuxPublicTestSuite))
 }
 
-func (s *HostnameLinuxPublicTestSuite) TestBuildInfo() {
-	tests := []struct {
-		name       string
-		short      string
-		resolveFn  func(string) string
-		wantFQDN   string
-		wantDomain string
-	}{
-		{
-			name:       "fqdn returns full name with domain",
-			short:      "web01",
-			resolveFn:  func(_ string) string { return "web01.example.com" },
-			wantFQDN:   "web01.example.com",
-			wantDomain: "example.com",
-		},
-		{
-			name:       "short-only hostname when resolver returns input",
-			short:      "standalone",
-			resolveFn:  func(s string) string { return s },
-			wantFQDN:   "standalone",
-			wantDomain: "",
-		},
-		{
-			name:       "fqdn ending in dot is not treated as domain",
-			short:      "foo",
-			resolveFn:  func(_ string) string { return "foo." },
-			wantFQDN:   "foo.",
-			wantDomain: "",
-		},
-		{
-			name:       "multi-label domain",
-			short:      "db",
-			resolveFn:  func(_ string) string { return "db.prod.internal.corp" },
-			wantFQDN:   "db.prod.internal.corp",
-			wantDomain: "prod.internal.corp",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			got := hostname.BuildInfo(tt.short, tt.resolveFn)
-			s.Equal(tt.short, got.Hostname)
-			s.Equal(tt.wantFQDN, got.FQDN)
-			s.Equal(tt.wantDomain, got.Domain)
-		})
-	}
-}
-
-func (s *HostnameLinuxPublicTestSuite) TestDefaultFqdnLookup() {
-	tests := []struct {
-		name   string
-		lookup func(string) (string, error)
-		input  string
-		want   string
-	}{
-		{
-			"cname trimmed of trailing dot",
-			func(_ string) (string, error) { return "web01.example.com.", nil },
-			"web01",
-			"web01.example.com",
-		},
-		{
-			"cname without trailing dot",
-			func(_ string) (string, error) { return "web01.example.com", nil },
-			"web01",
-			"web01.example.com",
-		},
-		{
-			"empty cname falls back to input",
-			func(_ string) (string, error) { return "", nil },
-			"solo",
-			"solo",
-		},
-		{
-			"lookup error falls back to input",
-			func(_ string) (string, error) { return "", errors.New("dns") },
-			"bad",
-			"bad",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			restore := hostname.SetLookupCNAMEFn(tt.lookup)
-			defer hostname.SetLookupCNAMEFn(restore)
-			s.Equal(tt.want, hostname.DefaultFqdnLookup(tt.input))
-		})
-	}
-}
-
 func (s *HostnameLinuxPublicTestSuite) TestCollect() {
+	okHost := func(_ context.Context) (*host.InfoStat, error) {
+		return &host.InfoStat{Hostname: "web01"}, nil
+	}
+
 	tests := []struct {
-		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
-		resolve func(string) string
-		wantErr bool
-		want    *hostname.Info
+		name         string
+		hostFn       func(context.Context) (*host.InfoStat, error)
+		osHostnameFn func() (string, error)
+		lookupHost   func(string) ([]string, error)
+		lookupAddr   func(string) ([]string, error)
+		wantErr      bool
+		want         hostname.Info
 	}{
 		{
-			name:    "success with fqdn",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: "web01"}, nil },
-			resolve: func(_ string) string { return "web01.example.com" },
-			want: &hostname.Info{
-				Hostname: "web01",
-				FQDN:     "web01.example.com",
-				Domain:   "example.com",
+			name:         "canonical case: short name + reverse DNS",
+			hostFn:       okHost,
+			osHostnameFn: func() (string, error) { return "web01", nil },
+			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
+			lookupAddr:   func(string) ([]string, error) { return []string{"web01.example.com."}, nil },
+			want: hostname.Info{
+				Hostname:    "web01",
+				MachineName: "web01",
+				FQDN:        "web01.example.com",
+				Domain:      "example.com",
 			},
 		},
 		{
-			name:    "success without domain",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: "solo"}, nil },
-			resolve: func(s string) string { return s },
-			want:    &hostname.Info{Hostname: "solo", FQDN: "solo"},
+			name:         "no DNS resolution falls back to short name",
+			hostFn:       okHost,
+			osHostnameFn: func() (string, error) { return "laptop", nil },
+			lookupHost:   func(string) ([]string, error) { return nil, errors.New("no such host") },
+			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
+			want:         hostname.Info{Hostname: "web01", MachineName: "laptop", FQDN: "web01"},
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			resolve: func(s string) string { return s },
-			wantErr: true,
+			name:         "reverse lookup fails falls back to short name",
+			hostFn:       okHost,
+			osHostnameFn: func() (string, error) { return "web01", nil },
+			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
+			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("no PTR") },
+			want:         hostname.Info{Hostname: "web01", MachineName: "web01", FQDN: "web01"},
+		},
+		{
+			name:         "reverse lookup empty falls back to short name",
+			hostFn:       okHost,
+			osHostnameFn: func() (string, error) { return "web01", nil },
+			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
+			lookupAddr:   func(string) ([]string, error) { return nil, nil },
+			want:         hostname.Info{Hostname: "web01", MachineName: "web01", FQDN: "web01"},
+		},
+		{
+			name:         "empty short name skips FQDN resolution",
+			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: ""}, nil },
+			osHostnameFn: func() (string, error) { return "", errors.New("no hostname") },
+			lookupHost:   func(string) ([]string, error) { return nil, errors.New("unused") },
+			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
+			want:         hostname.Info{},
+		},
+		{
+			name:         "nil host info treated as empty",
+			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return nil, nil },
+			osHostnameFn: func() (string, error) { return "", errors.New("no hostname") },
+			lookupHost:   func(string) ([]string, error) { return nil, errors.New("unused") },
+			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
+			want:         hostname.Info{},
+		},
+		{
+			name:         "host.Info error propagated",
+			hostFn:       func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			osHostnameFn: func() (string, error) { return "", nil },
+			lookupHost:   func(string) ([]string, error) { return nil, nil },
+			lookupAddr:   func(string) ([]string, error) { return nil, nil },
+			wantErr:      true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			restoreHost := hostname.SetHostInfoFn(tt.stub)
-			restoreFqdn := hostname.SetFqdnLookupFn(tt.resolve)
-			defer hostname.SetHostInfoFn(restoreHost)
-			defer hostname.SetFqdnLookupFn(restoreFqdn)
-
-			got, err := hostname.Collect(context.Background())
+			c := &hostname.Linux{
+				HostInfoFn:   tt.hostFn,
+				OSHostnameFn: tt.osHostnameFn,
+				LookupHostFn: tt.lookupHost,
+				LookupAddrFn: tt.lookupAddr,
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -175,7 +131,15 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*hostname.Info)
 			s.Require().True(ok)
-			s.Equal(tt.want, info)
+			s.Equal(tt.want, *info)
 		})
 	}
+}
+
+func (s *HostnameLinuxPublicTestSuite) TestNewLinuxWiresUp() {
+	c := hostname.NewLinux()
+	s.NotNil(c.HostInfoFn)
+	s.NotNil(c.OSHostnameFn)
+	s.NotNil(c.LookupHostFn)
+	s.NotNil(c.LookupAddrFn)
 }

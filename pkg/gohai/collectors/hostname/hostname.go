@@ -18,46 +18,107 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package hostname collects hostname, FQDN, and domain identification.
+// Package hostname collects hostname, machine name, FQDN, and domain
+// identification.
 package hostname
 
 import (
 	"context"
+	"fmt"
+	"strings"
+
+	"github.com/shirou/gopsutil/v4/host"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds hostname identification data.
 type Info struct {
-	Hostname string `json:"hostname"`         // short hostname (e.g., "web01")
-	FQDN     string `json:"fqdn,omitempty"`   // fully qualified (e.g., "web01.example.com")
-	Domain   string `json:"domain,omitempty"` // domain portion (e.g., "example.com")
+	Hostname    string `json:"hostname"`               // short hostname (e.g., "web01")
+	MachineName string `json:"machine_name,omitempty"` // raw `hostname` output (may be FQDN depending on OS config)
+	FQDN        string `json:"fqdn,omitempty"`         // fully qualified (e.g., "web01.example.com")
+	Domain      string `json:"domain,omitempty"`       // domain portion (e.g., "example.com")
 }
 
-// Collector implements the collector.Collector interface for hostname facts.
-type Collector struct{}
-
-// New returns a new hostname Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every hostname variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "hostname".
-func (c *Collector) Name() string {
-	return "hostname"
+type base struct{}
+
+func (base) Name() string           { return "hostname" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the hostname variant for the host OS. gopsutil and
+// net.LookupAddr work cross-platform so Linux and Darwin share logic
+// via the shared resolve helper — each struct just wires in the
+// right stdlib calls.
+func New() Collector {
+	switch platform.Detect() {
+	case "darwin":
+		return NewDarwin()
+	default:
+		return NewLinux()
+	}
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
-
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers hostname facts. Implementation lives in linux.go / darwin.go.
-func (c *Collector) Collect(
+// resolve performs the host-identity lookups:
+//   - Hostname: short name from gopsutil host.Info.
+//   - MachineName: raw os.Hostname (whatever the kernel returns — may
+//     or may not be FQDN depending on OS configuration).
+//   - FQDN: forward+reverse DNS canonicalization (matches `hostname -f`
+//     behavior and Ohai's canonicalize_hostname_with_retries).
+//   - Domain: everything after the first `.` in FQDN.
+//
+// Injectable so tests don't need DNS.
+func resolve(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+	hostInfoFn func(context.Context) (*host.InfoStat, error),
+	osHostnameFn func() (string, error),
+	lookupHostFn func(string) ([]string, error),
+	lookupAddrFn func(string) ([]string, error),
+) (*Info, error) {
+	info := &Info{}
+	h, err := hostInfoFn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("host.Info: %w", err)
+	}
+	if h != nil {
+		info.Hostname = h.Hostname
+	}
+	if raw, err := osHostnameFn(); err == nil {
+		info.MachineName = raw
+	}
+
+	info.FQDN, info.Domain = canonicalFQDN(info.Hostname, lookupHostFn, lookupAddrFn)
+	return info, nil
+}
+
+// canonicalFQDN resolves short hostname → IP → PTR (reverse DNS) to
+// find the canonical FQDN. Falls back to the short name if no reverse
+// record exists. Matches `hostname -f` semantics and Ohai.
+func canonicalFQDN(
+	short string,
+	lookupHost func(string) ([]string, error),
+	lookupAddr func(string) ([]string, error),
+) (fqdn, domain string) {
+	if short == "" {
+		return "", ""
+	}
+	ips, err := lookupHost(short)
+	if err != nil || len(ips) == 0 {
+		return short, ""
+	}
+	names, err := lookupAddr(ips[0])
+	if err != nil || len(names) == 0 {
+		return short, ""
+	}
+	fqdn = strings.TrimSuffix(names[0], ".")
+	if i := strings.Index(fqdn, "."); i >= 0 {
+		domain = fqdn[i+1:]
+	}
+	return fqdn, domain
 }

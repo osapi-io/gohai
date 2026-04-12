@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,45 +22,35 @@ package hostname
 
 import (
 	"context"
-	"fmt"
 	"net"
-	"strings"
+	"os"
 
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-var hostInfoFn = host.InfoWithContext
+// Linux collects hostname facts on Linux. Wraps gopsutil.host.Info
+// (short hostname), os.Hostname (machine_name), net.LookupHost +
+// net.LookupAddr (FQDN canonicalization via reverse DNS).
+type Linux struct {
+	base
 
-var lookupCNAMEFn = net.LookupCNAME
-
-var fqdnLookupFn = func(
-	hostname string,
-) string {
-	cname, err := lookupCNAMEFn(hostname)
-	if err != nil || cname == "" {
-		return hostname
-	}
-	return strings.TrimSuffix(cname, ".")
+	HostInfoFn   func(context.Context) (*host.InfoStat, error)
+	OSHostnameFn func() (string, error)
+	LookupHostFn func(string) ([]string, error)
+	LookupAddrFn func(string) ([]string, error)
 }
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	info, err := hostInfoFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+// NewLinux returns a Linux variant wired to stdlib + gopsutil.
+func NewLinux() *Linux {
+	return &Linux{
+		HostInfoFn:   host.InfoWithContext,
+		OSHostnameFn: os.Hostname,
+		LookupHostFn: net.LookupHost,
+		LookupAddrFn: net.LookupAddr,
 	}
-	return buildInfo(info.Hostname, fqdnLookupFn), nil
 }
 
-func buildInfo(
-	short string,
-	resolve func(string) string,
-) *Info {
-	fqdn := resolve(short)
-	info := &Info{Hostname: short, FQDN: fqdn}
-	if i := strings.IndexByte(fqdn, '.'); i > 0 && i < len(fqdn)-1 {
-		info.Domain = fqdn[i+1:]
-	}
-	return info
+// Collect returns hostname facts.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	return resolve(ctx, l.HostInfoFn, l.OSHostnameFn, l.LookupHostFn, l.LookupAddrFn)
 }
