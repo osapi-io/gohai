@@ -165,6 +165,20 @@ OSAPI's `pkg/sdk/platform`) wraps gopsutil's `host.Info` and returns
 - Dependency-inject file readers, command runners, and gopsutil calls
   via struct fields — lets tests exercise every branch without
   touching the real host.
+- **NEVER leak third-party types through public `Fn` fields.** Per-OS
+  struct `Fn` fields MUST be typed in our `*Info` / `[]OurType`, never
+  in gopsutil / ghw / procfs types. The upstream call lives in a
+  private package var (`var hostInfoFn = host.InfoWithContext`); tests
+  swap it via a `Set<X>Fn` setter declared in `export_test.go`. See
+  `pkg/gohai/collectors/uptime/` for the canonical example. Without
+  this rule, importing a collector sub-package transitively pulls
+  gopsutil into consumers' module graphs — an SDK leak.
+- **Upcoming (Phase 1):** the per-field `Fn` pattern will be replaced
+  by a shared VFS + Executor abstraction threaded through `Collect`.
+  Until that lands, follow the private-var + `export_test.go` pattern
+  above. Do NOT expand the old `Fn` field pattern for new code — if
+  you need a new seam, check the Phase 1 status in the "Upcoming:
+  VFS + Executor Abstractions" section below.
 
 The Collector interface and `Info` struct shape are the contract — whatever
 backing strategy a collector uses, its output must match the typed struct
@@ -178,6 +192,14 @@ and consumer expectations.
 canonical names for ~99% of what we collect. Using OCSF names means
 gohai output feeds SIEMs, data lakes, and inventory tools without
 translation, so the lookup is mandatory, not aspirational.
+
+**Both Go field names AND JSON tags derive from OCSF.** The JSON tag is
+the OCSF snake_case path verbatim (`json:"kernel_release"`); the Go
+field is the PascalCase rendering of the same path (`KernelRelease
+string`). When Go idiom on initialisms conflicts (OCSF `cpu_id` → Go
+`CPUID`, not `CpuId`), the Go convention wins the field name but the
+JSON tag still matches OCSF. Don't invent internal names that diverge
+from OCSF.
 
 Collector JSON field names use `snake_case`. Precedence:
 
@@ -240,17 +262,33 @@ questions also get a **"Signals"** section.
 
 **Data Sources** (required on every doc):
 
+The Data Sources section is a self-contained spec of HOW the collector
+collects data, written in **our voice**. Numbered step-by-step,
+per-OS sections when behavior differs. Describe the actual sequence of
+reads, fallbacks, distro branches, and error handling. Do NOT frame
+it as a parity comparison with Ohai. Example shape:
+
 ```md
 ## Data Sources
 
-| Platform | What we read | Ohai equivalent | Alignment |
-| --- | --- | --- | --- |
-| Linux   | `/path/or/command` | Ohai plugin + what it reads | equivalent / we deviate because … |
-| macOS   | …                  | …                          | …                                |
+On Linux the collector cascades through multiple signals:
 
-**Known gaps:** any edge cases Ohai handles that we don't yet, with a
-one-line plan (add-now or tracked follow-up).
+1. **Fast path:** if `systemd-detect-virt` is on PATH, call it.
+2. **Container-runtime presence:** `which(docker)` / `which(podman)`.
+3. **Xen:** `/proc/xen` and `/proc/xen/capabilities`.
+4. ...
 ```
+
+Ohai is mentioned inline only when a specific methodology choice needs
+attribution ("we mirror Ohai's legacy `/etc/*-release` fallback chain").
+The section is a spec of OUR behavior, not a diff against Ohai.
+
+**`Known gaps vs. Ohai` is NOT a permanent section.** Methodology gaps
+live on GitHub as issues labeled `methodology-gap` and `collector:<name>`.
+Each issue carries a "Doc after this fix lands" block with the exact
+prose the fix PR pastes into the Data Sources section. When all open
+methodology issues for a collector close, the doc has zero Ohai residue.
+See the "Methodology Work" section below for the full workflow.
 
 **Signals** (required on complex collectors like `fips` where multiple
 fields answer different consumer questions; omit for simple collectors
@@ -361,18 +399,34 @@ func (t Tier) String() string {
 
 - Public tests: `*_public_test.go` in test package
   (`package gohai_test` or `package collector_test`) for exported functions
-- Internal tests: `*_test.go` in same package (`package gohai`)
-  for private functions
+- Internal tests: `*_test.go` in same package (`package gohai`) for
+  private functions — avoid when the external package can reach what
+  it needs via an `export_test.go` alias
+- `export_test.go` in the same package exposes unexported symbols to
+  external `_test.go` files via typed aliases (`var ReadX = readX`)
+  and setter functions (`SetXFn(fn) func()` returning a restore func
+  the caller defers). Never put production-only code in
+  `export_test.go`; the `_test.go` suffix makes it test-only
 - Suite naming: `*_public_test.go` → `{Name}PublicTestSuite`,
   `*_test.go` → `{Name}TestSuite`
 - Use `testify/suite` with table-driven patterns
 - One suite method per function under test — all scenarios (success, errors,
   edge cases) as rows in one table
+- **No custom assertion messages** — `s.Equal(want, got)`, not
+  `s.Equal(want, got, "expected equal")`. Matches osapi's test style
 - Target 100% test coverage on all packages
+- **Don't coverage-chase trivial bridges.** If the wrapper is a single
+  gopsutil call, make the upstream call itself swappable via private
+  package var + `Set<X>Fn` setter in `export_test.go`; the error-branch
+  test then lives naturally as a table row exercising both success and
+  error paths. See `pkg/gohai/collectors/load/` for the canonical shape
 
 ### Go Patterns
 
-- Error wrapping: `fmt.Errorf("context: %w", err)`
+- Error wrapping: `fmt.Errorf("context: %w", err)`. Wrap upstream
+  library errors with context — **never expose raw gopsutil / ghw /
+  procfs error types through our API**. Callers must never need those
+  packages in their module graph to handle errors
 - Early returns over nested if-else
 - Unused parameters: rename to `_`
 - Import order: stdlib, third-party, local (blank-line separated)
@@ -431,15 +485,24 @@ Before marking a collector complete, every item below must be true:
    returns nothing for the collector's files.
 5. **Collector tests do NOT import gopsutil** — stub `platform.Detect`
    directly. Compile-time enforcement.
-6. **`docs/collectors/<name>.md`** has all sections per the doc
-   template below, including the **OCSF mapping column** in Collected
-   Fields and the **Data Sources** section comparing our read vs.
-   Ohai's.
+6. **`docs/collectors/<name>.md`** is a self-contained functional
+   spec: Description (what + why in our voice), Collected Fields with
+   OCSF mapping column, Platform Support, Example Output, SDK Usage,
+   Enable/Disable, Dependencies, Data Sources (step-by-step
+   methodology in OUR voice — not a Ohai parity table), Backing
+   library. **No "Known gaps vs. Ohai" section** — methodology gaps
+   live as GitHub issues (labeled `methodology-gap` /
+   `collector:<name>`).
 7. **README.md** row flipped to `✅ (<backing>)`.
 8. **Lint clean**, `just go::vet` returns 0 issues.
 9. **Commit message** explains the "why" — what Ohai/OCSF
    cross-references drove the implementation, what extensions over the
    upstream library we added, any deliberate deviations.
+10. **Check GitHub issues** for tracked methodology gaps:
+    `gh issue list --label methodology-gap --label collector:<name>`.
+    If the work closes a tracked issue, the issue's "Doc after this
+    fix lands" block IS the doc content to paste into Data Sources.
+    The PR description must include `Closes #N`.
 
 ### Step 1: Create the sub-package
 
@@ -649,6 +712,69 @@ library doesn't expose (mirrors Ohai's <Y> behavior). Field names
 follow OCSF conventions where applicable (<list>). Supports Linux and
 macOS with platform.Detect() dispatch.
 ```
+
+## Methodology Work
+
+Methodology gaps between gohai and Ohai live on GitHub as issues
+labeled `methodology-gap` and `collector:<name>`. See
+`gh issue list --label methodology-gap`. Each issue carries:
+
+- Full Ohai methodology breakdown, source-cited with file + line ranges.
+- Our current implementation and what it misses.
+- Risk / severity / which hosts fail.
+- Proposed fix — concrete code plan.
+- Acceptance criteria.
+- **"Doc after this fix lands"** — the exact prose (Description +
+  Collected Fields table + Data Sources) the fix PR pastes into the
+  collector's `docs/collectors/<name>.md`.
+
+**Workflow when working a methodology issue:**
+
+1. `gh issue view <N>` — read end to end, especially the "Doc after
+   this fix lands" block.
+2. Implement the code change per "Proposed fix" — use the VFS /
+   Executor abstractions if Phase 1 has landed, otherwise the
+   `export_test.go` + private var + `Set<X>Fn` pattern.
+3. Paste the issue's "Doc after this fix lands" block into the
+   collector doc, replacing Description / Collected Fields / Data
+   Sources as specified.
+4. PR description must include `Closes #N`.
+5. CI green, 100% coverage, `just go::vet` clean.
+
+When every open methodology issue closes, every collector doc reads
+as a self-contained spec and the SDK has zero unresolved methodology
+divergences from Ohai.
+
+## Upcoming: VFS + Executor Abstractions (Phase 1, WIP)
+
+The current per-field `Fn` pattern (`ReadFileFn`, `RunCmdFn`,
+`HostInfoFn`, ...) is being replaced by two shared abstractions
+threaded through `Collect` the same way `context.Context` is threaded:
+
+- **`vfs.Filesystem`** — virtual filesystem (avfs-backed) for all
+  file reads. Production: real OS filesystem. Tests: in-memory FS
+  with canned files at their real absolute paths (`/proc/meminfo`,
+  `/etc/os-release`). Lets tests exercise real `os.ReadFile` code
+  paths against controlled file content.
+- **`executor.Executor`** — interface for shell-out calls.
+  Production: wraps `exec.CommandContext`. Tests: gomock-generated
+  mock asserting command name, flags, and stdin; returns canned
+  stdout. Mirrors osapi's executor pattern.
+
+Target signature once adopted:
+
+```go
+Collect(ctx context.Context, fs vfs.Filesystem, exec executor.Executor) (any, error)
+```
+
+**Until Phase 1 lands:** use the `export_test.go` + private var +
+`Set<X>Fn` setter pattern for gopsutil / syscall / file-read seams.
+Do NOT add new per-field `Fn` struct fields; if you need a new seam,
+check the Phase 1 status before expanding the old pattern.
+
+Reference: osapi's executor / filesystem / mockgen setup at
+[github.com/osapi-io/osapi](https://github.com/osapi-io/osapi) —
+gohai adopts the same shapes so patterns transfer.
 
 [Chef Ohai]: https://docs.chef.io/ohai/
 [OSAPI]: https://github.com/osapi-io/osapi
