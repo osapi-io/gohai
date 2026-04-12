@@ -18,45 +18,58 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package virtualization detects hypervisor and container runtime presence.
+// Package virtualization detects the hypervisor / container runtime the
+// host is running under.
+//
+// Known limitation vs. Ohai: Ohai's virtualization plugin additionally
+// reports a `systems` map (for hosts that are both docker host AND kvm
+// host, both entries appear) plus detailed container detection
+// (nspawn, LXD, podman host, hyper-v guest). Our current coverage is
+// what gopsutil exposes — system + role only. `systems` map and
+// container detail are tracked as a follow-up.
 package virtualization
 
 import (
 	"context"
+
+	"github.com/shirou/gopsutil/v4/host"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds virtualization detection data.
 type Info struct {
-	System string `json:"system,omitempty"` // "docker", "kvm", "xen", "vmware", etc.
-	Role   string `json:"role,omitempty"`   // "host" or "guest"
+	System string `json:"system,omitempty"` // hypervisor/container: "docker", "kvm", "vmware", "lxc", ""
+	Role   string `json:"role,omitempty"`   // "host" | "guest" | ""
 }
 
-// Collector implements the collector.Collector interface for virtualization.
-type Collector struct{}
-
-// New returns a new virtualization Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every virtualization variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "virtualization".
-func (c *Collector) Name() string {
-	return "virtualization"
+type base struct{}
+
+func (base) Name() string           { return "virtualization" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the virtualization variant for the host OS.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
-
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers virtualization facts.
-func (c *Collector) Collect(
+// detect is the production bridge to gopsutil's host.VirtualizationWithContext.
+func detect(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+) (*Info, error) {
+	system, role, err := host.VirtualizationWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &Info{System: system, Role: role}, nil
 }
