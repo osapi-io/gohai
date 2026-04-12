@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,53 +39,62 @@ func TestRootGroupDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(RootGroupDarwinPublicTestSuite))
 }
 
-func (s *RootGroupDarwinPublicTestSuite) TestCollectFromFuncs() {
+func (s *RootGroupDarwinPublicTestSuite) TestCollect() {
 	rootUser := &user.User{Username: "root", Uid: "0", Gid: "0"}
 	wheelGroup := &user.Group{Gid: "0", Name: "wheel"}
 
 	tests := []struct {
-		name        string
-		lookupUser  func(string) (*user.User, error)
-		lookupGroup func(string) (*user.Group, error)
-		wantErr     bool
-		want        string
+		name          string
+		lookupUserFn  func(string) (*user.User, error)
+		lookupGroupFn func(string) (*user.Group, error)
+		wantErr       bool
+		want          string
 	}{
 		{
-			name:        "root user → wheel group on macOS",
-			lookupUser:  func(string) (*user.User, error) { return rootUser, nil },
-			lookupGroup: func(string) (*user.Group, error) { return wheelGroup, nil },
-			want:        "wheel",
+			name:          "root user → wheel group on macOS",
+			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
+			lookupGroupFn: func(string) (*user.Group, error) { return wheelGroup, nil },
+			want:          "wheel",
 		},
 		{
-			name:        "user lookup error propagated",
-			lookupUser:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
-			lookupGroup: func(string) (*user.Group, error) { return wheelGroup, nil },
-			wantErr:     true,
+			name:          "user lookup error propagated",
+			lookupUserFn:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
+			lookupGroupFn: func(string) (*user.Group, error) { return wheelGroup, nil },
+			wantErr:       true,
 		},
 		{
-			name:        "group lookup error propagated",
-			lookupUser:  func(string) (*user.User, error) { return rootUser, nil },
-			lookupGroup: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
-			wantErr:     true,
+			name:          "group lookup error propagated",
+			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
+			lookupGroupFn: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
+			wantErr:       true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info, err := rootgroup.CollectFromFuncs(tt.lookupUser, tt.lookupGroup)
+			c := &rootgroup.Darwin{LookupUserFn: tt.lookupUserFn, LookupGroupFn: tt.lookupGroupFn}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
 			}
 			s.Require().NoError(err)
+			info, ok := got.(*rootgroup.Info)
+			s.Require().True(ok)
 			s.Equal(tt.want, info.Name)
 		})
 	}
 }
 
-func (s *RootGroupDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := rootgroup.Collect(context.Background())
+func (s *RootGroupDarwinPublicTestSuite) TestNewDarwinWiresUpRealLookups() {
+	c := rootgroup.NewDarwin()
+	s.Require().NotNil(c.LookupUserFn)
+	s.Require().NotNil(c.LookupGroupFn)
+
+	u, err := c.LookupUserFn("root")
 	s.Require().NoError(err)
-	info, ok := got.(*rootgroup.Info)
-	s.Require().True(ok)
-	s.NotEmpty(info.Name)
+	s.Equal("root", u.Username)
+
+	g, err := c.LookupGroupFn("0")
+	s.Require().NoError(err)
+	s.NotEmpty(g.Name)
 }

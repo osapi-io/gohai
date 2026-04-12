@@ -21,12 +21,12 @@
 package rootgroup_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
 )
 
@@ -41,22 +41,42 @@ func TestRootGroupPublicTestSuite(t *testing.T) {
 func (s *RootGroupPublicTestSuite) TestNew() {
 	c := rootgroup.New()
 	s.Equal("root_group", c.Name())
-	s.Equal(true, c.DefaultEnabled())
+	s.True(c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 
 func (s *RootGroupPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = rootgroup.New()
+	var _ collector.Collector = rootgroup.NewLinux()
+	var _ collector.Collector = rootgroup.NewDarwin()
 }
 
-func (s *RootGroupPublicTestSuite) TestCollect() {
-	c := rootgroup.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+func (s *RootGroupPublicTestSuite) TestNewDispatch() {
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
+
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	info, ok := got.(*rootgroup.Info)
-	s.Require().True(ok)
-	s.NotEmpty(info.Name)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			got := rootgroup.New()
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := got.(*rootgroup.Darwin)
+				s.True(ok, "expected *rootgroup.Darwin")
+			case "linux":
+				_, ok := got.(*rootgroup.Linux)
+				s.True(ok, "expected *rootgroup.Linux")
+			}
+		})
+	}
 }

@@ -18,44 +18,66 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package rootgroup reports the primary group name for root (GID 0).
+// Package rootgroup reports the primary group name for the root user.
 package rootgroup
 
 import (
-	"context"
+	"fmt"
+	"os/user"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds the root group data.
 type Info struct {
-	Name string `json:"name"` // typically "root" on Linux, "wheel" on macOS
+	Name string `json:"name"` // primary group name for root — typically "root" on Linux, "wheel" on macOS/BSD
 }
 
-// Collector implements the collector.Collector interface.
-type Collector struct{}
-
-// New returns a new root_group Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every rootgroup variant satisfies.
+type Collector interface {
+	collector.Collector
 }
+
+// base holds fields common to every OS variant.
+type base struct{}
 
 // Name returns "root_group".
-func (c *Collector) Name() string {
-	return "root_group"
-}
+func (base) Name() string { return "root_group" }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
+// DefaultEnabled returns true — root_group is on by default.
+func (base) DefaultEnabled() bool { return true }
 
 // Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
+func (base) Dependencies() []string { return nil }
+
+// New returns the root_group collector variant appropriate to the host.
+// os/user-backed lookups work identically on Linux and macOS, but the
+// expected result differs (Linux → "root", macOS → "wheel").
+func New() Collector {
+	switch platform.Detect() {
+	case "darwin":
+		return NewDarwin()
+	default:
+		return NewLinux()
+	}
 }
 
-// Collect gathers the root group name.
-func (c *Collector) Collect(
-	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+// resolveRootGroup performs the two-hop lookup Ohai uses: look up user
+// "root" to get its primary GID, then look up that GID to get the group
+// name. Correct even on systems where root's primary GID isn't 0.
+// Shared by both Linux and Darwin variants.
+func resolveRootGroup(
+	lookupUser func(string) (*user.User, error),
+	lookupGroup func(string) (*user.Group, error),
+) (*Info, error) {
+	u, err := lookupUser("root")
+	if err != nil {
+		return nil, fmt.Errorf("lookup user root: %w", err)
+	}
+	g, err := lookupGroup(u.Gid)
+	if err != nil {
+		return nil, fmt.Errorf("lookup gid %s: %w", u.Gid, err)
+	}
+	return &Info{Name: g.Name}, nil
 }

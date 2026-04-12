@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,37 +22,29 @@ package rootgroup
 
 import (
 	"context"
-	"fmt"
 	"os/user"
 )
 
-// lookupUserFn looks up a user by name. Swappable for tests.
-var lookupUserFn = user.Lookup
+// Darwin resolves the root group on macOS. Typically returns "wheel".
+// Embeds base for Name/DefaultEnabled/Dependencies.
+type Darwin struct {
+	base
 
-// lookupGroupFn looks up a group by GID. Swappable for tests.
-var lookupGroupFn = user.LookupGroupId
-
-func collect(
-	_ context.Context,
-) (any, error) {
-	return collectFromFuncs(lookupUserFn, lookupGroupFn)
+	LookupUserFn  func(string) (*user.User, error)
+	LookupGroupFn func(string) (*user.Group, error)
 }
 
-// collectFromFuncs resolves the primary group name for the root user via
-// a two-hop lookup: user "root" → its primary GID → group name. On
-// macOS/BSD the answer is typically "wheel". Matches Ohai's defensive
-// resolution and is correct even if root's primary GID isn't 0.
-func collectFromFuncs(
-	lookupUser func(string) (*user.User, error),
-	lookupGroup func(string) (*user.Group, error),
-) (*Info, error) {
-	u, err := lookupUser("root")
-	if err != nil {
-		return nil, fmt.Errorf("lookup user root: %w", err)
+// NewDarwin returns a Darwin variant wired to os/user.
+func NewDarwin() *Darwin {
+	return &Darwin{
+		LookupUserFn:  user.Lookup,
+		LookupGroupFn: user.LookupGroupId,
 	}
-	g, err := lookupGroup(u.Gid)
-	if err != nil {
-		return nil, fmt.Errorf("lookup gid %s: %w", u.Gid, err)
-	}
-	return &Info{Name: g.Name}, nil
+}
+
+// Collect performs the two-hop lookup. macOS and BSD set root's primary
+// group to "wheel"; we don't special-case the name — whatever the OS
+// reports is what we ship.
+func (d *Darwin) Collect(_ context.Context) (any, error) {
+	return resolveRootGroup(d.LookupUserFn, d.LookupGroupFn)
 }

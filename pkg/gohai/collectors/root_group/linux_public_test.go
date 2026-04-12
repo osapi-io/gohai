@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,61 +39,71 @@ func TestRootGroupLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(RootGroupLinuxPublicTestSuite))
 }
 
-func (s *RootGroupLinuxPublicTestSuite) TestCollectFromFuncs() {
+func (s *RootGroupLinuxPublicTestSuite) TestCollect() {
 	rootUser := &user.User{Username: "root", Uid: "0", Gid: "0"}
 	rootGroup := &user.Group{Gid: "0", Name: "root"}
-	customGroup := &user.Group{Gid: "1000", Name: "wheel"}
 	customRootUser := &user.User{Username: "root", Uid: "0", Gid: "1000"}
+	customGroup := &user.Group{Gid: "1000", Name: "wheel"}
 
 	tests := []struct {
-		name        string
-		lookupUser  func(string) (*user.User, error)
-		lookupGroup func(string) (*user.Group, error)
-		wantErr     bool
-		want        string
+		name          string
+		lookupUserFn  func(string) (*user.User, error)
+		lookupGroupFn func(string) (*user.Group, error)
+		wantErr       bool
+		want          string
 	}{
 		{
-			name:        "root user → root group (standard Linux)",
-			lookupUser:  func(string) (*user.User, error) { return rootUser, nil },
-			lookupGroup: func(string) (*user.Group, error) { return rootGroup, nil },
-			want:        "root",
+			name:          "root user → root group (standard Linux)",
+			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
+			lookupGroupFn: func(string) (*user.Group, error) { return rootGroup, nil },
+			want:          "root",
 		},
 		{
-			name:        "root user primary gid customized to non-zero",
-			lookupUser:  func(string) (*user.User, error) { return customRootUser, nil },
-			lookupGroup: func(string) (*user.Group, error) { return customGroup, nil },
-			want:        "wheel",
+			name:          "root primary gid customized to non-zero",
+			lookupUserFn:  func(string) (*user.User, error) { return customRootUser, nil },
+			lookupGroupFn: func(string) (*user.Group, error) { return customGroup, nil },
+			want:          "wheel",
 		},
 		{
-			name:        "user lookup error propagated",
-			lookupUser:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
-			lookupGroup: func(string) (*user.Group, error) { return rootGroup, nil },
-			wantErr:     true,
+			name:          "user lookup error propagated",
+			lookupUserFn:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
+			lookupGroupFn: func(string) (*user.Group, error) { return rootGroup, nil },
+			wantErr:       true,
 		},
 		{
-			name:        "group lookup error propagated",
-			lookupUser:  func(string) (*user.User, error) { return rootUser, nil },
-			lookupGroup: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
-			wantErr:     true,
+			name:          "group lookup error propagated",
+			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
+			lookupGroupFn: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
+			wantErr:       true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info, err := rootgroup.CollectFromFuncs(tt.lookupUser, tt.lookupGroup)
+			c := &rootgroup.Linux{LookupUserFn: tt.lookupUserFn, LookupGroupFn: tt.lookupGroupFn}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
 			}
 			s.Require().NoError(err)
+			info, ok := got.(*rootgroup.Info)
+			s.Require().True(ok)
 			s.Equal(tt.want, info.Name)
 		})
 	}
 }
 
-func (s *RootGroupLinuxPublicTestSuite) TestCollectDefault() {
-	got, err := rootgroup.Collect(context.Background())
+func (s *RootGroupLinuxPublicTestSuite) TestNewLinuxWiresUpRealLookups() {
+	c := rootgroup.NewLinux()
+	s.Require().NotNil(c.LookupUserFn)
+	s.Require().NotNil(c.LookupGroupFn)
+
+	// Exercise the real wired functions. "root" exists on every POSIX host.
+	u, err := c.LookupUserFn("root")
 	s.Require().NoError(err)
-	info, ok := got.(*rootgroup.Info)
-	s.Require().True(ok)
-	s.NotEmpty(info.Name)
+	s.Equal("root", u.Username)
+
+	g, err := c.LookupGroupFn("0")
+	s.Require().NoError(err)
+	s.NotEmpty(g.Name)
 }
