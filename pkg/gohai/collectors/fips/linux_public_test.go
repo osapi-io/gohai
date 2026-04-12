@@ -149,15 +149,21 @@ func (s *FipsLinuxPublicTestSuite) TestCollectFromFunc() {
 			wantPolicyNil: true,
 		},
 		{
-			name:              "kernel enabled + FIPS policy",
-			contents:          map[string]string{"/proc/sys/crypto/fips_enabled": "1\n", "/etc/crypto-policies/config": "FIPS\n"},
+			name: "kernel enabled + FIPS policy",
+			contents: map[string]string{
+				"/proc/sys/crypto/fips_enabled": "1\n",
+				"/etc/crypto-policies/config":   "FIPS\n",
+			},
 			wantEnabled:       true,
 			wantPolicyName:    "FIPS",
 			wantFIPSEffective: true,
 		},
 		{
-			name:              "kernel enabled but policy switched to DEFAULT",
-			contents:          map[string]string{"/proc/sys/crypto/fips_enabled": "1\n", "/etc/crypto-policies/config": "DEFAULT\n"},
+			name: "kernel enabled but policy switched to DEFAULT",
+			contents: map[string]string{
+				"/proc/sys/crypto/fips_enabled": "1\n",
+				"/etc/crypto-policies/config":   "DEFAULT\n",
+			},
 			wantEnabled:       true,
 			wantPolicyName:    "DEFAULT",
 			wantFIPSEffective: false,
@@ -182,9 +188,11 @@ func (s *FipsLinuxPublicTestSuite) TestCollectFromFunc() {
 			wantPolicyNil: true,
 		},
 		{
-			name:          "kernel file permission denied propagated",
-			contents:      map[string]string{},
-			errs:          map[string]error{"/proc/sys/crypto/fips_enabled": errors.New("permission denied")},
+			name:     "kernel file permission denied propagated",
+			contents: map[string]string{},
+			errs: map[string]error{
+				"/proc/sys/crypto/fips_enabled": errors.New("permission denied"),
+			},
 			wantErr:       true,
 			wantPolicyNil: true,
 		},

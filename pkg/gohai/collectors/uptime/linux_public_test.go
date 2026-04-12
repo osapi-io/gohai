@@ -42,17 +42,33 @@ func TestUptimeLinuxPublicTestSuite(t *testing.T) {
 }
 
 func (s *UptimeLinuxPublicTestSuite) TestCollectWithHost() {
+	okHost := func(_ context.Context) (*host.InfoStat, error) {
+		return &host.InfoStat{Uptime: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000}, nil
+	}
+
 	tests := []struct {
-		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
-		wantErr bool
-		want    uptime.Info
+		name     string
+		stub     func(context.Context) (*host.InfoStat, error)
+		readProc func() ([]byte, error)
+		wantErr  bool
+		want     uptime.Info
 	}{
 		{
-			name: "3 hours up",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{Uptime: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000}, nil
+			name:     "3h up + idle parsed",
+			stub:     okHost,
+			readProc: func() ([]byte, error) { return []byte("12345.67 9876.54\n"), nil },
+			want: uptime.Info{
+				Seconds:     3*3600 + 12*60 + 5,
+				BootTime:    1_700_000_000,
+				Human:       "3h 12m 5s",
+				IdleSeconds: 9876,
+				IdleHuman:   "2h 44m 36s",
 			},
+		},
+		{
+			name:     "missing /proc/uptime omits idle",
+			stub:     okHost,
+			readProc: func() ([]byte, error) { return nil, errors.New("not found") },
 			want: uptime.Info{
 				Seconds:  3*3600 + 12*60 + 5,
 				BootTime: 1_700_000_000,
@@ -60,14 +76,45 @@ func (s *UptimeLinuxPublicTestSuite) TestCollectWithHost() {
 			},
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			name:     "malformed /proc/uptime (one field) omits idle",
+			stub:     okHost,
+			readProc: func() ([]byte, error) { return []byte("12345.67\n"), nil },
+			want: uptime.Info{
+				Seconds:  3*3600 + 12*60 + 5,
+				BootTime: 1_700_000_000,
+				Human:    "3h 12m 5s",
+			},
+		},
+		{
+			name:     "unparseable idle field omits idle",
+			stub:     okHost,
+			readProc: func() ([]byte, error) { return []byte("12345.67 xyz\n"), nil },
+			want: uptime.Info{
+				Seconds:  3*3600 + 12*60 + 5,
+				BootTime: 1_700_000_000,
+				Human:    "3h 12m 5s",
+			},
+		},
+		{
+			name:     "negative idle omits",
+			stub:     okHost,
+			readProc: func() ([]byte, error) { return []byte("12345.67 -1.0\n"), nil },
+			want: uptime.Info{
+				Seconds:  3*3600 + 12*60 + 5,
+				BootTime: 1_700_000_000,
+				Human:    "3h 12m 5s",
+			},
+		},
+		{
+			name:     "host.Info error",
+			stub:     func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			readProc: func() ([]byte, error) { return []byte("1 1\n"), nil },
+			wantErr:  true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := uptime.CollectWithHost(context.Background(), tt.stub)
+			got, err := uptime.CollectWithHost(context.Background(), tt.stub, tt.readProc)
 			if tt.wantErr {
 				s.Error(err)
 				return
