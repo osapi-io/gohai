@@ -27,7 +27,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+)
+
+var (
+	_ collector.Collector = (*process.Linux)(nil)
+	_ collector.Collector = (*process.Darwin)(nil)
 )
 
 type ProcessPublicTestSuite struct {
@@ -38,24 +44,63 @@ func TestProcessPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ProcessPublicTestSuite))
 }
 
-func (s *ProcessPublicTestSuite) TestNew() {
-	c := process.New()
-	s.Equal("process", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
-	s.Empty(c.Dependencies())
-}
-
-func (s *ProcessPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = process.New()
-}
-
-func (s *ProcessPublicTestSuite) TestCollect() {
-	c := process.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+// TestCollectOnHost exercises the real gopsutil-backed listProcesses
+// bridge + snapshotFromGopsutil mapper by calling Collect on the live
+// host. We only assert that at least one process (ourselves) is
+// returned and that the top-level shape populates — no stable PID
+// assertions because this is the test harness's own process tree.
+// Without this test, listProcesses and snapshotFromGopsutil would be
+// untestable from the unit-test layer (gopsutil's *process.Process
+// isn't constructable from test-supplied data).
+func (s *ProcessPublicTestSuite) TestCollectOnHost() {
+	tests := []struct {
+		name string
+	}{
+		{name: "host exposes at least the test-runner process"},
 	}
-	_, ok := got.(*process.Info)
-	s.True(ok)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := process.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*process.Info)
+			s.Require().True(ok)
+			s.GreaterOrEqual(info.Count, 1)
+			s.GreaterOrEqual(len(info.Processes), 1)
+		})
+	}
+}
+
+func (s *ProcessPublicTestSuite) TestNew() {
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
+
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := process.New()
+			s.Equal("process", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*process.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*process.Linux)
+				s.True(ok)
+			}
+		})
+	}
 }

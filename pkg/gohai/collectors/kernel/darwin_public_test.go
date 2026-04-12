@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
@@ -41,33 +38,38 @@ func TestKernelDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(KernelDarwinPublicTestSuite))
 }
 
-func (s *KernelDarwinPublicTestSuite) TestCollectWithHost() {
+func (s *KernelDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
+		unameFn func() (string, string, string, string, error)
 		wantErr bool
 		want    kernel.Info
 	}{
 		{
-			name: "success",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					OS:            "darwin",
-					KernelVersion: "1.2.3",
-					KernelArch:    "arm64",
-				}, nil
+			name: "canonical macOS host",
+			unameFn: func() (string, string, string, string, error) {
+				return "Darwin", "23.4.0",
+					"Darwin Kernel Version 23.4.0: Wed Feb 21 21:44:31 PST 2024",
+					"arm64", nil
 			},
-			want: kernel.Info{OS: "darwin", Version: "1.2.3", Arch: "arm64"},
+			want: kernel.Info{
+				Name: "Darwin", Release: "23.4.0",
+				Version: "Darwin Kernel Version 23.4.0: Wed Feb 21 21:44:31 PST 2024",
+				Machine: "arm64",
+			},
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name: "uname error propagated",
+			unameFn: func() (string, string, string, string, error) {
+				return "", "", "", "", errors.New("uname failed")
+			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := kernel.CollectWithHost(context.Background(), tt.stub)
+			c := &kernel.Darwin{UnameFn: tt.unameFn}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -78,12 +80,4 @@ func (s *KernelDarwinPublicTestSuite) TestCollectWithHost() {
 			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *KernelDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := kernel.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*kernel.Info)
-	s.Require().True(ok)
-	s.NotEmpty(info.OS)
 }

@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,34 +22,59 @@ package platform
 
 import (
 	"context"
-	"fmt"
-	"runtime"
-
-	"github.com/shirou/gopsutil/v4/host"
+	"os/exec"
+	"strings"
 )
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, host.InfoWithContext)
+// Darwin collects platform identification on macOS. ReadFn is typed in
+// our *Info so importers don't need gopsutil; RunCmdFn wraps
+// exec.Command for the sw_vers -productVersionExtra call.
+type Darwin struct {
+	base
+
+	ReadFn   func(context.Context) (*Info, string, error)
+	RunCmdFn func(name string, args ...string) ([]byte, error)
 }
 
-// collectWithHost is the testable core: it accepts a function matching
-// gopsutil's host.InfoWithContext so tests can stub the system call.
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+// NewDarwin returns a Darwin variant wired to production bridges.
+func NewDarwin() *Darwin {
+	return &Darwin{
+		ReadFn:   readPlatform,
+		RunCmdFn: runSwVers,
 	}
-	return &Info{
-		OS:           runtime.GOOS,
-		Name:         info.Platform,
-		Version:      info.PlatformVersion,
-		Family:       "mac_os_x",
-		Architecture: info.KernelArch,
-		Build:        info.KernelVersion,
-	}, nil
+}
+
+// runSwVers wraps exec.Command for sw_vers.
+func runSwVers(
+	name string,
+	args ...string,
+) ([]byte, error) {
+	return exec.Command(name, args...).Output()
+}
+
+// Collect returns platform Info with Build set from the kernel version
+// and VersionExtra populated from sw_vers -productVersionExtra.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	info, kernelVer, err := d.ReadFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	info.Build = kernelVer
+	if extra := readVersionExtra(d.RunCmdFn); extra != "" {
+		info.VersionExtra = extra
+	}
+	return info, nil
+}
+
+// readVersionExtra reads `sw_vers -productVersionExtra`. Returns empty
+// string on any failure — RSR version is optional and absent on most
+// macOS versions.
+func readVersionExtra(
+	run func(string, ...string) ([]byte, error),
+) string {
+	out, err := run("sw_vers", "-productVersionExtra")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }

@@ -18,55 +18,74 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package uptime collects system uptime and boot time facts.
+// Package uptime collects system uptime, boot time, and (on Linux)
+// aggregate CPU idle time.
 package uptime
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/shirou/gopsutil/v4/host"
+
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds uptime and boot time data.
 type Info struct {
-	Seconds  uint64 `json:"seconds"`   // seconds since boot
-	BootTime uint64 `json:"boot_time"` // unix timestamp of boot
-	Human    string `json:"human"`     // human-readable uptime (e.g., "3d 4h 12m 5s")
+	Seconds     uint64 `json:"seconds"`                // seconds since boot
+	BootTime    uint64 `json:"boot_time"`              // unix timestamp of boot
+	Human       string `json:"human"`                  // human-readable uptime (e.g., "3d 4h 12m 5s")
+	IdleSeconds uint64 `json:"idle_seconds,omitempty"` // aggregate CPU idle seconds (Linux only)
+	IdleHuman   string `json:"idle_human,omitempty"`   // human-readable idle time (Linux only)
 }
 
-// Collector implements the collector.Collector interface for uptime facts.
-type Collector struct{}
-
-// New returns a new uptime Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every uptime variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "uptime".
-func (c *Collector) Name() string {
-	return "uptime"
+type base struct{}
+
+func (base) Name() string           { return "uptime" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the uptime collector variant for the host OS.
+func New() Collector {
+	switch platform.Detect() {
+	case "darwin":
+		return NewDarwin()
+	default:
+		return NewLinux()
+	}
 }
 
-// Tier returns TierCore.
-func (c *Collector) Tier() collector.Tier {
-	return collector.TierCore
-}
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+// Private — never leaked through a public Fn field. Swapped in tests
+// via SetHostInfoFn (export_test.go).
+var hostInfoFn = host.InfoWithContext
 
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers uptime facts.
-func (c *Collector) Collect(
+// readBase wraps the private gopsutil call and maps the result onto
+// our *Info so consumers of the collector never see gopsutil types.
+func readBase(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+) (*Info, error) {
+	h, err := hostInfoFn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("host.Info: %w", err)
+	}
+	return &Info{
+		Seconds:  h.Uptime,
+		BootTime: h.BootTime,
+		Human:    HumanDuration(h.Uptime),
+	}, nil
 }
 
 // HumanDuration formats a second count as "Xd Yh Zm Ws" (omitting zero
-// leading units).
+// leading units). Exported for consumers that want to render durations
+// consistently with uptime's own output.
 func HumanDuration(
 	seconds uint64,
 ) string {

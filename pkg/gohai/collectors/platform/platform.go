@@ -23,46 +23,97 @@ package platform
 
 import (
 	"context"
+	"runtime"
+
+	"github.com/shirou/gopsutil/v4/host"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	plat "github.com/osapi-io/gohai/internal/platform"
 )
+
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+// Kept private so importers don't transitively need gopsutil. Swapped
+// via SetHostInfoFn (export_test.go).
+var hostInfoFn = host.InfoWithContext
+
+// readPlatform is the production bridge. Wraps the private gopsutil
+// call and returns a pre-populated *Info plus the raw KernelVersion
+// string that Darwin consumes as Build (Linux's Info does not carry
+// Build; it discards the kernel string). OS/Architecture are always
+// set from runtime; Name/Version/Family come from gopsutil when
+// available. Per-OS Collect wrappers layer additional fields
+// (VersionExtra on darwin) on top of the returned Info.
+func readPlatform(
+	ctx context.Context,
+) (*Info, string, error) {
+	info := &Info{OS: runtime.GOOS, Architecture: runtime.GOARCH}
+	h, err := hostInfoFn(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	if h == nil {
+		return info, "", nil
+	}
+	info.Name = canonicalizePlatform(h.Platform)
+	info.Version = h.PlatformVersion
+	info.Family = h.PlatformFamily
+	return info, h.KernelVersion, nil
+}
 
 // Info holds platform identification data.
 type Info struct {
-	OS           string `json:"os"`              // runtime.GOOS: "linux", "darwin", "windows"
-	Name         string `json:"name"`            // distro/product: "ubuntu", "rhel", "darwin"
-	Version      string `json:"version"`         // "24.04", "14.4.1"
-	Family       string `json:"family"`          // "debian", "rhel", "mac_os_x"
-	Architecture string `json:"architecture"`    // "amd64", "arm64"
-	Build        string `json:"build,omitempty"` // kernel build (macOS)
+	OS           string `json:"os"`                      // runtime.GOOS: "linux", "darwin", "windows"
+	Name         string `json:"name"`                    // distro/product: "ubuntu", "redhat", "darwin"
+	Version      string `json:"version"`                 // "24.04", "14.4.1"
+	VersionExtra string `json:"version_extra,omitempty"` // extra version info (macOS RSR patches)
+	Family       string `json:"family"`                  // "debian", "rhel", "mac_os_x"
+	Architecture string `json:"architecture"`            // "amd64", "arm64"
+	Build        string `json:"build,omitempty"`         // kernel build (macOS)
 }
 
-// Collector implements the collector.Collector interface for platform facts.
-type Collector struct{}
-
-// New returns a new platform Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every platform variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "platform".
-func (c *Collector) Name() string {
-	return "platform"
+type base struct{}
+
+func (base) Name() string           { return "platform" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the platform variant for the host OS.
+func New() Collector {
+	if plat.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// Tier returns TierCore.
-func (c *Collector) Tier() collector.Tier {
-	return collector.TierCore
+// platformIDRemap is Ohai's ID normalization table — converts
+// distro identifiers into a canonical form so consumers don't have to
+// special-case per-distro quirks. Matches Ohai's
+// OS_RELEASE_PLATFORM_REMAP list.
+//
+// Source: https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/platform.rb
+var platformIDRemap = map[string]string{
+	"alinux":        "alibabalinux",
+	"amzn":          "amazon",
+	"ol":            "oracle",
+	"sles":          "suse",
+	"opensuse-leap": "opensuseleap",
+	"rhel":          "redhat",
+	"rocky":         "rocky",
+	"xenenterprise": "xenserver",
 }
 
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers platform facts. Implementation lives in platform_<os>.go.
-func (c *Collector) Collect(
-	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+// canonicalizePlatform applies platformIDRemap to the given platform
+// string. Returns the input unchanged if no remap entry exists.
+func canonicalizePlatform(
+	p string,
+) string {
+	if m, ok := platformIDRemap[p]; ok {
+		return m
+	}
+	return p
 }

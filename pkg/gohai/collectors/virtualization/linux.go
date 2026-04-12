@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,31 +20,22 @@
 
 package virtualization
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
+// Linux detects virtualization on Linux via gopsutil (which probes
+// /proc/cpuinfo, DMI, cgroups, and container-specific marker files).
+type Linux struct {
+	base
 
-var hostInfoFn = host.InfoWithContext
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn)
+	DetectFn func(context.Context) (*Info, error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
-	}
-	return &Info{
-		System: info.VirtualizationSystem,
-		Role:   info.VirtualizationRole,
-	}, nil
+// NewLinux returns a Linux variant wired to gopsutil.
+func NewLinux() *Linux {
+	return &Linux{DetectFn: detect}
+}
+
+// Collect returns virtualization Info.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	return l.DetectFn(ctx)
 }

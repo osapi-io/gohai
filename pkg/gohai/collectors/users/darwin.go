@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,37 +20,25 @@
 
 package users
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
+// Darwin collects logged-in sessions on macOS via gopsutil (utmpx).
+type Darwin struct {
+	base
 
-var usersFn = host.UsersWithContext
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, usersFn)
+	SessionsFn func(context.Context) ([]Session, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	fn func(context.Context) ([]host.UserStat, error),
-) (any, error) {
-	us, err := fn(ctx)
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{SessionsFn: listSessions}
+}
+
+// Collect returns logged-in session Info.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	ss, err := d.SessionsFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("host.Users: %w", err)
+		return nil, err
 	}
-	sessions := make([]Session, 0, len(us))
-	for _, u := range us {
-		sessions = append(sessions, Session{
-			User:     u.User,
-			Terminal: u.Terminal,
-			Host:     u.Host,
-			Started:  uint64(u.Started),
-		})
-	}
-	return &Info{LoggedIn: sessions}, nil
+	return &Info{LoggedIn: ss}, nil
 }

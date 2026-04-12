@@ -22,12 +22,20 @@ package kernel_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/sys/unix"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+)
+
+var (
+	_ collector.Collector = (*kernel.Linux)(nil)
+	_ collector.Collector = (*kernel.Darwin)(nil)
 )
 
 type KernelPublicTestSuite struct {
@@ -39,24 +47,112 @@ func TestKernelPublicTestSuite(t *testing.T) {
 }
 
 func (s *KernelPublicTestSuite) TestNew() {
-	c := kernel.New()
-	s.Equal("kernel", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
-	s.Empty(c.Dependencies())
-}
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
 
-func (s *KernelPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = kernel.New()
-}
-
-func (s *KernelPublicTestSuite) TestCollect() {
-	c := kernel.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	info, ok := got.(*kernel.Info)
-	s.Require().True(ok)
-	s.NotEmpty(info.OS)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := kernel.New()
+			s.Equal("kernel", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*kernel.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*kernel.Linux)
+				s.True(ok)
+			}
+		})
+	}
+}
+
+func (s *KernelPublicTestSuite) TestBytesToString() {
+	tests := []struct {
+		name string
+		in   []byte
+		want string
+	}{
+		{"NUL-terminated C string", []byte{'L', 'i', 'n', 'u', 'x', 0, 0, 0}, "Linux"},
+		{"no trailing NUL (full array used)", []byte{'a', 'b', 'c'}, "abc"},
+		{"empty input", []byte{}, ""},
+		{"leading NUL truncates to empty", []byte{0, 'x', 'y'}, ""},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, kernel.BytesToString(tt.in))
+		})
+	}
+}
+
+func (s *KernelPublicTestSuite) TestDefaultUname() {
+	tests := []struct {
+		name    string
+		fn      func(*unix.Utsname) error
+		wantErr bool
+	}{
+		{
+			name: "success returns populated fields",
+			fn: func(u *unix.Utsname) error {
+				copy(u.Sysname[:], "Linux")
+				copy(u.Release[:], "6.1.0")
+				copy(u.Version[:], "#1 SMP")
+				copy(u.Machine[:], "x86_64")
+				return nil
+			},
+		},
+		{
+			name:    "syscall error propagated",
+			fn:      func(*unix.Utsname) error { return errors.New("uname failed") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := kernel.SetUnameSyscall(tt.fn)
+			defer restore()
+			name, release, _, machine, err := kernel.DefaultUname()
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal("Linux", name)
+			s.Equal("6.1.0", release)
+			s.Equal("x86_64", machine)
+		})
+	}
+}
+
+// TestCollectOnHost exercises the real syscall.Uname via the wired
+// UnameFn. Asserts shape — specific values vary by test host.
+func (s *KernelPublicTestSuite) TestCollectOnHost() {
+	tests := []struct{ name string }{
+		{name: "host reports non-empty uname fields"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := kernel.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*kernel.Info)
+			s.Require().True(ok)
+			s.NotEmpty(info.Name)
+			s.NotEmpty(info.Release)
+			s.NotEmpty(info.Machine)
+		})
+	}
 }

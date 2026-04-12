@@ -27,7 +27,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
+)
+
+var (
+	_ collector.Collector = (*filesystem.Linux)(nil)
+	_ collector.Collector = (*filesystem.Darwin)(nil)
 )
 
 type FilesystemPublicTestSuite struct {
@@ -39,23 +45,54 @@ func TestFilesystemPublicTestSuite(t *testing.T) {
 }
 
 func (s *FilesystemPublicTestSuite) TestNew() {
-	c := filesystem.New()
-	s.Equal("filesystem", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
-	s.Empty(c.Dependencies())
-}
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
 
-func (s *FilesystemPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = filesystem.New()
-}
-
-func (s *FilesystemPublicTestSuite) TestCollect() {
-	c := filesystem.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	_, ok := got.(*filesystem.Info)
-	s.True(ok)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := filesystem.New()
+			s.Equal("filesystem", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*filesystem.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*filesystem.Linux)
+				s.True(ok)
+			}
+		})
+	}
+}
+
+// TestCollectOnHost exercises the real gopsutil-backed listMounts
+// bridge. gopsutil's Partition/Usage types aren't unit-constructable.
+// Asserts shape only.
+func (s *FilesystemPublicTestSuite) TestCollectOnHost() {
+	tests := []struct{ name string }{
+		{name: "host enumerates at least the root mount"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := filesystem.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*filesystem.Info)
+			s.Require().True(ok)
+			s.NotEmpty(info.Mounts)
+		})
+	}
 }

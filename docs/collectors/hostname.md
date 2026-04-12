@@ -9,24 +9,30 @@ Identifies the system hostname, FQDN, and domain. Wraps
 for the short hostname and performs a DNS CNAME lookup (via Go's
 `net.LookupCNAME`) to resolve the FQDN. The domain is derived from the FQDN.
 
+Consumers use this to:
+
+- Label telemetry and logs with a canonical host identity.
+- Tag service registrations with the externally-resolvable name (FQDN) rather
+  than just the kernel's `nodename`.
+- Detect hostname drift between `/etc/hostname` and DNS records.
+
 ## Collected Fields
 
-| Field      | Type   | Description                                             |
-| ---------- | ------ | ------------------------------------------------------- |
-| `hostname` | string | Short hostname (e.g., `web01`)                          |
-| `fqdn`     | string | Fully qualified domain name (e.g., `web01.example.com`) |
-| `domain`   | string | Domain portion of the FQDN (e.g., `example.com`)        |
+| Field      | Type   | Description                                              | OCSF mapping                                                                 |
+| ---------- | ------ | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `hostname` | string | Short hostname (e.g., `web01`).                          | `device.hostname`.                                                           |
+| `fqdn`     | string | Fully qualified domain name (e.g., `web01.example.com`). | `device.domain` (combined with hostname) / OCSF has no dedicated FQDN field. |
+| `domain`   | string | Domain portion of the FQDN (e.g., `example.com`).        | `device.domain`.                                                             |
 
 If no DNS record exists for the short name, `fqdn` falls back to the short
 hostname and `domain` is empty.
 
 ## Platform Support
 
-| Platform | Source                                                 | Supported |
-| -------- | ------------------------------------------------------ | --------- |
-| Linux    | `gopsutil/v4/host.InfoWithContext` + `net.LookupCNAME` | ✅        |
-| macOS    | `gopsutil/v4/host.InfoWithContext` + `net.LookupCNAME` | ✅        |
-| Other    | Returns `nil` (no hostname data)                       | —         |
+| Platform | Supported                                     |
+| -------- | --------------------------------------------- |
+| Linux    | ✅ (`gopsutil/host.Info` + `net.LookupCNAME`) |
+| macOS    | ✅ (`gopsutil/host.Info` + `net.LookupCNAME`) |
 
 ## Example Output
 
@@ -56,13 +62,6 @@ hostname and `domain` is empty.
 ## SDK Usage
 
 ```go
-import (
-    "context"
-
-    "github.com/osapi-io/gohai/pkg/gohai"
-    "github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
-)
-
 g, _ := gohai.New(gohai.WithCollectors("hostname"))
 facts, _ := g.Collect(context.Background())
 
@@ -79,10 +78,23 @@ gohai --no-collector.hostname   # disable
 
 ## Dependencies
 
-None — Tier 1 core collector with no upstream collector dependencies.
+None.
+
+## Data Sources
+
+| Platform | What we read                                                                            | Ohai plugin                                                                                                                                    | Alignment                                                                                                                                                                                                                  |
+| -------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | gopsutil `host.Info` (reads `/proc/sys/kernel/hostname` / `uname`) + `net.LookupCNAME`. | [`hostname.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/hostname.rb) — `Socket.gethostname` + `Socket.gethostbyname` for FQDN. | **Equivalent sources** (kernel nodename for short; DNS for FQDN). Ohai also surfaces `machinename` (uname `nodename`, which usually matches hostname but can differ on hosts with manual `/etc/hostname` edits) — tracked. |
+| macOS    | Same as Linux.                                                                          | Same `hostname.rb`.                                                                                                                            | **Equivalent.**                                                                                                                                                                                                            |
+
+**Known gaps vs. Ohai:**
+
+- `machine_name` — Ohai emits `machinename` (uname `nodename`) separately from
+  `hostname`; we fold them. Adding as an optional field is planned (issue #43 in
+  the repo's task list).
 
 ## Backing library
 
 - [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
-  BSD-3
-- Go stdlib `net.LookupCNAME` for FQDN resolution
+  BSD-3.
+- Go stdlib `net.LookupCNAME` for FQDN resolution.

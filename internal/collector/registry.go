@@ -81,9 +81,10 @@ func (r *Registry) Names() []string {
 	return names
 }
 
-// Selected returns the collectors that should run given the user's enable and
-// disable lists. Defaults: TierCore and TierExtended are on, TierOptIn is off.
-// Disable wins over enable for the same name. Unknown names return an error.
+// Selected returns the collectors that should run given the user's enable
+// and disable lists. A collector runs if its DefaultEnabled() is true, or if
+// its name appears in the enable list. Disable wins over enable for the
+// same name. Unknown names return an error.
 func (r *Registry) Selected(
 	enable []string,
 	disable []string,
@@ -116,7 +117,7 @@ func (r *Registry) Selected(
 		if disableSet[name] {
 			continue
 		}
-		if c.Tier().EnabledByDefault() || enableSet[name] {
+		if c.DefaultEnabled() || enableSet[name] {
 			out = append(out, c)
 		}
 	}

@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,53 +20,22 @@
 
 package memory
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/mem"
-)
+// Linux collects memory usage on Linux via gopsutil (which reads
+// /proc/meminfo internally).
+type Linux struct {
+	base
 
-var (
-	virtualMemoryFn = mem.VirtualMemoryWithContext
-	swapMemoryFn    = mem.SwapMemoryWithContext
-)
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, virtualMemoryFn, swapMemoryFn)
+	ReadFn func(context.Context) (*Info, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	vmFn func(context.Context) (*mem.VirtualMemoryStat, error),
-	swapFn func(context.Context) (*mem.SwapMemoryStat, error),
-) (any, error) {
-	vm, err := vmFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("mem.VirtualMemory: %w", err)
-	}
-	out := &Info{
-		Total:       vm.Total,
-		Available:   vm.Available,
-		Used:        vm.Used,
-		UsedPercent: vm.UsedPercent,
-		Free:        vm.Free,
-		Buffers:     vm.Buffers,
-		Cached:      vm.Cached,
-	}
-	sw, err := swapFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("mem.SwapMemory: %w", err)
-	}
-	if sw != nil && sw.Total > 0 {
-		out.Swap = &Swap{
-			Total:       sw.Total,
-			Used:        sw.Used,
-			Free:        sw.Free,
-			UsedPercent: sw.UsedPercent,
-		}
-	}
-	return out, nil
+// NewLinux returns a Linux variant wired to gopsutil.
+func NewLinux() *Linux {
+	return &Linux{ReadFn: readMemory}
+}
+
+// Collect returns the memory Info.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	return l.ReadFn(ctx)
 }

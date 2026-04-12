@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,32 +20,34 @@
 
 package kernel
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
+// Darwin collects kernel facts on macOS using syscall.Uname. Modules
+// on darwin would require parsing `kextstat` output — Apple has
+// deprecated kexts since Big Sur (system extensions replaced them),
+// so we skip the module map on darwin for now.
+type Darwin struct {
+	base
 
-var hostInfoFn = host.InfoWithContext
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn)
+	UnameFn func() (name, release, version, machine string, err error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
+// NewDarwin returns a Darwin variant wired to the shared defaultUname
+// helper.
+func NewDarwin() *Darwin {
+	return &Darwin{UnameFn: defaultUname}
+}
+
+// Collect returns kernel Info. No modules map on darwin.
+func (d *Darwin) Collect(_ context.Context) (any, error) {
+	name, release, version, machine, err := d.UnameFn()
 	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+		return nil, err
 	}
 	return &Info{
-		OS:      info.OS,
-		Version: info.KernelVersion,
-		Arch:    info.KernelArch,
+		Name:    name,
+		Release: release,
+		Version: version,
+		Machine: machine,
 	}, nil
 }

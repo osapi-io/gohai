@@ -17,9 +17,24 @@ typed access to system facts — or use the standalone `gohai` CLI, a thin
 wrapper over the same SDK.
 
 Each collector wraps a well-maintained backing source ([gopsutil][],
-[ghw][], [procfs][], cloud SDKs) and reshapes its output into Ohai-compatible
-JSON. gohai's value is the unified API, typed Go structs, and pluggable
+[ghw][], [procfs][], cloud SDKs) and reshapes its output into typed Go
+structs. gohai's value is the unified API, typed structs, and pluggable
 collector model — not reimplementing `/proc` parsing from scratch.
+
+### Schema: OCSF + Ohai
+
+Fact naming and structure follow [OCSF][] (the Open Cybersecurity Schema
+Framework) wherever OCSF has a canonical field. OCSF is the industry
+schema backed by AWS and Splunk for asset, observability, and security
+data — aligning means gohai output feeds SIEMs, data lakes, and
+inventory tools without translation. Browse the schema at
+[schema.ocsf.io][ocsf-schema] to see field names and object shapes.
+
+What we collect (which facts, which distro edge cases, which fallback
+sources) draws on [Chef Ohai][]'s years of accumulated plugin logic.
+What we call each field draws on OCSF. We do **not** pursue Ohai JSON
+shape parity — Ruby Mash ↔ Go struct translation isn't worth pinning
+byte-for-byte.
 
 ### Primary consumer
 
@@ -39,6 +54,21 @@ As a library dependency:
 go get github.com/osapi-io/gohai
 ```
 
+## ✨ Features
+
+| Feature                                                       | Description                                    |
+| ------------------------------------------------------------- | ---------------------------------------------- |
+| [🔌 Pluggable Collectors](docs/features/collectors.md)        | Enable/disable individual fact collectors      |
+| [🏗️ Typed Structs](docs/features/typed-structs.md)            | Strongly-typed Go structs for all facts        |
+| [📄 JSON Output](docs/features/json-output.md)                | Nested JSON output for CLI and programmatic use |
+| [🗺️ Flat Map Access](docs/features/flat-map.md)               | Dot-separated key-value access                 |
+| [🐧 Cross-Platform](docs/features/cross-platform.md)          | Linux primary, macOS best-effort               |
+| [🔗 Collector Dependencies](docs/features/dependencies.md)    | Automatic dependency resolution between facts  |
+| [⚡ Concurrent Collection](docs/features/concurrency.md)      | Collectors run concurrently; dependency graph resolves order when any collector declares deps. |
+| [🎛️ Profiles](docs/features/profiles.md)                      | Predefined collector sets (minimal, standard, full) |
+| [📊 OCSF Schema + Ohai Sources](docs/features/ocsf-ohai.md)   | Field names follow [OCSF](https://schema.ocsf.io/); data sources mirror Chef Ohai's plugins |
+| [🔌 SDK Integration](docs/features/sdk.md)                    | Import as a Go package for OSAPI and others    |
+
 ## 🔌 Collectors
 
 65 collectors across 9 categories. Collectors are individually toggled using
@@ -51,27 +81,27 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [platform](docs/collectors/platform.md)            | OS name, version, family, architecture         | ✅      | ✅ (gopsutil) |
-| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name           | ✅      | ✅ (gopsutil) |
-| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | ✅ (gopsutil) |
-| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | ✅ (gopsutil) |
-| [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | 🚧          |
-| [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | 🚧          |
-| [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | 🚧          |
-| [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | 🚧          |
-| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ (gopsutil) |
-| [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | 🚧          |
-| [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | 🚧          |
-| [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | 🚧          |
+| [platform](docs/collectors/platform.md)            | OS name, version, family, architecture         | ✅      | ✅ |
+| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name           | ✅      | ✅ |
+| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | ✅ |
+| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | ✅ |
+| [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | ✅ |
+| [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | ✅         |
+| [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | ✅         |
+| [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | ✅ |
+| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ |
+| [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | ✅ |
+| [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | ✅ |
+| [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | ✅         |
 
 ### ⚙️ Hardware
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | ✅ (gopsutil) |
+| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | ✅ |
 | [memory](docs/collectors/memory.md)                | Total, free, swap, buffers, cached, hugepages  | ✅      | 🚧          |
-| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | ✅ (gopsutil) |
-| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | ✅ (gopsutil) |
+| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | ✅ |
+| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | ✅ |
 | [dmi](docs/collectors/dmi.md)                      | BIOS, system manufacturer, serial, UUID        | ✅      | 🚧          |
 | [gpu](docs/collectors/gpu.md)                      | GPU model, driver, memory                      | ✅      | 🚧          |
 | [pci](docs/collectors/pci.md)                      | PCI devices (`lspci`)                          | ✅      | 🚧          |
@@ -82,7 +112,11 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, routes, DNS, counters   | ✅      | ⚠️ (gopsutil; no routes/default yet) |
+| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, counters                | ✅      | ⚠️         |
+| [routes](docs/collectors/routes.md)                | Routing table + default gateway (v4/v6)        | ✅      | 🚧          |
+| [dns](docs/collectors/dns.md)                      | `/etc/resolv.conf` nameservers + search        | ✅      | 🚧          |
+| [arp](docs/collectors/arp.md)                      | ARP / neighbor table                           | ❌      | 🚧          |
+| [ethtool](docs/collectors/ethtool.md)              | Per-NIC ethtool detail (link/duplex/driver)    | ❌      | 🚧          |
 
 ### ☁️ Cloud
 
@@ -106,7 +140,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection     | ✅      | ✅ (gopsutil) |
+| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection     | ✅      | ✅ |
 | [vmware](docs/collectors/vmware.md)                | VMware guest tools data                        | ✅      | 🚧          |
 | [virtualbox](docs/collectors/virtualbox.md)        | VirtualBox guest additions data                | ✅      | 🚧          |
 | [libvirt](docs/collectors/libvirt.md)              | Libvirt domain information                     | ✅      | 🚧          |
@@ -122,7 +156,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [package_mgr](docs/collectors/package_mgr.md)      | Active package manager (apt, dnf, brew, etc.)  | ✅      | 🚧          |
+| [package_mgr](docs/collectors/package_mgr.md)      | Active package manager (apt, dnf, brew, etc.)  | ✅      | ✅         |
 | [packages](docs/collectors/packages.md)            | Installed packages (apt, yum, brew, etc.)      | ❌      | 🚧          |
 | [languages](docs/collectors/languages.md)          | Go, Python, Ruby, Node, Rust, Java, etc.       | ❌      | 🚧          |
 | [docker](docs/collectors/docker.md)                | Running containers, images, Docker info        | ❌      | 🚧          |
@@ -132,14 +166,14 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [users](docs/collectors/users.md)                  | passwd/group data, current user                | ✅      | ⚠️ (gopsutil; logged-in only) |
+| [users](docs/collectors/users.md)                  | passwd/group data, current user                | ✅      | ⚠️         |
 | [sessions](docs/collectors/sessions.md)            | Logged-in sessions (`loginctl`)                | ✅      | 🚧          |
 
 ### 🐧 Linux-Specific
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [lsb](docs/collectors/lsb.md)                     | Linux Standard Base release info               | ✅      | 🚧          |
+| [lsb](docs/collectors/lsb.md)                     | Linux Standard Base release info               | ✅      | ✅         |
 | [hostnamectl](docs/collectors/hostnamectl.md)      | `hostnamectl` output                           | ✅      | 🚧          |
 | [sysctl](docs/collectors/sysctl.md)               | Kernel parameters via `sysctl`                 | ✅      | 🚧          |
 | [systemd_paths](docs/collectors/systemd_paths.md)  | Systemd path directories                       | ✅      | 🚧          |
@@ -157,7 +191,8 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [process](docs/collectors/process.md)              | Process list (PID, name, user, cmdline)        | ✅      | ✅ (gopsutil) |
+| [process](docs/collectors/process.md)              | Process list (PID, name, user, cmdline)        | ✅      | ✅ |
+| [load](docs/collectors/load.md)                    | Load averages (1/5/15-minute)                  | ✅      | ✅         |
 | [command](docs/collectors/command.md)              | Full `ps` output (Ohai command/ps parity)      | ✅      | 🚧          |
 | [sysconf](docs/collectors/sysconf.md)             | POSIX sysconf values                           | ✅      | 🚧          |
 
@@ -223,20 +258,6 @@ func main() {
 }
 ```
 
-## ✨ Features
-
-| Feature                                                       | Description                                    |
-| ------------------------------------------------------------- | ---------------------------------------------- |
-| [🔌 Pluggable Collectors](docs/features/collectors.md)        | Enable/disable individual fact collectors      |
-| [🏗️ Typed Structs](docs/features/typed-structs.md)            | Strongly-typed Go structs for all facts        |
-| [📄 JSON Output](docs/features/json-output.md)                | Nested JSON output for CLI and programmatic use |
-| [🗺️ Flat Map Access](docs/features/flat-map.md)               | Dot-separated key-value access                 |
-| [🐧 Cross-Platform](docs/features/cross-platform.md)          | Linux primary, macOS best-effort               |
-| [🔗 Collector Dependencies](docs/features/dependencies.md)    | Automatic dependency resolution between facts  |
-| [⚡ Concurrent Collection](docs/features/concurrency.md)      | Parallel collection with dependency ordering   |
-| [🎛️ Profiles](docs/features/profiles.md)                      | Predefined collector sets (minimal, standard, full) |
-| [📊 Ohai Compatibility](docs/features/ohai-compat.md)         | Output format compatible with Chef Ohai        |
-| [🔌 SDK Integration](docs/features/sdk.md)                    | Import as a Go package for OSAPI and others    |
 
 ## 🔗 Integrations
 
@@ -251,7 +272,16 @@ to gohai collectors — keep it in sync with any `Info` struct changes.
 
 ## 📖 Documentation
 
-See the [package documentation][] on pkg.go.dev for API details.
+- [Collectors reference](docs/collectors/README.md) — one doc per collector
+  with fields, OCSF mappings, and Ohai source alignment.
+- [Features](docs/features/README.md) — SDK surface, concurrency model,
+  dependency resolution, OCSF + Ohai schema, profiles.
+- [Integrations](docs/integrations/osapi.md) — how downstream services consume
+  the SDK.
+- [Development](docs/development.md) — prerequisites, setup, testing, commit
+  conventions.
+- [Contributing](docs/contributing.md) — PR workflow.
+- [Package documentation][] on pkg.go.dev — generated API reference.
 
 ## 🤝 Contributing
 
@@ -268,5 +298,7 @@ The [MIT][] License.
 [gopsutil]: https://github.com/shirou/gopsutil
 [ghw]: https://github.com/jaypipes/ghw
 [procfs]: https://github.com/prometheus/procfs
+[OCSF]: https://ocsf.io/
+[ocsf-schema]: https://schema.ocsf.io/
 [package documentation]: https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai
 [MIT]: LICENSE

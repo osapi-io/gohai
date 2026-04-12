@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
@@ -41,133 +38,53 @@ func TestHostnameDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(HostnameDarwinPublicTestSuite))
 }
 
-func (s *HostnameDarwinPublicTestSuite) TestBuildInfo() {
-	tests := []struct {
-		name       string
-		short      string
-		resolveFn  func(string) string
-		wantFQDN   string
-		wantDomain string
-	}{
-		{
-			name:       "fqdn returns full name with domain",
-			short:      "web01",
-			resolveFn:  func(_ string) string { return "web01.example.com" },
-			wantFQDN:   "web01.example.com",
-			wantDomain: "example.com",
-		},
-		{
-			name:       "short-only hostname when resolver returns input",
-			short:      "standalone",
-			resolveFn:  func(s string) string { return s },
-			wantFQDN:   "standalone",
-			wantDomain: "",
-		},
-		{
-			name:       "fqdn ending in dot is not treated as domain",
-			short:      "foo",
-			resolveFn:  func(_ string) string { return "foo." },
-			wantFQDN:   "foo.",
-			wantDomain: "",
-		},
-		{
-			name:       "multi-label domain",
-			short:      "db",
-			resolveFn:  func(_ string) string { return "db.prod.internal.corp" },
-			wantFQDN:   "db.prod.internal.corp",
-			wantDomain: "prod.internal.corp",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			got := hostname.BuildInfo(tt.short, tt.resolveFn)
-			s.Equal(tt.short, got.Hostname)
-			s.Equal(tt.wantFQDN, got.FQDN)
-			s.Equal(tt.wantDomain, got.Domain)
-		})
-	}
-}
-
-func (s *HostnameDarwinPublicTestSuite) TestDefaultFqdnLookup() {
-	tests := []struct {
-		name   string
-		lookup func(string) (string, error)
-		input  string
-		want   string
-	}{
-		{
-			"cname trimmed of trailing dot",
-			func(_ string) (string, error) { return "web01.example.com.", nil },
-			"web01",
-			"web01.example.com",
-		},
-		{
-			"cname without trailing dot",
-			func(_ string) (string, error) { return "web01.example.com", nil },
-			"web01",
-			"web01.example.com",
-		},
-		{
-			"empty cname falls back to input",
-			func(_ string) (string, error) { return "", nil },
-			"solo",
-			"solo",
-		},
-		{
-			"lookup error falls back to input",
-			func(_ string) (string, error) { return "", errors.New("dns") },
-			"bad",
-			"bad",
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			restore := hostname.SetLookupCNAMEFn(tt.lookup)
-			defer hostname.SetLookupCNAMEFn(restore)
-			s.Equal(tt.want, hostname.DefaultFqdnLookup(tt.input))
-		})
-	}
-}
-
 func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
-		resolve func(string) string
-		wantErr bool
-		want    *hostname.Info
+		name         string
+		shortFn      func(context.Context) (string, error)
+		osHostnameFn func() (string, error)
+		lookupHost   func(string) ([]string, error)
+		lookupAddr   func(string) ([]string, error)
+		want         hostname.Info
+		wantErr      bool
 	}{
 		{
-			name:    "success with fqdn",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: "web01"}, nil },
-			resolve: func(_ string) string { return "web01.example.com" },
-			want: &hostname.Info{
-				Hostname: "web01",
-				FQDN:     "web01.example.com",
-				Domain:   "example.com",
+			name:         "canonical macOS host with DNS",
+			shortFn:      func(context.Context) (string, error) { return "johns-mbp", nil },
+			osHostnameFn: func() (string, error) { return "johns-mbp.local", nil },
+			lookupHost:   func(string) ([]string, error) { return []string{"192.168.1.42"}, nil },
+			lookupAddr:   func(string) ([]string, error) { return []string{"johns-mbp.local."}, nil },
+			want: hostname.Info{
+				Hostname: "johns-mbp", MachineName: "johns-mbp.local",
+				FQDN: "johns-mbp.local", Domain: "local",
 			},
 		},
 		{
-			name:    "success without domain",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{Hostname: "solo"}, nil },
-			resolve: func(s string) string { return s },
-			want:    &hostname.Info{Hostname: "solo", FQDN: "solo"},
+			name:         "no DNS falls back to short name",
+			shortFn:      func(context.Context) (string, error) { return "laptop", nil },
+			osHostnameFn: func() (string, error) { return "laptop", nil },
+			lookupHost:   func(string) ([]string, error) { return nil, errors.New("no host") },
+			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
+			want:         hostname.Info{Hostname: "laptop", MachineName: "laptop", FQDN: "laptop"},
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			resolve: func(s string) string { return s },
-			wantErr: true,
+			name:         "short hostname error propagated",
+			shortFn:      func(context.Context) (string, error) { return "", errors.New("boom") },
+			osHostnameFn: func() (string, error) { return "", nil },
+			lookupHost:   func(string) ([]string, error) { return nil, nil },
+			lookupAddr:   func(string) ([]string, error) { return nil, nil },
+			wantErr:      true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			restoreHost := hostname.SetHostInfoFn(tt.stub)
-			restoreFqdn := hostname.SetFqdnLookupFn(tt.resolve)
-			defer hostname.SetHostInfoFn(restoreHost)
-			defer hostname.SetFqdnLookupFn(restoreFqdn)
-
-			got, err := hostname.Collect(context.Background())
+			c := &hostname.Darwin{
+				ShortHostnameFn: tt.shortFn,
+				OSHostnameFn:    tt.osHostnameFn,
+				LookupHostFn:    tt.lookupHost,
+				LookupAddrFn:    tt.lookupAddr,
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -175,7 +92,7 @@ func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*hostname.Info)
 			s.Require().True(ok)
-			s.Equal(tt.want, info)
+			s.Equal(tt.want, *info)
 		})
 	}
 }

@@ -4,32 +4,79 @@
 
 ## Description
 
-Reports the unique machine identifier (from `/etc/machine-id` on Linux,
-`IOPlatformUUID` on macOS). Wraps
-[gopsutil's `host.Info`](https://pkg.go.dev/github.com/shirou/gopsutil/v4/host).
+Reports a stable host identifier — one that survives reboots. On Linux the
+source of truth is `/etc/machine-id` (systemd) with a `/var/lib/dbus/machine-id`
+fallback for pre-systemd Debian/Ubuntu hosts. On macOS the source is
+`IOPlatformUUID` from IOKit, which Apple intends as the authoritative hardware
+identifier.
+
+Consumers use this to:
+
+- Build a stable host-identity index that survives reboots, IP changes, and
+  hostname renames.
+- Correlate asset inventory with OS-level events.
+- Dedupe hosts that appear under multiple hostnames.
+
+Caveats:
+
+- On a host where **none** of the expected sources exist (very minimal container
+  images, boot-from-initramfs systems), gopsutil may fall back to
+  `/proc/sys/kernel/random/boot_id` — **that value changes every reboot and is
+  not safe to use as a stable identifier.** Treat an ID that differs across two
+  consecutive reboots as unknown.
+- On Linux, if both `/etc/machine-id` and DMI product_uuid are missing, our
+  collector also consults `/var/lib/dbus/machine-id` (which gopsutil doesn't)
+  before giving up and returning empty.
 
 ## Collected Fields
 
-| Field | Type   | Description                           |
-| ----- | ------ | ------------------------------------- |
-| `id`  | string | Machine identifier (typically a UUID) |
+| Field | Type   | Description                                 | OCSF mapping                                                                                                                                                                 |
+| ----- | ------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`  | string | Stable machine identifier (typically UUID). | OCSF `device.uid` — the canonical OCSF host-identifier field (dictionary: "unique device identifier. Typically BIOS hardware identifier, machine id, or agent identifier."). |
 
 ## Platform Support
 
-| Platform | Source                                                       | Supported |
-| -------- | ------------------------------------------------------------ | --------- |
-| Linux    | `gopsutil/v4/host.InfoWithContext` (reads `/etc/machine-id`) | ✅        |
-| macOS    | `gopsutil/v4/host.InfoWithContext` (reads `IOPlatformUUID`)  | ✅        |
-| Other    | Returns `nil`                                                | —         |
+| Platform | Supported |
+| -------- | --------- |
+| Linux    | ✅        |
+| macOS    | ✅        |
+| Other    | —         |
 
 ## Example Output
+
+### Linux (systemd host)
 
 ```json
 {
   "machine_id": {
-    "id": "abc12345-6789-def0-1234-56789abcdef0"
+    "id": "abc123def4567890abcdef1234567890"
   }
 }
+```
+
+### macOS
+
+```json
+{
+  "machine_id": {
+    "id": "12345678-ABCD-EF01-2345-6789ABCDEF01"
+  }
+}
+```
+
+## SDK Usage
+
+```go
+import (
+    "context"
+
+    "github.com/osapi-io/gohai/pkg/gohai"
+)
+
+g, _ := gohai.New(gohai.WithCollectors("machine_id"))
+facts, _ := g.Collect(context.Background())
+
+fmt.Println(facts.MachineID.ID)
 ```
 
 ## Enable/Disable
@@ -43,7 +90,19 @@ gohai --no-collector.machine_id   # disable
 
 None.
 
+## Data Sources
+
+| Platform | What we read                                                                                                                                                      | Ohai plugin ([`linux/sysconf.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/sysconf.rb) et al.)                 | Alignment                                                                                                                                                              |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | gopsutil `host.InfoWithContext` (reads `/etc/machine-id` → DMI `product_uuid` → `boot_id`) + our `/var/lib/dbus/machine-id` fallback when gopsutil returns empty. | Ohai reads `/etc/machine-id` primarily and falls back to `/var/lib/dbus/machine-id`. No DMI / boot_id fallback.                     | **Superset of Ohai.** We inherit gopsutil's DMI fallback (useful on minimal hosts without systemd) and extend with the dbus path to match Ohai's pre-systemd coverage. |
+| macOS    | gopsutil `host.InfoWithContext` (reads `IOPlatformUUID` via IOKit).                                                                                               | Ohai doesn't provide a dedicated `machine_id` on darwin; the DMI-equivalent hardware UUID comes from the `hardware` plugin instead. | **Richer than Ohai.** gopsutil gives us `IOPlatformUUID` directly under `machine_id.id` for consistency with the Linux shape.                                          |
+
+**Known gaps:** None. gopsutil's `boot_id` tail — which is reboot-unstable — is
+documented in the Description so consumers know to treat mismatched reboots as
+unknown rather than two different hosts.
+
 ## Backing library
 
-[`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
-BSD-3.
+- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) for
+  the primary machine-id/DMI read. Linux `/var/lib/dbus/machine-id` fallback is
+  our own `os.ReadFile`.

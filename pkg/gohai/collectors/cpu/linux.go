@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,52 +20,22 @@
 
 package cpu
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	gcpu "github.com/shirou/gopsutil/v4/cpu"
-)
+// Linux collects CPU facts on Linux via gopsutil (which parses
+// /proc/cpuinfo).
+type Linux struct {
+	base
 
-var (
-	cpuInfoFn   = gcpu.InfoWithContext
-	cpuCountsFn = gcpu.CountsWithContext
-)
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, cpuInfoFn, cpuCountsFn)
+	ReadFn func(context.Context) (*Info, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	infoFn func(context.Context) ([]gcpu.InfoStat, error),
-	countsFn func(context.Context, bool) (int, error),
-) (any, error) {
-	infos, err := infoFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("cpu.Info: %w", err)
-	}
-	total, err := countsFn(ctx, true)
-	if err != nil {
-		return nil, fmt.Errorf("cpu.Counts(logical): %w", err)
-	}
-	cores, err := countsFn(ctx, false)
-	if err != nil {
-		return nil, fmt.Errorf("cpu.Counts(physical): %w", err)
-	}
-	out := &Info{Total: total, Cores: cores}
-	if len(infos) > 0 {
-		first := infos[0]
-		out.ModelName = first.ModelName
-		out.VendorID = first.VendorID
-		out.Family = first.Family
-		out.Model = first.Model
-		out.Stepping = first.Stepping
-		out.Mhz = first.Mhz
-		out.CacheSize = first.CacheSize
-		out.Flags = first.Flags
-	}
-	return out, nil
+// NewLinux returns a Linux variant wired to gopsutil.
+func NewLinux() *Linux {
+	return &Linux{ReadFn: readCPU}
+}
+
+// Collect returns the CPU Info.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	return l.ReadFn(ctx)
 }

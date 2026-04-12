@@ -21,13 +21,18 @@
 package platform_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	plat "github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
+)
+
+var (
+	_ collector.Collector = (*platform.Linux)(nil)
+	_ collector.Collector = (*platform.Darwin)(nil)
 )
 
 type PlatformPublicTestSuite struct {
@@ -39,24 +44,35 @@ func TestPlatformPublicTestSuite(t *testing.T) {
 }
 
 func (s *PlatformPublicTestSuite) TestNew() {
-	c := platform.New()
-	s.Equal("platform", c.Name())
-	s.Equal(collector.TierCore, c.Tier())
-	s.Empty(c.Dependencies())
-}
+	orig := plat.Detect
+	defer func() { plat.Detect = orig }()
 
-func (s *PlatformPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = platform.New()
-}
-
-func (s *PlatformPublicTestSuite) TestCollect() {
-	c := platform.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	info, ok := got.(*platform.Info)
-	s.Require().True(ok, "expected *platform.Info, got %T", got)
-	s.NotEmpty(info.Architecture)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			plat.Detect = func() string { return tt.detect }
+			c := platform.New()
+			s.Equal("platform", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*platform.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*platform.Linux)
+				s.True(ok)
+			}
+		})
+	}
 }

@@ -18,50 +18,23 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package collector defines the Collector interface and tier classifications
-// for gohai's pluggable fact collection system.
+// Package collector defines the Collector interface gohai uses to plug
+// fact collectors into the registry.
 package collector
 
 import "context"
-
-// Tier classifies a collector for default enable/disable behavior.
-type Tier int
-
-const (
-	// TierCore collectors are foundational and enabled by default.
-	TierCore Tier = iota + 1
-	// TierExtended collectors are enabled by default but cover broader topics.
-	TierExtended
-	// TierOptIn collectors are disabled by default and require explicit opt-in.
-	TierOptIn
-)
-
-// String returns the human-readable name of the tier.
-func (t Tier) String() string {
-	switch t {
-	case TierCore:
-		return "core"
-	case TierExtended:
-		return "extended"
-	case TierOptIn:
-		return "opt-in"
-	default:
-		return "unknown"
-	}
-}
-
-// EnabledByDefault reports whether collectors of this tier run by default.
-func (t Tier) EnabledByDefault() bool {
-	return t == TierCore || t == TierExtended
-}
 
 // Collector is the interface every fact collector must implement.
 type Collector interface {
 	// Name returns the unique identifier (e.g., "platform").
 	Name() string
 
-	// Tier returns the tier classification.
-	Tier() Tier
+	// DefaultEnabled reports whether this collector should run when no
+	// explicit enable/disable flags are provided. Most collectors return
+	// true; heavy or privileged collectors (ssh host keys, full package
+	// inventory, full service list) return false and require the caller
+	// to opt in via --collector.<name>.
+	DefaultEnabled() bool
 
 	// Dependencies returns names of collectors that must run before this one.
 	Dependencies() []string

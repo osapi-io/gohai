@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
@@ -41,29 +38,86 @@ func TestKernelLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(KernelLinuxPublicTestSuite))
 }
 
-func (s *KernelLinuxPublicTestSuite) TestCollectWithHost() {
+func (s *KernelLinuxPublicTestSuite) TestCollect() {
+	okUname := func() (string, string, string, string, error) {
+		return "Linux", "5.15.0-47-generic",
+			"#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022",
+			"x86_64", nil
+	}
+
 	tests := []struct {
-		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
-		wantErr bool
-		want    kernel.Info
+		name     string
+		unameFn  func() (string, string, string, string, error)
+		readFile func(string) ([]byte, error)
+		wantErr  bool
+		want     kernel.Info
 	}{
 		{
-			name: "success",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{OS: "linux", KernelVersion: "1.2.3", KernelArch: "arm64"}, nil
+			name:    "canonical Linux host with modules",
+			unameFn: okUname,
+			readFile: func(string) ([]byte, error) {
+				return []byte(
+					"nf_tables 217088 25 rfkill,nf_conntrack - Live 0x0000000000000000\n" +
+						"ipv6 557056 24 - Live 0x0000000000000000\n",
+				), nil
 			},
-			want: kernel.Info{OS: "linux", Version: "1.2.3", Arch: "arm64"},
+			want: kernel.Info{
+				Name: "Linux", Release: "5.15.0-47-generic",
+				Version: "#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022",
+				Machine: "x86_64",
+				Modules: map[string]kernel.Module{
+					"nf_tables": {Size: 217088, RefCount: 25},
+					"ipv6":      {Size: 557056, RefCount: 24},
+				},
+			},
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			name:     "missing /proc/modules omits Modules field",
+			unameFn:  okUname,
+			readFile: func(string) ([]byte, error) { return nil, errors.New("not found") },
+			want: kernel.Info{
+				Name: "Linux", Release: "5.15.0-47-generic",
+				Version: "#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022",
+				Machine: "x86_64",
+			},
+		},
+		{
+			name:     "malformed module line skipped",
+			unameFn:  okUname,
+			readFile: func(string) ([]byte, error) { return []byte("short\nvalid_mod 1024 3 - Live 0x0\n"), nil },
+			want: kernel.Info{
+				Name: "Linux", Release: "5.15.0-47-generic",
+				Version: "#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022",
+				Machine: "x86_64",
+				Modules: map[string]kernel.Module{
+					"valid_mod": {Size: 1024, RefCount: 3},
+				},
+			},
+		},
+		{
+			name:     "unparseable size/refcount leaves field zero",
+			unameFn:  okUname,
+			readFile: func(string) ([]byte, error) { return []byte("broken abc xyz - Live 0x0\n"), nil },
+			want: kernel.Info{
+				Name: "Linux", Release: "5.15.0-47-generic",
+				Version: "#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022",
+				Machine: "x86_64",
+				Modules: map[string]kernel.Module{"broken": {}},
+			},
+		},
+		{
+			name: "uname error propagated",
+			unameFn: func() (string, string, string, string, error) {
+				return "", "", "", "", errors.New("uname failed")
+			},
+			readFile: func(string) ([]byte, error) { return nil, nil },
+			wantErr:  true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := kernel.CollectWithHost(context.Background(), tt.stub)
+			c := &kernel.Linux{UnameFn: tt.unameFn, ReadFileFn: tt.readFile}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -74,12 +128,4 @@ func (s *KernelLinuxPublicTestSuite) TestCollectWithHost() {
 			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *KernelLinuxPublicTestSuite) TestCollectDefault() {
-	got, err := kernel.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*kernel.Info)
-	s.Require().True(ok)
-	s.NotEmpty(info.OS)
 }

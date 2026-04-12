@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,32 +20,22 @@
 
 package uptime
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
+// Darwin collects uptime on macOS. No idle-time equivalent. BaseFn is
+// typed in our *Info so importers don't need gopsutil.
+type Darwin struct {
+	base
 
-var hostInfoFn = host.InfoWithContext
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn)
+	BaseFn func(context.Context) (*Info, error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
-	}
-	return &Info{
-		Seconds:  info.Uptime,
-		BootTime: info.BootTime,
-		Human:    HumanDuration(info.Uptime),
-	}, nil
+// NewDarwin returns a Darwin variant wired to the production bridge.
+func NewDarwin() *Darwin {
+	return &Darwin{BaseFn: readBase}
+}
+
+// Collect returns uptime facts.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	return d.BaseFn(ctx)
 }

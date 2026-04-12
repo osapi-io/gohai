@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,52 +20,21 @@
 
 package cpu
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	gcpu "github.com/shirou/gopsutil/v4/cpu"
-)
+// Darwin collects CPU facts on macOS via gopsutil (which uses sysctl).
+type Darwin struct {
+	base
 
-var (
-	cpuInfoFn   = gcpu.InfoWithContext
-	cpuCountsFn = gcpu.CountsWithContext
-)
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, cpuInfoFn, cpuCountsFn)
+	ReadFn func(context.Context) (*Info, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	infoFn func(context.Context) ([]gcpu.InfoStat, error),
-	countsFn func(context.Context, bool) (int, error),
-) (any, error) {
-	infos, err := infoFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("cpu.Info: %w", err)
-	}
-	total, err := countsFn(ctx, true)
-	if err != nil {
-		return nil, fmt.Errorf("cpu.Counts(logical): %w", err)
-	}
-	cores, err := countsFn(ctx, false)
-	if err != nil {
-		return nil, fmt.Errorf("cpu.Counts(physical): %w", err)
-	}
-	out := &Info{Total: total, Cores: cores}
-	if len(infos) > 0 {
-		first := infos[0]
-		out.ModelName = first.ModelName
-		out.VendorID = first.VendorID
-		out.Family = first.Family
-		out.Model = first.Model
-		out.Stepping = first.Stepping
-		out.Mhz = first.Mhz
-		out.CacheSize = first.CacheSize
-		out.Flags = first.Flags
-	}
-	return out, nil
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{ReadFn: readCPU}
+}
+
+// Collect returns the CPU Info.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	return d.ReadFn(ctx)
 }

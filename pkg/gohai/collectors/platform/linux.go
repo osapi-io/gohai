@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,35 +20,27 @@
 
 package platform
 
-import (
-	"context"
-	"fmt"
-	"runtime"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
+// Linux collects platform identification on Linux hosts. ReadFn is
+// typed in our *Info so importers don't need gopsutil.
+type Linux struct {
+	base
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, host.InfoWithContext)
+	ReadFn func(context.Context) (*Info, string, error)
 }
 
-// collectWithHost is the testable core: it accepts a function matching
-// gopsutil's host.InfoWithContext so tests can stub the system call.
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
+// NewLinux returns a Linux variant wired to the production bridge.
+func NewLinux() *Linux {
+	return &Linux{ReadFn: readPlatform}
+}
+
+// Collect returns platform Info. Linux discards the raw kernel-version
+// string from readPlatform — Build is macOS-only.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	info, _, err := l.ReadFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+		return nil, err
 	}
-	return &Info{
-		OS:           runtime.GOOS,
-		Name:         info.Platform,
-		Version:      info.PlatformVersion,
-		Family:       info.PlatformFamily,
-		Architecture: info.KernelArch,
-	}, nil
+	return info, nil
 }

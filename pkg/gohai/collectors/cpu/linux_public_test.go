@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,7 @@ import (
 	"errors"
 	"testing"
 
-	gcpu "github.com/shirou/gopsutil/v4/cpu"
+	gpcpu "github.com/shirou/gopsutil/v4/cpu"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
@@ -41,93 +39,46 @@ func TestCPULinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CPULinuxPublicTestSuite))
 }
 
-func (s *CPULinuxPublicTestSuite) TestCollectFromGopsutil() {
-	okInfo := func(_ context.Context) ([]gcpu.InfoStat, error) {
-		return []gcpu.InfoStat{{
-			ModelName: "Intel Core i7",
-			VendorID:  "GenuineIntel",
-			Family:    "6",
-			Model:     "158",
-			Stepping:  10,
-			Mhz:       3600.0,
-			CacheSize: 8192,
-			Flags:     []string{"sse", "sse2"},
-		}}, nil
-	}
-	okCounts := func(_ bool) func(context.Context, bool) (int, error) {
-		return func(_ context.Context, l bool) (int, error) {
-			if l {
-				return 8, nil
-			}
-			return 4, nil
-		}
-	}
-
+func (s *CPULinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		infoFn   func(context.Context) ([]gcpu.InfoStat, error)
-		countsFn func(context.Context, bool) (int, error)
-		wantErr  bool
-		want     cpu.Info
+		name    string
+		info    *cpu.Info
+		fnErr   error
+		wantErr bool
+		want    cpu.Info
 	}{
 		{
-			name:     "success with one info",
-			infoFn:   okInfo,
-			countsFn: okCounts(true),
+			name: "8-core Xeon",
+			info: &cpu.Info{
+				Total: 16, Real: 1, Cores: 8, ModelName: "Intel(R) Xeon(R) CPU",
+				VendorID: "GenuineIntel", Family: "6", Model: "85",
+				Stepping: 7, Mhz: 2400, CacheSize: 25600,
+				Flags: []string{"fpu", "vme"},
+			},
 			want: cpu.Info{
-				Total:     8,
-				Cores:     4,
-				ModelName: "Intel Core i7",
-				VendorID:  "GenuineIntel",
-				Family:    "6",
-				Model:     "158",
-				Stepping:  10,
-				Mhz:       3600.0,
-				CacheSize: 8192,
-				Flags:     []string{"sse", "sse2"},
+				Total: 16, Real: 1, Cores: 8, ModelName: "Intel(R) Xeon(R) CPU",
+				VendorID: "GenuineIntel", Family: "6", Model: "85",
+				Stepping: 7, Mhz: 2400, CacheSize: 25600,
+				Flags: []string{"fpu", "vme"},
 			},
 		},
 		{
-			name: "empty info list",
-			infoFn: func(_ context.Context) ([]gcpu.InfoStat, error) {
-				return nil, nil
-			},
-			countsFn: okCounts(true),
-			want:     cpu.Info{Total: 8, Cores: 4},
-		},
-		{
-			name:     "info error",
-			infoFn:   func(_ context.Context) ([]gcpu.InfoStat, error) { return nil, errors.New("boom") },
-			countsFn: okCounts(true),
-			wantErr:  true,
-		},
-		{
-			name:   "logical counts error",
-			infoFn: okInfo,
-			countsFn: func(_ context.Context, logical bool) (int, error) {
-				if logical {
-					return 0, errors.New("lg")
-				}
-				return 4, nil
-			},
-			wantErr: true,
-		},
-		{
-			name:   "physical counts error",
-			infoFn: okInfo,
-			countsFn: func(_ context.Context, logical bool) (int, error) {
-				if logical {
-					return 8, nil
-				}
-				return 0, errors.New("ph")
-			},
+			name:    "gopsutil error wrapped and returned",
+			fnErr:   errors.New("cpuinfo error"),
 			wantErr: true,
 		},
 	}
-
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := cpu.CollectFromGopsutil(context.Background(), tt.infoFn, tt.countsFn)
+			c := &cpu.Linux{
+				ReadFn: func(context.Context) (*cpu.Info, error) {
+					if tt.fnErr != nil {
+						return nil, tt.fnErr
+					}
+					return tt.info, nil
+				},
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -140,10 +91,57 @@ func (s *CPULinuxPublicTestSuite) TestCollectFromGopsutil() {
 	}
 }
 
-func (s *CPULinuxPublicTestSuite) TestCollectDefault() {
-	got, err := cpu.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*cpu.Info)
-	s.Require().True(ok)
-	s.NotZero(info.Total)
+func (s *CPULinuxPublicTestSuite) TestReadCPU() {
+	okStats := []gpcpu.InfoStat{{
+		PhysicalID: "0", Cores: 8, ModelName: "Intel(R) Xeon(R) CPU",
+		VendorID: "GenuineIntel", Family: "6", Model: "85",
+		Stepping: 7, Mhz: 2400, CacheSize: 25600,
+		Flags: []string{"fpu", "vme"},
+	}}
+
+	tests := []struct {
+		name      string
+		infoFn    func(context.Context) ([]gpcpu.InfoStat, error)
+		countsFn  func(context.Context, bool) (int, error)
+		wantErr   bool
+		wantTotal int
+		wantCores int
+	}{
+		{
+			name:      "success maps stats",
+			infoFn:    func(context.Context) ([]gpcpu.InfoStat, error) { return okStats, nil },
+			countsFn:  func(context.Context, bool) (int, error) { return 16, nil },
+			wantTotal: 16,
+			wantCores: 8,
+		},
+		{
+			name:      "counts error ignored, info still populated",
+			infoFn:    func(context.Context) ([]gpcpu.InfoStat, error) { return okStats, nil },
+			countsFn:  func(context.Context, bool) (int, error) { return 0, errors.New("counts failed") },
+			wantTotal: 0,
+			wantCores: 8,
+		},
+		{
+			name:     "info error propagated",
+			infoFn:   func(context.Context) ([]gpcpu.InfoStat, error) { return nil, errors.New("info failed") },
+			countsFn: func(context.Context, bool) (int, error) { return 0, nil },
+			wantErr:  true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restoreInfo := cpu.SetInfoFn(tt.infoFn)
+			defer restoreInfo()
+			restoreCounts := cpu.SetCountsFn(tt.countsFn)
+			defer restoreCounts()
+			got, err := cpu.ReadCPU(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.wantTotal, got.Total)
+			s.Equal(tt.wantCores, got.Cores)
+		})
+	}
 }

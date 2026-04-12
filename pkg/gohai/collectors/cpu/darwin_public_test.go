@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	gcpu "github.com/shirou/gopsutil/v4/cpu"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
@@ -41,81 +38,36 @@ func TestCPUDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CPUDarwinPublicTestSuite))
 }
 
-func (s *CPUDarwinPublicTestSuite) TestCollectFromGopsutil() {
-	okInfo := func(_ context.Context) ([]gcpu.InfoStat, error) {
-		return []gcpu.InfoStat{{
-			ModelName: "Apple M1",
-			VendorID:  "Apple",
-			Mhz:       3200.0,
-		}}, nil
-	}
-	okCounts := func(_ context.Context, logical bool) (int, error) {
-		if logical {
-			return 8, nil
-		}
-		return 8, nil
-	}
-
+func (s *CPUDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		infoFn   func(context.Context) ([]gcpu.InfoStat, error)
-		countsFn func(context.Context, bool) (int, error)
-		wantErr  bool
-		want     cpu.Info
+		name    string
+		info    *cpu.Info
+		fnErr   error
+		wantErr bool
+		want    cpu.Info
 	}{
 		{
-			name:     "apple silicon",
-			infoFn:   okInfo,
-			countsFn: okCounts,
-			want: cpu.Info{
-				Total:     8,
-				Cores:     8,
-				ModelName: "Apple M1",
-				VendorID:  "Apple",
-				Mhz:       3200.0,
-			},
+			name: "Apple M2 Pro",
+			info: &cpu.Info{Total: 12, Real: 1, Cores: 10, ModelName: "Apple M2 Pro"},
+			want: cpu.Info{Total: 12, Real: 1, Cores: 10, ModelName: "Apple M2 Pro"},
 		},
 		{
-			name:     "info error",
-			infoFn:   func(_ context.Context) ([]gcpu.InfoStat, error) { return nil, errors.New("boom") },
-			countsFn: okCounts,
-			wantErr:  true,
-		},
-		{
-			name:   "logical counts error",
-			infoFn: okInfo,
-			countsFn: func(_ context.Context, logical bool) (int, error) {
-				if logical {
-					return 0, errors.New("lg")
-				}
-				return 8, nil
-			},
+			name:    "gopsutil error wrapped and returned",
+			fnErr:   errors.New("sysctl error"),
 			wantErr: true,
-		},
-		{
-			name:   "physical counts error",
-			infoFn: okInfo,
-			countsFn: func(_ context.Context, logical bool) (int, error) {
-				if logical {
-					return 8, nil
-				}
-				return 0, errors.New("ph")
-			},
-			wantErr: true,
-		},
-		{
-			name: "empty info list",
-			infoFn: func(_ context.Context) ([]gcpu.InfoStat, error) {
-				return nil, nil
-			},
-			countsFn: okCounts,
-			want:     cpu.Info{Total: 8, Cores: 8},
 		},
 	}
-
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := cpu.CollectFromGopsutil(context.Background(), tt.infoFn, tt.countsFn)
+			c := &cpu.Darwin{
+				ReadFn: func(context.Context) (*cpu.Info, error) {
+					if tt.fnErr != nil {
+						return nil, tt.fnErr
+					}
+					return tt.info, nil
+				},
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -126,12 +78,4 @@ func (s *CPUDarwinPublicTestSuite) TestCollectFromGopsutil() {
 			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *CPUDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := cpu.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*cpu.Info)
-	s.Require().True(ok)
-	s.NotZero(info.Total)
 }

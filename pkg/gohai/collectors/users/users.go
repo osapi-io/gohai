@@ -18,13 +18,21 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package users collects currently logged-in users.
+// Package users collects currently logged-in user sessions (utmp/who
+// output). NOTE: despite the name, this collector only covers logged-in
+// sessions — it does NOT enumerate /etc/passwd. Ohai splits this into
+// two plugins (passwd.rb for account enumeration, linux/sessions.rb
+// for loginctl). A future gohai `passwd` collector will fill the
+// enumeration gap.
 package users
 
 import (
 	"context"
 
+	"github.com/shirou/gopsutil/v4/host"
+
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds the set of logged-in sessions.
@@ -40,32 +48,47 @@ type Session struct {
 	Started  uint64 `json:"started,omitempty"` // unix timestamp
 }
 
-// Collector implements the collector.Collector interface.
-type Collector struct{}
-
-// New returns a new users Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every users variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "users".
-func (c *Collector) Name() string {
-	return "users"
+type base struct{}
+
+func (base) Name() string           { return "users" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the users variant for the host OS.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// Tier returns TierCore.
-func (c *Collector) Tier() collector.Tier {
-	return collector.TierCore
-}
+// usersFn is the injection seam for gopsutil's host.UsersWithContext.
+// Kept private so importers don't transitively need gopsutil. Swapped
+// via SetUsersFn.
+var usersFn = host.UsersWithContext
 
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers currently-logged-in-user facts.
-func (c *Collector) Collect(
+// listSessions is the production bridge to gopsutil (which reads
+// utmp on Linux / utmpx on macOS).
+func listSessions(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+) ([]Session, error) {
+	us, err := usersFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Session, 0, len(us))
+	for _, u := range us {
+		out = append(out, Session{
+			User:     u.User,
+			Terminal: u.Terminal,
+			Host:     u.Host,
+			Started:  uint64(u.Started),
+		})
+	}
+	return out, nil
 }

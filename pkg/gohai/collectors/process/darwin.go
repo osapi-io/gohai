@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,69 +20,25 @@
 
 package process
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/process"
-)
+// Darwin collects a process snapshot on macOS via gopsutil.
+type Darwin struct {
+	base
 
-// Snapshot abstracts what we need from a gopsutil process for testability.
-type Snapshot interface {
-	Pid() int32
-	Name() (string, error)
-	Username() (string, error)
-	Cmdline() (string, error)
+	ProcessesFn func(context.Context) ([]Process, error)
 }
 
-// processesFn lists live processes. Errors from gopsutil's Processes()
-// are infrequent in practice; we treat them as an empty list rather than
-// failing the whole collector.
-var processesFn = func(
-	ctx context.Context,
-) ([]Snapshot, error) {
-	ps, _ := process.ProcessesWithContext(ctx)
-	out := make([]Snapshot, 0, len(ps))
-	for _, p := range ps {
-		out = append(out, realSnap{p: p})
-	}
-	return out, nil
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{ProcessesFn: listProcesses}
 }
 
-type realSnap struct{ p *process.Process }
-
-func (r realSnap) Pid() int32                { return r.p.Pid }
-func (r realSnap) Name() (string, error)     { return r.p.Name() }
-func (r realSnap) Username() (string, error) { return r.p.Username() }
-func (r realSnap) Cmdline() (string, error)  { return r.p.Cmdline() }
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, processesFn)
-}
-
-func collectFromGopsutil(
-	ctx context.Context,
-	fn func(context.Context) ([]Snapshot, error),
-) (any, error) {
-	ps, err := fn(ctx)
+// Collect returns a process snapshot.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	procs, err := d.ProcessesFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("process.Processes: %w", err)
-	}
-	procs := make([]Process, 0, len(ps))
-	for _, p := range ps {
-		entry := Process{PID: p.Pid()}
-		if n, err := p.Name(); err == nil {
-			entry.Name = n
-		}
-		if u, err := p.Username(); err == nil {
-			entry.Username = u
-		}
-		if c, err := p.Cmdline(); err == nil {
-			entry.Cmdline = c
-		}
-		procs = append(procs, entry)
+		return nil, err
 	}
 	return &Info{Count: len(procs), Processes: procs}, nil
 }

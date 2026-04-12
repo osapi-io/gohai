@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,25 +23,14 @@ package process_test
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 
+	gpprocess "github.com/shirou/gopsutil/v4/process"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 )
-
-type fakeSnap struct {
-	pid             int32
-	name, user, cmd string
-	nameErr         error
-	userErr         error
-	cmdErr          error
-}
-
-func (f fakeSnap) Pid() int32                { return f.pid }
-func (f fakeSnap) Name() (string, error)     { return f.name, f.nameErr }
-func (f fakeSnap) Username() (string, error) { return f.user, f.userErr }
-func (f fakeSnap) Cmdline() (string, error)  { return f.cmd, f.cmdErr }
 
 type ProcessLinuxPublicTestSuite struct {
 	suite.Suite
@@ -53,37 +40,64 @@ func TestProcessLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ProcessLinuxPublicTestSuite))
 }
 
-func (s *ProcessLinuxPublicTestSuite) TestCollectFromGopsutil() {
-	ok := func(_ context.Context) ([]process.Snapshot, error) {
-		return []process.Snapshot{
-			fakeSnap{pid: 1, name: "init", user: "root", cmd: "/sbin/init"},
-			fakeSnap{
-				pid:     42,
-				name:    "",
-				user:    "",
-				cmd:     "",
-				nameErr: errors.New("denied"),
-				userErr: errors.New("denied"),
-				cmdErr:  errors.New("denied"),
-			},
-		}, nil
-	}
-	fail := func(_ context.Context) ([]process.Snapshot, error) {
-		return nil, errors.New("boom")
-	}
-
+func (s *ProcessLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		fn      func(context.Context) ([]process.Snapshot, error)
+		procs   []process.Process
+		fnErr   error
 		wantErr bool
-		wantLen int
+		want    process.Info
 	}{
-		{"happy path with permission-denied second process", ok, false, 2},
-		{"error from list", fail, true, 0},
+		{
+			name: "snapshot with populated processes",
+			procs: []process.Process{
+				{
+					PID:       1,
+					Name:      "systemd",
+					Username:  "root",
+					CmdLine:   "/sbin/init",
+					State:     "S",
+					StartTime: 1_700_000_000,
+				},
+				{PID: 1247, Name: "nginx", Username: "www-data"},
+			},
+			want: process.Info{
+				Count: 2,
+				Processes: []process.Process{
+					{
+						PID:       1,
+						Name:      "systemd",
+						Username:  "root",
+						CmdLine:   "/sbin/init",
+						State:     "S",
+						StartTime: 1_700_000_000,
+					},
+					{PID: 1247, Name: "nginx", Username: "www-data"},
+				},
+			},
+		},
+		{
+			name:  "empty process list",
+			procs: []process.Process{},
+			want:  process.Info{Count: 0, Processes: []process.Process{}},
+		},
+		{
+			name:    "processes error propagated",
+			fnErr:   errors.New("boom"),
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := process.CollectFromGopsutil(context.Background(), tt.fn)
+			c := &process.Linux{
+				ProcessesFn: func(context.Context) ([]process.Process, error) {
+					if tt.fnErr != nil {
+						return nil, tt.fnErr
+					}
+					return tt.procs, nil
+				},
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -91,19 +105,47 @@ func (s *ProcessLinuxPublicTestSuite) TestCollectFromGopsutil() {
 			s.Require().NoError(err)
 			info, ok := got.(*process.Info)
 			s.Require().True(ok)
-			s.Equal(tt.wantLen, info.Count)
-			s.Len(info.Processes, tt.wantLen)
-			if tt.wantLen == 2 {
-				s.Equal("init", info.Processes[0].Name)
-				s.Empty(info.Processes[1].Name) // permission-denied left empty
-			}
+			s.Equal(tt.want, *info)
 		})
 	}
 }
 
-func (s *ProcessLinuxPublicTestSuite) TestCollectDefault() {
-	got, err := process.Collect(context.Background())
-	s.Require().NoError(err)
-	_, ok := got.(*process.Info)
-	s.True(ok)
+func (s *ProcessLinuxPublicTestSuite) TestListProcesses() {
+	// NewProcess with our own PID yields a valid gopsutil Process whose
+	// field readers succeed — exercises the success branch of
+	// snapshotFromGopsutil.
+	ownPID := int32(os.Getpid())
+	tests := []struct {
+		name    string
+		fn      func(context.Context) ([]*gpprocess.Process, error)
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name: "success wraps gopsutil processes",
+			fn: func(context.Context) ([]*gpprocess.Process, error) {
+				p, _ := gpprocess.NewProcess(ownPID)
+				return []*gpprocess.Process{p}, nil
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "gopsutil error wrapped and returned",
+			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("processes failed") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := process.SetProcessesFn(tt.fn)
+			defer restore()
+			got, err := process.ListProcesses(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Len(got, tt.wantLen)
+		})
+	}
 }

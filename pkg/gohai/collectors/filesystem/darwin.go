@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,46 +20,26 @@
 
 package filesystem
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/disk"
-)
+// Darwin collects mounted filesystem data on macOS via gopsutil
+// (which uses the BSD getfsstat syscall).
+type Darwin struct {
+	base
 
-var (
-	partitionsFn = disk.PartitionsWithContext
-	usageFn      = disk.UsageWithContext
-)
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, partitionsFn, usageFn)
+	MountsFn func(context.Context) ([]Mount, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	partFn func(context.Context, bool) ([]disk.PartitionStat, error),
-	usageFnArg func(context.Context, string) (*disk.UsageStat, error),
-) (any, error) {
-	parts, err := partFn(ctx, false)
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{MountsFn: listMounts}
+}
+
+// Collect returns filesystem Info.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	mounts, err := d.MountsFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("disk.Partitions: %w", err)
-	}
-	mounts := make([]Mount, 0, len(parts))
-	for _, p := range parts {
-		m := Mount{Device: p.Device, Mountpoint: p.Mountpoint, Fstype: p.Fstype, Opts: p.Opts}
-		if u, uerr := usageFnArg(ctx, p.Mountpoint); uerr == nil && u != nil {
-			m.Total = u.Total
-			m.Used = u.Used
-			m.Free = u.Free
-			m.UsedPercent = u.UsedPercent
-			m.InodesTotal = u.InodesTotal
-			m.InodesUsed = u.InodesUsed
-			m.InodesFree = u.InodesFree
-		}
-		mounts = append(mounts, m)
+		return nil, err
 	}
 	return &Info{Mounts: mounts}, nil
 }

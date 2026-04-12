@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,31 +20,24 @@
 
 package virtualization
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
+// Darwin detects virtualization on macOS via gopsutil. On darwin
+// gopsutil's coverage is thinner than Linux (no VirtualBox/Parallels
+// detection) — a follow-up could extend with sysctl kern.hv_vmm_present
+// + ioreg probes matching Ohai's darwin handler.
+type Darwin struct {
+	base
 
-var hostInfoFn = host.InfoWithContext
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn)
+	DetectFn func(context.Context) (*Info, error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
-	}
-	return &Info{
-		System: info.VirtualizationSystem,
-		Role:   info.VirtualizationRole,
-	}, nil
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{DetectFn: detect}
+}
+
+// Collect returns virtualization Info.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	return d.DetectFn(ctx)
 }

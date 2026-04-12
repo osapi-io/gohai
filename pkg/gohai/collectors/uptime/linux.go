@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,30 +22,63 @@ package uptime
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/shirou/gopsutil/v4/host"
+	"os"
+	"strconv"
+	"strings"
 )
 
-var hostInfoFn = host.InfoWithContext
+// procUptimePath is /proc/uptime. Two fields: uptime seconds and
+// aggregate idle seconds across all CPUs.
+const procUptimePath = "/proc/uptime"
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn)
+// Linux collects uptime + idle on Linux. BaseFn is typed in our *Info
+// so importers don't need gopsutil; ReadFileFn is stdlib.
+type Linux struct {
+	base
+
+	BaseFn     func(context.Context) (*Info, error)
+	ReadFileFn func(string) ([]byte, error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+// NewLinux returns a Linux variant wired to the production bridges.
+func NewLinux() *Linux {
+	return &Linux{
+		BaseFn:     readBase,
+		ReadFileFn: os.ReadFile,
 	}
-	return &Info{
-		Seconds:  info.Uptime,
-		BootTime: info.BootTime,
-		Human:    HumanDuration(info.Uptime),
-	}, nil
+}
+
+// Collect returns uptime facts. Uses BaseFn for Seconds/BootTime and
+// layers idle on top via /proc/uptime.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	out, err := l.BaseFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if idle, ok := readIdleSeconds(l.ReadFileFn); ok {
+		out.IdleSeconds = idle
+		out.IdleHuman = HumanDuration(idle)
+	}
+	return out, nil
+}
+
+// readIdleSeconds parses the second field of /proc/uptime (aggregate
+// idle seconds across all CPU cores). Returns (0, false) on any failure
+// — idle is best-effort.
+func readIdleSeconds(
+	read func(string) ([]byte, error),
+) (uint64, bool) {
+	b, err := read(procUptimePath)
+	if err != nil {
+		return 0, false
+	}
+	fields := strings.Fields(string(b))
+	if len(fields) < 2 {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(fields[1], 64)
+	if err != nil || f < 0 {
+		return 0, false
+	}
+	return uint64(f), true
 }

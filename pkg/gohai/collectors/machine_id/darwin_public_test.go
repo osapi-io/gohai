@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
@@ -41,29 +38,33 @@ func TestMachineIDDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(MachineIDDarwinPublicTestSuite))
 }
 
-func (s *MachineIDDarwinPublicTestSuite) TestCollectWithHost() {
+func (s *MachineIDDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
-		wantErr bool
-		want    machineid.Info
+		name     string
+		hostIDFn func(context.Context) (string, error)
+		wantErr  bool
+		wantID   string
 	}{
 		{
-			name: "success",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{HostID: "XYZ-789"}, nil
-			},
-			want: machineid.Info{ID: "XYZ-789"},
+			name:     "gopsutil returns IOPlatformUUID",
+			hostIDFn: func(context.Context) (string, error) { return "iokit-uuid-1234", nil },
+			wantID:   "iokit-uuid-1234",
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			name:     "empty ID yields empty ID (no error)",
+			hostIDFn: func(context.Context) (string, error) { return "", nil },
+			wantID:   "",
+		},
+		{
+			name:     "gopsutil error wrapped and returned",
+			hostIDFn: func(context.Context) (string, error) { return "", errors.New("boom") },
+			wantErr:  true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := machineid.CollectWithHost(context.Background(), tt.stub)
+			c := &machineid.Darwin{HostIDFn: tt.hostIDFn}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -71,14 +72,7 @@ func (s *MachineIDDarwinPublicTestSuite) TestCollectWithHost() {
 			s.Require().NoError(err)
 			info, ok := got.(*machineid.Info)
 			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			s.Equal(tt.wantID, info.ID)
 		})
 	}
-}
-
-func (s *MachineIDDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := machineid.Collect(context.Background())
-	s.Require().NoError(err)
-	_, ok := got.(*machineid.Info)
-	s.True(ok)
 }

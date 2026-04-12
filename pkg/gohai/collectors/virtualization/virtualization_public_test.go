@@ -22,12 +22,19 @@ package virtualization_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
+)
+
+var (
+	_ collector.Collector = (*virtualization.Linux)(nil)
+	_ collector.Collector = (*virtualization.Darwin)(nil)
 )
 
 type VirtualizationPublicTestSuite struct {
@@ -39,23 +46,94 @@ func TestVirtualizationPublicTestSuite(t *testing.T) {
 }
 
 func (s *VirtualizationPublicTestSuite) TestNew() {
-	c := virtualization.New()
-	s.Equal("virtualization", c.Name())
-	s.Equal(collector.TierExtended, c.Tier())
-	s.Empty(c.Dependencies())
-}
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
 
-func (s *VirtualizationPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = virtualization.New()
-}
-
-func (s *VirtualizationPublicTestSuite) TestCollect() {
-	c := virtualization.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	_, ok := got.(*virtualization.Info)
-	s.True(ok)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			c := virtualization.New()
+			s.Equal("virtualization", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := c.(*virtualization.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := c.(*virtualization.Linux)
+				s.True(ok)
+			}
+		})
+	}
+}
+
+// TestCollectOnHost exercises the real gopsutil-backed detect bridge.
+// gopsutil's Virtualization returns "not implemented yet" on some
+// platforms (notably darwin); both behaviors are acceptable — we only
+// assert the bridge doesn't panic and returns a valid shape on success.
+func (s *VirtualizationPublicTestSuite) TestCollectOnHost() {
+	tests := []struct{ name string }{
+		{name: "host invokes bridge cleanly (nil or valid info)"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := virtualization.NewLinux()
+			got, err := c.Collect(context.Background())
+			if err != nil {
+				return // platform-specific "not implemented" is acceptable
+			}
+			info, ok := got.(*virtualization.Info)
+			s.Require().True(ok)
+			s.NotNil(info)
+		})
+	}
+}
+
+func (s *VirtualizationPublicTestSuite) TestDetect() {
+	tests := []struct {
+		name     string
+		fn       func(context.Context) (string, string, error)
+		wantErr  bool
+		wantInfo *virtualization.Info
+	}{
+		{
+			name: "success returns mapped Info",
+			fn: func(context.Context) (string, string, error) {
+				return "kvm", "guest", nil
+			},
+			wantInfo: &virtualization.Info{System: "kvm", Role: "guest"},
+		},
+		{
+			name: "error wrapped and returned",
+			fn: func(context.Context) (string, string, error) {
+				return "", "", errors.New("boom")
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			restore := virtualization.SetHostVirtualization(tt.fn)
+			defer restore()
+			info, err := virtualization.Detect(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.wantInfo, info)
+		})
+	}
 }

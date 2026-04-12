@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
@@ -41,33 +38,30 @@ func TestUptimeDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(UptimeDarwinPublicTestSuite))
 }
 
-func (s *UptimeDarwinPublicTestSuite) TestCollectWithHost() {
+func (s *UptimeDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
+		baseFn  func(context.Context) (*uptime.Info, error)
 		wantErr bool
 		want    uptime.Info
 	}{
 		{
-			name: "3 hours up",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{Uptime: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000}, nil
+			name: "uptime returned",
+			baseFn: func(context.Context) (*uptime.Info, error) {
+				return &uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"}, nil
 			},
-			want: uptime.Info{
-				Seconds:  3*3600 + 12*60 + 5,
-				BootTime: 1_700_000_000,
-				Human:    "3h 12m 5s",
-			},
+			want: uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name:    "BaseFn error propagated",
+			baseFn:  func(context.Context) (*uptime.Info, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := uptime.CollectWithHost(context.Background(), tt.stub)
+			c := &uptime.Darwin{BaseFn: tt.baseFn}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -78,12 +72,4 @@ func (s *UptimeDarwinPublicTestSuite) TestCollectWithHost() {
 			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *UptimeDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := uptime.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*uptime.Info)
-	s.Require().True(ok)
-	s.NotZero(info.Seconds + info.BootTime)
 }

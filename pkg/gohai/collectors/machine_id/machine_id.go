@@ -18,46 +18,64 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package machineid collects the unique machine identifier.
+// Package machineid reports the host's stable machine identifier.
 package machineid
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/shirou/gopsutil/v4/host"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds the machine identifier.
-type Info struct {
-	ID string `json:"id"` // machine ID (e.g., from /etc/machine-id or IOPlatformUUID)
-}
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+// Kept private so importers don't transitively need gopsutil. Swapped
+// via SetHostInfoFn (export_test.go).
+var hostInfoFn = host.InfoWithContext
 
-// Collector implements the collector.Collector interface for machine_id.
-type Collector struct{}
-
-// New returns a new machine_id Collector.
-func New() *Collector {
-	return &Collector{}
-}
-
-// Name returns "machine_id".
-func (c *Collector) Name() string {
-	return "machine_id"
-}
-
-// Tier returns TierCore.
-func (c *Collector) Tier() collector.Tier {
-	return collector.TierCore
-}
-
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers the machine ID.
-func (c *Collector) Collect(
+// readHostID is the production bridge. Wraps the private gopsutil call
+// and returns just the HostID string — callers never see gopsutil
+// types.
+func readHostID(
 	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+) (string, error) {
+	info, err := hostInfoFn(ctx)
+	if err != nil {
+		return "", fmt.Errorf("host.Info: %w", err)
+	}
+	if info == nil {
+		return "", nil
+	}
+	return info.HostID, nil
+}
+
+// Info holds the machine ID.
+type Info struct {
+	ID string `json:"id"` // stable host identifier — survives reboots
+}
+
+// Collector is the public interface every machine_id variant satisfies.
+type Collector interface {
+	collector.Collector
+}
+
+type base struct{}
+
+func (base) Name() string           { return "machine_id" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the machine_id variant appropriate for the detected host.
+// Linux and Darwin have substantially different sources of truth, so
+// each gets its own struct.
+func New() Collector {
+	switch platform.Detect() {
+	case "darwin":
+		return NewDarwin()
+	default:
+		return NewLinux()
+	}
 }

@@ -29,13 +29,23 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
+	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
+	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
@@ -53,12 +63,22 @@ type Facts struct {
 	Virtualization *virtualization.Info `json:"virtualization,omitempty"`
 	MachineID      *machineid.Info      `json:"machine_id,omitempty"`
 	CPU            *cpu.Info            `json:"cpu,omitempty"`
+	Load           *load.Info           `json:"load,omitempty"`
 	Memory         *memory.Info         `json:"memory,omitempty"`
 	Filesystem     *filesystem.Info     `json:"filesystem,omitempty"`
 	Disk           *disk.Info           `json:"disk,omitempty"`
 	Network        *network.Info        `json:"network,omitempty"`
 	Process        *process.Info        `json:"process,omitempty"`
 	Users          *users.Info          `json:"users,omitempty"`
+	Timezone       *timezone.Info       `json:"timezone,omitempty"`
+	RootGroup      *rootgroup.Info      `json:"root_group,omitempty"`
+	Shells         *shells.Info         `json:"shells,omitempty"`
+	Fips           *fips.Info           `json:"fips,omitempty"`
+	OSRelease      *osrelease.Info      `json:"os_release,omitempty"`
+	LSB            *lsb.Info            `json:"lsb,omitempty"`
+	Init           *initd.Info          `json:"init,omitempty"`
+	Shard          *shard.Info          `json:"shard,omitempty"`
+	PackageMgr     *packagemgr.Info     `json:"package_mgr,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -120,6 +140,9 @@ func (f *Facts) countPopulated() int {
 	if f.CPU != nil {
 		n++
 	}
+	if f.Load != nil {
+		n++
+	}
 	if f.Memory != nil {
 		n++
 	}
@@ -136,6 +159,33 @@ func (f *Facts) countPopulated() int {
 		n++
 	}
 	if f.Users != nil {
+		n++
+	}
+	if f.Timezone != nil {
+		n++
+	}
+	if f.RootGroup != nil {
+		n++
+	}
+	if f.Shells != nil {
+		n++
+	}
+	if f.Fips != nil {
+		n++
+	}
+	if f.OSRelease != nil {
+		n++
+	}
+	if f.LSB != nil {
+		n++
+	}
+	if f.Init != nil {
+		n++
+	}
+	if f.Shard != nil {
+		n++
+	}
+	if f.PackageMgr != nil {
 		n++
 	}
 	return n
@@ -177,6 +227,10 @@ func (f *Facts) set(
 		if v, ok := result.(*cpu.Info); ok {
 			f.CPU = v
 		}
+	case "load":
+		if v, ok := result.(*load.Info); ok {
+			f.Load = v
+		}
 	case "memory":
 		if v, ok := result.(*memory.Info); ok {
 			f.Memory = v
@@ -200,6 +254,42 @@ func (f *Facts) set(
 	case "users":
 		if v, ok := result.(*users.Info); ok {
 			f.Users = v
+		}
+	case "timezone":
+		if v, ok := result.(*timezone.Info); ok {
+			f.Timezone = v
+		}
+	case "root_group":
+		if v, ok := result.(*rootgroup.Info); ok {
+			f.RootGroup = v
+		}
+	case "shells":
+		if v, ok := result.(*shells.Info); ok {
+			f.Shells = v
+		}
+	case "fips":
+		if v, ok := result.(*fips.Info); ok {
+			f.Fips = v
+		}
+	case "os_release":
+		if v, ok := result.(*osrelease.Info); ok {
+			f.OSRelease = v
+		}
+	case "lsb":
+		if v, ok := result.(*lsb.Info); ok {
+			f.LSB = v
+		}
+	case "init":
+		if v, ok := result.(*initd.Info); ok {
+			f.Init = v
+		}
+	case "shard":
+		if v, ok := result.(*shard.Info); ok {
+			f.Shard = v
+		}
+	case "package_mgr":
+		if v, ok := result.(*packagemgr.Info); ok {
+			f.PackageMgr = v
 		}
 	}
 }

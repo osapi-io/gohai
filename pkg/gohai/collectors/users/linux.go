@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,37 +20,25 @@
 
 package users
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
+// Linux collects logged-in sessions on Linux via gopsutil (utmp).
+type Linux struct {
+	base
 
-var usersFn = host.UsersWithContext
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectFromGopsutil(ctx, usersFn)
+	SessionsFn func(context.Context) ([]Session, error)
 }
 
-func collectFromGopsutil(
-	ctx context.Context,
-	fn func(context.Context) ([]host.UserStat, error),
-) (any, error) {
-	us, err := fn(ctx)
+// NewLinux returns a Linux variant wired to gopsutil.
+func NewLinux() *Linux {
+	return &Linux{SessionsFn: listSessions}
+}
+
+// Collect returns logged-in session Info.
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	ss, err := l.SessionsFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("host.Users: %w", err)
+		return nil, err
 	}
-	sessions := make([]Session, 0, len(us))
-	for _, u := range us {
-		sessions = append(sessions, Session{
-			User:     u.User,
-			Terminal: u.Terminal,
-			Host:     u.Host,
-			Started:  uint64(u.Started),
-		})
-	}
-	return &Info{LoggedIn: sessions}, nil
+	return &Info{LoggedIn: ss}, nil
 }

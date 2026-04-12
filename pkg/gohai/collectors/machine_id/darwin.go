@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -22,28 +20,30 @@
 
 package machineid
 
-import (
-	"context"
-	"fmt"
+import "context"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
+// Darwin resolves the machine ID on macOS. Wraps readHostID
+// (gopsutil.host.Info internally, which on darwin reads
+// `IOPlatformUUID` from IOKit — the correct, stable hardware
+// identifier Apple intends for this purpose). HostIDFn returns our
+// `string` so importers don't need gopsutil in their module graph.
+type Darwin struct {
+	base
 
-var hostInfoFn = host.InfoWithContext
-
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn)
+	HostIDFn func(context.Context) (string, error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{HostIDFn: readHostID}
+}
+
+// Collect returns the machine ID. gopsutil's darwin path is
+// correct — no extension needed.
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	id, err := d.HostIDFn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+		return nil, err
 	}
-	return &Info{ID: info.HostID}, nil
+	return &Info{ID: id}, nil
 }

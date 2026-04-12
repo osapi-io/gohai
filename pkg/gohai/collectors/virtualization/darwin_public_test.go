@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -27,51 +25,49 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 )
 
-type VirtDarwinPublicTestSuite struct {
+type VirtualizationDarwinPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestVirtDarwinPublicTestSuite(t *testing.T) {
-	suite.Run(t, new(VirtDarwinPublicTestSuite))
+func TestVirtualizationDarwinPublicTestSuite(t *testing.T) {
+	suite.Run(t, new(VirtualizationDarwinPublicTestSuite))
 }
 
-func (s *VirtDarwinPublicTestSuite) TestCollectWithHost() {
+func (s *VirtualizationDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
+		info    *virtualization.Info
+		fnErr   error
 		wantErr bool
 		want    virtualization.Info
 	}{
 		{
-			name: "docker guest",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					VirtualizationSystem: "docker",
-					VirtualizationRole:   "guest",
-				}, nil
-			},
-			want: virtualization.Info{System: "docker", Role: "guest"},
-		},
-		{
-			name: "bare metal",
-			stub: func(_ context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
+			name: "bare metal mac",
+			info: &virtualization.Info{},
 			want: virtualization.Info{},
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name:    "gopsutil error wrapped and returned",
+			fnErr:   errors.New("virt detect error"),
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := virtualization.CollectWithHost(context.Background(), tt.stub)
+			c := &virtualization.Darwin{
+				DetectFn: func(context.Context) (*virtualization.Info, error) {
+					if tt.fnErr != nil {
+						return nil, tt.fnErr
+					}
+					return tt.info, nil
+				},
+			}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -82,11 +78,4 @@ func (s *VirtDarwinPublicTestSuite) TestCollectWithHost() {
 			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *VirtDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := virtualization.Collect(context.Background())
-	s.Require().NoError(err)
-	_, ok := got.(*virtualization.Info)
-	s.True(ok)
 }
