@@ -50,6 +50,25 @@ type erroringReader struct{}
 
 func (erroringReader) Read([]byte) (int, error) { return 0, errors.New("read fail") }
 
+// fakeFS builds an open function that returns per-path content. A path
+// set to nil is treated as not-existing; a path mapped to a sentinel
+// error returns that error instead.
+func fakeFS(
+	contents map[string]string,
+	errs map[string]error,
+) func(string) (io.ReadCloser, error) {
+	return func(path string) (io.ReadCloser, error) {
+		if e, ok := errs[path]; ok {
+			return nil, e
+		}
+		c, ok := contents[path]
+		if !ok {
+			return nil, os.ErrNotExist
+		}
+		return stringReadCloser{strings.NewReader(c)}, nil
+	}
+}
+
 func (s *FipsLinuxPublicTestSuite) TestParseFips() {
 	tests := []struct {
 		name    string
@@ -65,13 +84,13 @@ func (s *FipsLinuxPublicTestSuite) TestParseFips() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info, err := fips.ParseFips(strings.NewReader(tt.content))
+			kernel, err := fips.ParseFips(strings.NewReader(tt.content))
 			if tt.wantErr {
 				s.Error(err)
 				return
 			}
 			s.Require().NoError(err)
-			s.Equal(tt.want, info.Kernel.Enabled)
+			s.Equal(tt.want, kernel.Enabled)
 		})
 	}
 }
@@ -81,49 +100,111 @@ func (s *FipsLinuxPublicTestSuite) TestParseFipsReadError() {
 	s.Error(err)
 }
 
+func (s *FipsLinuxPublicTestSuite) TestParsePolicy() {
+	tests := []struct {
+		name              string
+		content           string
+		wantNil           bool
+		wantName          string
+		wantFIPSEffective bool
+	}{
+		{"FIPS policy", "FIPS\n", false, "FIPS", true},
+		{"FIPS with subpolicy", "FIPS:OSPP\n", false, "FIPS:OSPP", true},
+		{"DEFAULT policy", "DEFAULT\n", false, "DEFAULT", false},
+		{"DEFAULT with subpolicy", "DEFAULT:NO-SHA1\n", false, "DEFAULT:NO-SHA1", false},
+		{"skips comments", "# set by update-crypto-policies\nFIPS\n", false, "FIPS", true},
+		{"empty file", "", true, "", false},
+		{"only comments", "# comment only\n", true, "", false},
+		{"blank lines before value", "\n\n  FIPS\n", false, "FIPS", true},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			p := fips.ParsePolicy(tt.content)
+			if tt.wantNil {
+				s.Nil(p)
+				return
+			}
+			s.Require().NotNil(p)
+			s.Equal(tt.wantName, p.Name)
+			s.Equal(tt.wantFIPSEffective, p.FIPSEffective)
+		})
+	}
+}
+
 func (s *FipsLinuxPublicTestSuite) TestCollectFromFunc() {
 	tests := []struct {
-		name    string
-		open    func(string) (io.ReadCloser, error)
-		wantErr bool
-		want    bool
+		name              string
+		contents          map[string]string
+		errs              map[string]error
+		wantErr           bool
+		wantEnabled       bool
+		wantPolicyNil     bool
+		wantPolicyName    string
+		wantFIPSEffective bool
 	}{
 		{
-			name: "enabled",
-			open: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{strings.NewReader("1\n")}, nil
-			},
-			want: true,
+			name:          "kernel enabled, no crypto-policies file",
+			contents:      map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"},
+			wantEnabled:   true,
+			wantPolicyNil: true,
 		},
 		{
-			name: "disabled",
-			open: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{strings.NewReader("0\n")}, nil
-			},
-			want: false,
+			name:              "kernel enabled + FIPS policy",
+			contents:          map[string]string{"/proc/sys/crypto/fips_enabled": "1\n", "/etc/crypto-policies/config": "FIPS\n"},
+			wantEnabled:       true,
+			wantPolicyName:    "FIPS",
+			wantFIPSEffective: true,
 		},
 		{
-			name: "file missing reports disabled",
-			open: func(string) (io.ReadCloser, error) {
-				return nil, os.ErrNotExist
-			},
-			want: false,
+			name:              "kernel enabled but policy switched to DEFAULT",
+			contents:          map[string]string{"/proc/sys/crypto/fips_enabled": "1\n", "/etc/crypto-policies/config": "DEFAULT\n"},
+			wantEnabled:       true,
+			wantPolicyName:    "DEFAULT",
+			wantFIPSEffective: false,
 		},
 		{
-			name:    "other open error propagated",
-			open:    func(string) (io.ReadCloser, error) { return nil, errors.New("permission denied") },
-			wantErr: true,
+			name:          "kernel disabled, no policy file",
+			contents:      map[string]string{"/proc/sys/crypto/fips_enabled": "0\n"},
+			wantEnabled:   false,
+			wantPolicyNil: true,
+		},
+		{
+			name:          "kernel file missing treated as disabled",
+			contents:      map[string]string{},
+			wantEnabled:   false,
+			wantPolicyNil: true,
+		},
+		{
+			name:          "policy read error ignored",
+			contents:      map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"},
+			errs:          map[string]error{"/etc/crypto-policies/config": errors.New("perm")},
+			wantEnabled:   true,
+			wantPolicyNil: true,
+		},
+		{
+			name:          "kernel file permission denied propagated",
+			contents:      map[string]string{},
+			errs:          map[string]error{"/proc/sys/crypto/fips_enabled": errors.New("permission denied")},
+			wantErr:       true,
+			wantPolicyNil: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info, err := fips.CollectFromFunc(tt.open)
+			info, err := fips.CollectFromFunc(fakeFS(tt.contents, tt.errs))
 			if tt.wantErr {
 				s.Error(err)
 				return
 			}
 			s.Require().NoError(err)
-			s.Equal(tt.want, info.Kernel.Enabled)
+			s.Equal(tt.wantEnabled, info.Kernel.Enabled)
+			if tt.wantPolicyNil {
+				s.Nil(info.Policy)
+				return
+			}
+			s.Require().NotNil(info.Policy)
+			s.Equal(tt.wantPolicyName, info.Policy.Name)
+			s.Equal(tt.wantFIPSEffective, info.Policy.FIPSEffective)
 		})
 	}
 }

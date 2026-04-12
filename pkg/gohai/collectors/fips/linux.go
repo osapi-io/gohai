@@ -31,7 +31,10 @@ import (
 	"strings"
 )
 
-const fipsPath = "/proc/sys/crypto/fips_enabled"
+const (
+	fipsPath   = "/proc/sys/crypto/fips_enabled"
+	policyPath = "/etc/crypto-policies/config"
+)
 
 var openFn = func(path string) (io.ReadCloser, error) {
 	return os.Open(path)
@@ -46,12 +49,28 @@ func collect(
 func collectFromFunc(
 	open func(string) (io.ReadCloser, error),
 ) (*Info, error) {
+	info := &Info{}
+
+	kernel, err := readKernelFlag(open)
+	if err != nil {
+		return nil, err
+	}
+	info.Kernel = kernel
+
+	info.Policy = readCryptoPolicy(open)
+
+	return info, nil
+}
+
+func readKernelFlag(
+	open func(string) (io.ReadCloser, error),
+) (Kernel, error) {
 	rc, err := open(fipsPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return &Info{}, nil
+			return Kernel{}, nil
 		}
-		return nil, fmt.Errorf("open %s: %w", fipsPath, err)
+		return Kernel{}, fmt.Errorf("open %s: %w", fipsPath, err)
 	}
 	defer func() { _ = rc.Close() }()
 	return parseFips(rc)
@@ -59,10 +78,46 @@ func collectFromFunc(
 
 func parseFips(
 	r io.Reader,
-) (*Info, error) {
+) (Kernel, error) {
 	b, err := io.ReadAll(r)
 	if err != nil {
-		return nil, fmt.Errorf("read fips: %w", err)
+		return Kernel{}, fmt.Errorf("read fips: %w", err)
 	}
-	return &Info{Kernel: Kernel{Enabled: strings.TrimSpace(string(b)) == "1"}}, nil
+	return Kernel{Enabled: strings.TrimSpace(string(b)) == "1"}, nil
+}
+
+// readCryptoPolicy returns nil on hosts without /etc/crypto-policies
+// (Debian/Ubuntu, older RHEL, Alpine, etc.). A missing file is not an
+// error — it just means the distro doesn't ship the crypto-policies
+// framework. Read errors other than not-exist also return nil; we'd
+// rather omit the field than fail the whole collector.
+func readCryptoPolicy(
+	open func(string) (io.ReadCloser, error),
+) *Policy {
+	rc, err := open(policyPath)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = rc.Close() }()
+	b, err := io.ReadAll(rc)
+	if err != nil {
+		return nil
+	}
+	return parsePolicy(string(b))
+}
+
+func parsePolicy(
+	raw string,
+) *Policy {
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		return &Policy{
+			Name:          line,
+			FIPSEffective: strings.HasPrefix(line, "FIPS"),
+		}
+	}
+	return nil
 }

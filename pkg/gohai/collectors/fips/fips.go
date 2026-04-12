@@ -28,15 +28,28 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Info holds FIPS mode state. Shape matches Ohai's `fips.kernel.enabled`
-// for JSON compatibility.
+// Info holds FIPS mode state.
 type Info struct {
-	Kernel Kernel `json:"kernel"`
+	Kernel Kernel  `json:"kernel"`
+	Policy *Policy `json:"policy,omitempty"`
 }
 
-// Kernel holds the kernel-level FIPS mode flag.
+// Kernel holds the kernel-level FIPS flag from
+// /proc/sys/crypto/fips_enabled. True means the kernel booted with
+// fips=1. This is the 140-2-era signal Ohai reads indirectly via
+// OpenSSL.fips_mode.
 type Kernel struct {
 	Enabled bool `json:"enabled"`
+}
+
+// Policy holds the user-space crypto policy state, present on hosts
+// with /etc/crypto-policies/config (RHEL 8+, Fedora 30+, CentOS Stream,
+// Amazon Linux 2023). FIPS 140-3 systems can toggle this post-boot
+// without flipping the kernel flag, so kernel.enabled alone can
+// misreport the effective crypto posture.
+type Policy struct {
+	Name          string `json:"name"`           // e.g. "FIPS", "FIPS:OSPP", "DEFAULT"
+	FIPSEffective bool   `json:"fips_effective"` // true if Name starts with "FIPS"
 }
 
 // Collector implements the collector.Collector interface.

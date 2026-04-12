@@ -26,4 +26,5 @@ var (
 	Collect         = collect
 	CollectFromFunc = collectFromFunc
 	ParseFips       = parseFips
+	ParsePolicy     = parsePolicy
 )

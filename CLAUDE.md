@@ -46,13 +46,19 @@ The Collector interface and `Info` struct shape are the contract — whatever
 backing strategy a collector uses, its output must match the typed struct
 and Ohai-compatible JSON shape consumers expect.
 
-### MANDATORY: Cross-reference Ohai before implementing
+### MANDATORY: Cross-reference Ohai's data sources before implementing
 
 Before writing code for a new collector (or modifying an existing one),
-**always read Ohai's corresponding plugin and spec** and shape the output
-to match theirs. Ohai-compatible JSON is an explicit product goal, so the
-JSON field names, nesting, and semantics must line up — don't invent a
-new shape.
+**read Ohai's corresponding plugin and spec** — but the goal is to match
+their **collection approach** (what file/command/library they read, what
+edge cases they handle, how they detect per-distro differences), **not**
+their JSON output shape. Ruby Mash ↔ Go struct translation isn't
+worthwhile to pin byte-for-byte; Go-native JSON shape is fine.
+
+What matters: Ohai has years of accumulated bug fixes and distro-specific
+quirks. Leverage that. If they read `/proc/X` plus fall back to `cmd Y`
+on SUSE, we should too. If they have special handling for Amazon Linux
+vs RHEL, we need to think about it too.
 
 Fetch both files with `gh api`:
 
@@ -61,21 +67,29 @@ gh api repos/chef/ohai/contents/lib/ohai/plugins/<name>.rb --jq .content | base6
 gh api repos/chef/ohai/contents/spec/unit/plugins/<name>_spec.rb --jq .content | base64 -d
 ```
 
-(Filenames occasionally differ — e.g. `root_group` is under `linux/` or
-`darwin/` subdirs. Browse `repos/chef/ohai/contents/lib/ohai/plugins` if
-the direct path 404s.)
+Filenames occasionally differ — many plugins live under OS subdirs
+(`linux/`, `darwin/`, `windows/`). Browse
+`repos/chef/ohai/contents/lib/ohai/plugins` if the direct path 404s.
 
-Record the cross-reference in the collector's doc under a
-**"Ohai parity"** heading:
+Every collector doc **must** carry a standard **"Data Sources"** section
+with this shape:
 
-- Ohai plugin path (link to `chef/ohai` main branch).
-- Output shape diff: identical / we add / we omit / we rename, with a
-  one-line justification for each deviation.
-- Source divergence: if Ohai reads X and we read Y, say why (e.g. avoids
-  a runtime dependency, more portable, faster).
+```md
+## Data Sources
 
-If you find Ohai has coverage we lack (extra fields, OS support, edge
-cases), open a follow-up issue rather than silently dropping it.
+| Platform | What we read | Ohai equivalent | Alignment |
+| --- | --- | --- | --- |
+| Linux   | `/path/or/command` | Ohai plugin + what it reads | equivalent / we deviate because … |
+| macOS   | …                  | …                          | …                                |
+
+**Known gaps:** any edge cases Ohai handles that we don't yet, with a
+one-line plan (add-now or tracked follow-up).
+```
+
+This keeps docs consistent across collectors and makes it obvious at a
+glance whether we're leveraging Ohai's hard-won knowledge or flying
+solo. If Ohai has coverage we lack, either add it in the same PR or open
+a tracked issue — don't silently drop it.
 
 [Reference PR adding this rule: chef/ohai#1754]
 
