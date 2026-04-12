@@ -39,7 +39,7 @@ a human-readable uptime string. Wraps
 ## SDK Usage
 
 ```go
-info := facts.Data["uptime"].(*uptime.Info)
+info := facts.Uptime
 fmt.Println(info.Human)
 ```
 

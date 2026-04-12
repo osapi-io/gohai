@@ -77,7 +77,7 @@ import (
 g, _ := gohai.New(gohai.WithCollectors("platform"))
 facts, _ := g.Collect(context.Background())
 
-info := facts.Data["platform"].(*platform.Info)
+info := facts.Platform
 fmt.Println(info.Name, info.Version) // "ubuntu" "24.04"
 ```
 

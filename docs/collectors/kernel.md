@@ -38,7 +38,7 @@ Identifies the kernel OS name, release version, and architecture. Wraps
 ## SDK Usage
 
 ```go
-info := facts.Data["kernel"].(*kernel.Info)
+info := facts.Kernel
 fmt.Println(info.Version)
 ```
 

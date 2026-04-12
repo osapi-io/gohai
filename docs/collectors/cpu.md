@@ -49,7 +49,7 @@ package.
 ## SDK Usage
 
 ```go
-info := facts.Data["cpu"].(*cpu.Info)
+info := facts.CPU
 fmt.Println(info.Total, "logical CPUs")
 ```
 
