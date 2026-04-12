@@ -20,20 +20,50 @@ rather than run as a standalone agent.
 **We are a wrapper and aggregator, not a re-implementor.** Each collector's
 job is to wrap a well-maintained backing source (Go library, provider SDK, or
 a thin file/command parser) and reshape its output into our typed `Info`
-struct for Ohai-compatible JSON.
+struct.
+
+### Extend upstream, don't replace
+
+**MANDATORY:** When a Go library (gopsutil, ghw, procfs, cloud SDKs) covers
+part of what a collector needs, use it for that part. If the library doesn't
+cover everything we want, add the extension logic **in our collector** on
+top of the library's output. Do not replace the library wholesale just
+because it's missing one piece — you lose years of accumulated bug fixes
+and cross-platform handling that way.
+
+Extension pattern:
+
+```go
+// Wrap the library for what it does well.
+info, err := upstream.Get(ctx)
+if err != nil { return nil, err }
+
+// Layer our extension on top for the gap.
+if shouldAddOurBit(info) {
+    info.OurField = readOurSource()
+}
+```
+
+Only replace the library entirely when its scope genuinely doesn't match
+what the collector is supposed to report (e.g. a library mixes sources in
+a way that produces an ambiguous value, or its output isn't reshapeable
+into the right semantics). When you do replace, justify the decision in
+the collector's Data Sources doc.
 
 **Decision order for each collector:**
 
 1. **Prefer a well-maintained Go library** — saves time, handles edge cases.
    Standard picks: [gopsutil][] (CPU/memory/disk/network/host/process),
    [ghw][] (hardware detail), [procfs][] (raw `/proc`, `/sys`),
-   [go-sysinfo][] (alternative host info).
+   [go-sysinfo][] (alternative host info). **Extend if needed, don't
+   replace.**
 2. **Prefer official provider SDKs** for cloud collectors (aws-sdk-go,
    google.golang.org/cloud, azure-sdk-for-go) or plain `net/http` to IMDS
    endpoints for smaller binaries.
-3. **Composite approach** when needed — combine multiple sources.
+3. **Composite approach** when needed — combine multiple sources (library
+   + our own direct reads for fields the library doesn't expose).
 4. **Roll our own thin parser** when the data is simple (single file or
-   command) and a library would be over-engineering.
+   command) and no library covers the domain.
 5. **Fall back to porting [Ohai's Ruby plugin][ohai-plugins]** when no Go
    library covers the domain. Ohai has solved the edge cases for every major
    OS/distro; our job is translate, not re-discover.
@@ -41,6 +71,100 @@ struct for Ohai-compatible JSON.
 **We learn from, but don't directly import, [node_exporter][]** — their
 collectors are a gold reference for tricky Linux `/proc` and `/sys` parsing
 (Apache-2 licensed). Read, understand, rewrite in our style.
+
+### Cross-platform compilation — no build tags (osapi pattern)
+
+**MANDATORY:** Collector code must compile on every target platform,
+with **no `//go:build` tags anywhere**. This is the pattern OSAPI uses
+in `internal/provider/` — study that code before writing a new
+collector. Result: `go test ./...` on any dev machine compiles and
+runs every collector's tests, coverage is visible cross-platform, and
+CI on linux runners still validates actual linux runtime behavior.
+
+The shape of a collector:
+
+```
+pkg/gohai/collectors/<name>/
+  <name>.go         # Info struct, Collector interface, New() factory
+  linux.go          # type Linux struct {...}; implements Collector
+  darwin.go         # type Darwin struct {...}; implements Collector
+  debian.go         # (only when debian diverges from generic linux)
+  <name>_public_test.go
+  linux_public_test.go
+  darwin_public_test.go
+```
+
+**Per-OS struct pattern:**
+
+```go
+// linux.go — NO build tag
+package machineid
+
+type Linux struct {
+    ReadFileFn func(string) ([]byte, error) // injectable for tests
+}
+
+func NewLinux() *Linux {
+    return &Linux{ReadFileFn: os.ReadFile}
+}
+
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+    // Linux-specific logic. Reads /proc paths, etc.
+    // On a non-linux host these reads fail gracefully (ErrNotExist)
+    // but the code still compiles — which is what matters.
+}
+```
+
+```go
+// darwin.go — NO build tag
+package machineid
+
+type Darwin struct {
+    HostInfoFn func(context.Context) (*host.InfoStat, error)
+}
+
+func NewDarwin() *Darwin {
+    return &Darwin{HostInfoFn: host.InfoWithContext}
+}
+
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+    // Darwin-specific logic.
+}
+```
+
+**Single-entry factory** in `<name>.go` dispatches on
+`platform.Detect()`:
+
+```go
+func New() collector.Collector {
+    switch platform.Detect() {
+    case "debian":
+        return NewDebian()
+    case "darwin":
+        return NewDarwin()
+    default:
+        return NewLinux()
+    }
+}
+```
+
+`platform.Detect()` (add a new `internal/platform` package mirroring
+OSAPI's `pkg/sdk/platform`) wraps gopsutil's `host.Info` and returns
+`"debian"` / `"darwin"` / empty-string (generic linux).
+
+**Key rules:**
+
+- Every struct must compile on every platform. Use cross-platform APIs
+  only: stdlib, gopsutil, `golang.org/x/sys/unix` (per-OS layouts but
+  compiles everywhere), ghw, cloud SDKs. No raw `syscall.Utsname` etc.
+- Missing OS-specific paths (e.g. `/proc/modules` on darwin) return
+  empty gracefully — never error.
+- Add a `Debian` variant (or `RHEL`, `SUSE`, etc.) **only** when that
+  distro family genuinely diverges. Otherwise generic `Linux` covers
+  all non-darwin.
+- Dependency-inject file readers, command runners, and gopsutil calls
+  via struct fields — lets tests exercise every branch without
+  touching the real host.
 
 The Collector interface and `Info` struct shape are the contract — whatever
 backing strategy a collector uses, its output must match the typed struct
