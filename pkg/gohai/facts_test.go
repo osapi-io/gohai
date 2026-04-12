@@ -24,7 +24,34 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 )
+
+func hostnameInfoPtr() *hostname.Info     { return &hostname.Info{} }
+func kernelInfoPtr() *kernel.Info         { return &kernel.Info{} }
+func uptimeInfoPtr() *uptime.Info         { return &uptime.Info{} }
+func virtInfoPtr() *virtualization.Info   { return &virtualization.Info{} }
+func machineIDInfoPtr() *machineid.Info   { return &machineid.Info{} }
+func cpuInfoPtr() *cpu.Info               { return &cpu.Info{} }
+func memoryInfoPtr() *memory.Info         { return &memory.Info{} }
+func filesystemInfoPtr() *filesystem.Info { return &filesystem.Info{} }
+func diskInfoPtr() *disk.Info             { return &disk.Info{} }
+func networkInfoPtr() *network.Info       { return &network.Info{} }
+func processInfoPtr() *process.Info       { return &process.Info{} }
+func usersInfoPtr() *users.Info           { return &users.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -69,41 +96,72 @@ func (s *FactsTestSuite) TestFlattenMap() {
 	}
 }
 
-func (s *FactsTestSuite) TestNormalize() {
+func (s *FactsTestSuite) TestSet() {
 	tests := []struct {
-		name    string
-		in      any
-		wantKey string
+		name     string
+		collName string
+		result   any
+		check    func(*Facts) bool
 	}{
 		{
-			name:    "map round-trips to map",
-			in:      map[string]any{"a": 1},
-			wantKey: "a",
+			name:     "platform populated",
+			collName: "platform",
+			result:   &platform.Info{Name: "ubuntu"},
+			check:    func(f *Facts) bool { return f.Platform != nil && f.Platform.Name == "ubuntu" },
 		},
 		{
-			name: "unmarshalable returns original",
-			in:   make(chan int),
+			name:     "wrong type ignored",
+			collName: "platform",
+			result:   "not an Info",
+			check:    func(f *Facts) bool { return f.Platform == nil },
+		},
+		{
+			name:     "unknown name ignored",
+			collName: "nope",
+			result:   &platform.Info{Name: "x"},
+			check:    func(f *Facts) bool { return f.Platform == nil },
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got := normalize(tt.in)
-			if tt.wantKey != "" {
-				m, ok := got.(map[string]any)
-				s.Require().True(ok)
-				s.Contains(m, tt.wantKey)
-				return
-			}
-			s.NotNil(got)
+			f := &Facts{}
+			f.set(tt.collName, tt.result)
+			s.True(tt.check(f))
 		})
 	}
 }
 
-func (s *FactsTestSuite) TestFlatNonMapFallback() {
-	// Build a Facts whose normalize result isn't a map. Since toMap always
-	// returns a map[string]any and time/int values are JSON-safe, this tests
-	// the defensive type assertion path.
-	f := &Facts{Data: map[string]any{}}
-	got := f.Flat()
-	s.NotNil(got)
+func (s *FactsTestSuite) TestCountPopulated() {
+	tests := []struct {
+		name  string
+		facts *Facts
+		want  int
+	}{
+		{"empty", &Facts{}, 0},
+		{"platform only", &Facts{Platform: &platform.Info{}}, 1},
+		{
+			name: "all thirteen fields populated",
+			facts: &Facts{
+				Platform:       &platform.Info{},
+				Hostname:       hostnameInfoPtr(),
+				Kernel:         kernelInfoPtr(),
+				Uptime:         uptimeInfoPtr(),
+				Virtualization: virtInfoPtr(),
+				MachineID:      machineIDInfoPtr(),
+				CPU:            cpuInfoPtr(),
+				Memory:         memoryInfoPtr(),
+				Filesystem:     filesystemInfoPtr(),
+				Disk:           diskInfoPtr(),
+				Network:        networkInfoPtr(),
+				Process:        processInfoPtr(),
+				Users:          usersInfoPtr(),
+			},
+			want: 13,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, tt.facts.countPopulated())
+		})
+	}
 }

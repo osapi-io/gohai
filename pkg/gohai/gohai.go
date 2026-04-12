@@ -67,7 +67,9 @@ func New(
 	return g, nil
 }
 
-// Collect runs all selected collectors and returns Facts.
+// Collect runs all selected collectors and returns Facts. Each collector's
+// typed result is written to the matching field on Facts; collectors that
+// error or aren't selected leave their field nil.
 func (g *Gohai) Collect(
 	ctx context.Context,
 ) (*Facts, error) {
@@ -80,11 +82,14 @@ func (g *Gohai) Collect(
 	if err != nil {
 		return nil, fmt.Errorf("run collectors: %w", err)
 	}
-	return &Facts{
-		Data:            results,
+	facts := &Facts{
 		CollectTime:     start,
 		CollectDuration: time.Since(start),
-	}, nil
+	}
+	for name, result := range results {
+		facts.set(name, result)
+	}
+	return facts, nil
 }
 
 func selectCollectors(
