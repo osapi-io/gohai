@@ -25,29 +25,63 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 )
 
-// Facts holds the result of a collection run. The Data map is keyed by
-// collector name and contains each collector's typed result struct.
+// Facts holds the result of a collection run. Each collector populates its
+// own typed field; disabled or failed collectors leave their field nil.
+// Facts round-trips through JSON cleanly — marshaled output can be
+// unmarshaled back into a Facts value without losing type information.
 type Facts struct {
-	Data            map[string]any `json:"-"`
-	CollectTime     time.Time      `json:"collect_time"`
-	CollectDuration time.Duration  `json:"collect_duration_ns"`
+	Platform       *platform.Info       `json:"platform,omitempty"`
+	Hostname       *hostname.Info       `json:"hostname,omitempty"`
+	Kernel         *kernel.Info         `json:"kernel,omitempty"`
+	Uptime         *uptime.Info         `json:"uptime,omitempty"`
+	Virtualization *virtualization.Info `json:"virtualization,omitempty"`
+	MachineID      *machineid.Info      `json:"machine_id,omitempty"`
+	CPU            *cpu.Info            `json:"cpu,omitempty"`
+	Memory         *memory.Info         `json:"memory,omitempty"`
+	Filesystem     *filesystem.Info     `json:"filesystem,omitempty"`
+	Disk           *disk.Info           `json:"disk,omitempty"`
+	Network        *network.Info        `json:"network,omitempty"`
+	Process        *process.Info        `json:"process,omitempty"`
+	Users          *users.Info          `json:"users,omitempty"`
+
+	CollectTime     time.Time     `json:"collect_time"`
+	CollectDuration time.Duration `json:"collect_duration_ns"`
 }
 
 // JSON returns the compact JSON representation of the facts.
 func (f *Facts) JSON() ([]byte, error) {
-	return json.Marshal(f.toMap())
+	return json.Marshal(f)
 }
 
 // PrettyJSON returns the indented JSON representation of the facts.
 func (f *Facts) PrettyJSON() ([]byte, error) {
-	return json.MarshalIndent(f.toMap(), "", "  ")
+	return json.MarshalIndent(f, "", "  ")
 }
 
-// Flat returns a flat dot-separated key map of all facts.
+// Flat returns a flat dot-separated key map of all facts. Marshal and
+// unmarshal are guaranteed to succeed because every field on Facts is
+// JSON-safe (Info structs with JSON tags, time.Time, time.Duration).
 func (f *Facts) Flat() map[string]any {
-	return flattenMap("", normalize(f.toMap()).(map[string]any))
+	b, _ := json.Marshal(f)
+	var generic map[string]any
+	_ = json.Unmarshal(b, &generic)
+	return flattenMap("", generic)
 }
 
 // Get returns the value at a dot-separated key path, or nil if absent.
@@ -59,17 +93,115 @@ func (f *Facts) Get(
 
 // String returns a printable summary.
 func (f *Facts) String() string {
-	return fmt.Sprintf("Facts{%d collectors, took %s}", len(f.Data), f.CollectDuration)
+	return fmt.Sprintf("Facts{%d collectors, took %s}", f.countPopulated(), f.CollectDuration)
 }
 
-func (f *Facts) toMap() map[string]any {
-	out := make(map[string]any, len(f.Data)+2)
-	for k, v := range f.Data {
-		out[k] = v
+// countPopulated returns how many collector fields are non-nil.
+func (f *Facts) countPopulated() int {
+	n := 0
+	if f.Platform != nil {
+		n++
 	}
-	out["collect_time"] = f.CollectTime
-	out["collect_duration_ns"] = int64(f.CollectDuration)
-	return out
+	if f.Hostname != nil {
+		n++
+	}
+	if f.Kernel != nil {
+		n++
+	}
+	if f.Uptime != nil {
+		n++
+	}
+	if f.Virtualization != nil {
+		n++
+	}
+	if f.MachineID != nil {
+		n++
+	}
+	if f.CPU != nil {
+		n++
+	}
+	if f.Memory != nil {
+		n++
+	}
+	if f.Filesystem != nil {
+		n++
+	}
+	if f.Disk != nil {
+		n++
+	}
+	if f.Network != nil {
+		n++
+	}
+	if f.Process != nil {
+		n++
+	}
+	if f.Users != nil {
+		n++
+	}
+	return n
+}
+
+// set assigns the result of a single collector into the correct typed
+// field on f. Unknown names are silently ignored (shouldn't happen for
+// registered collectors).
+func (f *Facts) set(
+	name string,
+	result any,
+) {
+	switch name {
+	case "platform":
+		if v, ok := result.(*platform.Info); ok {
+			f.Platform = v
+		}
+	case "hostname":
+		if v, ok := result.(*hostname.Info); ok {
+			f.Hostname = v
+		}
+	case "kernel":
+		if v, ok := result.(*kernel.Info); ok {
+			f.Kernel = v
+		}
+	case "uptime":
+		if v, ok := result.(*uptime.Info); ok {
+			f.Uptime = v
+		}
+	case "virtualization":
+		if v, ok := result.(*virtualization.Info); ok {
+			f.Virtualization = v
+		}
+	case "machine_id":
+		if v, ok := result.(*machineid.Info); ok {
+			f.MachineID = v
+		}
+	case "cpu":
+		if v, ok := result.(*cpu.Info); ok {
+			f.CPU = v
+		}
+	case "memory":
+		if v, ok := result.(*memory.Info); ok {
+			f.Memory = v
+		}
+	case "filesystem":
+		if v, ok := result.(*filesystem.Info); ok {
+			f.Filesystem = v
+		}
+	case "disk":
+		if v, ok := result.(*disk.Info); ok {
+			f.Disk = v
+		}
+	case "network":
+		if v, ok := result.(*network.Info); ok {
+			f.Network = v
+		}
+	case "process":
+		if v, ok := result.(*process.Info); ok {
+			f.Process = v
+		}
+	case "users":
+		if v, ok := result.(*users.Info); ok {
+			f.Users = v
+		}
+	}
 }
 
 func flattenMap(
@@ -90,20 +222,5 @@ func flattenMap(
 		}
 		out[key] = v
 	}
-	return out
-}
-
-// normalize round-trips through JSON to convert typed structs into
-// generic map[string]any so flattenMap can walk them uniformly. If the input
-// cannot be marshaled, it is returned unchanged.
-func normalize(
-	v any,
-) any {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return v
-	}
-	var out any
-	_ = json.Unmarshal(b, &out)
 	return out
 }

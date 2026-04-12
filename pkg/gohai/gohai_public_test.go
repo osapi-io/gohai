@@ -65,25 +65,14 @@ func (s *GohaiPublicTestSuite) TestNew() {
 
 func (s *GohaiPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		opts       []gohai.Option
-		wantKey    string
-		notWantKey string
+		name         string
+		opts         []gohai.Option
+		wantPlatform bool
+		wantHostname bool
 	}{
-		{
-			name:    "default collects platform",
-			wantKey: "platform",
-		},
-		{
-			name:       "disabled platform is absent",
-			opts:       []gohai.Option{gohai.WithDisabled("platform")},
-			notWantKey: "platform",
-		},
-		{
-			name:    "only platform",
-			opts:    []gohai.Option{gohai.WithCollectors("platform")},
-			wantKey: "platform",
-		},
+		{name: "default collects platform and hostname", wantPlatform: true, wantHostname: true},
+		{name: "disabled platform is absent", opts: []gohai.Option{gohai.WithDisabled("platform")}, wantPlatform: false, wantHostname: true},
+		{name: "only platform", opts: []gohai.Option{gohai.WithCollectors("platform")}, wantPlatform: true, wantHostname: false},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -91,13 +80,9 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			facts, err := g.Collect(context.Background())
 			s.Require().NoError(err)
-			s.NotNil(facts)
-			if tt.wantKey != "" {
-				s.Contains(facts.Data, tt.wantKey)
-			}
-			if tt.notWantKey != "" {
-				s.NotContains(facts.Data, tt.notWantKey)
-			}
+			s.Require().NotNil(facts)
+			s.Equal(tt.wantPlatform, facts.Platform != nil)
+			s.Equal(tt.wantHostname, facts.Hostname != nil)
 		})
 	}
 }

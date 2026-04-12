@@ -28,6 +28,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 )
 
 type FactsPublicTestSuite struct {
@@ -41,9 +43,16 @@ func TestFactsPublicTestSuite(t *testing.T) {
 
 func (s *FactsPublicTestSuite) SetupTest() {
 	s.facts = &gohai.Facts{
-		Data: map[string]any{
-			"platform": map[string]any{"name": "ubuntu", "version": "24.04"},
-			"cpu":      map[string]any{"total": 8},
+		Platform: &platform.Info{
+			OS:           "linux",
+			Name:         "ubuntu",
+			Version:      "24.04",
+			Family:       "debian",
+			Architecture: "amd64",
+		},
+		CPU: &cpu.Info{
+			Total: 8,
+			Cores: 4,
 		},
 		CollectTime:     time.Date(2026, 4, 11, 12, 0, 0, 0, time.UTC),
 		CollectDuration: 100 * time.Millisecond,
@@ -69,6 +78,24 @@ func (s *FactsPublicTestSuite) TestJSON() {
 			s.Contains(got, "collect_time")
 		})
 	}
+}
+
+func (s *FactsPublicTestSuite) TestJSONRoundTrip() {
+	// Marshal and unmarshal back into Facts — all typed fields should
+	// survive the round-trip.
+	b, err := s.facts.JSON()
+	s.Require().NoError(err)
+
+	var got gohai.Facts
+	s.Require().NoError(json.Unmarshal(b, &got))
+
+	s.Require().NotNil(got.Platform)
+	s.Equal("ubuntu", got.Platform.Name)
+	s.Equal("24.04", got.Platform.Version)
+
+	s.Require().NotNil(got.CPU)
+	s.Equal(8, got.CPU.Total)
+	s.Equal(4, got.CPU.Cores)
 }
 
 func (s *FactsPublicTestSuite) TestFlat() {
