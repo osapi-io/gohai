@@ -17,9 +17,24 @@ typed access to system facts — or use the standalone `gohai` CLI, a thin
 wrapper over the same SDK.
 
 Each collector wraps a well-maintained backing source ([gopsutil][],
-[ghw][], [procfs][], cloud SDKs) and reshapes its output into Ohai-compatible
-JSON. gohai's value is the unified API, typed Go structs, and pluggable
+[ghw][], [procfs][], cloud SDKs) and reshapes its output into typed Go
+structs. gohai's value is the unified API, typed structs, and pluggable
 collector model — not reimplementing `/proc` parsing from scratch.
+
+### Schema: OCSF + Ohai
+
+Fact naming and structure follow [OCSF][] (the Open Cybersecurity Schema
+Framework) wherever OCSF has a canonical field. OCSF is the industry
+schema backed by AWS and Splunk for asset, observability, and security
+data — aligning means gohai output feeds SIEMs, data lakes, and
+inventory tools without translation. Browse the schema at
+[schema.ocsf.io][ocsf-schema] to see field names and object shapes.
+
+What we collect (which facts, which distro edge cases, which fallback
+sources) draws on [Chef Ohai][]'s years of accumulated plugin logic.
+What we call each field draws on OCSF. We do **not** pursue Ohai JSON
+shape parity — Ruby Mash ↔ Go struct translation isn't worth pinning
+byte-for-byte.
 
 ### Primary consumer
 
@@ -268,5 +283,7 @@ The [MIT][] License.
 [gopsutil]: https://github.com/shirou/gopsutil
 [ghw]: https://github.com/jaypipes/ghw
 [procfs]: https://github.com/prometheus/procfs
+[OCSF]: https://ocsf.io/
+[ocsf-schema]: https://schema.ocsf.io/
 [package documentation]: https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai
 [MIT]: LICENSE

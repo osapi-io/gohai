@@ -48,28 +48,42 @@ and consumer expectations.
 
 ### Field naming
 
-Collector JSON field names use `snake_case`. For the specific names,
-follow this precedence:
+**OCSF is our data schema.** When adding or renaming a collector field,
+**always check [schema.ocsf.io](https://schema.ocsf.io/) first** — OCSF
+(Open Cybersecurity Schema Framework, backed by AWS and Splunk) has
+canonical names for ~99% of what we collect. Using OCSF names means
+gohai output feeds SIEMs, data lakes, and inventory tools without
+translation, so the lookup is mandatory, not aspirational.
 
-1. **[OCSF](https://ocsf.io/)** (Open Cybersecurity Schema Framework) —
-   when a field we collect has a canonical OCSF name, use it. OCSF is
-   the industry schema for asset/observability/security data, backed by
-   AWS and Splunk, and aligning means our output feeds SIEMs and
-   inventory tools without translation. Examples: `process.cmd_line`
-   (not `cmdline`), `network_interface.mac` (not `hardware_addr`),
-   `os.kernel_release` (not `kernel_version`).
-2. **Industry standard** — when OCSF doesn't cover the field, use
-   whatever node_exporter / systemd / Prometheus exporters have
-   standardized on. Example: filesystem `mountpoint` / `fstype` follow
-   node_exporter, not Ohai's `mount` / `fs_type`.
+Collector JSON field names use `snake_case`. Precedence:
+
+1. **OCSF** — if OCSF has a name for the field, use it. Examples:
+   `process.cmd_line` (not `cmdline`), `network_interface.mac` (not
+   `hardware_addr`), `os.kernel_release` (not `kernel_version`),
+   `device.hostname`, `os.name`, `file.path`. Browse OCSF's
+   [objects](https://schema.ocsf.io/objects), [data types][], and
+   [dictionary][] to find the right field. When OCSF has a field we
+   don't emit yet but easily could (e.g. `device.hw_info.serial_number`,
+   `os.build`), consider adding it — they've thought about what a
+   consumer wants.
+2. **Industry standard** — when OCSF is silent, use whatever
+   node_exporter / systemd / Prometheus exporters standardized on.
+   Example: filesystem `mountpoint` / `fstype` follow node_exporter.
 3. **Ohai's name** — only when OCSF and industry standards are silent
    AND Ohai has a clear, meaningful name.
-4. **Our own name** — last resort. Use a Go-idiomatic snake_case form.
+4. **Our own name** — last resort. Go-idiomatic snake_case.
 
-**Do not mirror Ohai's JSON shape.** Ohai is for data-source reference
-(collection approach, distro edge cases) — not field names or struct
-layout. Ruby Mash ↔ Go struct translation isn't worthwhile to pin
-byte-for-byte.
+**Do not mirror Ohai's JSON shape.** Ohai is for **data-source**
+reference (what file/command to read, which distro edge cases, which
+fallback) — not field names or struct layout. Ruby Mash ↔ Go struct
+translation isn't worth pinning byte-for-byte.
+
+Record OCSF alignment in the collector doc's **Data Sources** section:
+call out which OCSF object each field maps to, or note "no OCSF
+equivalent" with a one-line reason.
+
+[data types]: https://schema.ocsf.io/data_types
+[dictionary]: https://schema.ocsf.io/dictionary
 
 ### MANDATORY: Cross-reference Ohai's data sources before implementing
 

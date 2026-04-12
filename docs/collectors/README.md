@@ -10,6 +10,17 @@ Collectors are individually toggled using node_exporter-style flags:
 gohai --collector.platform --no-collector.cloud
 ```
 
+**Schema:** Field names follow the [OCSF][] (Open Cybersecurity Schema
+Framework) schema — browse [schema.ocsf.io][ocsf-schema] to see canonical names
+and object shapes. Each collector's doc includes a **Data Sources** section
+noting which OCSF objects its fields map to. Collection logic (what to read,
+which distro edge cases to handle) follows [Chef Ohai][]'s plugins; field names and
+struct layout follow OCSF.
+
+[OCSF]: https://ocsf.io/
+[ocsf-schema]: https://schema.ocsf.io/
+[Chef Ohai]: https://github.com/chef/ohai
+
 ## 🖥️ System
 
 | Collector                   | Key          | Description                            | Default |
