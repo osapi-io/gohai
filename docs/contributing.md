@@ -47,8 +47,8 @@ before submitting a PR.
 > I want to contribute, where do I start?
 
 All kinds of contributions are welcome, whether it's a typo fix or a shiny new
-collector. You can also contribute by upvoting/commenting on issues or helping to
-answer questions.
+collector. You can also contribute by upvoting/commenting on issues or helping
+to answer questions.
 
 > I'm stuck, where can I get help?
 
