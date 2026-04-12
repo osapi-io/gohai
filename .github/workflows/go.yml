@@ -1,0 +1,30 @@
+---
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - name: Install just
+        uses: extractions/setup-just@v4
+      - name: Fetch justfiles
+        run: just fetch
+      - name: Deps
+        run: just deps
+      - name: Test
+        run: just test
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v6
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

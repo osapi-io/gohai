@@ -1,0 +1,12 @@
+.coverage/
+.worktrees/
+dist/
+docs/node_modules/
+docs/bun.lock
+.just/
+
+# Compiled example binaries
+examples/*/*
+!examples/*/*.go
+!examples/*/*.mod
+!examples/*/*.sum

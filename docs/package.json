@@ -1,0 +1,7 @@
+{
+  "name": "gohai",
+  "private": true,
+  "devDependencies": {
+    "prettier": "3.3.3"
+  }
+}
