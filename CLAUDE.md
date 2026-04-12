@@ -72,11 +72,13 @@ just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
 - **`pkg/gohai/collectors/<name>/`** — Public per-collector sub-packages
   - `<name>.go` — `Info` struct and `Collector` implementation
   - `linux.go` / `darwin.go` / `other.go` — build-tagged OS implementations
-  - `export_linux_test.go` / `export_darwin_test.go` — exposes private
-    symbols to public tests (`var X = x`)
+  - `linux_export_test.go` / `darwin_export_test.go` — exposes private
+    symbols to public tests (`var X = x`). Requires an explicit
+    `//go:build linux` or `//go:build darwin` tag (filename does not
+    auto-tag because the suffix isn't `_<GOOS>`).
   - `<name>_public_test.go` — package-level public tests
   - `linux_public_test.go` / `darwin_public_test.go` — OS-specific public
-    tests (build-tagged)
+    tests (filename auto-tags; explicit `//go:build` tag also present)
 - **`internal/collector/`** — Collector interface + registry plumbing
   - `collector.go` — `Collector` interface, `Tier` type
   - `registry.go` — `Registry` (register, resolve deps, run concurrently)
@@ -279,7 +281,7 @@ Import the sub-package at the top of `gohai.go`.
 
 ### Step 5: Tests — 100% coverage required
 
-**`export_linux_test.go` / `export_darwin_test.go`** — expose private
+**`linux_export_test.go` / `darwin_export_test.go`** — expose private
 symbols (usually `Collect` and `CollectWithInfo`) so public tests can
 exercise them:
 
