@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -32,23 +30,33 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-var (
-	hostInfoFn       = host.InfoWithContext
-	readProcUptimeFn = func() ([]byte, error) { return os.ReadFile("/proc/uptime") }
-)
+// Linux collects uptime + idle on Linux. Wraps gopsutil.host.Info for
+// uptime/boot time and extends with /proc/uptime for aggregate CPU
+// idle time (which gopsutil doesn't expose). Matches Ohai's idletime.
+type Linux struct {
+	base
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn, readProcUptimeFn)
+	// HostInfoFn is gopsutil's host.InfoWithContext.
+	HostInfoFn func(context.Context) (*host.InfoStat, error)
+	// ReadProcUptimeFn reads /proc/uptime. On non-linux hosts this
+	// returns ErrNotExist and idle fields stay empty.
+	ReadProcUptimeFn func() ([]byte, error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-	readProcUptime func() ([]byte, error),
-) (any, error) {
-	info, err := fn(ctx)
+// NewLinux returns a Linux variant wired to gopsutil + os.ReadFile.
+func NewLinux() *Linux {
+	return &Linux{
+		HostInfoFn:       host.InfoWithContext,
+		ReadProcUptimeFn: func() ([]byte, error) { return os.ReadFile("/proc/uptime") },
+	}
+}
+
+// Collect returns uptime facts. Uses gopsutil for Seconds/BootTime
+// (works on any OS) and our own /proc/uptime parse for IdleSeconds
+// (Linux-specific; silently omitted on other OSes since the file
+// doesn't exist).
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	info, err := l.HostInfoFn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("host.Info: %w", err)
 	}
@@ -57,22 +65,20 @@ func collectWithHost(
 		BootTime: info.BootTime,
 		Human:    HumanDuration(info.Uptime),
 	}
-	if idle, ok := readIdleSeconds(readProcUptime); ok {
+	if idle, ok := readIdleSeconds(l.ReadProcUptimeFn); ok {
 		out.IdleSeconds = idle
 		out.IdleHuman = HumanDuration(idle)
 	}
 	return out, nil
 }
 
-// readIdleSeconds parses the second field of /proc/uptime, which records
-// the aggregate seconds all CPU cores have spent idle since boot. On
-// multi-core systems this can exceed wall-clock uptime (it's summed
-// across cores). Returns (0, false) if /proc/uptime is unreadable or
-// malformed — idle is a best-effort signal.
+// readIdleSeconds parses the second field of /proc/uptime (aggregate
+// idle seconds across all CPU cores). Returns (0, false) on any failure
+// — idle is best-effort.
 func readIdleSeconds(
-	readProcUptime func() ([]byte, error),
+	read func() ([]byte, error),
 ) (uint64, bool) {
-	b, err := readProcUptime()
+	b, err := read()
 	if err != nil {
 		return 0, false
 	}

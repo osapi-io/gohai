@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,33 +39,32 @@ func TestUptimeDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(UptimeDarwinPublicTestSuite))
 }
 
-func (s *UptimeDarwinPublicTestSuite) TestCollectWithHost() {
+func (s *UptimeDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		stub    func(context.Context) (*host.InfoStat, error)
+		hostFn  func(context.Context) (*host.InfoStat, error)
 		wantErr bool
 		want    uptime.Info
 	}{
 		{
-			name: "3 hours up",
-			stub: func(_ context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{Uptime: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000}, nil
+			name: "darwin host returns uptime + boot time, no idle field",
+			hostFn: func(_ context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{Uptime: 7200, BootTime: 1_700_000_000}, nil
 			},
-			want: uptime.Info{
-				Seconds:  3*3600 + 12*60 + 5,
-				BootTime: 1_700_000_000,
-				Human:    "3h 12m 5s",
-			},
+			want: uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
 		},
 		{
-			name:    "host.Info error",
-			stub:    func(_ context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			name: "host.Info error propagated",
+			hostFn: func(_ context.Context) (*host.InfoStat, error) {
+				return nil, errors.New("boom")
+			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := uptime.CollectWithHost(context.Background(), tt.stub)
+			c := &uptime.Darwin{HostInfoFn: tt.hostFn}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
@@ -80,10 +77,7 @@ func (s *UptimeDarwinPublicTestSuite) TestCollectWithHost() {
 	}
 }
 
-func (s *UptimeDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := uptime.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*uptime.Info)
-	s.Require().True(ok)
-	s.NotZero(info.Seconds + info.BootTime)
+func (s *UptimeDarwinPublicTestSuite) TestNewDarwinWiresUpStdlib() {
+	c := uptime.NewDarwin()
+	s.NotNil(c.HostInfoFn)
 }

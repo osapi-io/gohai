@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -29,19 +27,24 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-var hostInfoFn = host.InfoWithContext
+// Darwin collects uptime on macOS. Wraps gopsutil.host.Info.
+// No idle-time equivalent — macOS doesn't expose an aggregate CPU idle
+// counter equivalent to Linux's /proc/uptime[1].
+type Darwin struct {
+	base
 
-func collect(
-	ctx context.Context,
-) (any, error) {
-	return collectWithHost(ctx, hostInfoFn)
+	HostInfoFn func(context.Context) (*host.InfoStat, error)
 }
 
-func collectWithHost(
-	ctx context.Context,
-	fn func(context.Context) (*host.InfoStat, error),
-) (any, error) {
-	info, err := fn(ctx)
+// NewDarwin returns a Darwin variant wired to gopsutil.
+func NewDarwin() *Darwin {
+	return &Darwin{HostInfoFn: host.InfoWithContext}
+}
+
+// Collect returns uptime facts. IdleSeconds/IdleHuman stay empty on
+// darwin (no kernel-level aggregate idle counter).
+func (d *Darwin) Collect(ctx context.Context) (any, error) {
+	info, err := d.HostInfoFn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("host.Info: %w", err)
 	}

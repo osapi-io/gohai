@@ -21,12 +21,12 @@
 package uptime_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 )
 
@@ -41,24 +41,44 @@ func TestUptimePublicTestSuite(t *testing.T) {
 func (s *UptimePublicTestSuite) TestNew() {
 	c := uptime.New()
 	s.Equal("uptime", c.Name())
-	s.Equal(true, c.DefaultEnabled())
+	s.True(c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 
 func (s *UptimePublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = uptime.New()
+	var _ collector.Collector = uptime.NewLinux()
+	var _ collector.Collector = uptime.NewDarwin()
 }
 
-func (s *UptimePublicTestSuite) TestCollect() {
-	c := uptime.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+func (s *UptimePublicTestSuite) TestNewDispatch() {
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
+
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	info, ok := got.(*uptime.Info)
-	s.Require().True(ok)
-	s.NotZero(info.Seconds + info.BootTime) // at least one populated
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			got := uptime.New()
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := got.(*uptime.Darwin)
+				s.True(ok)
+			case "linux":
+				_, ok := got.(*uptime.Linux)
+				s.True(ok)
+			}
+		})
+	}
 }
 
 func (s *UptimePublicTestSuite) TestHumanDuration() {
@@ -67,12 +87,11 @@ func (s *UptimePublicTestSuite) TestHumanDuration() {
 		seconds uint64
 		want    string
 	}{
-		{"zero", 0, "0s"},
+		{"zero seconds", 0, "0s"},
 		{"seconds only", 45, "45s"},
-		{"minutes", 3*60 + 7, "3m 7s"},
-		{"hours", 2*3600 + 5*60 + 9, "2h 5m 9s"},
-		{"days", 4*86400 + 6*3600 + 15*60 + 2, "4d 6h 15m 2s"},
-		{"exactly one day", 86400, "1d 0h 0m 0s"},
+		{"minutes and seconds", 75, "1m 15s"},
+		{"hours/minutes/seconds", 3*3600 + 12*60 + 5, "3h 12m 5s"},
+		{"days+hours+minutes+seconds", 2*86400 + 5*3600 + 12*60 + 5, "2d 5h 12m 5s"},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {

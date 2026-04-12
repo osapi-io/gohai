@@ -18,12 +18,15 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package uptime collects system uptime and boot time facts.
+// Package uptime collects system uptime, boot time, and (on Linux)
+// aggregate CPU idle time.
 package uptime
 
 import (
-	"context"
 	"fmt"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds uptime and boot time data.
@@ -31,42 +34,37 @@ type Info struct {
 	Seconds     uint64 `json:"seconds"`                // seconds since boot
 	BootTime    uint64 `json:"boot_time"`              // unix timestamp of boot
 	Human       string `json:"human"`                  // human-readable uptime (e.g., "3d 4h 12m 5s")
-	IdleSeconds uint64 `json:"idle_seconds,omitempty"` // seconds CPUs have been idle (Linux only; aggregate across cores)
+	IdleSeconds uint64 `json:"idle_seconds,omitempty"` // aggregate CPU idle seconds (Linux only)
 	IdleHuman   string `json:"idle_human,omitempty"`   // human-readable idle time (Linux only)
 }
 
-// Collector implements the collector.Collector interface for uptime facts.
-type Collector struct{}
-
-// New returns a new uptime Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every uptime variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "uptime".
-func (c *Collector) Name() string {
-	return "uptime"
-}
+type base struct{}
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
-}
+func (base) Name() string           { return "uptime" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
 
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers uptime facts.
-func (c *Collector) Collect(
-	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+// New returns the uptime collector variant for the host OS. Both
+// variants wrap gopsutil's host.Info; the Linux variant additionally
+// parses /proc/uptime for the idle-time field that gopsutil doesn't
+// expose.
+func New() Collector {
+	switch platform.Detect() {
+	case "darwin":
+		return NewDarwin()
+	default:
+		return NewLinux()
+	}
 }
 
 // HumanDuration formats a second count as "Xd Yh Zm Ws" (omitting zero
-// leading units).
+// leading units). Exported for consumers that want to render durations
+// consistently with uptime's own output.
 func HumanDuration(
 	seconds uint64,
 ) string {
