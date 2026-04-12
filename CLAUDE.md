@@ -71,7 +71,9 @@ just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
   - `registry.go` — `PublicRegistry` used by CLI for flag enumeration
 - **`pkg/gohai/collectors/<name>/`** — Public per-collector sub-packages
   - `<name>.go` — `Info` struct and `Collector` implementation
-  - `linux.go` / `darwin.go` / `other.go` — build-tagged OS implementations
+  - `linux.go` / `darwin.go` / `other.go` — build-tagged OS implementations.
+    **Always separate files** — keep `darwin.go` distinct from `linux.go`
+    even when code is byte-identical. Uniform layout > tiny duplication.
   - `linux_export_test.go` / `darwin_export_test.go` — exposes private
     symbols to public tests (`var X = x`). Requires an explicit
     `//go:build linux` or `//go:build darwin` tag (filename does not
@@ -319,9 +321,10 @@ func collectWithInfo(
 }
 ```
 
-**`darwin.go`** — same shape, possibly same call if the library is
-cross-platform. Factor out a shared `unix.go` if linux and darwin do the
-same thing.
+**`darwin.go`** — same shape, possibly same code if the library is
+cross-platform. **Always keep `darwin.go` and `linux.go` as separate
+files** even when code is byte-identical. Uniform layout across collectors
+is more valuable than saving ~30 lines of duplication.
 
 **`other.go`** (build-tagged `//go:build !linux && !darwin`):
 

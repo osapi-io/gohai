@@ -13,15 +13,15 @@ contract between the two projects.
 
 | OSAPI field           | gohai collector                                     | gohai source                                      | Status                     |
 | --------------------- | --------------------------------------------------- | ------------------------------------------------- | -------------------------- |
-| `hostname` (envelope) | [`hostname`](../collectors/hostname.md)             | `hostname.Info.Hostname`                          | 🚧 planned                 |
+| `hostname` (envelope) | [`hostname`](../collectors/hostname.md)             | `hostname.Info.Hostname`                          | ✅ implemented             |
 | `Architecture`        | [`platform`](../collectors/platform.md)             | `platform.Info.Architecture`                      | ✅ implemented             |
 | _(OS / os family)_    | [`platform`](../collectors/platform.md)             | `platform.Info.OS`, `platform.Info.Family`        | ✅ implemented             |
-| `KernelVersion`       | [`kernel`](../collectors/kernel.md)                 | `kernel.Info.Version`                             | 🚧 planned                 |
-| `CPUCount`            | [`cpu`](../collectors/cpu.md)                       | `cpu.Info.Total`                                  | 🚧 planned (hardware plan) |
-| `FQDN`                | [`hostname`](../collectors/hostname.md)             | `hostname.Info.FQDN`                              | 🚧 planned                 |
+| `KernelVersion`       | [`kernel`](../collectors/kernel.md)                 | `kernel.Info.Version`                             | ✅ implemented             |
+| `CPUCount`            | [`cpu`](../collectors/cpu.md)                       | `cpu.Info.Total`                                  | ✅ implemented             |
+| `FQDN`                | [`hostname`](../collectors/hostname.md)             | `hostname.Info.FQDN`                              | ✅ implemented             |
 | `ServiceMgr`          | [`init`](../collectors/init.md)                     | `init.Info.Name` (`systemd`, `openrc`, `launchd`) | 🚧 planned                 |
 | `PackageMgr`          | [`package_mgr`](../collectors/package_mgr.md)       | `package_mgr.Info.Name` (`apt`, `dnf`, `brew`, …) | 🚧 planned                 |
-| `Containerized`       | [`virtualization`](../collectors/virtualization.md) | `virtualization.Info.Role == "guest"`             | 🚧 planned                 |
+| `Containerized`       | [`virtualization`](../collectors/virtualization.md) | `virtualization.Info.Role == "guest"`             | ✅ implemented             |
 | `Interfaces`          | [`network`](../collectors/network.md)               | `network.Info.Interfaces`                         | 🚧 planned                 |
 | `PrimaryInterface`    | [`network`](../collectors/network.md)               | `network.Info.DefaultInterface`                   | 🚧 planned                 |
 | `Routes`              | [`network`](../collectors/network.md)               | `network.Info.Routes`                             | 🚧 planned                 |

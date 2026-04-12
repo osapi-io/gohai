@@ -52,14 +52,14 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
 | [platform](docs/collectors/platform.md)            | OS name, version, family, architecture         | ✅      | ✅ (gopsutil) |
-| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name           | ✅      | 🚧          |
-| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | 🚧          |
-| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | 🚧          |
+| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name           | ✅      | ✅ (gopsutil) |
+| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | ✅ (gopsutil) |
+| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | ✅ (gopsutil) |
 | [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | 🚧          |
 | [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | 🚧          |
 | [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | 🚧          |
 | [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | 🚧          |
-| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | 🚧          |
+| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ (gopsutil) |
 | [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | 🚧          |
 | [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | 🚧          |
 | [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | 🚧          |
@@ -68,7 +68,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | 🚧          |
+| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | ✅ (gopsutil) |
 | [memory](docs/collectors/memory.md)                | Total, free, swap, buffers, cached, hugepages  | ✅      | 🚧          |
 | [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | 🚧          |
 | [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | 🚧          |
@@ -106,7 +106,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection     | ✅      | 🚧          |
+| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection     | ✅      | ✅ (gopsutil) |
 | [vmware](docs/collectors/vmware.md)                | VMware guest tools data                        | ✅      | 🚧          |
 | [virtualbox](docs/collectors/virtualbox.md)        | VirtualBox guest additions data                | ✅      | 🚧          |
 | [libvirt](docs/collectors/libvirt.md)              | Libvirt domain information                     | ✅      | 🚧          |

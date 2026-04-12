@@ -26,7 +26,14 @@ import (
 	"time"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 )
 
 // Gohai is the SDK entry point for collecting system facts.
@@ -112,5 +119,12 @@ func registerBuiltins(
 func builtinCollectors() []collector.Collector {
 	return []collector.Collector{
 		platform.New(),
+		hostname.New(),
+		kernel.New(),
+		uptime.New(),
+		virtualization.New(),
+		machineid.New(),
+		cpu.New(),
+		memory.New(),
 	}
 }
