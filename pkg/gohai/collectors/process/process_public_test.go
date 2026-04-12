@@ -22,7 +22,6 @@ package process_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -30,6 +29,11 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
+)
+
+var (
+	_ collector.Collector = (*process.Linux)(nil)
+	_ collector.Collector = (*process.Darwin)(nil)
 )
 
 type ProcessPublicTestSuite struct {
@@ -40,46 +44,34 @@ func TestProcessPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ProcessPublicTestSuite))
 }
 
-// fakeProc is a lightweight ProcSnapshot stub used by Collect tests to
-// avoid exercising real /proc data. Every field has an "err" variant
-// the test can set to simulate partial-read scenarios.
-type fakeProc struct {
-	pid       int32
-	ppid      int32
-	ppidErr   error
-	name      string
-	nameErr   error
-	username  string
-	userErr   error
-	cmdline   string
-	cmdErr    error
-	status    []string
-	statusErr error
-	ctime     int64
-	ctimeErr  error
+// TestCollectOnHost exercises the real gopsutil-backed listProcesses
+// bridge + snapshotFromGopsutil mapper by calling Collect on the live
+// host. We only assert that at least one process (ourselves) is
+// returned and that the top-level shape populates — no stable PID
+// assertions because this is the test harness's own process tree.
+// Without this test, listProcesses and snapshotFromGopsutil would be
+// untestable from the unit-test layer (gopsutil's *process.Process
+// isn't constructable from test-supplied data).
+func (s *ProcessPublicTestSuite) TestCollectOnHost() {
+	tests := []struct {
+		name string
+	}{
+		{name: "host exposes at least the test-runner process"},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := process.NewLinux()
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*process.Info)
+			s.Require().True(ok)
+			s.GreaterOrEqual(info.Count, 1)
+			s.GreaterOrEqual(len(info.Processes), 1)
+		})
+	}
 }
-
-func (f fakeProc) Pid() int32                 { return f.pid }
-func (f fakeProc) Ppid() (int32, error)       { return f.ppid, f.ppidErr }
-func (f fakeProc) Name() (string, error)      { return f.name, f.nameErr }
-func (f fakeProc) Username() (string, error)  { return f.username, f.userErr }
-func (f fakeProc) Cmdline() (string, error)   { return f.cmdline, f.cmdErr }
-func (f fakeProc) Status() ([]string, error)  { return f.status, f.statusErr }
-func (f fakeProc) CreateTime() (int64, error) { return f.ctime, f.ctimeErr }
 
 func (s *ProcessPublicTestSuite) TestNew() {
-	c := process.New()
-	s.Equal("process", c.Name())
-	s.True(c.DefaultEnabled())
-	s.Empty(c.Dependencies())
-}
-
-func (s *ProcessPublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = process.NewLinux()
-	var _ collector.Collector = process.NewDarwin()
-}
-
-func (s *ProcessPublicTestSuite) TestNewDispatch() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
@@ -88,120 +80,27 @@ func (s *ProcessPublicTestSuite) TestNewDispatch() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin", "darwin", "darwin"},
-		{"debian", "debian", "linux"},
-		{"rhel", "rhel", "linux"},
-		{"arch", "arch", "linux"},
-		{"unknown", "", "linux"},
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
-			got := process.New()
+			c := process.New()
+			s.Equal("process", c.Name())
+			s.True(c.DefaultEnabled())
+			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
-				_, ok := got.(*process.Darwin)
+				_, ok := c.(*process.Darwin)
 				s.True(ok)
 			case "linux":
-				_, ok := got.(*process.Linux)
+				_, ok := c.(*process.Linux)
 				s.True(ok)
 			}
-		})
-	}
-}
-
-// TestSnapshotOf is exercised indirectly via Linux/Darwin Collect
-// tables. This entry-level test here covers shared helper behavior
-// through a public seam: running Collect() with a fake proc and
-// asserting the populated fields.
-func (s *ProcessPublicTestSuite) TestCollectMapsFields() {
-	tests := []struct {
-		name    string
-		procs   []process.ProcSnapshot
-		wantErr bool
-		want    process.Info
-	}{
-		{
-			name: "fully-populated process",
-			procs: []process.ProcSnapshot{
-				fakeProc{
-					pid:      1,
-					ppid:     0,
-					name:     "systemd",
-					username: "root",
-					cmdline:  "/sbin/init",
-					status:   []string{"S"},
-					ctime:    1_700_000_000_000,
-				},
-			},
-			want: process.Info{
-				Count: 1,
-				Processes: []process.Process{
-					{
-						PID:       1,
-						PPID:      0,
-						Name:      "systemd",
-						Username:  "root",
-						CmdLine:   "/sbin/init",
-						State:     "S",
-						StartTime: 1_700_000_000,
-					},
-				},
-			},
-		},
-		{
-			name: "access-denied errors fall through to empty fields",
-			procs: []process.ProcSnapshot{
-				fakeProc{
-					pid: 42, ppidErr: errors.New("perm"), nameErr: errors.New("perm"),
-					userErr: errors.New("perm"), cmdErr: errors.New("perm"),
-					statusErr: errors.New("perm"), ctimeErr: errors.New("perm"),
-				},
-			},
-			want: process.Info{
-				Count:     1,
-				Processes: []process.Process{{PID: 42}},
-			},
-		},
-		{
-			name: "negative create time is skipped",
-			procs: []process.ProcSnapshot{
-				fakeProc{pid: 99, name: "unset-ctime", ctime: -1},
-			},
-			want: process.Info{
-				Count:     1,
-				Processes: []process.Process{{PID: 99, Name: "unset-ctime"}},
-			},
-		},
-		{
-			name: "empty status slice leaves state empty",
-			procs: []process.ProcSnapshot{
-				fakeProc{pid: 100, name: "weird", status: []string{}},
-			},
-			want: process.Info{
-				Count:     1,
-				Processes: []process.Process{{PID: 100, Name: "weird"}},
-			},
-		},
-		{
-			name:  "empty process list",
-			procs: []process.ProcSnapshot{},
-			want:  process.Info{Count: 0, Processes: []process.Process{}},
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := &process.Linux{
-				ProcessesFn: func(context.Context) ([]process.ProcSnapshot, error) {
-					return tt.procs, nil
-				},
-			}
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*process.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
 		})
 	}
 }

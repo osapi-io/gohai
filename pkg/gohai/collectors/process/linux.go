@@ -20,69 +20,28 @@
 
 package process
 
-import (
-	"context"
-
-	"github.com/shirou/gopsutil/v4/process"
-)
+import "context"
 
 // Linux collects a process snapshot on Linux hosts via gopsutil.
 type Linux struct {
 	base
 
-	ProcessesFn func(context.Context) ([]ProcSnapshot, error)
+	// ProcessesFn returns a pre-mapped slice of Process snapshots.
+	// Production wiring calls gopsutil; tests inject a stub returning
+	// canned data.
+	ProcessesFn func(context.Context) ([]Process, error)
 }
 
 // NewLinux returns a Linux variant wired to gopsutil.
 func NewLinux() *Linux {
-	return &Linux{ProcessesFn: gopsutilProcesses}
+	return &Linux{ProcessesFn: listProcesses}
 }
 
-// gopsutilProcesses adapts gopsutil's Processes return to our
-// ProcSnapshot interface. Named helper so the factory assigns a
-// function reference (no closure body to cover).
-func gopsutilProcesses(
-	ctx context.Context,
-) ([]ProcSnapshot, error) {
-	ps, err := process.ProcessesWithContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]ProcSnapshot, 0, len(ps))
-	for _, p := range ps {
-		out = append(out, procAdapter{P: p})
-	}
-	return out, nil
-}
-
-// procAdapter adapts *gopsutil/process.Process to our ProcSnapshot
-// interface. gopsutil's Process has context-accepting methods; we call
-// the non-context variants here to keep the ProcSnapshot interface
-// simple.
-type procAdapter struct {
-	P *process.Process
-}
-
-func (a procAdapter) Pid() int32                 { return a.P.Pid }
-func (a procAdapter) Ppid() (int32, error)       { return a.P.Ppid() }
-func (a procAdapter) Name() (string, error)      { return a.P.Name() }
-func (a procAdapter) Username() (string, error)  { return a.P.Username() }
-func (a procAdapter) Cmdline() (string, error)   { return a.P.Cmdline() }
-func (a procAdapter) Status() ([]string, error)  { return a.P.Status() }
-func (a procAdapter) CreateTime() (int64, error) { return a.P.CreateTime() }
-
-// Collect returns a process snapshot. Per-process read errors (access
-// denied, zombie parent, etc.) fall through to empty fields rather
-// than erroring — we'd rather list a process with partial data than
-// drop it.
+// Collect returns a process snapshot.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
 	procs, err := l.ProcessesFn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	out := &Info{Count: len(procs), Processes: make([]Process, 0, len(procs))}
-	for _, p := range procs {
-		out.Processes = append(out.Processes, snapshotOf(p))
-	}
-	return out, nil
+	return &Info{Count: len(procs), Processes: procs}, nil
 }

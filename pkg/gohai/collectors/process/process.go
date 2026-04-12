@@ -22,6 +22,10 @@
 package process
 
 import (
+	"context"
+
+	"github.com/shirou/gopsutil/v4/process"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 )
@@ -57,37 +61,39 @@ func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 
 // New returns the process variant for the host OS. gopsutil's process
-// package works cross-platform — both variants share identical logic,
-// split for pattern uniformity.
+// package works cross-platform — both variants share listing logic.
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
+	if platform.Detect() == "darwin" {
 		return NewDarwin()
-	default:
-		return NewLinux()
 	}
+	return NewLinux()
 }
 
-// ProcSnapshot is the subset of *gopsutil.Process methods we consume.
-// Defined as an interface so Collect() can be tested with mock procs
-// without constructing real gopsutil Process values (which require a
-// live /proc/<pid> directory).
-type ProcSnapshot interface {
-	Pid() int32
-	Ppid() (int32, error)
-	Name() (string, error)
-	Username() (string, error)
-	Cmdline() (string, error)
-	Status() ([]string, error)
-	CreateTime() (int64, error)
+// listProcesses is the production bridge to gopsutil. Factored as a
+// named function so factories can assign it as a plain function
+// reference (no closure body). Tests inject a stub and don't touch
+// this directly.
+func listProcesses(
+	ctx context.Context,
+) ([]Process, error) {
+	ps, err := process.ProcessesWithContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Process, 0, len(ps))
+	for _, p := range ps {
+		out = append(out, snapshotFromGopsutil(p))
+	}
+	return out, nil
 }
 
-// snapshotOf converts a ProcSnapshot into our Process struct. Missing
-// fields (access denied, zombie parent, etc.) remain zero-valued.
-func snapshotOf(
-	p ProcSnapshot,
+// snapshotFromGopsutil maps a *gopsutil.Process onto our Process
+// struct. Per-field read errors (access denied, zombie state, etc.)
+// leave the corresponding field zero-valued.
+func snapshotFromGopsutil(
+	p *process.Process,
 ) Process {
-	out := Process{PID: p.Pid()}
+	out := Process{PID: p.Pid}
 	if ppid, err := p.Ppid(); err == nil {
 		out.PPID = ppid
 	}

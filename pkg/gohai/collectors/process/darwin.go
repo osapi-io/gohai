@@ -22,18 +22,16 @@ package process
 
 import "context"
 
-// Darwin collects a process snapshot on macOS via gopsutil. Same
-// logic as Linux — separate struct preserves the osapi dispatch
-// pattern and lets darwin diverge freely if Apple changes kauth.
+// Darwin collects a process snapshot on macOS via gopsutil.
 type Darwin struct {
 	base
 
-	ProcessesFn func(context.Context) ([]ProcSnapshot, error)
+	ProcessesFn func(context.Context) ([]Process, error)
 }
 
 // NewDarwin returns a Darwin variant wired to gopsutil.
 func NewDarwin() *Darwin {
-	return &Darwin{ProcessesFn: gopsutilProcesses}
+	return &Darwin{ProcessesFn: listProcesses}
 }
 
 // Collect returns a process snapshot.
@@ -42,9 +40,5 @@ func (d *Darwin) Collect(ctx context.Context) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := &Info{Count: len(procs), Processes: make([]Process, 0, len(procs))}
-	for _, p := range procs {
-		out.Processes = append(out.Processes, snapshotOf(p))
-	}
-	return out, nil
+	return &Info{Count: len(procs), Processes: procs}, nil
 }
