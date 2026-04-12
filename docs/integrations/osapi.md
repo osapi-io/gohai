@@ -11,21 +11,21 @@ contract between the two projects.
 
 ## OSAPI `FactsRegistration` → gohai mapping
 
-| OSAPI field           | gohai collector                                     | gohai source                                      | Status                     |
-| --------------------- | --------------------------------------------------- | ------------------------------------------------- | -------------------------- |
-| `hostname` (envelope) | [`hostname`](../collectors/hostname.md)             | `hostname.Info.Hostname`                          | 🚧 planned                 |
-| `Architecture`        | [`platform`](../collectors/platform.md)             | `platform.Info.Architecture`                      | ✅ implemented             |
-| _(OS / os family)_    | [`platform`](../collectors/platform.md)             | `platform.Info.OS`, `platform.Info.Family`        | ✅ implemented             |
-| `KernelVersion`       | [`kernel`](../collectors/kernel.md)                 | `kernel.Info.Version`                             | 🚧 planned                 |
-| `CPUCount`            | [`cpu`](../collectors/cpu.md)                       | `cpu.Info.Total`                                  | 🚧 planned (hardware plan) |
-| `FQDN`                | [`hostname`](../collectors/hostname.md)             | `hostname.Info.FQDN`                              | 🚧 planned                 |
-| `ServiceMgr`          | [`init`](../collectors/init.md)                     | `init.Info.Name` (`systemd`, `openrc`, `launchd`) | 🚧 planned                 |
-| `PackageMgr`          | [`package_mgr`](../collectors/package_mgr.md)       | `package_mgr.Info.Name` (`apt`, `dnf`, `brew`, …) | 🚧 planned                 |
-| `Containerized`       | [`virtualization`](../collectors/virtualization.md) | `virtualization.Info.Role == "guest"`             | 🚧 planned                 |
-| `Interfaces`          | [`network`](../collectors/network.md)               | `network.Info.Interfaces`                         | 🚧 planned                 |
-| `PrimaryInterface`    | [`network`](../collectors/network.md)               | `network.Info.DefaultInterface`                   | 🚧 planned                 |
-| `Routes`              | [`network`](../collectors/network.md)               | `network.Info.Routes`                             | 🚧 planned                 |
-| `Facts` (custom map)  | —                                                   | OSAPI-layer concern (user-supplied)               | N/A                        |
+| OSAPI field           | gohai collector                                     | gohai source                                      | Status         |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------- | -------------- |
+| `hostname` (envelope) | [`hostname`](../collectors/hostname.md)             | `hostname.Info.Hostname`                          | ✅ implemented |
+| `Architecture`        | [`platform`](../collectors/platform.md)             | `platform.Info.Architecture`                      | ✅ implemented |
+| _(OS / os family)_    | [`platform`](../collectors/platform.md)             | `platform.Info.OS`, `platform.Info.Family`        | ✅ implemented |
+| `KernelVersion`       | [`kernel`](../collectors/kernel.md)                 | `kernel.Info.Version`                             | ✅ implemented |
+| `CPUCount`            | [`cpu`](../collectors/cpu.md)                       | `cpu.Info.Total`                                  | ✅ implemented |
+| `FQDN`                | [`hostname`](../collectors/hostname.md)             | `hostname.Info.FQDN`                              | ✅ implemented |
+| `ServiceMgr`          | [`init`](../collectors/init.md)                     | `init.Info.Name` (`systemd`, `openrc`, `launchd`) | 🚧 planned     |
+| `PackageMgr`          | [`package_mgr`](../collectors/package_mgr.md)       | `package_mgr.Info.Name` (`apt`, `dnf`, `brew`, …) | 🚧 planned     |
+| `Containerized`       | [`virtualization`](../collectors/virtualization.md) | `virtualization.Info.Role == "guest"`             | ✅ implemented |
+| `Interfaces`          | [`network`](../collectors/network.md)               | `network.Info.Interfaces`                         | 🚧 planned     |
+| `PrimaryInterface`    | [`network`](../collectors/network.md)               | `network.Info.DefaultInterface`                   | 🚧 planned     |
+| `Routes`              | [`network`](../collectors/network.md)               | `network.Info.Routes`                             | 🚧 planned     |
+| `Facts` (custom map)  | —                                                   | OSAPI-layer concern (user-supplied)               | N/A            |
 
 ## Usage pattern
 

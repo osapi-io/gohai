@@ -1,35 +1,67 @@
 # Memory
 
-> **Status:** Planned
+> **Status:** Implemented ✅
 
 ## Description
 
-TODO: Description of the memory collector.
+Collects virtual and swap memory usage. Wraps
+[gopsutil's `mem`](https://pkg.go.dev/github.com/shirou/gopsutil/v4/mem).
 
 ## Collected Fields
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| TODO  | TODO | TODO        |
+| Field          | Type    | Description                      |
+| -------------- | ------- | -------------------------------- |
+| `total`        | uint64  | Total memory (bytes)             |
+| `available`    | uint64  | Available memory (bytes)         |
+| `used`         | uint64  | Used memory (bytes)              |
+| `used_percent` | float64 | Percent used (0-100)             |
+| `free`         | uint64  | Free memory (bytes)              |
+| `buffers`      | uint64  | Buffers (Linux; bytes)           |
+| `cached`       | uint64  | Cached memory (Linux; bytes)     |
+| `swap`         | object  | Swap memory (omitted if no swap) |
+
+`swap` nested object fields: `total`, `used`, `free`, `used_percent`.
 
 ## Platform Support
 
-| Platform | Supported |
-| -------- | --------- |
-| Linux    | ✅        |
-| macOS    | ⚠️        |
+| Platform | Source                                         | Supported |
+| -------- | ---------------------------------------------- | --------- |
+| Linux    | `gopsutil/v4/mem.VirtualMemory` + `SwapMemory` | ✅        |
+| macOS    | `gopsutil/v4/mem.VirtualMemory` + `SwapMemory` | ✅        |
+| Other    | Returns `nil`                                  | —         |
 
 ## Example Output
 
 ```json
 {
-  "memory": {}
+  "memory": {
+    "total": 17179869184,
+    "available": 8589934592,
+    "used": 8589934592,
+    "used_percent": 50.0,
+    "free": 4294967296,
+    "swap": {
+      "total": 2147483648,
+      "used": 1024,
+      "free": 2147482624,
+      "used_percent": 0.1
+    }
+  }
 }
 ```
 
 ## Enable/Disable
 
 ```bash
-gohai --collector.memory      # enable
+gohai --collector.memory      # enable (default)
 gohai --no-collector.memory   # disable
 ```
+
+## Dependencies
+
+None.
+
+## Backing library
+
+[`github.com/shirou/gopsutil/v4/mem`](https://github.com/shirou/gopsutil) —
+BSD-3.
