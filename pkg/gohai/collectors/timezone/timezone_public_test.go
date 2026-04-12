@@ -21,12 +21,12 @@
 package timezone_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 )
 
@@ -41,21 +41,42 @@ func TestTimezonePublicTestSuite(t *testing.T) {
 func (s *TimezonePublicTestSuite) TestNew() {
 	c := timezone.New()
 	s.Equal("timezone", c.Name())
-	s.Equal(true, c.DefaultEnabled())
+	s.True(c.DefaultEnabled())
 	s.Empty(c.Dependencies())
 }
 
 func (s *TimezonePublicTestSuite) TestImplementsCollectorInterface() {
-	var _ collector.Collector = timezone.New()
+	var _ collector.Collector = timezone.NewLinux()
+	var _ collector.Collector = timezone.NewDarwin()
 }
 
-func (s *TimezonePublicTestSuite) TestCollect() {
-	c := timezone.New()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	if got == nil {
-		return
+func (s *TimezonePublicTestSuite) TestNewDispatch() {
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
+
+	tests := []struct {
+		name     string
+		detect   string
+		wantKind string
+	}{
+		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"debian dispatches to Linux", "debian", "linux"},
+		{"rhel dispatches to Linux", "rhel", "linux"},
+		{"arch dispatches to Linux", "arch", "linux"},
+		{"unknown dispatches to Linux", "", "linux"},
 	}
-	_, ok := got.(*timezone.Info)
-	s.True(ok)
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			got := timezone.New()
+			switch tt.wantKind {
+			case "darwin":
+				_, ok := got.(*timezone.Darwin)
+				s.True(ok, "expected *timezone.Darwin")
+			case "linux":
+				_, ok := got.(*timezone.Linux)
+				s.True(ok, "expected *timezone.Linux")
+			}
+		})
+	}
 }

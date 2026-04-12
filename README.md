@@ -66,27 +66,27 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [platform](docs/collectors/platform.md)            | OS name, version, family, architecture         | ✅      | ✅ (gopsutil) |
-| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name           | ✅      | ✅ (gopsutil) |
-| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | ✅ (gopsutil) |
-| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | ✅ (gopsutil) |
-| [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | ✅ (stdlib) |
+| [platform](docs/collectors/platform.md)            | OS name, version, family, architecture         | ✅      | ✅ |
+| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name           | ✅      | ✅ |
+| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | ✅ |
+| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | ✅ |
+| [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | ✅ |
 | [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | 🚧          |
 | [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | 🚧          |
-| [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | ✅ (stdlib) |
-| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ (gopsutil) |
-| [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | ✅ (stdlib) |
-| [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | ✅ (stdlib) |
+| [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | ✅ |
+| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ |
+| [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | ✅ |
+| [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | ✅ |
 | [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | 🚧          |
 
 ### ⚙️ Hardware
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | ✅ (gopsutil) |
+| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | ✅ |
 | [memory](docs/collectors/memory.md)                | Total, free, swap, buffers, cached, hugepages  | ✅      | 🚧          |
-| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | ✅ (gopsutil) |
-| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | ✅ (gopsutil) |
+| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | ✅ |
+| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | ✅ |
 | [dmi](docs/collectors/dmi.md)                      | BIOS, system manufacturer, serial, UUID        | ✅      | 🚧          |
 | [gpu](docs/collectors/gpu.md)                      | GPU model, driver, memory                      | ✅      | 🚧          |
 | [pci](docs/collectors/pci.md)                      | PCI devices (`lspci`)                          | ✅      | 🚧          |
@@ -121,7 +121,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection     | ✅      | ✅ (gopsutil) |
+| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection     | ✅      | ✅ |
 | [vmware](docs/collectors/vmware.md)                | VMware guest tools data                        | ✅      | 🚧          |
 | [virtualbox](docs/collectors/virtualbox.md)        | VirtualBox guest additions data                | ✅      | 🚧          |
 | [libvirt](docs/collectors/libvirt.md)              | Libvirt domain information                     | ✅      | 🚧          |
@@ -172,7 +172,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [process](docs/collectors/process.md)              | Process list (PID, name, user, cmdline)        | ✅      | ✅ (gopsutil) |
+| [process](docs/collectors/process.md)              | Process list (PID, name, user, cmdline)        | ✅      | ✅ |
 | [command](docs/collectors/command.md)              | Full `ps` output (Ohai command/ps parity)      | ✅      | 🚧          |
 | [sysconf](docs/collectors/sysconf.md)             | POSIX sysconf values                           | ✅      | 🚧          |
 

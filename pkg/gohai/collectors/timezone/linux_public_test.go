@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,7 +39,7 @@ func TestTimezoneLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(TimezoneLinuxPublicTestSuite))
 }
 
-func (s *TimezoneLinuxPublicTestSuite) TestCollectFromFuncs() {
+func (s *TimezoneLinuxPublicTestSuite) TestCollect() {
 	now := func() time.Time {
 		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PDT", -7*3600))
 	}
@@ -92,7 +90,11 @@ func (s *TimezoneLinuxPublicTestSuite) TestCollectFromFuncs() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info := timezone.CollectFromFuncs(tt.readlink, tt.readFile, now)
+			c := &timezone.Linux{ReadlinkFn: tt.readlink, ReadFileFn: tt.readFile, NowFn: now}
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*timezone.Info)
+			s.Require().True(ok)
 			s.Equal(tt.wantName, info.Name)
 			s.Equal(tt.wantAbbrev, info.Abbrev)
 			s.Equal(tt.wantOffset, info.Offset)
@@ -100,10 +102,11 @@ func (s *TimezoneLinuxPublicTestSuite) TestCollectFromFuncs() {
 	}
 }
 
-func (s *TimezoneLinuxPublicTestSuite) TestCollectDefault() {
-	got, err := timezone.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*timezone.Info)
-	s.Require().True(ok)
-	s.NotNil(info)
+func (s *TimezoneLinuxPublicTestSuite) TestNewLinuxWiresUpStdlib() {
+	c := timezone.NewLinux()
+	s.NotNil(c.ReadlinkFn)
+	s.NotNil(c.ReadFileFn)
+	s.NotNil(c.NowFn)
+	// Exercise NowFn — stdlib time.Now always succeeds.
+	s.False(c.NowFn().IsZero())
 }

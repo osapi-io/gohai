@@ -1,5 +1,3 @@
-//go:build linux
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -25,61 +23,53 @@ package timezone
 import (
 	"context"
 	"os"
-	"strings"
 	"time"
 )
 
-// readlinkFn reads the target of a symbolic link. Swappable for tests.
-var readlinkFn = os.Readlink
+// linuxZoneinfoPrefix is stripped from the symlink target to yield the
+// IANA name. Standard Linux (glibc tzdata) layout.
+const linuxZoneinfoPrefix = "/usr/share/zoneinfo/"
 
-// readFileFn reads a file's contents. Swappable for tests.
-var readFileFn = os.ReadFile
+// timezonePath is the Debian/Ubuntu fallback when /etc/localtime is a
+// copied file rather than a symlink (common in container images).
+const timezonePath = "/etc/timezone"
 
-// nowFn returns the current time. Swappable for tests.
-var nowFn = time.Now
+// Linux collects timezone facts on Linux hosts. Embeds base for
+// Name/DefaultEnabled/Dependencies.
+type Linux struct {
+	base
 
-const (
-	localtimePath  = "/etc/localtime"
-	timezonePath   = "/etc/timezone"
-	zoneinfoPrefix = "/usr/share/zoneinfo/"
-)
-
-func collect(
-	_ context.Context,
-) (any, error) {
-	return collectFromFuncs(readlinkFn, readFileFn, nowFn), nil
+	// ReadlinkFn reads /etc/localtime's symlink target.
+	ReadlinkFn func(string) (string, error)
+	// ReadFileFn reads /etc/timezone for the Debian-style fallback.
+	ReadFileFn func(string) ([]byte, error)
+	// NowFn returns the current time for zone abbreviation + offset.
+	NowFn func() time.Time
 }
 
-// collectFromFuncs assembles Info from a readlink function, a file-reader,
-// and a clock. Never returns an error — any missing source leaves the
-// affected field empty while the others still populate.
-//
-// Name resolution order:
-//  1. /etc/localtime symlink target (systemd-style hosts)
-//  2. /etc/timezone file contents (Debian/Ubuntu style, or container
-//     images that copy zoneinfo files instead of symlinking)
-func collectFromFuncs(
-	readlink func(string) (string, error),
-	readFile func(string) ([]byte, error),
-	now func() time.Time,
-) *Info {
-	info := &Info{}
-	abbrev, offset := now().Zone()
-	info.Abbrev = abbrev
-	info.Offset = offset
-	info.Name = resolveName(readlink, readFile)
-	return info
+// NewLinux returns a Linux variant wired to stdlib.
+func NewLinux() *Linux {
+	return &Linux{
+		ReadlinkFn: os.Readlink,
+		ReadFileFn: os.ReadFile,
+		NowFn:      time.Now,
+	}
 }
 
-func resolveName(
-	readlink func(string) (string, error),
-	readFile func(string) ([]byte, error),
-) string {
-	if target, err := readlink(localtimePath); err == nil {
-		return strings.TrimPrefix(target, zoneinfoPrefix)
-	}
-	if b, err := readFile(timezonePath); err == nil {
-		return strings.TrimSpace(string(b))
-	}
-	return ""
+// Collect returns the timezone Info. Never errors — missing sources
+// leave fields empty, clock values still populate from Go's runtime.
+func (l *Linux) Collect(_ context.Context) (any, error) {
+	abbrev, offset := clockZone(l.NowFn)
+	name := resolveName(
+		l.ReadlinkFn,
+		func() (string, error) {
+			b, err := l.ReadFileFn(timezonePath)
+			if err != nil {
+				return "", err
+			}
+			return string(b), nil
+		},
+		linuxZoneinfoPrefix,
+	)
+	return &Info{Name: name, Abbrev: abbrev, Offset: offset}, nil
 }

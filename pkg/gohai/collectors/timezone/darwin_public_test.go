@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,9 +39,9 @@ func TestTimezoneDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(TimezoneDarwinPublicTestSuite))
 }
 
-func (s *TimezoneDarwinPublicTestSuite) TestCollectFromFuncs() {
+func (s *TimezoneDarwinPublicTestSuite) TestCollect() {
 	now := func() time.Time {
-		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PDT", -7*3600))
+		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PST", -8*3600))
 	}
 
 	tests := []struct {
@@ -54,24 +52,35 @@ func (s *TimezoneDarwinPublicTestSuite) TestCollectFromFuncs() {
 		wantOffset int
 	}{
 		{
-			name:       "symlink points to IANA zone",
+			name:       "macOS zoneinfo symlink",
 			readlink:   func(string) (string, error) { return "/var/db/timezone/zoneinfo/America/Los_Angeles", nil },
 			wantName:   "America/Los_Angeles",
-			wantAbbrev: "PDT",
-			wantOffset: -7 * 3600,
+			wantAbbrev: "PST",
+			wantOffset: -8 * 3600,
+		},
+		{
+			name:       "target without prefix passed through",
+			readlink:   func(string) (string, error) { return "UTC", nil },
+			wantName:   "UTC",
+			wantAbbrev: "PST",
+			wantOffset: -8 * 3600,
 		},
 		{
 			name:       "readlink error leaves name empty",
-			readlink:   func(string) (string, error) { return "", errors.New("not found") },
+			readlink:   func(string) (string, error) { return "", errors.New("not a symlink") },
 			wantName:   "",
-			wantAbbrev: "PDT",
-			wantOffset: -7 * 3600,
+			wantAbbrev: "PST",
+			wantOffset: -8 * 3600,
 		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			info := timezone.CollectFromFuncs(tt.readlink, now)
+			c := &timezone.Darwin{ReadlinkFn: tt.readlink, NowFn: now}
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*timezone.Info)
+			s.Require().True(ok)
 			s.Equal(tt.wantName, info.Name)
 			s.Equal(tt.wantAbbrev, info.Abbrev)
 			s.Equal(tt.wantOffset, info.Offset)
@@ -79,10 +88,9 @@ func (s *TimezoneDarwinPublicTestSuite) TestCollectFromFuncs() {
 	}
 }
 
-func (s *TimezoneDarwinPublicTestSuite) TestCollectDefault() {
-	got, err := timezone.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*timezone.Info)
-	s.Require().True(ok)
-	s.NotNil(info)
+func (s *TimezoneDarwinPublicTestSuite) TestNewDarwinWiresUpStdlib() {
+	c := timezone.NewDarwin()
+	s.NotNil(c.ReadlinkFn)
+	s.NotNil(c.NowFn)
+	s.False(c.NowFn().IsZero())
 }

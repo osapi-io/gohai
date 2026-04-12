@@ -1,5 +1,3 @@
-//go:build darwin
-
 // Copyright (c) 2026 John Dewey
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -24,41 +22,41 @@ package timezone
 
 import (
 	"context"
+	"errors"
 	"os"
-	"strings"
 	"time"
 )
 
-// readlinkFn reads the target of a symbolic link. Swappable for tests.
-var readlinkFn = os.Readlink
+// darwinZoneinfoPrefix is the macOS-specific zoneinfo database path
+// (Apple maintains its own tzdata symlinked under /var/db/timezone).
+const darwinZoneinfoPrefix = "/var/db/timezone/zoneinfo/"
 
-// nowFn returns the current time. Swappable for tests.
-var nowFn = time.Now
+// Darwin collects timezone facts on macOS hosts. Embeds base for
+// Name/DefaultEnabled/Dependencies.
+type Darwin struct {
+	base
 
-const (
-	localtimePath  = "/etc/localtime"
-	zoneinfoPrefix = "/var/db/timezone/zoneinfo/"
-)
-
-func collect(
-	_ context.Context,
-) (any, error) {
-	return collectFromFuncs(readlinkFn, nowFn), nil
+	ReadlinkFn func(string) (string, error)
+	NowFn      func() time.Time
 }
 
-// collectFromFuncs assembles Info from a readlink function and a clock.
-// Never returns an error: a missing /etc/localtime leaves Name empty while
-// Abbrev/Offset still come from the clock.
-func collectFromFuncs(
-	readlink func(string) (string, error),
-	now func() time.Time,
-) *Info {
-	info := &Info{}
-	abbrev, offset := now().Zone()
-	info.Abbrev = abbrev
-	info.Offset = offset
-	if target, err := readlink(localtimePath); err == nil {
-		info.Name = strings.TrimPrefix(target, zoneinfoPrefix)
+// NewDarwin returns a Darwin variant wired to stdlib.
+func NewDarwin() *Darwin {
+	return &Darwin{
+		ReadlinkFn: os.Readlink,
+		NowFn:      time.Now,
 	}
-	return info
+}
+
+// Collect returns the timezone Info. macOS has no /etc/timezone
+// equivalent — if /etc/localtime isn't a symlink the Name stays empty
+// (rare on real macs; seen in some CI sandboxes).
+func (d *Darwin) Collect(_ context.Context) (any, error) {
+	abbrev, offset := clockZone(d.NowFn)
+	name := resolveName(
+		d.ReadlinkFn,
+		func() (string, error) { return "", errors.New("no fallback on darwin") },
+		darwinZoneinfoPrefix,
+	)
+	return &Info{Name: name, Abbrev: abbrev, Offset: offset}, nil
 }

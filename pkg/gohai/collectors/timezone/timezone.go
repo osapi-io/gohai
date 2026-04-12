@@ -18,12 +18,20 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package timezone collects the system timezone.
+// Package timezone collects the system timezone (IANA name, short
+// abbreviation, and offset from UTC).
 package timezone
 
 import (
-	"context"
+	"strings"
+	"time"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/platform"
 )
+
+// localtimePath is the standard symlink path on both Linux and macOS.
+const localtimePath = "/etc/localtime"
 
 // Info holds timezone data.
 type Info struct {
@@ -32,32 +40,51 @@ type Info struct {
 	Offset int    `json:"offset"`           // Seconds from UTC
 }
 
-// Collector implements the collector.Collector interface.
-type Collector struct{}
-
-// New returns a new timezone Collector.
-func New() *Collector {
-	return &Collector{}
+// Collector is the public interface every timezone variant satisfies.
+type Collector interface {
+	collector.Collector
 }
 
-// Name returns "timezone".
-func (c *Collector) Name() string {
-	return "timezone"
+type base struct{}
+
+func (base) Name() string           { return "timezone" }
+func (base) DefaultEnabled() bool   { return true }
+func (base) Dependencies() []string { return nil }
+
+// New returns the timezone collector variant for the host OS. Linux and
+// macOS use different zoneinfo prefixes; the per-OS structs carry their
+// own.
+func New() Collector {
+	switch platform.Detect() {
+	case "darwin":
+		return NewDarwin()
+	default:
+		return NewLinux()
+	}
 }
 
-// DefaultEnabled returns true — collector is on by default.
-func (c *Collector) DefaultEnabled() bool {
-	return true
+// clockZone extracts the abbreviation and offset from the Go runtime's
+// local clock. Shared by both variants — identical across OSes.
+func clockZone(
+	now func() time.Time,
+) (string, int) {
+	return now().Zone()
 }
 
-// Dependencies returns no dependencies.
-func (c *Collector) Dependencies() []string {
-	return nil
-}
-
-// Collect gathers timezone facts.
-func (c *Collector) Collect(
-	ctx context.Context,
-) (any, error) {
-	return collect(ctx)
+// resolveName tries readlink(localtimePath) first; on hosts where
+// /etc/localtime is a copied file (Debian/Ubuntu installer output,
+// container images) falls back to the file named by the `fallback`
+// reader. Returns empty when neither source yields a name.
+func resolveName(
+	readlink func(string) (string, error),
+	fallback func() (string, error),
+	zoneinfoPrefix string,
+) string {
+	if target, err := readlink(localtimePath); err == nil {
+		return strings.TrimPrefix(target, zoneinfoPrefix)
+	}
+	if name, err := fallback(); err == nil {
+		return strings.TrimSpace(name)
+	}
+	return ""
 }
