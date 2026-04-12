@@ -27,12 +27,17 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 )
 
@@ -126,5 +131,10 @@ func builtinCollectors() []collector.Collector {
 		machineid.New(),
 		cpu.New(),
 		memory.New(),
+		filesystem.New(),
+		disk.New(),
+		network.New(),
+		process.New(),
+		users.New(),
 	}
 }

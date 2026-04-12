@@ -70,8 +70,8 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
 | [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | ✅ (gopsutil) |
 | [memory](docs/collectors/memory.md)                | Total, free, swap, buffers, cached, hugepages  | ✅      | 🚧          |
-| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | 🚧          |
-| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | 🚧          |
+| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | ✅ (gopsutil) |
+| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | ✅ (gopsutil) |
 | [dmi](docs/collectors/dmi.md)                      | BIOS, system manufacturer, serial, UUID        | ✅      | 🚧          |
 | [gpu](docs/collectors/gpu.md)                      | GPU model, driver, memory                      | ✅      | 🚧          |
 | [pci](docs/collectors/pci.md)                      | PCI devices (`lspci`)                          | ✅      | 🚧          |
@@ -82,7 +82,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, routes, DNS, counters   | ✅      | 🚧          |
+| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, routes, DNS, counters   | ✅      | ⚠️ (gopsutil; no routes/default yet) |
 
 ### ☁️ Cloud
 
@@ -132,7 +132,7 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [users](docs/collectors/users.md)                  | passwd/group data, current user                | ✅      | 🚧          |
+| [users](docs/collectors/users.md)                  | passwd/group data, current user                | ✅      | ⚠️ (gopsutil; logged-in only) |
 | [sessions](docs/collectors/sessions.md)            | Logged-in sessions (`loginctl`)                | ✅      | 🚧          |
 
 ### 🐧 Linux-Specific
@@ -157,7 +157,8 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [command](docs/collectors/command.md)              | Process snapshot (`ps` output)                 | ✅      | 🚧          |
+| [process](docs/collectors/process.md)              | Process list (PID, name, user, cmdline)        | ✅      | ✅ (gopsutil) |
+| [command](docs/collectors/command.md)              | Full `ps` output (Ohai command/ps parity)      | ✅      | 🚧          |
 | [sysconf](docs/collectors/sysconf.md)             | POSIX sysconf values                           | ✅      | 🚧          |
 
 ## 🎯 Usage
