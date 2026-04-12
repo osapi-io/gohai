@@ -29,6 +29,8 @@ contract between the two projects.
 
 ## Usage pattern
 
+### In-process (OSAPI imports gohai)
+
 ```go
 package facts
 
@@ -36,8 +38,7 @@ import (
     "context"
 
     "github.com/osapi-io/gohai/pkg/gohai"
-    "github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
-    // ... other collector sub-packages as needed
+
     "github.com/osapi-io/osapi/internal/job"
 )
 
@@ -54,16 +55,50 @@ func Collect(
     }
 
     reg := &job.FactsRegistration{}
-    if p, ok := f.Data["platform"].(*platform.Info); ok {
-        reg.Architecture = p.Architecture
+    if f.Platform != nil {
+        reg.Architecture = f.Platform.Architecture
     }
-    // ... project other collectors similarly as they become available
+    if f.Hostname != nil {
+        reg.FQDN = f.Hostname.FQDN
+    }
+    if f.Kernel != nil {
+        reg.KernelVersion = f.Kernel.Version
+    }
+    if f.CPU != nil {
+        reg.CPUCount = f.CPU.Total
+    }
+    if f.Virtualization != nil {
+        reg.Containerized = f.Virtualization.Role == "guest"
+    }
+    if f.Network != nil {
+        reg.Interfaces = make([]job.NetworkInterface, 0, len(f.Network.Interfaces))
+        // ... project network.Info into OSAPI's shape
+    }
     return reg, nil
 }
 ```
 
-The typed cast is safe because gohai exports each collector's `Info` struct from
-`pkg/gohai/collectors/<name>/`.
+No collector sub-package imports — the typed fields on `gohai.Facts` give you
+direct access. Each field is a `nil`-check before use (collector was disabled or
+failed).
+
+### Serialized handoff (agent → server)
+
+Agents may serialize `gohai.Facts` as JSON, store it, and have the server
+re-parse later. The JSON schema is stable (pinned by `TestUnmarshalStoredBlob`
+in the gohai test suite):
+
+```go
+// Agent side
+f, _ := g.Collect(ctx)
+blob, _ := f.JSON()
+// store blob in KV
+
+// Server side — later
+var f gohai.Facts
+json.Unmarshal(blob, &f)
+reg.FQDN = f.Hostname.FQDN  // typed access, no assertions
+```
 
 ## Known gaps
 

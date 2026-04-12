@@ -66,7 +66,7 @@ import (
 g, _ := gohai.New(gohai.WithCollectors("hostname"))
 facts, _ := g.Collect(context.Background())
 
-info := facts.Data["hostname"].(*hostname.Info)
+info := facts.Hostname
 fmt.Println(info.Hostname, info.FQDN, info.Domain)
 ```
 

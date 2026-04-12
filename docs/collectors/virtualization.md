@@ -51,7 +51,7 @@ Both fields are empty when no virtualization is detected.
 ## SDK Usage
 
 ```go
-info := facts.Data["virtualization"].(*virtualization.Info)
+info := facts.Virtualization
 containerized := info.Role == "guest"
 ```
 
