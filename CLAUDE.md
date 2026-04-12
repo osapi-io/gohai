@@ -72,11 +72,13 @@ just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
 - **`pkg/gohai/collectors/<name>/`** — Public per-collector sub-packages
   - `<name>.go` — `Info` struct and `Collector` implementation
   - `linux.go` / `darwin.go` / `other.go` — build-tagged OS implementations
-  - `export_linux_test.go` / `export_darwin_test.go` — exposes private
-    symbols to public tests (`var X = x`)
+  - `linux_export_test.go` / `darwin_export_test.go` — exposes private
+    symbols to public tests (`var X = x`). Requires an explicit
+    `//go:build linux` or `//go:build darwin` tag (filename does not
+    auto-tag because the suffix isn't `_<GOOS>`).
   - `<name>_public_test.go` — package-level public tests
   - `linux_public_test.go` / `darwin_public_test.go` — OS-specific public
-    tests (build-tagged)
+    tests (filename auto-tags; explicit `//go:build` tag also present)
 - **`internal/collector/`** — Collector interface + registry plumbing
   - `collector.go` — `Collector` interface, `Tier` type
   - `registry.go` — `Registry` (register, resolve deps, run concurrently)
@@ -228,6 +230,75 @@ func (c *Collector) Collect(
 Follow the library decision order (see "Implementation Methodology" above).
 Wrap gopsutil / ghw / procfs / cloud SDK and reshape the output.
 
+#### Linux distro-family branching
+
+Go build tags split by `GOOS` (linux/darwin/windows) — they **cannot** split
+by Linux distro family (debian/rhel/suse/arch/alpine). Family branching
+happens at **runtime** by reading `platform.Family` (debian, rhel, fedora,
+amazon, suse, arch, alpine, mac_os_x).
+
+**Default: runtime switch inside `linux.go`.** Readable top-down, easy to
+test by injecting a probe/parse function.
+
+```go
+//go:build linux
+
+func collect(
+    ctx context.Context,
+) (any, error) {
+    family := detectFamily(ctx) // read /etc/os-release or call gopsutil
+    name, path := detectLinuxManager(family, probeBinary)
+    return &Info{Name: name, Path: path}, nil
+}
+
+func detectLinuxManager(
+    family string,
+    probe func(string) (name, path string),
+) (string, string) {
+    switch family {
+    case "debian":
+        return probe("apt")
+    case "rhel", "fedora", "amazon":
+        if n, p := probe("dnf"); n != "" {
+            return n, p
+        }
+        return probe("yum")
+    case "suse":
+        return probe("zypper")
+    case "arch":
+        return probe("pacman")
+    case "alpine":
+        return probe("apk")
+    }
+    return "", ""
+}
+```
+
+**When to split into family files:** if a Linux collector's per-family
+branches exceed ~50 lines each, split into sibling files for readability.
+Every family file must have an explicit `//go:build linux` tag (filename
+alone doesn't auto-tag for families; only for GOOS):
+
+```
+package_mgr/
+  package_mgr.go
+  linux.go              # dispatcher — switches on Family, calls collectDebian / collectRhel / ...
+  linux_debian.go       # //go:build linux — debian-specific collector logic
+  linux_rhel.go         # //go:build linux
+  linux_suse.go         # //go:build linux
+  darwin.go
+  other.go
+```
+
+**Getting `platform.Family` inside a collector.** Our `Collect(ctx) (any,
+error)` signature doesn't receive prior collector results. Two options:
+
+1. **Re-detect locally** (simple — call gopsutil's `host.Info()` or parse
+   `/etc/os-release`). gopsutil caches so the extra call is cheap. Default
+   to this.
+2. **Change the Collector interface** to accept prior results. Avoid unless
+   we have a concrete perf reason — it's an API break.
+
 **`linux.go`** (build-tagged `//go:build linux`):
 
 ```go
@@ -279,7 +350,7 @@ Import the sub-package at the top of `gohai.go`.
 
 ### Step 5: Tests — 100% coverage required
 
-**`export_linux_test.go` / `export_darwin_test.go`** — expose private
+**`linux_export_test.go` / `darwin_export_test.go`** — expose private
 symbols (usually `Collect` and `CollectWithInfo`) so public tests can
 exercise them:
 

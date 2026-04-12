@@ -13,7 +13,8 @@ and reshapes the output into a typed `platform.Info` struct.
 
 | Field          | Type   | Description                                               |
 | -------------- | ------ | --------------------------------------------------------- |
-| `name`         | string | OS identifier (e.g., `ubuntu`, `rhel`, `darwin`)          |
+| `os`           | string | Coarse OS (`runtime.GOOS`): `linux`, `darwin`, `windows`  |
+| `name`         | string | Distro/product (e.g., `ubuntu`, `rhel`, `darwin`)         |
 | `version`      | string | OS version (e.g., `24.04`, `14.4.1`)                      |
 | `family`       | string | OS family (e.g., `debian`, `rhel`, `mac_os_x`)            |
 | `architecture` | string | CPU architecture (e.g., `amd64`, `arm64`, `aarch64`)      |
@@ -39,6 +40,7 @@ the full list of distro quirks it handles.
 ```json
 {
   "platform": {
+    "os": "linux",
     "name": "ubuntu",
     "version": "24.04",
     "family": "debian",
@@ -52,6 +54,7 @@ the full list of distro quirks it handles.
 ```json
 {
   "platform": {
+    "os": "darwin",
     "name": "darwin",
     "version": "14.4.1",
     "family": "mac_os_x",

@@ -59,6 +59,7 @@ func (s *PlatformLinuxPublicTestSuite) TestCollectWithHost() {
 				}, nil
 			},
 			want: platform.Info{
+				OS:           "linux",
 				Name:         "ubuntu",
 				Version:      "24.04",
 				Family:       "debian",
@@ -76,6 +77,7 @@ func (s *PlatformLinuxPublicTestSuite) TestCollectWithHost() {
 				}, nil
 			},
 			want: platform.Info{
+				OS:           "linux",
 				Name:         "rhel",
 				Version:      "9.3",
 				Family:       "rhel",

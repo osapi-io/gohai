@@ -83,12 +83,13 @@ gohai --collector.platform --no-collector.cloud
 
 ## 📦 Software
 
-| Collector                 | Key         | Description                     | Default |
-| ------------------------- | ----------- | ------------------------------- | ------- |
-| [packages](packages.md)   | `packages`  | Installed packages              | ❌      |
-| [languages](languages.md) | `languages` | Go, Python, Ruby, Node, etc.    | ❌      |
-| [docker](docker.md)       | `docker`    | Containers, images, Docker info | ❌      |
-| [services](services.md)   | `services`  | Systemd service states          | ❌      |
+| Collector                     | Key           | Description                                   | Default |
+| ----------------------------- | ------------- | --------------------------------------------- | ------- |
+| [package_mgr](package_mgr.md) | `package_mgr` | Active package manager (apt, dnf, brew, etc.) | ✅      |
+| [packages](packages.md)       | `packages`    | Installed packages                            | ❌      |
+| [languages](languages.md)     | `languages`   | Go, Python, Ruby, Node, etc.                  | ❌      |
+| [docker](docker.md)           | `docker`      | Containers, images, Docker info               | ❌      |
+| [services](services.md)       | `services`    | Systemd service states                        | ❌      |
 
 ## 👥 Users & Sessions
 
@@ -130,6 +131,7 @@ automatically — enabling a collector also enables its dependencies.
 | Collector        | Depends On                      |
 | ---------------- | ------------------------------- |
 | `platform`       | `kernel`                        |
+| `package_mgr`    | `platform`                      |
 | `cloud`          | `network`, `dmi`                |
 | `ec2`            | `dmi`                           |
 | `gce`            | —                               |
