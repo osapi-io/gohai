@@ -81,9 +81,11 @@ func (s *LoadLinuxPublicTestSuite) TestReadAverages() {
 		want    load.Info
 	}{
 		{
-			name:  "success maps gopsutil AvgStat to Info",
-			avgFn: func(context.Context) (*gpload.AvgStat, error) { return &gpload.AvgStat{Load1: 1.5, Load5: 2.0, Load15: 2.5}, nil },
-			want:  load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
+			name: "success maps gopsutil AvgStat to Info",
+			avgFn: func(context.Context) (*gpload.AvgStat, error) {
+				return &gpload.AvgStat{Load1: 1.5, Load5: 2.0, Load15: 2.5}, nil
+			},
+			want: load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
 		},
 		{
 			name:    "gopsutil error wrapped and returned",

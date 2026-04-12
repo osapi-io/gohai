@@ -46,9 +46,11 @@ func (s *UptimeDarwinPublicTestSuite) TestCollect() {
 		want    uptime.Info
 	}{
 		{
-			name:   "uptime returned",
-			baseFn: func(context.Context) (*uptime.Info, error) { return &uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"}, nil },
-			want:   uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
+			name: "uptime returned",
+			baseFn: func(context.Context) (*uptime.Info, error) {
+				return &uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"}, nil
+			},
+			want: uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
 		},
 		{
 			name:    "BaseFn error propagated",

@@ -97,7 +97,13 @@ func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 
 func (s *NetworkLinuxPublicTestSuite) TestReadInterfaces() {
 	okIfs := gpnet.InterfaceStatList{
-		{Name: "eth0", MTU: 1500, HardwareAddr: "02:42:ac:11:00:02", Flags: []string{"up"}, Addrs: gpnet.InterfaceAddrList{{Addr: "10.0.0.5/24"}}},
+		{
+			Name:         "eth0",
+			MTU:          1500,
+			HardwareAddr: "02:42:ac:11:00:02",
+			Flags:        []string{"up"},
+			Addrs:        gpnet.InterfaceAddrList{{Addr: "10.0.0.5/24"}},
+		},
 	}
 
 	tests := []struct {
@@ -109,9 +115,11 @@ func (s *NetworkLinuxPublicTestSuite) TestReadInterfaces() {
 		wantCounter bool
 	}{
 		{
-			name:        "interfaces + counters merged",
-			ifsFn:       func(context.Context) (gpnet.InterfaceStatList, error) { return okIfs, nil },
-			countersFn:  func(context.Context, bool) ([]gpnet.IOCountersStat, error) { return []gpnet.IOCountersStat{{Name: "eth0", BytesSent: 100, BytesRecv: 200}}, nil },
+			name:  "interfaces + counters merged",
+			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) { return okIfs, nil },
+			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
+				return []gpnet.IOCountersStat{{Name: "eth0", BytesSent: 100, BytesRecv: 200}}, nil
+			},
 			wantLen:     1,
 			wantCounter: true,
 		},

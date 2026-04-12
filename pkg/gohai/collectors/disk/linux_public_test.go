@@ -101,7 +101,13 @@ func (s *DiskLinuxPublicTestSuite) TestListIOCounters() {
 			name: "success maps counters",
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return map[string]gpdisk.IOCountersStat{
-					"sda": {Name: "sda", ReadCount: 100, WriteCount: 50, ReadBytes: 1024, WriteBytes: 512},
+					"sda": {
+						Name:       "sda",
+						ReadCount:  100,
+						WriteCount: 50,
+						ReadBytes:  1024,
+						WriteBytes: 512,
+					},
 				}, nil
 			},
 			wantLen: 1,

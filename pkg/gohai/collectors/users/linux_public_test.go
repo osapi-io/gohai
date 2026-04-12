@@ -102,7 +102,9 @@ func (s *UsersLinuxPublicTestSuite) TestListSessions() {
 		{
 			name: "success maps UserStat",
 			fn: func(context.Context) ([]host.UserStat, error) {
-				return []host.UserStat{{User: "john", Terminal: "pts/0", Host: "10.0.0.1", Started: 1712908800}}, nil
+				return []host.UserStat{
+					{User: "john", Terminal: "pts/0", Host: "10.0.0.1", Started: 1712908800},
+				}, nil
 			},
 			wantLen: 1,
 		},

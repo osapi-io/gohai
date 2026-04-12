@@ -76,7 +76,12 @@ func (s *PlatformDarwinPublicTestSuite) TestCollect() {
 		{
 			name: "macOS without RSR patch (sw_vers empty)",
 			readFn: func(context.Context) (*platform.Info, string, error) {
-				return &platform.Info{OS: runtime.GOOS, Name: "darwin", Version: "13.5", Architecture: runtime.GOARCH}, "22G74", nil
+				return &platform.Info{
+					OS:           runtime.GOOS,
+					Name:         "darwin",
+					Version:      "13.5",
+					Architecture: runtime.GOARCH,
+				}, "22G74", nil
 			},
 			runCmd: func(string, ...string) ([]byte, error) { return []byte("\n"), nil },
 			want: platform.Info{
@@ -87,7 +92,12 @@ func (s *PlatformDarwinPublicTestSuite) TestCollect() {
 		{
 			name: "sw_vers error omits version_extra",
 			readFn: func(context.Context) (*platform.Info, string, error) {
-				return &platform.Info{OS: runtime.GOOS, Name: "darwin", Version: "12.6", Architecture: runtime.GOARCH}, "21G115", nil
+				return &platform.Info{
+					OS:           runtime.GOOS,
+					Name:         "darwin",
+					Version:      "12.6",
+					Architecture: runtime.GOARCH,
+				}, "21G115", nil
 			},
 			runCmd: func(string, ...string) ([]byte, error) { return nil, errors.New("not found") },
 			want: platform.Info{
