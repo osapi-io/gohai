@@ -47,7 +47,7 @@ const vulnerabilitiesDir = "/sys/devices/system/cpu/vulnerabilities"
 // (assumed homogeneous), per-level cache sizes, NUMA topology, and the
 // vulnerability mitigation status map on Linux.
 type Info struct {
-	Total           int               `json:"total"`                // logical CPU count
+	Count           int               `json:"count"`                // logical CPU count (OCSF: device.cpu_count)
 	Sockets         int               `json:"sockets"`              // physical packages
 	Cores           int               `json:"cores"`                // physical core count
 	ModelName       string            `json:"model_name,omitempty"` // human-readable CPU name
@@ -113,7 +113,7 @@ func readCPU(
 	}
 	info := &Info{}
 	if logical, err := countsFn(ctx, true); err == nil {
-		info.Total = logical
+		info.Count = logical
 	}
 	sockets := map[string]struct{}{}
 	var totalCores int32
@@ -336,7 +336,7 @@ func applyLscpuToInfo(
 			nonZero(s.booksPerDrawer) *
 			nonZero(s.drawers)
 		if total > 0 {
-			info.Total = total
+			info.Count = total
 		}
 		if cores > 0 {
 			info.Cores = cores
@@ -351,7 +351,7 @@ func applyLscpuToInfo(
 			nonZero(s.threadsPerCore)
 		cores := nonZero(s.sockets) * nonZero(s.coresPerSocket)
 		if total > 0 {
-			info.Total = total
+			info.Count = total
 		}
 		if cores > 0 {
 			info.Cores = cores

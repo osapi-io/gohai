@@ -51,7 +51,7 @@ func (s *FactsPublicTestSuite) SetupTest() {
 			Architecture: "amd64",
 		},
 		CPU: &cpu.Info{
-			Total: 8,
+			Count: 8,
 			Cores: 4,
 		},
 		CollectTime:     time.Date(2026, 4, 11, 12, 0, 0, 0, time.UTC),
@@ -95,7 +95,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
     "architecture": "amd64"
   },
   "hostname": {
-    "hostname": "web01",
+    "name": "web01",
     "fqdn": "web01.example.com",
     "domain": "example.com"
   },
@@ -105,7 +105,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
     "machine": "x86_64"
   },
   "cpu": {
-    "total": 8,
+    "count": 8,
     "cores": 4,
     "model_name": "Intel Core i7"
   },
@@ -136,7 +136,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 			name: "hostname typed fields",
 			check: func(f *gohai.Facts) {
 				s.Require().NotNil(f.Hostname)
-				s.Equal("web01", f.Hostname.Hostname)
+				s.Equal("web01", f.Hostname.Name)
 				s.Equal("web01.example.com", f.Hostname.FQDN)
 				s.Equal("example.com", f.Hostname.Domain)
 			},
@@ -154,7 +154,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 			name: "cpu typed fields",
 			check: func(f *gohai.Facts) {
 				s.Require().NotNil(f.CPU)
-				s.Equal(8, f.CPU.Total)
+				s.Equal(8, f.CPU.Count)
 				s.Equal(4, f.CPU.Cores)
 				s.Equal("Intel Core i7", f.CPU.ModelName)
 			},
@@ -191,7 +191,7 @@ func (s *FactsPublicTestSuite) TestFlat() {
 	flat := s.facts.Flat()
 	s.Equal("ubuntu", flat["platform.name"])
 	s.Equal("24.04", flat["platform.version"])
-	s.EqualValues(8, flat["cpu.total"])
+	s.EqualValues(8, flat["cpu.count"])
 }
 
 func (s *FactsPublicTestSuite) TestGet() {
@@ -200,7 +200,7 @@ func (s *FactsPublicTestSuite) TestGet() {
 		want any
 	}{
 		{"platform.name", "ubuntu"},
-		{"cpu.total", float64(8)},
+		{"cpu.count", float64(8)},
 		{"missing", nil},
 	}
 	for _, tt := range tests {

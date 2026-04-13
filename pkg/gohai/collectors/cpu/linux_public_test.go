@@ -114,7 +114,7 @@ func lscpuExec(
 func (s *CPULinuxPublicTestSuite) TestCollect() {
 	baseInfo := func() *cpu.Info {
 		return &cpu.Info{
-			Total: 16, Sockets: 1, Cores: 8,
+			Count: 16, Sockets: 1, Cores: 8,
 			ModelName: "Intel(R) Xeon(R) CPU",
 			VendorID:  "GenuineIntel",
 			Family:    "6", Model: "85",
@@ -140,7 +140,7 @@ func (s *CPULinuxPublicTestSuite) TestCollect() {
 				s.Nil(i.Vulnerabilities)
 				s.Nil(i.Caches)
 				s.Nil(i.NumaNodes)
-				s.Equal(16, i.Total)
+				s.Equal(16, i.Count)
 				s.Equal(8, i.Cores)
 				s.Equal(1, i.Sockets)
 			},
@@ -193,14 +193,14 @@ NUMA node0 CPU(s):   0-15
 				s.Require().NotNil(i.NumaNodes)
 				s.Equal([]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, i.NumaNodes[0])
 				// x86 does NOT override gopsutil's counts
-				s.Equal(16, i.Total)
+				s.Equal(16, i.Count)
 				s.Equal(8, i.Cores)
 				s.Equal(1, i.Sockets)
 			},
 		},
 		{
 			name:   "s390x lscpu: counts overridden",
-			readFn: func(context.Context) (*cpu.Info, error) { return &cpu.Info{Total: 1, Sockets: 1, Cores: 1}, nil },
+			readFn: func(context.Context) (*cpu.Info, error) { return &cpu.Info{Count: 1, Sockets: 1, Cores: 1}, nil },
 			fs:     newVulnFS(s, nil),
 			exec: lscpuExec(s, `Architecture:        s390x
 Thread(s) per core:  1
@@ -213,14 +213,14 @@ Drawer(s):           2
 				// total = 2 * 3 * 1 * 2 * 2 = 24
 				// cores = 2 * 3 * 2 * 2 = 24
 				// sockets = socketsPerBook = 2
-				s.Equal(24, i.Total)
+				s.Equal(24, i.Count)
 				s.Equal(24, i.Cores)
 				s.Equal(2, i.Sockets)
 			},
 		},
 		{
 			name:   "ppc64le lscpu: counts overridden",
-			readFn: func(context.Context) (*cpu.Info, error) { return &cpu.Info{Total: 1, Sockets: 1, Cores: 1}, nil },
+			readFn: func(context.Context) (*cpu.Info, error) { return &cpu.Info{Count: 1, Sockets: 1, Cores: 1}, nil },
 			fs:     newVulnFS(s, nil),
 			exec: lscpuExec(s, `Architecture:        ppc64le
 Thread(s) per core:  4
@@ -231,7 +231,7 @@ Socket(s):           2
 				// total = 2 * 20 * 4 = 160
 				// cores = 2 * 20 = 40
 				// sockets = 2
-				s.Equal(160, i.Total)
+				s.Equal(160, i.Count)
 				s.Equal(40, i.Cores)
 				s.Equal(2, i.Sockets)
 			},
@@ -244,7 +244,7 @@ Socket(s):           2
 			validate: func(i *cpu.Info) {
 				s.Nil(i.Caches)
 				s.Nil(i.NumaNodes)
-				s.Equal(16, i.Total)
+				s.Equal(16, i.Count)
 			},
 		},
 		{
@@ -292,7 +292,8 @@ NUMA node0 CPU(s):   5-2
 			readFn: func(context.Context) (*cpu.Info, error) { return baseInfo(), nil },
 			fs: func() avfs.VFS {
 				f := newVulnFS(s, map[string]string{"meltdown": "Mitigation: PTI\n"})
-				s.Require().NoError(f.MkdirAll("/sys/devices/system/cpu/vulnerabilities/unrelated_subdir", 0o755))
+				s.Require().
+					NoError(f.MkdirAll("/sys/devices/system/cpu/vulnerabilities/unrelated_subdir", 0o755))
 				return f
 			}(),
 			exec: noLscpuExec(s),
@@ -305,7 +306,10 @@ NUMA node0 CPU(s):   5-2
 			name:   "vulnerabilities dir with unreadable file: that file skipped",
 			readFn: func(context.Context) (*cpu.Info, error) { return baseInfo(), nil },
 			fs: vulnReadErrorFS{
-				VFS:      newVulnFS(s, map[string]string{"meltdown": "Mitigation: PTI\n", "bad": "x"}),
+				VFS: newVulnFS(
+					s,
+					map[string]string{"meltdown": "Mitigation: PTI\n", "bad": "x"},
+				),
 				failPath: "/sys/devices/system/cpu/vulnerabilities/bad",
 			},
 			exec: noLscpuExec(s),
@@ -367,7 +371,7 @@ NUMA node0 CPU(s):   ,,,
 		},
 		{
 			name:   "s390x lscpu with missing drawers: nonZero fallback to 1",
-			readFn: func(context.Context) (*cpu.Info, error) { return &cpu.Info{Total: 1, Sockets: 1, Cores: 1}, nil },
+			readFn: func(context.Context) (*cpu.Info, error) { return &cpu.Info{Count: 1, Sockets: 1, Cores: 1}, nil },
 			fs:     newVulnFS(s, nil),
 			exec: lscpuExec(s, `Architecture:        s390x
 Thread(s) per core:  1
@@ -378,7 +382,7 @@ Book(s) per drawer:  1
 			validate: func(i *cpu.Info) {
 				// drawers missing (0) → nonZero returns 1
 				// total = 1 * 2 * 1 * 1 * 1 = 2, cores = 1 * 2 * 1 * 1 = 2
-				s.Equal(2, i.Total)
+				s.Equal(2, i.Count)
 				s.Equal(2, i.Cores)
 				s.Equal(1, i.Sockets)
 			},
@@ -422,7 +426,7 @@ func (s *CPULinuxPublicTestSuite) TestReadCPU() {
 		infoFn      func(context.Context) ([]gpcpu.InfoStat, error)
 		countsFn    func(context.Context, bool) (int, error)
 		wantErr     bool
-		wantTotal   int
+		wantCount   int
 		wantSockets int
 		wantCores   int
 	}{
@@ -430,7 +434,7 @@ func (s *CPULinuxPublicTestSuite) TestReadCPU() {
 			name:        "success maps stats",
 			infoFn:      func(context.Context) ([]gpcpu.InfoStat, error) { return okStats, nil },
 			countsFn:    func(context.Context, bool) (int, error) { return 16, nil },
-			wantTotal:   16,
+			wantCount:   16,
 			wantSockets: 1,
 			wantCores:   8,
 		},
@@ -438,7 +442,7 @@ func (s *CPULinuxPublicTestSuite) TestReadCPU() {
 			name:        "counts error ignored, info still populated",
 			infoFn:      func(context.Context) ([]gpcpu.InfoStat, error) { return okStats, nil },
 			countsFn:    func(context.Context, bool) (int, error) { return 0, errors.New("counts failed") },
-			wantTotal:   0,
+			wantCount:   0,
 			wantSockets: 1,
 			wantCores:   8,
 		},
@@ -446,7 +450,7 @@ func (s *CPULinuxPublicTestSuite) TestReadCPU() {
 			name:        "empty info stats yields zero-value Info",
 			infoFn:      func(context.Context) ([]gpcpu.InfoStat, error) { return nil, nil },
 			countsFn:    func(context.Context, bool) (int, error) { return 4, nil },
-			wantTotal:   4,
+			wantCount:   4,
 			wantSockets: 0,
 			wantCores:   0,
 		},
@@ -469,7 +473,7 @@ func (s *CPULinuxPublicTestSuite) TestReadCPU() {
 				return
 			}
 			s.Require().NoError(err)
-			s.Equal(tt.wantTotal, got.Total)
+			s.Equal(tt.wantCount, got.Count)
 			s.Equal(tt.wantSockets, got.Sockets)
 			s.Equal(tt.wantCores, got.Cores)
 		})

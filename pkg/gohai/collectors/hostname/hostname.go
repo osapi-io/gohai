@@ -56,7 +56,7 @@ func readShortHostname(
 
 // Info holds hostname identification data.
 type Info struct {
-	Hostname    string `json:"hostname"`               // short hostname (e.g., "web01")
+	Name        string `json:"name"`                   // short hostname (OCSF: device.hostname — leaf matches collector, stripped per CLAUDE.md)
 	MachineName string `json:"machine_name,omitempty"` // raw `hostname` output (may be FQDN depending on OS config)
 	FQDN        string `json:"fqdn,omitempty"`         // fully qualified (e.g., "web01.example.com")
 	Domain      string `json:"domain,omitempty"`       // domain portion (e.g., "example.com")
@@ -107,12 +107,12 @@ func resolve(
 	if err != nil {
 		return nil, err
 	}
-	info := &Info{Hostname: short}
+	info := &Info{Name: short}
 	if raw, err := osHostnameFn(); err == nil {
 		info.MachineName = raw
 	}
 
-	info.FQDN, info.Domain = canonicalFQDN(info.Hostname, lookupHostFn, lookupAddrFn)
+	info.FQDN, info.Domain = canonicalFQDN(info.Name, lookupHostFn, lookupAddrFn)
 	return info, nil
 }
 

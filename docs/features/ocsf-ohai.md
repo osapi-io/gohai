@@ -11,12 +11,11 @@ gohai separates two decisions most fact collectors conflate:
   vocabulary as the primary schema, with
   [OpenTelemetry Resource Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/resource/)
   as the secondary when OCSF is silent. OCSF is the industry schema backed by
-  AWS and Splunk for asset / observability / security data. OpenTelemetry is
-  the widely-adopted standard for observability telemetry and covers areas OCSF
+  AWS and Splunk for asset / observability / security data. OpenTelemetry is the
+  widely-adopted standard for observability telemetry and covers areas OCSF
   doesn't (per-CPU vendor/family/model, system load averages, process runtime
   metadata, host uptime). Aligning with both means gohai's output feeds SIEMs,
-  data lakes, inventory tools, and OTel-compatible backends without
-  translation.
+  data lakes, inventory tools, and OTel-compatible backends without translation.
 - **How** each fact is collected (which file to read, which distro quirks to
   handle, which command to fall back to) → mirrors
   [Chef Ohai](https://github.com/chef/ohai/tree/main/lib/ohai/plugins)'s
@@ -43,8 +42,8 @@ Every `docs/collectors/<name>.md` has:
 3. No "Known gaps vs. Ohai" section — methodology gaps live as GitHub issues
    labeled `methodology-gap` + `collector:<name>`.
 
-This structure is enforced for every collector so drift against either source
-is easy to spot.
+This structure is enforced for every collector so drift against either source is
+easy to spot.
 
 ## Field-naming precedence (applied repo-wide)
 
@@ -52,26 +51,27 @@ When picking a Go field name + JSON tag for a new field:
 
 1. **OCSF** ([schema.ocsf.io/dictionary](https://schema.ocsf.io/dictionary)) —
    if OCSF names it, use that.
-2. **OpenTelemetry** ([opentelemetry.io/docs/specs/semconv/resource/](https://opentelemetry.io/docs/specs/semconv/resource/))
+2. **OpenTelemetry**
+   ([opentelemetry.io/docs/specs/semconv/resource/](https://opentelemetry.io/docs/specs/semconv/resource/))
    — when OCSF is silent.
-3. **Industry standard** (node_exporter / systemd / Prometheus exporters) —
-   when OCSF and OpenTelemetry are silent.
+3. **Industry standard** (node_exporter / systemd / Prometheus exporters) — when
+   OCSF and OpenTelemetry are silent.
 4. **Ohai's name** — only when the above are silent and Ohai has a clear
    meaningful name.
 5. **Our own** — last resort, Go-idiomatic snake_case.
 
-Both Go field names and JSON tags derive from the chosen schema name. The
-JSON tag is the schema's leaf name verbatim (`json:"cpu_count"`); the Go field
-is the PascalCase rendering (`CPUCount int`). When Go idiom on initialisms
-conflicts (OCSF `cpu_id` → Go `CPUID`, not `CpuId`), Go convention wins the
-field name but the JSON tag still matches the schema.
+Both Go field names and JSON tags derive from the chosen schema name. The JSON
+tag is the schema's leaf name verbatim (`json:"cpu_count"`); the Go field is the
+PascalCase rendering (`CPUCount int`). When Go idiom on initialisms conflicts
+(OCSF `cpu_id` → Go `CPUID`, not `CpuId`), Go convention wins the field name but
+the JSON tag still matches the schema.
 
 ## Not reference schemas for our naming
 
 - **Open Compute Project (OCP)** is a hardware design spec, not a data/naming
   schema. Ignore for field naming.
-- **CIS / SCAP / XCCDF** describe compliance policies, not field schemas.
-  Ignore for naming.
+- **CIS / SCAP / XCCDF** describe compliance policies, not field schemas. Ignore
+  for naming.
 - **CloudEvents** is an event envelope spec. Ignore for naming.
 
 ## Related

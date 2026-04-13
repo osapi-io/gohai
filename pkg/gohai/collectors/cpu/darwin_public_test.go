@@ -45,7 +45,7 @@ func (s *CPUDarwinPublicTestSuite) TestCollect() {
 		// What gopsutil's ReadFn returns on Darwin today:
 		// Cores == Total (hyperthreaded Intel — wrong), Mhz may be 0.
 		return &cpu.Info{
-			Total: 12, Sockets: 1, Cores: 12,
+			Count: 12, Sockets: 1, Cores: 12,
 			ModelName: "Apple M2 Pro",
 			Mhz:       0,
 		}
@@ -75,7 +75,7 @@ func (s *CPUDarwinPublicTestSuite) TestCollect() {
 				"hw.cpufrequency_max": {out: "2600000000\n"},
 			},
 			validate: func(i *cpu.Info) {
-				s.Equal(12, i.Total)   // unchanged from gopsutil
+				s.Equal(12, i.Count)   // unchanged from gopsutil
 				s.Equal(6, i.Cores)    // overridden
 				s.Equal(1, i.Sockets)  // set
 				s.Equal(2600.0, i.Mhz) // 2600 MHz
