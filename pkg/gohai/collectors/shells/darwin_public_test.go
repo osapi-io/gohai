@@ -51,12 +51,24 @@ func (s *ShellsDarwinPublicTestSuite) TestCollect() {
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.WriteFile("/etc/shells",
-					[]byte("/bin/bash\n/bin/csh\n/bin/dash\n/bin/ksh\n/bin/sh\n/bin/tcsh\n/bin/zsh\n"),
-					fs.FileMode(0o644))
+				_ = f.WriteFile(
+					"/etc/shells",
+					[]byte(
+						"/bin/bash\n/bin/csh\n/bin/dash\n/bin/ksh\n/bin/sh\n/bin/tcsh\n/bin/zsh\n",
+					),
+					fs.FileMode(0o644),
+				)
 				return f
 			},
-			want: []string{"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/sh", "/bin/tcsh", "/bin/zsh"},
+			want: []string{
+				"/bin/bash",
+				"/bin/csh",
+				"/bin/dash",
+				"/bin/ksh",
+				"/bin/sh",
+				"/bin/tcsh",
+				"/bin/zsh",
+			},
 		},
 		{
 			name:    "missing file soft-misses",

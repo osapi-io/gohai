@@ -74,8 +74,11 @@ func (s *ExecutorPublicTestSuite) TestExecute() {
 			wantOut: "hello",
 		},
 		{
-			name:    "non-zero exit returns wrapped error with output captured",
-			setenv:  map[string]string{"GOHAI_EXECUTOR_TEST_OUT": "boom\n", "GOHAI_EXECUTOR_TEST_EXIT": "1"},
+			name: "non-zero exit returns wrapped error with output captured",
+			setenv: map[string]string{
+				"GOHAI_EXECUTOR_TEST_OUT":  "boom\n",
+				"GOHAI_EXECUTOR_TEST_EXIT": "1",
+			},
 			cmd:     os.Args[0],
 			wantOut: "boom\n",
 			wantErr: true,
