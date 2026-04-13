@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
@@ -41,34 +42,31 @@ func TestUsersDarwinPublicTestSuite(t *testing.T) {
 func (s *UsersDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		ss      []users.Session
-		fnErr   error
+		fn      func(context.Context) ([]host.UserStat, error)
 		wantErr bool
 		want    users.Info
 	}{
 		{
 			name: "console session",
-			ss:   []users.Session{{User: "john", Terminal: "console", Started: 1712908800}},
+			fn: func(context.Context) ([]host.UserStat, error) {
+				return []host.UserStat{
+					{User: "john", Terminal: "console", Started: 1712908800},
+				}, nil
+			},
 			want: users.Info{
 				LoggedIn: []users.Session{{User: "john", Terminal: "console", Started: 1712908800}},
 			},
 		},
 		{
 			name:    "gopsutil error wrapped and returned",
-			fnErr:   errors.New("utmpx error"),
+			fn:      func(context.Context) ([]host.UserStat, error) { return nil, errors.New("utmpx error") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &users.Darwin{
-				SessionsFn: func(context.Context) ([]users.Session, error) {
-					if tt.fnErr != nil {
-						return nil, tt.fnErr
-					}
-					return tt.ss, nil
-				},
-			}
+			defer users.SetUsersFn(tt.fn)()
+			c := &users.Darwin{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

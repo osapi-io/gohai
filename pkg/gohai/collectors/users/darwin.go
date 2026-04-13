@@ -23,20 +23,20 @@ package users
 import "context"
 
 // Darwin collects logged-in sessions on macOS via gopsutil (utmpx).
+// loginctl does not exist on Darwin so there's no exec path; gopsutil
+// reads utmpx directly through the package-level usersFn seam.
 type Darwin struct {
 	base
-
-	SessionsFn func(context.Context) ([]Session, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{SessionsFn: listSessions}
+	return &Darwin{}
 }
 
 // Collect returns logged-in session Info.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	ss, err := d.SessionsFn(ctx)
+	ss, err := listSessions(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -27,7 +27,10 @@ import (
 
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
+	"github.com/osapi-io/gohai/internal/executor"
+	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
 )
 
@@ -39,46 +42,100 @@ func TestUsersLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(UsersLinuxPublicTestSuite))
 }
 
+// loginctlExec returns a MockExecutor that canned-answers the
+// `loginctl list-sessions` command.
+func loginctlExec(
+	t *testing.T,
+	out []byte, err error,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(
+			gomock.Any(),
+			"loginctl",
+			"--no-pager",
+			"--no-legend",
+			"--no-ask-password",
+			"list-sessions",
+		).
+		Return(out, err).
+		AnyTimes()
+	return m
+}
+
 func (s *UsersLinuxPublicTestSuite) TestCollect() {
+	loginctlOutput := []byte(
+		"   c1   1000 john     seat0\n" +
+			"   2    0    root\n" +
+			"\n" +
+			"  bad-line\n",
+	)
+	utmpUsers := []host.UserStat{
+		{User: "fallback", Terminal: "pts/0", Host: "10.0.0.1", Started: 1712908800},
+	}
+
 	tests := []struct {
-		name    string
-		ss      []users.Session
-		fnErr   error
-		wantErr bool
-		want    users.Info
+		name     string
+		exec     executor.Executor
+		usersFn  func(context.Context) ([]host.UserStat, error)
+		wantErr  bool
+		validate func(*users.Info)
 	}{
 		{
-			name: "multiple sessions",
-			ss: []users.Session{
-				{User: "john", Terminal: "pts/0", Host: "192.168.1.5", Started: 1712908800},
-				{User: "root", Terminal: "tty1", Started: 1712900000},
+			name:    "loginctl present: parses sessions, ignores utmp",
+			exec:    loginctlExec(s.T(), loginctlOutput, nil),
+			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
+			validate: func(i *users.Info) {
+				s.Require().Len(i.LoggedIn, 2)
+				s.Equal("c1", i.LoggedIn[0].SessionID)
+				s.Equal("1000", i.LoggedIn[0].UID)
+				s.Equal("john", i.LoggedIn[0].User)
+				s.Equal("seat0", i.LoggedIn[0].Seat)
+				s.Equal("2", i.LoggedIn[1].SessionID)
+				s.Equal("root", i.LoggedIn[1].User)
+				s.Empty(i.LoggedIn[1].Seat)
 			},
-			want: users.Info{LoggedIn: []users.Session{
-				{User: "john", Terminal: "pts/0", Host: "192.168.1.5", Started: 1712908800},
-				{User: "root", Terminal: "tty1", Started: 1712900000},
-			}},
 		},
 		{
-			name: "empty session list",
-			ss:   []users.Session{},
-			want: users.Info{LoggedIn: []users.Session{}},
+			name:    "loginctl missing: falls back to utmp via gopsutil",
+			exec:    loginctlExec(s.T(), nil, errors.New("not found")),
+			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
+			validate: func(i *users.Info) {
+				s.Require().Len(i.LoggedIn, 1)
+				s.Equal("fallback", i.LoggedIn[0].User)
+				s.Equal("pts/0", i.LoggedIn[0].Terminal)
+				s.Empty(i.LoggedIn[0].SessionID)
+			},
 		},
 		{
-			name:    "gopsutil error wrapped and returned",
-			fnErr:   errors.New("utmp error"),
+			name:    "nil Exec: utmp path direct",
+			exec:    nil,
+			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
+			validate: func(i *users.Info) {
+				s.Require().Len(i.LoggedIn, 1)
+				s.Equal("fallback", i.LoggedIn[0].User)
+			},
+		},
+		{
+			name:    "loginctl returns empty output: empty session list (not fallback)",
+			exec:    loginctlExec(s.T(), []byte(""), nil),
+			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
+			validate: func(i *users.Info) {
+				s.Empty(i.LoggedIn)
+			},
+		},
+		{
+			name:    "loginctl missing AND gopsutil errors: error propagated",
+			exec:    loginctlExec(s.T(), nil, errors.New("not found")),
+			usersFn: func(context.Context) ([]host.UserStat, error) { return nil, errors.New("utmp boom") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &users.Linux{
-				SessionsFn: func(context.Context) ([]users.Session, error) {
-					if tt.fnErr != nil {
-						return nil, tt.fnErr
-					}
-					return tt.ss, nil
-				},
-			}
+			defer users.SetUsersFn(tt.usersFn)()
+			c := &users.Linux{Exec: tt.exec}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -87,7 +144,7 @@ func (s *UsersLinuxPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*users.Info)
 			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validate(info)
 		})
 	}
 }
@@ -96,8 +153,8 @@ func (s *UsersLinuxPublicTestSuite) TestListSessions() {
 	tests := []struct {
 		name    string
 		fn      func(context.Context) ([]host.UserStat, error)
-		wantErr bool
 		wantLen int
+		wantErr bool
 	}{
 		{
 			name: "success maps UserStat",
@@ -109,22 +166,21 @@ func (s *UsersLinuxPublicTestSuite) TestListSessions() {
 			wantLen: 1,
 		},
 		{
-			name:    "gopsutil error wrapped and returned",
-			fn:      func(context.Context) ([]host.UserStat, error) { return nil, errors.New("utmp failed") },
+			name:    "gopsutil error wrapped",
+			fn:      func(context.Context) ([]host.UserStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			restore := users.SetUsersFn(tt.fn)
-			defer restore()
-			got, err := users.ListSessions(context.Background())
+			defer users.SetUsersFn(tt.fn)()
+			ss, err := users.ListSessions(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
 			}
 			s.Require().NoError(err)
-			s.Len(got, tt.wantLen)
+			s.Len(ss, tt.wantLen)
 		})
 	}
 }
