@@ -126,14 +126,14 @@ None.
 
 **Methodology notes vs. Ohai:**
 
-- We `TrimSpace` each line before the `/`-prefix check, so paths with
-  leading whitespace (e.g. `  /bin/bash`) are accepted. Ohai tests
-  `line[0] == "/"` on the raw line and would skip a space-prefixed entry.
-  Permissive by design — indented entries in `/etc/shells` aren't a real
-  case but trimming is safer behavior.
-- On a missing `/etc/shells` we soft-miss to `{paths: []}`. Ohai omits
-  the `shells` attribute entirely. Our typed struct is always present —
-  this is a Go-idiom divergence, not a collection divergence.
+- We `TrimSpace` each line before the `/`-prefix check, so paths with leading
+  whitespace (e.g. `  /bin/bash`) are accepted. Ohai tests `line[0] == "/"` on
+  the raw line and would skip a space-prefixed entry. Permissive by design —
+  indented entries in `/etc/shells` aren't a real case but trimming is safer
+  behavior.
+- On a missing `/etc/shells` we soft-miss to `{paths: []}`. Ohai omits the
+  `shells` attribute entirely. Our typed struct is always present — this is a
+  Go-idiom divergence, not a collection divergence.
 
 No tracked methodology gaps. Both divergences above are intentional.
 
