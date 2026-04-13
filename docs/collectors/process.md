@@ -22,7 +22,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field                    | Type   | Description                                  | OCSF mapping                  |
+| Field                    | Type   | Description                                  | Schema mapping                |
 | ------------------------ | ------ | -------------------------------------------- | ----------------------------- |
 | `count`                  | int    | Total process count.                         | No direct OCSF.               |
 | `processes[].pid`        | int32  | Process ID.                                  | `process.pid`.                |

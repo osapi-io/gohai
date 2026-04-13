@@ -55,7 +55,7 @@ func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 			lookupHost:   func(string) ([]string, error) { return []string{"192.168.1.42"}, nil },
 			lookupAddr:   func(string) ([]string, error) { return []string{"johns-mbp.local."}, nil },
 			want: hostname.Info{
-				Hostname: "johns-mbp", MachineName: "johns-mbp.local",
+				Name: "johns-mbp", MachineName: "johns-mbp.local",
 				FQDN: "johns-mbp.local", Domain: "local",
 			},
 		},
@@ -65,7 +65,7 @@ func (s *HostnameDarwinPublicTestSuite) TestCollect() {
 			osHostnameFn: func() (string, error) { return "laptop", nil },
 			lookupHost:   func(string) ([]string, error) { return nil, errors.New("no host") },
 			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
-			want:         hostname.Info{Hostname: "laptop", MachineName: "laptop", FQDN: "laptop"},
+			want:         hostname.Info{Name: "laptop", MachineName: "laptop", FQDN: "laptop"},
 		},
 		{
 			name:         "short hostname error propagated",

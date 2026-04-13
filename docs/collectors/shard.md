@@ -18,7 +18,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field  | Type   | Description                                                                                                                     | OCSF mapping                                           |
+| Field  | Type   | Description                                                                                                                     | Schema mapping                                         |
 | ------ | ------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
 | `seed` | string | Hex-encoded SHA-256 of `"<machine_id>:<hostname>"`. 64 characters. Stable across reboots when the host has a stable machine-id. | No OCSF equivalent — shard is a gohai/Ohai convention. |
 

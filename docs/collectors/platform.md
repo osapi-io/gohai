@@ -23,7 +23,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field           | Type   | Description                                               | OCSF mapping                               |
+| Field           | Type   | Description                                               | Schema mapping                             |
 | --------------- | ------ | --------------------------------------------------------- | ------------------------------------------ |
 | `os`            | string | `runtime.GOOS` — `"linux"`, `"darwin"`, `"windows"`.      | `os.type`.                                 |
 | `name`          | string | Distro / product ID (`"ubuntu"`, `"redhat"`, `"darwin"`). | `os.name`.                                 |

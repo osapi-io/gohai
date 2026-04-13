@@ -23,7 +23,7 @@ opts still populate.
 
 Top level: `mounts: []Mount`.
 
-| Field per mount | Type     | Description                                      | OCSF mapping                                      |
+| Field per mount | Type     | Description                                      | Schema mapping                                    |
 | --------------- | -------- | ------------------------------------------------ | ------------------------------------------------- |
 | `device`        | string   | Block device path (`/dev/sda1`, `/dev/disk3s1`). | No direct OCSF.                                   |
 | `mountpoint`    | string   | Mount point path (`/`, `/boot`).                 | Nearest: `file.path` (event-scoped, not perfect). |

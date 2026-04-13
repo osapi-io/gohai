@@ -91,7 +91,7 @@ func (s *CPUPublicTestSuite) TestCollectOnHost() {
 			s.Require().NoError(err)
 			info, ok := got.(*cpu.Info)
 			s.Require().True(ok)
-			s.Greater(info.Total, 0)
+			s.Greater(info.Count, 0)
 		})
 	}
 }

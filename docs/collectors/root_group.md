@@ -23,7 +23,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field  | Type   | Description                                       | OCSF mapping                                                                                                                            |
+| Field  | Type   | Description                                       | Schema mapping                                                                                                                          |
 | ------ | ------ | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `name` | string | Primary group name for root (`root`, `wheel`, …). | No direct OCSF equivalent. OCSF's `group` object targets access-control events, not host-level facts. Treated as a gohai-native scalar. |
 

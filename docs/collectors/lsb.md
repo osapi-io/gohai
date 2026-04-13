@@ -14,7 +14,7 @@ back to `lsb` on legacy systems or for Debian-tooling compatibility.
 
 ## Collected Fields
 
-| Field         | Type   | Description                                        | OCSF mapping                             |
+| Field         | Type   | Description                                        | Schema mapping                           |
 | ------------- | ------ | -------------------------------------------------- | ---------------------------------------- |
 | `id`          | string | DISTRIB_ID — distro short name (`"Ubuntu"`).       | `os.name`.                               |
 | `release`     | string | DISTRIB_RELEASE — version (`"24.04"`).             | `os.version`.                            |

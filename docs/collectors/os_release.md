@@ -23,7 +23,7 @@ macOS has no equivalent file; the collector returns `nil` there.
 
 ## Collected Fields
 
-| Field              | Type              | Description                                              | OCSF mapping                                                        |
+| Field              | Type              | Description                                              | Schema mapping                                                      |
 | ------------------ | ----------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
 | `id`               | string            | Short identifier (`ubuntu`, `rhel`, `debian`, `alpine`). | `os.name` (OCSF uses `name` for the distro identifier).             |
 | `id_like`          | []string          | Parent/upstream distros this host is compatible with.    | No direct OCSF field; downstream-compatible with `os.name` aliases. |

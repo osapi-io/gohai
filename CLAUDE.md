@@ -210,13 +210,35 @@ canonical names for ~99% of what we collect. Using OCSF names means
 gohai output feeds SIEMs, data lakes, and inventory tools without
 translation, so the lookup is mandatory, not aspirational.
 
-**Both Go field names AND JSON tags derive from OCSF.** The JSON tag is
-the OCSF snake_case path verbatim (`json:"kernel_release"`); the Go
-field is the PascalCase rendering of the same path (`KernelRelease
-string`). When Go idiom on initialisms conflicts (OCSF `cpu_id` → Go
-`CPUID`, not `CpuId`), the Go convention wins the field name but the
-JSON tag still matches OCSF. Don't invent internal names that diverge
-from OCSF.
+**Both Go field names AND JSON tags derive from the chosen schema
+(OCSF primary, OpenTelemetry when OCSF is silent).**
+
+**Redundant-prefix rule:** JSON keys use the schema's leaf name with
+any parent-object prefix stripped when that prefix duplicates our
+collector name. Our output nests by collector (`{"cpu": {...},
+"memory": {...}}`), so restating the prefix inside the nested object
+is noise. Examples:
+
+| OCSF path | Our collector | Redundant prefix? | Our JSON key |
+| --- | --- | --- | --- |
+| `device.cpu_count` | `cpu` | `cpu_` → strip | `count` |
+| `device.cpu_cores` | `cpu` | `cpu_` → strip | `cores` |
+| `device.memory_size` | `memory` | `memory_` → strip | `size` |
+| `os.kernel_release` | `kernel` | `kernel_` → strip | `release` |
+| `device.hostname` | `hostname` | `hostname` == collector → `name` | `name` |
+| `process.cmd_line` | `process` | no match → keep | `cmd_line` |
+| `host.cpu.vendor.id` | `cpu` | OTel leaf is `id`, parent `vendor` isn't our collector — keep | `vendor_id` |
+
+The full schema path (OCSF first, OTel if OCSF silent) is cited in
+every collector doc's **Schema mapping** column so consumers bridging
+to OCSF can write a mechanical transform.
+
+The Go field is the PascalCase rendering of the final JSON key
+(`Count int \`json:"count"\``, `Name string \`json:"name"\``). When
+Go idiom on initialisms conflicts (OCSF `cpu_id` → Go `CPUID`, not
+`CpuId`), Go convention wins the field name but the JSON tag still
+follows the rule above. Don't invent internal names that have no
+schema-mapping claim.
 
 Collector JSON field names use `snake_case`. Precedence:
 
@@ -229,12 +251,22 @@ Collector JSON field names use `snake_case`. Precedence:
    don't emit yet but easily could (e.g. `device.hw_info.serial_number`,
    `os.build`), consider adding it — they've thought about what a
    consumer wants.
-2. **Industry standard** — when OCSF is silent, use whatever
-   node_exporter / systemd / Prometheus exporters standardized on.
-   Example: filesystem `mountpoint` / `fstype` follow node_exporter.
-3. **Ohai's name** — only when OCSF and industry standards are silent
-   AND Ohai has a clear, meaningful name.
-4. **Our own name** — last resort. Go-idiomatic snake_case.
+2. **OpenTelemetry semantic conventions** — when OCSF is silent.
+   Well-maintained, widely adopted for observability telemetry; covers
+   areas OCSF hasn't (e.g. per-CPU `host.cpu.model.name`,
+   `host.cpu.family`, `host.cpu.stepping`, `process.runtime.name`).
+   Browse [OpenTelemetry Resource Semantic Conventions][otel-semconv].
+3. **Industry standard** — when OCSF and OpenTelemetry are silent,
+   use whatever node_exporter / systemd / Prometheus exporters
+   standardized on. Example: filesystem `mountpoint` / `fstype`
+   follow node_exporter.
+4. **Ohai's name** — only when OCSF / OpenTelemetry / industry
+   standards are silent AND Ohai has a clear, meaningful name.
+5. **Our own name** — last resort. Go-idiomatic snake_case.
+
+**Not a reference for our schema:** Open Compute Project (OCP) is a
+hardware design spec, not a data schema. CIS / SCAP / XCCDF describe
+compliance policies, not field naming. Ignore for naming purposes.
 
 **Do not mirror Ohai's JSON shape.** Ohai is for **data-source**
 reference (what file/command to read, which distro edge cases, which
@@ -247,6 +279,7 @@ equivalent" with a one-line reason.
 
 [data types]: https://schema.ocsf.io/data_types
 [dictionary]: https://schema.ocsf.io/dictionary
+[otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 
 ### MANDATORY: Cross-reference Ohai's data sources before implementing
 
@@ -496,9 +529,11 @@ Before marking a collector complete, every item below must be true:
    theirs — we inherit their years of bug fixes. Deviations are
    documented and justified.
 2. **Checked OCSF schema** ([schema.ocsf.io](https://schema.ocsf.io/))
-   for canonical field names. OCSF mappings recorded in the collector
-   doc's Collected Fields table. When OCSF has a field we could emit
-   but don't, either add it or note why.
+   and, when OCSF is silent, [OpenTelemetry Resource Semantic
+   Conventions][otel-semconv] for canonical field names. Schema
+   mappings recorded in the collector doc's Collected Fields table
+   under the **Schema mapping** column. When a schema has a field we
+   could emit but don't, either add it or note why.
 3. **osapi per-OS struct pattern** — no build tags, factory dispatch
    on `platform.Detect()`, per-OS structs each implementing Collect.
 4. **100% test coverage.** `go tool cover -func=/tmp/cov.out | grep -v '100.0%'`
@@ -507,7 +542,8 @@ Before marking a collector complete, every item below must be true:
    directly. Compile-time enforcement.
 6. **`docs/collectors/<name>.md`** is a self-contained functional
    spec: Description (what + why in our voice), Collected Fields with
-   OCSF mapping column, Platform Support, Example Output, SDK Usage,
+   **Schema mapping** column (OCSF path first, OpenTelemetry attribute
+   when OCSF is silent), Platform Support, Example Output, SDK Usage,
    Enable/Disable, Dependencies, Data Sources (step-by-step
    methodology in OUR voice — not a Ohai parity table), Backing
    library. **No "Known gaps vs. Ohai" section** — methodology gaps

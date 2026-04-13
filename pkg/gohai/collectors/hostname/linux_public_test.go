@@ -58,7 +58,7 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
 			lookupAddr:   func(string) ([]string, error) { return []string{"web01.example.com."}, nil },
 			want: hostname.Info{
-				Hostname:    "web01",
+				Name:        "web01",
 				MachineName: "web01",
 				FQDN:        "web01.example.com",
 				Domain:      "example.com",
@@ -70,7 +70,7 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 			osHostnameFn: func() (string, error) { return "laptop", nil },
 			lookupHost:   func(string) ([]string, error) { return nil, errors.New("no such host") },
 			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
-			want:         hostname.Info{Hostname: "web01", MachineName: "laptop", FQDN: "web01"},
+			want:         hostname.Info{Name: "web01", MachineName: "laptop", FQDN: "web01"},
 		},
 		{
 			name:         "reverse lookup fails falls back to short name",
@@ -78,7 +78,7 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 			osHostnameFn: func() (string, error) { return "web01", nil },
 			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
 			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("no PTR") },
-			want:         hostname.Info{Hostname: "web01", MachineName: "web01", FQDN: "web01"},
+			want:         hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
 		},
 		{
 			name:         "reverse lookup empty falls back to short name",
@@ -86,7 +86,7 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 			osHostnameFn: func() (string, error) { return "web01", nil },
 			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
 			lookupAddr:   func(string) ([]string, error) { return nil, nil },
-			want:         hostname.Info{Hostname: "web01", MachineName: "web01", FQDN: "web01"},
+			want:         hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
 		},
 		{
 			name:         "empty short name skips FQDN resolution",

@@ -18,11 +18,11 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field      | Type   | Description                                              | OCSF mapping                                                                 |
-| ---------- | ------ | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `hostname` | string | Short hostname (e.g., `web01`).                          | `device.hostname`.                                                           |
-| `fqdn`     | string | Fully qualified domain name (e.g., `web01.example.com`). | `device.domain` (combined with hostname) / OCSF has no dedicated FQDN field. |
-| `domain`   | string | Domain portion of the FQDN (e.g., `example.com`).        | `device.domain`.                                                             |
+| Field    | Type   | Description                                              | Schema mapping                                                               |
+| -------- | ------ | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `name`   | string | Short hostname (e.g., `web01`).                          | OCSF `device.hostname` (leaf stripped: leaf matches collector name).         |
+| `fqdn`   | string | Fully qualified domain name (e.g., `web01.example.com`). | `device.domain` (combined with hostname) / OCSF has no dedicated FQDN field. |
+| `domain` | string | Domain portion of the FQDN (e.g., `example.com`).        | `device.domain`.                                                             |
 
 If no DNS record exists for the short name, `fqdn` falls back to the short
 hostname and `domain` is empty.
@@ -41,7 +41,7 @@ hostname and `domain` is empty.
 ```json
 {
   "hostname": {
-    "hostname": "web01",
+    "name": "web01",
     "fqdn": "web01.example.com",
     "domain": "example.com"
   }
@@ -53,7 +53,7 @@ hostname and `domain` is empty.
 ```json
 {
   "hostname": {
-    "hostname": "laptop",
+    "name": "laptop",
     "fqdn": "laptop"
   }
 }
@@ -66,7 +66,7 @@ g, _ := gohai.New(gohai.WithCollectors("hostname"))
 facts, _ := g.Collect(context.Background())
 
 info := facts.Hostname
-fmt.Println(info.Hostname, info.FQDN, info.Domain)
+fmt.Println(info.Name, info.FQDN, info.Domain)
 ```
 
 ## Enable/Disable

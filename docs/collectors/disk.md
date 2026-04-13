@@ -16,7 +16,7 @@ splits these the same way.
 
 ## Collected Fields
 
-| Field per device | Type   | Description                                   | OCSF mapping    |
+| Field per device | Type   | Description                                   | Schema mapping  |
 | ---------------- | ------ | --------------------------------------------- | --------------- |
 | `name`           | string | Device name (e.g. `sda`, `nvme0n1`, `disk0`). | No direct OCSF. |
 | `read_count`     | uint64 | Number of completed reads.                    | No direct OCSF. |
