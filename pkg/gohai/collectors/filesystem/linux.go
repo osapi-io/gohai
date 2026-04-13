@@ -51,7 +51,7 @@ func NewLinux() *Linux {
 // malformed JSON) silently skips the enrichment and leaves
 // gopsutil-sourced fields intact.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	mounts, err := listMounts(ctx)
+	mounts, err := listMountsFn(ctx)
 	if err != nil {
 		return nil, err
 	}

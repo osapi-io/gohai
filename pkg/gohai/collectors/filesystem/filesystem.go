@@ -101,6 +101,11 @@ var partitionsFn = disk.PartitionsWithContext
 // Kept private alongside partitionsFn. Swapped via SetUsageFn.
 var usageFn = disk.UsageWithContext
 
+// listMountsFn is the per-collector seam the Linux and Darwin
+// variants call. Points at listMounts in production; tests swap via
+// SetListMountsFn to bypass gopsutil entirely.
+var listMountsFn = listMounts
+
 // listMounts is the production bridge to gopsutil. Enumerates
 // partitions and fetches usage (capacity + inodes) for each. Per-mount
 // usage failures (permission denied, stale NFS, etc.) skip usage

@@ -50,3 +50,13 @@ func SetUsageFn(
 	usageFn = fn
 	return func() { usageFn = orig }
 }
+
+// SetListMountsFn swaps the per-collector listMounts seam. Returns a
+// restore func the caller must defer.
+func SetListMountsFn(
+	fn func(context.Context) ([]Mount, error),
+) (restore func()) {
+	orig := listMountsFn
+	listMountsFn = fn
+	return func() { listMountsFn = orig }
+}

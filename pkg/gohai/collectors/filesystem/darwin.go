@@ -26,18 +26,16 @@ import "context"
 // (which uses the BSD getfsstat syscall).
 type Darwin struct {
 	base
-
-	MountsFn func(context.Context) ([]Mount, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{MountsFn: listMounts}
+	return &Darwin{}
 }
 
 // Collect returns filesystem Info.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	mounts, err := d.MountsFn(ctx)
+	mounts, err := listMountsFn(ctx)
 	if err != nil {
 		return nil, err
 	}
