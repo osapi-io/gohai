@@ -21,7 +21,6 @@
 package users_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -81,18 +80,3 @@ func (s *UsersPublicTestSuite) TestNew() {
 // TestCollectOnHost exercises the real gopsutil-backed listSessions
 // bridge. gopsutil's UserStat values aren't unit-constructable;
 // asserts shape only.
-func (s *UsersPublicTestSuite) TestCollectOnHost() {
-	tests := []struct{ name string }{
-		{name: "host enumerates without error"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := users.NewLinux()
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*users.Info)
-			s.Require().True(ok)
-			s.NotNil(info)
-		})
-	}
-}

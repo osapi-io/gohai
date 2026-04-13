@@ -209,8 +209,8 @@ func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 				s.Equal("default", i.Routes[0].Destination)
 				s.Equal("10.0.0.1", i.Routes[0].Gateway)
 				s.Equal("eth0", i.Routes[0].Interface)
-				s.Equal("static", i.Routes[0].Proto, "proto carried from prefix")
-				s.Equal(100, i.Routes[0].Metric, "metric carried from prefix")
+				s.Equal("static", i.Routes[0].Proto)
+				s.Equal(100, i.Routes[0].Metric)
 				s.Equal("10.0.0.2", i.Routes[1].Gateway)
 				s.Equal("lo", i.Routes[1].Interface)
 				// Default route picks the first nexthop's interface/gateway.
@@ -231,7 +231,7 @@ func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 			),
 			validate: func(i *network.Info) {
 				s.Require().Len(i.Routes, 1)
-				s.Equal("eth0", i.Routes[0].Interface, "inferred from src")
+				s.Equal("eth0", i.Routes[0].Interface)
 			},
 		},
 		{

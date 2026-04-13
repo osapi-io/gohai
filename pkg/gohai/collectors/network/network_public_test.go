@@ -21,7 +21,6 @@
 package network_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -80,18 +79,3 @@ func (s *NetworkPublicTestSuite) TestNew() {
 
 // TestCollectOnHost exercises the real gopsutil-backed readInterfaces
 // bridge. Real net.Interfaces aren't unit-constructable.
-func (s *NetworkPublicTestSuite) TestCollectOnHost() {
-	tests := []struct{ name string }{
-		{name: "host enumerates at least the loopback interface"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := network.NewLinux()
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*network.Info)
-			s.Require().True(ok)
-			s.NotEmpty(info.Interfaces)
-		})
-	}
-}

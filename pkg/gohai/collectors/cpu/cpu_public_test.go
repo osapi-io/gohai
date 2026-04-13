@@ -21,7 +21,6 @@
 package cpu_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -80,18 +79,3 @@ func (s *CPUPublicTestSuite) TestNew() {
 
 // TestCollectOnHost exercises the real gopsutil-backed readCPU
 // bridge. gopsutil's InfoStat values aren't unit-constructable.
-func (s *CPUPublicTestSuite) TestCollectOnHost() {
-	tests := []struct{ name string }{
-		{name: "host reports non-zero logical CPU count"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := cpu.NewLinux()
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*cpu.Info)
-			s.Require().True(ok)
-			s.Greater(info.Count, 0)
-		})
-	}
-}

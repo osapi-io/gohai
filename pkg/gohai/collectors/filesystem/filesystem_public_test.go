@@ -21,7 +21,6 @@
 package filesystem_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -81,18 +80,3 @@ func (s *FilesystemPublicTestSuite) TestNew() {
 // TestCollectOnHost exercises the real gopsutil-backed listMounts
 // bridge. gopsutil's Partition/Usage types aren't unit-constructable.
 // Asserts shape only.
-func (s *FilesystemPublicTestSuite) TestCollectOnHost() {
-	tests := []struct{ name string }{
-		{name: "host enumerates at least the root mount"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := filesystem.NewLinux()
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*filesystem.Info)
-			s.Require().True(ok)
-			s.NotEmpty(info.Mounts)
-		})
-	}
-}

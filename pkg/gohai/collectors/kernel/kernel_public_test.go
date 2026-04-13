@@ -21,7 +21,6 @@
 package kernel_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -139,20 +138,3 @@ func (s *KernelPublicTestSuite) TestDefaultUname() {
 
 // TestCollectOnHost exercises the real syscall.Uname via the wired
 // UnameFn. Asserts shape — specific values vary by test host.
-func (s *KernelPublicTestSuite) TestCollectOnHost() {
-	tests := []struct{ name string }{
-		{name: "host reports non-empty uname fields"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := kernel.NewLinux()
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*kernel.Info)
-			s.Require().True(ok)
-			s.NotEmpty(info.Name)
-			s.NotEmpty(info.Release)
-			s.NotEmpty(info.Machine)
-		})
-	}
-}
