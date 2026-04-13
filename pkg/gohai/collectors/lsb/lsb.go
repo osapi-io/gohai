@@ -18,10 +18,10 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package lsb parses /etc/lsb-release — the Debian/Ubuntu-specific LSB
-// metadata file. Matches Ohai's linux/lsb plugin. Mostly a legacy
-// data source; os-release has superseded it on modern distros but
-// Debian derivatives still populate /etc/lsb-release.
+// Package lsb reports Linux Standard Base identification fields via
+// the `lsb_release` CLI — matches Ohai's linux/lsb plugin. The legacy
+// /etc/lsb-release file fallback was deliberately removed by Ohai in
+// chef/ohai#1562; we match that stance.
 package lsb
 
 import (
@@ -32,14 +32,12 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
-const lsbReleasePath = "/etc/lsb-release"
-
 // Info holds LSB release data.
 type Info struct {
-	ID          string `json:"id,omitempty"`          // DISTRIB_ID    (e.g., "Ubuntu")
-	Release     string `json:"release,omitempty"`     // DISTRIB_RELEASE (e.g., "24.04")
-	Codename    string `json:"codename,omitempty"`    // DISTRIB_CODENAME (e.g., "noble")
-	Description string `json:"description,omitempty"` // DISTRIB_DESCRIPTION
+	ID          string `json:"id,omitempty"`          // Distributor ID (e.g., "Ubuntu")
+	Release     string `json:"release,omitempty"`     // Release number (e.g., "24.04")
+	Codename    string `json:"codename,omitempty"`    // Release codename (e.g., "noble")
+	Description string `json:"description,omitempty"` // Human-readable description
 }
 
 // Collector is the public interface every lsb variant satisfies.
@@ -61,32 +59,29 @@ func New() Collector {
 	return NewLinux()
 }
 
-// parseLSBRelease parses lsb-release format: KEY=VALUE, values may
-// be quoted with double quotes.
-func parseLSBRelease(
+// parseLsbReleaseCLI parses `lsb_release -a` output. The CLI emits one
+// labelled field per line — matches Ohai's regex set in linux/lsb.rb.
+func parseLsbReleaseCLI(
 	content string,
 ) *Info {
 	info := &Info{}
 	sc := bufio.NewScanner(strings.NewReader(content))
 	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		i := strings.Index(line, "=")
+		line := sc.Text()
+		i := strings.Index(line, ":")
 		if i < 0 {
 			continue
 		}
-		key := line[:i]
-		val := strings.Trim(line[i+1:], `"'`)
+		key := strings.TrimSpace(line[:i])
+		val := strings.TrimSpace(line[i+1:])
 		switch key {
-		case "DISTRIB_ID":
+		case "Distributor ID":
 			info.ID = val
-		case "DISTRIB_RELEASE":
+		case "Release":
 			info.Release = val
-		case "DISTRIB_CODENAME":
+		case "Codename":
 			info.Codename = val
-		case "DISTRIB_DESCRIPTION":
+		case "Description":
 			info.Description = val
 		}
 	}

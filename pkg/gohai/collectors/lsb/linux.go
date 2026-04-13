@@ -22,31 +22,38 @@ package lsb
 
 import (
 	"context"
-	"errors"
-	"os"
+
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Linux parses /etc/lsb-release on Linux hosts.
+// Linux reports LSB identification fields via the `lsb_release` CLI —
+// the authoritative source used by Ohai and mandated on RHEL-family
+// hosts with `redhat-lsb-core` installed. Ohai deliberately removed
+// the legacy /etc/lsb-release file fallback (chef/ohai#1562) because
+// on modern Debian/Ubuntu the `lsb-release` package ships both the
+// file and the CLI; we match that stance — when the CLI is absent,
+// Info stays empty rather than parsing a possibly-stale file.
 type Linux struct {
 	base
 
-	ReadFileFn func(string) ([]byte, error)
+	Exec executor.Executor
 }
 
-// NewLinux returns a Linux variant wired to os.ReadFile.
+// NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{ReadFileFn: os.ReadFile}
+	return &Linux{Exec: executor.New()}
 }
 
-// Collect reads /etc/lsb-release. Missing file soft-misses to an empty
-// Info — not every Linux distro ships lsb-release.
-func (l *Linux) Collect(_ context.Context) (any, error) {
-	b, err := l.ReadFileFn(lsbReleasePath)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return &Info{}, nil
-		}
-		return nil, err
+// Collect runs `lsb_release -a` and parses its labelled lines. Exec
+// errors or empty output yield an empty Info — not an error (matches
+// Ohai's no-panic behaviour).
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+	if l.Exec == nil {
+		return &Info{}, nil
 	}
-	return parseLSBRelease(string(b)), nil
+	out, err := l.Exec.Execute(ctx, "lsb_release", "-a")
+	if err != nil {
+		return &Info{}, nil
+	}
+	return parseLsbReleaseCLI(string(out)), nil
 }
