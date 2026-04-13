@@ -22,20 +22,21 @@ package load
 
 import "context"
 
-// Darwin collects load averages on macOS. Reads kernel sysctl
-// `vm.loadavg` via gopsutil.
+// Darwin collects load averages on macOS. gopsutil's
+// load.AvgWithContext (vm.loadavg sysctl) is swapped via the
+// package-level avgFn seam.
 type Darwin struct {
 	base
-
-	ReadFn func(context.Context) (*Info, error)
 }
 
-// NewDarwin returns a Darwin variant wired to the production bridge.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{ReadFn: readAverages}
+	return &Darwin{}
 }
 
 // Collect returns the load averages.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	return d.ReadFn(ctx)
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
+	return readAverages(ctx)
 }

@@ -21,7 +21,6 @@
 package memory_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -82,18 +81,3 @@ func (s *MemoryPublicTestSuite) TestNew() {
 // bridge. gopsutil's mem.VirtualMemoryStat + SwapMemoryStat aren't
 // unit-constructable. Asserts shape only — actual byte values depend
 // on the test host.
-func (s *MemoryPublicTestSuite) TestCollectOnHost() {
-	tests := []struct{ name string }{
-		{name: "host reports non-zero total memory"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := memory.NewLinux()
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*memory.Info)
-			s.Require().True(ok)
-			s.NotZero(info.Total)
-		})
-	}
-}

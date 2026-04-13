@@ -25,18 +25,18 @@ import "context"
 // Darwin collects a process snapshot on macOS via gopsutil.
 type Darwin struct {
 	base
-
-	ProcessesFn func(context.Context) ([]Process, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{ProcessesFn: listProcesses}
+	return &Darwin{}
 }
 
 // Collect returns a process snapshot.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	procs, err := d.ProcessesFn(ctx)
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
+	procs, err := listProcesses(ctx)
 	if err != nil {
 		return nil, err
 	}

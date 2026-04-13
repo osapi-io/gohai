@@ -29,9 +29,9 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Linux collects CPU facts on Linux. Uses gopsutil's `/proc/cpuinfo`
-// parse as the primary source (ReadFn) and layers two extensions on
-// top:
+// Linux collects CPU facts on Linux. gopsutil's `/proc/cpuinfo` parse
+// is the primary source (via the package-level readCPUFn seam); we
+// layer two extensions on top:
 //
 //   - vulnerability mitigation status via /sys/devices/system/cpu/vulnerabilities/*
 //     (read through FS — an avfs.VFS, so tests can inject memfs content).
@@ -41,26 +41,26 @@ import (
 type Linux struct {
 	base
 
-	ReadFn func(context.Context) (*Info, error)
-	FS     avfs.VFS
-	Exec   executor.Executor
+	FS   avfs.VFS
+	Exec executor.Executor
 }
 
 // NewLinux returns a Linux variant wired to production dependencies:
-// gopsutil for /proc/cpuinfo, the real OS filesystem for sysfs, and a
-// real `os/exec` wrapper for `lscpu`.
+// the real OS filesystem for sysfs, and a real `os/exec` wrapper for
+// `lscpu`.
 func NewLinux() *Linux {
 	return &Linux{
-		ReadFn: readCPU,
-		FS:     osfs.NewWithNoIdm(),
-		Exec:   executor.New(),
+		FS:   osfs.NewWithNoIdm(),
+		Exec: executor.New(),
 	}
 }
 
 // Collect returns the CPU Info with Linux-specific extensions merged
 // on top of the gopsutil base.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
-	info, err := l.ReadFn(ctx)
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
+	info, err := readCPUFn(ctx)
 	if err != nil {
 		return nil, err
 	}

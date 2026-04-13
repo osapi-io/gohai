@@ -28,24 +28,20 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects CPU facts on macOS. gopsutil's cpu.Info (via
-// ReadFn) sources model / vendor / flags and the logical thread
-// count correctly but gets physical cores (reports logical) and
-// frequency (zero on Apple Silicon) wrong. We override those via
-// direct sysctl reads through the injected Exec.
+// Darwin collects CPU facts on macOS. gopsutil's cpu.Info (via the
+// package-level readCPUFn seam) sources model / vendor / flags and
+// the logical thread count correctly but gets physical cores
+// (reports logical) and frequency (zero on Apple Silicon) wrong. We
+// override those via direct sysctl reads through the injected Exec.
 type Darwin struct {
 	base
 
-	ReadFn func(context.Context) (*Info, error)
-	Exec   executor.Executor
+	Exec executor.Executor
 }
 
 // NewDarwin returns a Darwin variant wired to production dependencies.
 func NewDarwin() *Darwin {
-	return &Darwin{
-		ReadFn: readCPU,
-		Exec:   executor.New(),
-	}
+	return &Darwin{Exec: executor.New()}
 }
 
 // Collect returns the CPU Info with macOS-specific sysctl overrides
@@ -56,8 +52,10 @@ func NewDarwin() *Darwin {
 //   - hw.cpufrequency_max / hw.cpufrequency → Mhz (both absent on
 //     Apple Silicon; Mhz left as whatever gopsutil returned — usually 0
 //     there).
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	info, err := d.ReadFn(ctx)
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
+	info, err := readCPUFn(ctx)
 	if err != nil {
 		return nil, err
 	}

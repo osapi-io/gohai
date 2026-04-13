@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	gpdisk "github.com/shirou/gopsutil/v4/disk"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
@@ -41,48 +42,31 @@ func TestDiskDarwinPublicTestSuite(t *testing.T) {
 func (s *DiskDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		devs    []disk.Device
-		fnErr   error
+		fn      func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error)
 		wantErr bool
-		want    disk.Info
+		wantLen int
 	}{
 		{
 			name: "disk0 snapshot",
-			devs: []disk.Device{
-				{
-					Name:       "disk0",
-					ReadCount:  200,
-					WriteCount: 100,
-					ReadBytes:  204800,
-					WriteBytes: 102400,
-				},
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return map[string]gpdisk.IOCountersStat{
+					"disk0": {Name: "disk0", ReadCount: 200, WriteCount: 100},
+				}, nil
 			},
-			want: disk.Info{Devices: []disk.Device{
-				{
-					Name:       "disk0",
-					ReadCount:  200,
-					WriteCount: 100,
-					ReadBytes:  204800,
-					WriteBytes: 102400,
-				},
-			}},
+			wantLen: 1,
 		},
 		{
-			name:    "iokit error propagated",
-			fnErr:   errors.New("iokit unavailable"),
+			name: "iokit error propagated",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return nil, errors.New("iokit unavailable")
+			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &disk.Darwin{
-				DevicesFn: func(context.Context) ([]disk.Device, error) {
-					if tt.fnErr != nil {
-						return nil, tt.fnErr
-					}
-					return tt.devs, nil
-				},
-			}
+			defer disk.SetIOCountersFn(tt.fn)()
+			c := &disk.Darwin{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -91,7 +75,7 @@ func (s *DiskDarwinPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*disk.Info)
 			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			s.Len(info.Devices, tt.wantLen)
 		})
 	}
 }

@@ -182,7 +182,8 @@ func (s *CPUDarwinPublicTestSuite) TestCollect() {
 				}
 			}
 
-			c := &cpu.Darwin{ReadFn: tt.readFn, Exec: mockExec}
+			defer cpu.SetReadCPUFn(tt.readFn)()
+			c := &cpu.Darwin{Exec: mockExec}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

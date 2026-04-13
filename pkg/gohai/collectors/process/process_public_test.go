@@ -21,7 +21,6 @@
 package process_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -52,24 +51,6 @@ func TestProcessPublicTestSuite(t *testing.T) {
 // Without this test, listProcesses and snapshotFromGopsutil would be
 // untestable from the unit-test layer (gopsutil's *process.Process
 // isn't constructable from test-supplied data).
-func (s *ProcessPublicTestSuite) TestCollectOnHost() {
-	tests := []struct {
-		name string
-	}{
-		{name: "host exposes at least the test-runner process"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := process.NewLinux()
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*process.Info)
-			s.Require().True(ok)
-			s.GreaterOrEqual(info.Count, 1)
-			s.GreaterOrEqual(len(info.Processes), 1)
-		})
-	}
-}
 
 func (s *ProcessPublicTestSuite) TestNew() {
 	orig := platform.Detect

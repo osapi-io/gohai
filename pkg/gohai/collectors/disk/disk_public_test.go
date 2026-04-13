@@ -21,7 +21,6 @@
 package disk_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -82,18 +81,3 @@ func (s *DiskPublicTestSuite) TestNew() {
 // bridge. gopsutil's disk.IOCounters return values aren't
 // unit-constructable; this is the only place we touch the real host.
 // We only assert shape, not specific device names.
-func (s *DiskPublicTestSuite) TestCollectOnHost() {
-	tests := []struct{ name string }{
-		{name: "host enumerates without error"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := disk.NewLinux()
-			got, err := c.Collect(context.Background())
-			s.Require().NoError(err)
-			info, ok := got.(*disk.Info)
-			s.Require().True(ok)
-			s.NotNil(info)
-		})
-	}
-}

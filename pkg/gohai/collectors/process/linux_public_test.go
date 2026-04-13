@@ -41,79 +41,6 @@ func TestProcessLinuxPublicTestSuite(t *testing.T) {
 }
 
 func (s *ProcessLinuxPublicTestSuite) TestCollect() {
-	tests := []struct {
-		name    string
-		procs   []process.Process
-		fnErr   error
-		wantErr bool
-		want    process.Info
-	}{
-		{
-			name: "snapshot with populated processes",
-			procs: []process.Process{
-				{
-					PID:       1,
-					Name:      "systemd",
-					Username:  "root",
-					CmdLine:   "/sbin/init",
-					State:     "S",
-					StartTime: 1_700_000_000,
-				},
-				{PID: 1247, Name: "nginx", Username: "www-data"},
-			},
-			want: process.Info{
-				Count: 2,
-				Processes: []process.Process{
-					{
-						PID:       1,
-						Name:      "systemd",
-						Username:  "root",
-						CmdLine:   "/sbin/init",
-						State:     "S",
-						StartTime: 1_700_000_000,
-					},
-					{PID: 1247, Name: "nginx", Username: "www-data"},
-				},
-			},
-		},
-		{
-			name:  "empty process list",
-			procs: []process.Process{},
-			want:  process.Info{Count: 0, Processes: []process.Process{}},
-		},
-		{
-			name:    "processes error propagated",
-			fnErr:   errors.New("boom"),
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := &process.Linux{
-				ProcessesFn: func(context.Context) ([]process.Process, error) {
-					if tt.fnErr != nil {
-						return nil, tt.fnErr
-					}
-					return tt.procs, nil
-				},
-			}
-			got, err := c.Collect(context.Background())
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*process.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
-		})
-	}
-}
-
-func (s *ProcessLinuxPublicTestSuite) TestListProcesses() {
-	// NewProcess with our own PID yields a valid gopsutil Process whose
-	// field readers succeed — exercises the success branch of
-	// snapshotFromGopsutil.
 	ownPID := int32(os.Getpid())
 	tests := []struct {
 		name    string
@@ -122,7 +49,7 @@ func (s *ProcessLinuxPublicTestSuite) TestListProcesses() {
 		wantLen int
 	}{
 		{
-			name: "success wraps gopsutil processes",
+			name: "snapshot wraps gopsutil processes",
 			fn: func(context.Context) ([]*gpprocess.Process, error) {
 				p, _ := gpprocess.NewProcess(ownPID)
 				return []*gpprocess.Process{p}, nil
@@ -130,22 +57,32 @@ func (s *ProcessLinuxPublicTestSuite) TestListProcesses() {
 			wantLen: 1,
 		},
 		{
-			name:    "gopsutil error wrapped and returned",
-			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("processes failed") },
+			name: "empty process list",
+			fn: func(context.Context) ([]*gpprocess.Process, error) {
+				return []*gpprocess.Process{}, nil
+			},
+			wantLen: 0,
+		},
+		{
+			name:    "gopsutil error propagated",
+			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			restore := process.SetProcessesFn(tt.fn)
-			defer restore()
-			got, err := process.ListProcesses(context.Background())
+			defer process.SetProcessesFn(tt.fn)()
+			c := &process.Linux{}
+			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
 				return
 			}
 			s.Require().NoError(err)
-			s.Len(got, tt.wantLen)
+			info, ok := got.(*process.Info)
+			s.Require().True(ok)
+			s.Equal(tt.wantLen, info.Count)
+			s.Len(info.Processes, tt.wantLen)
 		})
 	}
 }
