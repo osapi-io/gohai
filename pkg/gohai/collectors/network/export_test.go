@@ -22,8 +22,11 @@ package network
 
 import (
 	"context"
+	"net"
 
-	"github.com/shirou/gopsutil/v4/net"
+	"github.com/jaypipes/ghw"
+	gpnet "github.com/shirou/gopsutil/v4/net"
+	"github.com/vishvananda/netlink"
 )
 
 // ReadInterfaces exposes the private readInterfaces bridge to the
@@ -34,7 +37,7 @@ var ReadInterfaces = readInterfaces
 // call backing readInterfaces. Returns a restore func the caller must
 // defer.
 func SetInterfacesFn(
-	fn func(context.Context) (net.InterfaceStatList, error),
+	fn func(context.Context) (gpnet.InterfaceStatList, error),
 ) (restore func()) {
 	orig := interfacesFn
 	interfacesFn = fn
@@ -45,9 +48,73 @@ func SetInterfacesFn(
 // call backing readInterfaces. Returns a restore func the caller must
 // defer.
 func SetIOCountersFn(
-	fn func(context.Context, bool) ([]net.IOCountersStat, error),
+	fn func(context.Context, bool) ([]gpnet.IOCountersStat, error),
 ) (restore func()) {
 	orig := ioCountersFn
 	ioCountersFn = fn
 	return func() { ioCountersFn = orig }
+}
+
+// SetNICFn swaps the ghw-backed link-detail probe (returns name →
+// {Speed, Duplex} map).
+func SetNICFn(
+	fn func() (map[string]NICStat, error),
+) (restore func()) {
+	orig := nicFn
+	nicFn = fn
+	return func() { nicFn = orig }
+}
+
+// SetNeighListFn swaps the netlink-backed neighbour-list probe.
+func SetNeighListFn(
+	fn func() ([]Neighbour, error),
+) (restore func()) {
+	orig := neighListFn
+	neighListFn = fn
+	return func() { neighListFn = orig }
+}
+
+// NeighFamily / NeighState expose the private mapping helpers so
+// tests can assert per-input outputs without going through netlink.
+var (
+	NeighFamily = neighFamily
+	NeighState  = neighState
+)
+
+// NICMapFromGHW / NeighboursFromNetlink expose the pure conversion
+// helpers so tests can exercise them without calling ghw / netlink.
+var (
+	NICMapFromGHW         = nicMapFromGHW
+	NeighboursFromNetlink = neighboursFromNetlink
+)
+
+// ReadNIC / ReadNeighbours expose the production wrappers so tests
+// can drive them with swapped upstream calls.
+var (
+	ReadNIC          = readNIC
+	ReadNeighbours   = readNeighbours
+	IndexToIfaceName = indexToInterfaceName
+)
+
+// SetGHWNetworkFn / SetNetlinkNeighListFn / SetNetInterfaceByIndex
+// swap the upstream library calls for unit-testing readNIC /
+// readNeighbours / indexToInterfaceName without touching the host.
+func SetGHWNetworkFn(fn func(...any) (*ghw.NetworkInfo, error)) (restore func()) {
+	orig := ghwNetworkFn
+	ghwNetworkFn = fn
+	return func() { ghwNetworkFn = orig }
+}
+
+func SetNetlinkNeighListFn(
+	fn func(linkIndex, family int) ([]netlink.Neigh, error),
+) (restore func()) {
+	orig := netlinkNeighListFn
+	netlinkNeighListFn = fn
+	return func() { netlinkNeighListFn = orig }
+}
+
+func SetNetInterfaceByIndex(fn func(int) (*net.Interface, error)) (restore func()) {
+	orig := netInterfaceByIndex
+	netInterfaceByIndex = fn
+	return func() { netInterfaceByIndex = orig }
 }

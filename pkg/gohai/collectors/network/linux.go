@@ -66,11 +66,56 @@ func (l *Linux) Collect(ctx context.Context) (any, error) {
 		applyEncapsulation(l.FS, ifs)
 		ifs = applyOpenVZAliasMerge(l.FS, ifs)
 	}
+	applyNICStats(l.FS, ifs)
 	info := &Info{Interfaces: ifs}
 	if l.Exec != nil {
 		applyRoutes(ctx, l.Exec, info)
 	}
+	if entries, err := neighListFn(); err == nil {
+		info.Neighbours = entries
+	}
 	return info, nil
+}
+
+// applyNICStats merges per-interface link-layer detail. Speed +
+// Duplex come from ghw via the nicFn seam; Driver comes from a
+// sysfs read of `/sys/class/net/<iface>/device/driver` symlink
+// target via the avfs.VFS so tests don't need ghw.
+func applyNICStats(
+	fs avfs.VFS,
+	ifs []Interface,
+) {
+	stats, err := nicFn()
+	if err != nil {
+		stats = nil
+	}
+	for i := range ifs {
+		if s, ok := stats[ifs[i].Name]; ok {
+			ifs[i].Speed = s.Speed
+			ifs[i].Duplex = s.Duplex
+		}
+		if fs != nil {
+			ifs[i].Driver = readSysfsDriver(fs, ifs[i].Name)
+		}
+	}
+}
+
+// readSysfsDriver resolves /sys/class/net/<iface>/device/driver as a
+// symlink and returns the basename. Empty when the symlink can't be
+// read (virtual / loopback interfaces have no driver).
+func readSysfsDriver(
+	fs avfs.VFS,
+	name string,
+) string {
+	target, err := fs.Readlink("/sys/class/net/" + name + "/device/driver")
+	if err != nil {
+		return ""
+	}
+	// target looks like "../../../../bus/pci/drivers/e1000e"; basename.
+	if i := strings.LastIndex(target, "/"); i >= 0 {
+		return target[i+1:]
+	}
+	return target
 }
 
 // applyEncapsulation reads /sys/class/net/<iface>/type for each

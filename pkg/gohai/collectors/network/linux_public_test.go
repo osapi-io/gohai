@@ -23,13 +23,16 @@ package network_test
 import (
 	"context"
 	"errors"
+	"net"
 	"testing"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
+	"github.com/jaypipes/ghw"
 	gpnet "github.com/shirou/gopsutil/v4/net"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"github.com/vishvananda/netlink"
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/executor"
@@ -50,10 +53,25 @@ func fsWith(
 	t require.TestingT,
 	files map[string]string,
 ) avfs.VFS {
+	return fsWithSymlinks(t, files, nil)
+}
+
+// fsWithSymlinks adds symlinks (path → target) on top of regular
+// files. Used for /sys/class/net/<iface>/device/driver, which is a
+// symlink in real sysfs.
+func fsWithSymlinks(
+	t require.TestingT,
+	files map[string]string,
+	symlinks map[string]string,
+) avfs.VFS {
 	fs := memfs.New()
 	for path, content := range files {
 		require.NoError(t, fs.MkdirAll(dirOf(path), 0o755))
 		require.NoError(t, fs.WriteFile(path, []byte(content), 0o644))
+	}
+	for path, target := range symlinks {
+		require.NoError(t, fs.MkdirAll(dirOf(path), 0o755))
+		require.NoError(t, fs.Symlink(target, path))
 	}
 	return fs
 }
@@ -393,6 +411,61 @@ func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:       "ghw NIC + sysfs driver populate Speed/Duplex/Driver per interface",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWithSymlinks(s.T(), nil, map[string]string{
+				"/sys/class/net/eth0/device/driver": "../../../../bus/pci/drivers/e1000e",
+			}),
+			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			validate: func(i *network.Info) {
+				eth0 := i.Interfaces[1]
+				s.Equal("e1000e", eth0.Driver)
+				s.Equal("1000Mb/s", eth0.Speed)
+				s.Equal("Full", eth0.Duplex)
+			},
+		},
+		{
+			name:       "nicFn errors: Speed/Duplex stay empty, Driver from sysfs still works",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWithSymlinks(s.T(), nil, map[string]string{
+				"/sys/class/net/eth0/device/driver": "../../../../bus/pci/drivers/virtio_net",
+			}),
+			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			validate: func(i *network.Info) {
+				eth0 := i.Interfaces[1]
+				s.Equal("virtio_net", eth0.Driver)
+				s.Empty(eth0.Speed)
+				s.Empty(eth0.Duplex)
+			},
+		},
+		{
+			name:       "sysfs driver symlink without slash: target used as-is",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWithSymlinks(s.T(), nil, map[string]string{
+				"/sys/class/net/eth0/device/driver": "ixgbe",
+			}),
+			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			validate: func(i *network.Info) {
+				s.Equal("ixgbe", i.Interfaces[1].Driver)
+			},
+		},
+		{
+			name:       "neighbour list populates Info.Neighbours",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec:       ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			validate: func(i *network.Info) {
+				s.Require().Len(i.Neighbours, 2)
+				s.Equal("10.0.0.1", i.Neighbours[0].Address)
+				s.Equal("inet", i.Neighbours[0].Family)
+				s.Equal("REACHABLE", i.Neighbours[0].State)
+			},
+		},
+		{
 			name: "gopsutil error propagated",
 			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
 				return nil, errors.New("interfaces failed")
@@ -403,8 +476,36 @@ func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 			wantErr:    true,
 		},
 	}
+	defer network.SetNICFn(func() (map[string]network.NICStat, error) {
+		return map[string]network.NICStat{
+			"eth0": {Speed: "1000Mb/s", Duplex: "Full"},
+		}, nil
+	})()
+	defer network.SetNeighListFn(func() ([]network.Neighbour, error) {
+		return []network.Neighbour{
+			{
+				Address:   "10.0.0.1",
+				Family:    "inet",
+				MAC:       "aa:bb:cc:dd:ee:01",
+				Interface: "eth0",
+				State:     "REACHABLE",
+			},
+			{
+				Address:   "fe80::1",
+				Family:    "inet6",
+				MAC:       "aa:bb:cc:dd:ee:02",
+				Interface: "eth0",
+				State:     "STALE",
+			},
+		}, nil
+	})()
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			if tt.name == "nicFn errors: Speed/Duplex stay empty, Driver from sysfs still works" {
+				defer network.SetNICFn(func() (map[string]network.NICStat, error) {
+					return nil, errors.New("ghw failed")
+				})()
+			}
 			defer network.SetInterfacesFn(tt.ifsFn)()
 			defer network.SetIOCountersFn(tt.countersFn)()
 			c := &network.Linux{FS: tt.fs, Exec: tt.exec}
@@ -417,6 +518,249 @@ func (s *NetworkLinuxPublicTestSuite) TestCollect() {
 			info, ok := got.(*network.Info)
 			s.Require().True(ok)
 			tt.validate(info)
+		})
+	}
+}
+
+func (s *NetworkLinuxPublicTestSuite) TestReadNIC() {
+	tests := []struct {
+		name      string
+		fn        func(...any) (*ghw.NetworkInfo, error)
+		wantErr   bool
+		wantCount int
+	}{
+		{
+			name: "ghw success returns mapped NICStats",
+			fn: func(...any) (*ghw.NetworkInfo, error) {
+				return &ghw.NetworkInfo{NICs: []*ghw.NIC{
+					{Name: "eth0", Speed: "1Gb/s", Duplex: "Full"},
+				}}, nil
+			},
+			wantCount: 1,
+		},
+		{
+			name: "ghw error propagated",
+			fn: func(...any) (*ghw.NetworkInfo, error) {
+				return nil, errors.New("ghw failed")
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			defer network.SetGHWNetworkFn(tt.fn)()
+			out, err := network.ReadNIC()
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Len(out, tt.wantCount)
+		})
+	}
+}
+
+func (s *NetworkLinuxPublicTestSuite) TestReadNeighbours() {
+	tests := []struct {
+		name    string
+		fn      func(int, int) ([]netlink.Neigh, error)
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name: "netlink success returns mapped neighbours",
+			fn: func(int, int) ([]netlink.Neigh, error) {
+				return []netlink.Neigh{
+					{IP: net.ParseIP("10.0.0.1"), Family: 2, State: 0x02},
+				}, nil
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "netlink error propagated",
+			fn:      func(int, int) ([]netlink.Neigh, error) { return nil, errors.New("netlink failed") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			defer network.SetNetlinkNeighListFn(tt.fn)()
+			out, err := network.ReadNeighbours()
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Len(out, tt.wantLen)
+		})
+	}
+}
+
+func (s *NetworkLinuxPublicTestSuite) TestIndexToInterfaceName() {
+	tests := []struct {
+		name string
+		fn   func(int) (*net.Interface, error)
+		want string
+	}{
+		{
+			name: "lookup success returns name",
+			fn:   func(int) (*net.Interface, error) { return &net.Interface{Name: "eth0"}, nil },
+			want: "eth0",
+		},
+		{
+			name: "lookup error returns empty",
+			fn:   func(int) (*net.Interface, error) { return nil, errors.New("no such index") },
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			defer network.SetNetInterfaceByIndex(tt.fn)()
+			s.Equal(tt.want, network.IndexToIfaceName(1))
+		})
+	}
+}
+
+func (s *NetworkLinuxPublicTestSuite) TestNICMapFromGHW() {
+	tests := []struct {
+		name string
+		nics []*ghw.NIC
+		want map[string]network.NICStat
+	}{
+		{
+			name: "two NICs mapped",
+			nics: []*ghw.NIC{
+				{Name: "eth0", Speed: "1000Mb/s", Duplex: "Full"},
+				{Name: "wlan0", Speed: "300Mb/s", Duplex: "Half"},
+			},
+			want: map[string]network.NICStat{
+				"eth0":  {Speed: "1000Mb/s", Duplex: "Full"},
+				"wlan0": {Speed: "300Mb/s", Duplex: "Half"},
+			},
+		},
+		{
+			name: "nil NIC entries skipped",
+			nics: []*ghw.NIC{nil, {Name: "eth0", Speed: "10Gb/s", Duplex: "Full"}},
+			want: map[string]network.NICStat{
+				"eth0": {Speed: "10Gb/s", Duplex: "Full"},
+			},
+		},
+		{
+			name: "empty input",
+			nics: nil,
+			want: map[string]network.NICStat{},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, network.NICMapFromGHW(tt.nics))
+		})
+	}
+}
+
+func (s *NetworkLinuxPublicTestSuite) TestNeighboursFromNetlink() {
+	indexToName := func(idx int) string {
+		switch idx {
+		case 1:
+			return "lo"
+		case 2:
+			return "eth0"
+		}
+		return ""
+	}
+	tests := []struct {
+		name    string
+		entries []netlink.Neigh
+		want    []network.Neighbour
+	}{
+		{
+			name: "v4 + v6 neighbours mapped",
+			entries: []netlink.Neigh{
+				{
+					IP: net.ParseIP("10.0.0.1"), Family: 2, State: 0x02, LinkIndex: 2,
+					HardwareAddr: parseMAC(s.T(), "aa:bb:cc:dd:ee:01"),
+				},
+				{
+					IP: net.ParseIP("fe80::1"), Family: 10, State: 0x04, LinkIndex: 2,
+					HardwareAddr: parseMAC(s.T(), "aa:bb:cc:dd:ee:02"),
+				},
+			},
+			want: []network.Neighbour{
+				{
+					Address:   "10.0.0.1",
+					Family:    "inet",
+					MAC:       "aa:bb:cc:dd:ee:01",
+					Interface: "eth0",
+					State:     "REACHABLE",
+				},
+				{
+					Address:   "fe80::1",
+					Family:    "inet6",
+					MAC:       "aa:bb:cc:dd:ee:02",
+					Interface: "eth0",
+					State:     "STALE",
+				},
+			},
+		},
+		{
+			name: "neigh without HardwareAddr leaves MAC empty",
+			entries: []netlink.Neigh{
+				{IP: net.ParseIP("10.0.0.2"), Family: 2, State: 0x02, LinkIndex: 1},
+			},
+			want: []network.Neighbour{
+				{Address: "10.0.0.2", Family: "inet", Interface: "lo", State: "REACHABLE"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, network.NeighboursFromNetlink(tt.entries, indexToName))
+		})
+	}
+}
+
+func parseMAC(t require.TestingT, s string) net.HardwareAddr {
+	mac, err := net.ParseMAC(s)
+	require.NoError(t, err)
+	return mac
+}
+
+func (s *NetworkLinuxPublicTestSuite) TestNeighFamily() {
+	tests := []struct {
+		name string
+		in   int
+		want string
+	}{
+		{"AF_INET → inet", 2, "inet"},
+		{"AF_INET6 → inet6", 10, "inet6"},
+		{"unknown → empty", 99, ""},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, network.NeighFamily(tt.in))
+		})
+	}
+}
+
+func (s *NetworkLinuxPublicTestSuite) TestNeighState() {
+	tests := []struct {
+		name string
+		in   int
+		want string
+	}{
+		{"INCOMPLETE", 0x01, "INCOMPLETE"},
+		{"REACHABLE", 0x02, "REACHABLE"},
+		{"STALE", 0x04, "STALE"},
+		{"DELAY", 0x08, "DELAY"},
+		{"PROBE", 0x10, "PROBE"},
+		{"FAILED", 0x20, "FAILED"},
+		{"NOARP", 0x40, "NOARP"},
+		{"PERMANENT", 0x80, "PERMANENT"},
+		{"unknown bitmask returns empty", 0x100, ""},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, network.NeighState(tt.in))
 		})
 	}
 }
