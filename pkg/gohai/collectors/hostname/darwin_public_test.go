@@ -25,8 +25,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
+	"github.com/osapi-io/gohai/internal/executor"
+	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 )
 
@@ -38,52 +42,192 @@ func TestHostnameDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(HostnameDarwinPublicTestSuite))
 }
 
+// hostnameExec returns a MockExecutor that canned-answers
+// `hostname -s` and bare `hostname` separately. Shared by linux and
+// darwin tests because both OSes run the same commands.
+func hostnameExec(
+	t *testing.T,
+	shortOut []byte, shortErr error,
+	bareOut []byte, bareErr error,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "hostname", "-s").
+		Return(shortOut, shortErr).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "hostname").
+		Return(bareOut, bareErr).
+		AnyTimes()
+	return m
+}
+
 func (s *HostnameDarwinPublicTestSuite) TestCollect() {
+	defer hostname.SetResolverBackoff(0)()
+
+	okHostInfo := func(context.Context) (*host.InfoStat, error) {
+		return &host.InfoStat{Hostname: "gopsutil-short"}, nil
+	}
+	errHostInfo := func(context.Context) (*host.InfoStat, error) {
+		return nil, errors.New("boom")
+	}
+	okLookupHost := func(string) ([]string, error) { return []string{"192.168.1.42"}, nil }
+	okLookupAddr := func(string) ([]string, error) { return []string{"johns-mbp.local."}, nil }
+	failLookupHost := func(string) ([]string, error) { return nil, errors.New("no host") }
+	failLookupAddr := func(string) ([]string, error) { return nil, errors.New("unused") }
+
 	tests := []struct {
-		name         string
-		shortFn      func(context.Context) (string, error)
-		osHostnameFn func() (string, error)
-		lookupHost   func(string) ([]string, error)
-		lookupAddr   func(string) ([]string, error)
-		want         hostname.Info
-		wantErr      bool
+		name       string
+		hostInfo   func(context.Context) (*host.InfoStat, error)
+		osHostname func() (string, error)
+		lookupHost func(string) ([]string, error)
+		lookupAddr func(string) ([]string, error)
+		exec       executor.Executor
+		want       hostname.Info
+		wantErr    bool
 	}{
 		{
-			name:         "canonical macOS host with DNS",
-			shortFn:      func(context.Context) (string, error) { return "johns-mbp", nil },
-			osHostnameFn: func() (string, error) { return "johns-mbp.local", nil },
-			lookupHost:   func(string) ([]string, error) { return []string{"192.168.1.42"}, nil },
-			lookupAddr:   func(string) ([]string, error) { return []string{"johns-mbp.local."}, nil },
+			name:       "exec succeeds: hostname -s + hostname win over gopsutil",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: okLookupHost,
+			lookupAddr: okLookupAddr,
+			exec: hostnameExec(
+				s.T(),
+				[]byte("johns-mbp\n"),
+				nil,
+				[]byte("Johns MacBook Pro\n"),
+				nil,
+			),
 			want: hostname.Info{
-				Name: "johns-mbp", MachineName: "johns-mbp.local",
-				FQDN: "johns-mbp.local", Domain: "local",
+				Name:        "johns-mbp",
+				MachineName: "Johns MacBook Pro",
+				FQDN:        "johns-mbp.local",
+				Domain:      "local",
 			},
 		},
 		{
-			name:         "no DNS falls back to short name",
-			shortFn:      func(context.Context) (string, error) { return "laptop", nil },
-			osHostnameFn: func() (string, error) { return "laptop", nil },
-			lookupHost:   func(string) ([]string, error) { return nil, errors.New("no host") },
-			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
-			want:         hostname.Info{Name: "laptop", MachineName: "laptop", FQDN: "laptop"},
+			name:       "hostname -s fails: short falls back to gopsutil; machine_name from bare hostname",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: failLookupHost,
+			lookupAddr: failLookupAddr,
+			exec: hostnameExec(
+				s.T(),
+				nil,
+				errors.New("no hostname -s"),
+				[]byte("Friendly Name\n"),
+				nil,
+			),
+			want: hostname.Info{
+				Name:        "gopsutil-short",
+				MachineName: "Friendly Name",
+				FQDN:        "gopsutil-short",
+			},
 		},
 		{
-			name:         "short hostname error propagated",
-			shortFn:      func(context.Context) (string, error) { return "", errors.New("boom") },
-			osHostnameFn: func() (string, error) { return "", nil },
-			lookupHost:   func(string) ([]string, error) { return nil, nil },
-			lookupAddr:   func(string) ([]string, error) { return nil, nil },
-			wantErr:      true,
+			name:       "both exec fail: fall back to gopsutil + os.Hostname",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "os-hostname", nil },
+			lookupHost: failLookupHost,
+			lookupAddr: failLookupAddr,
+			exec:       hostnameExec(s.T(), nil, errors.New("e1"), nil, errors.New("e2")),
+			want: hostname.Info{
+				Name:        "gopsutil-short",
+				MachineName: "os-hostname",
+				FQDN:        "gopsutil-short",
+			},
+		},
+		{
+			name:       "both exec fail and os.Hostname errors: machine_name mirrors short",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "", errors.New("nope") },
+			lookupHost: failLookupHost,
+			lookupAddr: failLookupAddr,
+			exec:       hostnameExec(s.T(), nil, errors.New("e1"), nil, errors.New("e2")),
+			want: hostname.Info{
+				Name:        "gopsutil-short",
+				MachineName: "gopsutil-short",
+				FQDN:        "gopsutil-short",
+			},
+		},
+		{
+			name:       "empty exec output treated as fallback",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "os-hostname", nil },
+			lookupHost: failLookupHost,
+			lookupAddr: failLookupAddr,
+			exec:       hostnameExec(s.T(), []byte("\n"), nil, []byte(""), nil),
+			want: hostname.Info{
+				Name:        "gopsutil-short",
+				MachineName: "os-hostname",
+				FQDN:        "gopsutil-short",
+			},
+		},
+		{
+			name:       "nil Exec path",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "os-hostname", nil },
+			lookupHost: failLookupHost,
+			lookupAddr: failLookupAddr,
+			exec:       nil,
+			want: hostname.Info{
+				Name:        "gopsutil-short",
+				MachineName: "os-hostname",
+				FQDN:        "gopsutil-short",
+			},
+		},
+		{
+			name:       "short hostname error propagated",
+			hostInfo:   errHostInfo,
+			osHostname: func() (string, error) { return "", nil },
+			lookupHost: func(string) ([]string, error) { return nil, nil },
+			lookupAddr: func(string) ([]string, error) { return nil, nil },
+			exec:       hostnameExec(s.T(), nil, errors.New("e1"), nil, errors.New("e2")),
+			wantErr:    true,
+		},
+		{
+			name:       "transient DNS failure recovers on retry",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: func() func(string) ([]string, error) {
+				n := 0
+				return func(string) ([]string, error) {
+					n++
+					if n < 2 {
+						return nil, errors.New("transient")
+					}
+					return []string{"192.168.1.42"}, nil
+				}
+			}(),
+			lookupAddr: okLookupAddr,
+			exec:       hostnameExec(s.T(), []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil),
+			want: hostname.Info{
+				Name:        "johns-mbp",
+				MachineName: "Johns",
+				FQDN:        "johns-mbp.local",
+				Domain:      "local",
+			},
+		},
+		{
+			name:       "empty short name skips FQDN",
+			hostInfo:   func(context.Context) (*host.InfoStat, error) { return nil, nil },
+			osHostname: func() (string, error) { return "", errors.New("no hostname") },
+			lookupHost: func(string) ([]string, error) { return nil, errors.New("unused") },
+			lookupAddr: func(string) ([]string, error) { return nil, errors.New("unused") },
+			exec:       hostnameExec(s.T(), nil, errors.New("e1"), nil, errors.New("e2")),
+			want:       hostname.Info{},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &hostname.Darwin{
-				ShortHostnameFn: tt.shortFn,
-				OSHostnameFn:    tt.osHostnameFn,
-				LookupHostFn:    tt.lookupHost,
-				LookupAddrFn:    tt.lookupAddr,
-			}
+			defer hostname.SetHostInfoFn(tt.hostInfo)()
+			defer hostname.SetOSHostnameFn(tt.osHostname)()
+			defer hostname.SetLookupHostFn(tt.lookupHost)()
+			defer hostname.SetLookupAddrFn(tt.lookupAddr)()
+
+			c := &hostname.Darwin{Exec: tt.exec}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

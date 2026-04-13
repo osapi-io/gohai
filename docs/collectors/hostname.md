@@ -4,57 +4,43 @@
 
 ## Description
 
-Identifies the system hostname, FQDN, and domain. Wraps
-[gopsutil's `host.Info`](https://pkg.go.dev/github.com/shirou/gopsutil/v4/host)
-for the short hostname and performs a DNS CNAME lookup (via Go's
-`net.LookupCNAME`) to resolve the FQDN. The domain is derived from the FQDN.
+Reports the host's short name, fully qualified domain name, and DNS domain. The
+FQDN is canonicalized via a DNS round-trip; the collector tolerates transient
+resolver failures by retrying up to three times before falling back to the short
+hostname. Consumers use this as a stable identity for telemetry, inventory, and
+correlation.
 
-Consumers use this to:
-
-- Label telemetry and logs with a canonical host identity.
-- Tag service registrations with the externally-resolvable name (FQDN) rather
-  than just the kernel's `nodename`.
-- Detect hostname drift between `/etc/hostname` and DNS records.
+On macOS we additionally capture the friendly machine name
+(ComputerName-derived, e.g. "John's MacBook Pro") and prefer `hostname -s` over
+gopsutil so the short name always matches what `$(hostname -s)` reports
+elsewhere on the host — important on MDM-managed Macs where
+`scutil --get HostName` can differ.
 
 ## Collected Fields
 
-| Field    | Type   | Description                                              | Schema mapping                                                               |
-| -------- | ------ | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `name`   | string | Short hostname (e.g., `web01`).                          | OCSF `device.hostname` (leaf stripped: leaf matches collector name).         |
-| `fqdn`   | string | Fully qualified domain name (e.g., `web01.example.com`). | `device.domain` (combined with hostname) / OCSF has no dedicated FQDN field. |
-| `domain` | string | Domain portion of the FQDN (e.g., `example.com`).        | `device.domain`.                                                             |
-
-If no DNS record exists for the short name, `fqdn` falls back to the short
-hostname and `domain` is empty.
+| Field          | Type   | Description                                                                              | Schema mapping                                                       |
+| -------------- | ------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `name`         | string | Short hostname (e.g., `web01`).                                                          | OCSF `device.hostname` (leaf stripped: leaf matches collector name). |
+| `fqdn`         | string | Canonical FQDN; falls back to short hostname when DNS canonicalization ultimately fails. | `device.domain` + `.hostname`.                                       |
+| `domain`       | string | DNS domain — everything after the first `.` of the FQDN. Empty when FQDN equals `name`.  | `device.domain`.                                                     |
+| `machine_name` | string | Human-friendly name (macOS `ComputerName`-derived). Linux: same as `name`.               | No direct OCSF.                                                      |
 
 ## Platform Support
 
-| Platform | Supported                                     |
-| -------- | --------------------------------------------- |
-| Linux    | ✅ (`gopsutil/host.Info` + `net.LookupCNAME`) |
-| macOS    | ✅ (`gopsutil/host.Info` + `net.LookupCNAME`) |
+| Platform | Supported                                                          |
+| -------- | ------------------------------------------------------------------ |
+| Linux    | ✅ (`hostname -s` + `hostname` via executor, DNS canonicalization) |
+| macOS    | ✅ (`hostname -s` + `hostname` via executor, DNS canonicalization) |
 
 ## Example Output
-
-### With DNS CNAME
 
 ```json
 {
   "hostname": {
     "name": "web01",
     "fqdn": "web01.example.com",
-    "domain": "example.com"
-  }
-}
-```
-
-### Without DNS CNAME
-
-```json
-{
-  "hostname": {
-    "name": "laptop",
-    "fqdn": "laptop"
+    "domain": "example.com",
+    "machine_name": "web01"
   }
 }
 ```
@@ -66,7 +52,7 @@ g, _ := gohai.New(gohai.WithCollectors("hostname"))
 facts, _ := g.Collect(context.Background())
 
 info := facts.Hostname
-fmt.Println(info.Name, info.FQDN, info.Domain)
+fmt.Println(info.Name, info.FQDN, info.Domain, info.MachineName)
 ```
 
 ## Enable/Disable
@@ -82,19 +68,37 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                                                            | Ohai plugin                                                                                                                                    | Alignment                                                                                                                                                                                                                  |
-| -------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `host.Info` (reads `/proc/sys/kernel/hostname` / `uname`) + `net.LookupCNAME`. | [`hostname.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/hostname.rb) — `Socket.gethostname` + `Socket.gethostbyname` for FQDN. | **Equivalent sources** (kernel nodename for short; DNS for FQDN). Ohai also surfaces `machinename` (uname `nodename`, which usually matches hostname but can differ on hosts with manual `/etc/hostname` edits) — tracked. |
-| macOS    | Same as Linux.                                                                          | Same `hostname.rb`.                                                                                                                            | **Equivalent.**                                                                                                                                                                                                            |
+On Linux and macOS (identical — mirrors Ohai's `hostname.rb` linux and darwin
+branches):
 
-**Known gaps vs. Ohai:**
+1. `hostname -s` → `name`. Run through the shared `internal/executor` runner. We
+   prefer this over gopsutil so our short name matches what `$(hostname -s)`
+   reports in any other tool on the host — important on MDM-managed Macs where
+   `scutil --get HostName` can differ, and on Linux hosts where `/etc/hostname`
+   has been manually edited to an FQDN.
+2. `hostname` (no args) → `machine_name`. On stock macOS this is the
+   `ComputerName`-derived friendly name; on Linux it normally matches the short
+   name.
+3. FQDN is canonicalized via `net.LookupHost` followed by `net.LookupAddr`,
+   retried up to 3 times with a 100ms backoff on transient errors — matches
+   Ohai's `canonicalize_hostname_with_retries`. On final failure we use the
+   short hostname as FQDN.
+4. Derive `domain` by splitting FQDN on the first `.`. Empty when FQDN equals
+   `name`.
+5. Fallback chain when the exec runner is unavailable or `hostname -s` /
+   `hostname` fail: short name from gopsutil's `host.Info`, `machine_name` from
+   `os.Hostname()`. Keeps minimal containers without `util-linux-hostname`
+   working.
 
-- `machine_name` — Ohai emits `machinename` (uname `nodename`) separately from
-  `hostname`; we fold them. Adding as an optional field is planned (issue #43 in
-  the repo's task list).
+Both commands are invoked through the shared `internal/executor` runner; tests
+mock present / absent / empty-output cases via `go.uber.org/mock`.
 
 ## Backing library
 
+- [`internal/executor`](../../internal/executor) — shared command-runner
+  abstraction used to invoke `hostname -s` and `hostname` on both Linux and
+  macOS. Tests mock it with `go.uber.org/mock`.
+- Go stdlib `net` package for forward/reverse DNS canonicalization.
 - [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
-  BSD-3.
-- Go stdlib `net.LookupCNAME` for FQDN resolution.
+  BSD-3. Fallback source for the short hostname when the exec runner is
+  unavailable.

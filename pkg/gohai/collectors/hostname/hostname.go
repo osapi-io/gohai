@@ -18,29 +18,45 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package hostname collects hostname, machine name, FQDN, and domain
-// identification.
+// Package hostname collects the short hostname, fully qualified domain
+// name, DNS domain, and friendly machine name. Mirrors Ohai's
+// `hostname -s` + `hostname` + DNS-canonicalization methodology; FQDN
+// canonicalization tolerates transient resolver failures by retrying
+// the forward+reverse DNS chain up to three times before falling back
+// to the short hostname.
 package hostname
 
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/shirou/gopsutil/v4/host"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
-// Kept private so importers don't transitively need gopsutil. Swapped
-// via SetHostInfoFn (export_test.go).
-var hostInfoFn = host.InfoWithContext
+// Package-level injection seams. Kept private so importers don't
+// transitively need gopsutil; swapped via the SetXFn helpers in
+// export_test.go. Stdlib calls are swapped the same way so tests avoid
+// real DNS traffic and don't sleep.
+var (
+	hostInfoFn      = host.InfoWithContext
+	lookupHostFn    = net.LookupHost
+	lookupAddrFn    = net.LookupAddr
+	osHostnameFn    = os.Hostname
+	resolverRetries = 3
+	resolverBackoff = 100 * time.Millisecond
+)
 
-// readShortHostname is the production bridge. Wraps the private
-// gopsutil call and returns just the short hostname string — callers
-// never see gopsutil types.
+// readShortHostname returns just the short hostname from gopsutil's
+// host.Info, stripped of the gopsutil types so callers never see them.
+// Used as a fallback when the `hostname -s` exec fails.
 func readShortHostname(
 	ctx context.Context,
 ) (string, error) {
@@ -57,7 +73,7 @@ func readShortHostname(
 // Info holds hostname identification data.
 type Info struct {
 	Name        string `json:"name"`                   // short hostname (OCSF: device.hostname — leaf matches collector, stripped per CLAUDE.md)
-	MachineName string `json:"machine_name,omitempty"` // raw `hostname` output (may be FQDN depending on OS config)
+	MachineName string `json:"machine_name,omitempty"` // raw `hostname` output (macOS: ComputerName-derived friendly name)
 	FQDN        string `json:"fqdn,omitempty"`         // fully qualified (e.g., "web01.example.com")
 	Domain      string `json:"domain,omitempty"`       // domain portion (e.g., "example.com")
 }
@@ -73,10 +89,7 @@ func (base) Name() string           { return "hostname" }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 
-// New returns the hostname variant for the host OS. gopsutil and
-// net.LookupAddr work cross-platform so Linux and Darwin share logic
-// via the shared resolve helper — each struct just wires in the
-// right stdlib calls.
+// New returns the hostname variant for the host OS.
 func New() Collector {
 	switch platform.Detect() {
 	case "darwin":
@@ -86,58 +99,79 @@ func New() Collector {
 	}
 }
 
-// resolve performs the host-identity lookups:
-//   - Hostname: short name from gopsutil host.Info (via injected
-//     shortHostnameFn).
-//   - MachineName: raw os.Hostname (whatever the kernel returns — may
-//     or may not be FQDN depending on OS configuration).
-//   - FQDN: forward+reverse DNS canonicalization (matches `hostname -f`
-//     behavior and Ohai's canonicalize_hostname_with_retries).
-//   - Domain: everything after the first `.` in FQDN.
-//
-// Injectable so tests don't need DNS.
-func resolve(
+// collectWithExec is the shared Collect body — Linux and Darwin run
+// the exact same commands (`hostname -s` for the short name,
+// `hostname` for the friendly machine name), matching Ohai's linux
+// and darwin branches.
+func collectWithExec(
 	ctx context.Context,
-	shortHostnameFn func(context.Context) (string, error),
-	osHostnameFn func() (string, error),
-	lookupHostFn func(string) ([]string, error),
-	lookupAddrFn func(string) ([]string, error),
+	exec executor.Executor,
 ) (*Info, error) {
-	short, err := shortHostnameFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	info := &Info{Name: short}
-	if raw, err := osHostnameFn(); err == nil {
-		info.MachineName = raw
+	short, shortOK := "", false
+	machine, machineOK := "", false
+
+	if exec != nil {
+		if out, err := exec.Execute(ctx, "hostname", "-s"); err == nil {
+			if trimmed := strings.TrimSpace(string(out)); trimmed != "" {
+				short, shortOK = trimmed, true
+			}
+		}
+		if out, err := exec.Execute(ctx, "hostname"); err == nil {
+			if trimmed := strings.TrimSpace(string(out)); trimmed != "" {
+				machine, machineOK = trimmed, true
+			}
+		}
 	}
 
-	info.FQDN, info.Domain = canonicalFQDN(info.Name, lookupHostFn, lookupAddrFn)
+	if !shortOK {
+		gpShort, err := readShortHostname(ctx)
+		if err != nil {
+			return nil, err
+		}
+		short = gpShort
+	}
+	if !machineOK {
+		if raw, err := osHostnameFn(); err == nil {
+			machine = raw
+		} else {
+			machine = short
+		}
+	}
+
+	info := &Info{Name: short, MachineName: machine}
+	info.FQDN, info.Domain = canonicalFQDN(short)
 	return info, nil
 }
 
 // canonicalFQDN resolves short hostname → IP → PTR (reverse DNS) to
-// find the canonical FQDN. Falls back to the short name if no reverse
-// record exists. Matches `hostname -f` semantics and Ohai.
+// find the canonical FQDN. Retries the chain up to resolverRetries
+// times with resolverBackoff between attempts to ride over transient
+// resolver blips (split-horizon resolvers, systemd-resolved startup
+// races). On final failure returns the short name as FQDN and empty
+// domain — matches Ohai's canonicalize_hostname_with_retries behaviour.
 func canonicalFQDN(
 	short string,
-	lookupHost func(string) ([]string, error),
-	lookupAddr func(string) ([]string, error),
 ) (fqdn, domain string) {
 	if short == "" {
 		return "", ""
 	}
-	ips, err := lookupHost(short)
-	if err != nil || len(ips) == 0 {
-		return short, ""
+	for attempt := 0; attempt < resolverRetries; attempt++ {
+		if attempt > 0 {
+			time.Sleep(resolverBackoff)
+		}
+		ips, err := lookupHostFn(short)
+		if err != nil || len(ips) == 0 {
+			continue
+		}
+		names, err := lookupAddrFn(ips[0])
+		if err != nil || len(names) == 0 {
+			continue
+		}
+		fqdn = strings.TrimSuffix(names[0], ".")
+		if i := strings.Index(fqdn, "."); i >= 0 {
+			domain = fqdn[i+1:]
+		}
+		return fqdn, domain
 	}
-	names, err := lookupAddr(ips[0])
-	if err != nil || len(names) == 0 {
-		return short, ""
-	}
-	fqdn = strings.TrimSuffix(names[0], ".")
-	if i := strings.Index(fqdn, "."); i >= 0 {
-		domain = fqdn[i+1:]
-	}
-	return fqdn, domain
+	return short, ""
 }
