@@ -20,23 +20,39 @@
 
 package users
 
-import "context"
+import (
+	"context"
 
-// Linux collects logged-in sessions on Linux via gopsutil (utmp).
+	"github.com/osapi-io/gohai/internal/executor"
+)
+
+// Linux collects logged-in sessions on Linux. Prefers
+// `loginctl list-sessions` on systemd hosts (catches GDM/KDE
+// graphical sessions, remote desktop, systemd-run sessions that
+// never reach utmp). Falls back to gopsutil's utmp read when
+// loginctl is absent or errors (non-systemd hosts, minimized
+// containers).
 type Linux struct {
 	base
 
-	SessionsFn func(context.Context) ([]Session, error)
+	Exec executor.Executor
 }
 
-// NewLinux returns a Linux variant wired to gopsutil.
+// NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{SessionsFn: listSessions}
+	return &Linux{Exec: executor.New()}
 }
 
 // Collect returns logged-in session Info.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	ss, err := l.SessionsFn(ctx)
+	if l.Exec != nil {
+		out, err := l.Exec.Execute(ctx,
+			"loginctl", "--no-pager", "--no-legend", "--no-ask-password", "list-sessions")
+		if err == nil {
+			return &Info{LoggedIn: parseLoginctlSessions(out)}, nil
+		}
+	}
+	ss, err := listSessions(ctx)
 	if err != nil {
 		return nil, err
 	}

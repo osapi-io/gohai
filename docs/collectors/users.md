@@ -5,41 +5,60 @@
 
 ## Description
 
-Reports currently logged-in user sessions — the same data `who` / `utmp` / the
-`w` command surface. Each session carries the user, terminal, origin host (for
-remote logins), and session start time.
+Reports currently logged-in user sessions. On systemd hosts we prefer
+`loginctl list-sessions` — the same data `loginctl` itself shows — which
+surfaces graphical (GDM/KDE), remote-desktop, and `systemd-run` sessions that
+never reach `utmp`. On non-systemd hosts and macOS we fall back to `utmp` /
+`utmpx` via gopsutil, which matches `who` / `w` output.
 
-**Scope note:** despite the name, this collector currently covers _logged-in
-sessions only_ — it does NOT enumerate `/etc/passwd`. Ohai splits this into two
-plugins (`passwd.rb` for account enumeration, `linux/sessions.rb` for logged-in
-sessions). gohai has a planned `passwd` collector for the enumeration gap and a
-planned `sessions` collector that will take over the logged-in half (see
+**Scope note:** despite the name, this collector covers _logged-in sessions
+only_ — it does NOT enumerate `/etc/passwd`. Ohai splits this into two plugins
+(`passwd.rb` for account enumeration, `linux/sessions.rb` for loginctl). gohai
+has a planned `passwd` collector for the enumeration gap and a planned
+`sessions` collector that may take over the logged-in half (see
 [README](README.md#-users--sessions)).
 
 Consumers use this to:
 
-- Detect unexpected interactive sessions (security — who's logged in right
-  now?).
-- Audit origin IPs for SSH sessions (remote-access pattern).
+- Detect unexpected interactive sessions.
+- Audit origin IPs for SSH sessions.
 - Correlate session start times with other events.
 
 ## Collected Fields
 
-| Field                  | Type   | Description                                      | Schema mapping                               |
-| ---------------------- | ------ | ------------------------------------------------ | -------------------------------------------- |
-| `logged_in[].user`     | string | Username.                                        | `user.name`.                                 |
-| `logged_in[].terminal` | string | Terminal (`pts/0`, `ttys001`). Empty for remote. | No direct OCSF.                              |
-| `logged_in[].host`     | string | Origin host for remote logins (IP or hostname).  | `src_endpoint.hostname` / `src_endpoint.ip`. |
-| `logged_in[].started`  | uint64 | Session start time (unix seconds).               | No direct OCSF.                              |
+| Field                    | Type   | Description                                                                | Schema mapping                               |
+| ------------------------ | ------ | -------------------------------------------------------------------------- | -------------------------------------------- |
+| `logged_in[].user`       | string | Username.                                                                  | `user.name`.                                 |
+| `logged_in[].terminal`   | string | Terminal (`pts/0`, `ttys001`). Empty for remote / graphical.               | No direct OCSF.                              |
+| `logged_in[].host`       | string | Origin host for remote logins (IP or hostname).                            | `src_endpoint.hostname` / `src_endpoint.ip`. |
+| `logged_in[].started`    | uint64 | Session start time (unix seconds). Populated from utmp path only.          | No direct OCSF.                              |
+| `logged_in[].session_id` | string | systemd session id (`c1`, `2`). Empty on utmp fallback.                    | `process.session_uid` (nearest).             |
+| `logged_in[].uid`        | string | Numeric UID as reported by loginctl. Empty on utmp fallback.               | `user.uid`.                                  |
+| `logged_in[].seat`       | string | systemd seat (`seat0`, empty for remote sessions). Empty on utmp fallback. | No direct OCSF.                              |
 
 ## Platform Support
 
-| Platform | Supported                          |
-| -------- | ---------------------------------- |
-| Linux    | ✅ (`/var/run/utmp` via gopsutil)  |
-| macOS    | ✅ (`/var/run/utmpx` via gopsutil) |
+| Platform | Supported                                                    |
+| -------- | ------------------------------------------------------------ |
+| Linux    | ✅ (`loginctl list-sessions` via executor; utmp fallback)    |
+| macOS    | ✅ (`/var/run/utmpx` via gopsutil — no `loginctl` on Darwin) |
 
 ## Example Output
+
+### Linux with systemd (loginctl)
+
+```json
+{
+  "users": {
+    "logged_in": [
+      { "user": "alice", "session_id": "c1", "uid": "1000", "seat": "seat0" },
+      { "user": "bob", "session_id": "2", "uid": "1001" }
+    ]
+  }
+}
+```
+
+### Linux without systemd / macOS (utmp fallback)
 
 ```json
 {
@@ -50,11 +69,6 @@ Consumers use this to:
         "terminal": "pts/0",
         "host": "10.0.0.42",
         "started": 1712068800
-      },
-      {
-        "user": "bob",
-        "terminal": "tty1",
-        "started": 1712032000
       }
     ]
   }
@@ -77,7 +91,7 @@ for _, s := range facts.Users.LoggedIn {
 ## Enable/Disable
 
 ```bash
-gohai --collector.users      # opt-in (off by default — passwd/group scan is niche)
+gohai --collector.users      # opt-in (off by default — niche)
 gohai --no-collector.users   # explicitly disable (e.g. when stripping defaults)
 ```
 
@@ -87,23 +101,36 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                    | Ohai plugin                                                                                                                                            | Alignment                                                                                                                                                                                                                                                                       |
-| -------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `host.Users` (reads `/var/run/utmp`).  | [`linux/sessions.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/sessions.rb) — `loginctl list-sessions` + `loginctl show-session`. | **Different source, overlapping scope.** Ohai uses `loginctl` (systemd) which reports more detail per session (seat, VT, type, service). gopsutil reads `utmp` — simpler, cross-platform, no systemd dependency. `loginctl` enrichment is planned for the `sessions` collector. |
-| macOS    | gopsutil `host.Users` (reads `/var/run/utmpx`). | Ohai has no dedicated macOS session plugin — only `passwd.rb` for account enumeration.                                                                 | **gohai extension on macOS.**                                                                                                                                                                                                                                                   |
+On Linux the collector probes for `loginctl` on PATH:
+
+1. **When present (systemd hosts):** run
+   `loginctl --no-pager --no-legend --no-ask-password list-sessions` through the
+   shared `internal/executor` runner and parse each line's
+   `session, uid, user, seat` whitespace-split columns into a `Session`.
+   `terminal`, `host`, and `started` are left empty unless we later extend with
+   `loginctl show-session` enrichment.
+2. **When absent or errors (non-systemd hosts, minimized containers):** fall
+   back to gopsutil's `host.Users`, which reads `/var/run/utmp`. `session_id`,
+   `uid`, and `seat` are empty in this mode.
+
+On macOS we read `/var/run/utmpx` via gopsutil — `loginctl` does not exist on
+Darwin.
+
+The `loginctl` extension is the methodology Ohai uses
+([`linux/sessions.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/sessions.rb))
+and matters because graphical (GDM/KDE), remote-desktop, and `systemd-run`
+sessions never write utmp — gopsutil's utmp-only path silently misses them.
 
 Ohai's
 [`passwd.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/passwd.rb)
 (which enumerates `/etc/passwd` + `/etc/group`) is the scope of the planned
 gohai `passwd` collector — it will not be merged into this one.
 
-**Known gaps vs. Ohai:**
-
-- No `/etc/passwd` / `/etc/group` enumeration (planned `passwd` collector).
-- No systemd-session detail: seat, vtnr, type, service, scope, etc. (planned
-  `sessions` collector).
-
 ## Backing library
 
+- [`internal/executor`](../../internal/executor) — shared command-runner
+  abstraction used to invoke `loginctl` on Linux. Tests mock it with
+  `go.uber.org/mock`.
 - [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
-  BSD-3.
+  BSD-3. Fallback (Linux non-systemd) and primary source on macOS for utmp /
+  utmpx.

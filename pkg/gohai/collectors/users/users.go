@@ -18,16 +18,23 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package users collects currently logged-in user sessions (utmp/who
-// output). NOTE: despite the name, this collector only covers logged-in
-// sessions — it does NOT enumerate /etc/passwd. Ohai splits this into
-// two plugins (passwd.rb for account enumeration, linux/sessions.rb
-// for loginctl). A future gohai `passwd` collector will fill the
-// enumeration gap.
+// Package users reports currently logged-in user sessions. On systemd
+// hosts we prefer `loginctl list-sessions` — the same data loginctl
+// itself shows — which surfaces graphical (GDM/KDE), remote-desktop,
+// and `systemd-run` sessions that never reach utmp. On non-systemd
+// hosts and macOS we fall back to utmp / utmpx via gopsutil, which
+// matches what `who` / `w` print.
+//
+// Despite the name, this collector covers logged-in sessions only —
+// it does NOT enumerate /etc/passwd. A planned `passwd` collector
+// will fill that gap, and a planned `sessions` collector may take
+// over the logged-in half entirely.
 package users
 
 import (
+	"bufio"
 	"context"
+	"strings"
 
 	"github.com/shirou/gopsutil/v4/host"
 
@@ -42,10 +49,13 @@ type Info struct {
 
 // Session represents one logged-in user session.
 type Session struct {
-	User     string `json:"user"`
-	Terminal string `json:"terminal,omitempty"`
-	Host     string `json:"host,omitempty"`
-	Started  uint64 `json:"started,omitempty"` // unix timestamp
+	User      string `json:"user"`
+	Terminal  string `json:"terminal,omitempty"`
+	Host      string `json:"host,omitempty"`
+	Started   uint64 `json:"started,omitempty"`    // unix timestamp (utmp path only)
+	SessionID string `json:"session_id,omitempty"` // systemd session id (loginctl path only)
+	UID       string `json:"uid,omitempty"`        // numeric UID (loginctl path only)
+	Seat      string `json:"seat,omitempty"`       // systemd seat (loginctl path only)
 }
 
 // Collector is the public interface every users variant satisfies.
@@ -73,7 +83,7 @@ func New() Collector {
 
 // usersFn is the injection seam for gopsutil's host.UsersWithContext.
 // Kept private so importers don't transitively need gopsutil. Swapped
-// via SetUsersFn.
+// via SetUsersFn (export_test.go).
 var usersFn = host.UsersWithContext
 
 // listSessions is the production bridge to gopsutil (which reads
@@ -95,4 +105,31 @@ func listSessions(
 		})
 	}
 	return out, nil
+}
+
+// parseLoginctlSessions parses `loginctl --no-pager --no-legend
+// --no-ask-password list-sessions` output. Each non-empty line is
+// whitespace-split into `session uid user [seat]`. Lines with fewer
+// than 3 fields are skipped (defensive — Ohai assumes the format).
+func parseLoginctlSessions(
+	raw []byte,
+) []Session {
+	var out []Session
+	sc := bufio.NewScanner(strings.NewReader(string(raw)))
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) < 3 {
+			continue
+		}
+		s := Session{
+			SessionID: fields[0],
+			UID:       fields[1],
+			User:      fields[2],
+		}
+		if len(fields) >= 4 {
+			s.Seat = fields[3]
+		}
+		out = append(out, s)
+	}
+	return out
 }
