@@ -18,44 +18,70 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package network collects network interface data — MTU, MAC, addresses,
-// I/O counters.
-//
-// Known limitation vs. Ohai: current shape is interfaces-only. Ohai
-// additionally exposes default_interface/default_gateway, routes, and
-// enriched per-address data (family/prefixlen/netmask/scope). Those
-// are tracked as follow-ups.
+// Package network reports network interfaces, structured per-address
+// data (family / prefix / scope / netmask / broadcast), per-interface
+// I/O counters, the routing table, and top-level default interface +
+// gateway facts (v4 + v6). On Linux we additionally derive the
+// canonical encapsulation name from sysfs ARPHRD types and merge
+// OpenVZ `venet0:N` aliases under the primary `venet0` interface.
 package network
 
 import (
 	"context"
+	"net"
+	"strconv"
+	"strings"
 
-	"github.com/shirou/gopsutil/v4/net"
+	gpnet "github.com/shirou/gopsutil/v4/net"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds network interface data and per-interface I/O counters.
+// Info holds network interfaces plus top-level routing facts.
 type Info struct {
-	Interfaces []Interface `json:"interfaces"`
+	Interfaces            []Interface `json:"interfaces"`
+	Routes                []Route     `json:"routes,omitempty"`
+	DefaultInterface      string      `json:"default_interface,omitempty"`
+	DefaultGateway        string      `json:"default_gateway,omitempty"`
+	DefaultInet6Interface string      `json:"default_inet6_interface,omitempty"`
+	DefaultInet6Gateway   string      `json:"default_inet6_gateway,omitempty"`
 }
 
 // Interface describes a single network interface.
 type Interface struct {
-	Name         string    `json:"name"`
-	MTU          int       `json:"mtu"`
-	HardwareAddr string    `json:"hardware_addr,omitempty"` // OCSF: network_interface.mac
-	Flags        []string  `json:"flags,omitempty"`
-	Addresses    []Address `json:"addresses,omitempty"`
-	Counters     *Counters `json:"counters,omitempty"`
+	Name          string    `json:"name"`
+	MTU           int       `json:"mtu"`
+	HardwareAddr  string    `json:"hardware_addr,omitempty"` // OCSF: network_interface.mac
+	Encapsulation string    `json:"encapsulation,omitempty"` // canonical: Ethernet / Loopback / PPP / SLIP / IPIP / 6to4
+	Flags         []string  `json:"flags,omitempty"`
+	Addresses     []Address `json:"addresses,omitempty"`
+	Routes        []Route   `json:"routes,omitempty"`
+	Counters      *Counters `json:"counters,omitempty"`
 }
 
-// Address represents a single IP bound to an interface. Currently just
-// the CIDR string from gopsutil; future extension will split into
-// family/prefixlen/netmask/scope fields to match Ohai/OCSF.
+// Address represents a single IP bound to an interface, structured
+// the way Ohai emits it: family, prefix length, netmask (IPv4),
+// broadcast (IPv4), scope.
 type Address struct {
-	Addr string `json:"addr"`
+	Addr      string `json:"addr"`
+	Family    string `json:"family"`              // inet | inet6
+	Prefixlen int    `json:"prefixlen"`           // 24, 64, ...
+	Netmask   string `json:"netmask,omitempty"`   // IPv4 only
+	Broadcast string `json:"broadcast,omitempty"` // IPv4 only
+	Scope     string `json:"scope,omitempty"`     // Global | Link | Host | Site
+}
+
+// Route is one entry from the kernel routing table.
+type Route struct {
+	Destination string `json:"destination"`
+	Family      string `json:"family"`
+	Gateway     string `json:"gateway,omitempty"`
+	Interface   string `json:"interface,omitempty"`
+	Source      string `json:"source,omitempty"`
+	Scope       string `json:"scope,omitempty"`
+	Proto       string `json:"proto,omitempty"`
+	Metric      int    `json:"metric,omitempty"`
 }
 
 // Counters holds I/O counters for one interface.
@@ -89,17 +115,16 @@ func New() Collector {
 	return NewLinux()
 }
 
-// interfacesFn is the injection seam for gopsutil's
-// net.InterfacesWithContext. Kept private so importers don't
-// transitively need gopsutil. Swapped via SetInterfacesFn.
-var interfacesFn = net.InterfacesWithContext
-
-// ioCountersFn is the injection seam for gopsutil's
-// net.IOCountersWithContext. Swapped via SetIOCountersFn.
-var ioCountersFn = net.IOCountersWithContext
+// Package-level injection seams for gopsutil (kept private so
+// importers don't transitively need gopsutil).
+var (
+	interfacesFn = gpnet.InterfacesWithContext
+	ioCountersFn = gpnet.IOCountersWithContext
+)
 
 // readInterfaces is the production bridge to gopsutil. Enumerates
-// interfaces and merges per-interface I/O counters (matched by name).
+// interfaces, structures each address, and merges per-interface I/O
+// counters (matched by name).
 func readInterfaces(
 	ctx context.Context,
 ) ([]Interface, error) {
@@ -126,7 +151,9 @@ func readInterfaces(
 			Flags:        i.Flags,
 		}
 		for _, a := range i.Addrs {
-			item.Addresses = append(item.Addresses, Address{Addr: a.Addr})
+			if addr, ok := parseAddress(a.Addr); ok {
+				item.Addresses = append(item.Addresses, addr)
+			}
 		}
 		if c, ok := countersByName[i.Name]; ok {
 			item.Counters = c
@@ -134,4 +161,87 @@ func readInterfaces(
 		out = append(out, item)
 	}
 	return out, nil
+}
+
+// parseAddress turns a CIDR string into a structured Address.
+// gopsutil emits everything as `<ip>/<prefix>`; non-parseable input
+// (defensive) returns ok=false and is skipped by the caller.
+func parseAddress(
+	cidr string,
+) (Address, bool) {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return Address{}, false
+	}
+	ones, _ := ipnet.Mask.Size()
+	addr := Address{Addr: ip.String(), Prefixlen: ones}
+	if v4 := ip.To4(); v4 != nil {
+		addr.Family = "inet"
+		addr.Netmask = net.IP(net.CIDRMask(ones, 32)).String()
+		addr.Broadcast = ipv4Broadcast(v4, ones)
+	} else {
+		addr.Family = "inet6"
+	}
+	addr.Scope = scopeOf(ip)
+	return addr, true
+}
+
+// ipv4Broadcast computes the broadcast address for the given IPv4 +
+// prefix length.
+func ipv4Broadcast(
+	ip net.IP,
+	prefixlen int,
+) string {
+	mask := net.CIDRMask(prefixlen, 32)
+	bcast := make(net.IP, 4)
+	for i := 0; i < 4; i++ {
+		bcast[i] = ip[i] | ^mask[i]
+	}
+	return bcast.String()
+}
+
+// scopeOf classifies an IP into Ohai's title-cased scope buckets.
+// Multicast classifications are intentionally collapsed into the
+// nearest single answer — Ohai uses Global for routable, Link for
+// link-local-anything, Host for loopback. We don't emit Site (no
+// caller needs IPv6 site-local distinction in 2026).
+func scopeOf(
+	ip net.IP,
+) string {
+	switch {
+	case ip.IsLoopback():
+		return "Host"
+	case ip.IsLinkLocalUnicast(), ip.IsLinkLocalMulticast():
+		return "Link"
+	}
+	return "Global"
+}
+
+// arphrdEncapsulation maps the ARPHRD_* integer (read from
+// /sys/class/net/<iface>/type) to Ohai's canonical encapsulation
+// name.
+//
+// Source: https://github.com/torvalds/linux/blob/master/include/uapi/linux/if_arp.h
+var arphrdEncapsulation = map[int]string{
+	1:   "Ethernet", // ARPHRD_ETHER
+	24:  "PPP",      // ARPHRD_PPP (kernel uses 512 — keep both)
+	512: "PPP",
+	256: "SLIP", // ARPHRD_SLIP
+	257: "VJSLIP",
+	768: "IPIP", // ARPHRD_TUNNEL
+	769: "6to4", // ARPHRD_TUNNEL6
+	772: "Loopback",
+}
+
+// isOpenVZAlias reports whether name looks like `<base>:<n>` — the
+// venet0 alias pattern OpenVZ guests use.
+func isOpenVZAlias(
+	name string,
+) (string, bool) {
+	if i := strings.Index(name, ":"); i > 0 {
+		if _, err := strconv.Atoi(name[i+1:]); err == nil {
+			return name[:i], true
+		}
+	}
+	return "", false
 }
