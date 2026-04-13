@@ -49,7 +49,9 @@ func (s *UsersDarwinPublicTestSuite) TestCollect() {
 		{
 			name: "console session",
 			fn: func(context.Context) ([]host.UserStat, error) {
-				return []host.UserStat{{User: "john", Terminal: "console", Started: 1712908800}}, nil
+				return []host.UserStat{
+					{User: "john", Terminal: "console", Started: 1712908800},
+				}, nil
 			},
 			want: users.Info{
 				LoggedIn: []users.Session{{User: "john", Terminal: "console", Started: 1712908800}},
