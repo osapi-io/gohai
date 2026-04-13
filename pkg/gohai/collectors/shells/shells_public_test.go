@@ -21,9 +21,6 @@
 package shells_test
 
 import (
-	"io"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -49,7 +46,7 @@ func TestShellsPublicTestSuite(t *testing.T) {
 }
 
 // TestNew covers the factory: identity methods inherited from base
-// (Name/DefaultEnabled/Dependencies) plus dispatch to the right
+// (Name / DefaultEnabled / Dependencies) plus dispatch to the right
 // concrete type per platform.Detect() value.
 func (s *ShellsPublicTestSuite) TestNew() {
 	orig := platform.Detect
@@ -58,7 +55,7 @@ func (s *ShellsPublicTestSuite) TestNew() {
 	tests := []struct {
 		name     string
 		detect   string
-		wantKind string // "linux" or "darwin"
+		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
 		{"debian dispatches to Linux", "debian", "linux"},
@@ -85,46 +82,16 @@ func (s *ShellsPublicTestSuite) TestNew() {
 	}
 }
 
-// TestOpenFileHelper covers the package's openFile bridge (one-line
-// wrapper os.Open → io.ReadCloser) via a test-owned tempfile. Does
-// not touch any real host path.
-func (s *ShellsPublicTestSuite) TestOpenFileHelper() {
-	tests := []struct {
-		name        string
-		setup       func(dir string) string
-		wantErr     bool
-		wantContent string
-	}{
-		{
-			name: "opens existing file and reads content",
-			setup: func(dir string) string {
-				p := filepath.Join(dir, "shells")
-				s.Require().NoError(os.WriteFile(p, []byte("/bin/sh\n"), 0o644))
-				return p
-			},
-			wantContent: "/bin/sh\n",
-		},
-		{
-			name:    "nonexistent path returns error",
-			setup:   func(dir string) string { return filepath.Join(dir, "missing") },
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			dir := s.T().TempDir()
-			path := tt.setup(dir)
-			c := shells.NewLinux()
-			rc, err := c.OpenFn(path)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			defer func() { _ = rc.Close() }()
-			b, err := io.ReadAll(rc)
-			s.Require().NoError(err)
-			s.Equal(tt.wantContent, string(b))
-		})
-	}
+// TestNewLinuxWiresFS verifies NewLinux() returns a Linux with a
+// non-nil FS. No real filesystem reads — just the wiring.
+func (s *ShellsPublicTestSuite) TestNewLinuxWiresFS() {
+	c := shells.NewLinux()
+	s.NotNil(c.FS)
+}
+
+// TestNewDarwinWiresFS verifies NewDarwin() returns a Darwin with a
+// non-nil FS.
+func (s *ShellsPublicTestSuite) TestNewDarwinWiresFS() {
+	c := shells.NewDarwin()
+	s.NotNil(c.FS)
 }

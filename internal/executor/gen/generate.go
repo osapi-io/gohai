@@ -18,38 +18,9 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package shells
+// Package mocks holds gomock-generated mocks for the executor package.
+// Generated files (*.gen.go) are checked in and regenerated via
+// `go generate ./internal/executor/...`.
+package mocks
 
-import (
-	"context"
-
-	"github.com/avfs/avfs"
-	"github.com/avfs/avfs/vfs/osfs"
-)
-
-// Darwin collects the shell list on macOS hosts. /etc/shells on macOS
-// ships with a small curated set (/bin/bash, /bin/zsh, /bin/sh, etc.)
-// and is managed by the OS installer. Embeds base for Name /
-// DefaultEnabled / Dependencies. FS is the virtual filesystem — real
-// OS on production, avfs memfs in tests.
-type Darwin struct {
-	base
-
-	FS avfs.VFS
-}
-
-// NewDarwin returns a Darwin variant wired to the real OS filesystem.
-func NewDarwin() *Darwin {
-	return &Darwin{FS: osfs.NewWithNoIdm()}
-}
-
-// Collect reads /etc/shells and returns the list of valid login shells.
-func (d *Darwin) Collect(
-	_ context.Context,
-) (any, error) {
-	b, err := d.FS.ReadFile(etcShellsPath)
-	if err != nil {
-		return wrapReadError(err)
-	}
-	return parseShells(b), nil
-}
+//go:generate go run go.uber.org/mock/mockgen -source=../executor.go -destination=executor.gen.go -package=mocks

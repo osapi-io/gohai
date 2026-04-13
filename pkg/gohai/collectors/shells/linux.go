@@ -22,41 +22,35 @@ package shells
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"io"
-	"os"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
 // Linux collects the shell list on Linux hosts. Embeds base for the
-// static Name / DefaultEnabled / Dependencies methods. OpenFn is
-// injected so tests can stub the file read.
+// static Name / DefaultEnabled / Dependencies methods. FS is the
+// virtual filesystem the collector reads from — production is the real
+// OS FS via avfs/osfs; tests inject an avfs memfs with canned content.
 type Linux struct {
 	base
 
-	OpenFn func(string) (io.ReadCloser, error)
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to the package-level openFile
-// helper. Named helper (not inline closure) keeps the factory a plain
-// assignment — no closure body that needs test coverage.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{OpenFn: openFile}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect reads /etc/shells and returns the list of valid login shells.
-// A missing file soft-misses to an empty list rather than erroring —
-// distroless/scratch containers legitimately lack /etc/shells.
+// A missing file soft-misses to an empty list — distroless/scratch
+// containers legitimately lack /etc/shells.
 func (l *Linux) Collect(
 	_ context.Context,
 ) (any, error) {
-	rc, err := l.OpenFn(etcShellsPath)
+	b, err := l.FS.ReadFile(etcShellsPath)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return &Info{Paths: []string{}}, nil
-		}
-		return nil, fmt.Errorf("open %s: %w", etcShellsPath, err)
+		return wrapReadError(err)
 	}
-	defer func() { _ = rc.Close() }()
-	return parseShells(rc)
+	return parseShells(b), nil
 }
