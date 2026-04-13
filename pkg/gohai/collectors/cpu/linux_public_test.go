@@ -397,7 +397,8 @@ Book(s) per drawer:  1
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &cpu.Linux{ReadFn: tt.readFn, FS: tt.fs, Exec: tt.exec}
+			defer cpu.SetReadCPUFn(tt.readFn)()
+			c := &cpu.Linux{FS: tt.fs, Exec: tt.exec}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

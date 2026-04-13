@@ -45,3 +45,12 @@ func SetCountsFn(fn func(context.Context, bool) (int, error)) (restore func()) {
 	countsFn = fn
 	return func() { countsFn = orig }
 }
+
+// SetReadCPUFn swaps the high-level readCPU bridge so per-OS Collect
+// tests can stub the entire gopsutil base in one call instead of
+// orchestrating SetInfoFn + SetCountsFn separately.
+func SetReadCPUFn(fn func(context.Context) (*Info, error)) (restore func()) {
+	orig := readCPUFn
+	readCPUFn = fn
+	return func() { readCPUFn = orig }
+}
