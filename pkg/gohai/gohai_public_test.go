@@ -70,12 +70,29 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 		wantPlatform bool
 		wantHostname bool
 	}{
-		{name: "default collects platform and hostname", wantPlatform: true, wantHostname: true},
 		{
-			name:         "disabled platform is absent",
-			opts:         []gohai.Option{gohai.WithDisabled("platform")},
+			name:         "no opts collects nothing",
+			opts:         nil,
+			wantPlatform: false,
+			wantHostname: false,
+		},
+		{
+			name:         "WithDefaults collects platform and hostname",
+			opts:         []gohai.Option{gohai.WithDefaults()},
+			wantPlatform: true,
+			wantHostname: true,
+		},
+		{
+			name:         "WithDefaults + WithDisabled subtracts platform",
+			opts:         []gohai.Option{gohai.WithDefaults(), gohai.WithDisabled("platform")},
 			wantPlatform: false,
 			wantHostname: true,
+		},
+		{
+			name:         "WithEnabled platform without defaults still collects platform",
+			opts:         []gohai.Option{gohai.WithEnabled("platform")},
+			wantPlatform: true,
+			wantHostname: false,
 		},
 		{
 			name:         "only platform",

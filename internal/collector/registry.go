@@ -81,11 +81,25 @@ func (r *Registry) Names() []string {
 	return names
 }
 
-// Selected returns the collectors that should run given the user's enable
-// and disable lists. A collector runs if its DefaultEnabled() is true, or if
-// its name appears in the enable list. Disable wins over enable for the
-// same name. Unknown names return an error.
+// Selected returns the collectors that should run treating every
+// DefaultEnabled() collector as on, plus anything in `enable`, minus
+// anything in `disable`. Kept for backward compatibility; new callers
+// should use SelectedWith and decide explicitly whether to honour
+// DefaultEnabled().
 func (r *Registry) Selected(
+	enable []string,
+	disable []string,
+) ([]Collector, error) {
+	return r.SelectedWith(true, enable, disable)
+}
+
+// SelectedWith returns the collectors that should run. When
+// useDefaults is true, every collector with DefaultEnabled()==true is
+// included. The enable list adds names regardless of DefaultEnabled.
+// The disable list subtracts names. Unknown names in enable/disable
+// return an error.
+func (r *Registry) SelectedWith(
+	useDefaults bool,
 	enable []string,
 	disable []string,
 ) ([]Collector, error) {
@@ -117,7 +131,7 @@ func (r *Registry) Selected(
 		if disableSet[name] {
 			continue
 		}
-		if c.DefaultEnabled() || enableSet[name] {
+		if (useDefaults && c.DefaultEnabled()) || enableSet[name] {
 			out = append(out, c)
 		}
 	}

@@ -24,27 +24,40 @@ package gohai
 type Option func(*config)
 
 type config struct {
-	enabled  []string
-	disabled []string
-	only     []string
+	useDefaults bool
+	enabled     []string
+	disabled    []string
+	only        []string
 }
 
-// WithEnabled explicitly enables one or more opt-in collectors.
+// WithDefaults opts in to the recommended default collector set —
+// every collector whose DefaultEnabled() is true. Without this option
+// (and without WithCollectors / WithEnabled), gohai.New() returns an
+// empty registry and Collect() runs nothing. The CLI wires this in at
+// the command layer; SDK consumers opt in explicitly.
+func WithDefaults() Option {
+	return func(c *config) { c.useDefaults = true }
+}
+
+// WithEnabled explicitly enables one or more collectors on top of
+// whatever WithDefaults selects (or in isolation when WithDefaults
+// isn't passed).
 func WithEnabled(
 	names ...string,
 ) Option {
 	return func(c *config) { c.enabled = append(c.enabled, names...) }
 }
 
-// WithDisabled explicitly disables one or more collectors.
+// WithDisabled explicitly disables one or more collectors. Subtracts
+// from the WithDefaults / WithEnabled set.
 func WithDisabled(
 	names ...string,
 ) Option {
 	return func(c *config) { c.disabled = append(c.disabled, names...) }
 }
 
-// WithCollectors restricts collection to ONLY the named collectors and their
-// dependencies. Overrides the default tier-based selection.
+// WithCollectors restricts collection to ONLY the named collectors and
+// their dependencies. Overrides any default-set selection.
 func WithCollectors(
 	names ...string,
 ) Option {

@@ -91,7 +91,7 @@ func (s *ProcessPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := process.New()
 			s.Equal("process", c.Name())
-			s.True(c.DefaultEnabled())
+			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":

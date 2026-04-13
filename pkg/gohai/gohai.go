@@ -106,6 +106,7 @@ func selectCollectors(
 	reg *collector.Registry,
 	cfg config,
 ) ([]collector.Collector, error) {
+	// WithCollectors wins outright — explicit roster, no defaults.
 	if len(cfg.only) > 0 {
 		out := make([]collector.Collector, 0, len(cfg.only))
 		for _, n := range cfg.only {
@@ -117,7 +118,18 @@ func selectCollectors(
 		}
 		return out, nil
 	}
-	sel, err := reg.Selected(cfg.enabled, cfg.disabled)
+	// Without WithDefaults / WithEnabled, return empty — gohai.New()
+	// is opt-in. Consumers either pass WithDefaults() to get the
+	// recommended set or enumerate collectors via WithEnabled /
+	// WithCollectors. Still validate the disabled list so unknown
+	// names error consistently.
+	if !cfg.useDefaults && len(cfg.enabled) == 0 {
+		if _, err := reg.SelectedWith(false, nil, cfg.disabled); err != nil {
+			return nil, fmt.Errorf("select collectors: %w", err)
+		}
+		return nil, nil
+	}
+	sel, err := reg.SelectedWith(cfg.useDefaults, cfg.enabled, cfg.disabled)
 	if err != nil {
 		return nil, fmt.Errorf("select collectors: %w", err)
 	}

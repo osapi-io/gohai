@@ -64,7 +64,7 @@ func (s *UsersPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := users.New()
 			s.Equal("users", c.Name())
-			s.True(c.DefaultEnabled())
+			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
