@@ -20,27 +20,46 @@
 
 package platform
 
-import "context"
+import (
+	"context"
 
-// Linux collects platform identification on Linux hosts. ReadFn is
-// typed in our *Info so importers don't need gopsutil.
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+)
+
+// Linux collects platform identification on Linux. gopsutil reads
+// /etc/os-release for the modern systemd path; we then layer two
+// extensions:
+//
+//   - /etc/redhat-release (or /etc/debian_version) supplements
+//     `Version` when gopsutil reports a major-only or empty value.
+//   - When gopsutil produces no name at all (legacy / appliance
+//     distros without /etc/os-release), we cascade through the Ohai
+//     legacy_platform_detection chain (redhat-release, SuSE-release,
+//     f5-release, system-release, debian_version, arch-release,
+//     gentoo-release, slackware-version, enterprise-release,
+//     exherbo-release).
 type Linux struct {
 	base
 
-	ReadFn func(context.Context) (*Info, string, error)
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to the production bridge.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{ReadFn: readPlatform}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns platform Info. Linux discards the raw kernel-version
-// string from readPlatform — Build is macOS-only.
+// Collect returns platform Info.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	info, _, err := l.ReadFn(ctx)
+	info, _, err := readPlatform(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if l.FS != nil {
+		applyRedhatReleaseSupplement(l.FS, info)
+		applyLegacyReleaseFallback(l.FS, info)
+	}
+	applyFamilyFallback(info)
 	return info, nil
 }

@@ -23,24 +23,17 @@ package platform_test
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
 	"runtime"
 	"testing"
 
+	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
+	"github.com/osapi-io/gohai/internal/executor"
+	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 )
-
-// TestMain enables self-exec subprocess testing for runSwVers.
-func TestMain(m *testing.M) {
-	if os.Getenv("GOHAI_PLATFORM_SWVERS_TEST") == "1" {
-		fmt.Print("(a)")
-		os.Exit(0)
-	}
-	os.Exit(m.Run())
-}
 
 type PlatformDarwinPublicTestSuite struct {
 	suite.Suite
@@ -50,23 +43,50 @@ func TestPlatformDarwinPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(PlatformDarwinPublicTestSuite))
 }
 
+// swVersExec returns a MockExecutor that canned-answers `sw_vers`
+// with the given output and error.
+func swVersExec(
+	t *testing.T,
+	out []byte, err error,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "sw_vers").
+		Return(out, err).
+		AnyTimes()
+	return m
+}
+
+const swVersWithRSR = `ProductName:		macOS
+ProductVersion:		14.4.1
+ProductVersionExtra:	(a)
+BuildVersion:		23E224
+`
+
+const swVersNoRSR = `ProductName:		macOS
+ProductVersion:		13.5
+BuildVersion:		22G74
+`
+
 func (s *PlatformDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		readFn  func(context.Context) (*platform.Info, string, error)
-		runCmd  func(string, ...string) ([]byte, error)
-		wantErr bool
-		want    platform.Info
+		name     string
+		hostInfo func(context.Context) (*host.InfoStat, error)
+		exec     executor.Executor
+		wantErr  bool
+		want     platform.Info
 	}{
 		{
-			name: "macOS with RSR patch version",
-			readFn: func(context.Context) (*platform.Info, string, error) {
-				return &platform.Info{
-					OS: runtime.GOOS, Name: "darwin", Version: "14.4.1",
-					Family: "Standalone Workstation", Architecture: runtime.GOARCH,
-				}, "23E224", nil
+			name: "macOS with RSR patch: BuildVersion + ProductVersionExtra both populate",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "darwin", PlatformVersion: "14.4.1",
+					PlatformFamily: "Standalone Workstation",
+					KernelVersion:  "fallback-kernel",
+				}, nil
 			},
-			runCmd: func(string, ...string) ([]byte, error) { return []byte("(a)\n"), nil },
+			exec: swVersExec(s.T(), []byte(swVersWithRSR), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "darwin", Version: "14.4.1",
 				VersionExtra: "(a)", Family: "Standalone Workstation",
@@ -74,55 +94,72 @@ func (s *PlatformDarwinPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name: "macOS without RSR patch (sw_vers empty)",
-			readFn: func(context.Context) (*platform.Info, string, error) {
-				return &platform.Info{
-					OS:           runtime.GOOS,
-					Name:         "darwin",
-					Version:      "13.5",
-					Architecture: runtime.GOARCH,
-				}, "22G74", nil
+			name: "macOS without RSR: BuildVersion populates, VersionExtra stays empty",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "darwin", PlatformVersion: "13.5",
+					KernelVersion: "fallback-kernel",
+				}, nil
 			},
-			runCmd: func(string, ...string) ([]byte, error) { return []byte("\n"), nil },
+			exec: swVersExec(s.T(), []byte(swVersNoRSR), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "darwin", Version: "13.5",
 				Architecture: runtime.GOARCH, Build: "22G74",
 			},
 		},
 		{
-			name: "sw_vers error omits version_extra",
-			readFn: func(context.Context) (*platform.Info, string, error) {
-				return &platform.Info{
-					OS:           runtime.GOOS,
-					Name:         "darwin",
-					Version:      "12.6",
-					Architecture: runtime.GOARCH,
-				}, "21G115", nil
+			name: "sw_vers error: Build falls back to gopsutil KernelVersion",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "darwin", PlatformVersion: "12.6",
+					KernelVersion: "21G115",
+				}, nil
 			},
-			runCmd: func(string, ...string) ([]byte, error) { return nil, errors.New("not found") },
+			exec: swVersExec(s.T(), nil, errors.New("not found")),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "darwin", Version: "12.6",
 				Architecture: runtime.GOARCH, Build: "21G115",
 			},
 		},
 		{
-			name: "nil info from readFn",
-			readFn: func(context.Context) (*platform.Info, string, error) {
-				return &platform.Info{OS: runtime.GOOS, Architecture: runtime.GOARCH}, "", nil
+			name: "sw_vers output with no-colon line: skipped, valid lines parsed",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{Platform: "darwin", PlatformVersion: "14.0"}, nil
 			},
-			runCmd: func(string, ...string) ([]byte, error) { return nil, errors.New("no host info") },
-			want:   platform.Info{OS: runtime.GOOS, Architecture: runtime.GOARCH},
+			exec: swVersExec(s.T(),
+				[]byte("no colon line\nBuildVersion:\t23A344\nProductVersionExtra:\n"), nil),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "darwin", Version: "14.0",
+				Architecture: runtime.GOARCH, Build: "23A344",
+			},
 		},
 		{
-			name:    "ReadFn error propagated",
-			readFn:  func(context.Context) (*platform.Info, string, error) { return nil, "", errors.New("boom") },
-			runCmd:  func(string, ...string) ([]byte, error) { return nil, nil },
+			name: "nil Exec: extension skipped, Build from KernelVersion fallback",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "darwin", PlatformVersion: "14.0",
+					KernelVersion: "23A344",
+				}, nil
+			},
+			exec: nil,
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "darwin", Version: "14.0",
+				Architecture: runtime.GOARCH, Build: "23A344",
+			},
+		},
+		{
+			name: "gopsutil error propagated",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return nil, errors.New("boom")
+			},
+			exec:    swVersExec(s.T(), nil, nil),
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &platform.Darwin{ReadFn: tt.readFn, RunCmdFn: tt.runCmd}
+			defer platform.SetHostInfoFn(tt.hostInfo)()
+			c := &platform.Darwin{Exec: tt.exec}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -132,42 +169,6 @@ func (s *PlatformDarwinPublicTestSuite) TestCollect() {
 			info, ok := got.(*platform.Info)
 			s.Require().True(ok)
 			s.Equal(tt.want, *info)
-		})
-	}
-}
-
-func (s *PlatformDarwinPublicTestSuite) TestRunSwVers() {
-	tests := []struct {
-		name    string
-		envVal  string
-		cmd     string
-		wantOut string
-		wantErr bool
-	}{
-		{
-			name:    "subprocess writes expected output",
-			envVal:  "1",
-			cmd:     os.Args[0],
-			wantOut: "(a)",
-		},
-		{
-			name:    "missing binary returns error",
-			envVal:  "",
-			cmd:     "/gohai-test-does-not-exist",
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			s.T().Setenv("GOHAI_PLATFORM_SWVERS_TEST", tt.envVal)
-			c := platform.NewDarwin()
-			out, err := c.RunCmdFn(tt.cmd)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.wantOut, string(out))
 		})
 	}
 }

@@ -21,60 +21,77 @@
 package platform
 
 import (
+	"bufio"
 	"context"
-	"os/exec"
 	"strings"
+
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects platform identification on macOS. ReadFn is typed in
-// our *Info so importers don't need gopsutil; RunCmdFn wraps
-// exec.Command for the sw_vers -productVersionExtra call.
+// Darwin collects platform identification on macOS. gopsutil's
+// host.Info provides Name/Version/Family; we additionally run
+// `sw_vers` through the shared Executor and parse:
+//
+//   - ProductVersionExtra → VersionExtra (Apple Rapid Security
+//     Response patch suffix, e.g., "(a)" — empty when no RSR is
+//     applied).
+//   - BuildVersion → Build (e.g., "23E224") — preferred over
+//     gopsutil's KernelVersion field as the macOS-canonical build id.
+//
+// Falls back to gopsutil's KernelVersion for Build when sw_vers fails.
 type Darwin struct {
 	base
 
-	ReadFn   func(context.Context) (*Info, string, error)
-	RunCmdFn func(name string, args ...string) ([]byte, error)
+	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant wired to production bridges.
+// NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{
-		ReadFn:   readPlatform,
-		RunCmdFn: runSwVers,
-	}
+	return &Darwin{Exec: executor.New()}
 }
 
-// runSwVers wraps exec.Command for sw_vers.
-func runSwVers(
-	name string,
-	args ...string,
-) ([]byte, error) {
-	return exec.Command(name, args...).Output()
-}
-
-// Collect returns platform Info with Build set from the kernel version
-// and VersionExtra populated from sw_vers -productVersionExtra.
+// Collect returns platform Info.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	info, kernelVer, err := d.ReadFn(ctx)
+	info, kernelVer, err := readPlatform(ctx)
 	if err != nil {
 		return nil, err
 	}
 	info.Build = kernelVer
-	if extra := readVersionExtra(d.RunCmdFn); extra != "" {
-		info.VersionExtra = extra
+	if d.Exec != nil {
+		applySwVers(ctx, d.Exec, info)
 	}
 	return info, nil
 }
 
-// readVersionExtra reads `sw_vers -productVersionExtra`. Returns empty
-// string on any failure — RSR version is optional and absent on most
-// macOS versions.
-func readVersionExtra(
-	run func(string, ...string) ([]byte, error),
-) string {
-	out, err := run("sw_vers", "-productVersionExtra")
+// applySwVers parses `sw_vers` output (key: value lines) and
+// supplements info with Build + VersionExtra. Silent on exec failure.
+func applySwVers(
+	ctx context.Context,
+	exec executor.Executor,
+	info *Info,
+) {
+	out, err := exec.Execute(ctx, "sw_vers")
 	if err != nil {
-		return ""
+		return
 	}
-	return strings.TrimSpace(string(out))
+	sc := bufio.NewScanner(strings.NewReader(string(out)))
+	for sc.Scan() {
+		line := sc.Text()
+		i := strings.Index(line, ":")
+		if i < 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:i])
+		val := strings.TrimSpace(line[i+1:])
+		switch key {
+		case "BuildVersion":
+			if val != "" {
+				info.Build = val
+			}
+		case "ProductVersionExtra":
+			if val != "" {
+				info.VersionExtra = val
+			}
+		}
+	}
 }
