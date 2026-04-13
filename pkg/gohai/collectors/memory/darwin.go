@@ -20,23 +20,90 @@
 
 package memory
 
-import "context"
+import (
+	"bufio"
+	"context"
+	"regexp"
+	"strconv"
+	"strings"
 
-// Darwin collects memory usage on macOS via gopsutil (which uses mach
-// vm_stat APIs under the hood). Buffers/Cached fields stay zero on
-// darwin — those are Linux-only concepts.
+	"github.com/osapi-io/gohai/internal/executor"
+)
+
+// Darwin collects memory usage on macOS. gopsutil's mem.VirtualMemory
+// (mach `host_statistics64`) provides Total / Available / Used / Free
+// / Active / Inactive / Wired. We additionally run `vm_stat` through
+// the shared Executor to populate Speculative and Compressed — the
+// mach syscall doesn't expose either and they're essential for Apple
+// Silicon performance diagnostics (aggressive compressor use).
 type Darwin struct {
 	base
 
-	ReadFn func(context.Context) (*Info, error)
+	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{ReadFn: readMemory}
+	return &Darwin{Exec: executor.New()}
 }
 
-// Collect returns the memory Info.
+// Collect returns the memory Info with vm_stat extensions layered on
+// top of gopsutil's totals.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	return d.ReadFn(ctx)
+	info, err := readMemory(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if d.Exec == nil {
+		return info, nil
+	}
+	out, err := d.Exec.Execute(ctx, "vm_stat")
+	if err != nil {
+		return info, nil
+	}
+	applyVMStat(info, out)
+	return info, nil
+}
+
+// vmStatPageSize matches the first line's page-size declaration.
+// `Mach Virtual Memory Statistics: (page size of 16384 bytes)` on
+// Apple Silicon; 4096 on Intel.
+var vmStatPageSize = regexp.MustCompile(`page size of (\d+) bytes`)
+
+// applyVMStat parses `vm_stat` output and populates Darwin-specific
+// buckets (Speculative, Compressed) on the existing Info. Active /
+// Inactive / Wired are left to gopsutil (they're already populated
+// via the mach syscall and match vm_stat's numbers anyway).
+func applyVMStat(
+	info *Info,
+	out []byte,
+) {
+	pageSize := uint64(4096)
+	sc := bufio.NewScanner(strings.NewReader(string(out)))
+	for sc.Scan() {
+		line := sc.Text()
+		if m := vmStatPageSize.FindStringSubmatch(line); m != nil {
+			if ps, err := strconv.ParseUint(m[1], 10, 64); err == nil && ps > 0 {
+				pageSize = ps
+			}
+			continue
+		}
+		idx := strings.Index(line, ":")
+		if idx < 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:idx])
+		val := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(line[idx+1:]), "."))
+		pages, err := strconv.ParseUint(val, 10, 64)
+		if err != nil {
+			continue
+		}
+		bytes := pages * pageSize
+		switch key {
+		case "Pages speculative":
+			info.Speculative = bytes
+		case "Pages stored in compressor":
+			info.Compressed = bytes
+		}
+	}
 }

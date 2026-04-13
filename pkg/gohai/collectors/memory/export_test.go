@@ -31,8 +31,7 @@ import (
 var ReadMemory = readMemory
 
 // SetVirtualMemoryFn swaps the private gopsutil
-// mem.VirtualMemoryWithContext call backing readMemory. Returns a
-// restore func the caller must defer.
+// mem.VirtualMemoryWithContext call backing readMemory.
 func SetVirtualMemoryFn(
 	fn func(context.Context) (*mem.VirtualMemoryStat, error),
 ) (restore func()) {
@@ -42,8 +41,7 @@ func SetVirtualMemoryFn(
 }
 
 // SetSwapMemoryFn swaps the private gopsutil mem.SwapMemoryWithContext
-// call backing readMemory. Returns a restore func the caller must
-// defer.
+// call backing readMemory.
 func SetSwapMemoryFn(
 	fn func(context.Context) (*mem.SwapMemoryStat, error),
 ) (restore func()) {
