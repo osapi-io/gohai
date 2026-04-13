@@ -22,21 +22,21 @@ package load
 
 import "context"
 
-// Linux collects load averages on Linux. Reads `/proc/loadavg` via
-// gopsutil. Injected ReadFn is typed in our *Info so importers don't
-// need gopsutil in their module graph.
+// Linux collects load averages on Linux. gopsutil's load.AvgWithContext
+// is swapped via the package-level avgFn seam (see SetAvgFn in
+// export_test.go).
 type Linux struct {
 	base
-
-	ReadFn func(context.Context) (*Info, error)
 }
 
-// NewLinux returns a Linux variant wired to the production bridge.
+// NewLinux returns a Linux variant.
 func NewLinux() *Linux {
-	return &Linux{ReadFn: readAverages}
+	return &Linux{}
 }
 
 // Collect returns the load averages.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
-	return l.ReadFn(ctx)
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
+	return readAverages(ctx)
 }

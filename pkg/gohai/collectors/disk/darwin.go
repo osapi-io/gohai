@@ -23,20 +23,22 @@ package disk
 import "context"
 
 // Darwin collects disk I/O counters on macOS via gopsutil (IOKit).
+// The gopsutil call is swapped via the package-level ioCountersFn
+// seam.
 type Darwin struct {
 	base
-
-	DevicesFn func(context.Context) ([]Device, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{DevicesFn: listIOCounters}
+	return &Darwin{}
 }
 
 // Collect returns per-device I/O counters.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	devs, err := d.DevicesFn(ctx)
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
+	devs, err := listIOCounters(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -22,22 +22,23 @@ package disk
 
 import "context"
 
-// Linux collects disk I/O counters on Linux via gopsutil. The
-// underlying read is /proc/diskstats.
+// Linux collects disk I/O counters on Linux. gopsutil's
+// disk.IOCountersWithContext (/proc/diskstats) is swapped via the
+// package-level ioCountersFn seam.
 type Linux struct {
 	base
-
-	DevicesFn func(context.Context) ([]Device, error)
 }
 
-// NewLinux returns a Linux variant wired to gopsutil.
+// NewLinux returns a Linux variant.
 func NewLinux() *Linux {
-	return &Linux{DevicesFn: listIOCounters}
+	return &Linux{}
 }
 
 // Collect returns per-device I/O counters.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
-	devs, err := l.DevicesFn(ctx)
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
+	devs, err := listIOCounters(ctx)
 	if err != nil {
 		return nil, err
 	}

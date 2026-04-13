@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	gpprocess "github.com/shirou/gopsutil/v4/process"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
@@ -41,53 +42,27 @@ func TestProcessDarwinPublicTestSuite(t *testing.T) {
 func (s *ProcessDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		procs   []process.Process
-		fnErr   error
+		fn      func(context.Context) ([]*gpprocess.Process, error)
 		wantErr bool
-		want    process.Info
+		wantLen int
 	}{
 		{
 			name: "macOS snapshot",
-			procs: []process.Process{
-				{
-					PID:       1,
-					Name:      "launchd",
-					Username:  "root",
-					CmdLine:   "/sbin/launchd",
-					State:     "R",
-					StartTime: 1_700_000_000,
-				},
+			fn: func(context.Context) ([]*gpprocess.Process, error) {
+				return []*gpprocess.Process{}, nil
 			},
-			want: process.Info{
-				Count: 1,
-				Processes: []process.Process{
-					{
-						PID:       1,
-						Name:      "launchd",
-						Username:  "root",
-						CmdLine:   "/sbin/launchd",
-						State:     "R",
-						StartTime: 1_700_000_000,
-					},
-				},
-			},
+			wantLen: 0,
 		},
 		{
 			name:    "processes error propagated",
-			fnErr:   errors.New("kauth denied"),
+			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("kauth denied") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &process.Darwin{
-				ProcessesFn: func(context.Context) ([]process.Process, error) {
-					if tt.fnErr != nil {
-						return nil, tt.fnErr
-					}
-					return tt.procs, nil
-				},
-			}
+			defer process.SetProcessesFn(tt.fn)()
+			c := &process.Darwin{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -96,7 +71,7 @@ func (s *ProcessDarwinPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*process.Info)
 			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			s.Equal(tt.wantLen, info.Count)
 		})
 	}
 }

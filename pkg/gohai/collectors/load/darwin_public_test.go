@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	gpload "github.com/shirou/gopsutil/v4/load"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
@@ -41,24 +42,27 @@ func TestLoadDarwinPublicTestSuite(t *testing.T) {
 func (s *LoadDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		readFn  func(context.Context) (*load.Info, error)
+		fn      func(context.Context) (*gpload.AvgStat, error)
 		wantErr bool
 		want    load.Info
 	}{
 		{
-			name:   "averages returned",
-			readFn: func(context.Context) (*load.Info, error) { return &load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5}, nil },
-			want:   load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
+			name: "averages returned",
+			fn: func(context.Context) (*gpload.AvgStat, error) {
+				return &gpload.AvgStat{Load1: 1.5, Load5: 2.0, Load15: 2.5}, nil
+			},
+			want: load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
 		},
 		{
-			name:    "ReadFn error propagated",
-			readFn:  func(context.Context) (*load.Info, error) { return nil, errors.New("boom") },
+			name:    "gopsutil error propagated",
+			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &load.Darwin{ReadFn: tt.readFn}
+			defer load.SetAvgFn(tt.fn)()
+			c := &load.Darwin{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

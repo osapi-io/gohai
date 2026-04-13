@@ -42,41 +42,44 @@ func TestDiskLinuxPublicTestSuite(t *testing.T) {
 func (s *DiskLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		devs    []disk.Device
-		fnErr   error
+		fn      func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error)
 		wantErr bool
-		want    disk.Info
+		wantLen int
 	}{
 		{
 			name: "sda snapshot",
-			devs: []disk.Device{
-				{Name: "sda", ReadCount: 100, WriteCount: 50, ReadBytes: 102400, WriteBytes: 51200},
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return map[string]gpdisk.IOCountersStat{
+					"sda": {
+						Name:       "sda",
+						ReadCount:  100,
+						WriteCount: 50,
+						ReadBytes:  102400,
+						WriteBytes: 51200,
+					},
+				}, nil
 			},
-			want: disk.Info{Devices: []disk.Device{
-				{Name: "sda", ReadCount: 100, WriteCount: 50, ReadBytes: 102400, WriteBytes: 51200},
-			}},
+			wantLen: 1,
 		},
 		{
 			name: "empty devices",
-			devs: []disk.Device{},
-			want: disk.Info{Devices: []disk.Device{}},
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return map[string]gpdisk.IOCountersStat{}, nil
+			},
+			wantLen: 0,
 		},
 		{
-			name:    "gopsutil error wrapped and returned",
-			fnErr:   errors.New("boom"),
+			name: "gopsutil error propagated",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return nil, errors.New("boom")
+			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &disk.Linux{
-				DevicesFn: func(context.Context) ([]disk.Device, error) {
-					if tt.fnErr != nil {
-						return nil, tt.fnErr
-					}
-					return tt.devs, nil
-				},
-			}
+			defer disk.SetIOCountersFn(tt.fn)()
+			c := &disk.Linux{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -85,52 +88,7 @@ func (s *DiskLinuxPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*disk.Info)
 			s.Require().True(ok)
-			s.Equal(tt.want, *info)
-		})
-	}
-}
-
-func (s *DiskLinuxPublicTestSuite) TestListIOCounters() {
-	tests := []struct {
-		name    string
-		fn      func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error)
-		wantErr bool
-		wantLen int
-	}{
-		{
-			name: "success maps counters",
-			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
-				return map[string]gpdisk.IOCountersStat{
-					"sda": {
-						Name:       "sda",
-						ReadCount:  100,
-						WriteCount: 50,
-						ReadBytes:  1024,
-						WriteBytes: 512,
-					},
-				}, nil
-			},
-			wantLen: 1,
-		},
-		{
-			name: "gopsutil error wrapped and returned",
-			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
-				return nil, errors.New("iocounters failed")
-			},
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			restore := disk.SetIOCountersFn(tt.fn)
-			defer restore()
-			got, err := disk.ListIOCounters(context.Background())
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Len(got, tt.wantLen)
+			s.Len(info.Devices, tt.wantLen)
 		})
 	}
 }

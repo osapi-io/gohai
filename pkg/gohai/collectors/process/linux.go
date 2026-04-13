@@ -23,23 +23,22 @@ package process
 import "context"
 
 // Linux collects a process snapshot on Linux hosts via gopsutil.
+// gopsutil's process.Processes is swapped via the package-level
+// processesFn seam (see SetProcessesFn in export_test.go).
 type Linux struct {
 	base
-
-	// ProcessesFn returns a pre-mapped slice of Process snapshots.
-	// Production wiring calls gopsutil; tests inject a stub returning
-	// canned data.
-	ProcessesFn func(context.Context) ([]Process, error)
 }
 
-// NewLinux returns a Linux variant wired to gopsutil.
+// NewLinux returns a Linux variant.
 func NewLinux() *Linux {
-	return &Linux{ProcessesFn: listProcesses}
+	return &Linux{}
 }
 
 // Collect returns a process snapshot.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
-	procs, err := l.ProcessesFn(ctx)
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
+	procs, err := listProcesses(ctx)
 	if err != nil {
 		return nil, err
 	}

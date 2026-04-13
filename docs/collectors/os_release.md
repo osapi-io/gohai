@@ -23,22 +23,22 @@ macOS has no equivalent file; the collector returns `nil` there.
 
 ## Collected Fields
 
-| Field              | Type              | Description                                              | Schema mapping                                                      |
-| ------------------ | ----------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
-| `id`               | string            | Short identifier (`ubuntu`, `rhel`, `debian`, `alpine`). | `os.name` (OCSF uses `name` for the distro identifier).             |
+| Field              | Type              | Description                                              | Schema mapping                                                          |
+| ------------------ | ----------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `id`               | string            | Short identifier (`ubuntu`, `rhel`, `debian`, `alpine`). | `os.name` (OCSF uses `name` for the distro identifier).                 |
 | `id_like`          | []string          | Parent/upstream distros this host is compatible with.    | No direct schema mapping; downstream-compatible with `os.name` aliases. |
-| `name`             | string            | Display name (`"Ubuntu"`).                               | No direct schema mapping — `os.name` is already `id`.               |
-| `pretty_name`      | string            | Human-readable (`"Ubuntu 24.04 LTS"`).                   | No direct schema mapping (presentation-level).                            |
-| `version`          | string            | Full version string including codename.                  | No OCSF — `os.version` is used for the version number.              |
-| `version_id`       | string            | Version number only (`"24.04"`).                         | OCSF `os.version`.                                                  |
-| `version_codename` | string            | Codename only (`"noble"`).                               | No direct schema mapping.                                                 |
-| `build_id`         | string            | Build identifier (rolling distros).                      | OCSF `os.build` (closest match).                                    |
-| `variant`          | string            | Distro variant (edge, workstation, server, cloud).       | No direct schema mapping.                                                 |
-| `variant_id`       | string            | Variant identifier (short form).                         | No direct schema mapping.                                                 |
-| `home_url`         | string            | Distro homepage.                                         | No OCSF.                                                            |
-| `support_url`      | string            | Distro support URL.                                      | No OCSF.                                                            |
-| `bug_report_url`   | string            | Where to file bugs upstream.                             | No OCSF.                                                            |
-| `extra`            | map[string]string | Any keys not explicitly parsed (e.g. `UBUNTU_CODENAME`). | No OCSF.                                                            |
+| `name`             | string            | Display name (`"Ubuntu"`).                               | No direct schema mapping — `os.name` is already `id`.                   |
+| `pretty_name`      | string            | Human-readable (`"Ubuntu 24.04 LTS"`).                   | No direct schema mapping (presentation-level).                          |
+| `version`          | string            | Full version string including codename.                  | No OCSF — `os.version` is used for the version number.                  |
+| `version_id`       | string            | Version number only (`"24.04"`).                         | OCSF `os.version`.                                                      |
+| `version_codename` | string            | Codename only (`"noble"`).                               | No direct schema mapping.                                               |
+| `build_id`         | string            | Build identifier (rolling distros).                      | OCSF `os.build` (closest match).                                        |
+| `variant`          | string            | Distro variant (edge, workstation, server, cloud).       | No direct schema mapping.                                               |
+| `variant_id`       | string            | Variant identifier (short form).                         | No direct schema mapping.                                               |
+| `home_url`         | string            | Distro homepage.                                         | No OCSF.                                                                |
+| `support_url`      | string            | Distro support URL.                                      | No OCSF.                                                                |
+| `bug_report_url`   | string            | Where to file bugs upstream.                             | No OCSF.                                                                |
+| `extra`            | map[string]string | Any keys not explicitly parsed (e.g. `UBUNTU_CODENAME`). | No OCSF.                                                                |
 
 ## Platform Support
 
