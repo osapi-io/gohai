@@ -33,9 +33,9 @@ Consumers that need per-core saturation should divide by `cpu.total` from the
 | `five`    | float64 | 5-minute load average.  | No direct OCSF. |
 | `fifteen` | float64 | 15-minute load average. | No direct OCSF. |
 
-Field names follow Ohai's `cpu.load_avg.{one,five,fifteen}` vocabulary — OCSF
-has no load-average field, so Ohai wins the precedence per
-[field-naming precedence](../features/ocsf-ohai.md#field-naming-precedence-applied-repo-wide).
+Field names are a gohai choice: OCSF has no load-average field and Ohai ships no
+loadavg plugin, so `one`/`five`/`fifteen` are picked to match the conceptual
+triple returned by `getloadavg(3)`.
 
 ## Platform Support
 
@@ -85,15 +85,15 @@ would auto-include `cpu` even when the user disabled it. See
 
 ## Data Sources
 
-| Platform | What we read                                                | Ohai plugin                                                                                                             | Alignment                                                                                                                                                                                                                                                                     |
-| -------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `load.AvgWithContext` (reads `/proc/loadavg`).     | [`linux/loadavg.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/loadavg.rb) — `/proc/loadavg` parse. | **Same source of truth (`/proc/loadavg`).** Ohai emits under `cpu.load_avg.{one,five,fifteen}` (nested under the cpu plugin); we surface as a top-level `load` fact since a consumer may want it without the whole cpu collector. Field names match (`one`/`five`/`fifteen`). |
-| macOS    | gopsutil `load.AvgWithContext` (reads `sysctl vm.loadavg`). | [`darwin/cpu.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/darwin/cpu.rb) — `sysctl -n vm.loadavg`.      | **Equivalent.** Same sysctl, same three numbers.                                                                                                                                                                                                                              |
+| Platform | What we read                                                | Ohai plugin                                                                    | Alignment                                                                                                                                                                 |
+| -------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | gopsutil `load.AvgWithContext` (reads `/proc/loadavg`).     | **No Ohai equivalent.** Ohai does not ship a loadavg plugin in current `main`. | **gohai extension.** The `one`/`five`/`fifteen` field names are a Go-idiomatic choice aligned with `getloadavg(3)`'s conceptual triple; they are not inherited from Ohai. |
+| macOS    | gopsutil `load.AvgWithContext` (reads `sysctl vm.loadavg`). | **No Ohai equivalent.**                                                        | Same as Linux — gohai extension.                                                                                                                                          |
 
-**Known gaps vs. Ohai:** None. Ohai also carries `runnable_tasks` / `last_pid`
-from `/proc/loadavg`'s trailing fields, but those aren't exposed via
-`getloadavg(3)` and are rarely consumed — deferred until a concrete consumer
-asks.
+**Known gaps vs. Ohai:** N/A — Ohai has no loadavg plugin, so there is no
+coverage to mirror. Trailing fields of `/proc/loadavg` (`runnable_tasks`,
+`last_pid`) aren't exposed by `getloadavg(3)`; deferred until a concrete
+consumer asks.
 
 ## Backing library
 

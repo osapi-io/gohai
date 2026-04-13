@@ -74,15 +74,16 @@ None.
 
 ## Data Sources
 
-| Platform | What we read       | Ohai plugin                                                                                                   | Alignment  |
-| -------- | ------------------ | ------------------------------------------------------------------------------------------------------------- | ---------- |
-| Linux    | `/etc/lsb-release` | [`linux/lsb.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/lsb.rb) — parses the same file | Equivalent |
-| macOS    | —                  | No Ohai handler                                                                                               | Parity     |
+| Platform | What we read       | Ohai plugin                                                                                                                                                                              | Alignment                                                                                                                                                                                                                                                                                                                                                                                                      |
+| -------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/etc/lsb-release` | [`linux/lsb.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/lsb.rb) — shells out to `lsb_release -a` when `/usr/bin/lsb_release` is present, otherwise emits nothing. | **Same four fields (`id`/`release`/`codename`/`description`), different source.** Ohai invokes the `lsb_release` CLI (requires the `lsb-release` package). We read `/etc/lsb-release` directly — faster, no subprocess, works on Debian/Ubuntu derivatives even without the `lsb-release` package installed. Distros that only populate via the CLI (rare on modern Debian/Ubuntu) would not be covered by us. |
+| macOS    | —                  | No Ohai handler                                                                                                                                                                          | Parity                                                                                                                                                                                                                                                                                                                                                                                                         |
 
-**Known gaps:** None. Ohai also runs `lsb_release -a` as a fallback when the
-file is absent; we don't (the file exists on every host that has the `lsb`
-package installed, and adding an exec path for a legacy format isn't worth the
-complexity).
+**Known gaps vs. Ohai:** Ohai's `lsb_release -a` fallback can surface data on
+hosts that have the CLI installed but no `/etc/lsb-release` file (uncommon on
+modern Debian/Ubuntu; more common on older RHEL with the `redhat-lsb` package).
+We do not shell out — adding an exec path for a legacy format isn't worth the
+complexity.
 
 ## Backing library
 
