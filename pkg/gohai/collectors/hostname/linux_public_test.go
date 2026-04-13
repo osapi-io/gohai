@@ -27,7 +27,10 @@ import (
 
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
+	"github.com/osapi-io/gohai/internal/executor"
+	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 )
 
@@ -37,6 +40,27 @@ type HostnameLinuxPublicTestSuite struct {
 
 func TestHostnameLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(HostnameLinuxPublicTestSuite))
+}
+
+// hostnameExec returns a MockExecutor that canned-answers
+// `hostname -s` and bare `hostname` separately. Shared by linux and
+// darwin tests because both OSes run the same commands.
+func hostnameExec(
+	t *testing.T,
+	shortOut []byte, shortErr error,
+	bareOut []byte, bareErr error,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "hostname", "-s").
+		Return(shortOut, shortErr).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "hostname").
+		Return(bareOut, bareErr).
+		AnyTimes()
+	return m
 }
 
 func (s *HostnameLinuxPublicTestSuite) TestCollect() {
