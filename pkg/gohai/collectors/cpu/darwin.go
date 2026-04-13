@@ -20,21 +20,93 @@
 
 package cpu
 
-import "context"
+import (
+	"context"
+	"strconv"
+	"strings"
 
-// Darwin collects CPU facts on macOS via gopsutil (which uses sysctl).
+	"github.com/osapi-io/gohai/internal/executor"
+)
+
+// Darwin collects CPU facts on macOS. gopsutil's cpu.Info (via
+// ReadFn) sources model / vendor / flags and the logical thread
+// count correctly but gets physical cores (reports logical) and
+// frequency (zero on Apple Silicon) wrong. We override those via
+// direct sysctl reads through the injected Exec.
 type Darwin struct {
 	base
 
 	ReadFn func(context.Context) (*Info, error)
+	Exec   executor.Executor
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant wired to production dependencies.
 func NewDarwin() *Darwin {
-	return &Darwin{ReadFn: readCPU}
+	return &Darwin{
+		ReadFn: readCPU,
+		Exec:   executor.New(),
+	}
 }
 
-// Collect returns the CPU Info.
+// Collect returns the CPU Info with macOS-specific sysctl overrides
+// merged on top of the gopsutil base:
+//
+//   - hw.physicalcpu   → Cores (gopsutil reports logical here).
+//   - hw.packages      → Sockets.
+//   - hw.cpufrequency_max / hw.cpufrequency → Mhz (both absent on
+//     Apple Silicon; Mhz left as whatever gopsutil returned — usually 0
+//     there).
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	return d.ReadFn(ctx)
+	info, err := d.ReadFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if n, ok := sysctlInt(ctx, d.Exec, "hw.physicalcpu"); ok {
+		info.Cores = n
+	}
+	if n, ok := sysctlInt(ctx, d.Exec, "hw.packages"); ok {
+		info.Sockets = n
+	}
+	if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency_max"); ok {
+		info.Mhz = float64(n) / 1_000_000
+	} else if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency"); ok {
+		info.Mhz = float64(n) / 1_000_000
+	}
+	return info, nil
+}
+
+// sysctlInt runs `sysctl -n <key>` and parses the output as int.
+// Returns (0, false) on any exec error or parse failure.
+func sysctlInt(
+	ctx context.Context,
+	exec executor.Executor,
+	key string,
+) (int, bool) {
+	out, err := exec.Execute(ctx, "sysctl", "-n", key)
+	if err != nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// sysctlInt64 runs `sysctl -n <key>` and parses the output as int64 —
+// used for hw.cpufrequency which exceeds int32 on modern CPUs.
+func sysctlInt64(
+	ctx context.Context,
+	exec executor.Executor,
+	key string,
+) (int64, bool) {
+	out, err := exec.Execute(ctx, "sysctl", "-n", key)
+	if err != nil {
+		return 0, false
+	}
+	n, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
 }

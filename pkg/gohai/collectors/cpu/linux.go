@@ -20,22 +20,55 @@
 
 package cpu
 
-import "context"
+import (
+	"context"
 
-// Linux collects CPU facts on Linux via gopsutil (which parses
-// /proc/cpuinfo).
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
+	"github.com/osapi-io/gohai/internal/executor"
+)
+
+// Linux collects CPU facts on Linux. Uses gopsutil's `/proc/cpuinfo`
+// parse as the primary source (ReadFn) and layers two extensions on
+// top:
+//
+//   - vulnerability mitigation status via /sys/devices/system/cpu/vulnerabilities/*
+//     (read through FS — an avfs.VFS, so tests can inject memfs content).
+//   - NUMA topology, per-level cache sizes, and — on s390x / ppc64le —
+//     authoritative core/socket/thread counts via `lscpu` (run through
+//     Exec — an executor.Executor, so tests can mock the command).
 type Linux struct {
 	base
 
 	ReadFn func(context.Context) (*Info, error)
+	FS     avfs.VFS
+	Exec   executor.Executor
 }
 
-// NewLinux returns a Linux variant wired to gopsutil.
+// NewLinux returns a Linux variant wired to production dependencies:
+// gopsutil for /proc/cpuinfo, the real OS filesystem for sysfs, and a
+// real `os/exec` wrapper for `lscpu`.
 func NewLinux() *Linux {
-	return &Linux{ReadFn: readCPU}
+	return &Linux{
+		ReadFn: readCPU,
+		FS:     osfs.NewWithNoIdm(),
+		Exec:   executor.New(),
+	}
 }
 
-// Collect returns the CPU Info.
+// Collect returns the CPU Info with Linux-specific extensions merged
+// on top of the gopsutil base.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	return l.ReadFn(ctx)
+	info, err := l.ReadFn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if v := readVulnerabilities(l.FS); v != nil {
+		info.Vulnerabilities = v
+	}
+	if out, err := l.Exec.Execute(ctx, "lscpu"); err == nil {
+		applyLscpuToInfo(info, parseLscpu(out))
+	}
+	return info, nil
 }
