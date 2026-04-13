@@ -1,7 +1,7 @@
 # Network
 
 > **Status:** Implemented ✅ (interfaces, structured addresses, routes, default
-> gateway; ethtool + ARP planned)
+> gateway, link details, ARP/ND)
 
 ## Description
 
@@ -20,10 +20,8 @@ Consumers use this to:
   string-parsing CIDRs.
 - Detect MTU mismatches or flapping interfaces (high `errin`/`errout`).
 
-**Scope note:** ethtool enrichment (link speed / duplex / driver) and the ARP/ND
-neighbour table are tracked separately — those will land via library adoption
-(safchain/ethtool, vishvananda/netlink) in a follow-up PR. DNS resolver config
-will live in its own `dns` collector.
+DNS resolver configuration (`/etc/resolv.conf` nameservers + search domains)
+will live in its own `dns` collector — out of scope here.
 
 ## Collected Fields
 
@@ -37,6 +35,7 @@ Top level:
 | `default_gateway`         | string      | Next-hop IPv4 address for the default route.          | No direct OCSF. |
 | `default_inet6_interface` | string      | Interface the default IPv6 route exits through.       | No direct OCSF. |
 | `default_inet6_gateway`   | string      | Next-hop IPv6 address for the default route.          | No direct OCSF. |
+| `neighbours`              | []Neighbour | Kernel ARP + NDP cache (Linux only — netlink).        | No direct OCSF. |
 
 Per interface:
 
@@ -46,6 +45,9 @@ Per interface:
 | `mtu`           | int       | Maximum transmission unit (bytes).                                                                          | No direct OCSF.           |
 | `hardware_addr` | string    | MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                    | `network_interface.mac`.  |
 | `encapsulation` | string    | Canonical encapsulation: `Ethernet` / `Loopback` / `PPP` / `SLIP` / `IPIP` / `6to4` / `VJSLIP`. Linux only. | No direct OCSF.           |
+| `driver`        | string    | Kernel driver bound to the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only — sysfs-derived.               | No direct OCSF.           |
+| `speed`         | string    | Negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only — ghw-derived.                                 | No direct OCSF.           |
+| `duplex`        | string    | Link duplex (`Full`, `Half`). Linux only — ghw-derived.                                                     | No direct OCSF.           |
 | `flags`         | []string  | Interface flags (`up`, `broadcast`, `multicast`).                                                           | No direct OCSF.           |
 | `addresses[]`   | []Address | See below.                                                                                                  | —                         |
 | `routes[]`      | []Route   | Routes whose `dev` matches this interface.                                                                  | No direct OCSF.           |
@@ -74,6 +76,16 @@ Per route:
 | `scope`       | string | `global` / `link` / `host` (kernel-reported, lowercase).      | No direct OCSF. |
 | `proto`       | string | Routing protocol / source (`kernel`, `dhcp`, `static`, `ra`). | No direct OCSF. |
 | `metric`      | int    | Route metric.                                                 | No direct OCSF. |
+
+Per neighbour:
+
+| Field       | Type   | Description                                                                                             | Schema mapping  |
+| ----------- | ------ | ------------------------------------------------------------------------------------------------------- | --------------- |
+| `address`   | string | IPv4 / IPv6 address of the neighbour.                                                                   | No direct OCSF. |
+| `family`    | string | `inet` or `inet6`.                                                                                      | No direct OCSF. |
+| `mac`       | string | Hardware address (MAC) when known.                                                                      | No direct OCSF. |
+| `interface` | string | Egress interface (resolved from netlink LinkIndex via `net.InterfaceByIndex`).                          | No direct OCSF. |
+| `state`     | string | NUD state: `INCOMPLETE` / `REACHABLE` / `STALE` / `DELAY` / `PROBE` / `FAILED` / `NOARP` / `PERMANENT`. | No direct OCSF. |
 
 Per `Counters`:
 
@@ -205,7 +217,17 @@ On Linux:
    corresponding top-level `default_*` fields. Each route is also appended to
    the matching interface's `routes` slice. When `ip` is unavailable (minimal
    containers without iproute2), routing fields stay empty.
-6. **OpenVZ alias merge**: detect OpenVZ guest via `/proc/vz` present AND
+6. **Link details**: per-interface `Speed` and `Duplex` come from
+   `ghw.Network()` keyed by interface name (ghw reads
+   `/sys/class/net/<iface>/speed` and `/duplex`). `Driver` is the basename of
+   `/sys/class/net/<iface>/device/driver`'s symlink target, read through the
+   injected `avfs.VFS`. Virtual / loopback interfaces typically lack the driver
+   symlink and stay empty.
+7. **Neighbours**: `vishvananda/netlink.NeighList(0, 0)` returns the kernel
+   ARP + NDP cache. Each entry is mapped to a `Neighbour` with address / family
+   / MAC / interface (resolved from LinkIndex) / state (NUD bitmask → ip-neigh
+   canonical string).
+8. **OpenVZ alias merge**: detect OpenVZ guest via `/proc/vz` present AND
    `/proc/bc/0` absent. When detected, any `<base>:<n>` interface (typically
    `venet0:0`) has its addresses appended to the primary interface (`venet0`)
    and the alias is removed from the output. Mirrors Ohai's behaviour so
@@ -225,3 +247,9 @@ routing, and OpenVZ handling are Linux-specific. A future enhancement may add
 - [`internal/executor`](../../internal/executor) — shared command-runner
   abstraction used to invoke `ip route show` on Linux. Tests mock with
   `go.uber.org/mock`.
+- [`github.com/jaypipes/ghw`](https://github.com/jaypipes/ghw) — Apache-2.
+  Source for per-interface link `Speed` + `Duplex` on Linux.
+- [`github.com/vishvananda/netlink`](https://github.com/vishvananda/netlink) —
+  Apache-2. Source for the kernel ARP + NDP cache on Linux. Both libraries
+  compile cross-platform; their darwin paths return errors at runtime, leaving
+  the relevant fields blank.

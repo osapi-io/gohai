@@ -32,16 +32,20 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jaypipes/ghw"
 	gpnet "github.com/shirou/gopsutil/v4/net"
+	"github.com/vishvananda/netlink"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds network interfaces plus top-level routing facts.
+// Info holds network interfaces plus top-level routing + neighbour
+// facts.
 type Info struct {
 	Interfaces            []Interface `json:"interfaces"`
 	Routes                []Route     `json:"routes,omitempty"`
+	Neighbours            []Neighbour `json:"neighbours,omitempty"`
 	DefaultInterface      string      `json:"default_interface,omitempty"`
 	DefaultGateway        string      `json:"default_gateway,omitempty"`
 	DefaultInet6Interface string      `json:"default_inet6_interface,omitempty"`
@@ -54,10 +58,22 @@ type Interface struct {
 	MTU           int       `json:"mtu"`
 	HardwareAddr  string    `json:"hardware_addr,omitempty"` // OCSF: network_interface.mac
 	Encapsulation string    `json:"encapsulation,omitempty"` // canonical: Ethernet / Loopback / PPP / SLIP / IPIP / 6to4
+	Driver        string    `json:"driver,omitempty"`        // sysfs driver name (e1000e, virtio_net, ixgbe, ...)
+	Speed         string    `json:"speed,omitempty"`         // ghw link speed string ("1000Mb/s")
+	Duplex        string    `json:"duplex,omitempty"`        // half | full | unknown
 	Flags         []string  `json:"flags,omitempty"`
 	Addresses     []Address `json:"addresses,omitempty"`
 	Routes        []Route   `json:"routes,omitempty"`
 	Counters      *Counters `json:"counters,omitempty"`
+}
+
+// Neighbour is one entry from the ARP / NDP cache.
+type Neighbour struct {
+	Address   string `json:"address"`             // IPv4 / IPv6
+	Family    string `json:"family"`              // inet | inet6
+	MAC       string `json:"mac,omitempty"`       // hardware address
+	Interface string `json:"interface,omitempty"` // egress interface
+	State     string `json:"state,omitempty"`     // REACHABLE / STALE / DELAY / PROBE / PERMANENT / NOARP
 }
 
 // Address represents a single IP bound to an interface, structured
@@ -244,4 +260,146 @@ func isOpenVZAlias(
 		}
 	}
 	return "", false
+}
+
+// NICStat captures the per-interface link-layer fields we surface on
+// `Interface.{Driver, Speed, Duplex}`. Speed is a string (matching
+// ghw's `"1000Mb/s"` shape) so we can preserve units / "Unknown!".
+// Exported so tests can stub the probe via SetNICFn.
+type NICStat struct {
+	Driver string
+	Speed  string
+	Duplex string
+}
+
+// Package-level seams. Production uses ghw/net for Speed + Duplex
+// and a sysfs read for Driver; vishvananda/netlink for the kernel
+// ARP+NDP cache. Both libraries compile cross-platform; their darwin
+// code paths return errors at runtime, leaving the relevant fields
+// blank.
+//
+// nicFn / neighListFn are the high-level seams collectors use. The
+// inner upstream calls (ghwNetworkFn / netlinkNeighListFn /
+// netInterfaceByIndex) are also private vars so tests can swap them
+// in isolation when exercising readNIC / readNeighbours directly.
+var (
+	nicFn               = readNIC
+	neighListFn         = readNeighbours
+	ghwNetworkFn        = ghw.Network
+	netlinkNeighListFn  = netlink.NeighList
+	netInterfaceByIndex = net.InterfaceByIndex
+)
+
+// readNIC asks ghw for the link layer's Speed + Duplex per
+// interface name. Driver comes from a separate sysfs read in
+// applyNICStats (it's avfs-injectable so tests cover it without
+// touching ghw). Returns a name → NICStat map so a single ghw call
+// services every interface.
+func readNIC() (map[string]NICStat, error) {
+	info, err := ghwNetworkFn()
+	if err != nil {
+		return nil, err
+	}
+	return nicMapFromGHW(info.NICs), nil
+}
+
+// nicMapFromGHW is the pure conversion from ghw's []*NIC to our
+// name → NICStat map. Extracted so tests cover the mapping without
+// touching the host (readNIC itself stays trivial).
+func nicMapFromGHW(
+	nics []*ghw.NIC,
+) map[string]NICStat {
+	out := map[string]NICStat{}
+	for _, n := range nics {
+		if n == nil {
+			continue
+		}
+		out[n.Name] = NICStat{Speed: n.Speed, Duplex: n.Duplex}
+	}
+	return out
+}
+
+// readNeighbours queries the kernel ARP + NDP cache via netlink and
+// returns one Neighbour per entry. The pure conversion lives in
+// neighboursFromNetlink so tests can drive it without netlink.
+func readNeighbours() ([]Neighbour, error) {
+	entries, err := netlinkNeighListFn(0, 0)
+	if err != nil {
+		return nil, err
+	}
+	return neighboursFromNetlink(entries, indexToInterfaceName), nil
+}
+
+// indexToInterfaceName resolves an interface index via stdlib's
+// net.InterfaceByIndex (swappable as netInterfaceByIndex).
+func indexToInterfaceName(
+	idx int,
+) string {
+	if iface, err := netInterfaceByIndex(idx); err == nil {
+		return iface.Name
+	}
+	return ""
+}
+
+// neighboursFromNetlink is the pure conversion from netlink.Neigh
+// to our Neighbour. Takes an indexToName resolver so tests can
+// avoid touching the host.
+func neighboursFromNetlink(
+	entries []netlink.Neigh,
+	indexToName func(int) string,
+) []Neighbour {
+	out := make([]Neighbour, 0, len(entries))
+	for _, e := range entries {
+		nb := Neighbour{
+			Address:   e.IP.String(),
+			Family:    neighFamily(e.Family),
+			Interface: indexToName(e.LinkIndex),
+			State:     neighState(e.State),
+		}
+		if e.HardwareAddr != nil {
+			nb.MAC = e.HardwareAddr.String()
+		}
+		out = append(out, nb)
+	}
+	return out
+}
+
+// neighFamily turns the netlink AF_* integer into our string label.
+func neighFamily(
+	fam int,
+) string {
+	switch fam {
+	case 2: // AF_INET
+		return "inet"
+	case 10: // AF_INET6
+		return "inet6"
+	}
+	return ""
+}
+
+// neighState turns netlink's NUD_* bitmask into the canonical
+// ip-neigh string. Mirrors `ip neigh show`'s human output. Unknown
+// values fall through to a hex-formatted string.
+func neighState(
+	state int,
+) string {
+	switch state {
+	case 0x01:
+		return "INCOMPLETE"
+	case 0x02:
+		return "REACHABLE"
+	case 0x04:
+		return "STALE"
+	case 0x08:
+		return "DELAY"
+	case 0x10:
+		return "PROBE"
+	case 0x20:
+		return "FAILED"
+	case 0x40:
+		return "NOARP"
+	case 0x80:
+		return "PERMANENT"
+	}
+	return ""
 }
