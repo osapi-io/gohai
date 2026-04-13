@@ -23,46 +23,53 @@ package kernel
 import (
 	"bufio"
 	"context"
-	"os"
 	"strconv"
 	"strings"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
-const procModulesPath = "/proc/modules"
+const (
+	procModulesPath     = "/proc/modules"
+	sysModuleVersionFmt = "/sys/module/%s/version"
+)
 
-// Linux collects kernel facts on Linux using syscall.Uname plus
-// /proc/modules for loaded module data. UnameFn and ReadFileFn are
-// injected so tests cover every branch without touching the real host.
+// Linux collects kernel facts on Linux. Uses unix.Uname for the top-level
+// identity fields (via the package-level unameSyscall seam), reads
+// /proc/modules for the module list, and reads /sys/module/<name>/version
+// to populate each module's Version — matches Ohai's kernel plugin on
+// Linux. `processor` and `os` are synthesized per Option A of issue #29
+// (Machine and the static string "GNU/Linux") rather than shelling out
+// to `uname -p` / `uname -o`.
 type Linux struct {
 	base
 
-	UnameFn    func() (name, release, version, machine string, err error)
-	ReadFileFn func(string) ([]byte, error)
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to real syscalls / os.ReadFile.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{
-		UnameFn:    defaultUname,
-		ReadFileFn: os.ReadFile,
-	}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns kernel Info. Module parsing failures yield an empty
-// Modules map rather than failing the whole collector.
+// Collect returns kernel Info.
 func (l *Linux) Collect(_ context.Context) (any, error) {
-	name, release, version, machine, err := l.UnameFn()
+	name, release, version, machine, err := defaultUname()
 	if err != nil {
 		return nil, err
 	}
 	info := &Info{
-		Name:    name,
-		Release: release,
-		Version: version,
-		Machine: machine,
+		Name:      name,
+		Release:   release,
+		Version:   version,
+		Machine:   machine,
+		Processor: machine,
+		OS:        "GNU/Linux",
 	}
-	if b, err := l.ReadFileFn(procModulesPath); err == nil {
+	if b, err := l.FS.ReadFile(procModulesPath); err == nil {
 		info.Modules = parseProcModules(b)
+		enrichModuleVersions(l.FS, info.Modules)
 	}
 	return info, nil
 }
@@ -91,4 +98,27 @@ func parseProcModules(
 		out[fields[0]] = m
 	}
 	return out
+}
+
+// enrichModuleVersions reads /sys/module/<name>/version per module and
+// assigns the trimmed contents to Module.Version. Many built-in or
+// stripped-down modules do not expose a version file; those leave the
+// field empty (matches Ohai's silent-on-miss behaviour).
+func enrichModuleVersions(
+	fs avfs.VFS,
+	modules map[string]Module,
+) {
+	for name, m := range modules {
+		path := "/sys/module/" + name + "/version"
+		b, err := fs.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		v := strings.TrimSpace(string(b))
+		if v == "" {
+			continue
+		}
+		m.Version = v
+		modules[name] = m
+	}
 }
