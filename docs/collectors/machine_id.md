@@ -30,7 +30,7 @@ Caveats:
 
 ## Collected Fields
 
-| Field | Type   | Description                                 | OCSF mapping                                                                                                                                                                 |
+| Field | Type   | Description                                 | Schema mapping |
 | ----- | ------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`  | string | Stable machine identifier (typically UUID). | OCSF `device.uid` — the canonical OCSF host-identifier field (dictionary: "unique device identifier. Typically BIOS hardware identifier, machine id, or agent identifier."). |
 

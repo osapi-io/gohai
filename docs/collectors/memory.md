@@ -21,7 +21,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field               | Type    | Description                                | OCSF mapping                     |
+| Field               | Type    | Description                                | Schema mapping |
 | ------------------- | ------- | ------------------------------------------ | -------------------------------- |
 | `total`             | uint64  | Total physical memory in bytes.            | `device.hw_info.ram_size_bytes`. |
 | `available`         | uint64  | Memory available to new allocations.       | No direct OCSF.                  |

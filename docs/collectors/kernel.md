@@ -22,7 +22,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field     | Type            | Description                                                      | OCSF mapping                                                |
+| Field     | Type            | Description                                                      | Schema mapping |
 | --------- | --------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
 | `name`    | string          | `uname -s` (`"Linux"`, `"Darwin"`).                              | `os.name`.                                                  |
 | `release` | string          | `uname -r` — kernel release (`"5.15.0-47-generic"`).             | `os.kernel_release`.                                        |

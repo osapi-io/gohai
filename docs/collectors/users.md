@@ -25,7 +25,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field                  | Type   | Description                                      | OCSF mapping                                 |
+| Field                  | Type   | Description                                      | Schema mapping |
 | ---------------------- | ------ | ------------------------------------------------ | -------------------------------------------- |
 | `logged_in[].user`     | string | Username.                                        | `user.name`.                                 |
 | `logged_in[].terminal` | string | Terminal (`pts/0`, `ttys001`). Empty for remote. | No direct OCSF.                              |
