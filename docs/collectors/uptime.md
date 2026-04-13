@@ -19,13 +19,13 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field          | Type   | Description                                               | Schema mapping                                                                                |
-| -------------- | ------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `seconds`      | uint64 | Seconds since boot.                                       | No direct OCSF. OCSF records individual event times; host uptime isn't a first-class concept. |
-| `boot_time`    | uint64 | Unix timestamp of boot.                                   | OCSF `device.first_seen_time` captures the same idea for asset-inventory use cases.           |
-| `human`        | string | Human-readable uptime (e.g. `3d 4h 12m 5s`).              | N/A (presentation).                                                                           |
-| `idle_seconds` | uint64 | Aggregate CPU idle seconds across all cores (Linux only). | No OCSF equivalent.                                                                           |
-| `idle_human`   | string | Human-readable idle duration (Linux only).                | N/A (presentation).                                                                           |
+| Field          | Type   | Description                                               | Schema mapping                                                                                          |
+| -------------- | ------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `seconds`      | uint64 | Seconds since boot.                                       | No direct schema mapping. OCSF records individual event times; host uptime isn't a first-class concept. |
+| `boot_time`    | uint64 | Unix timestamp of boot.                                   | OCSF `device.first_seen_time` captures the same idea for asset-inventory use cases.                     |
+| `human`        | string | Human-readable uptime (e.g. `3d 4h 12m 5s`).              | N/A (presentation).                                                                                     |
+| `idle_seconds` | uint64 | Aggregate CPU idle seconds across all cores (Linux only). | No direct schema mapping.                                                                               |
+| `idle_human`   | string | Human-readable idle duration (Linux only).                | N/A (presentation).                                                                                     |
 
 ## Platform Support
 

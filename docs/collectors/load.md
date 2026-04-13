@@ -27,11 +27,11 @@ Consumers that need per-core saturation should divide by `cpu.total` from the
 
 ## Collected Fields
 
-| Field     | Type    | Description             | Schema mapping  |
-| --------- | ------- | ----------------------- | --------------- |
-| `one`     | float64 | 1-minute load average.  | No direct OCSF. |
-| `five`    | float64 | 5-minute load average.  | No direct OCSF. |
-| `fifteen` | float64 | 15-minute load average. | No direct OCSF. |
+| Field     | Type    | Description             | Schema mapping            |
+| --------- | ------- | ----------------------- | ------------------------- |
+| `one`     | float64 | 1-minute load average.  | No direct schema mapping. |
+| `five`    | float64 | 5-minute load average.  | No direct schema mapping. |
+| `fifteen` | float64 | 15-minute load average. | No direct schema mapping. |
 
 Field names are a gohai choice: OCSF has no load-average field and Ohai ships no
 loadavg plugin, so `one`/`five`/`fifteen` are picked to match the conceptual

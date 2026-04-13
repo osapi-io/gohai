@@ -31,56 +31,56 @@ Consumers use this to:
 | Field                      | Type    | Description                                               | Schema mapping                   |
 | -------------------------- | ------- | --------------------------------------------------------- | -------------------------------- |
 | `total`                    | uint64  | Total physical memory in bytes.                           | `device.hw_info.ram_size_bytes`. |
-| `available`                | uint64  | Memory available to new allocations.                      | No direct OCSF.                  |
-| `used`                     | uint64  | Used memory in bytes.                                     | No direct OCSF.                  |
-| `used_percent`             | float64 | Percent of `total` used (0–100).                          | No direct OCSF.                  |
-| `free`                     | uint64  | Free memory in bytes.                                     | No direct OCSF.                  |
-| `active`                   | uint64  | Active LRU pages (bytes).                                 | No direct OCSF.                  |
-| `inactive`                 | uint64  | Inactive LRU pages (bytes).                               | No direct OCSF.                  |
-| `active_anon`              | uint64  | Active anonymous pages (Linux).                           | No direct OCSF.                  |
-| `inactive_anon`            | uint64  | Inactive anonymous pages (Linux).                         | No direct OCSF.                  |
-| `active_file`              | uint64  | Active file-backed pages (Linux).                         | No direct OCSF.                  |
-| `inactive_file`            | uint64  | Inactive file-backed pages (Linux).                       | No direct OCSF.                  |
-| `unevictable`              | uint64  | Unevictable pages (mlock, ramfs) (Linux).                 | No direct OCSF.                  |
-| `wired`                    | uint64  | Non-swappable pages (macOS primary signal). Linux: 0.     | No direct OCSF.                  |
-| `speculative`              | uint64  | macOS speculative pages (prefetch-style cache). Linux: 0. | No direct OCSF.                  |
-| `compressed`               | uint64  | macOS memory in the compressor. Linux: 0.                 | No direct OCSF.                  |
-| `buffers`                  | uint64  | Block-layer buffers (Linux).                              | No direct OCSF.                  |
-| `cached`                   | uint64  | Page cache (Linux).                                       | No direct OCSF.                  |
-| `dirty`                    | uint64  | Pages awaiting writeback.                                 | No direct OCSF.                  |
-| `writeback`                | uint64  | Pages being written back.                                 | No direct OCSF.                  |
-| `writeback_tmp`            | uint64  | Temporary writeback memory used by FUSE.                  | No direct OCSF.                  |
-| `shared`                   | uint64  | Shared memory (tmpfs + SysV shm).                         | No direct OCSF.                  |
-| `mapped`                   | uint64  | mmap'd pages.                                             | No direct OCSF.                  |
-| `slab`                     | uint64  | Total slab allocator.                                     | No direct OCSF.                  |
-| `s_reclaimable`            | uint64  | Reclaimable slab.                                         | No direct OCSF.                  |
-| `s_unreclaim`              | uint64  | Unreclaimable slab.                                       | No direct OCSF.                  |
-| `k_reclaimable`            | uint64  | Other kernel-reclaimable memory (Linux).                  | No direct OCSF.                  |
-| `page_tables`              | uint64  | Page-table allocations.                                   | No direct OCSF.                  |
-| `kernel_stack`             | uint64  | Kernel stack allocations (Linux).                         | No direct OCSF.                  |
-| `percpu`                   | uint64  | Per-CPU allocations (Linux).                              | No direct OCSF.                  |
-| `anon_pages`               | uint64  | Anonymous (non-file-backed) pages (Linux).                | No direct OCSF.                  |
-| `shmem`                    | uint64  | Shared memory (tmpfs + SysV shm) (Linux).                 | No direct OCSF.                  |
-| `commit_limit`             | uint64  | Overcommit ceiling.                                       | No direct OCSF.                  |
-| `committed_as`             | uint64  | Committed address space.                                  | No direct OCSF.                  |
-| `vmalloc_total`            | uint64  | vmalloc arena size.                                       | No direct OCSF.                  |
-| `vmalloc_used`             | uint64  | vmalloc in use.                                           | No direct OCSF.                  |
-| `vmalloc_chunk`            | uint64  | Largest free vmalloc chunk.                               | No direct OCSF.                  |
-| `hugepages.total`          | uint64  | `HugePages_Total` — configured pages.                     | No direct OCSF.                  |
-| `hugepages.free`           | uint64  | `HugePages_Free`.                                         | No direct OCSF.                  |
-| `hugepages.reserved`       | uint64  | `HugePages_Rsvd`.                                         | No direct OCSF.                  |
-| `hugepages.surplus`        | uint64  | `HugePages_Surp`.                                         | No direct OCSF.                  |
-| `hugepages.size`           | uint64  | `Hugepagesize` in bytes.                                  | No direct OCSF.                  |
-| `hugepages.anon_hugepages` | uint64  | `AnonHugePages`.                                          | No direct OCSF.                  |
-| `hugepages.hugetlb`        | uint64  | `Hugetlb` — total memory in hugepages (Linux).            | No direct OCSF.                  |
-| `direct_map.map_4k`        | uint64  | Physical memory mapped with 4k pages (Linux).             | No direct OCSF.                  |
-| `direct_map.map_2m`        | uint64  | Physical memory mapped with 2M pages (Linux).             | No direct OCSF.                  |
-| `direct_map.map_1g`        | uint64  | Physical memory mapped with 1G pages (Linux).             | No direct OCSF.                  |
-| `swap.total`               | uint64  | Total swap. Omitted when no swap.                         | No direct OCSF.                  |
-| `swap.used`                | uint64  | Swap used.                                                | No direct OCSF.                  |
-| `swap.free`                | uint64  | Swap free.                                                | No direct OCSF.                  |
-| `swap.used_percent`        | float64 | Percent of swap used.                                     | No direct OCSF.                  |
-| `swap.cached`              | uint64  | `SwapCached` from `/proc/meminfo` (Linux).                | No direct OCSF.                  |
+| `available`                | uint64  | Memory available to new allocations.                      | No direct schema mapping.        |
+| `used`                     | uint64  | Used memory in bytes.                                     | No direct schema mapping.        |
+| `used_percent`             | float64 | Percent of `total` used (0–100).                          | No direct schema mapping.        |
+| `free`                     | uint64  | Free memory in bytes.                                     | No direct schema mapping.        |
+| `active`                   | uint64  | Active LRU pages (bytes).                                 | No direct schema mapping.        |
+| `inactive`                 | uint64  | Inactive LRU pages (bytes).                               | No direct schema mapping.        |
+| `active_anon`              | uint64  | Active anonymous pages (Linux).                           | No direct schema mapping.        |
+| `inactive_anon`            | uint64  | Inactive anonymous pages (Linux).                         | No direct schema mapping.        |
+| `active_file`              | uint64  | Active file-backed pages (Linux).                         | No direct schema mapping.        |
+| `inactive_file`            | uint64  | Inactive file-backed pages (Linux).                       | No direct schema mapping.        |
+| `unevictable`              | uint64  | Unevictable pages (mlock, ramfs) (Linux).                 | No direct schema mapping.        |
+| `wired`                    | uint64  | Non-swappable pages (macOS primary signal). Linux: 0.     | No direct schema mapping.        |
+| `speculative`              | uint64  | macOS speculative pages (prefetch-style cache). Linux: 0. | No direct schema mapping.        |
+| `compressed`               | uint64  | macOS memory in the compressor. Linux: 0.                 | No direct schema mapping.        |
+| `buffers`                  | uint64  | Block-layer buffers (Linux).                              | No direct schema mapping.        |
+| `cached`                   | uint64  | Page cache (Linux).                                       | No direct schema mapping.        |
+| `dirty`                    | uint64  | Pages awaiting writeback.                                 | No direct schema mapping.        |
+| `writeback`                | uint64  | Pages being written back.                                 | No direct schema mapping.        |
+| `writeback_tmp`            | uint64  | Temporary writeback memory used by FUSE.                  | No direct schema mapping.        |
+| `shared`                   | uint64  | Shared memory (tmpfs + SysV shm).                         | No direct schema mapping.        |
+| `mapped`                   | uint64  | mmap'd pages.                                             | No direct schema mapping.        |
+| `slab`                     | uint64  | Total slab allocator.                                     | No direct schema mapping.        |
+| `s_reclaimable`            | uint64  | Reclaimable slab.                                         | No direct schema mapping.        |
+| `s_unreclaim`              | uint64  | Unreclaimable slab.                                       | No direct schema mapping.        |
+| `k_reclaimable`            | uint64  | Other kernel-reclaimable memory (Linux).                  | No direct schema mapping.        |
+| `page_tables`              | uint64  | Page-table allocations.                                   | No direct schema mapping.        |
+| `kernel_stack`             | uint64  | Kernel stack allocations (Linux).                         | No direct schema mapping.        |
+| `percpu`                   | uint64  | Per-CPU allocations (Linux).                              | No direct schema mapping.        |
+| `anon_pages`               | uint64  | Anonymous (non-file-backed) pages (Linux).                | No direct schema mapping.        |
+| `shmem`                    | uint64  | Shared memory (tmpfs + SysV shm) (Linux).                 | No direct schema mapping.        |
+| `commit_limit`             | uint64  | Overcommit ceiling.                                       | No direct schema mapping.        |
+| `committed_as`             | uint64  | Committed address space.                                  | No direct schema mapping.        |
+| `vmalloc_total`            | uint64  | vmalloc arena size.                                       | No direct schema mapping.        |
+| `vmalloc_used`             | uint64  | vmalloc in use.                                           | No direct schema mapping.        |
+| `vmalloc_chunk`            | uint64  | Largest free vmalloc chunk.                               | No direct schema mapping.        |
+| `hugepages.total`          | uint64  | `HugePages_Total` — configured pages.                     | No direct schema mapping.        |
+| `hugepages.free`           | uint64  | `HugePages_Free`.                                         | No direct schema mapping.        |
+| `hugepages.reserved`       | uint64  | `HugePages_Rsvd`.                                         | No direct schema mapping.        |
+| `hugepages.surplus`        | uint64  | `HugePages_Surp`.                                         | No direct schema mapping.        |
+| `hugepages.size`           | uint64  | `Hugepagesize` in bytes.                                  | No direct schema mapping.        |
+| `hugepages.anon_hugepages` | uint64  | `AnonHugePages`.                                          | No direct schema mapping.        |
+| `hugepages.hugetlb`        | uint64  | `Hugetlb` — total memory in hugepages (Linux).            | No direct schema mapping.        |
+| `direct_map.map_4k`        | uint64  | Physical memory mapped with 4k pages (Linux).             | No direct schema mapping.        |
+| `direct_map.map_2m`        | uint64  | Physical memory mapped with 2M pages (Linux).             | No direct schema mapping.        |
+| `direct_map.map_1g`        | uint64  | Physical memory mapped with 1G pages (Linux).             | No direct schema mapping.        |
+| `swap.total`               | uint64  | Total swap. Omitted when no swap.                         | No direct schema mapping.        |
+| `swap.used`                | uint64  | Swap used.                                                | No direct schema mapping.        |
+| `swap.free`                | uint64  | Swap free.                                                | No direct schema mapping.        |
+| `swap.used_percent`        | float64 | Percent of swap used.                                     | No direct schema mapping.        |
+| `swap.cached`              | uint64  | `SwapCached` from `/proc/meminfo` (Linux).                | No direct schema mapping.        |
 
 ## Platform Support
 

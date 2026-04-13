@@ -27,15 +27,15 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field           | Type   | Description                                                             | Schema mapping                             |
-| --------------- | ------ | ----------------------------------------------------------------------- | ------------------------------------------ |
-| `os`            | string | `runtime.GOOS` — `"linux"`, `"darwin"`, `"windows"`.                    | `os.type`.                                 |
-| `name`          | string | Canonical distro / product ID (`"ubuntu"`, `"redhat"`, `"darwin"`).     | `os.name`.                                 |
-| `version`       | string | Distro version (`"24.04"`, `"7.9.2009"`, `"14.4.1"`).                   | `os.version`.                              |
-| `version_extra` | string | macOS RSR patch suffix (`"(a)"`). Empty when no RSR is applied.         | No direct OCSF.                            |
-| `family`        | string | Family grouping (`"debian"`, `"rhel"`, `"fedora"`, `"suse"`, `"arch"`). | No direct OCSF — input to packaging logic. |
-| `architecture`  | string | Hardware arch (`"amd64"`, `"arm64"`).                                   | `device.hw_info.cpu_bits` is the nearest.  |
-| `build`         | string | macOS build identifier from `sw_vers` `BuildVersion` (`"23E224"`).      | `os.build`.                                |
+| Field           | Type   | Description                                                             | Schema mapping                                       |
+| --------------- | ------ | ----------------------------------------------------------------------- | ---------------------------------------------------- |
+| `os`            | string | `runtime.GOOS` — `"linux"`, `"darwin"`, `"windows"`.                    | `os.type`.                                           |
+| `name`          | string | Canonical distro / product ID (`"ubuntu"`, `"redhat"`, `"darwin"`).     | `os.name`.                                           |
+| `version`       | string | Distro version (`"24.04"`, `"7.9.2009"`, `"14.4.1"`).                   | `os.version`.                                        |
+| `version_extra` | string | macOS RSR patch suffix (`"(a)"`). Empty when no RSR is applied.         | No direct schema mapping.                            |
+| `family`        | string | Family grouping (`"debian"`, `"rhel"`, `"fedora"`, `"suse"`, `"arch"`). | No direct schema mapping — input to packaging logic. |
+| `architecture`  | string | Hardware arch (`"amd64"`, `"arm64"`).                                   | `device.hw_info.cpu_bits` is the nearest.            |
+| `build`         | string | macOS build identifier from `sw_vers` `BuildVersion` (`"23E224"`).      | `os.build`.                                          |
 
 `name` values pass through our `platformIDRemap` table (mirrors Ohai's
 `OS_RELEASE_PLATFORM_REMAP`) so common variants canonicalize to their parent

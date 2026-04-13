@@ -41,11 +41,11 @@ validated revision should correlate with `platform`/`kernel`.
 
 ## Collected Fields
 
-| Field                   | Type   | Description                                                                    | Schema mapping  |
-| ----------------------- | ------ | ------------------------------------------------------------------------------ | --------------- |
-| `kernel.enabled`        | `bool` | `true` if the kernel flag `/proc/sys/crypto/fips_enabled` is `1`.              | No direct OCSF. |
-| `policy.name`           | string | Active crypto policy (e.g. `FIPS`, `FIPS:OSPP`, `DEFAULT`). Omitted if absent. | No direct OCSF. |
-| `policy.fips_effective` | `bool` | `true` if the policy name starts with `FIPS`.                                  | No direct OCSF. |
+| Field                   | Type   | Description                                                                    | Schema mapping            |
+| ----------------------- | ------ | ------------------------------------------------------------------------------ | ------------------------- |
+| `kernel.enabled`        | `bool` | `true` if the kernel flag `/proc/sys/crypto/fips_enabled` is `1`.              | No direct schema mapping. |
+| `policy.name`           | string | Active crypto policy (e.g. `FIPS`, `FIPS:OSPP`, `DEFAULT`). Omitted if absent. | No direct schema mapping. |
+| `policy.fips_effective` | `bool` | `true` if the policy name starts with `FIPS`.                                  | No direct schema mapping. |
 
 ## Platform Support
 

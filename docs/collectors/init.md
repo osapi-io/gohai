@@ -17,9 +17,9 @@ dependency ordering:
 
 ## Collected Fields
 
-| Field  | Type   | Description                                                                               | Schema mapping                                                                                               |
-| ------ | ------ | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `name` | string | Canonical init system name. Known values listed above; unknown values pass through as-is. | No direct OCSF — `process.name` of PID 1 is the closest concept (`os.pid_1_name`-style field doesn't exist). |
+| Field  | Type   | Description                                                                               | Schema mapping                                                                                                         |
+| ------ | ------ | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `name` | string | Canonical init system name. Known values listed above; unknown values pass through as-is. | No direct schema mapping — `process.name` of PID 1 is the closest concept (`os.pid_1_name`-style field doesn't exist). |
 
 ## Platform Support
 

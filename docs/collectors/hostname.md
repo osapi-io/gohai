@@ -23,7 +23,7 @@ elsewhere on the host — important on MDM-managed Macs where
 | `name`         | string | Short hostname (e.g., `web01`).                                                          | OCSF `device.hostname` (leaf stripped: leaf matches collector name). |
 | `fqdn`         | string | Canonical FQDN; falls back to short hostname when DNS canonicalization ultimately fails. | `device.domain` + `.hostname`.                                       |
 | `domain`       | string | DNS domain — everything after the first `.` of the FQDN. Empty when FQDN equals `name`.  | `device.domain`.                                                     |
-| `machine_name` | string | Human-friendly name (macOS `ComputerName`-derived). Linux: same as `name`.               | No direct OCSF.                                                      |
+| `machine_name` | string | Human-friendly name (macOS `ComputerName`-derived). Linux: same as `name`.               | No direct schema mapping.                                            |
 
 ## Platform Support
 
