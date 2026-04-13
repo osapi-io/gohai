@@ -20,36 +20,25 @@
 
 package shard
 
-import (
-	"context"
-	"os"
-)
+import "context"
 
 // Darwin computes a shard seed on macOS from IOPlatformUUID (via
-// gopsutil under the hood) + os.Hostname. MachineIDFn is typed in
-// `string` so importers don't need gopsutil.
+// gopsutil under the hood) + os.Hostname.
 type Darwin struct {
 	base
-
-	MachineIDFn func(context.Context) (string, error)
-	HostnameFn  func() (string, error)
 }
 
-// NewDarwin returns a Darwin variant wired to production bridges.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{
-		MachineIDFn: readMachineUUID,
-		HostnameFn:  os.Hostname,
-	}
+	return &Darwin{}
 }
 
 // Collect derives the shard seed. macOS has no /etc/machine-id; we use
-// the IOPlatformUUID via MachineIDFn. A lookup error is treated as
-// "no stable ID" — the seed still computes deterministically over the
-// hostname (matches the Linux collector's behavior when
-// /etc/machine-id is missing).
+// the IOPlatformUUID. A lookup error is treated as "no stable ID" —
+// the seed still computes deterministically over the hostname (matches
+// the Linux collector's behavior when /etc/machine-id is missing).
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	mid, _ := d.MachineIDFn(ctx)
-	host, _ := d.HostnameFn()
+	mid, _ := readMachineUUIDFn(ctx)
+	host, _ := hostnameFn()
 	return &Info{Seed: computeSeed(mid, host)}, nil
 }

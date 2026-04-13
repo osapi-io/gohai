@@ -22,10 +22,12 @@ package timezone_test
 
 import (
 	"context"
-	"errors"
+	"io/fs"
 	"testing"
 	"time"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
@@ -43,45 +45,59 @@ func (s *TimezoneLinuxPublicTestSuite) TestCollect() {
 	now := func() time.Time {
 		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PDT", -7*3600))
 	}
-	missingReadlink := func(string) (string, error) { return "", errors.New("not a symlink") }
-	missingReadFile := func(string) ([]byte, error) { return nil, errors.New("not found") }
 
 	tests := []struct {
 		name       string
-		readlink   func(string) (string, error)
-		readFile   func(string) ([]byte, error)
+		setupFS    func() avfs.VFS
 		wantName   string
 		wantAbbrev string
 		wantOffset int
 	}{
 		{
-			name:       "symlink points to IANA zone",
-			readlink:   func(string) (string, error) { return "/usr/share/zoneinfo/America/Los_Angeles", nil },
-			readFile:   missingReadFile,
+			name: "symlink points to IANA zone",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/usr/share/zoneinfo/America", 0o755)
+				_ = f.WriteFile(
+					"/usr/share/zoneinfo/America/Los_Angeles",
+					[]byte{},
+					fs.FileMode(0o644),
+				)
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.Symlink("/usr/share/zoneinfo/America/Los_Angeles", "/etc/localtime")
+				return f
+			},
 			wantName:   "America/Los_Angeles",
 			wantAbbrev: "PDT",
 			wantOffset: -7 * 3600,
 		},
 		{
-			name:       "target without zoneinfo prefix passed through",
-			readlink:   func(string) (string, error) { return "UTC", nil },
-			readFile:   missingReadFile,
+			name: "target without zoneinfo prefix passed through",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.Symlink("UTC", "/etc/localtime")
+				return f
+			},
 			wantName:   "UTC",
 			wantAbbrev: "PDT",
 			wantOffset: -7 * 3600,
 		},
 		{
-			name:       "readlink fails, falls back to /etc/timezone",
-			readlink:   missingReadlink,
-			readFile:   func(string) ([]byte, error) { return []byte("Europe/Berlin\n"), nil },
+			name: "readlink fails, falls back to /etc/timezone",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/timezone", []byte("Europe/Berlin\n"), fs.FileMode(0o644))
+				return f
+			},
 			wantName:   "Europe/Berlin",
 			wantAbbrev: "PDT",
 			wantOffset: -7 * 3600,
 		},
 		{
 			name:       "both sources missing leaves name empty",
-			readlink:   missingReadlink,
-			readFile:   missingReadFile,
+			setupFS:    func() avfs.VFS { return memfs.New() },
 			wantName:   "",
 			wantAbbrev: "PDT",
 			wantOffset: -7 * 3600,
@@ -90,7 +106,8 @@ func (s *TimezoneLinuxPublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &timezone.Linux{ReadlinkFn: tt.readlink, ReadFileFn: tt.readFile, NowFn: now}
+			defer timezone.SetNowFn(now)()
+			c := &timezone.Linux{FS: tt.setupFS()}
 			got, err := c.Collect(context.Background())
 			s.Require().NoError(err)
 			info, ok := got.(*timezone.Info)

@@ -18,33 +18,16 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package shard
+package timezone
 
-import (
-	"context"
+import "time"
 
-	"github.com/avfs/avfs"
-	"github.com/avfs/avfs/vfs/osfs"
-)
-
-// Linux computes a shard seed on Linux from /etc/machine-id (or
-// /var/lib/dbus/machine-id fallback) + os.Hostname.
-type Linux struct {
-	base
-
-	FS avfs.VFS
-}
-
-// NewLinux returns a Linux variant wired to the real OS filesystem.
-func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm()}
-}
-
-// Collect derives the shard seed. A missing machine_id still produces
-// a (less useful) seed from the hostname alone — that matches Ohai's
-// semantics and avoids the collector returning nil for minimal hosts.
-func (l *Linux) Collect(_ context.Context) (any, error) {
-	mid := readMachineID(l.FS.ReadFile)
-	host, _ := hostnameFn()
-	return &Info{Seed: computeSeed(mid, host)}, nil
+// SetNowFn swaps the package-level time.Now seam. Returns a restore
+// func the caller must defer.
+func SetNowFn(
+	fn func() time.Time,
+) (restore func()) {
+	orig := nowFn
+	nowFn = fn
+	return func() { nowFn = orig }
 }

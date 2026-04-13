@@ -22,26 +22,28 @@ package initd
 
 import (
 	"context"
-	"os"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
 // Linux detects the init system by reading /proc/1/comm.
 type Linux struct {
 	base
 
-	ReadFileFn func(string) ([]byte, error)
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to os.ReadFile.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{ReadFileFn: os.ReadFile}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect reads /proc/1/comm and classifies the result. Missing or
 // unreadable /proc/1/comm (rare — possible in restricted containers)
 // returns an empty Name rather than erroring.
 func (l *Linux) Collect(_ context.Context) (any, error) {
-	b, err := l.ReadFileFn(proc1CommPath)
+	b, err := l.FS.ReadFile(proc1CommPath)
 	if err != nil {
 		return &Info{}, nil
 	}

@@ -23,8 +23,11 @@ package uptime_test
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
@@ -48,64 +51,74 @@ func (s *UptimeLinuxPublicTestSuite) TestCollect() {
 		}, nil
 	}
 
+	buildFS := func(content string, writeFile bool) avfs.VFS {
+		f := memfs.New()
+		if writeFile {
+			_ = f.MkdirAll("/proc", 0o755)
+			_ = f.WriteFile("/proc/uptime", []byte(content), fs.FileMode(0o644))
+		}
+		return f
+	}
+
 	tests := []struct {
-		name     string
-		baseFn   func(context.Context) (*uptime.Info, error)
-		readFile func(string) ([]byte, error)
-		wantErr  bool
-		want     uptime.Info
+		name    string
+		baseFn  func(context.Context) (*uptime.Info, error)
+		setupFS func() avfs.VFS
+		wantErr bool
+		want    uptime.Info
 	}{
 		{
-			name:     "3h up + idle parsed",
-			baseFn:   okBase,
-			readFile: func(string) ([]byte, error) { return []byte("12345.67 9876.54\n"), nil },
+			name:    "3h up + idle parsed",
+			baseFn:  okBase,
+			setupFS: func() avfs.VFS { return buildFS("12345.67 9876.54\n", true) },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
 				IdleSeconds: 9876, IdleHuman: "2h 44m 36s",
 			},
 		},
 		{
-			name:     "missing /proc/uptime omits idle",
-			baseFn:   okBase,
-			readFile: func(string) ([]byte, error) { return nil, errors.New("not found") },
+			name:    "missing /proc/uptime omits idle",
+			baseFn:  okBase,
+			setupFS: func() avfs.VFS { return buildFS("", false) },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
 			},
 		},
 		{
-			name:     "malformed /proc/uptime omits idle",
-			baseFn:   okBase,
-			readFile: func(string) ([]byte, error) { return []byte("12345.67\n"), nil },
+			name:    "malformed /proc/uptime omits idle",
+			baseFn:  okBase,
+			setupFS: func() avfs.VFS { return buildFS("12345.67\n", true) },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
 			},
 		},
 		{
-			name:     "unparseable idle field omits",
-			baseFn:   okBase,
-			readFile: func(string) ([]byte, error) { return []byte("12345.67 xyz\n"), nil },
+			name:    "unparseable idle field omits",
+			baseFn:  okBase,
+			setupFS: func() avfs.VFS { return buildFS("12345.67 xyz\n", true) },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
 			},
 		},
 		{
-			name:     "negative idle omits",
-			baseFn:   okBase,
-			readFile: func(string) ([]byte, error) { return []byte("12345.67 -1.0\n"), nil },
+			name:    "negative idle omits",
+			baseFn:  okBase,
+			setupFS: func() avfs.VFS { return buildFS("12345.67 -1.0\n", true) },
 			want: uptime.Info{
 				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
 			},
 		},
 		{
-			name:     "BaseFn error propagated",
-			baseFn:   func(context.Context) (*uptime.Info, error) { return nil, errors.New("boom") },
-			readFile: func(string) ([]byte, error) { return []byte("1 1\n"), nil },
-			wantErr:  true,
+			name:    "BaseFn error propagated",
+			baseFn:  func(context.Context) (*uptime.Info, error) { return nil, errors.New("boom") },
+			setupFS: func() avfs.VFS { return buildFS("1 1\n", true) },
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &uptime.Linux{BaseFn: tt.baseFn, ReadFileFn: tt.readFile}
+			defer uptime.SetReadBaseFn(tt.baseFn)()
+			c := &uptime.Linux{FS: tt.setupFS()}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

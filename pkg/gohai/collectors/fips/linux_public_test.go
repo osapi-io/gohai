@@ -23,9 +23,12 @@ package fips_test
 import (
 	"context"
 	"errors"
-	"os"
+	"io/fs"
+	"path/filepath"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
@@ -39,29 +42,36 @@ func TestFipsLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(FipsLinuxPublicTestSuite))
 }
 
-// fakeFS builds a ReadFileFn that returns canned content per path and
-// canned errors per path. Missing paths return ErrNotExist (mimics
-// real filesystem semantics).
-func fakeFS(
-	contents map[string]string,
-	errs map[string]error,
-) func(string) ([]byte, error) {
-	return func(path string) ([]byte, error) {
-		if e, ok := errs[path]; ok {
-			return nil, e
-		}
-		if v, ok := contents[path]; ok {
-			return []byte(v), nil
-		}
-		return nil, os.ErrNotExist
+// pathErrorFS wraps a memfs and forces ReadFile to error on a
+// specific path — exercises non-ErrNotExist read failures.
+type pathErrorFS struct {
+	avfs.VFS
+	failPath string
+}
+
+func (p pathErrorFS) ReadFile(path string) ([]byte, error) {
+	if path == p.failPath {
+		return nil, errors.New("permission denied")
 	}
+	return p.VFS.ReadFile(path)
+}
+
+// newFipsFS builds a memfs with the given path→contents mapping.
+func newFipsFS(
+	contents map[string]string,
+) avfs.VFS {
+	f := memfs.New()
+	for path, body := range contents {
+		_ = f.MkdirAll(filepath.Dir(path), 0o755)
+		_ = f.WriteFile(path, []byte(body), fs.FileMode(0o644))
+	}
+	return f
 }
 
 func (s *FipsLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name              string
-		contents          map[string]string
-		errs              map[string]error
+		setupFS           func() avfs.VFS
 		wantErr           bool
 		wantEnabled       bool
 		wantPolicyNil     bool
@@ -69,16 +79,20 @@ func (s *FipsLinuxPublicTestSuite) TestCollect() {
 		wantFIPSEffective bool
 	}{
 		{
-			name:          "kernel enabled, no crypto-policies",
-			contents:      map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"},
+			name: "kernel enabled, no crypto-policies",
+			setupFS: func() avfs.VFS {
+				return newFipsFS(map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"})
+			},
 			wantEnabled:   true,
 			wantPolicyNil: true,
 		},
 		{
 			name: "kernel enabled + FIPS policy effective",
-			contents: map[string]string{
-				"/proc/sys/crypto/fips_enabled": "1\n",
-				"/etc/crypto-policies/config":   "FIPS\n",
+			setupFS: func() avfs.VFS {
+				return newFipsFS(map[string]string{
+					"/proc/sys/crypto/fips_enabled": "1\n",
+					"/etc/crypto-policies/config":   "FIPS\n",
+				})
 			},
 			wantEnabled:       true,
 			wantPolicyName:    "FIPS",
@@ -86,9 +100,11 @@ func (s *FipsLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "kernel enabled + FIPS subpolicy",
-			contents: map[string]string{
-				"/proc/sys/crypto/fips_enabled": "1\n",
-				"/etc/crypto-policies/config":   "FIPS:OSPP\n",
+			setupFS: func() avfs.VFS {
+				return newFipsFS(map[string]string{
+					"/proc/sys/crypto/fips_enabled": "1\n",
+					"/etc/crypto-policies/config":   "FIPS:OSPP\n",
+				})
 			},
 			wantEnabled:       true,
 			wantPolicyName:    "FIPS:OSPP",
@@ -96,9 +112,11 @@ func (s *FipsLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "kernel enabled, policy toggled to DEFAULT (drift)",
-			contents: map[string]string{
-				"/proc/sys/crypto/fips_enabled": "1\n",
-				"/etc/crypto-policies/config":   "DEFAULT\n",
+			setupFS: func() avfs.VFS {
+				return newFipsFS(map[string]string{
+					"/proc/sys/crypto/fips_enabled": "1\n",
+					"/etc/crypto-policies/config":   "DEFAULT\n",
+				})
 			},
 			wantEnabled:       true,
 			wantPolicyName:    "DEFAULT",
@@ -106,9 +124,11 @@ func (s *FipsLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "policy with comments and blanks",
-			contents: map[string]string{
-				"/proc/sys/crypto/fips_enabled": "1\n",
-				"/etc/crypto-policies/config":   "# set by update-crypto-policies\n\nFIPS\n",
+			setupFS: func() avfs.VFS {
+				return newFipsFS(map[string]string{
+					"/proc/sys/crypto/fips_enabled": "1\n",
+					"/etc/crypto-policies/config":   "# set by update-crypto-policies\n\nFIPS\n",
+				})
 			},
 			wantEnabled:       true,
 			wantPolicyName:    "FIPS",
@@ -116,45 +136,50 @@ func (s *FipsLinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "policy file comments only → no policy",
-			contents: map[string]string{
-				"/proc/sys/crypto/fips_enabled": "1\n",
-				"/etc/crypto-policies/config":   "# comment\n",
+			setupFS: func() avfs.VFS {
+				return newFipsFS(map[string]string{
+					"/proc/sys/crypto/fips_enabled": "1\n",
+					"/etc/crypto-policies/config":   "# comment\n",
+				})
 			},
 			wantEnabled:   true,
 			wantPolicyNil: true,
 		},
 		{
-			name:          "kernel disabled",
-			contents:      map[string]string{"/proc/sys/crypto/fips_enabled": "0\n"},
+			name: "kernel disabled",
+			setupFS: func() avfs.VFS {
+				return newFipsFS(map[string]string{"/proc/sys/crypto/fips_enabled": "0\n"})
+			},
 			wantEnabled:   false,
 			wantPolicyNil: true,
 		},
 		{
 			name:          "kernel file missing → disabled",
-			contents:      map[string]string{},
+			setupFS:       func() avfs.VFS { return memfs.New() },
 			wantEnabled:   false,
 			wantPolicyNil: true,
 		},
 		{
-			name:     "kernel read error propagated",
-			contents: map[string]string{},
-			errs: map[string]error{
-				"/proc/sys/crypto/fips_enabled": errors.New("permission denied"),
+			name: "kernel read error propagated",
+			setupFS: func() avfs.VFS {
+				return pathErrorFS{VFS: memfs.New(), failPath: "/proc/sys/crypto/fips_enabled"}
 			},
 			wantErr:       true,
 			wantPolicyNil: true,
 		},
 		{
-			name:          "policy read error ignored (Policy omitted)",
-			contents:      map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"},
-			errs:          map[string]error{"/etc/crypto-policies/config": errors.New("perm")},
+			name: "policy read error ignored (Policy omitted)",
+			setupFS: func() avfs.VFS {
+				base := newFipsFS(map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"})
+				return pathErrorFS{VFS: base, failPath: "/etc/crypto-policies/config"}
+			},
 			wantEnabled:   true,
 			wantPolicyNil: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &fips.Linux{ReadFileFn: fakeFS(tt.contents, tt.errs)}
+			c := &fips.Linux{FS: tt.setupFS()}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

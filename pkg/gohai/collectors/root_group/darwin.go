@@ -20,31 +20,22 @@
 
 package rootgroup
 
-import (
-	"context"
-	"os/user"
-)
+import "context"
 
 // Darwin resolves the root group on macOS. Typically returns "wheel".
 // Embeds base for Name/DefaultEnabled/Dependencies.
 type Darwin struct {
 	base
-
-	LookupUserFn  func(string) (*user.User, error)
-	LookupGroupFn func(string) (*user.Group, error)
 }
 
-// NewDarwin returns a Darwin variant wired to os/user.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{
-		LookupUserFn:  user.Lookup,
-		LookupGroupFn: user.LookupGroupId,
-	}
+	return &Darwin{}
 }
 
 // Collect performs the two-hop lookup. macOS and BSD set root's primary
 // group to "wheel"; we don't special-case the name — whatever the OS
 // reports is what we ship.
 func (d *Darwin) Collect(_ context.Context) (any, error) {
-	return resolveRootGroup(d.LookupUserFn, d.LookupGroupFn)
+	return resolveRootGroup()
 }

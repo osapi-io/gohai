@@ -25,17 +25,15 @@ import "context"
 // Debian covers debian / ubuntu / raspbian — apt-based hosts.
 type Debian struct {
 	base
-
-	ProbeFn func(string) string
 }
 
 // NewDebian returns a Debian variant.
 func NewDebian() *Debian {
-	return &Debian{ProbeFn: probe}
+	return &Debian{}
 }
 
 // Collect returns apt if present.
 func (d *Debian) Collect(_ context.Context) (any, error) {
-	name, path := firstFound(d.ProbeFn, "apt", "apt-get")
+	name, path := firstFound(probeFn, "apt", "apt-get")
 	return &Info{Name: name, Path: path}, nil
 }

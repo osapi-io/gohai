@@ -67,6 +67,11 @@ func New() Collector {
 // via SetHostInfoFn (export_test.go).
 var hostInfoFn = host.InfoWithContext
 
+// readBaseFn is the per-collector seam the Linux and Darwin variants
+// call directly. Points at readBase in production; tests swap via
+// SetReadBaseFn to bypass gopsutil entirely.
+var readBaseFn = readBase
+
 // readBase wraps the private gopsutil call and maps the result onto
 // our *Info so consumers of the collector never see gopsutil types.
 func readBase(

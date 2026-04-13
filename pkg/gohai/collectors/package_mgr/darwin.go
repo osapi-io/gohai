@@ -26,17 +26,15 @@ import "context"
 // falls back to port (MacPorts) if brew isn't installed.
 type Darwin struct {
 	base
-
-	ProbeFn func(string) string
 }
 
 // NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{ProbeFn: probe}
+	return &Darwin{}
 }
 
 // Collect returns brew if present, else port.
 func (d *Darwin) Collect(_ context.Context) (any, error) {
-	name, path := firstFound(d.ProbeFn, "brew", "port")
+	name, path := firstFound(probeFn, "brew", "port")
 	return &Info{Name: name, Path: path}, nil
 }

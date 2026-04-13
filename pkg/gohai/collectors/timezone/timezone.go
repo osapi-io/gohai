@@ -30,6 +30,10 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
+// nowFn is the package-level seam for time.Now. Tests swap it via
+// SetNowFn to pin deterministic zone/offset values.
+var nowFn = time.Now
+
 // localtimePath is the standard symlink path on both Linux and macOS.
 const localtimePath = "/etc/localtime"
 
@@ -65,10 +69,8 @@ func New() Collector {
 
 // clockZone extracts the abbreviation and offset from the Go runtime's
 // local clock. Shared by both variants — identical across OSes.
-func clockZone(
-	now func() time.Time,
-) (string, int) {
-	return now().Zone()
+func clockZone() (string, int) {
+	return nowFn().Zone()
 }
 
 // resolveName tries readlink(localtimePath) first; on hosts where

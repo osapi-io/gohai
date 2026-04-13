@@ -22,20 +22,17 @@ package uptime
 
 import "context"
 
-// Darwin collects uptime on macOS. No idle-time equivalent. BaseFn is
-// typed in our *Info so importers don't need gopsutil.
+// Darwin collects uptime on macOS. No idle-time equivalent.
 type Darwin struct {
 	base
-
-	BaseFn func(context.Context) (*Info, error)
 }
 
-// NewDarwin returns a Darwin variant wired to the production bridge.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{BaseFn: readBase}
+	return &Darwin{}
 }
 
 // Collect returns uptime facts.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	return d.BaseFn(ctx)
+	return readBaseFn(ctx)
 }

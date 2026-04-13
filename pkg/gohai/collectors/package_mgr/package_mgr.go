@@ -64,9 +64,13 @@ func New() Collector {
 	}
 }
 
-// probe looks up a binary via exec.LookPath. Named helper so
-// factories assign by reference. Returns the empty string for missing
-// binaries — no error distinction needed.
+// probeFn is the package-level injection seam for binary lookups.
+// Collectors call firstFound(probeFn, ...) directly; tests swap the
+// seam via SetProbeFn.
+var probeFn = probe
+
+// probe looks up a binary via exec.LookPath. Returns the empty string
+// for missing binaries — no error distinction needed.
 func probe(
 	name string,
 ) string {

@@ -18,33 +18,26 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package shard
+package rootgroup
 
-import (
-	"context"
+import "os/user"
 
-	"github.com/avfs/avfs"
-	"github.com/avfs/avfs/vfs/osfs"
-)
-
-// Linux computes a shard seed on Linux from /etc/machine-id (or
-// /var/lib/dbus/machine-id fallback) + os.Hostname.
-type Linux struct {
-	base
-
-	FS avfs.VFS
+// SetLookupUserFn swaps the package-level os/user.Lookup seam. Returns
+// a restore func the caller must defer.
+func SetLookupUserFn(
+	fn func(string) (*user.User, error),
+) (restore func()) {
+	orig := lookupUserFn
+	lookupUserFn = fn
+	return func() { lookupUserFn = orig }
 }
 
-// NewLinux returns a Linux variant wired to the real OS filesystem.
-func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm()}
-}
-
-// Collect derives the shard seed. A missing machine_id still produces
-// a (less useful) seed from the hostname alone — that matches Ohai's
-// semantics and avoids the collector returning nil for minimal hosts.
-func (l *Linux) Collect(_ context.Context) (any, error) {
-	mid := readMachineID(l.FS.ReadFile)
-	host, _ := hostnameFn()
-	return &Info{Seed: computeSeed(mid, host)}, nil
+// SetLookupGroupFn swaps the package-level os/user.LookupGroupId seam.
+// Returns a restore func the caller must defer.
+func SetLookupGroupFn(
+	fn func(string) (*user.Group, error),
+) (restore func()) {
+	orig := lookupGroupFn
+	lookupGroupFn = fn
+	return func() { lookupGroupFn = orig }
 }

@@ -63,7 +63,8 @@ func (s *MachineIDDarwinPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &machineid.Darwin{HostIDFn: tt.hostIDFn}
+			defer machineid.SetReadHostIDFn(tt.hostIDFn)()
+			c := &machineid.Darwin{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

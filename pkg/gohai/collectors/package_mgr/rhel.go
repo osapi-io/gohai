@@ -27,17 +27,15 @@ import "context"
 // falls back to yum (RHEL 7 and earlier, Amazon Linux 2).
 type RHEL struct {
 	base
-
-	ProbeFn func(string) string
 }
 
 // NewRHEL returns an RHEL variant.
 func NewRHEL() *RHEL {
-	return &RHEL{ProbeFn: probe}
+	return &RHEL{}
 }
 
 // Collect returns dnf if present, else yum.
 func (r *RHEL) Collect(_ context.Context) (any, error) {
-	name, path := firstFound(r.ProbeFn, "dnf", "yum")
+	name, path := firstFound(probeFn, "dnf", "yum")
 	return &Info{Name: name, Path: path}, nil
 }

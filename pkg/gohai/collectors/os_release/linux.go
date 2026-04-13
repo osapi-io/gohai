@@ -24,24 +24,27 @@ import (
 	"context"
 	"errors"
 	"os"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
 // Linux parses /etc/os-release on Linux hosts.
 type Linux struct {
 	base
 
-	ReadFileFn func(string) ([]byte, error)
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to os.ReadFile.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{ReadFileFn: os.ReadFile}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect reads /etc/os-release. Missing file soft-misses to an empty
 // Info — common on minimal/scratch containers that lack the file.
 func (l *Linux) Collect(_ context.Context) (any, error) {
-	b, err := l.ReadFileFn(osReleasePath)
+	b, err := l.FS.ReadFile(osReleasePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return &Info{}, nil

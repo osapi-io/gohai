@@ -35,3 +35,13 @@ func SetHostInfoFn(fn func(context.Context) (*host.InfoStat, error)) (restore fu
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }
 }
+
+// SetReadBaseFn swaps the per-collector readBase seam the Linux and
+// Darwin variants call directly.
+func SetReadBaseFn(
+	fn func(context.Context) (*Info, error),
+) (restore func()) {
+	orig := readBaseFn
+	readBaseFn = fn
+	return func() { readBaseFn = orig }
+}

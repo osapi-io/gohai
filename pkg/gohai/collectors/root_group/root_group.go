@@ -29,6 +29,13 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
+// lookupUserFn and lookupGroupFn are the package-level seams wrapping
+// os/user. Tests swap them via SetLookupUserFn / SetLookupGroupFn.
+var (
+	lookupUserFn  = user.Lookup
+	lookupGroupFn = user.LookupGroupId
+)
+
 // Info holds the root group data.
 type Info struct {
 	Name string `json:"name"` // primary group name for root — typically "root" on Linux, "wheel" on macOS/BSD
@@ -67,15 +74,12 @@ func New() Collector {
 // "root" to get its primary GID, then look up that GID to get the group
 // name. Correct even on systems where root's primary GID isn't 0.
 // Shared by both Linux and Darwin variants.
-func resolveRootGroup(
-	lookupUser func(string) (*user.User, error),
-	lookupGroup func(string) (*user.Group, error),
-) (*Info, error) {
-	u, err := lookupUser("root")
+func resolveRootGroup() (*Info, error) {
+	u, err := lookupUserFn("root")
 	if err != nil {
 		return nil, fmt.Errorf("lookup user root: %w", err)
 	}
-	g, err := lookupGroup(u.Gid)
+	g, err := lookupGroupFn(u.Gid)
 	if err != nil {
 		return nil, fmt.Errorf("lookup gid %s: %w", u.Gid, err)
 	}

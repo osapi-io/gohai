@@ -79,7 +79,9 @@ func (s *RootGroupLinuxPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &rootgroup.Linux{LookupUserFn: tt.lookupUserFn, LookupGroupFn: tt.lookupGroupFn}
+			defer rootgroup.SetLookupUserFn(tt.lookupUserFn)()
+			defer rootgroup.SetLookupGroupFn(tt.lookupGroupFn)()
+			c := &rootgroup.Linux{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

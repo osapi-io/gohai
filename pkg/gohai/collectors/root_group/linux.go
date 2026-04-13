@@ -20,29 +20,20 @@
 
 package rootgroup
 
-import (
-	"context"
-	"os/user"
-)
+import "context"
 
 // Linux resolves the root group on generic Linux hosts. Typically
 // returns "root". Embeds base for Name/DefaultEnabled/Dependencies.
 type Linux struct {
 	base
-
-	LookupUserFn  func(string) (*user.User, error)
-	LookupGroupFn func(string) (*user.Group, error)
 }
 
-// NewLinux returns a Linux variant wired to os/user.
+// NewLinux returns a Linux variant.
 func NewLinux() *Linux {
-	return &Linux{
-		LookupUserFn:  user.Lookup,
-		LookupGroupFn: user.LookupGroupId,
-	}
+	return &Linux{}
 }
 
 // Collect performs the two-hop lookup (root → gid → group name).
 func (l *Linux) Collect(_ context.Context) (any, error) {
-	return resolveRootGroup(l.LookupUserFn, l.LookupGroupFn)
+	return resolveRootGroup()
 }
