@@ -23,8 +23,9 @@ package timezone
 import (
 	"context"
 	"errors"
-	"os"
-	"time"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
 // darwinZoneinfoPrefix is the macOS-specific zoneinfo database path
@@ -36,25 +37,21 @@ const darwinZoneinfoPrefix = "/var/db/timezone/zoneinfo/"
 type Darwin struct {
 	base
 
-	ReadlinkFn func(string) (string, error)
-	NowFn      func() time.Time
+	FS avfs.VFS
 }
 
-// NewDarwin returns a Darwin variant wired to stdlib.
+// NewDarwin returns a Darwin variant wired to the real OS filesystem.
 func NewDarwin() *Darwin {
-	return &Darwin{
-		ReadlinkFn: os.Readlink,
-		NowFn:      time.Now,
-	}
+	return &Darwin{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect returns the timezone Info. macOS has no /etc/timezone
 // equivalent — if /etc/localtime isn't a symlink the Name stays empty
 // (rare on real macs; seen in some CI sandboxes).
 func (d *Darwin) Collect(_ context.Context) (any, error) {
-	abbrev, offset := clockZone(d.NowFn)
+	abbrev, offset := clockZone()
 	name := resolveName(
-		d.ReadlinkFn,
+		d.FS.Readlink,
 		func() (string, error) { return "", errors.New("no fallback on darwin") },
 		darwinZoneinfoPrefix,
 	)

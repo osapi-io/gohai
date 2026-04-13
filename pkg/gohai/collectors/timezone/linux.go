@@ -22,8 +22,9 @@ package timezone
 
 import (
 	"context"
-	"os"
-	"time"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
 // linuxZoneinfoPrefix is stripped from the symlink target to yield the
@@ -39,31 +40,22 @@ const timezonePath = "/etc/timezone"
 type Linux struct {
 	base
 
-	// ReadlinkFn reads /etc/localtime's symlink target.
-	ReadlinkFn func(string) (string, error)
-	// ReadFileFn reads /etc/timezone for the Debian-style fallback.
-	ReadFileFn func(string) ([]byte, error)
-	// NowFn returns the current time for zone abbreviation + offset.
-	NowFn func() time.Time
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to stdlib.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{
-		ReadlinkFn: os.Readlink,
-		ReadFileFn: os.ReadFile,
-		NowFn:      time.Now,
-	}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect returns the timezone Info. Never errors — missing sources
 // leave fields empty, clock values still populate from Go's runtime.
 func (l *Linux) Collect(_ context.Context) (any, error) {
-	abbrev, offset := clockZone(l.NowFn)
+	abbrev, offset := clockZone()
 	name := resolveName(
-		l.ReadlinkFn,
+		l.FS.Readlink,
 		func() (string, error) {
-			b, err := l.ReadFileFn(timezonePath)
+			b, err := l.FS.ReadFile(timezonePath)
 			if err != nil {
 				return "", err
 			}

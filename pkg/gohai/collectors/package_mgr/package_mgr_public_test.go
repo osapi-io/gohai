@@ -155,21 +155,18 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			probe := func(name string) string { return tt.probed[name] }
+			defer packagemgr.SetProbeFn(probe)()
 			var got any
 			var err error
 			switch tt.variant {
 			case "debian":
-				c := &packagemgr.Debian{ProbeFn: probe}
-				got, err = c.Collect(context.Background())
+				got, err = (&packagemgr.Debian{}).Collect(context.Background())
 			case "rhel":
-				c := &packagemgr.RHEL{ProbeFn: probe}
-				got, err = c.Collect(context.Background())
+				got, err = (&packagemgr.RHEL{}).Collect(context.Background())
 			case "darwin":
-				c := &packagemgr.Darwin{ProbeFn: probe}
-				got, err = c.Collect(context.Background())
+				got, err = (&packagemgr.Darwin{}).Collect(context.Background())
 			case "linux":
-				c := &packagemgr.Linux{ProbeFn: probe}
-				got, err = c.Collect(context.Background())
+				got, err = (&packagemgr.Linux{}).Collect(context.Background())
 			}
 			s.Require().NoError(err)
 			info, ok := got.(*packagemgr.Info)

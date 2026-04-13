@@ -23,13 +23,25 @@ package osrelease_test
 import (
 	"context"
 	"errors"
-	"os"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
 )
+
+// readErrorFS forces ReadFile to return a non-ErrNotExist error so the
+// "other read error propagated" branch is exercised.
+type readErrorFS struct {
+	avfs.VFS
+}
+
+func (readErrorFS) ReadFile(string) ([]byte, error) {
+	return nil, errors.New("permission denied")
+}
 
 type OSReleaseLinuxPublicTestSuite struct {
 	suite.Suite
@@ -56,7 +68,8 @@ UBUNTU_CODENAME=noble
 	tests := []struct {
 		name    string
 		content string
-		err     error
+		missing bool
+		readErr bool
 		wantErr bool
 		want    osrelease.Info
 	}{
@@ -76,14 +89,12 @@ UBUNTU_CODENAME=noble
 		},
 		{
 			name:    "missing file soft-misses",
-			content: "",
-			err:     os.ErrNotExist,
+			missing: true,
 			want:    osrelease.Info{},
 		},
 		{
 			name:    "other read error propagated",
-			content: "",
-			err:     errors.New("permission denied"),
+			readErr: true,
 			wantErr: true,
 		},
 		{
@@ -108,14 +119,19 @@ VARIANT_ID=workstation
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &osrelease.Linux{
-				ReadFileFn: func(string) ([]byte, error) {
-					if tt.err != nil {
-						return nil, tt.err
-					}
-					return []byte(tt.content), nil
-				},
+			var vfs avfs.VFS
+			switch {
+			case tt.readErr:
+				vfs = readErrorFS{VFS: memfs.New()}
+			case tt.missing:
+				vfs = memfs.New()
+			default:
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/os-release", []byte(tt.content), fs.FileMode(0o644))
+				vfs = f
 			}
+			c := &osrelease.Linux{FS: vfs}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

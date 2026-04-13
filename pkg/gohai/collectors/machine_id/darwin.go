@@ -25,23 +25,20 @@ import "context"
 // Darwin resolves the machine ID on macOS. Wraps readHostID
 // (gopsutil.host.Info internally, which on darwin reads
 // `IOPlatformUUID` from IOKit — the correct, stable hardware
-// identifier Apple intends for this purpose). HostIDFn returns our
-// `string` so importers don't need gopsutil in their module graph.
+// identifier Apple intends for this purpose).
 type Darwin struct {
 	base
-
-	HostIDFn func(context.Context) (string, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{HostIDFn: readHostID}
+	return &Darwin{}
 }
 
 // Collect returns the machine ID. gopsutil's darwin path is
 // correct — no extension needed.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	id, err := d.HostIDFn(ctx)
+	id, err := readHostIDFn(ctx)
 	if err != nil {
 		return nil, err
 	}

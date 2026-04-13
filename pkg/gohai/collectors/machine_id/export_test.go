@@ -39,3 +39,14 @@ func SetHostInfoFn(
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }
 }
+
+// SetReadHostIDFn swaps the per-collector readHostID seam — the seam
+// the Linux/Darwin variants call directly. Returns a restore func
+// the caller must defer.
+func SetReadHostIDFn(
+	fn func(context.Context) (string, error),
+) (restore func()) {
+	orig := readHostIDFn
+	readHostIDFn = fn
+	return func() { readHostIDFn = orig }
+}

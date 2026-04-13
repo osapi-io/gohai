@@ -60,7 +60,8 @@ func (s *UptimeDarwinPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &uptime.Darwin{BaseFn: tt.baseFn}
+			defer uptime.SetReadBaseFn(tt.baseFn)()
+			c := &uptime.Darwin{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

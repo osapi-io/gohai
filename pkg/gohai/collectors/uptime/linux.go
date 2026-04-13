@@ -22,40 +22,37 @@ package uptime
 
 import (
 	"context"
-	"os"
 	"strconv"
 	"strings"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
 // procUptimePath is /proc/uptime. Two fields: uptime seconds and
 // aggregate idle seconds across all CPUs.
 const procUptimePath = "/proc/uptime"
 
-// Linux collects uptime + idle on Linux. BaseFn is typed in our *Info
-// so importers don't need gopsutil; ReadFileFn is stdlib.
+// Linux collects uptime + idle on Linux.
 type Linux struct {
 	base
 
-	BaseFn     func(context.Context) (*Info, error)
-	ReadFileFn func(string) ([]byte, error)
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to the production bridges.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{
-		BaseFn:     readBase,
-		ReadFileFn: os.ReadFile,
-	}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns uptime facts. Uses BaseFn for Seconds/BootTime and
-// layers idle on top via /proc/uptime.
+// Collect returns uptime facts. Uses readBaseFn for Seconds/BootTime
+// and layers idle on top via /proc/uptime.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	out, err := l.BaseFn(ctx)
+	out, err := readBaseFn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if idle, ok := readIdleSeconds(l.ReadFileFn); ok {
+	if idle, ok := readIdleSeconds(l.FS); ok {
 		out.IdleSeconds = idle
 		out.IdleHuman = HumanDuration(idle)
 	}
@@ -66,9 +63,9 @@ func (l *Linux) Collect(ctx context.Context) (any, error) {
 // idle seconds across all CPU cores). Returns (0, false) on any failure
 // — idle is best-effort.
 func readIdleSeconds(
-	read func(string) ([]byte, error),
+	fs avfs.VFS,
 ) (uint64, bool) {
-	b, err := read(procUptimePath)
+	b, err := fs.ReadFile(procUptimePath)
 	if err != nil {
 		return 0, false
 	}

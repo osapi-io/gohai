@@ -36,3 +36,20 @@ func SetHostInfoFn(fn func(context.Context) (*host.InfoStat, error)) (restore fu
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }
 }
+
+// SetHostnameFn swaps the os.Hostname seam used by both variants.
+func SetHostnameFn(fn func() (string, error)) (restore func()) {
+	orig := hostnameFn
+	hostnameFn = fn
+	return func() { hostnameFn = orig }
+}
+
+// SetReadMachineUUIDFn swaps the darwin-variant readMachineUUID seam,
+// bypassing the hostInfoFn layer entirely.
+func SetReadMachineUUIDFn(
+	fn func(context.Context) (string, error),
+) (restore func()) {
+	orig := readMachineUUIDFn
+	readMachineUUIDFn = fn
+	return func() { readMachineUUIDFn = orig }
+}

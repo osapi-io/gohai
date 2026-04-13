@@ -27,13 +27,11 @@ import "context"
 // likelihood.
 type Linux struct {
 	base
-
-	ProbeFn func(string) string
 }
 
-// NewLinux returns a Linux variant wired to exec.LookPath.
+// NewLinux returns a Linux variant.
 func NewLinux() *Linux {
-	return &Linux{ProbeFn: probe}
+	return &Linux{}
 }
 
 // Collect identifies the package manager. Checks distros whose
@@ -45,6 +43,6 @@ func NewLinux() *Linux {
 // apt/dnf/yum are intentionally NOT probed here — those hosts dispatch
 // to the Debian or RHEL variant before ever reaching this one.
 func (l *Linux) Collect(_ context.Context) (any, error) {
-	name, path := firstFound(l.ProbeFn, "zypper", "pacman", "apk", "xbps-install", "emerge")
+	name, path := firstFound(probeFn, "zypper", "pacman", "apk", "xbps-install", "emerge")
 	return &Info{Name: name, Path: path}, nil
 }

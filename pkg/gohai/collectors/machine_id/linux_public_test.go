@@ -23,8 +23,11 @@ package machineid_test
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
@@ -40,47 +43,53 @@ func TestMachineIDLinuxPublicTestSuite(t *testing.T) {
 }
 
 func (s *MachineIDLinuxPublicTestSuite) TestCollect() {
+	const dbusPath = "/var/lib/dbus/machine-id"
 	tests := []struct {
-		name       string
-		hostIDFn   func(context.Context) (string, error)
-		readFileFn func(string) ([]byte, error)
-		wantErr    bool
-		wantID     string
+		name     string
+		hostIDFn func(context.Context) (string, error)
+		dbus     string // empty → file absent
+		wantErr  bool
+		wantID   string
 	}{
 		{
-			name:       "gopsutil returns /etc/machine-id → use it",
-			hostIDFn:   func(context.Context) (string, error) { return "gopsutil-id", nil },
-			readFileFn: func(string) ([]byte, error) { return nil, errors.New("should not be called") },
-			wantID:     "gopsutil-id",
+			name:     "gopsutil returns /etc/machine-id → use it",
+			hostIDFn: func(context.Context) (string, error) { return "gopsutil-id", nil },
+			wantID:   "gopsutil-id",
 		},
 		{
-			name:       "gopsutil empty, dbus fallback wins",
-			hostIDFn:   func(context.Context) (string, error) { return "", nil },
-			readFileFn: func(string) ([]byte, error) { return []byte("dbus-id\n"), nil },
-			wantID:     "dbus-id",
+			name:     "gopsutil empty, dbus fallback wins",
+			hostIDFn: func(context.Context) (string, error) { return "", nil },
+			dbus:     "dbus-id\n",
+			wantID:   "dbus-id",
 		},
 		{
-			name:       "gopsutil empty, dbus missing → empty ID (no error)",
-			hostIDFn:   func(context.Context) (string, error) { return "", nil },
-			readFileFn: func(string) ([]byte, error) { return nil, errors.New("not found") },
-			wantID:     "",
+			name:     "gopsutil empty, dbus missing → empty ID (no error)",
+			hostIDFn: func(context.Context) (string, error) { return "", nil },
+			wantID:   "",
 		},
 		{
-			name:       "gopsutil empty, dbus whitespace-only → empty ID",
-			hostIDFn:   func(context.Context) (string, error) { return "", nil },
-			readFileFn: func(string) ([]byte, error) { return []byte("   \n"), nil },
-			wantID:     "",
+			name:     "gopsutil empty, dbus whitespace-only → empty ID",
+			hostIDFn: func(context.Context) (string, error) { return "", nil },
+			dbus:     "   \n",
+			wantID:   "",
 		},
 		{
-			name:       "gopsutil error wrapped and returned",
-			hostIDFn:   func(context.Context) (string, error) { return "", errors.New("boom") },
-			readFileFn: func(string) ([]byte, error) { return nil, errors.New("ignored") },
-			wantErr:    true,
+			name:     "gopsutil error wrapped and returned",
+			hostIDFn: func(context.Context) (string, error) { return "", errors.New("boom") },
+			wantErr:  true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &machineid.Linux{HostIDFn: tt.hostIDFn, ReadFileFn: tt.readFileFn}
+			defer machineid.SetReadHostIDFn(tt.hostIDFn)()
+			var vfs avfs.VFS = memfs.New()
+			if tt.dbus != "" {
+				f := memfs.New()
+				_ = f.MkdirAll("/var/lib/dbus", 0o755)
+				_ = f.WriteFile(dbusPath, []byte(tt.dbus), fs.FileMode(0o644))
+				vfs = f
+			}
+			c := &machineid.Linux{FS: vfs}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)

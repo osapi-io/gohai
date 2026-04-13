@@ -23,3 +23,13 @@ package packagemgr
 // Probe exposes the private probe helper to the external
 // package_mgr_test package.
 var Probe = probe
+
+// SetProbeFn swaps the package-level probe seam. Returns a restore
+// func the caller must defer.
+func SetProbeFn(
+	fn func(string) string,
+) (restore func()) {
+	orig := probeFn
+	probeFn = fn
+	return func() { probeFn = orig }
+}

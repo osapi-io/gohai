@@ -26,6 +26,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
 const (
@@ -40,35 +43,37 @@ const (
 type Linux struct {
 	base
 
-	ReadFileFn func(string) ([]byte, error)
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to os.ReadFile.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{ReadFileFn: os.ReadFile}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect reads both the kernel flag and (if present) the crypto-policies
 // file. Missing policy file is expected on non-RHEL/Fedora hosts and
 // omits the Policy field rather than erroring.
-func (l *Linux) Collect(_ context.Context) (any, error) {
+func (l *Linux) Collect(
+	_ context.Context,
+) (any, error) {
 	info := &Info{}
 
-	kernel, err := readKernelFlag(l.ReadFileFn)
+	kernel, err := readKernelFlag(l.FS)
 	if err != nil {
 		return nil, err
 	}
 	info.Kernel = kernel
 
-	info.Policy = readCryptoPolicy(l.ReadFileFn)
+	info.Policy = readCryptoPolicy(l.FS)
 
 	return info, nil
 }
 
 func readKernelFlag(
-	readFile func(string) ([]byte, error),
+	fs avfs.VFS,
 ) (Kernel, error) {
-	b, err := readFile(fipsPath)
+	b, err := fs.ReadFile(fipsPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return Kernel{}, nil
@@ -83,9 +88,9 @@ func readKernelFlag(
 // file → nil (we'd rather omit the field than fail the whole
 // collector).
 func readCryptoPolicy(
-	readFile func(string) ([]byte, error),
+	fs avfs.VFS,
 ) *Policy {
-	b, err := readFile(policyPath)
+	b, err := fs.ReadFile(policyPath)
 	if err != nil {
 		return nil
 	}

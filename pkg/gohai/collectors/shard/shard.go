@@ -34,6 +34,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"os"
 
 	"github.com/shirou/gopsutil/v4/host"
 
@@ -45,6 +46,15 @@ import (
 // Private — never leaked through a public Fn field. Swapped in tests
 // via SetHostInfoFn (export_test.go).
 var hostInfoFn = host.InfoWithContext
+
+// hostnameFn is the injection seam for os.Hostname. Private —
+// swapped in tests via SetHostnameFn.
+var hostnameFn = os.Hostname
+
+// readMachineUUIDFn is the per-collector seam the Darwin variant
+// calls. Points at readMachineUUID in production; tests swap via
+// SetReadMachineUUIDFn to bypass gopsutil entirely.
+var readMachineUUIDFn = readMachineUUID
 
 // readMachineUUID wraps the private gopsutil call and returns the
 // macOS IOPlatformUUID as a plain string so importers don't see

@@ -23,8 +23,11 @@ package shard_test
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
@@ -32,6 +35,28 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 )
+
+// newShardFS builds a memfs populated with path→content for the
+// machine-id files the collector probes.
+func newShardFS(
+	contents map[string]string,
+) avfs.VFS {
+	f := memfs.New()
+	for path, body := range contents {
+		_ = f.MkdirAll(parentDir(path), 0o755)
+		_ = f.WriteFile(path, []byte(body), fs.FileMode(0o644))
+	}
+	return f
+}
+
+func parentDir(p string) string {
+	for i := len(p) - 1; i >= 0; i-- {
+		if p[i] == '/' {
+			return p[:i]
+		}
+	}
+	return "/"
+}
 
 var (
 	_ collector.Collector = (*shard.Linux)(nil)
@@ -100,15 +125,8 @@ func (s *ShardPublicTestSuite) TestCollectLinux() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &shard.Linux{
-				ReadFileFn: func(p string) ([]byte, error) {
-					if v, ok := tt.files[p]; ok {
-						return []byte(v), nil
-					}
-					return nil, errors.New("not found")
-				},
-				HostnameFn: func() (string, error) { return tt.host, nil },
-			}
+			defer shard.SetHostnameFn(func() (string, error) { return tt.host, nil })()
+			c := &shard.Linux{FS: newShardFS(tt.files)}
 			got, err := c.Collect(context.Background())
 			s.Require().NoError(err)
 			info, ok := got.(*shard.Info)
@@ -119,10 +137,8 @@ func (s *ShardPublicTestSuite) TestCollectLinux() {
 }
 
 func (s *ShardPublicTestSuite) TestCollectLinuxDeterministic() {
-	c := &shard.Linux{
-		ReadFileFn: func(string) ([]byte, error) { return []byte("stable-id"), nil },
-		HostnameFn: func() (string, error) { return "stable-host", nil },
-	}
+	defer shard.SetHostnameFn(func() (string, error) { return "stable-host", nil })()
+	c := &shard.Linux{FS: newShardFS(map[string]string{"/etc/machine-id": "stable-id"})}
 	first, err := c.Collect(context.Background())
 	s.Require().NoError(err)
 	second, err := c.Collect(context.Background())
@@ -154,10 +170,9 @@ func (s *ShardPublicTestSuite) TestCollectDarwin() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &shard.Darwin{
-				MachineIDFn: tt.midFn,
-				HostnameFn:  func() (string, error) { return tt.hostname, nil },
-			}
+			defer shard.SetReadMachineUUIDFn(tt.midFn)()
+			defer shard.SetHostnameFn(func() (string, error) { return tt.hostname, nil })()
+			c := &shard.Darwin{}
 			got, err := c.Collect(context.Background())
 			s.Require().NoError(err)
 			info, ok := got.(*shard.Info)

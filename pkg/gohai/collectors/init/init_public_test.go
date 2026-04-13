@@ -23,14 +23,27 @@ package initd_test
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 )
+
+// readErrorFS forces ReadFile to return a non-ErrNotExist error so the
+// "read error soft-misses" branch is exercised.
+type readErrorFS struct {
+	avfs.VFS
+}
+
+func (readErrorFS) ReadFile(string) ([]byte, error) {
+	return nil, errors.New("no /proc")
+}
 
 var (
 	_ collector.Collector = (*initd.Linux)(nil)
@@ -81,29 +94,47 @@ func (s *InitPublicTestSuite) TestNew() {
 
 func (s *InitPublicTestSuite) TestCollectLinux() {
 	tests := []struct {
-		name string
-		comm string
-		err  error
-		want initd.Info
+		name    string
+		comm    string
+		readErr bool
+		want    initd.Info
 	}{
-		{"systemd host", "systemd\n", nil, initd.Info{Name: "systemd"}},
-		{"upstart host", "upstart\n", nil, initd.Info{Name: "upstart"}},
-		{"sysvinit (comm=init) normalized", "init\n", nil, initd.Info{Name: "sysvinit"}},
-		{"openrc-init normalized to openrc", "openrc-init\n", nil, initd.Info{Name: "openrc"}},
-		{"runit host", "runit\n", nil, initd.Info{Name: "runit"}},
-		{"unknown comm passed through", "exoticinit\n", nil, initd.Info{Name: "exoticinit"}},
-		{"read error soft-misses", "", errors.New("no /proc"), initd.Info{}},
+		{name: "systemd host", comm: "systemd\n", want: initd.Info{Name: "systemd"}},
+		{name: "upstart host", comm: "upstart\n", want: initd.Info{Name: "upstart"}},
+		{
+			name: "sysvinit (comm=init) normalized",
+			comm: "init\n",
+			want: initd.Info{Name: "sysvinit"},
+		},
+		{
+			name: "openrc-init normalized to openrc",
+			comm: "openrc-init\n",
+			want: initd.Info{Name: "openrc"},
+		},
+		{name: "runit host", comm: "runit\n", want: initd.Info{Name: "runit"}},
+		{
+			name: "unknown comm passed through",
+			comm: "exoticinit\n",
+			want: initd.Info{Name: "exoticinit"},
+		},
+		{name: "missing file soft-misses", want: initd.Info{}},
+		{name: "read error soft-misses", readErr: true, want: initd.Info{}},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &initd.Linux{
-				ReadFileFn: func(string) ([]byte, error) {
-					if tt.err != nil {
-						return nil, tt.err
-					}
-					return []byte(tt.comm), nil
-				},
+			var vfs avfs.VFS
+			switch {
+			case tt.readErr:
+				vfs = readErrorFS{VFS: memfs.New()}
+			case tt.comm != "":
+				f := memfs.New()
+				_ = f.MkdirAll("/proc/1", 0o755)
+				_ = f.WriteFile("/proc/1/comm", []byte(tt.comm), fs.FileMode(0o644))
+				vfs = f
+			default:
+				vfs = memfs.New()
 			}
+			c := &initd.Linux{FS: vfs}
 			got, err := c.Collect(context.Background())
 			s.Require().NoError(err)
 			info, ok := got.(*initd.Info)
