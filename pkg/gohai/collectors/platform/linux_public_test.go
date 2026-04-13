@@ -26,7 +26,10 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/shirou/gopsutil/v4/host"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
@@ -40,41 +43,331 @@ func TestPlatformLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(PlatformLinuxPublicTestSuite))
 }
 
+// fsWith builds a memfs containing the given (path → contents) map.
+// Parent directories are auto-created.
+func fsWith(
+	t require.TestingT,
+	files map[string]string,
+) avfs.VFS {
+	fs := memfs.New()
+	for path, content := range files {
+		require.NoError(t, fs.MkdirAll(dirOf(path), 0o755))
+		require.NoError(t, fs.WriteFile(path, []byte(content), 0o644))
+	}
+	return fs
+}
+
+func dirOf(p string) string {
+	for i := len(p) - 1; i >= 0; i-- {
+		if p[i] == '/' {
+			if i == 0 {
+				return "/"
+			}
+			return p[:i]
+		}
+	}
+	return "/"
+}
+
 func (s *PlatformLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		readFn  func(context.Context) (*platform.Info, string, error)
-		wantErr bool
-		want    platform.Info
+		name     string
+		hostInfo func(context.Context) (*host.InfoStat, error)
+		fs       avfs.VFS
+		wantErr  bool
+		want     platform.Info
 	}{
 		{
-			name: "ubuntu info returned (Build discarded on Linux)",
-			readFn: func(context.Context) (*platform.Info, string, error) {
-				return &platform.Info{
-					OS:           "linux",
-					Name:         "ubuntu",
-					Version:      "24.04",
-					Family:       "debian",
-					Architecture: "amd64",
-				}, "6.1.0", nil
+			name: "ubuntu happy path: gopsutil populates everything",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "ubuntu", PlatformVersion: "24.04", PlatformFamily: "debian",
+				}, nil
 			},
+			fs: fsWith(s.T(), nil),
 			want: platform.Info{
-				OS:           "linux",
-				Name:         "ubuntu",
-				Version:      "24.04",
-				Family:       "debian",
-				Architecture: "amd64",
+				OS: runtime.GOOS, Name: "ubuntu", Version: "24.04",
+				Family: "debian", Architecture: runtime.GOARCH,
 			},
 		},
 		{
-			name:    "ReadFn error propagated",
-			readFn:  func(context.Context) (*platform.Info, string, error) { return nil, "", errors.New("boom") },
+			name: "centos 7 supplements minor version from /etc/redhat-release",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "centos", PlatformVersion: "7", PlatformFamily: "rhel",
+				}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/redhat-release": "CentOS Linux release 7.9.2009 (Core)\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "centos", Version: "7.9.2009",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "rhel 9.3 already dotted: no supplement",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "rhel", PlatformVersion: "9.3", PlatformFamily: "rhel",
+				}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/redhat-release": "Red Hat Enterprise Linux release 9.99 (Plow)\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "redhat", Version: "9.3",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "centos 7 missing /etc/redhat-release: version stays 7",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "centos", PlatformVersion: "7", PlatformFamily: "rhel",
+				}, nil
+			},
+			fs: fsWith(s.T(), nil),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "centos", Version: "7",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "debian testing: empty version supplemented from /etc/debian_version",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "debian", PlatformVersion: "", PlatformFamily: "debian",
+				}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/debian_version": "trixie/sid\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "debian", Version: "trixie/sid",
+				Family: "debian", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: legacy fallback /etc/redhat-release",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/redhat-release": "CentOS release 6.10 (Final)\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "centos", Version: "6.10",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: legacy fallback /etc/SuSE-release with PATCHLEVEL",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/SuSE-release": "SUSE Linux Enterprise Server 11\nVERSION = 11\nPATCHLEVEL = 4\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "suse", Version: "11.4",
+				Family: "suse", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: legacy SuSE without PATCHLEVEL",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/SuSE-release": "VERSION = 12\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "suse", Version: "12",
+				Family: "suse", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: legacy fallback /etc/debian_version",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/debian_version": "11.7\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "debian", Version: "11.7",
+				Family: "debian", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: legacy /etc/arch-release (rolling, no version)",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/arch-release": "",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "arch", Version: "",
+				Family: "arch", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: legacy /etc/system-release Amazon",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/system-release": "Amazon Linux release 2 (Karoo)\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "amazon", Version: "2",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: legacy /etc/gentoo-release",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/gentoo-release": "Gentoo Base System release 2.13\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "gentoo", Version: "2.13",
+				Family: "gentoo", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: malformed legacy file skipped, next succeeds",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/redhat-release": "garbage with no version\n",
+				"/etc/debian_version": "12\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "debian", Version: "12",
+				Family: "debian", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release: SuSE-release without VERSION line falls through",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/SuSE-release":   "SUSE Linux Enterprise Server\n",
+				"/etc/debian_version": "12\n",
+			}),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "debian", Version: "12",
+				Family: "debian", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "no os-release + no legacy files: empty Info, no error",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), nil),
+			want: platform.Info{
+				OS: runtime.GOOS, Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "family fallback: rocky has empty PlatformFamily, table fills rhel",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "rocky", PlatformVersion: "9.3",
+				}, nil
+			},
+			fs: fsWith(s.T(), nil),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "rocky", Version: "9.3",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "family fallback: kali → debian",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "kali", PlatformVersion: "2023",
+				}, nil
+			},
+			fs: fsWith(s.T(), nil),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "kali", Version: "2023",
+				Family: "debian", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "remap: archarm → arch",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "archarm", PlatformVersion: "rolling",
+				}, nil
+			},
+			fs: fsWith(s.T(), nil),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "arch", Version: "rolling",
+				Family: "arch", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "remap: cumulus-linux → cumulus",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "cumulus-linux", PlatformVersion: "5.0",
+				}, nil
+			},
+			fs: fsWith(s.T(), nil),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "cumulus", Version: "5.0",
+				Family: "debian", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "remap: sles_sap → suse",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "sles_sap", PlatformVersion: "15-SP5",
+				}, nil
+			},
+			fs: fsWith(s.T(), nil),
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "suse", Version: "15-SP5",
+				Family: "suse", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "nil FS: supplement and legacy skipped, gopsutil + family fallback only",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{
+					Platform: "almalinux", PlatformVersion: "9.3",
+				}, nil
+			},
+			fs: nil,
+			want: platform.Info{
+				OS: runtime.GOOS, Name: "almalinux", Version: "9.3",
+				Family: "rhel", Architecture: runtime.GOARCH,
+			},
+		},
+		{
+			name: "gopsutil error propagated",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return nil, errors.New("host.Info failed")
+			},
+			fs:      fsWith(s.T(), nil),
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &platform.Linux{ReadFn: tt.readFn}
+			defer platform.SetHostInfoFn(tt.hostInfo)()
+			c := &platform.Linux{FS: tt.fs}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -97,90 +390,29 @@ func (s *PlatformLinuxPublicTestSuite) TestReadPlatform() {
 		wantKernel string
 	}{
 		{
-			name: "ubuntu with remap",
+			name: "ubuntu canonical",
 			fn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{
-					Platform:        "ubuntu",
-					PlatformVersion: "24.04",
-					PlatformFamily:  "debian",
-					KernelVersion:   "6.1.0",
+					Platform: "ubuntu", PlatformVersion: "24.04",
+					PlatformFamily: "debian", KernelVersion: "6.1.0",
 				}, nil
 			},
 			want: platform.Info{
-				OS:           runtime.GOOS,
-				Name:         "ubuntu",
-				Version:      "24.04",
-				Family:       "debian",
-				Architecture: runtime.GOARCH,
+				OS: runtime.GOOS, Name: "ubuntu", Version: "24.04",
+				Family: "debian", Architecture: runtime.GOARCH,
 			},
 			wantKernel: "6.1.0",
-		},
-		{
-			name: "amzn remaps to amazon",
-			fn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform:        "amzn",
-					PlatformVersion: "2023",
-					PlatformFamily:  "rhel",
-				}, nil
-			},
-			want: platform.Info{
-				OS:           runtime.GOOS,
-				Name:         "amazon",
-				Version:      "2023",
-				Family:       "rhel",
-				Architecture: runtime.GOARCH,
-			},
 		},
 		{
 			name: "rhel remaps to redhat",
 			fn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{
-					Platform:        "rhel",
-					PlatformVersion: "9.4",
-					PlatformFamily:  "rhel",
+					Platform: "rhel", PlatformVersion: "9.4", PlatformFamily: "rhel",
 				}, nil
 			},
 			want: platform.Info{
-				OS:           runtime.GOOS,
-				Name:         "redhat",
-				Version:      "9.4",
-				Family:       "rhel",
-				Architecture: runtime.GOARCH,
-			},
-		},
-		{
-			name: "sles remaps to suse",
-			fn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform:        "sles",
-					PlatformVersion: "15-SP5",
-					PlatformFamily:  "suse",
-				}, nil
-			},
-			want: platform.Info{
-				OS:           runtime.GOOS,
-				Name:         "suse",
-				Version:      "15-SP5",
-				Family:       "suse",
-				Architecture: runtime.GOARCH,
-			},
-		},
-		{
-			name: "ol remaps to oracle",
-			fn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform:        "ol",
-					PlatformVersion: "8.9",
-					PlatformFamily:  "rhel",
-				}, nil
-			},
-			want: platform.Info{
-				OS:           runtime.GOOS,
-				Name:         "oracle",
-				Version:      "8.9",
-				Family:       "rhel",
-				Architecture: runtime.GOARCH,
+				OS: runtime.GOOS, Name: "redhat", Version: "9.4",
+				Family: "rhel", Architecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -189,15 +421,14 @@ func (s *PlatformLinuxPublicTestSuite) TestReadPlatform() {
 			want: platform.Info{OS: runtime.GOOS, Architecture: runtime.GOARCH},
 		},
 		{
-			name:    "gopsutil error wrapped and returned",
-			fn:      func(context.Context) (*host.InfoStat, error) { return nil, errors.New("host.Info failed") },
+			name:    "gopsutil error propagated",
+			fn:      func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			restore := platform.SetHostInfoFn(tt.fn)
-			defer restore()
+			defer platform.SetHostInfoFn(tt.fn)()
 			got, kernel, err := platform.ReadPlatform(context.Background())
 			if tt.wantErr {
 				s.Error(err)
