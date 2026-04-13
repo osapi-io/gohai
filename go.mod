@@ -3,7 +3,7 @@ module github.com/osapi-io/gohai
 go 1.25.7
 
 require (
-	github.com/shirou/gopsutil/v4 v4.26.2
+	github.com/shirou/gopsutil/v4 v4.26.3
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sys v0.42.0
