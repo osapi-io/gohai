@@ -20,26 +20,56 @@
 
 package filesystem
 
-import "context"
+import (
+	"context"
 
-// Linux collects mounted filesystem data on Linux via gopsutil
-// (which reads /proc/mounts + statfs).
+	"github.com/osapi-io/gohai/internal/executor"
+)
+
+// Linux collects filesystem data on Linux. gopsutil's `disk.Partitions`
+// provides the mount table (from `/proc/mounts`); gopsutil's
+// `disk.Usage` provides capacity + inodes per mount. When `lsblk` is
+// on PATH we layer UUID / label / partition-UUID / partition-label per
+// mount and surface block devices with a filesystem but no mountpoint
+// as `Info.Unmounted`.
 type Linux struct {
 	base
 
-	MountsFn func(context.Context) ([]Mount, error)
+	Exec executor.Executor
 }
 
-// NewLinux returns a Linux variant wired to gopsutil.
+// NewLinux returns a Linux variant wired to the production Executor
+// (wraps exec.CommandContext for the `lsblk` probe). The gopsutil base
+// is reached through package-level partitionsFn / usageFn, which tests
+// swap via SetPartitionsFn / SetUsageFn.
 func NewLinux() *Linux {
-	return &Linux{MountsFn: listMounts}
+	return &Linux{Exec: executor.New()}
 }
 
-// Collect returns filesystem Info.
+// Collect returns filesystem Info. Optional lsblk enrichment is
+// attempted when Exec is configured; any lsblk error (binary missing,
+// malformed JSON) silently skips the enrichment and leaves
+// gopsutil-sourced fields intact.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	mounts, err := l.MountsFn(ctx)
+	mounts, err := listMounts(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &Info{Mounts: mounts}, nil
+	info := &Info{Mounts: mounts}
+	if l.Exec == nil {
+		return info, nil
+	}
+	out, err := l.Exec.Execute(ctx,
+		"lsblk", "-J", "-o", "NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL")
+	if err != nil {
+		return info, nil
+	}
+	entries, err := parseLsblk(out)
+	if err != nil {
+		return info, nil
+	}
+	merged, unmounted := mergeLsblkIntoMounts(info.Mounts, entries)
+	info.Mounts = merged
+	info.Unmounted = unmounted
+	return info, nil
 }
