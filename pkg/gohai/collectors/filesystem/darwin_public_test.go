@@ -79,14 +79,13 @@ func (s *FilesystemDarwinPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &filesystem.Darwin{
-				MountsFn: func(context.Context) ([]filesystem.Mount, error) {
-					if tt.fnErr != nil {
-						return nil, tt.fnErr
-					}
-					return tt.mounts, nil
-				},
-			}
+			defer filesystem.SetListMountsFn(func(context.Context) ([]filesystem.Mount, error) {
+				if tt.fnErr != nil {
+					return nil, tt.fnErr
+				}
+				return tt.mounts, nil
+			})()
+			c := &filesystem.Darwin{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
