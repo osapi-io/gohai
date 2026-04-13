@@ -18,12 +18,15 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package filesystem collects mounted filesystem data with capacity,
-// usage, and inode stats.
+// Package filesystem collects filesystems known to the host, both
+// mounted and (on Linux, via lsblk) unmounted. Mounted filesystems
+// carry capacity, usage, and inode counters; every filesystem carries
+// UUID and label when lsblk reports them.
 package filesystem
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/shirou/gopsutil/v4/disk"
 
@@ -31,9 +34,11 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds mounted filesystem data.
+// Info holds filesystem data: the active mount table plus (Linux only)
+// any block devices with a filesystem but no active mountpoint.
 type Info struct {
-	Mounts []Mount `json:"mounts"`
+	Mounts    []Mount      `json:"mounts"`
+	Unmounted []Filesystem `json:"unmounted,omitempty"`
 }
 
 // Mount represents a single mounted filesystem.
@@ -49,6 +54,23 @@ type Mount struct {
 	InodesTotal uint64   `json:"inodes_total,omitempty"`
 	InodesUsed  uint64   `json:"inodes_used,omitempty"`
 	InodesFree  uint64   `json:"inodes_free,omitempty"`
+	UUID        string   `json:"uuid,omitempty"`       // filesystem UUID from lsblk
+	Label       string   `json:"label,omitempty"`      // filesystem label from lsblk
+	PartUUID    string   `json:"part_uuid,omitempty"`  // GPT partition UUID from lsblk
+	PartLabel   string   `json:"part_label,omitempty"` // GPT partition label from lsblk
+}
+
+// Filesystem describes a block device with a filesystem that isn't
+// currently mounted — LUKS containers, inactive LVs, btrfs device
+// members, etc. Populated from lsblk on Linux when the filesystem has
+// no mountpoint. Capacity/usage are omitted; statfs requires a mount.
+type Filesystem struct {
+	Device    string `json:"device"`
+	Fstype    string `json:"fstype"`
+	UUID      string `json:"uuid,omitempty"`
+	Label     string `json:"label,omitempty"`
+	PartUUID  string `json:"part_uuid,omitempty"`
+	PartLabel string `json:"part_label,omitempty"`
 }
 
 // Collector is the public interface every filesystem variant satisfies.
@@ -110,4 +132,115 @@ func listMounts(
 		out = append(out, m)
 	}
 	return out, nil
+}
+
+// lsblkJSON mirrors `lsblk -J` output. Only the subset of fields we
+// consume is declared — extra columns are ignored by json.Unmarshal.
+type lsblkJSON struct {
+	BlockDevices []lsblkNode `json:"blockdevices"`
+}
+
+// lsblkNode is a single node in lsblk's tree. Any node with a
+// non-empty Fstype represents a filesystem we care about; children are
+// recursively flattened.
+type lsblkNode struct {
+	Name       string      `json:"name"`
+	Fstype     string      `json:"fstype"`
+	UUID       string      `json:"uuid"`
+	Label      string      `json:"label"`
+	Mountpoint string      `json:"mountpoint"`
+	PartUUID   string      `json:"partuuid"`
+	PartLabel  string      `json:"partlabel"`
+	Children   []lsblkNode `json:"children"`
+}
+
+// parseLsblk decodes lsblk's JSON output into a flat slice of
+// Filesystem entries. Includes every node with a non-empty Fstype;
+// callers decide mount vs unmounted by inspecting Mountpoint on the
+// corresponding node.
+//
+// Returns the flat list of fs-bearing nodes paired with each node's
+// mountpoint so the caller can partition into mounted / unmounted.
+func parseLsblk(
+	raw []byte,
+) ([]lsblkEntry, error) {
+	var j lsblkJSON
+	if err := json.Unmarshal(raw, &j); err != nil {
+		return nil, err
+	}
+	var out []lsblkEntry
+	var walk func(nodes []lsblkNode)
+	walk = func(nodes []lsblkNode) {
+		for _, n := range nodes {
+			if n.Fstype != "" {
+				out = append(out, lsblkEntry{
+					Device:     "/dev/" + n.Name,
+					Fstype:     n.Fstype,
+					UUID:       n.UUID,
+					Label:      n.Label,
+					Mountpoint: n.Mountpoint,
+					PartUUID:   n.PartUUID,
+					PartLabel:  n.PartLabel,
+				})
+			}
+			walk(n.Children)
+		}
+	}
+	walk(j.BlockDevices)
+	return out, nil
+}
+
+// lsblkEntry is the internal flattened form — a filesystem-bearing
+// block device with enough context to decide mounted vs unmounted.
+type lsblkEntry struct {
+	Device     string
+	Fstype     string
+	UUID       string
+	Label      string
+	Mountpoint string
+	PartUUID   string
+	PartLabel  string
+}
+
+// mergeLsblkIntoMounts enriches the mount table with UUID/label from
+// lsblk (matched by device path) and returns the set of lsblk entries
+// that had no mountpoint so the caller can surface them as
+// Info.Unmounted.
+func mergeLsblkIntoMounts(
+	mounts []Mount,
+	entries []lsblkEntry,
+) ([]Mount, []Filesystem) {
+	byDevice := map[string]lsblkEntry{}
+	for _, e := range entries {
+		byDevice[e.Device] = e
+	}
+	for i, m := range mounts {
+		if e, ok := byDevice[m.Device]; ok {
+			mounts[i].UUID = e.UUID
+			mounts[i].Label = e.Label
+			mounts[i].PartUUID = e.PartUUID
+			mounts[i].PartLabel = e.PartLabel
+			delete(byDevice, m.Device)
+		}
+	}
+	var unmounted []Filesystem
+	for _, e := range entries {
+		if _, still := byDevice[e.Device]; !still {
+			continue
+		}
+		if e.Mountpoint != "" {
+			// mountpoint exists in lsblk but not in gopsutil's view;
+			// treat as mounted-but-unobserved rather than unmounted.
+			continue
+		}
+		unmounted = append(unmounted, Filesystem{
+			Device:    e.Device,
+			Fstype:    e.Fstype,
+			UUID:      e.UUID,
+			Label:     e.Label,
+			PartUUID:  e.PartUUID,
+			PartLabel: e.PartLabel,
+		})
+	}
+	return mounts, unmounted
 }
