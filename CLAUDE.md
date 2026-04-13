@@ -529,9 +529,11 @@ Before marking a collector complete, every item below must be true:
    theirs — we inherit their years of bug fixes. Deviations are
    documented and justified.
 2. **Checked OCSF schema** ([schema.ocsf.io](https://schema.ocsf.io/))
-   for canonical field names. OCSF mappings recorded in the collector
-   doc's Collected Fields table. When OCSF has a field we could emit
-   but don't, either add it or note why.
+   and, when OCSF is silent, [OpenTelemetry Resource Semantic
+   Conventions][otel-semconv] for canonical field names. Schema
+   mappings recorded in the collector doc's Collected Fields table
+   under the **Schema mapping** column. When a schema has a field we
+   could emit but don't, either add it or note why.
 3. **osapi per-OS struct pattern** — no build tags, factory dispatch
    on `platform.Detect()`, per-OS structs each implementing Collect.
 4. **100% test coverage.** `go tool cover -func=/tmp/cov.out | grep -v '100.0%'`
@@ -540,7 +542,8 @@ Before marking a collector complete, every item below must be true:
    directly. Compile-time enforcement.
 6. **`docs/collectors/<name>.md`** is a self-contained functional
    spec: Description (what + why in our voice), Collected Fields with
-   OCSF mapping column, Platform Support, Example Output, SDK Usage,
+   **Schema mapping** column (OCSF path first, OpenTelemetry attribute
+   when OCSF is silent), Platform Support, Example Output, SDK Usage,
    Enable/Disable, Dependencies, Data Sources (step-by-step
    methodology in OUR voice — not a Ohai parity table), Backing
    library. **No "Known gaps vs. Ohai" section** — methodology gaps
