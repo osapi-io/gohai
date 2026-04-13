@@ -24,9 +24,8 @@ package shells
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
-	"io"
-	"os"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -43,15 +42,11 @@ type Info struct {
 }
 
 // Collector is the public interface every shells variant satisfies.
-// Exposed so the New() factory's return type is explicit.
 type Collector interface {
 	collector.Collector
 }
 
-// base holds the fields every OS variant has in common. Per-OS structs
-// embed this so they don't each have to re-declare Name /
-// DefaultEnabled / Dependencies — those values are identical
-// regardless of OS.
+// base holds the fields every OS variant has in common.
 type base struct{}
 
 // Name returns "shells".
@@ -64,8 +59,7 @@ func (base) DefaultEnabled() bool { return true }
 func (base) Dependencies() []string { return nil }
 
 // New returns the shells collector variant appropriate to the detected
-// host OS. osapi-style dispatch — per-OS structs live in linux.go and
-// darwin.go and each implement Collect themselves.
+// host OS.
 func New() Collector {
 	switch platform.Detect() {
 	case "darwin":
@@ -75,26 +69,14 @@ func New() Collector {
 	}
 }
 
-// openFile opens a file and returns it as io.ReadCloser. Named helper
-// at package scope so NewLinux/NewDarwin can assign it as a function
-// reference without a closure — keeps coverage honest (no closure body
-// to exercise in tests).
-func openFile(
-	path string,
-) (io.ReadCloser, error) {
-	return os.Open(path)
-}
-
 // parseShells parses /etc/shells format: one path per line. Skips
-// comments (`#...`), blank lines, and non-absolute entries (matches
-// Ohai's filter — only `/`-prefixed paths are treated as shell entries).
-// Format is POSIX and identical across Linux and macOS, so this helper
-// is shared by both variants.
+// comments (`#...`), blank lines, and non-absolute entries. Format is
+// POSIX and identical across Linux and macOS, so this helper is shared.
 func parseShells(
-	r io.Reader,
-) (*Info, error) {
+	content []byte,
+) *Info {
 	info := &Info{Paths: []string{}}
-	sc := bufio.NewScanner(r)
+	sc := bufio.NewScanner(bytes.NewReader(content))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -105,8 +87,22 @@ func parseShells(
 		}
 		info.Paths = append(info.Paths, line)
 	}
-	if err := sc.Err(); err != nil {
-		return nil, fmt.Errorf("read shells: %w", err)
+	return info
+}
+
+// wrapReadError decides whether a read error should soft-miss to an
+// empty Info (file absent — distroless/scratch containers legitimately
+// lack /etc/shells) or propagate as a real failure.
+func wrapReadError(
+	err error,
+) (*Info, error) {
+	// avfs returns os.ErrNotExist-wrapped errors for missing files.
+	// We check via string match on the sentinel since avfs's error
+	// wrapping doesn't preserve errors.Is semantics across all
+	// backends.
+	if strings.Contains(err.Error(), "no such file or directory") ||
+		strings.Contains(err.Error(), "file does not exist") {
+		return &Info{Paths: []string{}}, nil
 	}
-	return info, nil
+	return nil, fmt.Errorf("read %s: %w", etcShellsPath, err)
 }

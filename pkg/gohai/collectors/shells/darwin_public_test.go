@@ -22,12 +22,11 @@ package shells_test
 
 import (
 	"context"
-	"errors"
-	"io"
-	"os"
-	"strings"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
@@ -44,63 +43,31 @@ func TestShellsDarwinPublicTestSuite(t *testing.T) {
 func (s *ShellsDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		openFn  func(string) (io.ReadCloser, error)
-		wantErr bool
+		setupFS func() avfs.VFS
 		want    []string
 	}{
 		{
-			name: "macOS /etc/shells",
-			openFn: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{
-					strings.NewReader("# comment\n/bin/bash\n/bin/zsh\n/bin/sh\n"),
-				}, nil
+			name: "canonical macOS /etc/shells",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells",
+					[]byte("/bin/bash\n/bin/csh\n/bin/dash\n/bin/ksh\n/bin/sh\n/bin/tcsh\n/bin/zsh\n"),
+					fs.FileMode(0o644))
+				return f
 			},
-			want: []string{"/bin/bash", "/bin/zsh", "/bin/sh"},
+			want: []string{"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/sh", "/bin/tcsh", "/bin/zsh"},
 		},
 		{
-			name: "non-absolute entries skipped",
-			openFn: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{strings.NewReader("/bin/bash\nnologin\n/bin/zsh\n")}, nil
-			},
-			want: []string{"/bin/bash", "/bin/zsh"},
-		},
-		{
-			name: "empty file",
-			openFn: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{strings.NewReader("")}, nil
-			},
-			want: []string{},
-		},
-		{
-			name: "missing file soft-misses",
-			openFn: func(string) (io.ReadCloser, error) {
-				return nil, os.ErrNotExist
-			},
-			want: []string{},
-		},
-		{
-			name: "other open error propagated",
-			openFn: func(string) (io.ReadCloser, error) {
-				return nil, errors.New("permission denied")
-			},
-			wantErr: true,
-		},
-		{
-			name: "read error propagated",
-			openFn: func(string) (io.ReadCloser, error) {
-				return erroringReadCloser{}, nil
-			},
-			wantErr: true,
+			name:    "missing file soft-misses",
+			setupFS: func() avfs.VFS { return memfs.New() },
+			want:    []string{},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &shells.Darwin{OpenFn: tt.openFn}
+			c := &shells.Darwin{FS: tt.setupFS()}
 			got, err := c.Collect(context.Background())
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
 			s.Require().NoError(err)
 			info, ok := got.(*shells.Info)
 			s.Require().True(ok)

@@ -23,11 +23,12 @@ package shells_test
 import (
 	"context"
 	"errors"
-	"io"
-	"os"
-	"strings"
+	"io/fs"
 	"testing"
+	"time"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
@@ -41,86 +42,89 @@ func TestShellsLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ShellsLinuxPublicTestSuite))
 }
 
-// stringReadCloser wraps a strings.Reader to satisfy io.ReadCloser.
-type stringReadCloser struct{ *strings.Reader }
+// errorFS wraps a memfs and forces a non-ErrNotExist error from
+// ReadFile. Used to exercise the "other read error" branch without
+// needing real-FS permission manipulation.
+type errorFS struct {
+	avfs.VFS
+}
 
-func (stringReadCloser) Close() error { return nil }
-
-// erroringReader fails on every Read — used to exercise the scanner
-// error path.
-type erroringReader struct{}
-
-func (erroringReader) Read([]byte) (int, error) { return 0, errors.New("read fail") }
-
-type erroringReadCloser struct{ erroringReader }
-
-func (erroringReadCloser) Close() error { return nil }
+func (errorFS) ReadFile(string) ([]byte, error) {
+	return nil, errors.New("permission denied")
+}
 
 func (s *ShellsLinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
-		openFn  func(string) (io.ReadCloser, error)
+		setupFS func() avfs.VFS
 		wantErr bool
 		want    []string
 	}{
 		{
 			name: "canonical /etc/shells",
-			openFn: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{
-					strings.NewReader("# comment\n/bin/sh\n/bin/bash\n\n/usr/bin/zsh\n"),
-				}, nil
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells",
+					[]byte("# comment\n/bin/sh\n/bin/bash\n\n/usr/bin/zsh\n"),
+					fs.FileMode(0o644))
+				return f
 			},
 			want: []string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"},
 		},
 		{
 			name: "non-absolute entries skipped",
-			openFn: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{
-					strings.NewReader("/bin/sh\nnologin\nbash\n/bin/zsh\n"),
-				}, nil
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells",
+					[]byte("/bin/sh\nnologin\nbash\n/bin/zsh\n"),
+					fs.FileMode(0o644))
+				return f
 			},
 			want: []string{"/bin/sh", "/bin/zsh"},
 		},
 		{
 			name: "whitespace trimmed",
-			openFn: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{strings.NewReader("  /bin/bash  \n\t/bin/sh\t\n")}, nil
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells",
+					[]byte("  /bin/bash  \n\t/bin/sh\t\n"),
+					fs.FileMode(0o644))
+				return f
 			},
 			want: []string{"/bin/bash", "/bin/sh"},
 		},
 		{
 			name: "empty file",
-			openFn: func(string) (io.ReadCloser, error) {
-				return stringReadCloser{strings.NewReader("")}, nil
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells", []byte{}, fs.FileMode(0o644))
+				return f
 			},
 			want: []string{},
 		},
 		{
 			name: "missing file soft-misses",
-			openFn: func(string) (io.ReadCloser, error) {
-				return nil, os.ErrNotExist
+			setupFS: func() avfs.VFS {
+				return memfs.New()
 			},
 			want: []string{},
 		},
 		{
-			name: "other open error propagated",
-			openFn: func(string) (io.ReadCloser, error) {
-				return nil, errors.New("permission denied")
-			},
-			wantErr: true,
-		},
-		{
-			name: "read error propagated",
-			openFn: func(string) (io.ReadCloser, error) {
-				return erroringReadCloser{}, nil
-			},
+			name:    "other read error propagated",
+			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &shells.Linux{OpenFn: tt.openFn}
-			got, err := c.Collect(context.Background())
+			c := &shells.Linux{FS: tt.setupFS()}
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			got, err := c.Collect(ctx)
 			if tt.wantErr {
 				s.Error(err)
 				return

@@ -129,4 +129,6 @@ rejected to match Ohai's `line[0] == "/"` filter.
 
 ## Backing library
 
-- Go stdlib (`os`, `bufio`) — no third-party dependency.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in
+  production, `memfs` in tests) for the `/etc/shells` read.
+- Go stdlib `bufio` for line scanning.

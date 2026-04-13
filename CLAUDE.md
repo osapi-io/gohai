@@ -560,36 +560,102 @@ When every open methodology issue closes, every collector doc reads
 as a self-contained spec and the SDK has zero unresolved methodology
 divergences from Ohai.
 
-## Upcoming: VFS + Executor Abstractions (Phase 1, WIP)
+## VFS + Executor Abstractions
 
-The current per-field `Fn` pattern (`ReadFileFn`, `RunCmdFn`,
-`HostInfoFn`, ...) is being replaced by two shared abstractions
-threaded through `Collect` the same way `context.Context` is threaded:
+Collectors that read files or shell out use two shared abstractions,
+injected as struct fields on the per-OS variant (same pattern as
+osapi's Agent struct).
 
-- **`vfs.Filesystem`** — virtual filesystem (avfs-backed) for all
-  file reads. Production: real OS filesystem. Tests: in-memory FS
-  with canned files at their real absolute paths (`/proc/meminfo`,
-  `/etc/os-release`). Lets tests exercise real `os.ReadFile` code
-  paths against controlled file content.
-- **`executor.Executor`** — interface for shell-out calls.
-  Production: wraps `exec.CommandContext`. Tests: gomock-generated
-  mock asserting command name, flags, and stdin; returns canned
-  stdout. Mirrors osapi's executor pattern.
+### `avfs.VFS` — filesystem
 
-Target signature once adopted:
+[`github.com/avfs/avfs`](https://github.com/avfs/avfs) used directly —
+no custom wrapper. Production wires the real OS FS via
+`osfs.NewWithNoIdm()`; tests wire `memfs.New()` with canned files at
+real absolute paths (`/proc/meminfo`, `/etc/os-release`, etc.). Tests
+exercise the real `ReadFile` / `Open` / `Stat` code path against
+memory-backed content — a genuine integration test of the collector's
+FS interaction, not a function-stub swap.
+
+**Per-OS struct shape:**
 
 ```go
-Collect(ctx context.Context, fs vfs.Filesystem, exec executor.Executor) (any, error)
+type Linux struct {
+    base
+    FS avfs.VFS
+}
+
+func NewLinux() *Linux {
+    return &Linux{FS: osfs.NewWithNoIdm()}
+}
+
+func (l *Linux) Collect(ctx context.Context) (any, error) {
+    b, err := l.FS.ReadFile("/etc/shells")
+    // ...
+}
 ```
 
-**Until Phase 1 lands:** use the `export_test.go` + private var +
-`Set<X>Fn` setter pattern for gopsutil / syscall / file-read seams.
-Do NOT add new per-field `Fn` struct fields; if you need a new seam,
-check the Phase 1 status before expanding the old pattern.
+**Test shape:**
 
-Reference: osapi's executor / filesystem / mockgen setup at
-[github.com/osapi-io/osapi](https://github.com/osapi-io/osapi) —
-gohai adopts the same shapes so patterns transfer.
+```go
+f := memfs.New()
+_ = f.MkdirAll("/etc", 0o755)          // memfs requires the directory
+_ = f.WriteFile("/etc/shells", canned, 0o644)
+c := &shells.Linux{FS: f}
+got, err := c.Collect(ctx)
+```
+
+Reference implementation: `pkg/gohai/collectors/shells/`.
+
+### `executor.Executor` — command execution
+
+`internal/executor` provides a minimal interface (single method:
+`Execute(ctx, name, args...) ([]byte, error)`) with a gomock mock at
+`internal/executor/mocks/`. Production impl wraps `exec.CommandContext`
+and returns combined stdout+stderr. Collectors that shell out (sysctl,
+sw_vers, lsb_release, loginctl, lscpu, kextstat, etc.) hold the
+Executor as a struct field.
+
+**Per-OS struct with both FS and Executor:**
+
+```go
+type Darwin struct {
+    base
+    FS   avfs.VFS
+    Exec executor.Executor
+}
+
+func NewDarwin() *Darwin {
+    return &Darwin{
+        FS:   osfs.NewWithNoIdm(),
+        Exec: executor.New(),
+    }
+}
+```
+
+**Test shape (gomock):**
+
+```go
+ctrl := gomock.NewController(t)
+mockExec := mocks.NewMockExecutor(ctrl)
+mockExec.EXPECT().
+    Execute(gomock.Any(), "sw_vers", "-productVersionExtra").
+    Return([]byte("(a)\n"), nil)
+
+c := &platform.Darwin{FS: memfs.New(), Exec: mockExec}
+```
+
+Mocks are regenerated via `go generate ./internal/executor/...` and
+committed. Pinned tool: `go.uber.org/mock` (maintained fork — osapi
+uses the deprecated `golang/mock`; we picked the fork).
+
+### Migration status
+
+New code and new collectors MUST use these abstractions. Existing
+collectors still on the legacy `ReadFileFn` / `RunCmdFn` struct-field
+pattern migrate as methodology work touches them. Canonical migrated
+reference: `pkg/gohai/collectors/shells/` (file-read only). A combined
+FS + Executor example will land with the first collector that needs
+both.
 
 [Chef Ohai]: https://docs.chef.io/ohai/
 [OSAPI]: https://github.com/osapi-io/osapi
