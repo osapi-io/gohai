@@ -21,58 +21,25 @@
 package lsb_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
 )
 
-var (
-	_ collector.Collector = (*lsb.Linux)(nil)
-	_ collector.Collector = (*lsb.Darwin)(nil)
-)
-
-type LSBPublicTestSuite struct {
+type LSBDarwinPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestLSBPublicTestSuite(t *testing.T) {
-	suite.Run(t, new(LSBPublicTestSuite))
+func TestLSBDarwinPublicTestSuite(t *testing.T) {
+	suite.Run(t, new(LSBDarwinPublicTestSuite))
 }
 
-func (s *LSBPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
-	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
-	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := lsb.New()
-			s.Equal("lsb", c.Name())
-			s.True(c.DefaultEnabled())
-			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*lsb.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*lsb.Linux)
-				s.True(ok)
-			}
-		})
-	}
+func (s *LSBDarwinPublicTestSuite) TestCollect() {
+	c := lsb.NewDarwin()
+	got, err := c.Collect(context.Background())
+	s.Require().NoError(err)
+	s.Nil(got)
 }

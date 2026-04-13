@@ -4,33 +4,35 @@
 
 ## Description
 
-Parses `/etc/lsb-release` — the Linux Standard Base metadata file. Largely
-superseded by `/etc/os-release` on modern distros, but Debian/Ubuntu derivatives
-still populate it, and many tools (including older Ansible modules and Chef
-Infra clients) still read it first.
+Reports Linux Standard Base identification fields — `id`, `release`,
+`codename`, `description` — used as a stable cross-distro identity
+tuple. Legacy compliance tooling and older packaging still consume
+LSB, so we surface it even though `os_release` has largely supplanted
+it on modern distros.
 
-Use `os_release` as the primary distro-identity source on modern hosts; fall
-back to `lsb` on legacy systems or for Debian-tooling compatibility.
+The `lsb_release` CLI is the sole source — matches current Ohai's
+linux/lsb plugin. When the CLI is absent, `Info` stays empty rather
+than parsing `/etc/lsb-release`. See Data Sources for why.
 
 ## Collected Fields
 
-| Field         | Type   | Description                                        | Schema mapping                           |
-| ------------- | ------ | -------------------------------------------------- | ---------------------------------------- |
-| `id`          | string | DISTRIB_ID — distro short name (`"Ubuntu"`).       | `os.name`.                               |
-| `release`     | string | DISTRIB_RELEASE — version (`"24.04"`).             | `os.version`.                            |
-| `codename`    | string | DISTRIB_CODENAME (`"noble"`).                      | No OCSF equivalent.                      |
-| `description` | string | DISTRIB_DESCRIPTION — formatted string for humans. | No OCSF equivalent (presentation-level). |
+| Field         | Type   | Description                                              | Schema mapping                       |
+| ------------- | ------ | -------------------------------------------------------- | ------------------------------------ |
+| `id`          | string | Distributor ID (`Ubuntu`, `RedHatEnterprise`, `CentOS`). | `os.name` (closest).                 |
+| `release`     | string | Release version (`22.04`, `9.3`).                        | `os.version`.                        |
+| `codename`    | string | Release codename (`jammy`, `Plow`).                      | No direct OCSF.                      |
+| `description` | string | Human-readable description (`Ubuntu 22.04.3 LTS`).       | No direct OCSF (presentation-level). |
 
 ## Platform Support
 
-| Platform | Supported |
-| -------- | --------- |
-| Linux    | ✅        |
-| macOS    | `nil`     |
+| Platform | Supported                                     |
+| -------- | --------------------------------------------- |
+| Linux    | ✅ (`lsb_release -a` via executor)            |
+| macOS    | `nil` (no LSB concept on Darwin)              |
 
 ## Example Output
 
-### Ubuntu
+### Ubuntu with `lsb-release` package
 
 ```json
 {
@@ -43,7 +45,7 @@ back to `lsb` on legacy systems or for Debian-tooling compatibility.
 }
 ```
 
-### Minimal host without /etc/lsb-release
+### Minimal host without `lsb_release` CLI
 
 ```json
 {
@@ -74,17 +76,32 @@ None.
 
 ## Data Sources
 
-| Platform | What we read       | Ohai plugin                                                                                                                                                                              | Alignment                                                                                                                                                                                                                                                                                                                                                                                                      |
-| -------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `/etc/lsb-release` | [`linux/lsb.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/lsb.rb) — shells out to `lsb_release -a` when `/usr/bin/lsb_release` is present, otherwise emits nothing. | **Same four fields (`id`/`release`/`codename`/`description`), different source.** Ohai invokes the `lsb_release` CLI (requires the `lsb-release` package). We read `/etc/lsb-release` directly — faster, no subprocess, works on Debian/Ubuntu derivatives even without the `lsb-release` package installed. Distros that only populate via the CLI (rare on modern Debian/Ubuntu) would not be covered by us. |
-| macOS    | —                  | No Ohai handler                                                                                                                                                                          | Parity                                                                                                                                                                                                                                                                                                                                                                                                         |
+On Linux we run `lsb_release -a` through the shared
+`internal/executor` runner and parse the four labelled lines it emits
+(`Distributor ID`, `Release`, `Codename`, `Description`) into the
+matching `Info` fields. When the CLI is absent or errors, `Info`
+stays empty — not an error. Matches Ohai's no-panic behaviour.
 
-**Known gaps vs. Ohai:** Ohai's `lsb_release -a` fallback can surface data on
-hosts that have the CLI installed but no `/etc/lsb-release` file (uncommon on
-modern Debian/Ubuntu; more common on older RHEL with the `redhat-lsb` package).
-We do not shell out — adding an exec path for a legacy format isn't worth the
-complexity.
+**Why no `/etc/lsb-release` file fallback?** Our prior implementation
+parsed the file directly. We removed that path to align with Ohai,
+which explicitly dropped the file fallback in
+[chef/ohai#1562](https://github.com/chef/ohai/pull/1562) (2021). The
+reasoning carries over:
+
+- On modern Debian/Ubuntu the `lsb-release` package ships both the
+  file and the CLI; when one is present the other is too, so the
+  fallback is redundant.
+- The file fallback was originally added for legacy Debian <7 where
+  only the file was installed. That class of host is out of scope.
+- Minimized container images that strip the CLI but keep the file
+  are an edge case; the correct fix there is to install the
+  `lsb-release` package (or consume `os_release` instead, which we
+  already surface in its own collector).
+
+macOS is not covered — no LSB concept on Darwin.
 
 ## Backing library
 
-- Go stdlib (`os`, `bufio`) — no third-party dependency.
+- [`internal/executor`](../../internal/executor) — shared command-runner
+  abstraction used to invoke `lsb_release -a` on Linux. Tests mock it
+  with `go.uber.org/mock`.
