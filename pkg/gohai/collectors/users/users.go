@@ -55,8 +55,12 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "users" }
-func (base) DefaultEnabled() bool   { return true }
+func (base) Name() string { return "users" }
+
+// DefaultEnabled is false: passwd/group scan is niche and not useful
+// per-invocation. Opt in via --collector.users or
+// WithEnabled("users").
+func (base) DefaultEnabled() bool   { return false }
 func (base) Dependencies() []string { return nil }
 
 // New returns the users variant for the host OS.

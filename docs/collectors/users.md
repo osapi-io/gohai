@@ -77,8 +77,8 @@ for _, s := range facts.Users.LoggedIn {
 ## Enable/Disable
 
 ```bash
-gohai --collector.users      # enable (default)
-gohai --no-collector.users   # disable
+gohai --collector.users      # opt-in (off by default — passwd/group scan is niche)
+gohai --no-collector.users   # explicitly disable (e.g. when stripping defaults)
 ```
 
 ## Dependencies

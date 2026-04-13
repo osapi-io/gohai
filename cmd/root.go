@@ -62,6 +62,7 @@ func newRootCommand() *cobra.Command {
 		pretty         bool
 		flat           bool
 		listCollectors bool
+		noDefaults     bool
 	)
 	enabled := newFlagSet()
 	disabled := newFlagSet()
@@ -78,7 +79,15 @@ func newRootCommand() *cobra.Command {
 			if listCollectors {
 				return printCollectorList(c.OutOrStdout())
 			}
-			return runCollect(c.Context(), c.OutOrStdout(), enabled, disabled, pretty, flat)
+			return runCollect(
+				c.Context(),
+				c.OutOrStdout(),
+				enabled,
+				disabled,
+				pretty,
+				flat,
+				noDefaults,
+			)
 		},
 	}
 
@@ -86,6 +95,12 @@ func newRootCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&flat, "flat", false, "output flat key=value pairs")
 	cmd.Flags().
 		BoolVar(&listCollectors, "list-collectors", false, "list available collectors and exit")
+	cmd.Flags().BoolVar(
+		&noDefaults,
+		"no-defaults",
+		false,
+		"skip the recommended default collector set; only --collector.X flags are honoured",
+	)
 	registerCollectorFlags(cmd, enabled, disabled)
 
 	return cmd
@@ -95,9 +110,12 @@ func runCollect(
 	ctx context.Context,
 	out io.Writer,
 	enabled, disabled *flagSet,
-	pretty, flat bool,
+	pretty, flat, noDefaults bool,
 ) error {
 	opts := []gohai.Option{}
+	if !noDefaults {
+		opts = append(opts, gohai.WithDefaults())
+	}
 	if names := enabled.values(); len(names) > 0 {
 		opts = append(opts, gohai.WithEnabled(names...))
 	}

@@ -56,8 +56,12 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "process" }
-func (base) DefaultEnabled() bool   { return true }
+func (base) Name() string { return "process" }
+
+// DefaultEnabled is false: process enumeration scales with process
+// count and isn't useful on every invocation. Opt in via
+// --collector.process or WithEnabled("process").
+func (base) DefaultEnabled() bool   { return false }
 func (base) Dependencies() []string { return nil }
 
 // New returns the process variant for the host OS. gopsutil's process
