@@ -20,24 +20,125 @@
 
 package virtualization
 
-import "context"
+import (
+	"context"
+	"strings"
 
-// Darwin detects virtualization on macOS via gopsutil. On darwin
-// gopsutil's coverage is thinner than Linux (no VirtualBox/Parallels
-// detection) — a follow-up could extend with sysctl kern.hv_vmm_present
-// + ioreg probes matching Ohai's darwin handler.
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
+	"github.com/osapi-io/gohai/internal/executor"
+)
+
+// Darwin runs the macOS detection cascade. Mirrors Ohai's
+// darwin/virtualization.rb: PATH probes for hypervisor binaries
+// (Docker/VBoxManage/prlctl), VMware Fusion app presence,
+// `sysctl kern.hv_vmm_present` for QEMU/Virtualization.framework,
+// `ioreg -l` grep for Parallels, and `system_profiler
+// SPHardwareDataType` for VirtualBox/VMware/Apple-VM Boot ROM /
+// Model Identifier strings.
 type Darwin struct {
 	base
 
-	DetectFn func(context.Context) (*Info, error)
+	FS   avfs.VFS
+	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant wired to the real OS filesystem
+// and the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{DetectFn: detect}
+	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
 
-// Collect returns virtualization Info.
+// Collect runs the cascade and returns Info.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	return d.DetectFn(ctx)
+	info := &Info{}
+	cascadeDarwin(ctx, d.FS, d.Exec, info)
+	return info, nil
+}
+
+// cascadeDarwin walks Ohai's darwin/virtualization.rb detection order.
+func cascadeDarwin(
+	ctx context.Context,
+	fs avfs.VFS,
+	exec executor.Executor,
+	info *Info,
+) {
+	// 1-3. Hypervisor host binaries on PATH.
+	if execBinaryOnPath(ctx, exec, "docker") {
+		addSystem(info, "docker", "host", false)
+	}
+	if execBinaryOnPath(ctx, exec, "VBoxManage") {
+		addSystem(info, "vbox", "host", false)
+	}
+	if execBinaryOnPath(ctx, exec, "prlctl") {
+		addSystem(info, "parallels", "host", false)
+	}
+
+	// 4. VMware Fusion app presence.
+	if fileExists(fs, "/Applications/VMware Fusion.app") {
+		addSystem(info, "vmware", "host", false)
+	}
+
+	// 5. QEMU / Virtualization.framework guest via sysctl.
+	if exec != nil {
+		if out, err := exec.Execute(ctx, "sysctl", "-n", "kern.hv_vmm_present"); err == nil {
+			if strings.TrimSpace(string(out)) == "1" {
+				addSystem(info, "qemu", "guest", false)
+			}
+		}
+	}
+
+	// 6. Parallels guest via ioreg.
+	if exec != nil {
+		if out, err := exec.Execute(ctx, "ioreg", "-l"); err == nil {
+			if strings.Contains(string(out), "pci1ab8,4000") {
+				addSystem(info, "parallels", "guest", false)
+			}
+		}
+	}
+
+	// 7-9. system_profiler signals.
+	if exec != nil {
+		if out, err := exec.Execute(ctx, "system_profiler", "SPHardwareDataType"); err == nil {
+			text := string(out)
+			switch {
+			case bootROMContains(text, "VirtualBox"):
+				addSystem(info, "vbox", "guest", false)
+			case bootROMContains(text, "VMW"):
+				addSystem(info, "vmware", "guest", false)
+			}
+			if modelIDContains(text, "VirtualMac") {
+				addSystem(info, "apple", "guest", false)
+			}
+		}
+	}
+}
+
+// bootROMContains scans system_profiler output for `Boot ROM Version`
+// containing the substring.
+func bootROMContains(
+	text, substr string,
+) bool {
+	for _, line := range strings.Split(text, "\n") {
+		l := strings.TrimSpace(line)
+		if strings.HasPrefix(l, "Boot ROM Version:") && strings.Contains(l, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+// modelIDContains scans system_profiler output for `Model Identifier`
+// containing the substring.
+func modelIDContains(
+	text, substr string,
+) bool {
+	for _, line := range strings.Split(text, "\n") {
+		l := strings.TrimSpace(line)
+		if strings.HasPrefix(l, "Model Identifier:") && strings.Contains(l, substr) {
+			return true
+		}
+	}
+	return false
 }

@@ -18,33 +18,27 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package virtualization detects the hypervisor / container runtime the
-// host is running under.
-//
-// Known limitation vs. Ohai: Ohai's virtualization plugin additionally
-// reports a `systems` map (for hosts that are both docker host AND kvm
-// host, both entries appear) plus detailed container detection
-// (nspawn, LXD, podman host, hyper-v guest). Our current coverage is
-// what gopsutil exposes — system + role only. `systems` map and
-// container detail are tracked as a follow-up.
+// Package virtualization detects every hypervisor and container
+// runtime the host participates in — as guest, host, or both. A
+// single host can legitimately report multiple systems (a Docker host
+// that is itself a KVM guest on EC2, an LXD host on bare metal,
+// etc.). Mirrors Ohai's linux/virtualization.rb and
+// darwin/virtualization.rb cascades.
 package virtualization
 
 import (
-	"context"
-
-	"github.com/shirou/gopsutil/v4/host"
-
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds virtualization detection data.
 type Info struct {
-	System string `json:"system,omitempty"` // hypervisor/container: "docker", "kvm", "vmware", "lxc", ""
-	Role   string `json:"role,omitempty"`   // "host" | "guest" | ""
+	System  string            `json:"system,omitempty"`  // primary / innermost runtime ("docker", "kvm", "vmware", "")
+	Role    string            `json:"role,omitempty"`    // "host" | "guest" | ""
+	Systems map[string]string `json:"systems,omitempty"` // every detected layer: {"kvm": "guest", "docker": "host"}
 }
 
-// Collector is the public interface every virtualization variant satisfies.
+// Collector is the public interface every variant satisfies.
 type Collector interface {
 	collector.Collector
 }
@@ -55,7 +49,7 @@ func (base) Name() string           { return "virtualization" }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 
-// New returns the virtualization variant for the host OS.
+// New returns the variant for the host OS.
 func New() Collector {
 	if platform.Detect() == "darwin" {
 		return NewDarwin()
@@ -63,19 +57,22 @@ func New() Collector {
 	return NewLinux()
 }
 
-// hostVirtualization is the injection seam for gopsutil's
-// host.VirtualizationWithContext. Tests swap this to exercise both the
-// success and error branches of detect on any host OS without hitting
-// the real syscall.
-var hostVirtualization = host.VirtualizationWithContext
-
-// detect is the production bridge to gopsutil's host.VirtualizationWithContext.
-func detect(
-	ctx context.Context,
-) (*Info, error) {
-	system, role, err := hostVirtualization(ctx)
-	if err != nil {
-		return nil, err
+// addSystem records a detected layer in info.Systems and updates the
+// primary System/Role to the most recent positive detection. Layers
+// are preserved on conflict unless force is true (used for `.dockerenv`
+// and other authoritative signals Ohai overrides on). Callers always
+// pass non-empty literal name/role; no defensive empty-string check.
+func addSystem(
+	info *Info,
+	name, role string,
+	force bool,
+) {
+	if info.Systems == nil {
+		info.Systems = map[string]string{}
 	}
-	return &Info{System: system, Role: role}, nil
+	if _, exists := info.Systems[name]; !exists || force {
+		info.Systems[name] = role
+	}
+	info.System = name
+	info.Role = role
 }
