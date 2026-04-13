@@ -22,11 +22,11 @@ reports `-25200` in July (PDT) and `-28800` in January (PST).
 
 ## Collected Fields
 
-| Field    | Type   | Description                                             | Schema mapping                                                                                                                                       |
-| -------- | ------ | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`   | string | IANA timezone name.                                     | No direct OCSF field. OCSF's `device.location.tz_name` (within Location object) is the nearest analog but scoped to event location, not host config. |
-| `abbrev` | string | Current short abbreviation (`PDT`, `PST`, `UTC`).       | No OCSF equivalent — ambiguous (e.g. `IST` means India / Israel / Ireland) so OCSF deliberately prefers offsets and IANA names.                      |
-| `offset` | int    | Current offset from UTC in seconds (positive for east). | Closest: OCSF's timestamps use ISO-8601 with offset, but there's no host-config field.                                                               |
+| Field    | Type   | Description                                             | Schema mapping                                                                                                                                           |
+| -------- | ------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`   | string | IANA timezone name.                                     | No direct schema mapping. OCSF's `device.location.tz_name` (within Location object) is the nearest analog but scoped to event location, not host config. |
+| `abbrev` | string | Current short abbreviation (`PDT`, `PST`, `UTC`).       | No direct schema mapping — ambiguous (e.g. `IST` means India / Israel / Ireland) so OCSF deliberately prefers offsets and IANA names.                    |
+| `offset` | int    | Current offset from UTC in seconds (positive for east). | Closest: OCSF's timestamps use ISO-8601 with offset, but there's no host-config field.                                                                   |
 
 ## Platform Support
 

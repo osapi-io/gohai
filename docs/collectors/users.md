@@ -29,12 +29,12 @@ Consumers use this to:
 | Field                    | Type   | Description                                                                | Schema mapping                               |
 | ------------------------ | ------ | -------------------------------------------------------------------------- | -------------------------------------------- |
 | `logged_in[].user`       | string | Username.                                                                  | `user.name`.                                 |
-| `logged_in[].terminal`   | string | Terminal (`pts/0`, `ttys001`). Empty for remote / graphical.               | No direct OCSF.                              |
+| `logged_in[].terminal`   | string | Terminal (`pts/0`, `ttys001`). Empty for remote / graphical.               | No direct schema mapping.                    |
 | `logged_in[].host`       | string | Origin host for remote logins (IP or hostname).                            | `src_endpoint.hostname` / `src_endpoint.ip`. |
-| `logged_in[].started`    | uint64 | Session start time (unix seconds). Populated from utmp path only.          | No direct OCSF.                              |
+| `logged_in[].started`    | uint64 | Session start time (unix seconds). Populated from utmp path only.          | No direct schema mapping.                    |
 | `logged_in[].session_id` | string | systemd session id (`c1`, `2`). Empty on utmp fallback.                    | `process.session_uid` (nearest).             |
 | `logged_in[].uid`        | string | Numeric UID as reported by loginctl. Empty on utmp fallback.               | `user.uid`.                                  |
-| `logged_in[].seat`       | string | systemd seat (`seat0`, empty for remote sessions). Empty on utmp fallback. | No direct OCSF.                              |
+| `logged_in[].seat`       | string | systemd seat (`seat0`, empty for remote sessions). Empty on utmp fallback. | No direct schema mapping.                    |
 
 ## Platform Support
 

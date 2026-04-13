@@ -29,12 +29,12 @@ Consumers use this to:
 | -------------------- | --------------- | ------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `name`               | string          | `uname -s` (`"Linux"`, `"Darwin"`).                                 | `os.name`.                                                  |
 | `release`            | string          | `uname -r` — kernel release (`"5.15.0-47-generic"`).                | OCSF `os.kernel_release` (leaf stripped per CLAUDE.md).     |
-| `version`            | string          | `uname -v` — build string.                                          | No direct OCSF.                                             |
+| `version`            | string          | `uname -v` — build string.                                          | No direct schema mapping.                                   |
 | `machine`            | string          | `uname -m` — hardware arch (`"x86_64"`, `"arm64"`).                 | Nearest: `device.hw_info.cpu_bits` (OCSF only stores bits). |
-| `processor`          | string          | `uname -p` synthesis: same as `machine` on Linux and Darwin.        | No direct OCSF.                                             |
+| `processor`          | string          | `uname -p` synthesis: same as `machine` on Linux and Darwin.        | No direct schema mapping.                                   |
 | `os`                 | string          | `uname -o` synthesis: `"GNU/Linux"` on Linux, `"Darwin"` on Darwin. | `os.type`.                                                  |
-| `rosetta_translated` | bool            | macOS only. True when the process is running under Rosetta 2.       | No direct OCSF.                                             |
-| `modules`            | map[name]Module | Loaded kernel modules / kexts.                                      | No OCSF equivalent.                                         |
+| `rosetta_translated` | bool            | macOS only. True when the process is running under Rosetta 2.       | No direct schema mapping.                                   |
+| `modules`            | map[name]Module | Loaded kernel modules / kexts.                                      | No direct schema mapping.                                   |
 
 ### `Module` entry
 

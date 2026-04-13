@@ -26,9 +26,9 @@ filter.
 
 ## Collected Fields
 
-| Field   | Type       | Description                                          | Schema mapping                                                                                                                     |
-| ------- | ---------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `paths` | `[]string` | Absolute paths to valid login shells, in file order. | No direct OCSF equivalent — OCSF has `user.shell` per-user but no host-level shell inventory object. Treated as a gohai extension. |
+| Field   | Type       | Description                                          | Schema mapping                                                                                                                    |
+| ------- | ---------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `paths` | `[]string` | Absolute paths to valid login shells, in file order. | No direct schema mapping — OCSF has `user.shell` per-user but no host-level shell inventory object. Treated as a gohai extension. |
 
 ## Platform Support
 

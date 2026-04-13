@@ -27,65 +27,65 @@ will live in its own `dns` collector — out of scope here.
 
 Top level:
 
-| Field                     | Type        | Description                                           | Schema mapping  |
-| ------------------------- | ----------- | ----------------------------------------------------- | --------------- |
-| `interfaces`              | []Interface | Interfaces enumerated from gopsutil + extensions.     | —               |
-| `routes`                  | []Route     | All routes from `ip route show table main` (v4 + v6). | No direct OCSF. |
-| `default_interface`       | string      | Interface the default IPv4 route exits through.       | No direct OCSF. |
-| `default_gateway`         | string      | Next-hop IPv4 address for the default route.          | No direct OCSF. |
-| `default_inet6_interface` | string      | Interface the default IPv6 route exits through.       | No direct OCSF. |
-| `default_inet6_gateway`   | string      | Next-hop IPv6 address for the default route.          | No direct OCSF. |
-| `neighbours`              | []Neighbour | Kernel ARP + NDP cache (Linux only — netlink).        | No direct OCSF. |
+| Field                     | Type        | Description                                           | Schema mapping            |
+| ------------------------- | ----------- | ----------------------------------------------------- | ------------------------- |
+| `interfaces`              | []Interface | Interfaces enumerated from gopsutil + extensions.     | —                         |
+| `routes`                  | []Route     | All routes from `ip route show table main` (v4 + v6). | No direct schema mapping. |
+| `default_interface`       | string      | Interface the default IPv4 route exits through.       | No direct schema mapping. |
+| `default_gateway`         | string      | Next-hop IPv4 address for the default route.          | No direct schema mapping. |
+| `default_inet6_interface` | string      | Interface the default IPv6 route exits through.       | No direct schema mapping. |
+| `default_inet6_gateway`   | string      | Next-hop IPv6 address for the default route.          | No direct schema mapping. |
+| `neighbours`              | []Neighbour | Kernel ARP + NDP cache (Linux only — netlink).        | No direct schema mapping. |
 
 Per interface:
 
 | Field           | Type      | Description                                                                                                 | Schema mapping            |
 | --------------- | --------- | ----------------------------------------------------------------------------------------------------------- | ------------------------- |
 | `name`          | string    | Interface name (`eth0`, `en0`, `lo`).                                                                       | `network_interface.name`. |
-| `mtu`           | int       | Maximum transmission unit (bytes).                                                                          | No direct OCSF.           |
+| `mtu`           | int       | Maximum transmission unit (bytes).                                                                          | No direct schema mapping. |
 | `hardware_addr` | string    | MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                    | `network_interface.mac`.  |
-| `encapsulation` | string    | Canonical encapsulation: `Ethernet` / `Loopback` / `PPP` / `SLIP` / `IPIP` / `6to4` / `VJSLIP`. Linux only. | No direct OCSF.           |
-| `driver`        | string    | Kernel driver bound to the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only — sysfs-derived.               | No direct OCSF.           |
-| `speed`         | string    | Negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only — ghw-derived.                                 | No direct OCSF.           |
-| `duplex`        | string    | Link duplex (`Full`, `Half`). Linux only — ghw-derived.                                                     | No direct OCSF.           |
-| `flags`         | []string  | Interface flags (`up`, `broadcast`, `multicast`).                                                           | No direct OCSF.           |
+| `encapsulation` | string    | Canonical encapsulation: `Ethernet` / `Loopback` / `PPP` / `SLIP` / `IPIP` / `6to4` / `VJSLIP`. Linux only. | No direct schema mapping. |
+| `driver`        | string    | Kernel driver bound to the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only — sysfs-derived.               | No direct schema mapping. |
+| `speed`         | string    | Negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only — ghw-derived.                                 | No direct schema mapping. |
+| `duplex`        | string    | Link duplex (`Full`, `Half`). Linux only — ghw-derived.                                                     | No direct schema mapping. |
+| `flags`         | []string  | Interface flags (`up`, `broadcast`, `multicast`).                                                           | No direct schema mapping. |
 | `addresses[]`   | []Address | See below.                                                                                                  | —                         |
-| `routes[]`      | []Route   | Routes whose `dev` matches this interface.                                                                  | No direct OCSF.           |
-| `counters.*`    | Counters  | I/O counters — see below.                                                                                   | No direct OCSF.           |
+| `routes[]`      | []Route   | Routes whose `dev` matches this interface.                                                                  | No direct schema mapping. |
+| `counters.*`    | Counters  | I/O counters — see below.                                                                                   | No direct schema mapping. |
 
 Per address:
 
-| Field       | Type   | Description                                                       | Schema mapping          |
-| ----------- | ------ | ----------------------------------------------------------------- | ----------------------- |
-| `addr`      | string | Address literal, no CIDR (`"10.0.0.5"`, `"fe80::1"`).             | `network_interface.ip`. |
-| `family`    | string | `inet` or `inet6`.                                                | No direct OCSF.         |
-| `prefixlen` | int    | Prefix length (24, 64, …).                                        | No direct OCSF.         |
-| `netmask`   | string | IPv4 netmask derived from prefix (`"255.255.255.0"`); IPv6 omits. | No direct OCSF.         |
-| `broadcast` | string | IPv4 broadcast address derived from address + prefix; IPv6 omits. | No direct OCSF.         |
-| `scope`     | string | `Global`, `Link`, or `Host` — derived from stdlib classification. | No direct OCSF.         |
+| Field       | Type   | Description                                                       | Schema mapping            |
+| ----------- | ------ | ----------------------------------------------------------------- | ------------------------- |
+| `addr`      | string | Address literal, no CIDR (`"10.0.0.5"`, `"fe80::1"`).             | `network_interface.ip`.   |
+| `family`    | string | `inet` or `inet6`.                                                | No direct schema mapping. |
+| `prefixlen` | int    | Prefix length (24, 64, …).                                        | No direct schema mapping. |
+| `netmask`   | string | IPv4 netmask derived from prefix (`"255.255.255.0"`); IPv6 omits. | No direct schema mapping. |
+| `broadcast` | string | IPv4 broadcast address derived from address + prefix; IPv6 omits. | No direct schema mapping. |
+| `scope`     | string | `Global`, `Link`, or `Host` — derived from stdlib classification. | No direct schema mapping. |
 
 Per route:
 
-| Field         | Type   | Description                                                   | Schema mapping  |
-| ------------- | ------ | ------------------------------------------------------------- | --------------- |
-| `destination` | string | Route destination (`"default"`, `"10.0.0.0/24"`, `"::/0"`).   | No direct OCSF. |
-| `family`      | string | `inet` or `inet6`.                                            | No direct OCSF. |
-| `gateway`     | string | Next-hop address.                                             | No direct OCSF. |
-| `interface`   | string | Egress interface (matches an entry in `interfaces[].name`).   | No direct OCSF. |
-| `source`      | string | Preferred source address.                                     | No direct OCSF. |
-| `scope`       | string | `global` / `link` / `host` (kernel-reported, lowercase).      | No direct OCSF. |
-| `proto`       | string | Routing protocol / source (`kernel`, `dhcp`, `static`, `ra`). | No direct OCSF. |
-| `metric`      | int    | Route metric.                                                 | No direct OCSF. |
+| Field         | Type   | Description                                                   | Schema mapping            |
+| ------------- | ------ | ------------------------------------------------------------- | ------------------------- |
+| `destination` | string | Route destination (`"default"`, `"10.0.0.0/24"`, `"::/0"`).   | No direct schema mapping. |
+| `family`      | string | `inet` or `inet6`.                                            | No direct schema mapping. |
+| `gateway`     | string | Next-hop address.                                             | No direct schema mapping. |
+| `interface`   | string | Egress interface (matches an entry in `interfaces[].name`).   | No direct schema mapping. |
+| `source`      | string | Preferred source address.                                     | No direct schema mapping. |
+| `scope`       | string | `global` / `link` / `host` (kernel-reported, lowercase).      | No direct schema mapping. |
+| `proto`       | string | Routing protocol / source (`kernel`, `dhcp`, `static`, `ra`). | No direct schema mapping. |
+| `metric`      | int    | Route metric.                                                 | No direct schema mapping. |
 
 Per neighbour:
 
-| Field       | Type   | Description                                                                                             | Schema mapping  |
-| ----------- | ------ | ------------------------------------------------------------------------------------------------------- | --------------- |
-| `address`   | string | IPv4 / IPv6 address of the neighbour.                                                                   | No direct OCSF. |
-| `family`    | string | `inet` or `inet6`.                                                                                      | No direct OCSF. |
-| `mac`       | string | Hardware address (MAC) when known.                                                                      | No direct OCSF. |
-| `interface` | string | Egress interface (resolved from netlink LinkIndex via `net.InterfaceByIndex`).                          | No direct OCSF. |
-| `state`     | string | NUD state: `INCOMPLETE` / `REACHABLE` / `STALE` / `DELAY` / `PROBE` / `FAILED` / `NOARP` / `PERMANENT`. | No direct OCSF. |
+| Field       | Type   | Description                                                                                             | Schema mapping            |
+| ----------- | ------ | ------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `address`   | string | IPv4 / IPv6 address of the neighbour.                                                                   | No direct schema mapping. |
+| `family`    | string | `inet` or `inet6`.                                                                                      | No direct schema mapping. |
+| `mac`       | string | Hardware address (MAC) when known.                                                                      | No direct schema mapping. |
+| `interface` | string | Egress interface (resolved from netlink LinkIndex via `net.InterfaceByIndex`).                          | No direct schema mapping. |
+| `state`     | string | NUD state: `INCOMPLETE` / `REACHABLE` / `STALE` / `DELAY` / `PROBE` / `FAILED` / `NOARP` / `PERMANENT`. | No direct schema mapping. |
 
 Per `Counters`:
 

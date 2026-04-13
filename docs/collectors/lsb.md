@@ -15,12 +15,12 @@ plugin. When the CLI is absent, `Info` stays empty rather than parsing
 
 ## Collected Fields
 
-| Field         | Type   | Description                                              | Schema mapping                       |
-| ------------- | ------ | -------------------------------------------------------- | ------------------------------------ |
-| `id`          | string | Distributor ID (`Ubuntu`, `RedHatEnterprise`, `CentOS`). | `os.name` (closest).                 |
-| `release`     | string | Release version (`22.04`, `9.3`).                        | `os.version`.                        |
-| `codename`    | string | Release codename (`jammy`, `Plow`).                      | No direct OCSF.                      |
-| `description` | string | Human-readable description (`Ubuntu 22.04.3 LTS`).       | No direct OCSF (presentation-level). |
+| Field         | Type   | Description                                              | Schema mapping                                 |
+| ------------- | ------ | -------------------------------------------------------- | ---------------------------------------------- |
+| `id`          | string | Distributor ID (`Ubuntu`, `RedHatEnterprise`, `CentOS`). | `os.name` (closest).                           |
+| `release`     | string | Release version (`22.04`, `9.3`).                        | `os.version`.                                  |
+| `codename`    | string | Release codename (`jammy`, `Plow`).                      | No direct schema mapping.                      |
+| `description` | string | Human-readable description (`Ubuntu 22.04.3 LTS`).       | No direct schema mapping (presentation-level). |
 
 ## Platform Support
 

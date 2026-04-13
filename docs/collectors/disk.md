@@ -16,16 +16,16 @@ splits these the same way.
 
 ## Collected Fields
 
-| Field per device | Type   | Description                                   | Schema mapping  |
-| ---------------- | ------ | --------------------------------------------- | --------------- |
-| `name`           | string | Device name (e.g. `sda`, `nvme0n1`, `disk0`). | No direct OCSF. |
-| `read_count`     | uint64 | Number of completed reads.                    | No direct OCSF. |
-| `write_count`    | uint64 | Number of completed writes.                   | No direct OCSF. |
-| `read_bytes`     | uint64 | Bytes read.                                   | No direct OCSF. |
-| `write_bytes`    | uint64 | Bytes written.                                | No direct OCSF. |
-| `read_time`      | uint64 | Time spent reading (ms).                      | No direct OCSF. |
-| `write_time`     | uint64 | Time spent writing (ms).                      | No direct OCSF. |
-| `io_time`        | uint64 | Time with in-flight I/O (ms).                 | No direct OCSF. |
+| Field per device | Type   | Description                                   | Schema mapping            |
+| ---------------- | ------ | --------------------------------------------- | ------------------------- |
+| `name`           | string | Device name (e.g. `sda`, `nvme0n1`, `disk0`). | No direct schema mapping. |
+| `read_count`     | uint64 | Number of completed reads.                    | No direct schema mapping. |
+| `write_count`    | uint64 | Number of completed writes.                   | No direct schema mapping. |
+| `read_bytes`     | uint64 | Bytes read.                                   | No direct schema mapping. |
+| `write_bytes`    | uint64 | Bytes written.                                | No direct schema mapping. |
+| `read_time`      | uint64 | Time spent reading (ms).                      | No direct schema mapping. |
+| `write_time`     | uint64 | Time spent writing (ms).                      | No direct schema mapping. |
+| `io_time`        | uint64 | Time with in-flight I/O (ms).                 | No direct schema mapping. |
 
 Top level: `devices: []Device`.
 

@@ -126,10 +126,8 @@ support (e.g., Linux only), 🚧 = planned but not yet built.
 
 | Collector                                          | Description                                    | Default | Implemented |
 | -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, counters                | ✅      | ⚠️         |
-| [routes](docs/collectors/routes.md)                | Routing table + default gateway (v4/v6)        | ✅      | 🚧          |
+| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, routes, neighbours, link details, counters | ✅      | ✅         |
 | [dns](docs/collectors/dns.md)                      | `/etc/resolv.conf` nameservers + search        | ✅      | 🚧          |
-| [arp](docs/collectors/arp.md)                      | ARP / neighbor table                           | ❌      | 🚧          |
 | [ethtool](docs/collectors/ethtool.md)              | Per-NIC ethtool detail (link/duplex/driver)    | ❌      | 🚧          |
 
 ### ☁️ Cloud

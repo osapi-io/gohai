@@ -20,10 +20,10 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field  | Type   | Description                                                                                                                                               | Schema mapping                                                                                       |
-| ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `name` | string | Canonical manager name: `apt`, `apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, `xbps-install`, `emerge`, `brew`, `port`. Empty when no manager found. | No OCSF equivalent — managed-software inventory has no canonical OCSF "which tool manages it" field. |
-| `path` | string | Absolute path to the manager binary (e.g. `/usr/bin/apt`). Empty when no manager found.                                                                   | No OCSF equivalent.                                                                                  |
+| Field  | Type   | Description                                                                                                                                               | Schema mapping                                                                                             |
+| ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `name` | string | Canonical manager name: `apt`, `apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, `xbps-install`, `emerge`, `brew`, `port`. Empty when no manager found. | No direct schema mapping — managed-software inventory has no canonical OCSF "which tool manages it" field. |
+| `path` | string | Absolute path to the manager binary (e.g. `/usr/bin/apt`). Empty when no manager found.                                                                   | No direct schema mapping.                                                                                  |
 
 ## Platform Support
 
