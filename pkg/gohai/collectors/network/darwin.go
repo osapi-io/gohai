@@ -22,21 +22,23 @@ package network
 
 import "context"
 
-// Darwin collects network facts on macOS via gopsutil.
+// Darwin collects network facts on macOS via gopsutil. Encapsulation
+// detection (sysfs ARPHRD on Linux), routing table parse (`ip` on
+// Linux), and OpenVZ alias merging are Linux-only — Darwin emits the
+// gopsutil base only. Future enhancement could add `route -n get
+// default` and `netstat -nr` parsing for macOS routes.
 type Darwin struct {
 	base
-
-	InterfacesFn func(context.Context) ([]Interface, error)
 }
 
-// NewDarwin returns a Darwin variant wired to gopsutil.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{InterfacesFn: readInterfaces}
+	return &Darwin{}
 }
 
 // Collect returns network Info.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	ifs, err := d.InterfacesFn(ctx)
+	ifs, err := readInterfaces(ctx)
 	if err != nil {
 		return nil, err
 	}

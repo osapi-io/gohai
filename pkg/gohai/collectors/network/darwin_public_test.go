@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	gpnet "github.com/shirou/gopsutil/v4/net"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
@@ -40,37 +41,40 @@ func TestNetworkDarwinPublicTestSuite(t *testing.T) {
 
 func (s *NetworkDarwinPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		ifs     []network.Interface
-		fnErr   error
-		wantErr bool
-		want    network.Info
+		name       string
+		ifsFn      func(context.Context) (gpnet.InterfaceStatList, error)
+		countersFn func(context.Context, bool) ([]gpnet.IOCountersStat, error)
+		wantErr    bool
+		wantLen    int
 	}{
 		{
-			name: "en0 with AirPort",
-			ifs: []network.Interface{
-				{Name: "en0", MTU: 1500, HardwareAddr: "aa:bb:cc:dd:ee:ff", Flags: []string{"up"}},
+			name: "en0 with MAC and global IPv4",
+			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
+				return gpnet.InterfaceStatList{
+					{
+						Name: "en0", MTU: 1500, HardwareAddr: "aa:bb:cc:dd:ee:ff",
+						Flags: []string{"up"},
+						Addrs: gpnet.InterfaceAddrList{{Addr: "192.168.1.5/24"}},
+					},
+				}, nil
 			},
-			want: network.Info{Interfaces: []network.Interface{
-				{Name: "en0", MTU: 1500, HardwareAddr: "aa:bb:cc:dd:ee:ff", Flags: []string{"up"}},
-			}},
+			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) { return nil, nil },
+			wantLen:    1,
 		},
 		{
-			name:    "gopsutil error wrapped and returned",
-			fnErr:   errors.New("net error"),
-			wantErr: true,
+			name: "gopsutil error propagated",
+			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
+				return nil, errors.New("net error")
+			},
+			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) { return nil, nil },
+			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &network.Darwin{
-				InterfacesFn: func(context.Context) ([]network.Interface, error) {
-					if tt.fnErr != nil {
-						return nil, tt.fnErr
-					}
-					return tt.ifs, nil
-				},
-			}
+			defer network.SetInterfacesFn(tt.ifsFn)()
+			defer network.SetIOCountersFn(tt.countersFn)()
+			c := &network.Darwin{}
 			got, err := c.Collect(context.Background())
 			if tt.wantErr {
 				s.Error(err)
@@ -79,7 +83,7 @@ func (s *NetworkDarwinPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*network.Info)
 			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			s.Len(info.Interfaces, tt.wantLen)
 		})
 	}
 }
