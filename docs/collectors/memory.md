@@ -188,18 +188,17 @@ On Linux:
    parse.
 2. gopsutil `mem.SwapMemory` provides the `swap.*` totals. `swap.cached` comes
    from the `SwapCached` field on the virtual memory stat.
-3. `hugepages.*` is populated only when any hugepage field is present
-   (kernels without hugepages support skip it cleanly).
-4. We additionally read `/proc/meminfo` through the injected `avfs.VFS`
-   to pick up the fields gopsutil's cross-platform struct doesn't
-   expose: `Active(anon)`, `Active(file)`, `Inactive(anon)`,
-   `Inactive(file)`, `Unevictable`, `KernelStack`, `Percpu`,
-   `KReclaimable`, `AnonPages`, `Shmem`, `Hugetlb`, and
-   `DirectMap4k` / `DirectMap2M` / `DirectMap1G`. All values are
-   kernel-reported kB; we multiply by 1024 to emit bytes. This closes
-   the Ohai-methodology gap without rolling a separate parser for the
-   27 fields gopsutil already handles — extension on top of the
-   library, per CLAUDE.md's library-first principle.
+3. `hugepages.*` is populated only when any hugepage field is present (kernels
+   without hugepages support skip it cleanly).
+4. We additionally read `/proc/meminfo` through the injected `avfs.VFS` to pick
+   up the fields gopsutil's cross-platform struct doesn't expose:
+   `Active(anon)`, `Active(file)`, `Inactive(anon)`, `Inactive(file)`,
+   `Unevictable`, `KernelStack`, `Percpu`, `KReclaimable`, `AnonPages`, `Shmem`,
+   `Hugetlb`, and `DirectMap4k` / `DirectMap2M` / `DirectMap1G`. All values are
+   kernel-reported kB; we multiply by 1024 to emit bytes. This closes the
+   Ohai-methodology gap without rolling a separate parser for the 27 fields
+   gopsutil already handles — extension on top of the library, per CLAUDE.md's
+   library-first principle.
 
 On macOS:
 

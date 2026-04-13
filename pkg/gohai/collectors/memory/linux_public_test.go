@@ -124,7 +124,12 @@ func fullGopsutilVM(context.Context) (*mem.VirtualMemoryStat, error) {
 }
 
 func swapOK(context.Context) (*mem.SwapMemoryStat, error) {
-	return &mem.SwapMemoryStat{Total: 2147483648, Used: 1024, Free: 2147482624, UsedPercent: 0.0001}, nil
+	return &mem.SwapMemoryStat{
+		Total:       2147483648,
+		Used:        1024,
+		Free:        2147482624,
+		UsedPercent: 0.0001,
+	}, nil
 }
 
 func zeroVM(context.Context) (*mem.VirtualMemoryStat, error) {
