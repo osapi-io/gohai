@@ -10,15 +10,17 @@ Collectors are individually toggled using node_exporter-style flags:
 gohai --collector.platform --no-collector.cloud
 ```
 
-**Schema:** Field names follow the [OCSF][] (Open Cybersecurity Schema
-Framework) schema — browse [schema.ocsf.io][ocsf-schema] to see canonical names
-and object shapes. Each collector's doc includes a **Data Sources** section
-noting which OCSF objects its fields map to. Collection logic (what to read,
-which distro edge cases to handle) follows [Chef Ohai][]'s plugins; field names and
-struct layout follow OCSF.
+**Schema:** Field names follow [OCSF][] (Open Cybersecurity Schema Framework)
+as the primary schema and [OpenTelemetry Resource Semantic Conventions][otel-semconv]
+as the secondary when OCSF is silent. Browse [schema.ocsf.io][ocsf-schema] and
+the [OpenTelemetry resource attributes][otel-semconv] to see canonical names
+and object shapes. Each collector's doc includes a **Collected Fields** table
+with a schema mapping column citing the canonical path. Collection logic (what
+to read, which distro edge cases to handle) follows [Chef Ohai][]'s plugins.
 
 [OCSF]: https://ocsf.io/
 [ocsf-schema]: https://schema.ocsf.io/
+[otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 [Chef Ohai]: https://github.com/chef/ohai
 
 ## 🖥️ System

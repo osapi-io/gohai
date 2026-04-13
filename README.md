@@ -21,20 +21,25 @@ Each collector wraps a well-maintained backing source ([gopsutil][],
 structs. gohai's value is the unified API, typed structs, and pluggable
 collector model — not reimplementing `/proc` parsing from scratch.
 
-### Schema: OCSF + Ohai
+### Schema: OCSF + OpenTelemetry + Ohai
 
-Fact naming and structure follow [OCSF][] (the Open Cybersecurity Schema
-Framework) wherever OCSF has a canonical field. OCSF is the industry
-schema backed by AWS and Splunk for asset, observability, and security
-data — aligning means gohai output feeds SIEMs, data lakes, and
-inventory tools without translation. Browse the schema at
-[schema.ocsf.io][ocsf-schema] to see field names and object shapes.
+Fact naming and structure follow, in order of precedence:
+
+1. **[OCSF][]** (Open Cybersecurity Schema Framework) — the primary
+   schema. Backed by AWS and Splunk for asset, observability, and
+   security data. Aligning means gohai output feeds SIEMs, data lakes,
+   and inventory tools without translation. Browse
+   [schema.ocsf.io][ocsf-schema] to see field names and object shapes.
+2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** —
+   used when OCSF is silent. Widely adopted for observability
+   telemetry; covers areas OCSF hasn't (per-CPU vendor/family/model,
+   system load averages, process runtime, host uptime).
 
 What we collect (which facts, which distro edge cases, which fallback
 sources) draws on [Chef Ohai][]'s years of accumulated plugin logic.
-What we call each field draws on OCSF. We do **not** pursue Ohai JSON
-shape parity — Ruby Mash ↔ Go struct translation isn't worth pinning
-byte-for-byte.
+What we call each field draws on OCSF + OpenTelemetry. We do **not**
+pursue Ohai JSON shape parity — Ruby Mash ↔ Go struct translation
+isn't worth pinning byte-for-byte.
 
 ### Primary consumer
 
@@ -66,7 +71,7 @@ go get github.com/osapi-io/gohai
 | [🔗 Collector Dependencies](docs/features/dependencies.md)    | Automatic dependency resolution between facts  |
 | [⚡ Concurrent Collection](docs/features/concurrency.md)      | Collectors run concurrently; dependency graph resolves order when any collector declares deps. |
 | [🎛️ Profiles](docs/features/profiles.md)                      | Predefined collector sets (minimal, standard, full) |
-| [📊 OCSF Schema + Ohai Sources](docs/features/ocsf-ohai.md)   | Field names follow [OCSF](https://schema.ocsf.io/); data sources mirror Chef Ohai's plugins |
+| [📊 OCSF + OpenTelemetry + Ohai](docs/features/ocsf-ohai.md)   | Field names follow [OCSF](https://schema.ocsf.io/) then [OpenTelemetry](https://opentelemetry.io/docs/specs/semconv/resource/); data sources mirror Chef Ohai's plugins |
 | [🔌 SDK Integration](docs/features/sdk.md)                    | Import as a Go package for OSAPI and others    |
 
 ## 🔌 Collectors
@@ -273,9 +278,10 @@ to gohai collectors — keep it in sync with any `Info` struct changes.
 ## 📖 Documentation
 
 - [Collectors reference](docs/collectors/README.md) — one doc per collector
-  with fields, OCSF mappings, and Ohai source alignment.
+  with fields, schema mappings (OCSF + OpenTelemetry), and Ohai source
+  alignment.
 - [Features](docs/features/README.md) — SDK surface, concurrency model,
-  dependency resolution, OCSF + Ohai schema, profiles.
+  dependency resolution, OCSF + OpenTelemetry + Ohai schema, profiles.
 - [Integrations](docs/integrations/osapi.md) — how downstream services consume
   the SDK.
 - [Development](docs/development.md) — prerequisites, setup, testing, commit
@@ -300,5 +306,6 @@ The [MIT][] License.
 [procfs]: https://github.com/prometheus/procfs
 [OCSF]: https://ocsf.io/
 [ocsf-schema]: https://schema.ocsf.io/
+[otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 [package documentation]: https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai
 [MIT]: LICENSE

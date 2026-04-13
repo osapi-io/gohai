@@ -229,12 +229,22 @@ Collector JSON field names use `snake_case`. Precedence:
    don't emit yet but easily could (e.g. `device.hw_info.serial_number`,
    `os.build`), consider adding it — they've thought about what a
    consumer wants.
-2. **Industry standard** — when OCSF is silent, use whatever
-   node_exporter / systemd / Prometheus exporters standardized on.
-   Example: filesystem `mountpoint` / `fstype` follow node_exporter.
-3. **Ohai's name** — only when OCSF and industry standards are silent
-   AND Ohai has a clear, meaningful name.
-4. **Our own name** — last resort. Go-idiomatic snake_case.
+2. **OpenTelemetry semantic conventions** — when OCSF is silent.
+   Well-maintained, widely adopted for observability telemetry; covers
+   areas OCSF hasn't (e.g. per-CPU `host.cpu.model.name`,
+   `host.cpu.family`, `host.cpu.stepping`, `process.runtime.name`).
+   Browse [OpenTelemetry Resource Semantic Conventions][otel-semconv].
+3. **Industry standard** — when OCSF and OpenTelemetry are silent,
+   use whatever node_exporter / systemd / Prometheus exporters
+   standardized on. Example: filesystem `mountpoint` / `fstype`
+   follow node_exporter.
+4. **Ohai's name** — only when OCSF / OpenTelemetry / industry
+   standards are silent AND Ohai has a clear, meaningful name.
+5. **Our own name** — last resort. Go-idiomatic snake_case.
+
+**Not a reference for our schema:** Open Compute Project (OCP) is a
+hardware design spec, not a data schema. CIS / SCAP / XCCDF describe
+compliance policies, not field naming. Ignore for naming purposes.
 
 **Do not mirror Ohai's JSON shape.** Ohai is for **data-source**
 reference (what file/command to read, which distro edge cases, which
@@ -247,6 +257,7 @@ equivalent" with a one-line reason.
 
 [data types]: https://schema.ocsf.io/data_types
 [dictionary]: https://schema.ocsf.io/dictionary
+[otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 
 ### MANDATORY: Cross-reference Ohai's data sources before implementing
 

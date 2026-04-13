@@ -12,5 +12,5 @@ gohai provides a rich set of features for collecting and consuming system facts.
 | [🔗 Collector Dependencies](dependencies.md)  | Automatic dependency resolution between facts                                             |
 | [⚡ Concurrent Collection](concurrency.md)    | Collectors run concurrently; dependency graph resolves order when declared                |
 | [🎛️ Profiles](profiles.md)                    | Predefined collector sets (minimal, standard, full)                                       |
-| [📊 OCSF Schema + Ohai Sources](ocsf-ohai.md) | Field names follow [OCSF](https://schema.ocsf.io/); data sources mirror Chef Ohai plugins |
+| [📊 OCSF + OpenTelemetry + Ohai](ocsf-ohai.md) | Field names follow [OCSF](https://schema.ocsf.io/) then [OpenTelemetry](https://opentelemetry.io/docs/specs/semconv/resource/); data sources mirror Chef Ohai plugins |
 | [🔌 SDK Integration](sdk.md)                  | Import as a Go package for OSAPI and others                                               |

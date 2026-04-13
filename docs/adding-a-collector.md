@@ -1,7 +1,7 @@
 # Adding a New Collector
 
 Step-by-step walkthrough for building a new collector. For the rules and
-principles (library-first, OCSF naming, no build tags, etc.) see
+principles (library-first, OCSF + OpenTelemetry naming, no build tags, etc.) see
 [CLAUDE.md](../CLAUDE.md).
 
 **Reference implementation:** `pkg/gohai/collectors/shells/`. Copy its file
@@ -32,12 +32,14 @@ import (
     "github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds CPU information. Field names follow OCSF where applicable.
+// Info holds CPU information. Field names follow OCSF first, then
+// OpenTelemetry when OCSF is silent.
 type Info struct {
-    Total     int      `json:"total"`                // OCSF: device.cpu_count
-    Cores     int      `json:"cores"`                // OCSF: device.cpu_cores
-    ModelName string   `json:"model_name,omitempty"` // no OCSF
-    Flags     []string `json:"flags,omitempty"`      // no OCSF
+    CPUCount  int      `json:"cpu_count"`            // OCSF: device.cpu_count
+    CPUCores  int      `json:"cpu_cores"`            // OCSF: device.cpu_cores
+    VendorID  string   `json:"vendor_id,omitempty"`  // OTel: host.cpu.vendor.id
+    ModelName string   `json:"model_name,omitempty"` // No direct schema
+    Flags     []string `json:"flags,omitempty"`      // No direct schema
 }
 
 // Collector is the public interface every cpu variant satisfies.
@@ -211,10 +213,11 @@ sections in order:
   Linux vs macOS. Our voice.
 - **Signals** (only for complex collectors — see `docs/collectors/fips.md` for
   reference).
-- **Collected Fields** — markdown table with Field / Type / Description / **OCSF
-  mapping** columns. Every field gets an OCSF row (`os.kernel_release`,
-  `network_interface.mac`, etc.) or explicit "No direct OCSF" with a one-line
-  reason.
+- **Collected Fields** — markdown table with Field / Type / Description /
+  **Schema mapping** columns. Every field cites its OCSF path first
+  (`os.kernel_release`, `device.cpu_count`), OpenTelemetry attribute second
+  (`host.cpu.vendor.id`, `system.load_average.1m`) when OCSF is silent, or
+  explicit "No direct schema" with a one-line reason.
 - **Platform Support** — table.
 - **Example Output** — realistic JSON for Linux and macOS.
 - **SDK Usage** — Go snippet using `gohai.New(...).Collect(ctx)`.
@@ -253,7 +256,7 @@ feat(<name>): add <name> collector
 
 Wraps <library> for the core collection, extending with <X> that the
 library doesn't expose (mirrors Ohai's <Y> behavior). Field names
-follow OCSF conventions where applicable (<list>). Supports Linux and
+follow OCSF / OpenTelemetry conventions where applicable (<list>). Supports Linux and
 macOS with platform.Detect() dispatch.
 
 Closes #<N>  (if work closes a methodology issue)
