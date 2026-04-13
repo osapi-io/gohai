@@ -4,67 +4,84 @@
 
 ## Description
 
-Detects the hypervisor or container runtime the host is running under
-(KVM/VMware/Xen/Hyper-V/docker/lxc/…) and whether this host is the `host` or the
-`guest` of that runtime.
-
-Detection runs through gopsutil's heuristics: DMI / product name
-(`/sys/class/dmi/id/product_name`, `sys_vendor`), CPUID flags (hypervisor leaf),
-`/proc/1/cgroup` / `/proc/self/cgroup` for container runtimes, and
-macOS-specific sysctls.
+Detects every hypervisor and container runtime the host participates in — as
+**guest**, **host**, or both. A single host can legitimately report multiple
+systems (a Docker host that is itself a KVM guest on EC2, an LXD host on bare
+metal, etc.). Mirrors Ohai's linux/virtualization.rb and
+darwin/virtualization.rb cascades.
 
 Consumers use this to:
 
-- Branch metrics collection (disabling certain facts inside VMs / containers).
-- Tag telemetry with the virtualization layer.
-- Detect nested virtualization (a KVM guest that is also a docker host — current
-  shape only reports one layer; multi-layer is a known gap).
+- Tag telemetry with every virtualization layer.
+- Gate metric collection inside containers.
+- Detect unexpected nesting (a container that shouldn't be running on a
+  hypervisor guest, or vice versa).
+- Distinguish host vs guest roles for the same runtime (a vbox host running on
+  bare metal vs a vbox guest under VirtualBox).
 
 ## Collected Fields
 
-| Field    | Type   | Description                                                                                     | Schema mapping  |
-| -------- | ------ | ----------------------------------------------------------------------------------------------- | --------------- |
-| `system` | string | Runtime name: `"kvm"`, `"vmware"`, `"xen"`, `"hyperv"`, `"docker"`, `"lxc"`, `""` (bare metal). | No direct OCSF. |
-| `role`   | string | `"host"`, `"guest"`, or `""` (unknown / not applicable).                                        | No direct OCSF. |
+| Field     | Type              | Description                                                                                                          | Schema mapping  |
+| --------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `system`  | string            | Primary / most-recent positive detection (`"docker"`, `"kvm"`, `"lxc"`, `""` for bare metal).                        | No direct OCSF. |
+| `role`    | string            | `"host"`, `"guest"`, or `""`.                                                                                        | No direct OCSF. |
+| `systems` | map[string]string | Every detected layer: `{"kvm": "guest", "docker": "host"}`. Single entry on single-layer hosts; empty on bare metal. | No direct OCSF. |
 
-Empty `system` + empty `role` means "no virtualization detected" (bare metal) —
-gopsutil didn't find hypervisor or container signatures.
+Empty `system` + empty `systems` means "no virtualization detected" (bare
+metal). When more than one layer is detected, `system`/`role` report the last
+positive detection in the cascade order — consumers that care about every layer
+should iterate `systems`.
 
 ## Platform Support
 
-| Platform | Supported                                                         |
-| -------- | ----------------------------------------------------------------- |
-| Linux    | ✅ (DMI + CPUID + cgroup parse via gopsutil)                      |
-| macOS    | ✅ (sysctl `kern.hv_vmm_present` / process ancestry via gopsutil) |
+| Platform | Supported                                                                        |
+| -------- | -------------------------------------------------------------------------------- |
+| Linux    | ✅ (full Ohai cascade: systemd-detect-virt + DMI + cgroup + 12 file/exec probes) |
+| macOS    | ✅ (Ohai cascade: PATH probes + sysctl + ioreg + system_profiler)                |
 
 ## Example Output
-
-### KVM guest
-
-```json
-{
-  "virtualization": {
-    "system": "kvm",
-    "role": "guest"
-  }
-}
-```
 
 ### Bare metal
 
 ```json
-{
-  "virtualization": {}
-}
+{ "virtualization": {} }
 ```
 
-### Docker host
+### KVM guest running Docker
 
 ```json
 {
   "virtualization": {
     "system": "docker",
-    "role": "host"
+    "role": "host",
+    "systems": {
+      "kvm": "guest",
+      "docker": "host"
+    }
+  }
+}
+```
+
+### VMware Fusion host on macOS
+
+```json
+{
+  "virtualization": {
+    "system": "vmware",
+    "role": "host",
+    "systems": { "vmware": "host" }
+  }
+}
+```
+
+### Apple Virtualization.framework guest
+
+```json
+{
+  "virtualization": {
+    "system": "apple",
+    "role": "guest",
+    "systems": { "qemu": "guest", "apple": "guest" }
   }
 }
 ```
@@ -76,13 +93,11 @@ g, _ := gohai.New(gohai.WithCollectors("virtualization"))
 facts, _ := g.Collect(context.Background())
 
 v := facts.Virtualization
-switch {
-case v.System == "":
+if len(v.Systems) == 0 {
     // bare metal
-case v.Role == "guest":
-    fmt.Printf("running under %s\n", v.System)
-case v.Role == "host":
-    fmt.Printf("hosting %s workloads\n", v.System)
+}
+for name, role := range v.Systems {
+    fmt.Printf("%s: %s\n", name, role)
 }
 ```
 
@@ -99,19 +114,62 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                                                                                                                                        | Ohai plugin                                                                                                                                                                                                          | Alignment                                                                                                                                                                                                                                                                                                                                                |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `host.Virtualization` — checks `/sys/class/dmi/id/product_name`/`sys_vendor`, CPUID hypervisor leaf, `/proc/1/cgroup`, `/proc/self/cgroup`, `/.dockerenv`. | [`linux/virtualization.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/virtualization.rb) — same DMI/cgroup/env checks plus `/proc/xen`, `/proc/vz`, `/proc/bc`, `lxc-ls`, `systemd-detect-virt`. | **Substantially same signal sources** (DMI + cgroup). Ohai additionally produces a `systems` map (e.g. `{"kvm": "guest", "docker": "host"}`) so nested runtimes surface both layers, and calls `systemd-detect-virt` as a fast-path. Our current shape reports only the outermost layer — multi-layer is tracked as a follow-up (issue #44 in the plan). |
-| macOS    | gopsutil `host.Virtualization` — sysctl `kern.hv_vmm_present`, process ancestry.                                                                                    | Ohai's `darwin/virtualization.rb` has minimal macOS coverage (largely no-op).                                                                                                                                        | **Equivalent or better** — gopsutil's macOS detection is more complete than Ohai's.                                                                                                                                                                                                                                                                      |
+On Linux the collector cascades through every signal Ohai's
+`linux/virtualization.rb` checks, populating `systems[<name>] = role` for each
+positive hit. Order matters — the last positive detection sets primary
+`system`/`role`, but every layer remains in `systems`:
 
-**Known gaps vs. Ohai:**
+1. **`systemd-detect-virt` fast-path:** when on PATH, run
+   `systemd-detect-virt --vm` and `systemd-detect-virt --container`; each
+   non-`none`/non-empty result registers as guest.
+2. **Container-runtime hosts:** `command -v docker` / `command -v podman` /
+   `command -v nova` → host.
+3. **Xen:** `/proc/xen` exists → guest; `/proc/xen/capabilities` contains
+   `control_d` → host.
+4. **VirtualBox:** `/proc/modules` line `vboxdrv` → host; `vboxguest` → guest.
+5. **KVM:** `/proc/cpuinfo` contains `QEMU Virtual CPU` or
+   `Common KVM processor` → guest. `/sys/devices/virtual/misc/kvm` exists → host
+   (or guest when the `hypervisor` cpuinfo flag is set).
+6. **DMI:** `/sys/class/dmi/id/product_name` / `sys_vendor` / `bios_vendor`
+   matched against vmware / hyperv / parallels / xen / qemu/kvm strings (Ohai's
+   `guest_from_dmi_data` table).
+7. **OpenVZ:** `/proc/bc/0` → host; `/proc/vz` → guest.
+8. **Hyper-V:** `/var/lib/hyperv/.kvp_pool_3` → guest.
+9. **linux-vserver:** `/proc/self/status` `s_context: 0` / `VxID: 0` → host;
+   non-zero → guest.
+10. **Containers via cgroup / environ:** `/proc/self/cgroup` regex for `docker`
+    / `lxc` / `containerd` (containerd remaps to docker); `/proc/1/environ` for
+    `container=lxc` / `container=systemd-nspawn` / `container=podman`.
+11. **`.dockerenv` override:** `/.dockerenv` or `/.dockerinit` → docker guest
+    (force overrides earlier registrations).
+12. **LXD:** `/dev/lxd/sock` → guest; `/var/lib/lxd/devlxd` or
+    `/var/snap/lxd/common/lxd/devlxd` → host.
 
-- No `systems` map for nested / multi-layer virtualization.
-- No explicit detection of `nspawn`, `podman`, `rkt`, `openvz` (gopsutil folds
-  some of these into `lxc`/`docker`).
-- No `systemd-detect-virt` fast-path.
+On macOS the cascade matches Ohai's `darwin/virtualization.rb`:
+
+1. **Hypervisor host binaries:** `command -v docker` → `systems[docker] = host`;
+   `command -v VBoxManage` → `vbox` host; `command -v prlctl` → `parallels`
+   host.
+2. **VMware Fusion host:** `/Applications/VMware Fusion.app` exists.
+3. **QEMU / Virtualization.framework guest:** `sysctl -n kern.hv_vmm_present`
+   returns `1`.
+4. **Parallels guest:** `ioreg -l` output contains `pci1ab8,4000`.
+5. **VirtualBox / VMware / Apple-VM guest:**
+   `system_profiler SPHardwareDataType` parsed for `Boot ROM Version` containing
+   `VirtualBox` / `VMW`, and `Model Identifier` containing `VirtualMac`.
+
+Bare-metal Macs with no hypervisor software produce an empty `systems` map and
+empty `system`/`role`.
+
+All file reads go through the injected `avfs.VFS`; all command invocations go
+through the shared `internal/executor` runner. Tests mock both with `memfs` and
+`go.uber.org/mock`.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
-  BSD-3.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) — virtual filesystem
+  for the dozen `/proc`, `/sys`, `/var/lib/...`, and `/Applications/...` probes.
+  Tests inject `memfs` with canned fixtures.
+- [`internal/executor`](../../internal/executor) — shared command-runner
+  abstraction for `systemd-detect-virt`, `command -v <bin>`, `sysctl`, `ioreg`,
+  `system_profiler`. Tests mock with `go.uber.org/mock`.
