@@ -27,7 +27,7 @@ Consumers that need per-core saturation should divide by `cpu.total` from the
 
 ## Collected Fields
 
-| Field     | Type    | Description             | Schema mapping |
+| Field     | Type    | Description             | Schema mapping  |
 | --------- | ------- | ----------------------- | --------------- |
 | `one`     | float64 | 1-minute load average.  | No direct OCSF. |
 | `five`    | float64 | 5-minute load average.  | No direct OCSF. |

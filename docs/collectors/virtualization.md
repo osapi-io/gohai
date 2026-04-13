@@ -22,7 +22,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field    | Type   | Description                                                                                     | Schema mapping |
+| Field    | Type   | Description                                                                                     | Schema mapping  |
 | -------- | ------ | ----------------------------------------------------------------------------------------------- | --------------- |
 | `system` | string | Runtime name: `"kvm"`, `"vmware"`, `"xen"`, `"hyperv"`, `"docker"`, `"lxc"`, `""` (bare metal). | No direct OCSF. |
 | `role`   | string | `"host"`, `"guest"`, or `""` (unknown / not applicable).                                        | No direct OCSF. |

@@ -18,11 +18,11 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field      | Type   | Description                                              | Schema mapping |
-| ---------- | ------ | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `name`     | string | Short hostname (e.g., `web01`).                          | OCSF `device.hostname` (leaf stripped: leaf matches collector name).         |
-| `fqdn`     | string | Fully qualified domain name (e.g., `web01.example.com`). | `device.domain` (combined with hostname) / OCSF has no dedicated FQDN field. |
-| `domain`   | string | Domain portion of the FQDN (e.g., `example.com`).        | `device.domain`.                                                             |
+| Field    | Type   | Description                                              | Schema mapping                                                               |
+| -------- | ------ | -------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `name`   | string | Short hostname (e.g., `web01`).                          | OCSF `device.hostname` (leaf stripped: leaf matches collector name).         |
+| `fqdn`   | string | Fully qualified domain name (e.g., `web01.example.com`). | `device.domain` (combined with hostname) / OCSF has no dedicated FQDN field. |
+| `domain` | string | Domain portion of the FQDN (e.g., `example.com`).        | `device.domain`.                                                             |
 
 If no DNS record exists for the short name, `fqdn` falls back to the short
 hostname and `domain` is empty.

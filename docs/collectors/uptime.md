@@ -19,7 +19,7 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field          | Type   | Description                                               | Schema mapping |
+| Field          | Type   | Description                                               | Schema mapping                                                                                |
 | -------------- | ------ | --------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `seconds`      | uint64 | Seconds since boot.                                       | No direct OCSF. OCSF records individual event times; host uptime isn't a first-class concept. |
 | `boot_time`    | uint64 | Unix timestamp of boot.                                   | OCSF `device.first_seen_time` captures the same idea for asset-inventory use cases.           |

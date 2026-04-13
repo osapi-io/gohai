@@ -23,7 +23,7 @@ selectability.
 
 Top level: `interfaces: []Interface`.
 
-| Field per interface | Type     | Description                                          | Schema mapping |
+| Field per interface | Type     | Description                                          | Schema mapping            |
 | ------------------- | -------- | ---------------------------------------------------- | ------------------------- |
 | `name`              | string   | Interface name (`eth0`, `en0`, `lo0`).               | `network_interface.name`. |
 | `mtu`               | int      | Maximum transmission unit (bytes).                   | No direct OCSF.           |
