@@ -210,13 +210,35 @@ canonical names for ~99% of what we collect. Using OCSF names means
 gohai output feeds SIEMs, data lakes, and inventory tools without
 translation, so the lookup is mandatory, not aspirational.
 
-**Both Go field names AND JSON tags derive from OCSF.** The JSON tag is
-the OCSF snake_case path verbatim (`json:"kernel_release"`); the Go
-field is the PascalCase rendering of the same path (`KernelRelease
-string`). When Go idiom on initialisms conflicts (OCSF `cpu_id` → Go
-`CPUID`, not `CpuId`), the Go convention wins the field name but the
-JSON tag still matches OCSF. Don't invent internal names that diverge
-from OCSF.
+**Both Go field names AND JSON tags derive from the chosen schema
+(OCSF primary, OpenTelemetry when OCSF is silent).**
+
+**Redundant-prefix rule:** JSON keys use the schema's leaf name with
+any parent-object prefix stripped when that prefix duplicates our
+collector name. Our output nests by collector (`{"cpu": {...},
+"memory": {...}}`), so restating the prefix inside the nested object
+is noise. Examples:
+
+| OCSF path | Our collector | Redundant prefix? | Our JSON key |
+| --- | --- | --- | --- |
+| `device.cpu_count` | `cpu` | `cpu_` → strip | `count` |
+| `device.cpu_cores` | `cpu` | `cpu_` → strip | `cores` |
+| `device.memory_size` | `memory` | `memory_` → strip | `size` |
+| `os.kernel_release` | `kernel` | `kernel_` → strip | `release` |
+| `device.hostname` | `hostname` | `hostname` == collector → `name` | `name` |
+| `process.cmd_line` | `process` | no match → keep | `cmd_line` |
+| `host.cpu.vendor.id` | `cpu` | OTel leaf is `id`, parent `vendor` isn't our collector — keep | `vendor_id` |
+
+The full schema path (OCSF first, OTel if OCSF silent) is cited in
+every collector doc's **Schema mapping** column so consumers bridging
+to OCSF can write a mechanical transform.
+
+The Go field is the PascalCase rendering of the final JSON key
+(`Count int \`json:"count"\``, `Name string \`json:"name"\``). When
+Go idiom on initialisms conflicts (OCSF `cpu_id` → Go `CPUID`, not
+`CpuId`), Go convention wins the field name but the JSON tag still
+follows the rule above. Don't invent internal names that have no
+schema-mapping claim.
 
 Collector JSON field names use `snake_case`. Precedence:
 
