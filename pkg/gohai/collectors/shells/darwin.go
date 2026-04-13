@@ -30,8 +30,9 @@ import (
 
 // Darwin collects the shell list on macOS hosts. /etc/shells on macOS
 // ships with a small curated set (/bin/bash, /bin/zsh, /bin/sh, etc.)
-// and is managed by the OS installer. Embeds base for Name / Tier /
-// Dependencies. OpenFn is injected so tests can stub the file read.
+// and is managed by the OS installer. Embeds base for Name /
+// DefaultEnabled / Dependencies. OpenFn is injected so tests can stub
+// the file read.
 type Darwin struct {
 	base
 

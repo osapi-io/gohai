@@ -126,12 +126,32 @@ go test -run TestName -v ./internal/collector/platform/...  # Run a single test
 
 - Public tests: `*_public_test.go` in test package (`package platform_test`) for
   exported functions.
+- `export_test.go` in the same package exposes unexported symbols to external
+  `_test.go` files via typed aliases (`var ReadX = readX`) and setter functions
+  (`SetXFn(fn) func()` returning a restore func the caller defers). Never put
+  production-only code in `export_test.go`.
 - Use `testify/suite` with table-driven patterns.
 - Table-driven structure with `validateFunc` callbacks.
 - **One suite method per function under test.** All scenarios for a function
   (success, error codes, edge cases) belong as rows in a single table — never
   split into separate `TestFoo`, `TestFooError`, `TestFooNilResponse` methods.
+- **No custom assertion messages** — `s.Equal(want, got)`, not
+  `s.Equal(want, got, "expected equal")`. Matches osapi's style.
 - Target 100% coverage on all packages.
+- **Don't coverage-chase trivial bridges.** If a wrapper is a single gopsutil
+  call, make the call itself swappable via private var + `Set<X>Fn` setter in
+  `export_test.go`; the error-branch test then lives naturally as a table row
+  exercising both success and error paths. See `pkg/gohai/collectors/load/` for
+  the canonical shape.
+
+### Upcoming: VFS + Executor (Phase 1, WIP)
+
+The per-field `Fn` injection pattern is being replaced by shared
+`vfs.Filesystem` and `executor.Executor` abstractions (avfs + gomock-backed)
+threaded through `Collect` the same way `context.Context` is. Until Phase 1
+lands, use `export_test.go` + private var + setter for gopsutil / syscall /
+file-read seams. Do NOT add new `Fn` struct fields for new seams. See the
+"Upcoming: VFS + Executor Abstractions" section in CLAUDE.md.
 
 ## Before committing
 
