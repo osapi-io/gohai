@@ -22,35 +22,27 @@ package hostname
 
 import (
 	"context"
-	"net"
-	"os"
+
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects hostname facts on macOS. Same wiring as Linux — the
-// underlying syscalls are cross-platform. Separate struct type
-// preserves the osapi dispatch pattern and lets macOS diverge if Apple
-// introduces an API change. ShortHostnameFn is typed in our `string`
-// so importers don't need gopsutil in their module graph.
+// Darwin collects hostname facts on macOS. Identical wiring to Linux:
+// Ohai's darwin branch also runs `hostname -s` + `hostname` +
+// canonicalize_hostname_with_retries. The separate type preserves the
+// osapi dispatch pattern and leaves room for macOS-specific scutil
+// enrichment later.
 type Darwin struct {
 	base
 
-	ShortHostnameFn func(context.Context) (string, error)
-	OSHostnameFn    func() (string, error)
-	LookupHostFn    func(string) ([]string, error)
-	LookupAddrFn    func(string) ([]string, error)
+	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant wired to stdlib + gopsutil.
+// NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{
-		ShortHostnameFn: readShortHostname,
-		OSHostnameFn:    os.Hostname,
-		LookupHostFn:    net.LookupHost,
-		LookupAddrFn:    net.LookupAddr,
-	}
+	return &Darwin{Exec: executor.New()}
 }
 
 // Collect returns hostname facts.
 func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	return resolve(ctx, d.ShortHostnameFn, d.OSHostnameFn, d.LookupHostFn, d.LookupAddrFn)
+	return collectWithExec(ctx, d.Exec)
 }

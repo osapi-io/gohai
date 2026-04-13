@@ -27,7 +27,10 @@ import (
 
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
+	"github.com/osapi-io/gohai/internal/executor"
+	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 )
 
@@ -39,24 +42,52 @@ func TestHostnameLinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(HostnameLinuxPublicTestSuite))
 }
 
+// hostnameExec returns a MockExecutor that canned-answers
+// `hostname -s` and bare `hostname` separately. Shared by linux and
+// darwin tests because both OSes run the same commands.
+func hostnameExec(
+	t *testing.T,
+	shortOut []byte, shortErr error,
+	bareOut []byte, bareErr error,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "hostname", "-s").
+		Return(shortOut, shortErr).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "hostname").
+		Return(bareOut, bareErr).
+		AnyTimes()
+	return m
+}
+
 func (s *HostnameLinuxPublicTestSuite) TestCollect() {
-	okShort := func(context.Context) (string, error) { return "web01", nil }
+	defer hostname.SetResolverBackoff(0)()
+
+	okHostInfo := func(context.Context) (*host.InfoStat, error) {
+		return &host.InfoStat{Hostname: "gopsutil-short"}, nil
+	}
 
 	tests := []struct {
-		name         string
-		shortFn      func(context.Context) (string, error)
-		osHostnameFn func() (string, error)
-		lookupHost   func(string) ([]string, error)
-		lookupAddr   func(string) ([]string, error)
-		wantErr      bool
-		want         hostname.Info
+		name       string
+		hostInfo   func(context.Context) (*host.InfoStat, error)
+		osHostname func() (string, error)
+		lookupHost func(string) ([]string, error)
+		lookupAddr func(string) ([]string, error)
+		execShort  []byte
+		execBare   []byte
+		want       hostname.Info
 	}{
 		{
-			name:         "canonical case: short name + reverse DNS",
-			shortFn:      okShort,
-			osHostnameFn: func() (string, error) { return "web01", nil },
-			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
-			lookupAddr:   func(string) ([]string, error) { return []string{"web01.example.com."}, nil },
+			name:       "canonical success with reverse DNS",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
+			lookupAddr: func(string) ([]string, error) { return []string{"web01.example.com."}, nil },
+			execShort:  []byte("web01\n"),
+			execBare:   []byte("web01\n"),
 			want: hostname.Info{
 				Name:        "web01",
 				MachineName: "web01",
@@ -65,59 +96,47 @@ func (s *HostnameLinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "no DNS resolution falls back to short name",
-			shortFn:      okShort,
-			osHostnameFn: func() (string, error) { return "laptop", nil },
-			lookupHost:   func(string) ([]string, error) { return nil, errors.New("no such host") },
-			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
-			want:         hostname.Info{Name: "web01", MachineName: "laptop", FQDN: "web01"},
+			name:       "empty forward lookup treated as miss; all retries exhausted",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: func(string) ([]string, error) { return nil, nil },
+			lookupAddr: func(string) ([]string, error) { return nil, nil },
+			execShort:  []byte("web01\n"),
+			execBare:   []byte("web01\n"),
+			want:       hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
 		},
 		{
-			name:         "reverse lookup fails falls back to short name",
-			shortFn:      okShort,
-			osHostnameFn: func() (string, error) { return "web01", nil },
-			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
-			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("no PTR") },
-			want:         hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
+			name:       "empty reverse lookup treated as miss",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
+			lookupAddr: func(string) ([]string, error) { return nil, nil },
+			execShort:  []byte("web01\n"),
+			execBare:   []byte("web01\n"),
+			want:       hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
 		},
 		{
-			name:         "reverse lookup empty falls back to short name",
-			shortFn:      okShort,
-			osHostnameFn: func() (string, error) { return "web01", nil },
-			lookupHost:   func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
-			lookupAddr:   func(string) ([]string, error) { return nil, nil },
-			want:         hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
-		},
-		{
-			name:         "empty short name skips FQDN resolution",
-			shortFn:      func(context.Context) (string, error) { return "", nil },
-			osHostnameFn: func() (string, error) { return "", errors.New("no hostname") },
-			lookupHost:   func(string) ([]string, error) { return nil, errors.New("unused") },
-			lookupAddr:   func(string) ([]string, error) { return nil, errors.New("unused") },
-			want:         hostname.Info{},
-		},
-		{
-			name:         "short hostname error propagated",
-			shortFn:      func(context.Context) (string, error) { return "", errors.New("boom") },
-			osHostnameFn: func() (string, error) { return "", nil },
-			lookupHost:   func(string) ([]string, error) { return nil, nil },
-			lookupAddr:   func(string) ([]string, error) { return nil, nil },
-			wantErr:      true,
+			name:       "FQDN without domain component",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: func(string) ([]string, error) { return []string{"10.0.0.5"}, nil },
+			lookupAddr: func(string) ([]string, error) { return []string{"web01."}, nil },
+			execShort:  []byte("web01\n"),
+			execBare:   []byte("web01\n"),
+			want:       hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			defer hostname.SetHostInfoFn(tt.hostInfo)()
+			defer hostname.SetOSHostnameFn(tt.osHostname)()
+			defer hostname.SetLookupHostFn(tt.lookupHost)()
+			defer hostname.SetLookupAddrFn(tt.lookupAddr)()
+
 			c := &hostname.Linux{
-				ShortHostnameFn: tt.shortFn,
-				OSHostnameFn:    tt.osHostnameFn,
-				LookupHostFn:    tt.lookupHost,
-				LookupAddrFn:    tt.lookupAddr,
+				Exec: hostnameExec(s.T(), tt.execShort, nil, tt.execBare, nil),
 			}
 			got, err := c.Collect(context.Background())
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
 			s.Require().NoError(err)
 			info, ok := got.(*hostname.Info)
 			s.Require().True(ok)

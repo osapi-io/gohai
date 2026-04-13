@@ -22,35 +22,28 @@ package hostname
 
 import (
 	"context"
-	"net"
-	"os"
+
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Linux collects hostname facts on Linux. Wraps readShortHostname
-// (gopsutil.host.Info internally), os.Hostname (machine_name),
-// net.LookupHost + net.LookupAddr (FQDN canonicalization via reverse
-// DNS). ShortHostnameFn is typed in our `string` so importers don't
-// need gopsutil in their module graph.
+// Linux collects hostname facts on Linux. Mirrors Ohai's linux branch:
+// `hostname -s` for the short name, bare `hostname` for machine_name,
+// plus DNS canonicalization for FQDN. When the exec runner is
+// unavailable (or any hostname command fails) we fall back to
+// gopsutil's host.Info + os.Hostname so minimal containers without
+// util-linux-hostname still produce output.
 type Linux struct {
 	base
 
-	ShortHostnameFn func(context.Context) (string, error)
-	OSHostnameFn    func() (string, error)
-	LookupHostFn    func(string) ([]string, error)
-	LookupAddrFn    func(string) ([]string, error)
+	Exec executor.Executor
 }
 
-// NewLinux returns a Linux variant wired to stdlib + gopsutil.
+// NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{
-		ShortHostnameFn: readShortHostname,
-		OSHostnameFn:    os.Hostname,
-		LookupHostFn:    net.LookupHost,
-		LookupAddrFn:    net.LookupAddr,
-	}
+	return &Linux{Exec: executor.New()}
 }
 
 // Collect returns hostname facts.
 func (l *Linux) Collect(ctx context.Context) (any, error) {
-	return resolve(ctx, l.ShortHostnameFn, l.OSHostnameFn, l.LookupHostFn, l.LookupAddrFn)
+	return collectWithExec(ctx, l.Exec)
 }

@@ -22,6 +22,7 @@ package hostname
 
 import (
 	"context"
+	"time"
 
 	"github.com/shirou/gopsutil/v4/host"
 )
@@ -30,13 +31,59 @@ import (
 // the external hostname_test package.
 var ReadShortHostname = readShortHostname
 
-// SetHostInfoFn swaps the private gopsutil host.InfoWithContext call
-// backing readShortHostname. Returns a restore func the caller must
-// defer.
+// CanonicalFQDN exposes the private canonicalFQDN helper.
+var CanonicalFQDN = canonicalFQDN
+
+// SetHostInfoFn swaps the private gopsutil host.InfoWithContext call.
 func SetHostInfoFn(
 	fn func(context.Context) (*host.InfoStat, error),
 ) (restore func()) {
 	orig := hostInfoFn
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }
+}
+
+// SetLookupHostFn swaps the private net.LookupHost seam.
+func SetLookupHostFn(
+	fn func(string) ([]string, error),
+) (restore func()) {
+	orig := lookupHostFn
+	lookupHostFn = fn
+	return func() { lookupHostFn = orig }
+}
+
+// SetLookupAddrFn swaps the private net.LookupAddr seam.
+func SetLookupAddrFn(
+	fn func(string) ([]string, error),
+) (restore func()) {
+	orig := lookupAddrFn
+	lookupAddrFn = fn
+	return func() { lookupAddrFn = orig }
+}
+
+// SetOSHostnameFn swaps the private os.Hostname seam.
+func SetOSHostnameFn(
+	fn func() (string, error),
+) (restore func()) {
+	orig := osHostnameFn
+	osHostnameFn = fn
+	return func() { osHostnameFn = orig }
+}
+
+// SetResolverRetries swaps the retry count used by canonicalFQDN.
+func SetResolverRetries(
+	n int,
+) (restore func()) {
+	orig := resolverRetries
+	resolverRetries = n
+	return func() { resolverRetries = orig }
+}
+
+// SetResolverBackoff swaps the backoff between resolver retries.
+func SetResolverBackoff(
+	d time.Duration,
+) (restore func()) {
+	orig := resolverBackoff
+	resolverBackoff = d
+	return func() { resolverBackoff = orig }
 }
