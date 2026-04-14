@@ -27,8 +27,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/cloud/gce"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
 )
 
 type GohaiTestSuite struct {

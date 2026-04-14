@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/platform"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 )
 
 type DmiPublicTestSuite struct {
