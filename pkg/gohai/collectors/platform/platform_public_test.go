@@ -566,7 +566,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &platform.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

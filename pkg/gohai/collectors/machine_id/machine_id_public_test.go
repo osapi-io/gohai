@@ -173,7 +173,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &machineid.Darwin{}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

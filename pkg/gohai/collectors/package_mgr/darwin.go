@@ -20,7 +20,11 @@
 
 package packagemgr
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin covers macOS hosts. Prefers brew (community-standard),
 // falls back to port (MacPorts) if brew isn't installed.
@@ -36,6 +40,7 @@ func NewDarwin() *Darwin {
 // Collect returns brew if present, else port.
 func (d *Darwin) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	name, path := firstFound("brew", "port")
 	return &Info{Name: name, Path: path}, nil

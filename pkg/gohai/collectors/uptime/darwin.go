@@ -20,7 +20,11 @@
 
 package uptime
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin collects uptime on macOS. No idle-time equivalent.
 type Darwin struct {
@@ -35,6 +39,7 @@ func NewDarwin() *Darwin {
 // Collect returns uptime facts.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return readBase(ctx)
 }

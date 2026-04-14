@@ -26,10 +26,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cloud/gce"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
@@ -79,6 +81,8 @@ type Facts struct {
 	Init           *initd.Info          `json:"init,omitempty"`
 	Shard          *shard.Info          `json:"shard,omitempty"`
 	PackageMgr     *packagemgr.Info     `json:"package_mgr,omitempty"`
+	Gce            *gce.Info            `json:"gce,omitempty"`
+	DMI            *dmi.Info            `json:"dmi,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -210,6 +214,12 @@ func (f *Facts) countPopulated() int {
 	if f.PackageMgr != nil {
 		n++
 	}
+	if f.Gce != nil {
+		n++
+	}
+	if f.DMI != nil {
+		n++
+	}
 	return n
 }
 
@@ -312,6 +322,14 @@ func (f *Facts) set(
 	case "package_mgr":
 		if v, ok := result.(*packagemgr.Info); ok {
 			f.PackageMgr = v
+		}
+	case "gce":
+		if v, ok := result.(*gce.Info); ok {
+			f.Gce = v
+		}
+	case "dmi":
+		if v, ok := result.(*dmi.Info); ok {
+			f.DMI = v
 		}
 	}
 }

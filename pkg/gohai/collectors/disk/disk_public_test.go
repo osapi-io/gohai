@@ -151,7 +151,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &disk.Darwin{}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

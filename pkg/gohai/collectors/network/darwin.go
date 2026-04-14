@@ -20,7 +20,11 @@
 
 package network
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin collects network facts on macOS via gopsutil. Encapsulation
 // detection (sysfs ARPHRD on Linux), routing table parse (`ip` on
@@ -39,6 +43,7 @@ func NewDarwin() *Darwin {
 // Collect returns network Info.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	ifs, err := readInterfaces(ctx)
 	if err != nil {

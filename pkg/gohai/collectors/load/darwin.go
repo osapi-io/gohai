@@ -20,7 +20,11 @@
 
 package load
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin collects load averages on macOS. gopsutil's
 // load.AvgWithContext (vm.loadavg sysctl) is swapped via the
@@ -37,6 +41,7 @@ func NewDarwin() *Darwin {
 // Collect returns the load averages.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return readAverages(ctx)
 }

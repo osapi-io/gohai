@@ -27,6 +27,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // procUptimePath is /proc/uptime. Two fields: uptime seconds and
@@ -49,6 +50,7 @@ func NewLinux() *Linux {
 // and layers idle on top via /proc/uptime.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	out, err := readBase(ctx)
 	if err != nil {

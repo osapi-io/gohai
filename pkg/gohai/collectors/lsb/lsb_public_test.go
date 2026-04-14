@@ -169,7 +169,7 @@ Codename:	noble
 			case "darwin":
 				c = lsb.NewDarwin()
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
 			if tt.wantNil {
 				s.Nil(got)

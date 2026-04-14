@@ -678,7 +678,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &virtualization.Darwin{FS: tt.fs(), Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
 			info, ok := got.(*virtualization.Info)
 			s.Require().True(ok)

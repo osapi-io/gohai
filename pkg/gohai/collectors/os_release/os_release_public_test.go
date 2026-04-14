@@ -195,7 +195,7 @@ VARIANT_ID=workstation
 			case "darwin":
 				c = osrelease.NewDarwin()
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

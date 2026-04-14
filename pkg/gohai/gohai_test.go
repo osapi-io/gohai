@@ -48,6 +48,10 @@ func (c *cycleCollector) Name() string {
 	return c.name
 }
 
+func (c *cycleCollector) Category() string {
+	return "misc"
+}
+
 func (c *cycleCollector) DefaultEnabled() bool {
 	return true
 }
@@ -58,6 +62,7 @@ func (c *cycleCollector) Dependencies() []string {
 
 func (c *cycleCollector) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return nil, nil
 }

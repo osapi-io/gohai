@@ -23,6 +23,7 @@ package lsb
 import (
 	"context"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -49,6 +50,7 @@ func NewLinux() *Linux {
 // Ohai's no-panic behaviour).
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	if l.Exec == nil {
 		return &Info{}, nil

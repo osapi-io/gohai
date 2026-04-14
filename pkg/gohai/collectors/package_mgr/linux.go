@@ -20,7 +20,11 @@
 
 package packagemgr
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Linux covers generic Linux hosts where we don't know the family —
 // arch, alpine, suse, etc. Probes common package managers in order of
@@ -44,6 +48,7 @@ func NewLinux() *Linux {
 // to the Debian or RHEL variant before ever reaching this one.
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	name, path := firstFound("zypper", "pacman", "apk", "xbps-install", "emerge")
 	return &Info{Name: name, Path: path}, nil

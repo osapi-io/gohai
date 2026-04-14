@@ -20,7 +20,11 @@
 
 package process
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin collects a process snapshot on macOS via gopsutil.
 type Darwin struct {
@@ -35,6 +39,7 @@ func NewDarwin() *Darwin {
 // Collect returns a process snapshot.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	procs, err := listProcesses(ctx)
 	if err != nil {

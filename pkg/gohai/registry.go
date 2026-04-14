@@ -40,3 +40,25 @@ func NewRegistry() *PublicRegistry {
 func (p *PublicRegistry) Names() []string {
 	return p.reg.Names()
 }
+
+// NamesInCategory returns the names of every collector in cat. Empty
+// slice when the category has no collectors — callers should treat
+// that as a user-facing "unknown category" error.
+func (p *PublicRegistry) NamesInCategory(
+	cat string,
+) []string {
+	return p.reg.NamesInCategory(cat)
+}
+
+// CategoryOf returns the collector's category, or empty string when
+// no collector is registered under that name. Intended for CLI help
+// and `--list-collectors`-style output that groups by category.
+func (p *PublicRegistry) CategoryOf(
+	name string,
+) string {
+	c, ok := p.reg.Get(name)
+	if !ok {
+		return ""
+	}
+	return c.Category()
+}

@@ -588,7 +588,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			default:
 				c = &network.Linux{FS: tt.fs, Exec: tt.exec}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

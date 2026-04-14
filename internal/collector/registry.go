@@ -84,6 +84,24 @@ func (r *Registry) Get(
 	return c, ok
 }
 
+// NamesInCategory returns the names of every collector whose Category
+// matches cat. Returns an empty slice (never nil) when no collector
+// has that category — callers should treat that as a user error
+// ("unknown category") rather than silently running nothing.
+func (r *Registry) NamesInCategory(
+	cat string,
+) []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := []string{}
+	for name, c := range r.collectors {
+		if c.Category() == cat {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // Names returns the names of all registered collectors.
 func (r *Registry) Names() []string {
 	r.mu.RLock()
@@ -179,6 +197,17 @@ func (r *Registry) Run(
 	var resultsMu sync.Mutex
 
 	for _, level := range levels {
+		// Snapshot prior results once per level. Collectors at the
+		// same level have no inter-dependencies by definition, so
+		// they all see the same prior state — matches the
+		// topological contract.
+		resultsMu.Lock()
+		prior := make(PriorResults, len(results))
+		for k, v := range results {
+			prior[k] = v
+		}
+		resultsMu.Unlock()
+
 		var wg sync.WaitGroup
 		for _, name := range level {
 			c := r.collectors[name]
@@ -186,7 +215,7 @@ func (r *Registry) Run(
 			go func() {
 				defer wg.Done()
 				start := time.Now()
-				out, cerr := c.Collect(ctx)
+				out, cerr := c.Collect(ctx, prior)
 				dur := time.Since(start)
 				if hooks.OnComplete != nil {
 					hooks.OnComplete(c.Name(), dur, cerr)

@@ -58,6 +58,10 @@ func (f *fakeCollector) Name() string {
 	return f.name
 }
 
+func (f *fakeCollector) Category() string {
+	return "misc"
+}
+
 func (f *fakeCollector) DefaultEnabled() bool {
 	return f.defaultEnabled
 }
@@ -68,6 +72,7 @@ func (f *fakeCollector) Dependencies() []string {
 
 func (f *fakeCollector) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return f.name + "-result", nil
 }
@@ -80,6 +85,10 @@ func (e *errCollector) Name() string {
 	return e.name
 }
 
+func (e *errCollector) Category() string {
+	return "misc"
+}
+
 func (e *errCollector) DefaultEnabled() bool {
 	return true
 }
@@ -90,6 +99,7 @@ func (e *errCollector) Dependencies() []string {
 
 func (e *errCollector) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return nil, errors.New("boom")
 }

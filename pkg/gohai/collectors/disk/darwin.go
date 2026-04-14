@@ -20,7 +20,11 @@
 
 package disk
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin collects disk I/O counters on macOS via gopsutil (IOKit).
 // The gopsutil call is swapped via the package-level ioCountersFn
@@ -37,6 +41,7 @@ func NewDarwin() *Darwin {
 // Collect returns per-device I/O counters.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	devs, err := listIOCounters(ctx)
 	if err != nil {

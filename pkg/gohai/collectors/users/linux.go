@@ -23,6 +23,7 @@ package users
 import (
 	"context"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -46,6 +47,7 @@ func NewLinux() *Linux {
 // Collect returns logged-in session Info.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	if l.Exec != nil {
 		out, err := l.Exec.Execute(ctx,

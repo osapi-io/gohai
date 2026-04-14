@@ -25,6 +25,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // Linux collects the shell list on Linux hosts. Embeds base for the
@@ -47,6 +48,7 @@ func NewLinux() *Linux {
 // containers legitimately lack /etc/shells.
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	b, err := l.FS.ReadFile(etcShellsPath)
 	if err != nil {

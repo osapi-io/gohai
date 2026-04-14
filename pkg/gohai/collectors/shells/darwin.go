@@ -25,6 +25,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // Darwin collects the shell list on macOS hosts. /etc/shells on macOS
@@ -46,6 +47,7 @@ func NewDarwin() *Darwin {
 // Collect reads /etc/shells and returns the list of valid login shells.
 func (d *Darwin) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	b, err := d.FS.ReadFile(etcShellsPath)
 	if err != nil {

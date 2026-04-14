@@ -20,7 +20,11 @@
 
 package shard
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin computes a shard seed on macOS from IOPlatformUUID (via
 // gopsutil under the hood) + os.Hostname.
@@ -39,6 +43,7 @@ func NewDarwin() *Darwin {
 // the Linux collector's behavior when /etc/machine-id is missing).
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	mid, _ := readMachineUUID(ctx)
 	host, _ := hostnameFn()

@@ -23,6 +23,7 @@ package hostname
 import (
 	"context"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -46,6 +47,7 @@ func NewLinux() *Linux {
 // Collect returns hostname facts.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return collectWithExec(ctx, l.Exec)
 }

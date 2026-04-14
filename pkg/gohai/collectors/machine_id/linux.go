@@ -26,6 +26,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // dbusMachineIDPath is the pre-systemd machine-id location Ohai reads
@@ -56,6 +57,7 @@ func NewLinux() *Linux {
 // existing work.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	id, err := readHostID(ctx)
 	if err != nil {

@@ -20,7 +20,11 @@
 
 package fips
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin reports no FIPS data on macOS. Apple's CoreCrypto module is
 // FIPS 140-validated by Apple but there's no kernel-level runtime
@@ -39,6 +43,7 @@ func NewDarwin() *Darwin {
 // Collect returns nil — no FIPS facts on darwin.
 func (d *Darwin) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return nil, nil
 }

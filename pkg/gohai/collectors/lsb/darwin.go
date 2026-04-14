@@ -20,7 +20,11 @@
 
 package lsb
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin returns no LSB data — /etc/lsb-release is a Linux-specific
 // file. Ohai's plugin is linux-only.
@@ -36,6 +40,7 @@ func NewDarwin() *Darwin {
 // Collect returns nil on darwin.
 func (d *Darwin) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return nil, nil
 }

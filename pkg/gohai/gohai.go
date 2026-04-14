@@ -27,10 +27,12 @@ import (
 	"time"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cloud/gce"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
@@ -150,18 +152,27 @@ func selectCollectors(
 		}
 		return out, nil
 	}
-	// Without WithDefaults / WithEnabled, return empty — gohai.New()
-	// is opt-in. Consumers either pass WithDefaults() to get the
-	// recommended set or enumerate collectors via WithEnabled /
-	// WithCollectors. Still validate the disabled list so unknown
-	// names error consistently.
-	if !cfg.useDefaults && len(cfg.enabled) == 0 {
+	// Expand WithCategory into an additive enable list. Unknown
+	// categories (zero collectors match) error so typos surface
+	// immediately rather than silently selecting nothing.
+	enabled := cfg.enabled
+	for _, cat := range cfg.categories {
+		names := reg.NamesInCategory(cat)
+		if len(names) == 0 {
+			return nil, fmt.Errorf("unknown category %q", cat)
+		}
+		enabled = append(enabled, names...)
+	}
+	// Without WithDefaults / WithEnabled / WithCategory, return
+	// empty — gohai.New() is opt-in. Still validate the disabled
+	// list so unknown names error consistently.
+	if !cfg.useDefaults && len(enabled) == 0 {
 		if _, err := reg.SelectedWith(false, nil, cfg.disabled); err != nil {
 			return nil, fmt.Errorf("select collectors: %w", err)
 		}
 		return nil, nil
 	}
-	sel, err := reg.SelectedWith(cfg.useDefaults, cfg.enabled, cfg.disabled)
+	sel, err := reg.SelectedWith(cfg.useDefaults, enabled, cfg.disabled)
 	if err != nil {
 		return nil, fmt.Errorf("select collectors: %w", err)
 	}
@@ -205,5 +216,7 @@ func builtinCollectors() []collector.Collector {
 		initd.New(),
 		shard.New(),
 		packagemgr.New(),
+		gce.New(),
+		dmi.New(),
 	}
 }

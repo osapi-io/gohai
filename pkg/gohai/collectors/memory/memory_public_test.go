@@ -452,7 +452,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &memory.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

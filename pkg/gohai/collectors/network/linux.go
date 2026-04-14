@@ -28,6 +28,7 @@ import (
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -59,6 +60,7 @@ func NewLinux() *Linux {
 // Collect returns network Info.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	ifs, err := readInterfaces(ctx)
 	if err != nil {

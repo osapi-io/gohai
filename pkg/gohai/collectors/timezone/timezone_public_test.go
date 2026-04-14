@@ -207,7 +207,7 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &timezone.Darwin{FS: tt.setupFS()}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
 			info, ok := got.(*timezone.Info)
 			s.Require().True(ok)

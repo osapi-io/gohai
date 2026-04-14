@@ -28,6 +28,7 @@ type config struct {
 	enabled     []string
 	disabled    []string
 	only        []string
+	categories  []string
 	withTimings bool
 }
 
@@ -63,6 +64,17 @@ func WithCollectors(
 	names ...string,
 ) Option {
 	return func(c *config) { c.only = append(c.only, names...) }
+}
+
+// WithCategory enables every collector whose Category() matches one
+// of the given names ("cloud", "hardware", "system", ...). Stacks
+// with WithEnabled / WithDefaults — categories add collectors,
+// WithDisabled still subtracts. Unknown category names error at
+// New() time so typos surface immediately.
+func WithCategory(
+	names ...string,
+) Option {
+	return func(c *config) { c.categories = append(c.categories, names...) }
 }
 
 // WithTimings embeds per-collector timing + error data into Facts

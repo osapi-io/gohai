@@ -23,6 +23,7 @@ package filesystem
 import (
 	"context"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -52,6 +53,7 @@ func NewLinux() *Linux {
 // gopsutil-sourced fields intact.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	mounts, err := listMounts(ctx)
 	if err != nil {

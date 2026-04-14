@@ -25,6 +25,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // Linux collects platform identification on Linux. gopsutil reads
@@ -53,6 +54,7 @@ func NewLinux() *Linux {
 // Collect returns platform Info.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	info, _, err := readPlatform(ctx)
 	if err != nil {

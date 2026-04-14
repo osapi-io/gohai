@@ -20,7 +20,11 @@
 
 package packagemgr
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // RHEL covers rhel / redhat / centos / fedora / rocky / alma /
 // amazon / oracle — dnf/yum-based hosts. Prefers dnf (RHEL 8+),
@@ -37,6 +41,7 @@ func NewRHEL() *RHEL {
 // Collect returns dnf if present, else yum.
 func (r *RHEL) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	name, path := firstFound("dnf", "yum")
 	return &Info{Name: name, Path: path}, nil

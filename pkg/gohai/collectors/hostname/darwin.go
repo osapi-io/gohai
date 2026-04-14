@@ -23,6 +23,7 @@ package hostname
 import (
 	"context"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -45,6 +46,7 @@ func NewDarwin() *Darwin {
 // Collect returns hostname facts.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return collectWithExec(ctx, d.Exec)
 }

@@ -20,7 +20,11 @@
 
 package machineid
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin resolves the machine ID on macOS. Wraps readHostID
 // (gopsutil.host.Info internally, which on darwin reads
@@ -39,6 +43,7 @@ func NewDarwin() *Darwin {
 // correct — no extension needed.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	id, err := readHostID(ctx)
 	if err != nil {

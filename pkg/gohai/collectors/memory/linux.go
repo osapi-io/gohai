@@ -28,6 +28,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 const procMeminfoPath = "/proc/meminfo"
@@ -55,6 +56,7 @@ func NewLinux() *Linux {
 // /proc/meminfo extension fills the gaps.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	info, err := readMemory(ctx)
 	if err != nil {

@@ -20,7 +20,11 @@
 
 package rootgroup
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin resolves the root group on macOS. Typically returns "wheel".
 // Embeds base for Name/DefaultEnabled/Dependencies.
@@ -38,6 +42,7 @@ func NewDarwin() *Darwin {
 // reports is what we ship.
 func (d *Darwin) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return resolveRootGroup()
 }
