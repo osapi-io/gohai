@@ -1,35 +1,107 @@
-# Openstack
+# OpenStack
 
-> **Status:** Planned
+> **Status:** Implemented ✅
 
 ## Description
 
-TODO: Description of the openstack collector.
+Collects OpenStack (Nova) instance metadata from the link-local server at
+`http://169.254.169.254/`. OpenStack intentionally emits an EC2-compatible
+metadata service under `/latest/meta-data/...` and a richer Nova-specific
+document at `/openstack/latest/meta_data.json` — gohai fetches both.
+`facts.OpenStack != nil` is the detection signal.
+
+Detection is gated on DMI `product.name` containing `"OpenStack"` — Ohai's
+plugin gates on the virtualization plugin's openstack signal, which itself reads
+DMI; we go directly to DMI for the same effect.
 
 ## Collected Fields
 
-| Field | Type | Description |
-| ----- | ---- | ----------- |
-| TODO  | TODO | TODO        |
+| Field               | Type                | Description                        | Schema mapping                 |
+| ------------------- | ------------------- | ---------------------------------- | ------------------------------ |
+| `instance_id`       | `string`            | EC2-mirror instance ID.            | OTel `cloud.resource_id`       |
+| `instance_type`     | `string`            | Instance flavor (e.g. `m1.small`). | OTel `host.type`               |
+| `hostname`          | `string`            | Hostname.                          | OCSF `device.hostname`         |
+| `local_hostname`    | `string`            | Internal DNS name.                 | No direct schema mapping.      |
+| `public_hostname`   | `string`            | Public DNS name.                   | No direct schema mapping.      |
+| `availability_zone` | `string`            | Nova availability zone.            | OTel `cloud.availability_zone` |
+| `local_ipv4`        | `string`            | Primary private IPv4.              | No direct schema mapping.      |
+| `public_ipv4`       | `string`            | Primary public IPv4.               | No direct schema mapping.      |
+| `security_groups`   | `[]string`          | Attached security groups.          | No direct schema mapping.      |
+| `ami_id`            | `string`            | EC2-mirror AMI ID.                 | OTel `host.image.id`           |
+| `kernel_id`         | `string`            | Boot kernel image.                 | No direct schema mapping.      |
+| `ramdisk_id`        | `string`            | Boot ramdisk image.                | No direct schema mapping.      |
+| `reservation_id`    | `string`            | EC2-mirror reservation ID.         | No direct schema mapping.      |
+| `name`              | `string`            | Nova `name` field.                 | OTel `host.name`               |
+| `project_id`        | `string`            | Nova project ID.                   | OTel `cloud.account.id`        |
+| `uuid`              | `string`            | Nova UUID.                         | No direct schema mapping.      |
+| `meta_data`         | `map[string]string` | Nova `meta` key/values.            | No direct schema mapping.      |
+| `public_keys`       | `map[string]string` | Name→key map of SSH keys.          | No direct schema mapping.      |
 
 ## Platform Support
 
-| Platform | Supported |
-| -------- | --------- |
-| Linux    | ✅        |
-| macOS    | ⚠️        |
+| Platform | Supported                               |
+| -------- | --------------------------------------- |
+| Linux    | ✅                                      |
+| macOS    | ✅ (only meaningful on an OpenStack VM) |
+| Other    | ✅ (only meaningful on an OpenStack VM) |
 
 ## Example Output
 
 ```json
 {
-  "openstack": {}
+  "openstack": {
+    "instance_id": "i-abc",
+    "instance_type": "m1.small",
+    "availability_zone": "nova",
+    "local_ipv4": "10.0.0.5",
+    "uuid": "uuid-xxx",
+    "project_id": "proj-1"
+  }
+}
+```
+
+## SDK Usage
+
+```go
+g, _ := gohai.New(gohai.WithCollectors("openstack"))
+facts, _ := g.Collect(context.Background())
+
+if facts.OpenStack != nil {
+    fmt.Println(facts.OpenStack.ProjectID, facts.OpenStack.AvailabilityZone)
 }
 ```
 
 ## Enable/Disable
 
 ```bash
-gohai --collector.openstack      # enable
-gohai --no-collector.openstack   # disable
+gohai --collector.openstack      # enable (opt-in)
+gohai --no-collector.openstack   # disable (default)
+gohai --category=cloud           # pulls this + all cloud collectors
 ```
+
+## Dependencies
+
+`dmi`. OpenStack writes `"OpenStack Nova"` or similar as `product_name`. Fails
+open when dmi wasn't run.
+
+## Data Sources
+
+1. **DMI gate:** `dmi.Product.Name` contains `"OpenStack"`. Mirrors Ohai's
+   virtualization-plugin gate (which itself reads DMI).
+2. **EC2-mirror endpoints:** GETs against the EC2-compatible tree under
+   `/latest/meta-data/` — same paths Amazon's IMDS serves. Ohai reuses its EC2
+   mixin for this; we issue targeted GETs at the specific known fields.
+3. **Nova endpoint:** `GET /openstack/latest/meta_data.json` — the richer
+   Nova-native document with `uuid`, `project_id`, `meta`, etc.
+4. **Timeout:** 2 seconds per request.
+5. **Failure handling:** first EC2-mirror probe failure returns `(nil, nil)`.
+   Nova doc failure or malformed JSON is tolerated; the EC2-mirror fields still
+   populate.
+
+Mirrors Ohai's `Ohai::Mixin::Ec2Metadata` (reused by their openstack plugin)
+plus the Nova-specific document.
+
+## Backing library
+
+- [`internal/cloudmetadata`](../../internal/cloudmetadata/) — the shared HTTP
+  client used by every cloud-provider collector.

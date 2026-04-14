@@ -91,19 +91,22 @@ edge cases to handle) follows [Chef Ohai][]'s plugins.
 
 | Collector                         | Key             | Description                    | Default | Implemented |
 | --------------------------------- | --------------- | ------------------------------ | ------- | ----------- |
-| [cloud](cloud.md)                 | `cloud`         | Aggregated cloud provider info | ❌      | 🚧          |
-| [ec2](ec2.md)                     | `ec2`           | AWS EC2 metadata               | ❌      | 🚧          |
+| [ec2](ec2.md)                     | `ec2`           | AWS EC2 metadata               | ❌      | ✅          |
 | [gce](gce.md)                     | `gce`           | Google Compute Engine metadata | ❌      | ✅          |
-| [azure](azure.md)                 | `azure`         | Azure instance metadata        | ❌      | 🚧          |
-| [digital_ocean](digital_ocean.md) | `digital_ocean` | DigitalOcean droplet metadata  | ❌      | 🚧          |
-| [openstack](openstack.md)         | `openstack`     | OpenStack instance metadata    | ❌      | 🚧          |
-| [alibaba](alibaba.md)             | `alibaba`       | Alibaba Cloud ECS metadata     | ❌      | 🚧          |
+| [azure](azure.md)                 | `azure`         | Azure instance metadata        | ❌      | ✅          |
+| [digital_ocean](digital_ocean.md) | `digital_ocean` | DigitalOcean droplet metadata  | ❌      | ✅          |
+| [openstack](openstack.md)         | `openstack`     | OpenStack instance metadata    | ❌      | ✅          |
+| [alibaba](alibaba.md)             | `alibaba`       | Alibaba Cloud ECS metadata     | ❌      | ✅          |
+| [linode](linode.md)               | `linode`        | Linode instance metadata       | ❌      | ✅          |
+| [oci](oci.md)                     | `oci`           | Oracle Cloud metadata          | ❌      | ✅          |
+| [scaleway](scaleway.md)           | `scaleway`      | Scaleway instance metadata     | ❌      | ✅          |
 | [rackspace](rackspace.md)         | `rackspace`     | Rackspace server metadata      | ❌      | 🪦          |
-| [linode](linode.md)               | `linode`        | Linode instance metadata       | ❌      | 🚧          |
-| [oci](oci.md)                     | `oci`           | Oracle Cloud metadata          | ❌      | 🚧          |
-| [scaleway](scaleway.md)           | `scaleway`      | Scaleway instance metadata     | ❌      | 🚧          |
 | [softlayer](softlayer.md)         | `softlayer`     | IBM SoftLayer metadata         | ❌      | 🪦          |
 | [eucalyptus](eucalyptus.md)       | `eucalyptus`    | Eucalyptus instance metadata   | ❌      | 🪦          |
+
+There is no `cloud` collector — gohai doesn't ship a cross-provider aggregator.
+See [cloud.md](cloud.md) for the SDK pattern for detecting which provider a host
+is on.
 
 ## 🔮 Virtualization
 
@@ -174,12 +177,15 @@ automatically — enabling a collector also enables its dependencies.
 | ---------------- | ------------------------------- |
 | `platform`       | `kernel`                        |
 | `package_mgr`    | `platform`                      |
-| `cloud`          | `network`, `dmi`                |
 | `ec2`            | `dmi`                           |
 | `gce`            | `dmi`                           |
 | `azure`          | —                               |
 | `digital_ocean`  | `dmi`                           |
-| `openstack`      | `virtualization`                |
+| `oci`            | `dmi`                           |
+| `alibaba`        | `dmi`                           |
+| `openstack`      | `dmi`                           |
+| `linode`         | —                               |
+| `scaleway`       | —                               |
 | `virtualization` | `dmi`, `cpu`                    |
 | `docker`         | `virtualization`                |
 | `packages`       | `platform`                      |

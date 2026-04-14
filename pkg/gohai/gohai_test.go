@@ -27,8 +27,16 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
+	digitalocean "github.com/osapi-io/gohai/pkg/gohai/collectors/digital_ocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
 )
 
 type GohaiTestSuite struct {
@@ -86,6 +94,126 @@ func (s *GohaiTestSuite) TestFactsSet() {
 			},
 		},
 		{
+			name:  "ec2 populates Facts.Ec2",
+			key:   "ec2",
+			value: &ec2.Info{InstanceID: "i-abc"},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.Ec2)
+				s.Equal("i-abc", f.Ec2.InstanceID)
+			},
+		},
+		{
+			name:   "ec2 wrong type ignored",
+			key:    "ec2",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Ec2) },
+		},
+		{
+			name:  "azure populates Facts.Azure",
+			key:   "azure",
+			value: &azure.Info{VMID: "vm"},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.Azure)
+				s.Equal("vm", f.Azure.VMID)
+			},
+		},
+		{
+			name:   "azure wrong type ignored",
+			key:    "azure",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Azure) },
+		},
+		{
+			name:  "digital_ocean populates Facts.DigitalOcean",
+			key:   "digital_ocean",
+			value: &digitalocean.Info{DropletID: 1},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.DigitalOcean)
+				s.Equal(int64(1), f.DigitalOcean.DropletID)
+			},
+		},
+		{
+			name:   "digital_ocean wrong type ignored",
+			key:    "digital_ocean",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.DigitalOcean) },
+		},
+		{
+			name:  "oci populates Facts.OCI",
+			key:   "oci",
+			value: &oci.Info{ID: "ocid1"},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.OCI)
+				s.Equal("ocid1", f.OCI.ID)
+			},
+		},
+		{
+			name:   "oci wrong type ignored",
+			key:    "oci",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.OCI) },
+		},
+		{
+			name:  "alibaba populates Facts.Alibaba",
+			key:   "alibaba",
+			value: &alibaba.Info{InstanceID: "i-ali"},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.Alibaba)
+				s.Equal("i-ali", f.Alibaba.InstanceID)
+			},
+		},
+		{
+			name:   "alibaba wrong type ignored",
+			key:    "alibaba",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Alibaba) },
+		},
+		{
+			name:  "linode populates Facts.Linode",
+			key:   "linode",
+			value: &linode.Info{PublicIP: "1.2.3.4"},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.Linode)
+				s.Equal("1.2.3.4", f.Linode.PublicIP)
+			},
+		},
+		{
+			name:   "linode wrong type ignored",
+			key:    "linode",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Linode) },
+		},
+		{
+			name:  "openstack populates Facts.OpenStack",
+			key:   "openstack",
+			value: &openstack.Info{InstanceID: "i-os"},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.OpenStack)
+				s.Equal("i-os", f.OpenStack.InstanceID)
+			},
+		},
+		{
+			name:   "openstack wrong type ignored",
+			key:    "openstack",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.OpenStack) },
+		},
+		{
+			name:  "scaleway populates Facts.Scaleway",
+			key:   "scaleway",
+			value: &scaleway.Info{ID: "sc-1"},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.Scaleway)
+				s.Equal("sc-1", f.Scaleway.ID)
+			},
+		},
+		{
+			name:   "scaleway wrong type ignored",
+			key:    "scaleway",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Scaleway) },
+		},
+		{
 			name:  "dmi populates Facts.DMI",
 			key:   "dmi",
 			value: &dmi.Info{Product: &dmi.Product{Name: "Google Compute Engine"}},
@@ -139,6 +267,14 @@ func (s *GohaiTestSuite) TestFactsCountPopulated() {
 		{"gce only", &Facts{Gce: &gce.Info{}}, 1},
 		{"dmi only", &Facts{DMI: &dmi.Info{}}, 1},
 		{"gce + dmi", &Facts{Gce: &gce.Info{}, DMI: &dmi.Info{}}, 2},
+		{"ec2", &Facts{Ec2: &ec2.Info{}}, 1},
+		{"azure", &Facts{Azure: &azure.Info{}}, 1},
+		{"digital_ocean", &Facts{DigitalOcean: &digitalocean.Info{}}, 1},
+		{"oci", &Facts{OCI: &oci.Info{}}, 1},
+		{"alibaba", &Facts{Alibaba: &alibaba.Info{}}, 1},
+		{"linode", &Facts{Linode: &linode.Info{}}, 1},
+		{"openstack", &Facts{OpenStack: &openstack.Info{}}, 1},
+		{"scaleway", &Facts{Scaleway: &scaleway.Info{}}, 1},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {

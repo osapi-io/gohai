@@ -186,6 +186,31 @@ Per-collector timings + error messages can be embedded in Facts by adding
 collectors or seeing why a collector failed without blocking the run.
 See the `Timings` field on [pkg.go.dev][Package documentation].
 
+**Detecting which cloud you're on.** Enable the cloud collectors
+(`WithCategory("cloud")`) and switch on `Facts.Cloud()` — returns a
+`*Cloud` with `Name` set to a provider identifier, or nil when no
+cloud was detected. Use the exported `gohai.CloudAWS` / `CloudGCE` /
+`CloudAzure` / etc. constants instead of raw strings:
+
+```go
+g, _ := gohai.New(gohai.WithCategory("cloud"))
+facts, _ := g.Collect(ctx)
+
+cloud := facts.Cloud()
+if cloud == nil { return } // not on a supported cloud
+
+switch cloud.Name {
+case gohai.CloudAWS:
+    fmt.Println(facts.Ec2.Region, facts.Ec2.IAMInfo.InstanceProfileArn)
+case gohai.CloudGCE:
+    fmt.Println(facts.Gce.ProjectID, facts.Gce.Zone)
+}
+```
+
+Rich per-provider data lives on the typed `Facts.Ec2` / `Facts.Gce` /
+etc. field. See [docs/collectors/cloud.md](docs/collectors/cloud.md)
+for the full pattern.
+
 ## 📖 Documentation
 
 - [Package documentation][] on pkg.go.dev — generated API reference. Every

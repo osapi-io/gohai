@@ -296,6 +296,62 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 	}
 }
 
+func (s *CloudMetadataPublicTestSuite) TestPut() {
+	tests := []struct {
+		name        string
+		setup       func() (baseURL string, cleanup func())
+		headers     map[string]string
+		wantErr     bool
+		wantBody    string
+		verifyAfter func(s *CloudMetadataPublicTestSuite)
+	}{
+		{
+			name: "200 with extra headers forwards the headers",
+			setup: func() (string, func()) {
+				var gotHdr string
+				var gotMethod string
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/token": func(w http.ResponseWriter, r *http.Request) {
+						gotHdr = r.Header.Get("X-TTL")
+						gotMethod = r.Method
+						_, _ = w.Write([]byte("TOKEN123"))
+					},
+				})
+				return srv.URL, func() {
+					srv.Close()
+					s.Equal("60", gotHdr)
+					s.Equal(http.MethodPut, gotMethod)
+				}
+			},
+			headers:  map[string]string{"X-TTL": "60"},
+			wantBody: "TOKEN123",
+		},
+		{
+			name: "404 wraps ErrNotAvailable",
+			setup: func() (string, func()) {
+				srv := newServer(nil)
+				return srv.URL, srv.Close
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			baseURL, cleanup := tt.setup()
+			defer cleanup()
+
+			client := cloudmetadata.New(baseURL)
+			body, err := client.Put(context.Background(), "/token", tt.headers)
+			if tt.wantErr {
+				s.Require().Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.wantBody, string(body))
+		})
+	}
+}
+
 func (s *CloudMetadataPublicTestSuite) TestGetJSON() {
 	type payload struct {
 		Instance string `json:"instance"`

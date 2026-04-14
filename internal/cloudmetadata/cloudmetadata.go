@@ -123,20 +123,59 @@ func WithHTTPClient(
 
 // Get fetches baseURL + path and returns the response body on 2xx.
 // Wraps transport failures and non-2xx responses in ErrNotAvailable
-// so callers can branch with errors.Is. The underlying error is
-// preserved via %w for debugging.
+// so callers can branch with errors.Is.
 func (c *Client) Get(
 	ctx context.Context,
 	path string,
 ) ([]byte, error) {
+	return c.do(ctx, http.MethodGet, path, nil)
+}
+
+// GetWithHeaders is Get with per-request headers merged onto the
+// Client's default headers. Used by EC2's IMDSv2 flow where the
+// token header must accompany every read but isn't known until
+// Collect runs.
+func (c *Client) GetWithHeaders(
+	ctx context.Context,
+	path string,
+	headers map[string]string,
+) ([]byte, error) {
+	return c.do(ctx, http.MethodGet, path, headers)
+}
+
+// Put issues a PUT against baseURL + path with per-request headers
+// merged onto the Client's default headers. Body may be nil. Used by
+// EC2's IMDSv2 token flow — that's currently the only provider that
+// writes rather than reads the metadata endpoint.
+func (c *Client) Put(
+	ctx context.Context,
+	path string,
+	headers map[string]string,
+) ([]byte, error) {
+	return c.do(ctx, http.MethodPut, path, headers)
+}
+
+// do is the shared request driver. Prefixes the path with / when
+// missing, applies the Client's default headers plus any per-request
+// headers, runs the request, and returns the body for 2xx responses.
+// Transport failures and non-2xx responses wrap ErrNotAvailable.
+func (c *Client) do(
+	ctx context.Context,
+	method string,
+	path string,
+	extraHeaders map[string]string,
+) ([]byte, error) {
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	for k, v := range c.headers {
+		req.Header.Set(k, v)
+	}
+	for k, v := range extraHeaders {
 		req.Header.Set(k, v)
 	}
 	resp, err := c.httpClient.Do(req)

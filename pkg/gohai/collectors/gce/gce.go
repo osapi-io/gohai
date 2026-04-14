@@ -34,6 +34,11 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 )
 
+// ProviderName is the canonical cloud identifier this collector
+// populates. Consumers switching on Facts.Cloud().Name match against
+// gohai.CloudGCE, which re-exports this constant.
+const ProviderName = "gce"
+
 // dmiProductName is the SMBIOS product_name signature GCE VMs
 // advertise. Matches Ohai's has_gce_dmi? substring check against
 // /sys/class/dmi/id/product_name.

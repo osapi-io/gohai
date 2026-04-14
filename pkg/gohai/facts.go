@@ -26,25 +26,33 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	digitalocean "github.com/osapi-io/gohai/pkg/gohai/collectors/digital_ocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
 	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
@@ -82,6 +90,14 @@ type Facts struct {
 	Shard          *shard.Info          `json:"shard,omitempty"`
 	PackageMgr     *packagemgr.Info     `json:"package_mgr,omitempty"`
 	Gce            *gce.Info            `json:"gce,omitempty"`
+	Ec2            *ec2.Info            `json:"ec2,omitempty"`
+	Azure          *azure.Info          `json:"azure,omitempty"`
+	DigitalOcean   *digitalocean.Info   `json:"digital_ocean,omitempty"`
+	OCI            *oci.Info            `json:"oci,omitempty"`
+	Alibaba        *alibaba.Info        `json:"alibaba,omitempty"`
+	Linode         *linode.Info         `json:"linode,omitempty"`
+	OpenStack      *openstack.Info      `json:"openstack,omitempty"`
+	Scaleway       *scaleway.Info       `json:"scaleway,omitempty"`
 	DMI            *dmi.Info            `json:"dmi,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
@@ -217,6 +233,30 @@ func (f *Facts) countPopulated() int {
 	if f.Gce != nil {
 		n++
 	}
+	if f.Ec2 != nil {
+		n++
+	}
+	if f.Azure != nil {
+		n++
+	}
+	if f.DigitalOcean != nil {
+		n++
+	}
+	if f.OCI != nil {
+		n++
+	}
+	if f.Alibaba != nil {
+		n++
+	}
+	if f.Linode != nil {
+		n++
+	}
+	if f.OpenStack != nil {
+		n++
+	}
+	if f.Scaleway != nil {
+		n++
+	}
 	if f.DMI != nil {
 		n++
 	}
@@ -326,6 +366,38 @@ func (f *Facts) set(
 	case "gce":
 		if v, ok := result.(*gce.Info); ok {
 			f.Gce = v
+		}
+	case "ec2":
+		if v, ok := result.(*ec2.Info); ok {
+			f.Ec2 = v
+		}
+	case "azure":
+		if v, ok := result.(*azure.Info); ok {
+			f.Azure = v
+		}
+	case "digital_ocean":
+		if v, ok := result.(*digitalocean.Info); ok {
+			f.DigitalOcean = v
+		}
+	case "oci":
+		if v, ok := result.(*oci.Info); ok {
+			f.OCI = v
+		}
+	case "alibaba":
+		if v, ok := result.(*alibaba.Info); ok {
+			f.Alibaba = v
+		}
+	case "linode":
+		if v, ok := result.(*linode.Info); ok {
+			f.Linode = v
+		}
+	case "openstack":
+		if v, ok := result.(*openstack.Info); ok {
+			f.OpenStack = v
+		}
+	case "scaleway":
+		if v, ok := result.(*scaleway.Info); ok {
+			f.Scaleway = v
 		}
 	case "dmi":
 		if v, ok := result.(*dmi.Info); ok {
