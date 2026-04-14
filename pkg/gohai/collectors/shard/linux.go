@@ -43,7 +43,9 @@ func NewLinux() *Linux {
 // Collect derives the shard seed. A missing machine_id still produces
 // a (less useful) seed from the hostname alone — that matches Ohai's
 // semantics and avoids the collector returning nil for minimal hosts.
-func (l *Linux) Collect(_ context.Context) (any, error) {
+func (l *Linux) Collect(
+	_ context.Context,
+) (any, error) {
 	mid := readMachineID(l.FS.ReadFile)
 	host, _ := hostnameFn()
 	return &Info{Seed: computeSeed(mid, host)}, nil

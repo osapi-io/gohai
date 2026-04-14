@@ -51,7 +51,9 @@ func NewLinux() *Linux {
 }
 
 // Collect returns platform Info.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
 	info, _, err := readPlatform(ctx)
 	if err != nil {
 		return nil, err

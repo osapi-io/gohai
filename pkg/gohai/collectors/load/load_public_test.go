@@ -21,8 +21,11 @@
 package load_test
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	gpload "github.com/shirou/gopsutil/v4/load"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -39,7 +42,9 @@ type LoadPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestLoadPublicTestSuite(t *testing.T) {
+func TestLoadPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(LoadPublicTestSuite))
 }
 
@@ -73,6 +78,66 @@ func (s *LoadPublicTestSuite) TestNew() {
 				_, ok := c.(*load.Linux)
 				s.True(ok)
 			}
+		})
+	}
+}
+
+func (s *LoadPublicTestSuite) TestCollect() {
+	tests := []struct {
+		name    string
+		variant string
+		fn      func(context.Context) (*gpload.AvgStat, error)
+		wantErr bool
+		want    load.Info
+	}{
+		{
+			name:    "linux: averages returned",
+			variant: "linux",
+			fn: func(context.Context) (*gpload.AvgStat, error) {
+				return &gpload.AvgStat{Load1: 0.25, Load5: 0.5, Load15: 1.0}, nil
+			},
+			want: load.Info{One: 0.25, Five: 0.5, Fifteen: 1.0},
+		},
+		{
+			name:    "linux: gopsutil error propagated",
+			variant: "linux",
+			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
+			wantErr: true,
+		},
+		{
+			name:    "darwin: averages returned",
+			variant: "darwin",
+			fn: func(context.Context) (*gpload.AvgStat, error) {
+				return &gpload.AvgStat{Load1: 1.5, Load5: 2.0, Load15: 2.5}, nil
+			},
+			want: load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
+		},
+		{
+			name:    "darwin: gopsutil error propagated",
+			variant: "darwin",
+			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			defer load.SetAvgFn(tt.fn)()
+			var c load.Collector
+			switch tt.variant {
+			case "linux":
+				c = &load.Linux{}
+			case "darwin":
+				c = &load.Darwin{}
+			}
+			got, err := c.Collect(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			info, ok := got.(*load.Info)
+			s.Require().True(ok)
+			s.Equal(tt.want, *info)
 		})
 	}
 }

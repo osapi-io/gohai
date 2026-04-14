@@ -37,7 +37,9 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns network Info.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
 	ifs, err := readInterfaces(ctx)
 	if err != nil {
 		return nil, err

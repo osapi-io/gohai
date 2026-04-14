@@ -33,6 +33,8 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns uptime facts.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	return readBaseFn(ctx)
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
+	return readBase(ctx)
 }

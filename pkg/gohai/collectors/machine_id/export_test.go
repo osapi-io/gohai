@@ -26,10 +26,6 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-// ReadHostID exposes the private readHostID bridge to the external
-// machineid_test package.
-var ReadHostID = readHostID
-
 // SetHostInfoFn swaps the private gopsutil host.InfoWithContext call
 // backing readHostID. Returns a restore func the caller must defer.
 func SetHostInfoFn(
@@ -38,15 +34,4 @@ func SetHostInfoFn(
 	orig := hostInfoFn
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }
-}
-
-// SetReadHostIDFn swaps the per-collector readHostID seam — the seam
-// the Linux/Darwin variants call directly. Returns a restore func
-// the caller must defer.
-func SetReadHostIDFn(
-	fn func(context.Context) (string, error),
-) (restore func()) {
-	orig := readHostIDFn
-	readHostIDFn = fn
-	return func() { readHostIDFn = orig }
 }

@@ -26,14 +26,12 @@ import (
 	"github.com/shirou/gopsutil/v4/load"
 )
 
-// ReadAverages exposes the private readAverages bridge to the external
-// load_test package.
-var ReadAverages = readAverages
-
 // SetAvgFn swaps the private gopsutil call backing readAverages for
 // the duration of a test. Returns a restore func the caller must
 // defer.
-func SetAvgFn(fn func(context.Context) (*load.AvgStat, error)) (restore func()) {
+func SetAvgFn(
+	fn func(context.Context) (*load.AvgStat, error),
+) (restore func()) {
 	orig := avgFn
 	avgFn = fn
 	return func() { avgFn = orig }

@@ -50,8 +50,10 @@ func NewLinux() *Linux {
 // attempted when Exec is configured; any lsblk error (binary missing,
 // malformed JSON) silently skips the enrichment and leaves
 // gopsutil-sourced fields intact.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
-	mounts, err := listMountsFn(ctx)
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
+	mounts, err := listMounts(ctx)
 	if err != nil {
 		return nil, err
 	}

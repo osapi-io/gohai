@@ -26,10 +26,6 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 )
 
-// ReadMemory exposes the private readMemory bridge to the external
-// memory_test package.
-var ReadMemory = readMemory
-
 // SetVirtualMemoryFn swaps the private gopsutil
 // mem.VirtualMemoryWithContext call backing readMemory.
 func SetVirtualMemoryFn(

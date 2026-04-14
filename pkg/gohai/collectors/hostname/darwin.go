@@ -43,6 +43,8 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns hostname facts.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
 	return collectWithExec(ctx, d.Exec)
 }

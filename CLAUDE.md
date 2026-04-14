@@ -159,11 +159,18 @@ pkg/gohai/collectors/<name>/
   <name>.go                # Info, Collector interface, base, New() factory
   linux.go / darwin.go     # type Linux / Darwin struct; implements Collector
   debian.go / rhel.go      # (only when distro diverges from generic linux)
-  export_test.go           # ReadX aliases + SetXFn setters for external tests
-  <name>_public_test.go    # TestNew dispatch, compile-time interface asserts
-  linux_public_test.go     # Linux.Collect behavior via injected stubs
-  darwin_public_test.go    # Darwin.Collect behavior via injected stubs
+  export_test.go           # SetXFn setters (upstream-library seams) for external tests
+  <name>_public_test.go    # TestNew dispatch + single table-driven TestCollect
+                           # keyed by a `variant` column that builds the right per-OS
+                           # struct; compile-time interface asserts at the top.
 ```
+
+**One TestCollect per collector, end of story.** No `linux_public_test.go`
+or `darwin_public_test.go` files. Both OS variants are tested through the
+same `TestCollect` method with a `variant: "linux" | "darwin"` column
+dispatching to `&X.Linux{...}` or `&X.Darwin{...}`. Consolidation makes
+the whole test surface of a collector visible at a glance; consistency
+across collectors is the priority.
 
 The factory dispatches on `platform.Detect()` (wraps gopsutil's
 `host.Info`; returns `"darwin"` / `"debian"` / `"rhel"` / `""` for generic
@@ -183,19 +190,25 @@ linux).
   via struct fields — lets tests exercise every branch without
   touching the real host.
 - **NEVER leak third-party types through public `Fn` fields.** Per-OS
-  struct `Fn` fields MUST be typed in our `*Info` / `[]OurType`, never
-  in gopsutil / ghw / procfs types. The upstream call lives in a
-  private package var (`var hostInfoFn = host.InfoWithContext`); tests
-  swap it via a `Set<X>Fn` setter declared in `export_test.go`. See
-  `pkg/gohai/collectors/uptime/` for the canonical example. Without
-  this rule, importing a collector sub-package transitively pulls
-  gopsutil into consumers' module graphs — an SDK leak.
-- **Upcoming (Phase 1):** the per-field `Fn` pattern will be replaced
-  by a shared VFS + Executor abstraction threaded through `Collect`.
-  Until that lands, follow the private-var + `export_test.go` pattern
-  above. Do NOT expand the old `Fn` field pattern for new code — if
-  you need a new seam, check the Phase 1 status in the "Upcoming:
-  VFS + Executor Abstractions" section below.
+  struct `Fn` fields are forbidden — no public field on a `Linux` /
+  `Darwin` / etc. variant may have a function type whose signature
+  mentions gopsutil / ghw / procfs types.
+- **Test seams swap at the upstream library boundary, not in the
+  middle.** The upstream call lives in a private package var
+  (`var hostInfoFn = host.InfoWithContext`); tests swap it via a
+  `Set<X>Fn` setter declared in `export_test.go`. **Do not** add
+  intermediate wrappers like `readBaseFn = readBase` that let tests
+  bypass a bridge function — that forces a second test method
+  (`TestReadBase`) to cover the bridge, which is exactly what we're
+  consolidating away from. One seam, one `TestCollect`. Collect
+  calls `readBase(ctx)` directly; tests swap `hostInfoFn` and the
+  bridge mapping runs on every row. See `pkg/gohai/collectors/uptime/`
+  and `pkg/gohai/collectors/load/` for canonical examples.
+- File reads and command execution go through `FS avfs.VFS` and
+  `Exec executor.Executor` struct fields on the per-OS variant —
+  these are *our* abstractions (not third-party types), so they're
+  fine to expose publicly. See the "VFS + Executor Abstractions"
+  section for the pattern.
 
 The Collector interface and `Info` struct shape are the contract — whatever
 backing strategy a collector uses, its output must match the typed struct
@@ -397,18 +410,20 @@ just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
     (holds shared `Name()`/`DefaultEnabled()`/`Dependencies()`), `New()` factory
     that dispatches on `platform.Detect()`, and any cross-OS helpers
     (shared parsing, shared constants).
-  - `linux.go` — `type Linux struct { base; <injectable fns> }` with
-    `NewLinux()` and `(l *Linux) Collect(ctx)` method. **No build tag.**
-  - `darwin.go` — `type Darwin struct { base; <injectable fns> }` with
-    `NewDarwin()` and `(d *Darwin) Collect(ctx)` method. **No build tag.**
+  - `linux.go` — `type Linux struct { base; FS avfs.VFS; Exec executor.Executor }`
+    (fields only when the collector needs them) with `NewLinux()` and
+    `(l *Linux) Collect(ctx)` method. **No build tag.**
+  - `darwin.go` — `type Darwin struct { base; FS; Exec }` with `NewDarwin()`
+    and `(d *Darwin) Collect(ctx)` method. **No build tag.**
   - `debian.go` / `rhel.go` (only when distro genuinely diverges) — same
     pattern, added to the `New()` dispatch switch.
-  - `<name>_public_test.go` — tests New()/base methods + `TestNewDispatch`
-    that swaps `platform.Detect` to exercise every dispatch branch
-    regardless of host OS. **Never import gopsutil in these tests.**
-  - `linux_public_test.go` — tests the `Linux` struct's `Collect` with
-    injected stubs. **No build tag.**
-  - `darwin_public_test.go` — tests the `Darwin` struct's `Collect`. **No build tag.**
+  - `<name>_public_test.go` — the **only** test file. Contains compile-time
+    `collector.Collector` asserts at the top, `TestNew` for the factory
+    dispatch, a single table-driven `TestCollect` whose rows carry a
+    `variant: "linux" | "darwin"` column and construct the right per-OS
+    struct, and optionally separate test methods for genuinely-pure
+    public helpers (e.g. `TestHumanDuration`, `TestBytesToString`).
+    No `linux_public_test.go` / `darwin_public_test.go` files.
 - **`internal/platform/`** — OS/distro detection wrapping gopsutil.
   `Detect()` is a swappable `var` so collector tests can force any
   branch without importing gopsutil. `hostInfoFn` is private, exposed
@@ -453,23 +468,33 @@ func (base) Name() string {
   private functions — avoid when the external package can reach what
   it needs via an `export_test.go` alias
 - `export_test.go` in the same package exposes unexported symbols to
-  external `_test.go` files via typed aliases (`var ReadX = readX`)
-  and setter functions (`SetXFn(fn) func()` returning a restore func
-  the caller defers). Never put production-only code in
+  external `_test.go` files via setter functions only
+  (`SetXFn(fn) func()` returning a restore func the caller defers).
+  **Do not** add `var ReadX = readX` type-aliases exposing private
+  bridges — those enabled a second `TestReadX` method that duplicates
+  what `TestCollect` already covers. Never put production-only code in
   `export_test.go`; the `_test.go` suffix makes it test-only
 - Suite naming: `*_public_test.go` → `{Name}PublicTestSuite`,
   `*_test.go` → `{Name}TestSuite`
 - Use `testify/suite` with table-driven patterns
-- One suite method per function under test — all scenarios (success, errors,
-  edge cases) as rows in one table
+- **One `TestCollect` per collector.** All scenarios — both Linux and
+  Darwin, success and error paths — live as rows in one table keyed
+  by a `variant` column. No `TestCollectLinux` / `TestCollectDarwin`
+  / `TestCollectX` splits. No `TestReadX` methods that duplicate
+  paths `TestCollect` already hits via the upstream seam.
+- Separate test methods are reserved for genuinely pure, independent
+  public helpers with their own contract (`TestHumanDuration`,
+  `TestBytesToString`, `TestNeighFamily`, `TestNeighState`) — not
+  for bridges Collect already exercises.
+- **Swap at the boundary, not in the middle.** `TestCollect` rows
+  swap the raw upstream library call (`hostInfoFn`, `partitionsFn`,
+  `usersFn`, ...) and let the bridge mapping run on every row. Do
+  NOT add intermediate seams (`readXFn = readX`) — that's
+  test-only scaffolding in production code, and it's what this
+  consistency rule is specifically eliminating.
 - **No custom assertion messages** — `s.Equal(want, got)`, not
   `s.Equal(want, got, "expected equal")`. Matches osapi's test style
 - Target 100% test coverage on all packages
-- **Don't coverage-chase trivial bridges.** If the wrapper is a single
-  gopsutil call, make the upstream call itself swappable via private
-  package var + `Set<X>Fn` setter in `export_test.go`; the error-branch
-  test then lives naturally as a table row exercising both success and
-  error paths. See `pkg/gohai/collectors/load/` for the canonical shape
 
 ### Go Patterns
 
@@ -538,9 +563,19 @@ Before marking a collector complete, every item below must be true:
    on `platform.Detect()`, per-OS structs each implementing Collect.
 4. **100% test coverage.** `go tool cover -func=/tmp/cov.out | grep -v '100.0%'`
    returns nothing for the collector's files.
-5. **Collector tests do NOT import gopsutil** — stub `platform.Detect`
-   directly. Compile-time enforcement.
-6. **`docs/collectors/<name>.md`** is a self-contained functional
+5. **One `<name>_public_test.go`, one `TestCollect`.** Linux and
+   Darwin scenarios share the same table, keyed by a `variant`
+   column. No `linux_public_test.go` / `darwin_public_test.go`
+   split files. No `TestReadX` methods shadowing bridge code
+   `TestCollect` already exercises. Pure-helper public-function
+   tests (e.g. `TestHumanDuration`) are the only legitimate
+   extra test methods.
+6. **No intermediate seams.** `export_test.go` exports only
+   `Set<X>Fn` setters that swap at the upstream library boundary
+   (`hostInfoFn`, `partitionsFn`, etc.). No `readXFn = readX`
+   wrappers, no `var ReadX = readX` type aliases for direct
+   bridge tests.
+7. **`docs/collectors/<name>.md`** is a self-contained functional
    spec: Description (what + why in our voice), Collected Fields with
    **Schema mapping** column (OCSF path first, OpenTelemetry attribute
    when OCSF is silent), Platform Support, Example Output, SDK Usage,
@@ -549,12 +584,12 @@ Before marking a collector complete, every item below must be true:
    library. **No "Known gaps vs. Ohai" section** — methodology gaps
    live as GitHub issues (labeled `methodology-gap` /
    `collector:<name>`).
-7. **README.md** row flipped to `✅ (<backing>)`.
-8. **Lint clean**, `just go::vet` returns 0 issues.
-9. **Commit message** explains the "why" — what Ohai/OCSF
-   cross-references drove the implementation, what extensions over the
-   upstream library we added, any deliberate deviations.
-10. **Check GitHub issues** for tracked methodology gaps:
+8. **README.md** row flipped to `✅ (<backing>)`.
+9. **Lint clean**, `just go::vet` returns 0 issues.
+10. **Commit message** explains the "why" — what Ohai/OCSF
+    cross-references drove the implementation, what extensions over the
+    upstream library we added, any deliberate deviations.
+11. **Check GitHub issues** for tracked methodology gaps:
     `gh issue list --label methodology-gap --label collector:<name>`.
     If the work closes a tracked issue, the issue's "Doc after this
     fix lands" block IS the doc content to paste into Data Sources.

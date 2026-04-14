@@ -99,7 +99,9 @@ var (
 // SetGHWNetworkFn / SetNetlinkNeighListFn / SetNetInterfaceByIndex
 // swap the upstream library calls for unit-testing readNIC /
 // readNeighbours / indexToInterfaceName without touching the host.
-func SetGHWNetworkFn(fn func(...any) (*ghw.NetworkInfo, error)) (restore func()) {
+func SetGHWNetworkFn(
+	fn func(...any) (*ghw.NetworkInfo, error),
+) (restore func()) {
 	orig := ghwNetworkFn
 	ghwNetworkFn = fn
 	return func() { ghwNetworkFn = orig }
@@ -113,7 +115,9 @@ func SetNetlinkNeighListFn(
 	return func() { netlinkNeighListFn = orig }
 }
 
-func SetNetInterfaceByIndex(fn func(int) (*net.Interface, error)) (restore func()) {
+func SetNetInterfaceByIndex(
+	fn func(int) (*net.Interface, error),
+) (restore func()) {
 	orig := netInterfaceByIndex
 	netInterfaceByIndex = fn
 	return func() { netInterfaceByIndex = orig }

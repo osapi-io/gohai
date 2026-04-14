@@ -101,12 +101,6 @@ var infoFn = cpu.InfoWithContext
 // Kept private alongside infoFn. Swapped via SetCountsFn.
 var countsFn = cpu.CountsWithContext
 
-// readCPUFn is a high-level package seam over readCPU itself so the
-// per-OS Collect methods can use a single swap point in tests
-// without each test needing to set up infoFn + countsFn separately.
-// Production points at readCPU; tests swap via SetReadCPUFn.
-var readCPUFn = readCPU
-
 // readCPU is the production bridge to gopsutil. Returns the base Info
 // populated from `/proc/cpuinfo` (Linux) or sysctl (Darwin). Per-OS
 // Collect wrappers layer extensions on top.

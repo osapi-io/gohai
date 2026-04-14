@@ -21,8 +21,13 @@
 package timezone_test
 
 import (
+	"context"
+	"io/fs"
 	"testing"
+	"time"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -39,7 +44,9 @@ type TimezonePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestTimezonePublicTestSuite(t *testing.T) {
+func TestTimezonePublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(TimezonePublicTestSuite))
 }
 
@@ -73,6 +80,140 @@ func (s *TimezonePublicTestSuite) TestNew() {
 				_, ok := c.(*timezone.Linux)
 				s.True(ok)
 			}
+		})
+	}
+}
+
+func (s *TimezonePublicTestSuite) TestCollect() {
+	pdt := func() time.Time {
+		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PDT", -7*3600))
+	}
+	pst := func() time.Time {
+		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PST", -8*3600))
+	}
+
+	tests := []struct {
+		name       string
+		variant    string
+		now        func() time.Time
+		setupFS    func() avfs.VFS
+		wantName   string
+		wantAbbrev string
+		wantOffset int
+	}{
+		{
+			name:    "linux: symlink points to IANA zone",
+			variant: "linux",
+			now:     pdt,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/usr/share/zoneinfo/America", 0o755)
+				_ = f.WriteFile(
+					"/usr/share/zoneinfo/America/Los_Angeles",
+					[]byte{},
+					fs.FileMode(0o644),
+				)
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.Symlink("/usr/share/zoneinfo/America/Los_Angeles", "/etc/localtime")
+				return f
+			},
+			wantName:   "America/Los_Angeles",
+			wantAbbrev: "PDT",
+			wantOffset: -7 * 3600,
+		},
+		{
+			name:    "linux: target without zoneinfo prefix passed through",
+			variant: "linux",
+			now:     pdt,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.Symlink("UTC", "/etc/localtime")
+				return f
+			},
+			wantName:   "UTC",
+			wantAbbrev: "PDT",
+			wantOffset: -7 * 3600,
+		},
+		{
+			name:    "linux: readlink fails, falls back to /etc/timezone",
+			variant: "linux",
+			now:     pdt,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/timezone", []byte("Europe/Berlin\n"), fs.FileMode(0o644))
+				return f
+			},
+			wantName:   "Europe/Berlin",
+			wantAbbrev: "PDT",
+			wantOffset: -7 * 3600,
+		},
+		{
+			name:       "linux: both sources missing leaves name empty",
+			variant:    "linux",
+			now:        pdt,
+			setupFS:    func() avfs.VFS { return memfs.New() },
+			wantName:   "",
+			wantAbbrev: "PDT",
+			wantOffset: -7 * 3600,
+		},
+		{
+			name:    "darwin: macOS zoneinfo symlink",
+			variant: "darwin",
+			now:     pst,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.Symlink("/var/db/timezone/zoneinfo/America/Los_Angeles", "/etc/localtime")
+				return f
+			},
+			wantName:   "America/Los_Angeles",
+			wantAbbrev: "PST",
+			wantOffset: -8 * 3600,
+		},
+		{
+			name:    "darwin: target without prefix passed through",
+			variant: "darwin",
+			now:     pst,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.Symlink("UTC", "/etc/localtime")
+				return f
+			},
+			wantName:   "UTC",
+			wantAbbrev: "PST",
+			wantOffset: -8 * 3600,
+		},
+		{
+			name:       "darwin: readlink error leaves name empty",
+			variant:    "darwin",
+			now:        pst,
+			setupFS:    func() avfs.VFS { return memfs.New() },
+			wantName:   "",
+			wantAbbrev: "PST",
+			wantOffset: -8 * 3600,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			defer timezone.SetNowFn(tt.now)()
+			var c timezone.Collector
+			switch tt.variant {
+			case "linux":
+				c = &timezone.Linux{FS: tt.setupFS()}
+			case "darwin":
+				c = &timezone.Darwin{FS: tt.setupFS()}
+			}
+			got, err := c.Collect(context.Background())
+			s.Require().NoError(err)
+			info, ok := got.(*timezone.Info)
+			s.Require().True(ok)
+			s.Equal(tt.wantName, info.Name)
+			s.Equal(tt.wantAbbrev, info.Abbrev)
+			s.Equal(tt.wantOffset, info.Offset)
 		})
 	}
 }

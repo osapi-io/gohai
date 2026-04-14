@@ -47,7 +47,9 @@ func NewLinux() *Linux {
 // Collect runs `lsb_release -a` and parses its labelled lines. Exec
 // errors or empty output yield an empty Info — not an error (matches
 // Ohai's no-panic behaviour).
-func (l *Linux) Collect(ctx context.Context) (any, error) {
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
 	if l.Exec == nil {
 		return &Info{}, nil
 	}

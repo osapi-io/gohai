@@ -33,7 +33,9 @@ func NewDebian() *Debian {
 }
 
 // Collect returns apt if present.
-func (d *Debian) Collect(_ context.Context) (any, error) {
-	name, path := firstFound(probeFn, "apt", "apt-get")
+func (d *Debian) Collect(
+	_ context.Context,
+) (any, error) {
+	name, path := firstFound("apt", "apt-get")
 	return &Info{Name: name, Path: path}, nil
 }

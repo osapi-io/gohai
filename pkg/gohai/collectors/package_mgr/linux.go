@@ -42,7 +42,9 @@ func NewLinux() *Linux {
 //
 // apt/dnf/yum are intentionally NOT probed here — those hosts dispatch
 // to the Debian or RHEL variant before ever reaching this one.
-func (l *Linux) Collect(_ context.Context) (any, error) {
-	name, path := firstFound(probeFn, "zypper", "pacman", "apk", "xbps-install", "emerge")
+func (l *Linux) Collect(
+	_ context.Context,
+) (any, error) {
+	name, path := firstFound("zypper", "pacman", "apk", "xbps-install", "emerge")
 	return &Info{Name: name, Path: path}, nil
 }

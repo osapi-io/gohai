@@ -34,7 +34,9 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns brew if present, else port.
-func (d *Darwin) Collect(_ context.Context) (any, error) {
-	name, path := firstFound(probeFn, "brew", "port")
+func (d *Darwin) Collect(
+	_ context.Context,
+) (any, error) {
+	name, path := firstFound("brew", "port")
 	return &Info{Name: name, Path: path}, nil
 }

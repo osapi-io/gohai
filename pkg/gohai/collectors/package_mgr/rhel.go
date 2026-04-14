@@ -35,7 +35,9 @@ func NewRHEL() *RHEL {
 }
 
 // Collect returns dnf if present, else yum.
-func (r *RHEL) Collect(_ context.Context) (any, error) {
-	name, path := firstFound(probeFn, "dnf", "yum")
+func (r *RHEL) Collect(
+	_ context.Context,
+) (any, error) {
+	name, path := firstFound("dnf", "yum")
 	return &Info{Name: name, Path: path}, nil
 }

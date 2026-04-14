@@ -26,10 +26,6 @@ import (
 	"github.com/shirou/gopsutil/v4/disk"
 )
 
-// ListMounts exposes the private listMounts bridge to the external
-// filesystem_test package.
-var ListMounts = listMounts
-
 // SetPartitionsFn swaps the private gopsutil disk.PartitionsWithContext
 // call backing listMounts. Returns a restore func the caller must
 // defer.
@@ -49,14 +45,4 @@ func SetUsageFn(
 	orig := usageFn
 	usageFn = fn
 	return func() { usageFn = orig }
-}
-
-// SetListMountsFn swaps the per-collector listMounts seam. Returns a
-// restore func the caller must defer.
-func SetListMountsFn(
-	fn func(context.Context) ([]Mount, error),
-) (restore func()) {
-	orig := listMountsFn
-	listMountsFn = fn
-	return func() { listMountsFn = orig }
 }

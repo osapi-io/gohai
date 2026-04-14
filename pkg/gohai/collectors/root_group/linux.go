@@ -34,6 +34,8 @@ func NewLinux() *Linux {
 }
 
 // Collect performs the two-hop lookup (root → gid → group name).
-func (l *Linux) Collect(_ context.Context) (any, error) {
+func (l *Linux) Collect(
+	_ context.Context,
+) (any, error) {
 	return resolveRootGroup()
 }

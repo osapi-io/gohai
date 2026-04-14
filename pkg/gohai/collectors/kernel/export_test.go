@@ -32,7 +32,9 @@ var DefaultUname = defaultUname
 // SetUnameSyscall swaps the private unix.Uname binding used by
 // defaultUname for the duration of a test. Returns a restore func the
 // caller must defer.
-func SetUnameSyscall(fn func(*unix.Utsname) error) (restore func()) {
+func SetUnameSyscall(
+	fn func(*unix.Utsname) error,
+) (restore func()) {
 	orig := unameSyscall
 	unameSyscall = fn
 	return func() { unameSyscall = orig }

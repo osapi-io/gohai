@@ -21,8 +21,12 @@
 package process_test
 
 import (
+	"context"
+	"errors"
+	"os"
 	"testing"
 
+	gpprocess "github.com/shirou/gopsutil/v4/process"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -39,18 +43,11 @@ type ProcessPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestProcessPublicTestSuite(t *testing.T) {
+func TestProcessPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(ProcessPublicTestSuite))
 }
-
-// TestCollectOnHost exercises the real gopsutil-backed listProcesses
-// bridge + snapshotFromGopsutil mapper by calling Collect on the live
-// host. We only assert that at least one process (ourselves) is
-// returned and that the top-level shape populates — no stable PID
-// assertions because this is the test harness's own process tree.
-// Without this test, listProcesses and snapshotFromGopsutil would be
-// untestable from the unit-test layer (gopsutil's *process.Process
-// isn't constructable from test-supplied data).
 
 func (s *ProcessPublicTestSuite) TestNew() {
 	orig := platform.Detect
@@ -82,6 +79,76 @@ func (s *ProcessPublicTestSuite) TestNew() {
 				_, ok := c.(*process.Linux)
 				s.True(ok)
 			}
+		})
+	}
+}
+
+func (s *ProcessPublicTestSuite) TestCollect() {
+	ownPID := int32(os.Getpid())
+	tests := []struct {
+		name    string
+		variant string
+		fn      func(context.Context) ([]*gpprocess.Process, error)
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name:    "linux: snapshot wraps gopsutil processes",
+			variant: "linux",
+			fn: func(context.Context) ([]*gpprocess.Process, error) {
+				p, _ := gpprocess.NewProcess(ownPID)
+				return []*gpprocess.Process{p}, nil
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "linux: empty process list",
+			variant: "linux",
+			fn: func(context.Context) ([]*gpprocess.Process, error) {
+				return []*gpprocess.Process{}, nil
+			},
+			wantLen: 0,
+		},
+		{
+			name:    "linux: gopsutil error propagated",
+			variant: "linux",
+			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("boom") },
+			wantErr: true,
+		},
+		{
+			name:    "darwin: macOS snapshot",
+			variant: "darwin",
+			fn: func(context.Context) ([]*gpprocess.Process, error) {
+				return []*gpprocess.Process{}, nil
+			},
+			wantLen: 0,
+		},
+		{
+			name:    "darwin: processes error propagated",
+			variant: "darwin",
+			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("kauth denied") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			defer process.SetProcessesFn(tt.fn)()
+			var c process.Collector
+			switch tt.variant {
+			case "linux":
+				c = &process.Linux{}
+			case "darwin":
+				c = &process.Darwin{}
+			}
+			got, err := c.Collect(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			info, ok := got.(*process.Info)
+			s.Require().True(ok)
+			s.Equal(tt.wantLen, info.Count)
 		})
 	}
 }

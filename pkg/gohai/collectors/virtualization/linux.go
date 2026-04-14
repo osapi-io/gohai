@@ -49,7 +49,9 @@ func NewLinux() *Linux {
 }
 
 // Collect runs the cascade and returns Info.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
 	info := &Info{}
 	cascadeLinux(ctx, l.FS, l.Exec, info)
 	return info, nil

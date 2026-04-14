@@ -44,7 +44,9 @@ func NewLinux() *Linux {
 }
 
 // Collect returns logged-in session Info.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
 	if l.Exec != nil {
 		out, err := l.Exec.Execute(ctx,
 			"loginctl", "--no-pager", "--no-legend", "--no-ask-password", "list-sessions")

@@ -41,7 +41,9 @@ type readErrorFS struct {
 	avfs.VFS
 }
 
-func (readErrorFS) ReadFile(string) ([]byte, error) {
+func (readErrorFS) ReadFile(
+	string,
+) ([]byte, error) {
 	return nil, errors.New("no /proc")
 }
 
@@ -54,7 +56,9 @@ type InitPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestInitPublicTestSuite(t *testing.T) {
+func TestInitPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(InitPublicTestSuite))
 }
 
@@ -92,49 +96,88 @@ func (s *InitPublicTestSuite) TestNew() {
 	}
 }
 
-func (s *InitPublicTestSuite) TestCollectLinux() {
+func (s *InitPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name    string
+		variant string // "linux" | "darwin"
 		comm    string
 		readErr bool
 		want    initd.Info
 	}{
-		{name: "systemd host", comm: "systemd\n", want: initd.Info{Name: "systemd"}},
-		{name: "upstart host", comm: "upstart\n", want: initd.Info{Name: "upstart"}},
 		{
-			name: "sysvinit (comm=init) normalized",
-			comm: "init\n",
-			want: initd.Info{Name: "sysvinit"},
+			name:    "linux: systemd host",
+			variant: "linux",
+			comm:    "systemd\n",
+			want:    initd.Info{Name: "systemd"},
 		},
 		{
-			name: "openrc-init normalized to openrc",
-			comm: "openrc-init\n",
-			want: initd.Info{Name: "openrc"},
+			name:    "linux: upstart host",
+			variant: "linux",
+			comm:    "upstart\n",
+			want:    initd.Info{Name: "upstart"},
 		},
-		{name: "runit host", comm: "runit\n", want: initd.Info{Name: "runit"}},
 		{
-			name: "unknown comm passed through",
-			comm: "exoticinit\n",
-			want: initd.Info{Name: "exoticinit"},
+			name:    "linux: sysvinit (comm=init) normalized",
+			variant: "linux",
+			comm:    "init\n",
+			want:    initd.Info{Name: "sysvinit"},
 		},
-		{name: "missing file soft-misses", want: initd.Info{}},
-		{name: "read error soft-misses", readErr: true, want: initd.Info{}},
+		{
+			name:    "linux: openrc-init normalized to openrc",
+			variant: "linux",
+			comm:    "openrc-init\n",
+			want:    initd.Info{Name: "openrc"},
+		},
+		{
+			name:    "linux: runit host",
+			variant: "linux",
+			comm:    "runit\n",
+			want:    initd.Info{Name: "runit"},
+		},
+		{
+			name:    "linux: unknown comm passed through",
+			variant: "linux",
+			comm:    "exoticinit\n",
+			want:    initd.Info{Name: "exoticinit"},
+		},
+		{
+			name:    "linux: missing file soft-misses",
+			variant: "linux",
+			want:    initd.Info{},
+		},
+		{
+			name:    "linux: read error soft-misses",
+			variant: "linux",
+			readErr: true,
+			want:    initd.Info{},
+		},
+		{
+			name:    "darwin always reports launchd",
+			variant: "darwin",
+			want:    initd.Info{Name: "launchd"},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var vfs avfs.VFS
-			switch {
-			case tt.readErr:
-				vfs = readErrorFS{VFS: memfs.New()}
-			case tt.comm != "":
-				f := memfs.New()
-				_ = f.MkdirAll("/proc/1", 0o755)
-				_ = f.WriteFile("/proc/1/comm", []byte(tt.comm), fs.FileMode(0o644))
-				vfs = f
-			default:
-				vfs = memfs.New()
+			var c initd.Collector
+			switch tt.variant {
+			case "linux":
+				var vfs avfs.VFS
+				switch {
+				case tt.readErr:
+					vfs = readErrorFS{VFS: memfs.New()}
+				case tt.comm != "":
+					f := memfs.New()
+					_ = f.MkdirAll("/proc/1", 0o755)
+					_ = f.WriteFile("/proc/1/comm", []byte(tt.comm), fs.FileMode(0o644))
+					vfs = f
+				default:
+					vfs = memfs.New()
+				}
+				c = &initd.Linux{FS: vfs}
+			case "darwin":
+				c = initd.NewDarwin()
 			}
-			c := &initd.Linux{FS: vfs}
 			got, err := c.Collect(context.Background())
 			s.Require().NoError(err)
 			info, ok := got.(*initd.Info)
@@ -142,13 +185,4 @@ func (s *InitPublicTestSuite) TestCollectLinux() {
 			s.Equal(tt.want, *info)
 		})
 	}
-}
-
-func (s *InitPublicTestSuite) TestCollectDarwin() {
-	c := initd.NewDarwin()
-	got, err := c.Collect(context.Background())
-	s.Require().NoError(err)
-	info, ok := got.(*initd.Info)
-	s.Require().True(ok)
-	s.Equal("launchd", info.Name)
 }

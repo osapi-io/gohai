@@ -33,7 +33,9 @@ type GohaiPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestGohaiPublicTestSuite(t *testing.T) {
+func TestGohaiPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(GohaiPublicTestSuite))
 }
 

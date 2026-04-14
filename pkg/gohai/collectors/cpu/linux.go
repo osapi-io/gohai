@@ -30,8 +30,8 @@ import (
 )
 
 // Linux collects CPU facts on Linux. gopsutil's `/proc/cpuinfo` parse
-// is the primary source (via the package-level readCPUFn seam); we
-// layer two extensions on top:
+// is the primary source (via the readCPU bridge); we layer two
+// extensions on top:
 //
 //   - vulnerability mitigation status via /sys/devices/system/cpu/vulnerabilities/*
 //     (read through FS — an avfs.VFS, so tests can inject memfs content).
@@ -60,7 +60,7 @@ func NewLinux() *Linux {
 func (l *Linux) Collect(
 	ctx context.Context,
 ) (any, error) {
-	info, err := readCPUFn(ctx)
+	info, err := readCPU(ctx)
 	if err != nil {
 		return nil, err
 	}

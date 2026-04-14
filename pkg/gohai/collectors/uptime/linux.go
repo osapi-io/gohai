@@ -47,8 +47,10 @@ func NewLinux() *Linux {
 
 // Collect returns uptime facts. Uses readBaseFn for Seconds/BootTime
 // and layers idle on top via /proc/uptime.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
-	out, err := readBaseFn(ctx)
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
+	out, err := readBase(ctx)
 	if err != nil {
 		return nil, err
 	}
