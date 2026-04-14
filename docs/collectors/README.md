@@ -17,7 +17,8 @@ wires `WithDefaults()` automatically; pass `--no-defaults` to turn it off and
 use only explicit `--collector.X` flags. The "Default" column below indicates
 membership in the recommended set (`✅` = on when `WithDefaults()` is in effect,
 `❌` = opt-in only). The "Implemented" column shows shipping status: `✅` =
-implemented and tested, `⚠️` = partial, `🚧` = planned.
+implemented and tested, `⚠️` = partial, `🚧` = planned, `🪦` = deprecated, will
+not implement (low demand / upstream project archived).
 
 **Schema:** Field names follow [OCSF][] (Open Cybersecurity Schema Framework) as
 the primary schema and [OpenTelemetry Resource Semantic
@@ -81,12 +82,12 @@ edge cases to handle) follows [Chef Ohai][]'s plugins.
 | [digital_ocean](digital_ocean.md) | `digital_ocean` | DigitalOcean droplet metadata  | ❌      | 🚧          |
 | [openstack](openstack.md)         | `openstack`     | OpenStack instance metadata    | ❌      | 🚧          |
 | [alibaba](alibaba.md)             | `alibaba`       | Alibaba Cloud ECS metadata     | ❌      | 🚧          |
-| [rackspace](rackspace.md)         | `rackspace`     | Rackspace server metadata      | ❌      | 🚧          |
+| [rackspace](rackspace.md)         | `rackspace`     | Rackspace server metadata      | ❌      | 🪦          |
 | [linode](linode.md)               | `linode`        | Linode instance metadata       | ❌      | 🚧          |
 | [oci](oci.md)                     | `oci`           | Oracle Cloud metadata          | ❌      | 🚧          |
 | [scaleway](scaleway.md)           | `scaleway`      | Scaleway instance metadata     | ❌      | 🚧          |
-| [softlayer](softlayer.md)         | `softlayer`     | IBM SoftLayer metadata         | ❌      | 🚧          |
-| [eucalyptus](eucalyptus.md)       | `eucalyptus`    | Eucalyptus instance metadata   | ❌      | 🚧          |
+| [softlayer](softlayer.md)         | `softlayer`     | IBM SoftLayer metadata         | ❌      | 🪦          |
+| [eucalyptus](eucalyptus.md)       | `eucalyptus`    | Eucalyptus instance metadata   | ❌      | 🪦          |
 
 ## 🔮 Virtualization
 
