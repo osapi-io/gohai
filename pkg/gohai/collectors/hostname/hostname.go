@@ -28,6 +28,7 @@ package hostname
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -148,8 +149,13 @@ func collectWithExec(
 // find the canonical FQDN. Retries the chain up to resolverRetries
 // times with resolverBackoff between attempts to ride over transient
 // resolver blips (split-horizon resolvers, systemd-resolved startup
-// races). On final failure returns the short name as FQDN and empty
-// domain — matches Ohai's canonicalize_hostname_with_retries behaviour.
+// races). Retries only fire on transient failures — a definitive
+// "no such host" (net.DNSError.IsNotFound) or an empty answer stops
+// the loop immediately. This matters on hosts without a PTR record
+// (laptops, minimal containers) where the full retry budget used to
+// add ~200ms of pure sleep. On final failure returns the short name
+// as FQDN and empty domain, matching Ohai's
+// canonicalize_hostname_with_retries behaviour.
 func canonicalFQDN(
 	short string,
 ) (fqdn, domain string) {
@@ -161,12 +167,24 @@ func canonicalFQDN(
 			time.Sleep(resolverBackoff)
 		}
 		ips, err := lookupHostFn(short)
-		if err != nil || len(ips) == 0 {
+		if err != nil {
+			if isDNSNotFound(err) {
+				break
+			}
 			continue
 		}
+		if len(ips) == 0 {
+			break
+		}
 		names, err := lookupAddrFn(ips[0])
-		if err != nil || len(names) == 0 {
+		if err != nil {
+			if isDNSNotFound(err) {
+				break
+			}
 			continue
+		}
+		if len(names) == 0 {
+			break
 		}
 		fqdn = strings.TrimSuffix(names[0], ".")
 		if i := strings.Index(fqdn, "."); i >= 0 {
@@ -175,4 +193,15 @@ func canonicalFQDN(
 		return fqdn, domain
 	}
 	return short, ""
+}
+
+// isDNSNotFound reports whether err is a definitive DNS "no such host"
+// answer. Used by canonicalFQDN to short-circuit the retry loop on
+// failures that won't resolve on a second attempt — transient errors
+// (timeouts, IO errors) still drive a retry.
+func isDNSNotFound(
+	err error,
+) bool {
+	var dnsErr *net.DNSError
+	return errors.As(err, &dnsErr) && dnsErr.IsNotFound
 }

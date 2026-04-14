@@ -39,6 +39,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	kernelmodules "github.com/osapi-io/gohai/pkg/gohai/collectors/kernel_modules"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
@@ -69,6 +70,7 @@ type Facts struct {
 	Platform       *platform.Info       `json:"platform,omitempty"`
 	Hostname       *hostname.Info       `json:"hostname,omitempty"`
 	Kernel         *kernel.Info         `json:"kernel,omitempty"`
+	KernelModules  *kernelmodules.Info  `json:"kernel_modules,omitempty"`
 	Uptime         *uptime.Info         `json:"uptime,omitempty"`
 	Virtualization *virtualization.Info `json:"virtualization,omitempty"`
 	MachineID      *machineid.Info      `json:"machine_id,omitempty"`
@@ -168,6 +170,9 @@ func (f *Facts) countPopulated() int {
 		n++
 	}
 	if f.Kernel != nil {
+		n++
+	}
+	if f.KernelModules != nil {
 		n++
 	}
 	if f.Uptime != nil {
@@ -282,6 +287,10 @@ func (f *Facts) set(
 	case "kernel":
 		if v, ok := result.(*kernel.Info); ok {
 			f.Kernel = v
+		}
+	case "kernel_modules":
+		if v, ok := result.(*kernelmodules.Info); ok {
+			f.KernelModules = v
 		}
 	case "uptime":
 		if v, ok := result.(*uptime.Info); ok {

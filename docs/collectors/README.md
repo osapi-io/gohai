@@ -52,20 +52,21 @@ edge cases to handle) follows [Chef Ohai][]'s plugins.
 
 ## 🖥️ System
 
-| Collector                   | Key          | Description                            | Default | Implemented |
-| --------------------------- | ------------ | -------------------------------------- | ------- | ----------- |
-| [platform](platform.md)     | `platform`   | OS name, version, family, architecture | ✅      | ✅          |
-| [hostname](hostname.md)     | `hostname`   | FQDN, domain, hostname, machine name   | ✅      | ✅          |
-| [kernel](kernel.md)         | `kernel`     | Version, modules, parameters           | ✅      | ✅          |
-| [uptime](uptime.md)         | `uptime`     | Boot time, uptime duration, idle time  | ✅      | ✅          |
-| [timezone](timezone.md)     | `timezone`   | System timezone                        | ✅      | ✅          |
-| [os_release](os_release.md) | `os_release` | `/etc/os-release` fields               | ✅      | ✅          |
-| [init](init.md)             | `init`       | Init system detection                  | ✅      | ✅          |
-| [fips](fips.md)             | `fips`       | FIPS mode detection                    | ✅      | ✅          |
-| [machine_id](machine_id.md) | `machine_id` | Machine ID                             | ✅      | ✅          |
-| [root_group](root_group.md) | `root_group` | Root's primary group                   | ✅      | ✅          |
-| [shells](shells.md)         | `shells`     | Available shells                       | ✅      | ✅          |
-| [shard](shard.md)           | `shard`      | Deterministic shard seed               | ✅      | ✅          |
+| Collector                           | Key              | Description                            | Default | Implemented |
+| ----------------------------------- | ---------------- | -------------------------------------- | ------- | ----------- |
+| [platform](platform.md)             | `platform`       | OS name, version, family, architecture | ✅      | ✅          |
+| [hostname](hostname.md)             | `hostname`       | FQDN, domain, hostname, machine name   | ✅      | ✅          |
+| [kernel](kernel.md)                 | `kernel`         | Kernel identity (uname + Rosetta)      | ✅      | ✅          |
+| [kernel_modules](kernel_modules.md) | `kernel_modules` | Loaded kernel modules / kexts          | ❌      | ✅          |
+| [uptime](uptime.md)                 | `uptime`         | Boot time, uptime duration, idle time  | ✅      | ✅          |
+| [timezone](timezone.md)             | `timezone`       | System timezone                        | ✅      | ✅          |
+| [os_release](os_release.md)         | `os_release`     | `/etc/os-release` fields               | ✅      | ✅          |
+| [init](init.md)                     | `init`           | Init system detection                  | ✅      | ✅          |
+| [fips](fips.md)                     | `fips`           | FIPS mode detection                    | ✅      | ✅          |
+| [machine_id](machine_id.md)         | `machine_id`     | Machine ID                             | ✅      | ✅          |
+| [root_group](root_group.md)         | `root_group`     | Root's primary group                   | ✅      | ✅          |
+| [shells](shells.md)                 | `shells`         | Available shells                       | ✅      | ✅          |
+| [shard](shard.md)                   | `shard`          | Deterministic shard seed               | ✅      | ✅          |
 
 ## ⚙️ Hardware
 

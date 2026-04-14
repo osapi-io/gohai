@@ -18,41 +18,4 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package kernel
-
-import (
-	"context"
-
-	"github.com/osapi-io/gohai/internal/collector"
-)
-
-// Linux collects kernel identity on Linux. `processor` and `os` are
-// synthesized per Option A of issue #29 (Machine and the static string
-// "GNU/Linux") rather than shelling out to `uname -p` / `uname -o`.
-type Linux struct {
-	base
-}
-
-// NewLinux returns a Linux variant.
-func NewLinux() *Linux {
-	return &Linux{}
-}
-
-// Collect returns kernel Info.
-func (l *Linux) Collect(
-	_ context.Context,
-	_ collector.PriorResults,
-) (any, error) {
-	name, release, version, machine, err := defaultUname()
-	if err != nil {
-		return nil, err
-	}
-	return &Info{
-		Name:      name,
-		Release:   release,
-		Version:   version,
-		Machine:   machine,
-		Processor: machine,
-		OS:        "GNU/Linux",
-	}, nil
-}
+package kernelmodules
