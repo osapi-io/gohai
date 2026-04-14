@@ -54,7 +54,9 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns kernel Info.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
 	name, release, version, machine, err := defaultUname()
 	if err != nil {
 		return nil, err

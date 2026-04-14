@@ -35,7 +35,9 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns logged-in session Info.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
 	ss, err := listSessions(ctx)
 	if err != nil {
 		return nil, err

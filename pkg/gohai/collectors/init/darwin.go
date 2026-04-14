@@ -34,6 +34,8 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns launchd.
-func (d *Darwin) Collect(_ context.Context) (any, error) {
+func (d *Darwin) Collect(
+	_ context.Context,
+) (any, error) {
 	return &Info{Name: "launchd"}, nil
 }

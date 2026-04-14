@@ -53,7 +53,9 @@ func NewLinux() *Linux {
 
 // Collect returns the memory Info. gopsutil provides the base; our
 // /proc/meminfo extension fills the gaps.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
 	info, err := readMemory(ctx)
 	if err != nil {
 		return nil, err

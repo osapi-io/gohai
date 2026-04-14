@@ -37,8 +37,10 @@ func NewDarwin() *Darwin {
 
 // Collect returns the machine ID. gopsutil's darwin path is
 // correct — no extension needed.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	id, err := readHostIDFn(ctx)
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
+	id, err := readHostID(ctx)
 	if err != nil {
 		return nil, err
 	}

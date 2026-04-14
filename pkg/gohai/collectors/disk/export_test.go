@@ -26,10 +26,6 @@ import (
 	"github.com/shirou/gopsutil/v4/disk"
 )
 
-// ListIOCounters exposes the private listIOCounters bridge to the
-// external disk_test package.
-var ListIOCounters = listIOCounters
-
 // SetIOCountersFn swaps the private gopsutil
 // disk.IOCountersWithContext call backing listIOCounters. Returns a
 // restore func the caller must defer.

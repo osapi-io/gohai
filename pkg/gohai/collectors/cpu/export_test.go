@@ -26,13 +26,11 @@ import (
 	"github.com/shirou/gopsutil/v4/cpu"
 )
 
-// ReadCPU exposes the private readCPU bridge to the external cpu_test
-// package.
-var ReadCPU = readCPU
-
 // SetInfoFn swaps the private gopsutil cpu.InfoWithContext call backing
 // readCPU. Returns a restore func the caller must defer.
-func SetInfoFn(fn func(context.Context) ([]cpu.InfoStat, error)) (restore func()) {
+func SetInfoFn(
+	fn func(context.Context) ([]cpu.InfoStat, error),
+) (restore func()) {
 	orig := infoFn
 	infoFn = fn
 	return func() { infoFn = orig }
@@ -40,17 +38,10 @@ func SetInfoFn(fn func(context.Context) ([]cpu.InfoStat, error)) (restore func()
 
 // SetCountsFn swaps the private gopsutil cpu.CountsWithContext call
 // backing readCPU. Returns a restore func the caller must defer.
-func SetCountsFn(fn func(context.Context, bool) (int, error)) (restore func()) {
+func SetCountsFn(
+	fn func(context.Context, bool) (int, error),
+) (restore func()) {
 	orig := countsFn
 	countsFn = fn
 	return func() { countsFn = orig }
-}
-
-// SetReadCPUFn swaps the high-level readCPU bridge so per-OS Collect
-// tests can stub the entire gopsutil base in one call instead of
-// orchestrating SetInfoFn + SetCountsFn separately.
-func SetReadCPUFn(fn func(context.Context) (*Info, error)) (restore func()) {
-	orig := readCPUFn
-	readCPUFn = fn
-	return func() { readCPUFn = orig }
 }

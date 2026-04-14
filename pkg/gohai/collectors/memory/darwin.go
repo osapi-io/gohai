@@ -49,7 +49,9 @@ func NewDarwin() *Darwin {
 
 // Collect returns the memory Info with vm_stat extensions layered on
 // top of gopsutil's totals.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
 	info, err := readMemory(ctx)
 	if err != nil {
 		return nil, err

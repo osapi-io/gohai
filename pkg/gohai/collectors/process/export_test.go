@@ -26,10 +26,6 @@ import (
 	"github.com/shirou/gopsutil/v4/process"
 )
 
-// ListProcesses exposes the private listProcesses bridge to the
-// external process_test package.
-var ListProcesses = listProcesses
-
 // SetProcessesFn swaps the private gopsutil
 // process.ProcessesWithContext call backing listProcesses. Returns a
 // restore func the caller must defer.

@@ -26,22 +26,11 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-// ReadBase exposes the private readBase bridge.
-var ReadBase = readBase
-
 // SetHostInfoFn swaps the private gopsutil call backing readBase.
-func SetHostInfoFn(fn func(context.Context) (*host.InfoStat, error)) (restore func()) {
+func SetHostInfoFn(
+	fn func(context.Context) (*host.InfoStat, error),
+) (restore func()) {
 	orig := hostInfoFn
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }
-}
-
-// SetReadBaseFn swaps the per-collector readBase seam the Linux and
-// Darwin variants call directly.
-func SetReadBaseFn(
-	fn func(context.Context) (*Info, error),
-) (restore func()) {
-	orig := readBaseFn
-	readBaseFn = fn
-	return func() { readBaseFn = orig }
 }

@@ -43,7 +43,9 @@ func NewLinux() *Linux {
 
 // Collect reads /etc/os-release. Missing file soft-misses to an empty
 // Info — common on minimal/scratch containers that lack the file.
-func (l *Linux) Collect(_ context.Context) (any, error) {
+func (l *Linux) Collect(
+	_ context.Context,
+) (any, error) {
 	b, err := l.FS.ReadFile(osReleasePath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

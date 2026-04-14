@@ -77,7 +77,9 @@ type FactsTestSuite struct {
 	suite.Suite
 }
 
-func TestFactsTestSuite(t *testing.T) {
+func TestFactsTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(FactsTestSuite))
 }
 

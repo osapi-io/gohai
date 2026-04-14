@@ -21,8 +21,11 @@
 package disk_test
 
 import (
+	"context"
+	"errors"
 	"testing"
 
+	gpdisk "github.com/shirou/gopsutil/v4/disk"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -39,7 +42,9 @@ type DiskPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestDiskPublicTestSuite(t *testing.T) {
+func TestDiskPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(DiskPublicTestSuite))
 }
 
@@ -77,7 +82,84 @@ func (s *DiskPublicTestSuite) TestNew() {
 	}
 }
 
-// TestCollectOnHost exercises the real gopsutil-backed listIOCounters
-// bridge. gopsutil's disk.IOCounters return values aren't
-// unit-constructable; this is the only place we touch the real host.
-// We only assert shape, not specific device names.
+func (s *DiskPublicTestSuite) TestCollect() {
+	tests := []struct {
+		name    string
+		variant string
+		fn      func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error)
+		wantErr bool
+		wantLen int
+	}{
+		{
+			name:    "linux: sda snapshot",
+			variant: "linux",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return map[string]gpdisk.IOCountersStat{
+					"sda": {
+						Name:       "sda",
+						ReadCount:  100,
+						WriteCount: 50,
+						ReadBytes:  102400,
+						WriteBytes: 51200,
+					},
+				}, nil
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "linux: empty devices",
+			variant: "linux",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return map[string]gpdisk.IOCountersStat{}, nil
+			},
+			wantLen: 0,
+		},
+		{
+			name:    "linux: gopsutil error propagated",
+			variant: "linux",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return nil, errors.New("boom")
+			},
+			wantErr: true,
+		},
+		{
+			name:    "darwin: disk0 snapshot",
+			variant: "darwin",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return map[string]gpdisk.IOCountersStat{
+					"disk0": {Name: "disk0", ReadCount: 200, WriteCount: 100},
+				}, nil
+			},
+			wantLen: 1,
+		},
+		{
+			name:    "darwin: iokit error propagated",
+			variant: "darwin",
+			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
+				return nil, errors.New("iokit unavailable")
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			defer disk.SetIOCountersFn(tt.fn)()
+			var c disk.Collector
+			switch tt.variant {
+			case "linux":
+				c = &disk.Linux{}
+			case "darwin":
+				c = &disk.Darwin{}
+			}
+			got, err := c.Collect(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			info, ok := got.(*disk.Info)
+			s.Require().True(ok)
+			s.Len(info.Devices, tt.wantLen)
+		})
+	}
+}

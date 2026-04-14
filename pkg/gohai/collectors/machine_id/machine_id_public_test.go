@@ -21,8 +21,14 @@
 package machineid_test
 
 import (
+	"context"
+	"errors"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
+	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -39,7 +45,9 @@ type MachineIDPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestMachineIDPublicTestSuite(t *testing.T) {
+func TestMachineIDPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(MachineIDPublicTestSuite))
 }
 
@@ -73,6 +81,107 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 				_, ok := c.(*machineid.Linux)
 				s.True(ok)
 			}
+		})
+	}
+}
+
+func (s *MachineIDPublicTestSuite) TestCollect() {
+	const dbusPath = "/var/lib/dbus/machine-id"
+	tests := []struct {
+		name    string
+		variant string
+		hostFn  func(context.Context) (*host.InfoStat, error)
+		dbus    string // empty → file absent
+		wantErr bool
+		wantID  string
+	}{
+		{
+			name:    "linux: gopsutil returns /etc/machine-id → use it",
+			variant: "linux",
+			hostFn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{HostID: "gopsutil-id"}, nil
+			},
+			wantID: "gopsutil-id",
+		},
+		{
+			name:    "linux: gopsutil empty, dbus fallback wins",
+			variant: "linux",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
+			dbus:    "dbus-id\n",
+			wantID:  "dbus-id",
+		},
+		{
+			name:    "linux: gopsutil empty, dbus missing → empty ID (no error)",
+			variant: "linux",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
+			wantID:  "",
+		},
+		{
+			name:    "linux: gopsutil empty, dbus whitespace-only → empty ID",
+			variant: "linux",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
+			dbus:    "   \n",
+			wantID:  "",
+		},
+		{
+			name:    "linux: gopsutil nil info returns empty",
+			variant: "linux",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, nil },
+			wantID:  "",
+		},
+		{
+			name:    "linux: gopsutil error wrapped and returned",
+			variant: "linux",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			wantErr: true,
+		},
+		{
+			name:    "darwin: gopsutil returns IOPlatformUUID",
+			variant: "darwin",
+			hostFn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{HostID: "iokit-uuid-1234"}, nil
+			},
+			wantID: "iokit-uuid-1234",
+		},
+		{
+			name:    "darwin: nil info returns empty",
+			variant: "darwin",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, nil },
+			wantID:  "",
+		},
+		{
+			name:    "darwin: gopsutil error wrapped and returned",
+			variant: "darwin",
+			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			defer machineid.SetHostInfoFn(tt.hostFn)()
+			var c machineid.Collector
+			switch tt.variant {
+			case "linux":
+				var vfs avfs.VFS = memfs.New()
+				if tt.dbus != "" {
+					f := memfs.New()
+					_ = f.MkdirAll("/var/lib/dbus", 0o755)
+					_ = f.WriteFile(dbusPath, []byte(tt.dbus), fs.FileMode(0o644))
+					vfs = f
+				}
+				c = &machineid.Linux{FS: vfs}
+			case "darwin":
+				c = &machineid.Darwin{}
+			}
+			got, err := c.Collect(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			info, ok := got.(*machineid.Info)
+			s.Require().True(ok)
+			s.Equal(tt.wantID, info.ID)
 		})
 	}
 }

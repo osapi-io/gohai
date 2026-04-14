@@ -25,7 +25,9 @@ import "github.com/shirou/gopsutil/v4/host"
 // SetHostInfoFn swaps the private gopsutil call used by detect() for
 // the duration of a test. Only this package's own tests — which live in
 // platform_test — use this; collector tests should swap Detect instead.
-func SetHostInfoFn(fn func() (*host.InfoStat, error)) (restore func()) {
+func SetHostInfoFn(
+	fn func() (*host.InfoStat, error),
+) (restore func()) {
 	orig := hostInfoFn
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }

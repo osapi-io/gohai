@@ -37,8 +37,10 @@ func NewDarwin() *Darwin {
 // the IOPlatformUUID. A lookup error is treated as "no stable ID" —
 // the seed still computes deterministically over the hostname (matches
 // the Linux collector's behavior when /etc/machine-id is missing).
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	mid, _ := readMachineUUIDFn(ctx)
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
+	mid, _ := readMachineUUID(ctx)
 	host, _ := hostnameFn()
 	return &Info{Seed: computeSeed(mid, host)}, nil
 }

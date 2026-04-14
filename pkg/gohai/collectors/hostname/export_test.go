@@ -27,13 +27,6 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-// ReadShortHostname exposes the private readShortHostname bridge to
-// the external hostname_test package.
-var ReadShortHostname = readShortHostname
-
-// CanonicalFQDN exposes the private canonicalFQDN helper.
-var CanonicalFQDN = canonicalFQDN
-
 // SetHostInfoFn swaps the private gopsutil host.InfoWithContext call.
 func SetHostInfoFn(
 	fn func(context.Context) (*host.InfoStat, error),

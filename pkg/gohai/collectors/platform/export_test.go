@@ -26,11 +26,10 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-// ReadPlatform exposes the private readPlatform bridge.
-var ReadPlatform = readPlatform
-
 // SetHostInfoFn swaps the private gopsutil call backing readPlatform.
-func SetHostInfoFn(fn func(context.Context) (*host.InfoStat, error)) (restore func()) {
+func SetHostInfoFn(
+	fn func(context.Context) (*host.InfoStat, error),
+) (restore func()) {
 	orig := hostInfoFn
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }

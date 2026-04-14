@@ -51,7 +51,9 @@ func NewDarwin() *Darwin {
 }
 
 // Collect runs the cascade and returns Info.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
 	info := &Info{}
 	cascadeDarwin(ctx, d.FS, d.Exec, info)
 	return info, nil

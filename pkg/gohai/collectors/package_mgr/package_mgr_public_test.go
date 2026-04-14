@@ -22,6 +22,7 @@ package packagemgr_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -42,7 +43,9 @@ type PackageMgrPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestPackageMgrPublicTestSuite(t *testing.T) {
+func TestPackageMgrPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(PackageMgrPublicTestSuite))
 }
 
@@ -154,8 +157,12 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			probe := func(name string) string { return tt.probed[name] }
-			defer packagemgr.SetProbeFn(probe)()
+			defer packagemgr.SetLookPathFn(func(name string) (string, error) {
+				if p, ok := tt.probed[name]; ok {
+					return p, nil
+				}
+				return "", errors.New("not found")
+			})()
 			var got any
 			var err error
 			switch tt.variant {
@@ -173,27 +180,6 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			s.Require().True(ok)
 			s.Equal(tt.wantName, info.Name)
 			s.Equal(tt.wantPath, info.Path)
-		})
-	}
-}
-
-func (s *PackageMgrPublicTestSuite) TestProbe() {
-	tests := []struct {
-		name    string
-		binary  string
-		wantAbs bool
-	}{
-		{"present binary resolves to absolute path", "sh", true},
-		{"missing binary returns empty", "definitely-not-a-real-binary-xyz123", false},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			got := packagemgr.Probe(tt.binary)
-			if tt.wantAbs {
-				s.NotEmpty(got)
-			} else {
-				s.Empty(got)
-			}
 		})
 	}
 }

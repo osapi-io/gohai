@@ -21,8 +21,13 @@
 package osrelease_test
 
 import (
+	"context"
+	"errors"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -35,11 +40,25 @@ var (
 	_ collector.Collector = (*osrelease.Darwin)(nil)
 )
 
+// readErrorFS forces ReadFile to return a non-ErrNotExist error so the
+// "other read error propagated" branch is exercised.
+type readErrorFS struct {
+	avfs.VFS
+}
+
+func (readErrorFS) ReadFile(
+	string,
+) ([]byte, error) {
+	return nil, errors.New("permission denied")
+}
+
 type OSReleasePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestOSReleasePublicTestSuite(t *testing.T) {
+func TestOSReleasePublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(OSReleasePublicTestSuite))
 }
 
@@ -73,6 +92,122 @@ func (s *OSReleasePublicTestSuite) TestNew() {
 				_, ok := c.(*osrelease.Linux)
 				s.True(ok)
 			}
+		})
+	}
+}
+
+func (s *OSReleasePublicTestSuite) TestCollect() {
+	const ubuntu = `NAME="Ubuntu"
+VERSION="24.04 LTS (Noble Numbat)"
+ID=ubuntu
+ID_LIKE=debian
+PRETTY_NAME="Ubuntu 24.04 LTS"
+VERSION_ID="24.04"
+VERSION_CODENAME=noble
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+UBUNTU_CODENAME=noble
+`
+
+	tests := []struct {
+		name    string
+		variant string
+		content string
+		missing bool
+		readErr bool
+		wantErr bool
+		wantNil bool
+		want    osrelease.Info
+	}{
+		{
+			name:    "linux: ubuntu 24.04",
+			variant: "linux",
+			content: ubuntu,
+			want: osrelease.Info{
+				ID: "ubuntu", IDLike: []string{"debian"},
+				Name: "Ubuntu", PrettyName: "Ubuntu 24.04 LTS",
+				Version: "24.04 LTS (Noble Numbat)", VersionID: "24.04",
+				VersionCodename: "noble",
+				HomeURL:         "https://www.ubuntu.com/",
+				SupportURL:      "https://help.ubuntu.com/",
+				BugReportURL:    "https://bugs.launchpad.net/ubuntu/",
+				Extra:           map[string]string{"UBUNTU_CODENAME": "noble"},
+			},
+		},
+		{
+			name:    "linux: missing file soft-misses",
+			variant: "linux",
+			missing: true,
+			want:    osrelease.Info{},
+		},
+		{
+			name:    "linux: other read error propagated",
+			variant: "linux",
+			readErr: true,
+			wantErr: true,
+		},
+		{
+			name:    "linux: comments and blanks and malformed lines",
+			variant: "linux",
+			content: "# some comment\n\nmalformed\nID=\"quoted\"\n",
+			want:    osrelease.Info{ID: "quoted"},
+		},
+		{
+			name:    "linux: build/variant fields populated (Fedora-style)",
+			variant: "linux",
+			content: `ID=fedora
+BUILD_ID=40.20240416.0
+VARIANT="Workstation Edition"
+VARIANT_ID=workstation
+`,
+			want: osrelease.Info{
+				ID:        "fedora",
+				BuildID:   "40.20240416.0",
+				Variant:   "Workstation Edition",
+				VariantID: "workstation",
+			},
+		},
+		{
+			name:    "darwin returns nil",
+			variant: "darwin",
+			wantNil: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			var c osrelease.Collector
+			switch tt.variant {
+			case "linux":
+				var vfs avfs.VFS
+				switch {
+				case tt.readErr:
+					vfs = readErrorFS{VFS: memfs.New()}
+				case tt.missing:
+					vfs = memfs.New()
+				default:
+					f := memfs.New()
+					_ = f.MkdirAll("/etc", 0o755)
+					_ = f.WriteFile("/etc/os-release", []byte(tt.content), fs.FileMode(0o644))
+					vfs = f
+				}
+				c = &osrelease.Linux{FS: vfs}
+			case "darwin":
+				c = osrelease.NewDarwin()
+			}
+			got, err := c.Collect(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			if tt.wantNil {
+				s.Nil(got)
+				return
+			}
+			info, ok := got.(*osrelease.Info)
+			s.Require().True(ok)
+			s.Equal(tt.want, *info)
 		})
 	}
 }

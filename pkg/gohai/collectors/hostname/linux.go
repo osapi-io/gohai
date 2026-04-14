@@ -44,6 +44,8 @@ func NewLinux() *Linux {
 }
 
 // Collect returns hostname facts.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
 	return collectWithExec(ctx, l.Exec)
 }

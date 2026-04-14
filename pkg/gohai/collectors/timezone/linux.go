@@ -50,7 +50,9 @@ func NewLinux() *Linux {
 
 // Collect returns the timezone Info. Never errors — missing sources
 // leave fields empty, clock values still populate from Go's runtime.
-func (l *Linux) Collect(_ context.Context) (any, error) {
+func (l *Linux) Collect(
+	_ context.Context,
+) (any, error) {
 	abbrev, offset := clockZone()
 	name := resolveName(
 		l.FS.Readlink,

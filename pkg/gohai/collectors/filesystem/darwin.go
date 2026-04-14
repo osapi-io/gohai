@@ -34,8 +34,10 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns filesystem Info.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
-	mounts, err := listMountsFn(ctx)
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
+	mounts, err := listMounts(ctx)
 	if err != nil {
 		return nil, err
 	}

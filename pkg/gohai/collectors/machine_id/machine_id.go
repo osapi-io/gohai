@@ -36,12 +36,6 @@ import (
 // via SetHostInfoFn (export_test.go).
 var hostInfoFn = host.InfoWithContext
 
-// readHostIDFn is the per-collector seam the Linux and Darwin
-// variants call. In production it points at readHostID; tests swap
-// it via SetReadHostIDFn to exercise collector logic without touching
-// gopsutil.
-var readHostIDFn = readHostID
-
 // readHostID is the production bridge. Wraps the private gopsutil call
 // and returns just the HostID string — callers never see gopsutil
 // types.

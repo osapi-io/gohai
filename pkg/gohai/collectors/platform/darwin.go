@@ -51,7 +51,9 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns platform Info.
-func (d *Darwin) Collect(ctx context.Context) (any, error) {
+func (d *Darwin) Collect(
+	ctx context.Context,
+) (any, error) {
 	info, kernelVer, err := readPlatform(ctx)
 	if err != nil {
 		return nil, err

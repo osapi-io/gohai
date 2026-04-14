@@ -51,11 +51,6 @@ var hostInfoFn = host.InfoWithContext
 // swapped in tests via SetHostnameFn.
 var hostnameFn = os.Hostname
 
-// readMachineUUIDFn is the per-collector seam the Darwin variant
-// calls. Points at readMachineUUID in production; tests swap via
-// SetReadMachineUUIDFn to bypass gopsutil entirely.
-var readMachineUUIDFn = readMachineUUID
-
 // readMachineUUID wraps the private gopsutil call and returns the
 // macOS IOPlatformUUID as a plain string so importers don't see
 // gopsutil types. Returns empty string + wrapped error when gopsutil

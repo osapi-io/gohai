@@ -29,8 +29,8 @@ import (
 )
 
 // Darwin collects CPU facts on macOS. gopsutil's cpu.Info (via the
-// package-level readCPUFn seam) sources model / vendor / flags and
-// the logical thread count correctly but gets physical cores
+// readCPU bridge) sources model / vendor / flags and the logical
+// thread count correctly but gets physical cores
 // (reports logical) and frequency (zero on Apple Silicon) wrong. We
 // override those via direct sysctl reads through the injected Exec.
 type Darwin struct {
@@ -55,7 +55,7 @@ func NewDarwin() *Darwin {
 func (d *Darwin) Collect(
 	ctx context.Context,
 ) (any, error) {
-	info, err := readCPUFn(ctx)
+	info, err := readCPU(ctx)
 	if err != nil {
 		return nil, err
 	}

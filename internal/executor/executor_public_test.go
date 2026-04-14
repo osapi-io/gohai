@@ -35,7 +35,9 @@ import (
 // GOHAI_EXECUTOR_TEST_OUT is set, the test binary emulates stdout +
 // optional non-zero exit — no reliance on /bin/echo or other external
 // binaries.
-func TestMain(m *testing.M) {
+func TestMain(
+	m *testing.M,
+) {
 	if out := os.Getenv("GOHAI_EXECUTOR_TEST_OUT"); out != "" {
 		fmt.Print(out)
 		if os.Getenv("GOHAI_EXECUTOR_TEST_EXIT") == "1" {
@@ -50,7 +52,9 @@ type ExecutorPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestExecutorPublicTestSuite(t *testing.T) {
+func TestExecutorPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(ExecutorPublicTestSuite))
 }
 

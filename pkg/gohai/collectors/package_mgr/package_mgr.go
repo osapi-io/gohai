@@ -64,17 +64,16 @@ func New() Collector {
 	}
 }
 
-// probeFn is the package-level injection seam for binary lookups.
-// Collectors call firstFound(probeFn, ...) directly; tests swap the
-// seam via SetProbeFn.
-var probeFn = probe
+// lookPathFn is the package-level injection seam for exec.LookPath.
+// Kept private; swapped in tests via SetLookPathFn.
+var lookPathFn = exec.LookPath
 
 // probe looks up a binary via exec.LookPath. Returns the empty string
 // for missing binaries — no error distinction needed.
 func probe(
 	name string,
 ) string {
-	p, err := exec.LookPath(name)
+	p, err := lookPathFn(name)
 	if err != nil {
 		return ""
 	}
@@ -85,11 +84,10 @@ func probe(
 // list where the binary is present on the host. Empty name + path if
 // none found.
 func firstFound(
-	probeFn func(string) string,
 	names ...string,
 ) (string, string) {
 	for _, n := range names {
-		if p := probeFn(n); p != "" {
+		if p := probe(n); p != "" {
 			return n, p
 		}
 	}

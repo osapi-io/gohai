@@ -21,8 +21,13 @@
 package shells_test
 
 import (
+	"context"
+	"errors"
+	"io/fs"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -30,38 +35,59 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
 )
 
-// Compile-time assertions that each per-OS struct satisfies
-// collector.Collector.
 var (
 	_ collector.Collector = (*shells.Linux)(nil)
 	_ collector.Collector = (*shells.Darwin)(nil)
 )
 
+// errorFS wraps a memfs and forces a non-ErrNotExist error from
+// ReadFile. Used to exercise the "other read error" branch without
+// needing real-FS permission manipulation.
+type errorFS struct {
+	avfs.VFS
+}
+
+func (errorFS) ReadFile(
+	string,
+) ([]byte, error) {
+	return nil, errors.New("permission denied")
+}
+
 type ShellsPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestShellsPublicTestSuite(t *testing.T) {
+func TestShellsPublicTestSuite(
+	t *testing.T,
+) {
 	suite.Run(t, new(ShellsPublicTestSuite))
 }
 
-// TestNew covers the factory: identity methods inherited from base
-// (Name / DefaultEnabled / Dependencies) plus dispatch to the right
-// concrete type per platform.Detect() value.
 func (s *ShellsPublicTestSuite) TestNew() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name       string
+		detect     string
+		wantKind   string
+		wantFSFrom func() avfs.VFS
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			"darwin dispatches to Darwin + wires FS",
+			"darwin",
+			"darwin",
+			func() avfs.VFS { return shells.NewDarwin().FS },
+		},
+		{
+			"debian dispatches to Linux + wires FS",
+			"debian",
+			"linux",
+			func() avfs.VFS { return shells.NewLinux().FS },
+		},
+		{"rhel dispatches to Linux", "rhel", "linux", nil},
+		{"arch dispatches to Linux", "arch", "linux", nil},
+		{"unknown dispatches to Linux", "", "linux", nil},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -78,20 +104,133 @@ func (s *ShellsPublicTestSuite) TestNew() {
 				_, ok := c.(*shells.Linux)
 				s.True(ok)
 			}
+			if tt.wantFSFrom != nil {
+				s.NotNil(tt.wantFSFrom())
+			}
 		})
 	}
 }
 
-// TestNewLinuxWiresFS verifies NewLinux() returns a Linux with a
-// non-nil FS. No real filesystem reads — just the wiring.
-func (s *ShellsPublicTestSuite) TestNewLinuxWiresFS() {
-	c := shells.NewLinux()
-	s.NotNil(c.FS)
-}
-
-// TestNewDarwinWiresFS verifies NewDarwin() returns a Darwin with a
-// non-nil FS.
-func (s *ShellsPublicTestSuite) TestNewDarwinWiresFS() {
-	c := shells.NewDarwin()
-	s.NotNil(c.FS)
+func (s *ShellsPublicTestSuite) TestCollect() {
+	tests := []struct {
+		name    string
+		variant string
+		setupFS func() avfs.VFS
+		wantErr bool
+		want    []string
+	}{
+		{
+			name:    "linux: canonical /etc/shells",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells",
+					[]byte("# comment\n/bin/sh\n/bin/bash\n\n/usr/bin/zsh\n"),
+					fs.FileMode(0o644))
+				return f
+			},
+			want: []string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"},
+		},
+		{
+			name:    "linux: non-absolute entries skipped",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells",
+					[]byte("/bin/sh\nnologin\nbash\n/bin/zsh\n"),
+					fs.FileMode(0o644))
+				return f
+			},
+			want: []string{"/bin/sh", "/bin/zsh"},
+		},
+		{
+			name:    "linux: whitespace trimmed",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells",
+					[]byte("  /bin/bash  \n\t/bin/sh\t\n"),
+					fs.FileMode(0o644))
+				return f
+			},
+			want: []string{"/bin/bash", "/bin/sh"},
+		},
+		{
+			name:    "linux: empty file",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells", []byte{}, fs.FileMode(0o644))
+				return f
+			},
+			want: []string{},
+		},
+		{
+			name:    "linux: missing file soft-misses",
+			variant: "linux",
+			setupFS: func() avfs.VFS { return memfs.New() },
+			want:    []string{},
+		},
+		{
+			name:    "linux: other read error propagated",
+			variant: "linux",
+			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
+			wantErr: true,
+		},
+		{
+			name:    "darwin: canonical macOS /etc/shells",
+			variant: "darwin",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile(
+					"/etc/shells",
+					[]byte(
+						"/bin/bash\n/bin/csh\n/bin/dash\n/bin/ksh\n/bin/sh\n/bin/tcsh\n/bin/zsh\n",
+					),
+					fs.FileMode(0o644),
+				)
+				return f
+			},
+			want: []string{
+				"/bin/bash",
+				"/bin/csh",
+				"/bin/dash",
+				"/bin/ksh",
+				"/bin/sh",
+				"/bin/tcsh",
+				"/bin/zsh",
+			},
+		},
+		{
+			name:    "darwin: missing file soft-misses",
+			variant: "darwin",
+			setupFS: func() avfs.VFS { return memfs.New() },
+			want:    []string{},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			var c shells.Collector
+			switch tt.variant {
+			case "linux":
+				c = &shells.Linux{FS: tt.setupFS()}
+			case "darwin":
+				c = &shells.Darwin{FS: tt.setupFS()}
+			}
+			got, err := c.Collect(context.Background())
+			if tt.wantErr {
+				s.Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			info, ok := got.(*shells.Info)
+			s.Require().True(ok)
+			s.Equal(tt.want, info.Paths)
+		})
+	}
 }

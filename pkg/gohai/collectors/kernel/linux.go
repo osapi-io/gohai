@@ -54,7 +54,9 @@ func NewLinux() *Linux {
 }
 
 // Collect returns kernel Info.
-func (l *Linux) Collect(_ context.Context) (any, error) {
+func (l *Linux) Collect(
+	_ context.Context,
+) (any, error) {
 	name, release, version, machine, err := defaultUname()
 	if err != nil {
 		return nil, err

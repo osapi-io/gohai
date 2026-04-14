@@ -164,33 +164,45 @@ func builtinCollectors() []collector.Collector {
 
 Add matching `Facts` field + `set()` switch case in `pkg/gohai/facts.go`.
 
-## Step 5 — Tests (100% coverage, no gopsutil leaks)
+## Step 5 — Tests (100% coverage, one test file)
 
-**`<name>_public_test.go`** — package-level tests:
+**One file only**: `<name>_public_test.go`. No `linux_public_test.go` or
+`darwin_public_test.go` split files.
 
-- `TestNew` — calls `New()`, asserts `Name()` / `DefaultEnabled()` /
-  `Dependencies()` on the returned interface. Stubs `platform.Detect` (a
-  swappable `var`) to force every dispatch branch. **No gopsutil import.**
-- `var _ collector.Collector = (*cpu.Linux)(nil)` at package level for
-  compile-time interface assertion.
+Required contents, in order:
 
-**`linux_public_test.go`** — tests the `Linux` struct directly with injected
-stubs:
+1. Compile-time interface asserts at the top:
+   ```go
+   var (
+       _ collector.Collector = (*cpu.Linux)(nil)
+       _ collector.Collector = (*cpu.Darwin)(nil)
+   )
+   ```
+2. `TestNew` — stubs `platform.Detect` (a swappable `var`), asserts the factory
+   returns the right concrete type per OS plus `Name()` / `DefaultEnabled()` /
+   `Dependencies()`. Table-driven.
+3. `TestCollect` — **one** method, table-driven, with a
+   `variant: "linux" | "darwin"` column. Each row sets up its seams, the loop
+   constructs the right per-OS struct:
+   ```go
+   switch tt.variant {
+   case "linux":
+       c = &cpu.Linux{FS: tt.fs, Exec: tt.exec}
+   case "darwin":
+       c = &cpu.Darwin{Exec: tt.exec}
+   }
+   ```
+4. Optional: separate test methods for genuinely pure, independent public helper
+   functions (`TestHumanDuration`, `TestBytesToString`, `TestNeighFamily`).
+   These are legitimate because the helper has its own contract — **do not**
+   create `TestReadX` methods that shadow bridge code `TestCollect` already
+   exercises.
 
-```go
-c := &cpu.Linux{ReadFn: func(ctx context.Context) (*cpu.Info, error) {
-    return &cpu.Info{Total: 8}, nil
-}}
-got, err := c.Collect(context.Background())
-```
-
-Table-driven scenarios covering happy path, error path, edge cases.
-
-Also add a `TestReadCPU` in `linux_public_test.go` that uses the `SetInfoFn`
-setter to exercise both the success and gopsutil-error branches of the private
-wrapper.
-
-**`darwin_public_test.go`** — same for `Darwin` struct.
+**Test seams swap at the upstream library boundary.** `export_test.go` exposes
+`Set<X>Fn` setters for the raw gopsutil / ghw / netlink calls (`SetHostInfoFn`,
+`SetPartitionsFn`, `SetInterfacesFn`, etc.). Do NOT add intermediate wrappers
+like `readCPUFn = readCPU` — that's test-only scaffolding in production code,
+and the consistency rule forbids it.
 
 No build tags on any test file. `go test ./...` on any dev OS runs every test.
 

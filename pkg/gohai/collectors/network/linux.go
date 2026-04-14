@@ -57,7 +57,9 @@ func NewLinux() *Linux {
 }
 
 // Collect returns network Info.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
 	ifs, err := readInterfaces(ctx)
 	if err != nil {
 		return nil, err

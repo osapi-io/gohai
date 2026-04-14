@@ -26,10 +26,6 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-// ListSessions exposes the private listSessions bridge to the external
-// users_test package.
-var ListSessions = listSessions
-
 // SetUsersFn swaps the private gopsutil host.UsersWithContext call
 // backing listSessions. Returns a restore func the caller must defer.
 func SetUsersFn(

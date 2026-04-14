@@ -54,8 +54,10 @@ func NewLinux() *Linux {
 // fall back to /var/lib/dbus/machine-id before giving up. This
 // mirrors Ohai's fallback chain without re-implementing gopsutil's
 // existing work.
-func (l *Linux) Collect(ctx context.Context) (any, error) {
-	id, err := readHostIDFn(ctx)
+func (l *Linux) Collect(
+	ctx context.Context,
+) (any, error) {
+	id, err := readHostID(ctx)
 	if err != nil {
 		return nil, err
 	}
