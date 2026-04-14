@@ -222,7 +222,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 
 			if tt.wantNoHTTP {
-				s.False(httpCalled, "should have short-circuited before HTTP")
+				s.False(httpCalled)
 			}
 			if tt.wantNil {
 				s.Nil(out)

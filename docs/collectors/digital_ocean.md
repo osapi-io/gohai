@@ -99,12 +99,15 @@ collector fails open and tries the endpoint anyway.
 1. **DMI gate:** `dmi.BIOS.Vendor == "DigitalOcean"` (exact). Matches Ohai's
    `has_do_dmi?`.
 2. **Endpoint:** `http://169.254.169.254/metadata/v1.json` — single JSON.
-3. **Timeout:** 2 seconds (cloudmetadata default).
-4. **Failure handling:** transport / 404 / other errors → `(nil, nil)`.
-5. **Security scrub:** `vendor_data` dropped from the output (matches Ohai). May
+3. **User-Agent:** `gohai` (the cloudmetadata default).
+4. **Timeout:** 6 seconds — matches Ohai's `read_timeout` in
+   `mixin/do_metadata.rb`.
+5. **Failure handling:** transport / 404 / other errors → `(nil, nil)`.
+6. **Security scrub:** `vendor_data` dropped from the output (matches Ohai). May
    contain cloud-init scripts + credentials.
 
-Mirrors Ohai's `Ohai::Mixin::DoMetadata` collection approach.
+Mirrors Ohai's `Ohai::Mixin::DoMetadata` methodology — same endpoint, same DMI
+gate, same `vendor_data` scrub, same 6s timeout.
 
 ## Backing library
 

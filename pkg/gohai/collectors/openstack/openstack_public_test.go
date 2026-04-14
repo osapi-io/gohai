@@ -24,6 +24,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -40,7 +42,10 @@ func osPrior() collector.PriorResults {
 	}
 }
 
-var ec2Responses = map[string]string{
+// metadataTree mirrors OpenStack's EC2-compatible meta-data tree.
+// Paths ending with "/" are directory listings; others are leaves.
+var metadataTree = map[string]string{
+	"/latest/meta-data/":                            "ami-id\ninstance-id\ninstance-type\nhostname\nlocal-hostname\nlocal-ipv4\npublic-hostname\npublic-ipv4\nplacement/\nreservation-id\nkernel-id\nramdisk-id\nsecurity-groups",
 	"/latest/meta-data/ami-id":                      "ami-xxx",
 	"/latest/meta-data/instance-id":                 "i-abc",
 	"/latest/meta-data/instance-type":               "m1.small",
@@ -49,6 +54,7 @@ var ec2Responses = map[string]string{
 	"/latest/meta-data/local-ipv4":                  "10.0.0.5",
 	"/latest/meta-data/public-hostname":             "prod-1.public",
 	"/latest/meta-data/public-ipv4":                 "10.0.0.6",
+	"/latest/meta-data/placement/":                  "availability-zone",
 	"/latest/meta-data/placement/availability-zone": "nova",
 	"/latest/meta-data/reservation-id":              "r-abc",
 	"/latest/meta-data/kernel-id":                   "aki-xxx",
@@ -68,12 +74,30 @@ const novaDoc = `{
 
 type OpenStackPublicTestSuite struct {
 	suite.Suite
+	tmpDir string
 }
 
 func TestOpenStackPublicTestSuite(
 	t *testing.T,
 ) {
 	suite.Run(t, new(OpenStackPublicTestSuite))
+}
+
+func (s *OpenStackPublicTestSuite) SetupTest() {
+	s.tmpDir = s.T().TempDir()
+	// Default: point passwd path at a nonexistent file so provider
+	// resolves to "openstack" unless a test overrides.
+	openstack.SetPasswdPath(filepath.Join(s.tmpDir, "no-passwd"))
+}
+
+// writePasswd writes a passwd-format file with the given lines and
+// swaps the package var.
+func (s *OpenStackPublicTestSuite) writePasswd(
+	content string,
+) func() {
+	path := filepath.Join(s.tmpDir, "passwd")
+	s.Require().NoError(os.WriteFile(path, []byte(content), 0o644))
+	return openstack.SetPasswdPath(path)
 }
 
 func (s *OpenStackPublicTestSuite) TestInterface() {
@@ -95,34 +119,48 @@ func (s *OpenStackPublicTestSuite) TestInterface() {
 	}
 }
 
-func canned(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/openstack/latest/meta_data.json" {
-		_, _ = w.Write([]byte(novaDoc))
-		return
+func canned(
+	tree map[string]string,
+	novaBody string,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/openstack/latest/meta_data.json" {
+			if novaBody == "" {
+				http.NotFound(w, r)
+				return
+			}
+			_, _ = w.Write([]byte(novaBody))
+			return
+		}
+		body, ok := tree[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(body))
 	}
-	body, ok := ec2Responses[r.URL.Path]
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	_, _ = w.Write([]byte(body))
 }
 
 func (s *OpenStackPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		prior      collector.PriorResults
-		handler    func(w http.ResponseWriter, r *http.Request)
-		closed     bool
-		wantNil    bool
-		wantNoHTTP bool
-		verify     func(s *OpenStackPublicTestSuite, info *openstack.Info)
+		name        string
+		prior       collector.PriorResults
+		tree        map[string]string
+		novaBody    string
+		passwdLines string // when non-empty, written before Collect
+		handler     http.HandlerFunc
+		closed      bool
+		wantNil     bool
+		wantNoHTTP  bool
+		verify      func(s *OpenStackPublicTestSuite, info *openstack.Info)
 	}{
 		{
-			name:    "happy path combines ec2 mirror + nova doc",
-			handler: canned,
+			name:     "happy path combines EC2-mirror walk + Nova doc + openstack provider",
+			tree:     metadataTree,
+			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
 				s.Require().NotNil(info)
+				s.Equal("openstack", info.Provider)
 				s.Equal("i-abc", info.InstanceID)
 				s.Equal("m1.small", info.InstanceType)
 				s.Equal("10.0.0.5", info.LocalIPv4)
@@ -131,6 +169,27 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				s.Equal("uuid-xxx", info.UUID)
 				s.Equal("proj-1", info.ProjectID)
 				s.Equal("sre", info.MetaData["owner"])
+				// Raw forward-compat
+				s.Require().NotNil(info.Raw)
+				s.Equal("i-abc", info.Raw["instance_id"])
+			},
+		},
+		{
+			name:        "passwd exists without dhc-user → provider = openstack",
+			tree:        metadataTree,
+			novaBody:    novaDoc,
+			passwdLines: "root:x:0:0:root:/root:/bin/bash\nuser:x:1000:1000::/home/user:/bin/bash\n",
+			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+				s.Equal("openstack", info.Provider)
+			},
+		},
+		{
+			name:        "passwd contains dhc-user → provider = dreamhost",
+			tree:        metadataTree,
+			novaBody:    novaDoc,
+			passwdLines: "root:x:0:0:root:/root:/bin/bash\ndhc-user:x:1000:1000::/home/dhc-user:/bin/bash\n",
+			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+				s.Equal("dreamhost", info.Provider)
 			},
 		},
 		{
@@ -138,70 +197,90 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Product: &dmi.Product{Name: "VMware"}},
 			},
-			handler:    canned,
+			tree:       metadataTree,
+			novaBody:   novaDoc,
 			wantNil:    true,
 			wantNoHTTP: true,
 		},
 		{
-			name:    "no dmi in prior fails open",
-			prior:   collector.PriorResults{},
-			handler: canned,
+			name:     "no dmi in prior fails open",
+			prior:    collector.PriorResults{},
+			tree:     metadataTree,
+			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
-				s.Require().NotNil(info)
 				s.Equal("i-abc", info.InstanceID)
 			},
 		},
 		{
-			name:    "first-path 404 drops silently",
-			handler: func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) },
-			wantNil: true,
-		},
-		{
-			name: "ec2 paths partial 404 tolerated, nova doc fills uuid",
-			handler: func(w http.ResponseWriter, r *http.Request) {
-				switch r.URL.Path {
-				case "/latest/meta-data/ami-id":
-					_, _ = w.Write([]byte("ami-yyy"))
-				case "/openstack/latest/meta_data.json":
-					_, _ = w.Write([]byte(`{"uuid": "uuid-solo", "hostname": "h"}`))
-				default:
-					http.NotFound(w, r)
-				}
-			},
+			name:     "EC2-mirror missing but Nova doc present → still detected",
+			tree:     map[string]string{},
+			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
 				s.Require().NotNil(info)
-				s.Equal("uuid-solo", info.UUID)
-				s.Equal("h", info.Hostname)
+				s.Equal("uuid-xxx", info.UUID)
+				s.Empty(info.InstanceID) // no EC2-mirror data
 			},
 		},
 		{
-			name: "nova doc missing is tolerated",
-			handler: func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/openstack/latest/meta_data.json" {
-					http.NotFound(w, r)
-					return
-				}
-				canned(w, r)
-			},
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
-				s.Require().NotNil(info)
-				s.Empty(info.UUID)
-				s.Equal("i-abc", info.InstanceID)
-			},
+			name:     "both EC2-mirror and Nova doc missing → drop",
+			tree:     map[string]string{},
+			novaBody: "",
+			wantNil:  true,
 		},
 		{
-			name: "nova doc returns malformed JSON and is tolerated",
+			name: "Nova doc malformed JSON tolerated",
+			tree: metadataTree,
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/openstack/latest/meta_data.json" {
 					_, _ = w.Write([]byte("not json"))
 					return
 				}
-				canned(w, r)
+				canned(metadataTree, "")(w, r)
 			},
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
-				s.Require().NotNil(info)
 				s.Empty(info.UUID)
 				s.Equal("i-abc", info.InstanceID)
+			},
+		},
+		{
+			name: "EC2-mirror partial: only ami-id present",
+			tree: map[string]string{
+				"/latest/meta-data/":       "ami-id",
+				"/latest/meta-data/ami-id": "ami-yyy",
+			},
+			novaBody: `{"uuid": "uuid-solo", "hostname": "h"}`,
+			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+				s.Equal("uuid-solo", info.UUID)
+				s.Equal("h", info.Hostname)
+				s.Equal("ami-yyy", info.AMIID)
+			},
+		},
+		{
+			name: "broken subdir during walk is tolerated",
+			tree: map[string]string{
+				"/latest/meta-data/":       "ami-id\nbroken/",
+				"/latest/meta-data/ami-id": "ami-zzz",
+				// /latest/meta-data/broken/ intentionally missing → 404
+			},
+			novaBody: novaDoc,
+			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+				s.Equal("ami-zzz", info.AMIID)
+				_, present := info.Raw["broken"]
+				s.False(present)
+			},
+		},
+		{
+			name: "leaf fetch error during walk is tolerated",
+			tree: map[string]string{
+				"/latest/meta-data/":       "ami-id\nmissing-leaf",
+				"/latest/meta-data/ami-id": "ami-aaa",
+				// /latest/meta-data/missing-leaf intentionally absent → 404
+			},
+			novaBody: novaDoc,
+			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+				s.Equal("ami-aaa", info.AMIID)
+				_, present := info.Raw["missing_leaf"]
+				s.False(present)
 			},
 		},
 		{
@@ -210,15 +289,45 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			closed:  true,
 			wantNil: true,
 		},
+		{
+			name: "empty listing lines are skipped",
+			tree: map[string]string{
+				"/latest/meta-data/":       "\n\nami-id\n\n",
+				"/latest/meta-data/ami-id": "ami-skip",
+			},
+			novaBody: novaDoc,
+			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+				s.Equal("ami-skip", info.AMIID)
+			},
+		},
+		{
+			name: "tree without placement subdirectory leaves AZ empty (until Nova fills it)",
+			tree: map[string]string{
+				"/latest/meta-data/":       "ami-id",
+				"/latest/meta-data/ami-id": "ami-no-placement",
+			},
+			novaBody: novaDoc,
+			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+				s.Equal("nova", info.AvailabilityZone) // from Nova doc
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			if tt.passwdLines != "" {
+				defer s.writePasswd(tt.passwdLines)()
+			}
+
 			var httpCalled bool
+			h := tt.handler
+			if h == nil {
+				h = canned(tt.tree, tt.novaBody)
+			}
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					httpCalled = true
-					tt.handler(w, r)
+					h(w, r)
 				},
 			))
 			if tt.closed {

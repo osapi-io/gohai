@@ -16,28 +16,28 @@ that's the hardcoded secret).
 
 ## Collected Fields
 
-| Field                   | Type                 | Description                                 | Schema mapping                 |
-| ----------------------- | -------------------- | ------------------------------------------- | ------------------------------ |
-| `id`                    | `string`             | Instance OCID.                              | OTel `cloud.resource_id`       |
-| `display_name`          | `string`             | Instance display name.                      | OTel `host.name`               |
-| `hostname`              | `string`             | Instance hostname.                          | OCSF `device.hostname`         |
-| `shape`                 | `string`             | Compute shape (e.g. `VM.Standard.E4.Flex`). | OTel `host.type`               |
-| `shape_config`          | `*ShapeConfig`       | Shape resource profile.                     | No direct schema mapping.      |
-| `image`                 | `string`             | Image OCID.                                 | OTel `host.image.id`           |
-| `region`                | `string`             | Region short code (e.g. `phx`).             | OTel `cloud.region`            |
-| `canonical_region_name` | `string`             | Full region (e.g. `us-phoenix-1`).          | No direct schema mapping.      |
-| `availability_domain`   | `string`             | OCI availability domain.                    | OTel `cloud.availability_zone` |
-| `fault_domain`          | `string`             | OCI fault domain.                           | No direct schema mapping.      |
-| `compartment_id`        | `string`             | Compartment OCID.                           | OTel `cloud.account.id`        |
-| `tenant_id`             | `string`             | Tenancy OCID.                               | No direct schema mapping.      |
-| `state`                 | `string`             | Lifecycle state (e.g. `RUNNING`).           | No direct schema mapping.      |
-| `time_created`          | `int64`              | Creation time (Unix ms).                    | No direct schema mapping.      |
-| `metadata`              | `map[string]string`  | Instance metadata key/values.               | No direct schema mapping.      |
-| `defined_tags`          | `map[string]any`     | OCI defined tags (namespaced).              | No direct schema mapping.      |
-| `freeform_tags`         | `map[string]string`  | OCI free-form tags.                         | No direct schema mapping.      |
-| `region_info`           | `*RegionInfo`        | Geographic identification sub-record.       | No direct schema mapping.      |
-| `vnics`                 | `[]VNIC`             | Virtual NICs — see below.                   | OCSF `network_interface`       |
-| `volume_attachments`    | `[]VolumeAttachment` | Attached volumes — see below.               | No direct schema mapping.      |
+| Field                   | Type                          | Description                                                                                           | Schema mapping                 |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `id`                    | `string`                      | Instance OCID.                                                                                        | OTel `cloud.resource_id`       |
+| `display_name`          | `string`                      | Instance display name.                                                                                | OTel `host.name`               |
+| `hostname`              | `string`                      | Instance hostname.                                                                                    | OCSF `device.hostname`         |
+| `shape`                 | `string`                      | Compute shape (e.g. `VM.Standard.E4.Flex`).                                                           | OTel `host.type`               |
+| `shape_config`          | `*ShapeConfig`                | Shape resource profile.                                                                               | No direct schema mapping.      |
+| `image`                 | `string`                      | Image OCID.                                                                                           | OTel `host.image.id`           |
+| `region`                | `string`                      | Region short code (e.g. `phx`).                                                                       | OTel `cloud.region`            |
+| `canonical_region_name` | `string`                      | Full region (e.g. `us-phoenix-1`).                                                                    | No direct schema mapping.      |
+| `availability_domain`   | `string`                      | OCI availability domain.                                                                              | OTel `cloud.availability_zone` |
+| `fault_domain`          | `string`                      | OCI fault domain.                                                                                     | No direct schema mapping.      |
+| `compartment_id`        | `string`                      | Compartment OCID.                                                                                     | OTel `cloud.account.id`        |
+| `tenant_id`             | `string`                      | Tenancy OCID.                                                                                         | No direct schema mapping.      |
+| `state`                 | `string`                      | Lifecycle state (e.g. `RUNNING`).                                                                     | No direct schema mapping.      |
+| `time_created`          | `int64`                       | Creation time (Unix ms).                                                                              | No direct schema mapping.      |
+| `metadata`              | `map[string]string`           | Instance metadata key/values.                                                                         | No direct schema mapping.      |
+| `defined_tags`          | `map[string]any`              | OCI defined tags (namespaced).                                                                        | No direct schema mapping.      |
+| `freeform_tags`         | `map[string]string`           | OCI free-form tags.                                                                                   | No direct schema mapping.      |
+| `region_info`           | `*RegionInfo`                 | Geographic identification sub-record.                                                                 | No direct schema mapping.      |
+| `vnics`                 | `[]VNIC`                      | Virtual NICs — see below.                                                                             | OCSF `network_interface`       |
+| `volume_attachments`    | `map[string]VolumeAttachment` | Attached volumes keyed by attachment OCID — matches Ohai's `metadata.volumes[<id>]` shape. See below. | No direct schema mapping.      |
 
 ### ShapeConfig
 
@@ -140,15 +140,19 @@ gates on a substring match. Fails open when dmi wasn't run.
 2. **Endpoints:** `GET /opc/v2/instance`, `GET /opc/v2/vnics`,
    `GET /opc/v2/allVolumeAttachments` — three JSON documents.
 3. **Required header:** `Authorization: Bearer Oracle` (literal).
-4. **Timeout:** 2 seconds.
-5. **Failure handling:** instance-doc failure returns `(nil, nil)`. Per-section
+4. **User-Agent:** `gohai` (the cloudmetadata default).
+5. **Timeout:** 6 seconds — matches Ohai's `read_timeout` in
+   `mixin/oci_metadata.rb`.
+6. **Failure handling:** instance-doc failure returns `(nil, nil)`. Per-section
    failures on `/vnics` or `/allVolumeAttachments` are tolerated (lightweight
    shapes legitimately 404 those paths) — the sections are left empty in the
    Info struct.
-6. **Transformation:** raw camelCase fields are unmarshalled and mapped to
-   snake_case in the typed Info.
+7. **Transformation:** raw camelCase fields are unmarshalled and mapped to
+   snake_case in the typed Info. Volume attachments are keyed by their OCID to
+   match Ohai's `metadata.volumes[<id>]` output shape.
 
-Mirrors Ohai's `Ohai::Mixin::OciMetadata` collection approach.
+Mirrors Ohai's `Ohai::Mixin::OciMetadata` methodology — same endpoint, same auth
+header, same three sub-fetches, same volume keying, same 6s timeout.
 
 ## Backing library
 

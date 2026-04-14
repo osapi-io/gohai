@@ -27,6 +27,7 @@ package digital_ocean
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
@@ -43,6 +44,9 @@ const metadataBaseURL = "http://169.254.169.254"
 
 // metadataPath returns the entire droplet metadata as one JSON blob.
 const metadataPath = "/metadata/v1.json"
+
+// metadataTimeout matches Ohai's 6s read timeout in mixin/do_metadata.rb.
+const metadataTimeout = 6 * time.Second
 
 // dmiVendorSignature is the exact string DigitalOcean writes to
 // /sys/class/dmi/id/bios_vendor. Matches Ohai's has_do_dmi? check.
@@ -126,9 +130,13 @@ type Collector struct {
 
 var _ collector.Collector = (*Collector)(nil)
 
-// New returns a default Collector pointed at DO's metadata server.
+// New returns a default Collector pointed at DO's metadata server
+// with Ohai-matching 6s timeout.
 func New() *Collector {
-	return NewWithClient(cloudmetadata.New(metadataBaseURL))
+	return NewWithClient(cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithTimeout(metadataTimeout),
+	))
 }
 
 // NewWithClient returns a Collector backed by a caller-supplied client.

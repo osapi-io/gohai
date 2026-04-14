@@ -18,24 +18,14 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package azure
+package ec2
 
-// SetWaagentPath swaps the waagent binary path tests look at.
-// Returns a restore func the caller defers.
-func SetWaagentPath(
+// SetHypervisorUUIDPath swaps the /sys/hypervisor/uuid path tests
+// read for the xen-UUID detection signal.
+func SetHypervisorUUIDPath(
 	path string,
 ) func() {
-	orig := waagentPath
-	waagentPath = path
-	return func() { waagentPath = orig }
-}
-
-// SetDhclientLeasesPath swaps the dhclient leases file path tests
-// look at for DHCP option 245 detection.
-func SetDhclientLeasesPath(
-	path string,
-) func() {
-	orig := dhclientLeasesPath
-	dhclientLeasesPath = path
-	return func() { dhclientLeasesPath = orig }
+	orig := hypervisorUUIDPath
+	hypervisorUUIDPath = path
+	return func() { hypervisorUUIDPath = orig }
 }

@@ -30,6 +30,8 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 )
 
@@ -80,7 +82,7 @@ func (s *LinodePublicTestSuite) TestDefaultInterfaceAddrs() {
 			break
 		}
 	}
-	s.Require().NotEmpty(loName, "no loopback interface found")
+	s.Require().NotEmpty(loName)
 
 	tests := []struct {
 		name    string
@@ -122,7 +124,7 @@ func (s *LinodePublicTestSuite) TestInterface() {
 		{"Name", c.Name(), "linode"},
 		{"Category", c.Category(), "cloud"},
 		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string(nil)},
+		{"Dependencies", c.Dependencies(), []string{"hostname"}},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -136,11 +138,49 @@ func (s *LinodePublicTestSuite) TestCollect() {
 		name      string
 		apt       string
 		noApt     bool
+		hostname  *hostname.Info // when set, added to prior under "hostname"
 		lookups   map[string][]net.Addr
 		lookupErr error
 		wantNil   bool
 		verify    func(s *LinodePublicTestSuite, info *linode.Info)
 	}{
+		{
+			name:     "FQDN contains 'linode' triggers detection without apt",
+			apt:      "deb http://archive.ubuntu.com/ubuntu focal main",
+			hostname: &hostname.Info{FQDN: "myhost.members.linode.com"},
+			lookups: map[string][]net.Addr{
+				"eth0": {mustCIDR(s, "50.1.2.3/24")},
+			},
+			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+				s.Require().NotNil(info)
+				s.Equal("50.1.2.3", info.PublicIP)
+			},
+		},
+		{
+			name:     "Domain contains 'linode' triggers detection",
+			apt:      "deb http://archive.ubuntu.com/ubuntu focal main",
+			hostname: &hostname.Info{Domain: "members.linode.com"},
+			lookups:  map[string][]net.Addr{"eth0": {mustCIDR(s, "50.1.2.3/24")}},
+			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+				s.Require().NotNil(info)
+				s.Equal("50.1.2.3", info.PublicIP)
+			},
+		},
+		{
+			name:     "hostname without linode + no apt → nil",
+			apt:      "deb http://archive.ubuntu.com/ubuntu focal main",
+			hostname: &hostname.Info{FQDN: "host.example.com", Domain: "example.com"},
+			wantNil:  true,
+		},
+		{
+			name:     "nil hostname Info is tolerated",
+			apt:      "linode",
+			hostname: nil,
+			lookups:  map[string][]net.Addr{"eth0": {mustCIDR(s, "50.1.2.3/24")}},
+			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+				s.Equal("50.1.2.3", info.PublicIP)
+			},
+		},
 		{
 			name: "apt says linode, eth0 and eth0:1 populated (link-local skipped)",
 			apt:  "deb http://mirrors.linode.com/ focal main",
@@ -247,8 +287,12 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				})()
 			}
 
+			var prior collector.PriorResults
+			if tt.hostname != nil {
+				prior = collector.PriorResults{"hostname": tt.hostname}
+			}
 			c := linode.New()
-			out, err := c.Collect(context.Background(), nil)
+			out, err := c.Collect(context.Background(), prior)
 			s.Require().NoError(err)
 			if tt.wantNil {
 				s.Nil(out)

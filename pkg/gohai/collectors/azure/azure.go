@@ -25,9 +25,14 @@
 package azure
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"os"
+	"sort"
+	"time"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
@@ -41,15 +46,23 @@ const ProviderName = "azure"
 // metadataBaseURL is Azure's link-local metadata endpoint.
 const metadataBaseURL = "http://169.254.169.254"
 
-// metadataPath + apiVersion is the canonical full path Azure expects.
-// The api-version parameter is required — requests without it return
-// 400. Ohai does a version negotiation handshake; we pin to the
-// latest Ohai-supported version (2023-07-01) and rely on Azure's
-// backward-compatibility for older VMs.
-const (
-	metadataPath = "/metadata/instance"
-	apiVersion   = "2023-07-01"
-)
+// metadataPath is the Azure instance metadata path.
+const metadataPath = "/metadata/instance"
+
+// metadataTimeout matches Ohai's 6s read timeout in mixin/azure_metadata.rb.
+const metadataTimeout = 6 * time.Second
+
+// supportedAPIVersions mirrors Ohai's AZURE_SUPPORTED_VERSIONS
+// array. When negotiating the best available version we intersect
+// Azure's newest-versions response with this list and pick the
+// latest. When negotiation fails, we fall back to the last entry.
+var supportedAPIVersions = []string{
+	"2018-10-01", "2019-02-01", "2019-03-11", "2019-04-30", "2019-06-01",
+	"2019-06-04", "2019-08-01", "2019-08-15", "2019-11-01", "2020-06-01",
+	"2020-07-15", "2020-09-01", "2020-10-01", "2020-12-01", "2021-01-01",
+	"2021-02-01", "2021-03-01", "2021-05-01", "2021-10-01", "2021-11-01",
+	"2021-11-15", "2021-12-13", "2023-07-01",
+}
 
 // metadataHeaderKey / metadataHeaderValue is Azure's required
 // anti-SSRF header. Matches Ohai's Metadata: true behavior.
@@ -62,6 +75,16 @@ const (
 // Existence of this file is Ohai's has_waagent? signal on Linux.
 // Package-level var so tests can swap it.
 var waagentPath = "/usr/sbin/waagent"
+
+// dhclientLeasesPath is the ISC dhclient leases file Ohai scans for
+// Azure's DHCP option 245 (a private Azure signal). Package-level
+// var so tests can swap it. Matches Ohai's has_dhcp_option_245?.
+var dhclientLeasesPath = "/var/lib/dhcp/dhclient.eth0.leases"
+
+// dhcpOption245Signature is the exact string Azure's DHCP lease
+// contains when that option is set. Found in files written by ISC
+// dhclient when the server returns DHCP option 245.
+const dhcpOption245Signature = "unknown-245"
 
 // Info is the Azure view — identity, placement, OS, and network
 // merged into the flat struct pattern.
@@ -109,12 +132,14 @@ type Info struct {
 	SecurityProfile *SecurityProfile `json:"security_profile,omitempty"`
 	PublicKeys      []PublicKey      `json:"public_keys,omitempty"`
 
-	// Network.
-	Interfaces []Interface `json:"interfaces,omitempty"`
-	PublicIPv4 []string    `json:"public_ipv4,omitempty"`
-	LocalIPv4  []string    `json:"local_ipv4,omitempty"`
-	PublicIPv6 []string    `json:"public_ipv6,omitempty"`
-	LocalIPv6  []string    `json:"local_ipv6,omitempty"`
+	// Network. Interfaces is keyed by MAC to match Ohai's
+	// metadata.network.interfaces[<mac>] shape. The Public/Local
+	// top-level lists are aggregated across all interfaces.
+	Interfaces map[string]Interface `json:"interfaces,omitempty"`
+	PublicIPv4 []string             `json:"public_ipv4,omitempty"`
+	LocalIPv4  []string             `json:"local_ipv4,omitempty"`
+	PublicIPv6 []string             `json:"public_ipv6,omitempty"`
+	LocalIPv6  []string             `json:"local_ipv6,omitempty"`
 }
 
 // Plan is the marketplace plan associated with the VM image (if any).
@@ -295,12 +320,13 @@ type Collector struct {
 var _ collector.Collector = (*Collector)(nil)
 
 // New returns a default Collector pointed at Azure's metadata server
-// with the required Metadata: true header.
+// with the required Metadata: true header and Ohai-matching 6s timeout.
 func New() *Collector {
 	return NewWithClient(
 		cloudmetadata.New(
 			metadataBaseURL,
 			cloudmetadata.WithHeader(metadataHeaderKey, metadataHeaderValue),
+			cloudmetadata.WithTimeout(metadataTimeout),
 		),
 	)
 }
@@ -325,9 +351,11 @@ func (*Collector) DefaultEnabled() bool { return false }
 // the waagent binary's presence; Ohai has no DMI check we mirror.
 func (*Collector) Dependencies() []string { return nil }
 
-// Collect gates the fetch on the presence of the Azure Linux Agent
-// binary (Ohai's has_waagent?). Returns (nil, nil) when we're not
-// on Azure or the endpoint is unreachable.
+// Collect gates the fetch on the Azure detection signals (waagent
+// binary OR DHCP option 245). Negotiates an api-version with the
+// metadata service (matches Ohai's handshake), then fetches the
+// instance document. Returns (nil, nil) when no detection signal
+// fires or the endpoint is unreachable.
 func (c *Collector) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -335,8 +363,9 @@ func (c *Collector) Collect(
 	if !onAzure() {
 		return nil, nil
 	}
+	version := c.negotiateAPIVersion(ctx)
 	var r raw
-	if err := c.client.GetJSON(ctx, metadataPath+"?api-version="+apiVersion, &r); err != nil {
+	if err := c.client.GetJSON(ctx, metadataPath+"?api-version="+version, &r); err != nil {
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 			return nil, nil
 		}
@@ -345,13 +374,61 @@ func (c *Collector) Collect(
 	return transform(r), nil
 }
 
-// onAzure returns true when the Azure Linux Agent binary exists.
-// Matches Ohai's has_waagent? on Linux. Non-Linux hosts (macOS,
-// Windows) return false — Windows has its own `C:\WindowsAzure`
-// directory signal that we don't support yet.
+// onAzure returns true when any of Ohai's non-Windows detection
+// signals fire:
+//   - waagent binary at /usr/sbin/waagent exists
+//   - /var/lib/dhcp/dhclient.eth0.leases contains "unknown-245"
+//
+// Matches Ohai's has_waagent? || has_dhcp_option_245? chain.
+// Windows-specific signals (C:\WindowsAzure directory, DhcpDomain
+// registry key) are not implemented — gohai is Linux/macOS primary.
 func onAzure() bool {
-	_, err := os.Stat(waagentPath)
-	return err == nil
+	if _, err := os.Stat(waagentPath); err == nil {
+		return true
+	}
+	if body, err := os.ReadFile(dhclientLeasesPath); err == nil {
+		if bytes.Contains(body, []byte(dhcpOption245Signature)) {
+			return true
+		}
+	}
+	return false
+}
+
+// negotiateAPIVersion asks Azure's metadata service which versions
+// it supports and picks the latest one gohai knows. Falls back to
+// the last entry of supportedAPIVersions on any failure. Matches
+// Ohai's best_api_version handshake: Azure returns HTTP 400 with
+// a `newest-versions` JSON body when no api-version is supplied.
+func (c *Collector) negotiateAPIVersion(
+	ctx context.Context,
+) string {
+	fallback := supportedAPIVersions[len(supportedAPIVersions)-1]
+	body, status, err := c.client.RawGet(ctx, metadataPath)
+	if err != nil || status != http.StatusBadRequest {
+		return fallback
+	}
+	var probe struct {
+		NewestVersions []string `json:"newest-versions"`
+	}
+	if json.Unmarshal(body, &probe) != nil || len(probe.NewestVersions) == 0 {
+		return fallback
+	}
+	supported := make(map[string]struct{}, len(supportedAPIVersions))
+	for _, v := range supportedAPIVersions {
+		supported[v] = struct{}{}
+	}
+	// Intersection, sorted descending, pick first.
+	matches := make([]string, 0, len(probe.NewestVersions))
+	for _, v := range probe.NewestVersions {
+		if _, ok := supported[v]; ok {
+			matches = append(matches, v)
+		}
+	}
+	if len(matches) == 0 {
+		return fallback
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
+	return matches[0]
 }
 
 // transform reshapes Azure's two-section response into the flat Info,
@@ -410,6 +487,7 @@ func transform(
 		}
 	}
 	if r.Network != nil {
+		info.Interfaces = make(map[string]Interface, len(r.Network.Interface))
 		for _, ri := range r.Network.Interface {
 			iface := Interface{MACAddress: ri.MACAddress}
 			if len(ri.IPv4.IPAddress) > 0 || len(ri.IPv4.Subnet) > 0 {
@@ -448,7 +526,7 @@ func transform(
 					iface.IPv6.Subnets = append(iface.IPv6.Subnets, Subnet(sn))
 				}
 			}
-			info.Interfaces = append(info.Interfaces, iface)
+			info.Interfaces[ri.MACAddress] = iface
 		}
 	}
 	return info

@@ -14,27 +14,28 @@ environment always announces itself in the kernel command line.
 
 ## Collected Fields
 
-| Field               | Type       | Description                              | Schema mapping                 |
-| ------------------- | ---------- | ---------------------------------------- | ------------------------------ |
-| `id`                | `string`   | Instance UUID.                           | OTel `cloud.resource_id`       |
-| `name`              | `string`   | Instance display name.                   | OTel `host.name`               |
-| `hostname`          | `string`   | Instance hostname.                       | OCSF `device.hostname`         |
-| `organization`      | `string`   | Scaleway organization UUID.              | OTel `cloud.account.id`        |
-| `project`           | `string`   | Scaleway project UUID.                   | No direct schema mapping.      |
-| `commercial_type`   | `string`   | Instance type (e.g. `DEV1-S`).           | OTel `host.type`               |
-| `tags`              | `[]string` | Instance tags.                           | No direct schema mapping.      |
-| `state_detail`      | `string`   | Instance lifecycle state.                | No direct schema mapping.      |
-| `public_ip`         | `string`   | Public IPv4.                             | No direct schema mapping.      |
-| `public_ip_id`      | `string`   | Public IP resource ID.                   | No direct schema mapping.      |
-| `public_ip_dynamic` | `bool`     | Whether the public IP is dynamic.        | No direct schema mapping.      |
-| `private_ip`        | `string`   | Private IPv4.                            | No direct schema mapping.      |
-| `ipv6_address`      | `string`   | Public IPv6.                             | No direct schema mapping.      |
-| `ipv6_netmask`      | `string`   | IPv6 prefix.                             | No direct schema mapping.      |
-| `ipv6_gateway`      | `string`   | IPv6 gateway.                            | No direct schema mapping.      |
-| `zone`              | `string`   | Availability zone (e.g. `fr-par-1`).     | OTel `cloud.availability_zone` |
-| `platform_id`       | `string`   | Scaleway hardware platform identifier.   | No direct schema mapping.      |
-| `ssh_public_keys`   | `[]string` | SSH public keys attached to the account. | No direct schema mapping.      |
-| `volumes`           | `[]Volume` | Attached volumes.                        | No direct schema mapping.      |
+| Field               | Type             | Description                                                                          | Schema mapping                 |
+| ------------------- | ---------------- | ------------------------------------------------------------------------------------ | ------------------------------ |
+| `id`                | `string`         | Instance UUID.                                                                       | OTel `cloud.resource_id`       |
+| `name`              | `string`         | Instance display name.                                                               | OTel `host.name`               |
+| `hostname`          | `string`         | Instance hostname.                                                                   | OCSF `device.hostname`         |
+| `organization`      | `string`         | Scaleway organization UUID.                                                          | OTel `cloud.account.id`        |
+| `project`           | `string`         | Scaleway project UUID.                                                               | No direct schema mapping.      |
+| `commercial_type`   | `string`         | Instance type (e.g. `DEV1-S`).                                                       | OTel `host.type`               |
+| `tags`              | `[]string`       | Instance tags.                                                                       | No direct schema mapping.      |
+| `state_detail`      | `string`         | Instance lifecycle state.                                                            | No direct schema mapping.      |
+| `public_ip`         | `string`         | Public IPv4.                                                                         | No direct schema mapping.      |
+| `public_ip_id`      | `string`         | Public IP resource ID.                                                               | No direct schema mapping.      |
+| `public_ip_dynamic` | `bool`           | Whether the public IP is dynamic.                                                    | No direct schema mapping.      |
+| `private_ip`        | `string`         | Private IPv4.                                                                        | No direct schema mapping.      |
+| `ipv6_address`      | `string`         | Public IPv6.                                                                         | No direct schema mapping.      |
+| `ipv6_netmask`      | `string`         | IPv6 prefix.                                                                         | No direct schema mapping.      |
+| `ipv6_gateway`      | `string`         | IPv6 gateway.                                                                        | No direct schema mapping.      |
+| `zone`              | `string`         | Availability zone (e.g. `fr-par-1`).                                                 | OTel `cloud.availability_zone` |
+| `platform_id`       | `string`         | Scaleway hardware platform identifier.                                               | No direct schema mapping.      |
+| `ssh_public_keys`   | `[]string`       | SSH public keys attached to the account.                                             | No direct schema mapping.      |
+| `volumes`           | `[]Volume`       | Attached volumes.                                                                    | No direct schema mapping.      |
+| `raw`               | `map[string]any` | Full /conf response. Use when you need a field gohai's typed surface doesn't expose. | No direct schema mapping.      |
 
 ### Volume
 
@@ -106,15 +107,20 @@ stable DMI signature, but their kernel cmdline always contains `"scaleway"`.
    short-circuits with `(nil, nil)`. Matches Ohai's `has_scaleway_cmdline?`.
 2. **Endpoint:** `http://169.254.42.42/conf?format=json` — a single JSON
    document.
-3. **Timeout:** 2 seconds (cloudmetadata default).
-4. **Failure handling:** transport failures and non-2xx responses wrap
-   `cloudmetadata.ErrNotAvailable`. The collector unwraps and returns
-   `(nil, nil)` so `Facts.Scaleway` drops silently.
-5. **Transformation:** nested `public_ip`, `ipv6`, and `location` objects are
+3. **User-Agent:** `gohai` (the cloudmetadata default).
+4. **Timeout:** 6 seconds — matches Ohai's `read_timeout` in
+   `mixin/scaleway_metadata.rb`.
+5. **Failure handling:** any fetch failure (transport, non-2xx, body read)
+   returns `(nil, nil)` so `Facts.Scaleway` drops silently. Only malformed JSON
+   in the response surfaces as an error.
+6. **Transformation:** nested `public_ip`, `ipv6`, and `location` objects are
    flattened; the oddly-shaped index-keyed `volumes` map is converted to a
-   slice.
+   slice. The full untransformed tree is also exposed as `Info.Raw` for
+   forward-compat — fields Scaleway adds in the future appear there without a
+   code change.
 
-Mirrors Ohai's `Ohai::Mixin::ScalewayMetadata` collection approach.
+Mirrors Ohai's `Ohai::Mixin::ScalewayMetadata` methodology — same endpoint, same
+single JSON GET, same 6s timeout.
 
 ## Backing library
 

@@ -14,29 +14,30 @@ Detection is gated on DMI `sys_vendor` containing `"Alibaba"` — matches Ohai's
 
 ## Collected Fields
 
-| Field                   | Type       | Description                               | Schema mapping                 |
-| ----------------------- | ---------- | ----------------------------------------- | ------------------------------ |
-| `instance_id`           | `string`   | ECS instance ID.                          | OTel `cloud.resource_id`       |
-| `instance_name`         | `string`   | Instance display name.                    | OTel `host.name`               |
-| `instance_type`         | `string`   | ECS instance type (e.g. `ecs.g6.large`).  | OTel `host.type`               |
-| `hostname`              | `string`   | Hostname.                                 | OCSF `device.hostname`         |
-| `image_id`              | `string`   | Source image ID.                          | OTel `host.image.id`           |
-| `serial_number`         | `string`   | Instance serial.                          | No direct schema mapping.      |
-| `network_type`          | `string`   | `vpc` / `classic`.                        | No direct schema mapping.      |
-| `region`                | `string`   | Region (e.g. `cn-hangzhou`).              | OTel `cloud.region`            |
-| `zone`                  | `string`   | Availability zone (e.g. `cn-hangzhou-b`). | OTel `cloud.availability_zone` |
-| `mac`                   | `string`   | Primary interface MAC.                    | OCSF `network_interface.mac`   |
-| `private_ipv4`          | `string`   | Primary private IPv4.                     | No direct schema mapping.      |
-| `public_ipv4`           | `string`   | EIP (elastic IP) when attached.           | No direct schema mapping.      |
-| `vpc_id`                | `string`   | VPC ID.                                   | No direct schema mapping.      |
-| `vpc_cidr_block`        | `string`   | VPC CIDR.                                 | No direct schema mapping.      |
-| `vswitch_id`            | `string`   | vSwitch ID (VPC subnet).                  | No direct schema mapping.      |
-| `vswitch_cidr_block`    | `string`   | vSwitch CIDR.                             | No direct schema mapping.      |
-| `dns_nameservers`       | `[]string` | Configured DNS resolvers.                 | No direct schema mapping.      |
-| `ntp_servers`           | `[]string` | Configured NTP servers.                   | No direct schema mapping.      |
-| `max_bandwidth_ingress` | `string`   | Ingress bandwidth cap (bytes/sec).        | No direct schema mapping.      |
-| `max_bandwidth_egress`  | `string`   | Egress bandwidth cap (bytes/sec).         | No direct schema mapping.      |
-| `ram_role_name`         | `string`   | Attached RAM (role) name.                 | No direct schema mapping.      |
+| Field                   | Type             | Description                                                                                                                                                | Schema mapping                 |
+| ----------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `instance_id`           | `string`         | ECS instance ID.                                                                                                                                           | OTel `cloud.resource_id`       |
+| `instance_name`         | `string`         | Instance display name.                                                                                                                                     | OTel `host.name`               |
+| `instance_type`         | `string`         | ECS instance type (e.g. `ecs.g6.large`).                                                                                                                   | OTel `host.type`               |
+| `hostname`              | `string`         | Hostname.                                                                                                                                                  | OCSF `device.hostname`         |
+| `image_id`              | `string`         | Source image ID.                                                                                                                                           | OTel `host.image.id`           |
+| `serial_number`         | `string`         | Instance serial.                                                                                                                                           | No direct schema mapping.      |
+| `network_type`          | `string`         | `vpc` / `classic`.                                                                                                                                         | No direct schema mapping.      |
+| `region`                | `string`         | Region (e.g. `cn-hangzhou`).                                                                                                                               | OTel `cloud.region`            |
+| `zone`                  | `string`         | Availability zone (e.g. `cn-hangzhou-b`).                                                                                                                  | OTel `cloud.availability_zone` |
+| `mac`                   | `string`         | Primary interface MAC.                                                                                                                                     | OCSF `network_interface.mac`   |
+| `private_ipv4`          | `string`         | Primary private IPv4.                                                                                                                                      | No direct schema mapping.      |
+| `public_ipv4`           | `string`         | EIP (elastic IP) when attached.                                                                                                                            | No direct schema mapping.      |
+| `vpc_id`                | `string`         | VPC ID.                                                                                                                                                    | No direct schema mapping.      |
+| `vpc_cidr_block`        | `string`         | VPC CIDR.                                                                                                                                                  | No direct schema mapping.      |
+| `vswitch_id`            | `string`         | vSwitch ID (VPC subnet).                                                                                                                                   | No direct schema mapping.      |
+| `vswitch_cidr_block`    | `string`         | vSwitch CIDR.                                                                                                                                              | No direct schema mapping.      |
+| `dns_nameservers`       | `[]string`       | Configured DNS resolvers.                                                                                                                                  | No direct schema mapping.      |
+| `ntp_servers`           | `[]string`       | Configured NTP servers.                                                                                                                                    | No direct schema mapping.      |
+| `max_bandwidth_ingress` | `int64`          | Ingress bandwidth cap (bytes/sec).                                                                                                                         | No direct schema mapping.      |
+| `max_bandwidth_egress`  | `int64`          | Egress bandwidth cap (bytes/sec).                                                                                                                          | No direct schema mapping.      |
+| `ram_role_name`         | `string`         | Attached RAM (role) name.                                                                                                                                  | No direct schema mapping.      |
+| `raw`                   | `map[string]any` | Full metadata tree as walked recursively. Keys follow Ohai's sanitization (dashes/slashes → `_`). Use when you need a field not exposed as a typed member. | No direct schema mapping.      |
 
 ## Platform Support
 
@@ -89,21 +90,34 @@ wasn't run.
 
 ## Data Sources
 
-1. **DMI gate:** `dmi.Product.Vendor` contains `"Alibaba"`. Matches Ohai's
-   `has_ali_dmi?`.
-2. **Endpoint:** `http://100.100.100.200/2016-01-01/meta-data/<path>`. Each
-   field is fetched as its own GET against the curated path list. Ohai walks the
-   entire tree recursively; we fetch the specific known fields to produce a
-   typed flat struct — same field coverage, fewer requests.
-3. **Timeout:** 2 seconds per request.
-4. **Failure handling:** first-probe (`/meta-data/hostname`) failure returns
-   `(nil, nil)`. Subsequent path failures are tolerated and leave their field
-   zero-valued.
-5. **Transformation:** space-separated DNS and NTP lists are split into Go
-   slices.
+1. **DMI gate:** `dmi.Product.Vendor` contains `"Alibaba"`. ghw reads
+   `/sys/class/dmi/id/sys_vendor` into `Product.Vendor`, so this check is
+   equivalent to Ohai's `has_ali_dmi?`.
+2. **Endpoint:** `http://100.100.100.200/2016-01-01/` — note the non-standard
+   `100.100.100.200` link-local address, not `169.254.169.254`.
+3. **Recursive walk:** starting at `/`, the collector fetches each directory
+   listing (newline-separated entries), recurses into entries ending in `/`, and
+   fetches leaves as values. Matches Ohai's `fetch_metadata` algorithm in
+   `mixin/alibaba_metadata.rb`. Forward-compatible — fields Alibaba adds later
+   surface automatically under `Raw`.
+4. **`/user-data` excluded** (root-level only) — matches Ohai's explicit skip to
+   avoid surfacing cloud-init scripts that may contain credentials.
+5. **Leaf parsing:** each leaf is tried as JSON first; on parse failure the raw
+   text is kept. Matches Ohai's `parse_json` fallback pattern.
+6. **Key sanitization:** dashes and slashes in path segments become underscores
+   in map keys; trailing underscores are stripped. Matches Ohai's
+   `sanitize_key`.
+7. **User-Agent:** `gohai` (the cloudmetadata default) — Alibaba's metadata
+   service filters some requests by UA.
+8. **Timeout:** 6 seconds per request, matching Ohai's `read_timeout` +
+   `keep_alive_timeout`.
+9. **Failure handling:** first call (the root listing) failing → `(nil, nil)`.
+   Per-path failures during the walk are tolerated and leave those keys absent
+   from `Raw`.
 
-Mirrors Ohai's `Ohai::Mixin::AlibabaMetadata` collection approach and Alibaba
-field coverage.
+Mirrors Ohai's `Ohai::Mixin::AlibabaMetadata` methodology: same endpoint, same
+recursive walk, same key sanitization, same `/user-data` scrub, same User-Agent
+pattern, same 6s timeout.
 
 ## Backing library
 

@@ -28,6 +28,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
@@ -41,6 +42,9 @@ const ProviderName = "oci"
 
 // metadataBaseURL is OCI's link-local metadata endpoint.
 const metadataBaseURL = "http://169.254.169.254/opc/v2"
+
+// metadataTimeout matches Ohai's 6s read timeout in mixin/oci_metadata.rb.
+const metadataTimeout = 6 * time.Second
 
 // metadataAuthHeader / Value is OCI's literal Authorization header.
 // Not a JWT — just the hardcoded string their IMDSv2 expects. Matches
@@ -87,8 +91,9 @@ type Info struct {
 	// From /vnics — virtual NICs.
 	VNICs []VNIC `json:"vnics,omitempty"`
 
-	// From /allVolumeAttachments.
-	VolumeAttachments []VolumeAttachment `json:"volume_attachments,omitempty"`
+	// From /allVolumeAttachments. Keyed by attachment OCID to match
+	// Ohai's metadata.volumes[<id>] = v shape.
+	VolumeAttachments map[string]VolumeAttachment `json:"volume_attachments,omitempty"`
 }
 
 // ShapeConfig is the compute shape's resource profile.
@@ -203,12 +208,14 @@ type Collector struct {
 var _ collector.Collector = (*Collector)(nil)
 
 // New returns a default Collector pointed at OCI's metadata server
-// with the required Authorization header pre-configured.
+// with the required Authorization header pre-configured and Ohai-
+// matching 6s timeout.
 func New() *Collector {
 	return NewWithClient(
 		cloudmetadata.New(
 			metadataBaseURL,
 			cloudmetadata.WithHeader(metadataAuthHeader, metadataAuthValue),
+			cloudmetadata.WithTimeout(metadataTimeout),
 		),
 	)
 }
@@ -267,8 +274,14 @@ func (c *Collector) Collect(
 
 	var vols []rawVolumeAttachment
 	if err := c.client.GetJSON(ctx, pathVolumes, &vols); err == nil {
+		if len(vols) > 0 {
+			info.VolumeAttachments = make(map[string]VolumeAttachment, len(vols))
+		}
 		for _, v := range vols {
-			info.VolumeAttachments = append(info.VolumeAttachments, VolumeAttachment(v))
+			if v.ID == "" {
+				continue
+			}
+			info.VolumeAttachments[v.ID] = VolumeAttachment(v)
 		}
 	} else if !errors.Is(err, cloudmetadata.ErrNotAvailable) {
 		return nil, err

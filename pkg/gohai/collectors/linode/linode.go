@@ -30,8 +30,10 @@ import (
 	"context"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 )
 
 // ProviderName is the canonical cloud identifier this collector
@@ -87,16 +89,19 @@ func (*Collector) Category() string { return collector.CategoryCloud }
 // DefaultEnabled returns false — cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
-// Dependencies returns no dependencies.
-func (*Collector) Dependencies() []string { return nil }
+// Dependencies declares hostname so the FQDN/Domain check can run
+// against the host's resolved name (matches Ohai's has_linode_domain?
+// signal which reads node['domain']).
+func (*Collector) Dependencies() []string { return []string{"hostname"} }
 
-// Collect returns the Linode Info when apt sources reference Linode,
-// else (nil, nil). Mirrors Ohai's has_linode_apt_repos? heuristic.
+// Collect returns the Linode Info when any detection signal fires
+// (apt-sources OR domain contains "linode"), else (nil, nil).
+// Mirrors Ohai's looks_like_linode? OR chain.
 func (c *Collector) Collect(
 	_ context.Context,
-	_ collector.PriorResults,
+	prior collector.PriorResults,
 ) (any, error) {
-	if !onLinode() {
+	if !onLinode(prior) {
 		return nil, nil
 	}
 	info := &Info{}
@@ -105,14 +110,25 @@ func (c *Collector) Collect(
 	return info, nil
 }
 
-// onLinode checks /etc/apt/sources.list for the Linode substring.
-// Matches Ohai's has_linode_apt_repos?. Missing file → not detected.
-func onLinode() bool {
-	b, err := os.ReadFile(aptSourcesPath)
-	if err != nil {
-		return false
+// onLinode runs Ohai's full non-hint detection chain:
+//   - /etc/apt/sources.list contains "linode" (has_linode_apt_repos?)
+//   - The host's FQDN or Domain contains "linode" (has_linode_domain?,
+//     e.g. members.linode.com)
+func onLinode(
+	prior collector.PriorResults,
+) bool {
+	if b, err := os.ReadFile(aptSourcesPath); err == nil {
+		if bytes.Contains(bytes.ToLower(b), []byte(linodeSignature)) {
+			return true
+		}
 	}
-	return bytes.Contains(bytes.ToLower(b), []byte(linodeSignature))
+	if h, ok := collector.GetDep[*hostname.Info](prior, "hostname"); ok && h != nil {
+		if strings.Contains(strings.ToLower(h.FQDN), linodeSignature) ||
+			strings.Contains(strings.ToLower(h.Domain), linodeSignature) {
+			return true
+		}
+	}
+	return false
 }
 
 // firstIPv4 returns the first non-link-local IPv4 address on the

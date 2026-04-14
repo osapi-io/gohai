@@ -18,24 +18,14 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package azure
+package openstack
 
-// SetWaagentPath swaps the waagent binary path tests look at.
-// Returns a restore func the caller defers.
-func SetWaagentPath(
+// SetPasswdPath swaps the /etc/passwd path tests look at for the
+// dreamhost-vs-openstack provider distinction.
+func SetPasswdPath(
 	path string,
 ) func() {
-	orig := waagentPath
-	waagentPath = path
-	return func() { waagentPath = orig }
-}
-
-// SetDhclientLeasesPath swaps the dhclient leases file path tests
-// look at for DHCP option 245 detection.
-func SetDhclientLeasesPath(
-	path string,
-) func() {
-	orig := dhclientLeasesPath
-	dhclientLeasesPath = path
-	return func() { dhclientLeasesPath = orig }
+	orig := passwdPath
+	passwdPath = path
+	return func() { passwdPath = orig }
 }

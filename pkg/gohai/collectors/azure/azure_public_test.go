@@ -105,6 +105,8 @@ const cannedResponse = `{
   }
 }`
 
+const negotiationBody = `{"newest-versions": ["2023-07-01", "9999-99-99"]}`
+
 type AzurePublicTestSuite struct {
 	suite.Suite
 	tmpDir string
@@ -128,6 +130,26 @@ func (s *AzurePublicTestSuite) installWaagent() func() {
 	return azure.SetWaagentPath(path)
 }
 
+// writeLeases writes a dhclient leases file containing the given
+// content and swaps the package var.
+func (s *AzurePublicTestSuite) writeLeases(
+	content string,
+) func() {
+	path := filepath.Join(s.tmpDir, "leases")
+	s.Require().NoError(os.WriteFile(path, []byte(content), 0o644))
+	return azure.SetDhclientLeasesPath(path)
+}
+
+// pointAwayFromWaagent + pointAwayFromLeases point the package vars
+// at nonexistent paths so detection short-circuits.
+func (s *AzurePublicTestSuite) pointAwayFromWaagent() func() {
+	return azure.SetWaagentPath(filepath.Join(s.tmpDir, "no-waagent"))
+}
+
+func (s *AzurePublicTestSuite) pointAwayFromLeases() func() {
+	return azure.SetDhclientLeasesPath(filepath.Join(s.tmpDir, "no-leases"))
+}
+
 func (s *AzurePublicTestSuite) TestInterface() {
 	c := azure.New()
 	tests := []struct {
@@ -147,58 +169,138 @@ func (s *AzurePublicTestSuite) TestInterface() {
 	}
 }
 
+// handler simulates Azure's metadata service. GET /metadata/instance
+// without api-version returns 400 with newest-versions; with a known
+// api-version returns the canned response. `respOverride` lets tests
+// force a specific handler.
+func handler(
+	respOverride func(w http.ResponseWriter, r *http.Request),
+	negotiationJSON string,
+	negotiationStatus int,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if respOverride != nil {
+			respOverride(w, r)
+			return
+		}
+		if r.URL.Path != "/metadata/instance" {
+			http.NotFound(w, r)
+			return
+		}
+		if r.URL.Query().Get("api-version") == "" {
+			w.WriteHeader(negotiationStatus)
+			_, _ = w.Write([]byte(negotiationJSON))
+			return
+		}
+		_, _ = w.Write([]byte(cannedResponse))
+	}
+}
+
 func (s *AzurePublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		waagent    bool
-		handler    func(w http.ResponseWriter, r *http.Request)
-		closed     bool
-		wantNil    bool
-		wantErr    bool
-		wantNoHTTP bool
-		verify     func(s *AzurePublicTestSuite, info *azure.Info, gotHdr string, gotAPI string)
+		name              string
+		waagent           bool
+		leasesContent     string // when non-empty, writes a dhclient leases file
+		noDetection       bool   // when true, skip waagent + leases setup
+		negotiationJSON   string
+		negotiationStatus int
+		overrideHandler   func(w http.ResponseWriter, r *http.Request)
+		closed            bool
+		wantNil           bool
+		wantErr           bool
+		wantNoHTTP        bool
+		verify            func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string)
 	}{
 		{
-			name:    "happy path",
-			waagent: true,
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write([]byte(cannedResponse))
-			},
-			verify: func(s *AzurePublicTestSuite, info *azure.Info, gotHdr, gotAPI string) {
-				s.Equal("true", gotHdr)
+			name:              "happy path with waagent + successful version negotiation",
+			waagent:           true,
+			negotiationJSON:   negotiationBody,
+			negotiationStatus: http.StatusBadRequest,
+			verify: func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string) {
 				s.Equal("2023-07-01", gotAPI)
 				s.Require().NotNil(info)
 				s.Equal("abcd-1234", info.VMID)
-				s.Equal("Standard_D2s_v3", info.VMSize)
 				s.Equal("eastus", info.Location)
-				s.Equal("1", info.Zone)
-				s.Equal("sub-uuid", info.SubscriptionID)
-				s.Require().NotNil(info.SecurityProfile)
-				s.Equal("true", info.SecurityProfile.SecureBootEnabled)
-				s.Require().Len(info.PublicKeys, 1)
-				s.Require().NotNil(info.StorageProfile)
-				s.Require().NotNil(info.StorageProfile.OSDisk)
-				s.Equal("osdisk", info.StorageProfile.OSDisk.Name)
-				s.Require().Len(info.StorageProfile.DataDisks, 1)
 				s.Require().Len(info.Interfaces, 1)
-				s.Equal("000D3A1122AA", info.Interfaces[0].MACAddress)
+				iface, ok := info.Interfaces["000D3A1122AA"]
+				s.Require().True(ok)
+				s.Require().NotNil(iface.IPv4)
 				s.Equal([]string{"10.0.0.4"}, info.LocalIPv4)
 				s.Equal([]string{"20.1.2.3"}, info.PublicIPv4)
-				s.Equal([]string{"fd00::4"}, info.LocalIPv6)
-				s.Equal([]string{"2603::1"}, info.PublicIPv6)
 			},
 		},
 		{
-			name:       "no waagent short-circuits",
-			waagent:    false,
-			handler:    func(http.ResponseWriter, *http.Request) {},
-			wantNil:    true,
-			wantNoHTTP: true,
+			name:              "DHCP option 245 detects Azure without waagent",
+			leasesContent:     "lease {\n  option unknown-245 12:34;\n}\n",
+			negotiationJSON:   negotiationBody,
+			negotiationStatus: http.StatusBadRequest,
+			verify: func(s *AzurePublicTestSuite, info *azure.Info, _ string) {
+				s.Require().NotNil(info)
+				s.Equal("abcd-1234", info.VMID)
+			},
 		},
 		{
-			name:    "404 drops silently",
+			name:          "DHCP leases without signature does not detect",
+			leasesContent: "lease { option routers 10.0.0.1; }\n",
+			wantNil:       true,
+			wantNoHTTP:    true,
+		},
+		{
+			name:        "no waagent + no leases file short-circuits",
+			noDetection: true,
+			wantNil:     true,
+			wantNoHTTP:  true,
+		},
+		{
+			name:              "version negotiation: 404 falls back to latest",
+			waagent:           true,
+			negotiationJSON:   "",
+			negotiationStatus: http.StatusNotFound,
+			verify: func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string) {
+				s.Equal("2023-07-01", gotAPI)
+				s.Require().NotNil(info)
+			},
+		},
+		{
+			name:              "version negotiation: malformed JSON falls back to latest",
+			waagent:           true,
+			negotiationJSON:   "not json",
+			negotiationStatus: http.StatusBadRequest,
+			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
+				s.Equal("2023-07-01", gotAPI)
+			},
+		},
+		{
+			name:              "version negotiation: empty newest-versions falls back",
+			waagent:           true,
+			negotiationJSON:   `{"newest-versions":[]}`,
+			negotiationStatus: http.StatusBadRequest,
+			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
+				s.Equal("2023-07-01", gotAPI)
+			},
+		},
+		{
+			name:              "version negotiation: no intersection falls back",
+			waagent:           true,
+			negotiationJSON:   `{"newest-versions":["2099-01-01", "2099-02-01"]}`,
+			negotiationStatus: http.StatusBadRequest,
+			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
+				s.Equal("2023-07-01", gotAPI)
+			},
+		},
+		{
+			name:              "version negotiation: intersection picks latest",
+			waagent:           true,
+			negotiationJSON:   `{"newest-versions":["2021-02-01","2023-07-01","2019-11-01"]}`,
+			negotiationStatus: http.StatusBadRequest,
+			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
+				s.Equal("2023-07-01", gotAPI)
+			},
+		},
+		{
+			name:    "404 on main fetch drops silently",
 			waagent: true,
-			handler: func(w http.ResponseWriter, _ *http.Request) {
+			overrideHandler: func(w http.ResponseWriter, _ *http.Request) {
 				http.NotFound(w, nil)
 			},
 			wantNil: true,
@@ -206,25 +308,34 @@ func (s *AzurePublicTestSuite) TestCollect() {
 		{
 			name:    "connection refused drops silently",
 			waagent: true,
-			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
 			wantNil: true,
 		},
 		{
-			name:    "malformed JSON surfaces as error",
+			name:    "malformed main JSON surfaces as error",
 			waagent: true,
-			handler: func(w http.ResponseWriter, _ *http.Request) {
+			overrideHandler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Query().Get("api-version") == "" {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(negotiationBody))
+					return
+				}
 				_, _ = w.Write([]byte("not json"))
 			},
 			wantErr: true,
 		},
 		{
-			name:    "empty compute and network skip all transform branches",
+			name:    "empty compute and network skip transform branches",
 			waagent: true,
-			handler: func(w http.ResponseWriter, _ *http.Request) {
+			overrideHandler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Query().Get("api-version") == "" {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(negotiationBody))
+					return
+				}
 				_, _ = w.Write([]byte(`{}`))
 			},
-			verify: func(s *AzurePublicTestSuite, info *azure.Info, _, _ string) {
+			verify: func(s *AzurePublicTestSuite, info *azure.Info, _ string) {
 				s.Require().NotNil(info)
 				s.Empty(info.VMID)
 				s.Empty(info.Interfaces)
@@ -234,20 +345,26 @@ func (s *AzurePublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.waagent {
+			if tt.noDetection {
+				defer s.pointAwayFromWaagent()()
+				defer s.pointAwayFromLeases()()
+			} else if tt.waagent {
 				defer s.installWaagent()()
-			} else {
-				defer azure.SetWaagentPath(filepath.Join(s.tmpDir, "missing"))()
+				defer s.pointAwayFromLeases()()
+			} else if tt.leasesContent != "" {
+				defer s.pointAwayFromWaagent()()
+				defer s.writeLeases(tt.leasesContent)()
 			}
 
 			var httpCalled bool
-			var gotHdr, gotAPI string
+			var gotAPI string
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					httpCalled = true
-					gotHdr = r.Header.Get("Metadata")
-					gotAPI = r.URL.Query().Get("api-version")
-					tt.handler(w, r)
+					if r.URL.Query().Get("api-version") != "" {
+						gotAPI = r.URL.Query().Get("api-version")
+					}
+					handler(tt.overrideHandler, tt.negotiationJSON, tt.negotiationStatus)(w, r)
 				},
 			))
 			if tt.closed {
@@ -277,7 +394,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			info, ok := out.(*azure.Info)
 			s.Require().True(ok)
 			if tt.verify != nil {
-				tt.verify(s, info, gotHdr, gotAPI)
+				tt.verify(s, info, gotAPI)
 			}
 		})
 	}

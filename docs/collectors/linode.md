@@ -6,10 +6,15 @@
 
 Detects Linode hosts and reports their public / private IPv4 addresses. Unlike
 every other cloud collector in gohai, Linode **does not** use a metadata HTTP
-endpoint — Ohai's Linode plugin doesn't either. Detection relies on
-`/etc/apt/sources.list` containing the substring `"linode"` (Linode's official
-images ship with a Linode-hosted apt mirror). Data comes from the host's own
-network interfaces.
+endpoint — Ohai's Linode plugin doesn't either. Detection ORs two non-hint
+signals (matches Ohai's `looks_like_linode?`):
+
+- `/etc/apt/sources.list` contains `"linode"` (Linode's official images ship a
+  Linode-hosted apt mirror).
+- The host's resolved FQDN or domain contains `"linode"` (e.g.
+  `members.linode.com` — Linode's reverse-DNS suffix).
+
+Data comes from the host's own network interfaces.
 
 ## Collected Fields
 
@@ -63,20 +68,23 @@ gohai --category=cloud        # pulls this + all cloud collectors
 
 ## Dependencies
 
-None. Linode has no DMI signature gohai uses. Detection is apt-sources-based.
+`hostname` — needed for the FQDN/Domain detection signal that mirrors Ohai's
+`has_linode_domain?`.
 
 ## Data Sources
 
-1. **apt gate:** read `/etc/apt/sources.list` and check for `"linode"` substring
-   (case-insensitive). Missing file or no match → `(nil, nil)`. Matches Ohai's
-   `has_linode_apt_repos?`.
+1. **Detection chain** (any signal triggers detection):
+   - **apt:** `/etc/apt/sources.list` contains `"linode"` (case-insensitive).
+     Matches Ohai's `has_linode_apt_repos?`.
+   - **domain:** the prior `hostname` collector's `FQDN` or `Domain` contains
+     `"linode"`. Matches Ohai's `has_linode_domain?`.
 2. **Interface reads:** `net.InterfaceByName("eth0")` / `"eth0:1"` via Go
    stdlib. First non-link-local IPv4 on each wins. Missing interface → empty
    string on that field.
 
-Mirrors Ohai's Linode plugin collection approach — same apt heuristic, same eth0
-/ eth0:1 interface scheme. We do not query Linode's `metadata.linode.com` API
-(neither does Ohai).
+Mirrors Ohai's Linode plugin methodology — same apt + domain detection chain,
+same eth0 / eth0:1 interface scheme. We do not query Linode's
+`metadata.linode.com` API (neither does Ohai).
 
 ## Backing library
 

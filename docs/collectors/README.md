@@ -184,7 +184,7 @@ automatically — enabling a collector also enables its dependencies.
 | `oci`            | `dmi`                           |
 | `alibaba`        | `dmi`                           |
 | `openstack`      | `dmi`                           |
-| `linode`         | —                               |
+| `linode`         | `hostname`                      |
 | `scaleway`       | —                               |
 | `virtualization` | `dmi`, `cpu`                    |
 | `docker`         | `virtualization`                |

@@ -68,17 +68,26 @@ type Client struct {
 // Option configures a Client at construction time.
 type Option func(*Client)
 
+// DefaultUserAgent is the User-Agent header applied to every request
+// unless the caller overrides it via WithHeader. Matches Ohai's
+// chef-ohai/<version> pattern — metadata services occasionally rate-
+// limit or filter by UA, and a stable identifier makes gohai traffic
+// distinguishable in provider logs.
+const DefaultUserAgent = "gohai"
+
 // New returns a Client rooted at baseURL. Default timeout is 2s;
 // override with WithTimeout. Default transport has proxy lookup
 // disabled (metadata IPs are link-local — honoring HTTP_PROXY would
 // route cloud probes through a proxy and almost certainly fail).
+// The User-Agent header defaults to DefaultUserAgent; override with
+// WithHeader("User-Agent", "...") if needed.
 func New(
 	baseURL string,
 	opts ...Option,
 ) *Client {
 	c := &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		headers: map[string]string{},
+		headers: map[string]string{"User-Agent": DefaultUserAgent},
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
 			Transport: &http.Transport{
@@ -141,6 +150,37 @@ func (c *Client) GetWithHeaders(
 	headers map[string]string,
 ) ([]byte, error) {
 	return c.do(ctx, http.MethodGet, path, headers)
+}
+
+// RawGet issues a GET and returns the response body + status code,
+// without treating non-2xx as ErrNotAvailable. Used by Azure's
+// api-version negotiation which relies on reading the HTTP 400 body
+// Azure emits when no api-version is supplied. Transport failures
+// still wrap ErrNotAvailable.
+func (c *Client) RawGet(
+	ctx context.Context,
+	path string,
+) ([]byte, int, error) {
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("build request: %w", err)
+	}
+	for k, v := range c.headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("%w: %v", ErrNotAvailable, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("read body: %w", err)
+	}
+	return body, resp.StatusCode, nil
 }
 
 // Put issues a PUT against baseURL + path with per-request headers

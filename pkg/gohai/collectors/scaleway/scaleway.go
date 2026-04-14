@@ -27,9 +27,10 @@ package scaleway
 import (
 	"bytes"
 	"context"
-	"errors"
+	"encoding/json"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
@@ -46,6 +47,9 @@ const metadataBaseURL = "http://169.254.42.42"
 
 // metadataPath returns the entire instance config as JSON in one GET.
 const metadataPath = "/conf?format=json"
+
+// metadataTimeout matches Ohai's 6s read timeout in mixin/scaleway_metadata.rb.
+const metadataTimeout = 6 * time.Second
 
 // cmdlineSignature is the substring Ohai looks for in /proc/cmdline
 // to gate metadata fetch (has_scaleway_cmdline?).
@@ -77,6 +81,11 @@ type Info struct {
 	PlatformID      string   `json:"platform_id,omitempty"`
 	SSHPublicKeys   []string `json:"ssh_public_keys,omitempty"`
 	Volumes         []Volume `json:"volumes,omitempty"`
+
+	// Raw is the full /conf response as Scaleway returned it. Use
+	// when you need a field gohai's typed surface doesn't expose.
+	// Mirrors Ohai's full-tree dump under node['scaleway'].
+	Raw map[string]any `json:"raw,omitempty"`
 }
 
 // Volume is one attached volume.
@@ -148,9 +157,13 @@ type Collector struct {
 
 var _ collector.Collector = (*Collector)(nil)
 
-// New returns a default Collector pointed at Scaleway's metadata server.
+// New returns a default Collector pointed at Scaleway's metadata
+// server with Ohai-matching 6s timeout.
 func New() *Collector {
-	return NewWithClient(cloudmetadata.New(metadataBaseURL))
+	return NewWithClient(cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithTimeout(metadataTimeout),
+	))
 }
 
 // NewWithClient returns a Collector backed by a caller-supplied client.
@@ -176,8 +189,11 @@ func (*Collector) DefaultEnabled() bool { return false }
 func (*Collector) Dependencies() []string { return nil }
 
 // Collect probes /proc/cmdline for Scaleway's signature, then fetches
-// the single /conf?format=json document. Returns (nil, nil) when the
-// signature is missing or the endpoint is unreachable.
+// the single /conf?format=json document. The body is unmarshalled
+// twice — once into the typed raw struct for the curated Info, and
+// once into a generic map for the Raw forward-compat escape hatch.
+// Returns (nil, nil) when the signature is missing or the endpoint
+// is unreachable.
 func (c *Collector) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -185,14 +201,24 @@ func (c *Collector) Collect(
 	if !onScaleway() {
 		return nil, nil
 	}
+	body, err := c.client.Get(ctx, metadataPath)
+	if err != nil {
+		// Any fetch failure (transport, 404, body-read) means we
+		// can't determine whether we're on Scaleway — treat as "not
+		// on this cloud" rather than propagating noise.
+		return nil, nil
+	}
 	var r raw
-	if err := c.client.GetJSON(ctx, metadataPath, &r); err != nil {
-		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
-			return nil, nil
-		}
+	if err := json.Unmarshal(body, &r); err != nil {
 		return nil, err
 	}
-	return transform(r), nil
+	info := transform(r)
+	// If the typed Unmarshal succeeded, the body is valid JSON, so
+	// the generic Unmarshal also succeeds — no error check needed.
+	var generic map[string]any
+	_ = json.Unmarshal(body, &generic)
+	info.Raw = generic
+	return info, nil
 }
 
 // onScaleway returns true when /proc/cmdline contains Scaleway's

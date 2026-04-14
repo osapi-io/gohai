@@ -26,8 +26,9 @@ package gce
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
@@ -48,6 +49,9 @@ const dmiProductName = "Google Compute Engine"
 // dot on the hostname defeats the host's DNS search path (matches
 // Ohai's Ohai::Mixin::GCEMetadata::GCE_METADATA_ADDR).
 const metadataBaseURL = "http://metadata.google.internal./computeMetadata/v1"
+
+// metadataTimeout matches Ohai's 6s read timeout in mixin/gce_metadata.rb.
+const metadataTimeout = 6 * time.Second
 
 // metadataFlavorHeader is required by GCE — without it the service
 // rejects the request with 403. Protects against lateral SSRF-style
@@ -101,6 +105,12 @@ type Info struct {
 
 	// Service accounts attached to the VM.
 	ServiceAccounts []ServiceAccount `json:"service_accounts,omitempty"`
+
+	// Raw is the full metadata tree as GCE returned it from
+	// `?recursive=true`. Use this when you need a field gohai's
+	// typed surface doesn't expose. Mirrors Ohai's full-tree dump
+	// under node['gce'].
+	Raw map[string]any `json:"raw,omitempty"`
 }
 
 // NetworkInterface is one attached VNIC. All fields GCE reports,
@@ -232,12 +242,14 @@ type Collector struct {
 
 var _ collector.Collector = (*Collector)(nil)
 
-// New returns a default Collector pointed at GCE's metadata server.
+// New returns a default Collector pointed at GCE's metadata server
+// with the required Metadata-Flavor header and Ohai-matching 6s timeout.
 func New() *Collector {
 	return NewWithClient(
 		cloudmetadata.New(
 			metadataBaseURL,
 			cloudmetadata.WithHeader(metadataFlavorHeader, "Google"),
+			cloudmetadata.WithTimeout(metadataTimeout),
 		),
 	)
 }
@@ -265,8 +277,12 @@ func (*Collector) DefaultEnabled() bool { return false }
 func (*Collector) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the metadata fetch on a DMI product_name match.
-// Returns (nil, nil) when we're not on GCE or when the endpoint is
-// unreachable — either way the Gce field drops cleanly from Facts.
+// Issues one recursive=true GET; the response body is unmarshalled
+// twice — once into the typed rawResponse for the curated Info, and
+// once into a generic map[string]any for the Raw forward-compat
+// escape hatch (matches Ohai's full-tree dump). Returns (nil, nil)
+// when we're not on GCE or when the endpoint is unreachable —
+// either way the Gce field drops cleanly from Facts.
 func (c *Collector) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -274,14 +290,24 @@ func (c *Collector) Collect(
 	if !onGCE(prior) {
 		return nil, nil
 	}
+	body, err := c.client.Get(ctx, "/?recursive=true")
+	if err != nil {
+		// Any fetch failure (transport, 404, body-read) means we
+		// can't determine whether we're on GCE — treat as "not on
+		// this cloud" rather than propagating noise.
+		return nil, nil
+	}
 	var raw rawResponse
-	if err := c.client.GetJSON(ctx, "/?recursive=true", &raw); err != nil {
-		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
-			return nil, nil
-		}
+	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, err
 	}
-	return transform(raw), nil
+	info := transform(raw)
+	// If the typed Unmarshal succeeded, the body is valid JSON, so
+	// the generic Unmarshal also succeeds — no error check needed.
+	var generic map[string]any
+	_ = json.Unmarshal(body, &generic)
+	info.Raw = generic
+	return info, nil
 }
 
 // onGCE returns true when the dmi collector's product.name indicates

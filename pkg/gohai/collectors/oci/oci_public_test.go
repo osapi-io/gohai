@@ -163,7 +163,9 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Require().Len(info.VNICs, 1)
 				s.Equal("10.0.1.5", info.VNICs[0].PrivateIP)
 				s.Require().Len(info.VolumeAttachments, 1)
-				s.Equal("ATTACHED", info.VolumeAttachments[0].LifecycleState)
+				va, ok := info.VolumeAttachments["ocid1.volumeattachment.oc1.phx.bbb"]
+				s.Require().True(ok)
+				s.Equal("ATTACHED", va.LifecycleState)
 			},
 		},
 		{
@@ -195,6 +197,16 @@ func (s *OCIPublicTestSuite) TestCollect() {
 		{
 			name:    "404 on instance drops silently",
 			wantNil: true,
+		},
+		{
+			name:     "volumes with empty id are skipped",
+			instance: instanceResponse,
+			volumes:  `[{"id": "", "lifecycleState": "ATTACHED"}, {"id": "ocid1.va.oc1.bbb", "lifecycleState": "ATTACHED"}]`,
+			verify: func(s *OCIPublicTestSuite, info *oci.Info, _ string) {
+				s.Require().Len(info.VolumeAttachments, 1)
+				_, ok := info.VolumeAttachments["ocid1.va.oc1.bbb"]
+				s.True(ok)
+			},
 		},
 		{
 			name:    "connection refused drops silently",
@@ -256,7 +268,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 
 			if tt.wantNoHTTP {
-				s.False(httpCalled, "should have short-circuited before HTTP")
+				s.False(httpCalled)
 			}
 			if tt.wantNil {
 				s.Nil(out)

@@ -26,8 +26,11 @@
 package openstack
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
@@ -52,24 +55,21 @@ const metadataBaseURL = "http://169.254.169.254"
 // DMI directly for the same effect.
 const dmiProductSignature = "OpenStack"
 
-// metadataPaths is the subset of EC2-style meta-data paths OpenStack
-// populates. Nova doesn't implement every EC2 path, so this is a
-// curated list.
-var metadataPaths = []string{
-	"/latest/meta-data/ami-id",
-	"/latest/meta-data/instance-id",
-	"/latest/meta-data/instance-type",
-	"/latest/meta-data/hostname",
-	"/latest/meta-data/local-hostname",
-	"/latest/meta-data/local-ipv4",
-	"/latest/meta-data/public-hostname",
-	"/latest/meta-data/public-ipv4",
-	"/latest/meta-data/placement/availability-zone",
-	"/latest/meta-data/reservation-id",
-	"/latest/meta-data/kernel-id",
-	"/latest/meta-data/ramdisk-id",
-	"/latest/meta-data/security-groups",
-}
+// Provider names emitted in Info.Provider. Matches Ohai's
+// openstack_provider return values.
+const (
+	providerOpenStack = "openstack"
+	providerDreamhost = "dreamhost"
+)
+
+// passwdPath is the system passwd file used for the dreamhost-vs-openstack
+// distinction. Package-level var so tests can swap it. Ohai's check is
+// `Etc::Passwd.entries.map(&:name).include?("dhc-user")`.
+var passwdPath = "/etc/passwd"
+
+// dreamhostUser is the username Dreamhost shipped in their OpenStack
+// images pre-2016. Matches Ohai's literal string.
+const dreamhostUser = "dhc-user"
 
 // Info is the OpenStack view. Flat shape; identity + network + a
 // few OpenStack-specific fields from the richer meta_data.json.
@@ -103,6 +103,15 @@ type Info struct {
 	UUID       string            `json:"uuid,omitempty"`
 	MetaData   map[string]string `json:"meta_data,omitempty"`
 	PublicKeys map[string]string `json:"public_keys,omitempty"`
+
+	// Provider distinguishes "openstack" from the legacy "dreamhost"
+	// (pre-2016 Dreamhost OpenStack images shipped a `dhc-user`
+	// account). Matches Ohai's openstack[:provider].
+	Provider string `json:"provider,omitempty"`
+
+	// Raw is the full EC2-mirror tree as walked recursively. Use
+	// when you need a field gohai's typed surface doesn't expose.
+	Raw map[string]any `json:"raw,omitempty"`
 }
 
 // openStackMetaDoc mirrors the subset of /openstack/latest/meta_data.json
@@ -152,10 +161,12 @@ func (*Collector) DefaultEnabled() bool { return false }
 // virtualization-plugin gate which itself reads DMI.
 func (*Collector) Dependencies() []string { return []string{"dmi"} }
 
-// Collect gates the fetch on a DMI product_name match, then walks
-// OpenStack's EC2-compatible meta-data paths and the Nova-specific
-// meta_data.json document. Individual failures are tolerated; first-
-// path failure returns (nil, nil).
+// Collect gates the fetch on a DMI product_name match, walks the
+// EC2-compatible /latest/meta-data tree recursively, and fetches the
+// Nova-specific meta_data.json. The provider field is populated
+// independently from /etc/passwd ("dreamhost" if dhc-user is present,
+// "openstack" otherwise — matches Ohai). First-call failure returns
+// (nil, nil); per-path failures are tolerated.
 func (c *Collector) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -164,24 +175,21 @@ func (c *Collector) Collect(
 		return nil, nil
 	}
 
-	values := make(map[string]string, len(metadataPaths))
-	for i, p := range metadataPaths {
-		body, err := c.client.Get(ctx, p)
-		if err != nil {
-			if i == 0 {
-				return nil, nil
-			}
-			continue
-		}
-		values[p] = strings.TrimSpace(string(body))
+	tree, err := walk(ctx, c.client, "/latest/meta-data/")
+	if err != nil {
+		// Even if EC2-mirror walk fails, try the Nova doc — some
+		// minimal Nova deployments only serve the JSON. Don't drop
+		// detection just because /latest 404s.
+		tree = nil
+	}
+	info := &Info{
+		Provider: detectProvider(),
+		Raw:      tree,
+	}
+	if tree != nil {
+		populateFromTree(info, tree)
 	}
 
-	info := transformEC2Paths(values)
-
-	// Nova's enriched JSON is served under /openstack, outside the
-	// /latest EC2-mirror tree. The Client's baseURL includes /latest,
-	// so this path is actually absolute-from-root — we use a second
-	// client rooted at the base address.
 	if body, err := c.fetchNovaDoc(ctx); err == nil {
 		var doc openStackMetaDoc
 		if jerr := json.Unmarshal(body, &doc); jerr == nil {
@@ -198,7 +206,118 @@ func (c *Collector) Collect(
 			}
 		}
 	}
+
+	if tree == nil && info.UUID == "" {
+		// Nothing came back from either source — not actually OpenStack.
+		return nil, nil
+	}
 	return info, nil
+}
+
+// detectProvider checks /etc/passwd for the "dhc-user" account that
+// Dreamhost shipped in their pre-2016 OpenStack images. Matches
+// Ohai's openstack_provider.
+func detectProvider() string {
+	f, err := os.Open(passwdPath)
+	if err != nil {
+		return providerOpenStack
+	}
+	defer func() { _ = f.Close() }()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		// passwd entries: username:x:uid:gid:gecos:home:shell
+		line := sc.Bytes()
+		if i := bytes.IndexByte(line, ':'); i >= 0 {
+			if string(line[:i]) == dreamhostUser {
+				return providerDreamhost
+			}
+		}
+	}
+	return providerOpenStack
+}
+
+// walk fetches a directory listing at path and recurses into entries
+// ending with "/". Leaf entries are fetched as values. Matches the
+// recursive style Ohai's ec2_metadata mixin uses for OpenStack's
+// EC2-compatible tree.
+func walk(
+	ctx context.Context,
+	c *cloudmetadata.Client,
+	path string,
+) (map[string]any, error) {
+	listing, err := c.Get(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]any)
+	for _, line := range strings.Split(string(listing), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		key := sanitizeKey(line)
+		child := path + line
+		if strings.HasSuffix(line, "/") {
+			sub, err := walk(ctx, c, child)
+			if err != nil {
+				continue
+			}
+			result[key] = sub
+		} else {
+			leaf, err := c.Get(ctx, child)
+			if err != nil {
+				continue
+			}
+			result[key] = strings.TrimSpace(string(leaf))
+		}
+	}
+	return result, nil
+}
+
+// sanitizeKey mirrors Ohai's metadata_key — strip trailing slash,
+// then dashes and slashes become underscores.
+func sanitizeKey(
+	k string,
+) string {
+	k = strings.TrimRight(k, "/")
+	return strings.NewReplacer("-", "_", "/", "_").Replace(k)
+}
+
+// populateFromTree fills the typed Info fields from the walked tree.
+// Unknown leaves are still preserved under Info.Raw.
+func populateFromTree(
+	info *Info,
+	tree map[string]any,
+) {
+	info.AMIID = strVal(tree, "ami_id")
+	info.InstanceID = strVal(tree, "instance_id")
+	info.InstanceType = strVal(tree, "instance_type")
+	info.Hostname = strVal(tree, "hostname")
+	info.LocalHostname = strVal(tree, "local_hostname")
+	info.LocalIPv4 = strVal(tree, "local_ipv4")
+	info.PublicHostname = strVal(tree, "public_hostname")
+	info.PublicIPv4 = strVal(tree, "public_ipv4")
+	info.ReservationID = strVal(tree, "reservation_id")
+	info.KernelID = strVal(tree, "kernel_id")
+	info.RamdiskID = strVal(tree, "ramdisk_id")
+	if placement, ok := tree["placement"].(map[string]any); ok {
+		info.AvailabilityZone = strVal(placement, "availability_zone")
+	}
+	if sg := strVal(tree, "security_groups"); sg != "" {
+		info.SecurityGroups = strings.Split(sg, "\n")
+	}
+}
+
+// strVal returns the string value at key, or empty when absent or
+// the wrong type.
+func strVal(
+	m map[string]any,
+	key string,
+) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
 }
 
 // onOpenStack checks the dmi collector's product.name for the
@@ -219,29 +338,4 @@ func (c *Collector) fetchNovaDoc(
 	ctx context.Context,
 ) ([]byte, error) {
 	return c.client.Get(ctx, "/openstack/latest/meta_data.json")
-}
-
-// transformEC2Paths populates Info's EC2-mirror fields from the
-// per-path value map.
-func transformEC2Paths(
-	v map[string]string,
-) *Info {
-	info := &Info{
-		AMIID:            v["/latest/meta-data/ami-id"],
-		InstanceID:       v["/latest/meta-data/instance-id"],
-		InstanceType:     v["/latest/meta-data/instance-type"],
-		Hostname:         v["/latest/meta-data/hostname"],
-		LocalHostname:    v["/latest/meta-data/local-hostname"],
-		LocalIPv4:        v["/latest/meta-data/local-ipv4"],
-		PublicHostname:   v["/latest/meta-data/public-hostname"],
-		PublicIPv4:       v["/latest/meta-data/public-ipv4"],
-		AvailabilityZone: v["/latest/meta-data/placement/availability-zone"],
-		ReservationID:    v["/latest/meta-data/reservation-id"],
-		KernelID:         v["/latest/meta-data/kernel-id"],
-		RamdiskID:        v["/latest/meta-data/ramdisk-id"],
-	}
-	if sg := v["/latest/meta-data/security-groups"]; sg != "" {
-		info.SecurityGroups = strings.Split(sg, "\n")
-	}
-	return info
 }
