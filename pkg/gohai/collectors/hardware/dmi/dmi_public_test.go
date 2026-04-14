@@ -61,6 +61,7 @@ func (s *DmiPublicTestSuite) TestNew() {
 
 			c := dmi.New()
 			s.Equal("dmi", c.Name())
+			s.Equal("hardware", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Nil(c.Dependencies())
 		})

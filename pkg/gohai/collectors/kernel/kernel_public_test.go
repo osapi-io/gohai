@@ -146,6 +146,7 @@ func (s *KernelPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := kernel.New()
 			s.Equal("kernel", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

@@ -82,6 +82,7 @@ func (s *OSReleasePublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := osrelease.New()
 			s.Equal("os_release", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

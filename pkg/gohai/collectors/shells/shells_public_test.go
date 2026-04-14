@@ -94,6 +94,7 @@ func (s *ShellsPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := shells.New()
 			s.Equal("shells", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

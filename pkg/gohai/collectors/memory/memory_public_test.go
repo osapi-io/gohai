@@ -128,6 +128,7 @@ func (s *MemoryPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := memory.New()
 			s.Equal("memory", c.Name())
+			s.Equal("hardware", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

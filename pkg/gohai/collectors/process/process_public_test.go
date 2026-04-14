@@ -69,6 +69,7 @@ func (s *ProcessPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := process.New()
 			s.Equal("process", c.Name())
+			s.Equal("misc", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

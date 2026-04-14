@@ -70,6 +70,7 @@ func (s *TimezonePublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := timezone.New()
 			s.Equal("timezone", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

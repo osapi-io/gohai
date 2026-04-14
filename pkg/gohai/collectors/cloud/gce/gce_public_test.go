@@ -341,8 +341,19 @@ func (s *GcePublicTestSuite) TestMetadata() {
 
 func (s *GcePublicTestSuite) TestMetadataInterface() {
 	c := gce.New()
-	s.Equal("gce", c.Name())
-	s.Equal("cloud", c.Category())
-	s.False(c.DefaultEnabled())
-	s.Equal([]string{"dmi"}, c.Dependencies())
+	tests := []struct {
+		name string
+		got  any
+		want any
+	}{
+		{"Name", c.Name(), "gce"},
+		{"Category", c.Category(), "cloud"},
+		{"DefaultEnabled", c.DefaultEnabled(), false},
+		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, tt.got)
+		})
+	}
 }

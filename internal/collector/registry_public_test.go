@@ -50,6 +50,7 @@ func (s *RegistryPublicTestSuite) SetupTest() {
 
 type fakeCollector struct {
 	name           string
+	category       string
 	defaultEnabled bool
 	deps           []string
 }
@@ -59,7 +60,10 @@ func (f *fakeCollector) Name() string {
 }
 
 func (f *fakeCollector) Category() string {
-	return "misc"
+	if f.category == "" {
+		return "misc"
+	}
+	return f.category
 }
 
 func (f *fakeCollector) DefaultEnabled() bool {
@@ -166,6 +170,72 @@ func (s *RegistryPublicTestSuite) TestGet() {
 			}
 			_, ok := reg.Get(tt.lookup)
 			s.Equal(tt.wantOK, ok)
+		})
+	}
+}
+
+func (s *RegistryPublicTestSuite) TestNamesInCategory() {
+	s.Require().NoError(s.reg.Register(&fakeCollector{name: "a", category: "cloud"}))
+	s.Require().NoError(s.reg.Register(&fakeCollector{name: "b", category: "cloud"}))
+	s.Require().NoError(s.reg.Register(&fakeCollector{name: "c", category: "system"}))
+
+	tests := []struct {
+		name     string
+		category string
+		want     []string
+	}{
+		{"multiple collectors in category", "cloud", []string{"a", "b"}},
+		{"single collector in category", "system", []string{"c"}},
+		{"unknown category returns empty", "missing", []string{}},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got := s.reg.NamesInCategory(tt.category)
+			sort.Strings(got)
+			s.Equal(tt.want, got)
+		})
+	}
+}
+
+func (s *RegistryPublicTestSuite) TestGetDep() {
+	prior := collector.PriorResults{
+		"typed":    "hello",
+		"wrong":    42,
+		"nil-slot": nil,
+	}
+
+	tests := []struct {
+		name    string
+		lookup  string
+		wantOK  bool
+		wantVal string // only checked when wantOK is true
+	}{
+		{
+			name:    "matching type returns the value",
+			lookup:  "typed",
+			wantOK:  true,
+			wantVal: "hello",
+		},
+		{
+			name:   "missing key returns ok=false",
+			lookup: "missing",
+		},
+		{
+			name:   "type mismatch returns ok=false",
+			lookup: "wrong",
+		},
+		{
+			name:   "nil-valued any does not type-assert",
+			lookup: "nil-slot",
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got, ok := collector.GetDep[string](prior, tt.lookup)
+			s.Equal(tt.wantOK, ok)
+			if tt.wantOK {
+				s.Equal(tt.wantVal, got)
+			}
 		})
 	}
 }

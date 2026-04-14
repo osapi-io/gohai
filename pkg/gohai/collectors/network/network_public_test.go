@@ -77,6 +77,7 @@ func (s *NetworkPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := network.New()
 			s.Equal("network", c.Name())
+			s.Equal("network", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

@@ -82,6 +82,7 @@ func (s *InitPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := initd.New()
 			s.Equal("init", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

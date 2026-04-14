@@ -127,6 +127,7 @@ func (s *PlatformPublicTestSuite) TestNew() {
 			plat.Detect = func() string { return tt.detect }
 			c := platform.New()
 			s.Equal("platform", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

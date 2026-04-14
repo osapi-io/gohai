@@ -143,6 +143,7 @@ func (s *VirtualizationPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := virtualization.New()
 			s.Equal("virtualization", c.Name())
+			s.Equal("virtualization", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

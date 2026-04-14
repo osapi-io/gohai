@@ -93,6 +93,7 @@ func (s *UsersPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := users.New()
 			s.Equal("users", c.Name())
+			s.Equal("users", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {

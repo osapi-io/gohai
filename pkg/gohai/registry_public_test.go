@@ -42,3 +42,45 @@ func (s *RegistryPublicTestSuite) TestNewRegistry() {
 	reg := gohai.NewRegistry()
 	s.Contains(reg.Names(), "platform")
 }
+
+func (s *RegistryPublicTestSuite) TestNamesInCategory() {
+	reg := gohai.NewRegistry()
+	tests := []struct {
+		name      string
+		category  string
+		contains  string // expected member of the category; empty when wantEmpty
+		wantEmpty bool
+	}{
+		{"cloud contains gce", "cloud", "gce", false},
+		{"hardware contains dmi", "hardware", "dmi", false},
+		{"unknown category returns empty", "nope", "", true},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got := reg.NamesInCategory(tt.category)
+			if tt.wantEmpty {
+				s.Empty(got)
+				return
+			}
+			s.Contains(got, tt.contains)
+		})
+	}
+}
+
+func (s *RegistryPublicTestSuite) TestCategoryOf() {
+	reg := gohai.NewRegistry()
+	tests := []struct {
+		name      string
+		collector string
+		want      string
+	}{
+		{"gce is cloud", "gce", "cloud"},
+		{"dmi is hardware", "dmi", "hardware"},
+		{"missing collector returns empty", "nope", ""},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, reg.CategoryOf(tt.collector))
+		})
+	}
+}

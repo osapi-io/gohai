@@ -68,6 +68,7 @@ func (s *DiskPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := disk.New()
 			s.Equal("disk", c.Name())
+			s.Equal("hardware", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
