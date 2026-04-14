@@ -20,7 +20,11 @@
 
 package load
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Linux collects load averages on Linux. gopsutil's load.AvgWithContext
 // is swapped via the package-level avgFn seam (see SetAvgFn in
@@ -37,6 +41,7 @@ func NewLinux() *Linux {
 // Collect returns the load averages.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return readAverages(ctx)
 }

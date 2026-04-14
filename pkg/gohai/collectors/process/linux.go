@@ -20,7 +20,11 @@
 
 package process
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Linux collects a process snapshot on Linux hosts via gopsutil.
 // gopsutil's process.Processes is swapped via the package-level
@@ -37,6 +41,7 @@ func NewLinux() *Linux {
 // Collect returns a process snapshot.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	procs, err := listProcesses(ctx)
 	if err != nil {

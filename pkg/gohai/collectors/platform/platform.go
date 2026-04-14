@@ -83,6 +83,7 @@ type Collector interface {
 type base struct{}
 
 func (base) Name() string           { return "platform" }
+func (base) Category() string       { return collector.CategorySystem }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 

@@ -136,6 +136,7 @@ func (s *CPUPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := cpu.New()
 			s.Equal("cpu", c.Name())
+			s.Equal("hardware", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -686,7 +687,7 @@ Book(s) per drawer:  1
 			case "darwin":
 				c = &cpu.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

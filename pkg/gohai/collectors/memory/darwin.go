@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -51,6 +52,7 @@ func NewDarwin() *Darwin {
 // top of gopsutil's totals.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	info, err := readMemory(ctx)
 	if err != nil {

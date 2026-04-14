@@ -28,6 +28,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 const (
@@ -56,6 +57,7 @@ func NewLinux() *Linux {
 // Collect returns kernel Info.
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	name, release, version, machine, err := defaultUname()
 	if err != nil {

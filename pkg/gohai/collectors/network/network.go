@@ -120,6 +120,7 @@ type Collector interface {
 type base struct{}
 
 func (base) Name() string           { return "network" }
+func (base) Category() string       { return collector.CategoryNetwork }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 

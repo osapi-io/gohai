@@ -91,6 +91,7 @@ func (s *HostnamePublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := hostname.New()
 			s.Equal("hostname", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -359,7 +360,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &hostname.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

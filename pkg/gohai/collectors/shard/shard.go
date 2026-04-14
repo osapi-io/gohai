@@ -85,6 +85,9 @@ type base struct{}
 
 func (base) Name() string { return "shard" }
 
+// Category returns "system".
+func (base) Category() string { return collector.CategorySystem }
+
 // DefaultEnabled returns true — shard is on by default.
 func (base) DefaultEnabled() bool { return true }
 

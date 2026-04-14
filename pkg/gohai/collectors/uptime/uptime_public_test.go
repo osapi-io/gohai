@@ -71,6 +71,7 @@ func (s *UptimePublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := uptime.New()
 			s.Equal("uptime", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -184,7 +185,7 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &uptime.Darwin{}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

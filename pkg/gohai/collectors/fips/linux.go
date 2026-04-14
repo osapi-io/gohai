@@ -29,6 +29,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 const (
@@ -56,6 +57,7 @@ func NewLinux() *Linux {
 // omits the Policy field rather than erroring.
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{}
 

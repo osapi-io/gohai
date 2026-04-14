@@ -20,7 +20,11 @@
 
 package osrelease
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin returns no os_release data — /etc/os-release is a Linux
 // freedesktop.org standard; macOS doesn't ship it. Ohai's plugin is
@@ -37,6 +41,7 @@ func NewDarwin() *Darwin {
 // Collect returns nil on darwin.
 func (d *Darwin) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return nil, nil
 }

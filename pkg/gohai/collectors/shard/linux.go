@@ -25,6 +25,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // Linux computes a shard seed on Linux from /etc/machine-id (or
@@ -45,6 +46,7 @@ func NewLinux() *Linux {
 // semantics and avoids the collector returning nil for minimal hosts.
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	mid := readMachineID(l.FS.ReadFile)
 	host, _ := hostnameFn()

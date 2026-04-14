@@ -65,6 +65,7 @@ type Collector interface {
 type base struct{}
 
 func (base) Name() string           { return "machine_id" }
+func (base) Category() string       { return collector.CategorySystem }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 

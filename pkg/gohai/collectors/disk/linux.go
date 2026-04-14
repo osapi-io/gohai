@@ -20,7 +20,11 @@
 
 package disk
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Linux collects disk I/O counters on Linux. gopsutil's
 // disk.IOCountersWithContext (/proc/diskstats) is swapped via the
@@ -37,6 +41,7 @@ func NewLinux() *Linux {
 // Collect returns per-device I/O counters.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	devs, err := listIOCounters(ctx)
 	if err != nil {

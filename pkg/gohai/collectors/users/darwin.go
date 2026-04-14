@@ -20,7 +20,11 @@
 
 package users
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin collects logged-in sessions on macOS via gopsutil (utmpx).
 // loginctl does not exist on Darwin so there's no exec path; gopsutil
@@ -37,6 +41,7 @@ func NewDarwin() *Darwin {
 // Collect returns logged-in session Info.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	ss, err := listSessions(ctx)
 	if err != nil {

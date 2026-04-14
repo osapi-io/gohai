@@ -143,6 +143,7 @@ func (s *VirtualizationPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := virtualization.New()
 			s.Equal("virtualization", c.Name())
+			s.Equal("virtualization", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -678,7 +679,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &virtualization.Darwin{FS: tt.fs(), Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
 			info, ok := got.(*virtualization.Info)
 			s.Require().True(ok)

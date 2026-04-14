@@ -127,6 +127,7 @@ func (s *PlatformPublicTestSuite) TestNew() {
 			plat.Detect = func() string { return tt.detect }
 			c := platform.New()
 			s.Equal("platform", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -566,7 +567,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &platform.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

@@ -68,6 +68,7 @@ func (s *RootGroupPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := rootgroup.New()
 			s.Equal("root_group", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -158,7 +159,7 @@ func (s *RootGroupPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &rootgroup.Darwin{}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

@@ -25,6 +25,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // linuxZoneinfoPrefix is stripped from the symlink target to yield the
@@ -52,6 +53,7 @@ func NewLinux() *Linux {
 // leave fields empty, clock values still populate from Go's runtime.
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	abbrev, offset := clockZone()
 	name := resolveName(

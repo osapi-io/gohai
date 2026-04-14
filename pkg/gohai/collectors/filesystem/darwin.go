@@ -20,7 +20,11 @@
 
 package filesystem
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin collects mounted filesystem data on macOS via gopsutil
 // (which uses the BSD getfsstat syscall).
@@ -36,6 +40,7 @@ func NewDarwin() *Darwin {
 // Collect returns filesystem Info.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	mounts, err := listMounts(ctx)
 	if err != nil {

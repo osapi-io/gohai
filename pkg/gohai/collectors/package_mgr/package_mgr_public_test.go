@@ -69,6 +69,7 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := packagemgr.New()
 			s.Equal("package_mgr", c.Name())
+			s.Equal("software", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -167,13 +168,13 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			var err error
 			switch tt.variant {
 			case "debian":
-				got, err = (&packagemgr.Debian{}).Collect(context.Background())
+				got, err = (&packagemgr.Debian{}).Collect(context.Background(), nil)
 			case "rhel":
-				got, err = (&packagemgr.RHEL{}).Collect(context.Background())
+				got, err = (&packagemgr.RHEL{}).Collect(context.Background(), nil)
 			case "darwin":
-				got, err = (&packagemgr.Darwin{}).Collect(context.Background())
+				got, err = (&packagemgr.Darwin{}).Collect(context.Background(), nil)
 			case "linux":
-				got, err = (&packagemgr.Linux{}).Collect(context.Background())
+				got, err = (&packagemgr.Linux{}).Collect(context.Background(), nil)
 			}
 			s.Require().NoError(err)
 			info, ok := got.(*packagemgr.Info)

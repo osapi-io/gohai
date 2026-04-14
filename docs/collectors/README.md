@@ -10,6 +10,22 @@ Collectors are individually toggled using node_exporter-style flags:
 gohai --collector.platform --no-collector.cloud
 ```
 
+Enable entire **categories** with `--category` (CLI) or `WithCategory(...)`
+(SDK):
+
+```bash
+gohai --category=cloud --category=hardware
+```
+
+```go
+gohai.New(gohai.WithCategory("cloud"))
+```
+
+Categories are the section headers below — `system`, `hardware`, `network`,
+`cloud`, `virtualization`, `security`, `software`, `users`, `linux`, `misc`.
+Dependencies pull in automatically, so e.g. enabling `cloud` picks up `dmi`
+since every cloud collector depends on it.
+
 **Defaults are opt-in.** `gohai.New()` (SDK) returns an empty registry — nothing
 runs unless you ask for it. Pass `gohai.WithDefaults()` for the recommended set,
 or `gohai.WithCollectors(...)` / `gohai.WithEnabled(...)` to enumerate. The CLI
@@ -59,7 +75,7 @@ edge cases to handle) follows [Chef Ohai][]'s plugins.
 | [memory](memory.md)         | `memory`     | Total, free, swap, buffers, hugepages    | ✅      | ✅          |
 | [disk](disk.md)             | `disk`       | Block devices, I/O stats                 | ✅      | ✅          |
 | [filesystem](filesystem.md) | `filesystem` | Mounts, capacity, usage, inodes          | ✅      | ✅          |
-| [dmi](dmi.md)               | `dmi`        | BIOS, manufacturer, serial, UUID         | ❌      | 🚧          |
+| [dmi](dmi.md)               | `dmi`        | BIOS, manufacturer, serial, UUID         | ❌      | ✅          |
 | [gpu](gpu.md)               | `gpu`        | GPU model, driver, memory                | ❌      | 🚧          |
 | [pci](pci.md)               | `pci`        | PCI devices                              | ❌      | 🚧          |
 | [scsi](scsi.md)             | `scsi`       | SCSI devices                             | ❌      | 🚧          |
@@ -77,7 +93,7 @@ edge cases to handle) follows [Chef Ohai][]'s plugins.
 | --------------------------------- | --------------- | ------------------------------ | ------- | ----------- |
 | [cloud](cloud.md)                 | `cloud`         | Aggregated cloud provider info | ❌      | 🚧          |
 | [ec2](ec2.md)                     | `ec2`           | AWS EC2 metadata               | ❌      | 🚧          |
-| [gce](gce.md)                     | `gce`           | Google Compute Engine metadata | ❌      | 🚧          |
+| [gce](gce.md)                     | `gce`           | Google Compute Engine metadata | ❌      | ✅          |
 | [azure](azure.md)                 | `azure`         | Azure instance metadata        | ❌      | 🚧          |
 | [digital_ocean](digital_ocean.md) | `digital_ocean` | DigitalOcean droplet metadata  | ❌      | 🚧          |
 | [openstack](openstack.md)         | `openstack`     | OpenStack instance metadata    | ❌      | 🚧          |
@@ -160,7 +176,7 @@ automatically — enabling a collector also enables its dependencies.
 | `package_mgr`    | `platform`                      |
 | `cloud`          | `network`, `dmi`                |
 | `ec2`            | `dmi`                           |
-| `gce`            | —                               |
+| `gce`            | `dmi`                           |
 | `azure`          | —                               |
 | `digital_ocean`  | `dmi`                           |
 | `openstack`      | `virtualization`                |

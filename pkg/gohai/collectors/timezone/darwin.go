@@ -26,6 +26,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // darwinZoneinfoPrefix is the macOS-specific zoneinfo database path
@@ -50,6 +51,7 @@ func NewDarwin() *Darwin {
 // (rare on real macs; seen in some CI sandboxes).
 func (d *Darwin) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	abbrev, offset := clockZone()
 	name := resolveName(

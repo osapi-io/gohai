@@ -99,6 +99,7 @@ func (s *FipsPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := fips.New()
 			s.Equal("fips", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -248,7 +249,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = fips.NewDarwin()
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

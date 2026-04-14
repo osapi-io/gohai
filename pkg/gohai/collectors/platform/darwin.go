@@ -25,6 +25,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -53,6 +54,7 @@ func NewDarwin() *Darwin {
 // Collect returns platform Info.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	info, kernelVer, err := readPlatform(ctx)
 	if err != nil {

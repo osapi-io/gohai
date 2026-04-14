@@ -82,6 +82,7 @@ func (s *InitPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := initd.New()
 			s.Equal("init", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -178,7 +179,7 @@ func (s *InitPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = initd.NewDarwin()
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
 			info, ok := got.(*initd.Info)
 			s.Require().True(ok)

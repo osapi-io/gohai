@@ -20,7 +20,11 @@
 
 package packagemgr
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Debian covers debian / ubuntu / raspbian — apt-based hosts.
 type Debian struct {
@@ -35,6 +39,7 @@ func NewDebian() *Debian {
 // Collect returns apt if present.
 func (d *Debian) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	name, path := firstFound("apt", "apt-get")
 	return &Info{Name: name, Path: path}, nil

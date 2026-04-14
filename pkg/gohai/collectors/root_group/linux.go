@@ -20,7 +20,11 @@
 
 package rootgroup
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Linux resolves the root group on generic Linux hosts. Typically
 // returns "root". Embeds base for Name/DefaultEnabled/Dependencies.
@@ -36,6 +40,7 @@ func NewLinux() *Linux {
 // Collect performs the two-hop lookup (root → gid → group name).
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return resolveRootGroup()
 }

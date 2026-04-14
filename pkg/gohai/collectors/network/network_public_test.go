@@ -77,6 +77,7 @@ func (s *NetworkPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := network.New()
 			s.Equal("network", c.Name())
+			s.Equal("network", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -588,7 +589,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			default:
 				c = &network.Linux{FS: tt.fs, Exec: tt.exec}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
 				s.Error(err)
 				return

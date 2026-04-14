@@ -20,7 +20,11 @@
 
 package initd
 
-import "context"
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // Darwin reports the macOS init system. Always launchd — macOS
 // doesn't support alternative init systems.
@@ -36,6 +40,7 @@ func NewDarwin() *Darwin {
 // Collect returns launchd.
 func (d *Darwin) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return &Info{Name: "launchd"}, nil
 }

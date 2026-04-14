@@ -27,6 +27,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cloud/gce"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware/dmi"
 )
 
 type GohaiTestSuite struct {
@@ -48,6 +50,10 @@ func (c *cycleCollector) Name() string {
 	return c.name
 }
 
+func (c *cycleCollector) Category() string {
+	return "misc"
+}
+
 func (c *cycleCollector) DefaultEnabled() bool {
 	return true
 }
@@ -58,8 +64,87 @@ func (c *cycleCollector) Dependencies() []string {
 
 func (c *cycleCollector) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	return nil, nil
+}
+
+func (s *GohaiTestSuite) TestFactsSet() {
+	tests := []struct {
+		name   string
+		key    string
+		value  any
+		verify func(s *GohaiTestSuite, f *Facts)
+	}{
+		{
+			name:  "gce populates Facts.Gce",
+			key:   "gce",
+			value: &gce.Info{Name: "vm-1"},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.Gce)
+				s.Equal("vm-1", f.Gce.Name)
+			},
+		},
+		{
+			name:  "dmi populates Facts.DMI",
+			key:   "dmi",
+			value: &dmi.Info{Product: &dmi.Product{Name: "Google Compute Engine"}},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.DMI)
+				s.Equal("Google Compute Engine", f.DMI.Product.Name)
+			},
+		},
+		{
+			name:  "mismatched type for gce is silently ignored",
+			key:   "gce",
+			value: "not-gce-info",
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Nil(f.Gce)
+			},
+		},
+		{
+			name:  "mismatched type for dmi is silently ignored",
+			key:   "dmi",
+			value: 42,
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Nil(f.DMI)
+			},
+		},
+		{
+			name:  "unknown key is a no-op",
+			key:   "nope",
+			value: &dmi.Info{},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Nil(f.DMI)
+				s.Nil(f.Gce)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			f := &Facts{}
+			f.set(tt.key, tt.value)
+			tt.verify(s, f)
+		})
+	}
+}
+
+func (s *GohaiTestSuite) TestFactsCountPopulated() {
+	tests := []struct {
+		name  string
+		facts *Facts
+		want  int
+	}{
+		{"empty", &Facts{}, 0},
+		{"gce only", &Facts{Gce: &gce.Info{}}, 1},
+		{"dmi only", &Facts{DMI: &dmi.Info{}}, 1},
+		{"gce + dmi", &Facts{Gce: &gce.Info{}, DMI: &dmi.Info{}}, 2},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			s.Equal(tt.want, tt.facts.countPopulated())
+		})
+	}
 }
 
 func (s *GohaiTestSuite) TestCollectPropagatesRunError() {

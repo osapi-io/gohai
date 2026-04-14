@@ -40,9 +40,10 @@ type failingCollector struct {
 }
 
 func (f *failingCollector) Name() string           { return f.name }
+func (f *failingCollector) Category() string       { return "misc" }
 func (f *failingCollector) DefaultEnabled() bool   { return false }
 func (f *failingCollector) Dependencies() []string { return nil }
-func (f *failingCollector) Collect(context.Context) (any, error) {
+func (f *failingCollector) Collect(context.Context, collector.PriorResults) (any, error) {
 	return nil, f.err
 }
 
@@ -56,32 +57,6 @@ func TestGohaiPublicTestSuite(
 	t *testing.T,
 ) {
 	suite.Run(t, new(GohaiPublicTestSuite))
-}
-
-func (s *GohaiPublicTestSuite) TestNew() {
-	tests := []struct {
-		name    string
-		opts    []gohai.Option
-		wantErr bool
-	}{
-		{"defaults", nil, false},
-		{"with disabled", []gohai.Option{gohai.WithDisabled("platform")}, false},
-		{"with collectors only", []gohai.Option{gohai.WithCollectors("platform")}, false},
-		{"unknown enabled errors", []gohai.Option{gohai.WithEnabled("nope")}, true},
-		{"unknown disabled errors", []gohai.Option{gohai.WithDisabled("nope")}, true},
-		{"unknown only errors", []gohai.Option{gohai.WithCollectors("nope")}, true},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			g, err := gohai.New(tt.opts...)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.NotNil(g)
-		})
-	}
 }
 
 func (s *GohaiPublicTestSuite) TestCollect() {
@@ -188,9 +163,4 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			}
 		})
 	}
-}
-
-func (s *GohaiPublicTestSuite) TestNewRegistry() {
-	reg := gohai.NewRegistry()
-	s.Contains(reg.Names(), "platform")
 }

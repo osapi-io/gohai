@@ -95,6 +95,7 @@ func (s *ShardPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := shard.New()
 			s.Equal("shard", c.Name())
+			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
@@ -174,13 +175,13 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				defer shard.SetHostInfoFn(tt.hostFn)()
 				c = &shard.Darwin{}
 			}
-			got, err := c.Collect(context.Background())
+			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
 			info, ok := got.(*shard.Info)
 			s.Require().True(ok)
 			s.Len(info.Seed, 64)
 			if tt.deterministic {
-				second, err := c.Collect(context.Background())
+				second, err := c.Collect(context.Background(), nil)
 				s.Require().NoError(err)
 				s.Equal(got, second)
 			}

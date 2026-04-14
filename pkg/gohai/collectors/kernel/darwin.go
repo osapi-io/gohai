@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -56,6 +57,7 @@ func NewDarwin() *Darwin {
 // Collect returns kernel Info.
 func (d *Darwin) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	name, release, version, machine, err := defaultUname()
 	if err != nil {

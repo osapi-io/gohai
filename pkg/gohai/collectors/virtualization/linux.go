@@ -28,6 +28,7 @@ import (
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
@@ -51,6 +52,7 @@ func NewLinux() *Linux {
 // Collect runs the cascade and returns Info.
 func (l *Linux) Collect(
 	ctx context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{}
 	cascadeLinux(ctx, l.FS, l.Exec, info)

@@ -45,6 +45,7 @@ type Collector interface {
 type base struct{}
 
 func (base) Name() string           { return "package_mgr" }
+func (base) Category() string       { return collector.CategorySoftware }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 

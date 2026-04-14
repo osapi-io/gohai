@@ -27,6 +27,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // Linux parses /etc/os-release on Linux hosts.
@@ -45,6 +46,7 @@ func NewLinux() *Linux {
 // Info — common on minimal/scratch containers that lack the file.
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	b, err := l.FS.ReadFile(osReleasePath)
 	if err != nil {

@@ -65,7 +65,8 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string { return "users" }
+func (base) Name() string     { return "users" }
+func (base) Category() string { return collector.CategoryUsers }
 
 // DefaultEnabled is false: passwd/group scan is niche and not useful
 // per-invocation. Opt in via --collector.users or

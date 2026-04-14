@@ -25,6 +25,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+	"github.com/osapi-io/gohai/internal/collector"
 )
 
 // Linux detects the init system by reading /proc/1/comm.
@@ -44,6 +45,7 @@ func NewLinux() *Linux {
 // returns an empty Name rather than erroring.
 func (l *Linux) Collect(
 	_ context.Context,
+	_ collector.PriorResults,
 ) (any, error) {
 	b, err := l.FS.ReadFile(proc1CommPath)
 	if err != nil {
