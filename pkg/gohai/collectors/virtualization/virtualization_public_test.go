@@ -622,7 +622,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(t, map[string][]byte{
-					"ioreg -l": []byte("    | |   \"compatible\" = <\"pci1ab8,4000\">\n"),
+					"ioreg -n pci1ab8,4000": []byte(
+						"    | |   \"compatible\" = <\"pci1ab8,4000\">\n",
+					),
 				})
 			},
 			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["parallels"]) },

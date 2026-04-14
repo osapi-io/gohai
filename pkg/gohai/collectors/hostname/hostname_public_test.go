@@ -23,6 +23,7 @@ package hostname_test
 import (
 	"context"
 	"errors"
+	"net"
 	"testing"
 
 	"github.com/shirou/gopsutil/v4/host"
@@ -153,7 +154,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "linux: empty forward lookup exhausts retries",
+			name:       "linux: empty forward lookup short-circuits",
 			variant:    "linux",
 			hostInfo:   okHostInfo,
 			osHostname: func() (string, error) { return "unused", nil },
@@ -331,6 +332,78 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				MachineName: "Johns",
 				FQDN:        "johns-mbp.local",
 				Domain:      "local",
+			},
+		},
+		{
+			name:       "darwin: transient LookupAddr failure recovers on retry",
+			variant:    "darwin",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: darwinLookupHost,
+			lookupAddr: func() func(string) ([]string, error) {
+				n := 0
+				return func(string) ([]string, error) {
+					n++
+					if n < 2 {
+						return nil, errors.New("transient PTR")
+					}
+					return []string{"johns-mbp.local."}, nil
+				}
+			}(),
+			exec: func(t *testing.T) executor.Executor {
+				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
+			},
+			want: hostname.Info{
+				Name:        "johns-mbp",
+				MachineName: "Johns",
+				FQDN:        "johns-mbp.local",
+				Domain:      "local",
+			},
+		},
+		{
+			name:       "darwin: IsNotFound on LookupHost short-circuits (no retry sleep)",
+			variant:    "darwin",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: func() func(string) ([]string, error) {
+				calls := 0
+				return func(string) ([]string, error) {
+					calls++
+					s.Equal(1, calls)
+					return nil, &net.DNSError{Err: "no such host", IsNotFound: true}
+				}
+			}(),
+			lookupAddr: failLookupAddr,
+			exec: func(t *testing.T) executor.Executor {
+				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
+			},
+			want: hostname.Info{
+				Name:        "johns-mbp",
+				MachineName: "Johns",
+				FQDN:        "johns-mbp",
+			},
+		},
+		{
+			name:       "darwin: IsNotFound on LookupAddr short-circuits",
+			variant:    "darwin",
+			hostInfo:   okHostInfo,
+			osHostname: func() (string, error) { return "unused", nil },
+			lookupHost: darwinLookupHost,
+			lookupAddr: func() func(string) ([]string, error) {
+				calls := 0
+				return func(string) ([]string, error) {
+					calls++
+					s.Equal(1, calls)
+					return nil, &net.DNSError{Err: "no PTR", IsNotFound: true}
+				}
+			}(),
+			exec: func(t *testing.T) executor.Executor {
+				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
+			},
+			want: hostname.Info{
+				Name:        "johns-mbp",
+				MachineName: "Johns",
+				FQDN:        "johns-mbp",
 			},
 		},
 		{

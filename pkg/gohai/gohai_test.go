@@ -33,6 +33,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
+	kernelmodules "github.com/osapi-io/gohai/pkg/gohai/collectors/kernel_modules"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
@@ -214,6 +215,21 @@ func (s *GohaiTestSuite) TestFactsSet() {
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Scaleway) },
 		},
 		{
+			name:  "kernel_modules populates Facts.KernelModules",
+			key:   "kernel_modules",
+			value: &kernelmodules.Info{Modules: map[string]kernelmodules.Module{"ipv6": {Size: 1}}},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.KernelModules)
+				s.Equal(uint64(1), f.KernelModules.Modules["ipv6"].Size)
+			},
+		},
+		{
+			name:   "kernel_modules wrong type ignored",
+			key:    "kernel_modules",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.KernelModules) },
+		},
+		{
 			name:  "dmi populates Facts.DMI",
 			key:   "dmi",
 			value: &dmi.Info{Product: &dmi.Product{Name: "Google Compute Engine"}},
@@ -275,6 +291,7 @@ func (s *GohaiTestSuite) TestFactsCountPopulated() {
 		{"linode", &Facts{Linode: &linode.Info{}}, 1},
 		{"openstack", &Facts{OpenStack: &openstack.Info{}}, 1},
 		{"scaleway", &Facts{Scaleway: &scaleway.Info{}}, 1},
+		{"kernel_modules", &Facts{KernelModules: &kernelmodules.Info{}}, 1},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {

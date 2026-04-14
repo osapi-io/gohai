@@ -19,12 +19,12 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package kernel reports kernel identity (name, release, version,
-// machine) plus the set of currently loaded modules. Module entries
-// carry size, reference count, and version so downstream tooling can
-// correlate loaded modules against CVE feeds or policy baselines. On
-// Linux versions come from /sys/module/<name>/version; on macOS the
-// module list is produced from `kextstat -k -l` (legacy kexts only —
-// System Extensions are not yet enumerated).
+// machine, processor, high-level OS) plus macOS Rosetta 2 translation
+// state. Loaded-module enumeration lives in the sibling kernel_modules
+// collector — that work shells out to kextstat on macOS (~280ms wall
+// time) and walks /sys/module on Linux, neither of which most
+// consumers need; splitting keeps this collector fast enough to stay
+// in the default set.
 package kernel
 
 import (
@@ -40,21 +40,13 @@ import (
 // uname(1) plus two synthesized fields (processor, os) matching what
 // the `uname(1)` CLI reports versus the raw syscall.
 type Info struct {
-	Name              string            `json:"name"`                         // uname -s: "Linux", "Darwin"
-	Release           string            `json:"release"`                      // uname -r: "5.15.0-47-generic" (OCSF: os.kernel_release — leaf stripped per CLAUDE.md)
-	Version           string            `json:"version,omitempty"`            // uname -v: build string
-	Machine           string            `json:"machine"`                      // uname -m: hardware arch ("x86_64", "arm64")
-	Processor         string            `json:"processor,omitempty"`          // uname -p synthesis: same as Machine on Linux/Darwin
-	OS                string            `json:"os,omitempty"`                 // uname -o synthesis: "GNU/Linux" on Linux, "Darwin" on Darwin (OCSF: os.type)
-	RosettaTranslated bool              `json:"rosetta_translated,omitempty"` // macOS only: true when process is under Rosetta 2
-	Modules           map[string]Module `json:"modules,omitempty"`            // loaded kernel modules (Linux: /proc/modules; macOS: kextstat)
-}
-
-// Module describes a loaded kernel module.
-type Module struct {
-	Size     uint64 `json:"size,omitempty"`     // bytes
-	RefCount int    `json:"refcount,omitempty"` // instances currently loaded
-	Version  string `json:"version,omitempty"`  // Linux: /sys/module/<m>/version; macOS: parens field from kextstat
+	Name              string `json:"name"`                         // uname -s: "Linux", "Darwin"
+	Release           string `json:"release"`                      // uname -r: "5.15.0-47-generic" (OCSF: os.kernel_release — leaf stripped per CLAUDE.md)
+	Version           string `json:"version,omitempty"`            // uname -v: build string
+	Machine           string `json:"machine"`                      // uname -m: hardware arch ("x86_64", "arm64")
+	Processor         string `json:"processor,omitempty"`          // uname -p synthesis: same as Machine on Linux/Darwin
+	OS                string `json:"os,omitempty"`                 // uname -o synthesis: "GNU/Linux" on Linux, "Darwin" on Darwin (OCSF: os.type)
+	RosettaTranslated bool   `json:"rosetta_translated,omitempty"` // macOS only: true when process is under Rosetta 2
 }
 
 // Collector is the public interface every kernel variant satisfies.

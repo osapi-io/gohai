@@ -40,6 +40,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	kernelmodules "github.com/osapi-io/gohai/pkg/gohai/collectors/kernel_modules"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
@@ -204,6 +205,7 @@ func builtinCollectors() []collector.Collector {
 		platform.New(),
 		hostname.New(),
 		kernel.New(),
+		kernelmodules.New(),
 		uptime.New(),
 		virtualization.New(),
 		machineid.New(),
