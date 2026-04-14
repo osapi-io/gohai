@@ -63,6 +63,7 @@ func newRootCommand() *cobra.Command {
 		flat           bool
 		listCollectors bool
 		noDefaults     bool
+		withTimings    bool
 	)
 	enabled := newFlagSet()
 	disabled := newFlagSet()
@@ -87,6 +88,7 @@ func newRootCommand() *cobra.Command {
 				pretty,
 				flat,
 				noDefaults,
+				withTimings,
 			)
 		},
 	}
@@ -101,6 +103,12 @@ func newRootCommand() *cobra.Command {
 		false,
 		"skip the recommended default collector set; only --collector.X flags are honoured",
 	)
+	cmd.Flags().BoolVar(
+		&withTimings,
+		"with-timings",
+		false,
+		"embed per-collector timings and errors under _timings in the JSON output",
+	)
 	registerCollectorFlags(cmd, enabled, disabled)
 
 	return cmd
@@ -110,7 +118,7 @@ func runCollect(
 	ctx context.Context,
 	out io.Writer,
 	enabled, disabled *flagSet,
-	pretty, flat, noDefaults bool,
+	pretty, flat, noDefaults, withTimings bool,
 ) error {
 	opts := []gohai.Option{}
 	if !noDefaults {
@@ -121,6 +129,9 @@ func runCollect(
 	}
 	if names := disabled.values(); len(names) > 0 {
 		opts = append(opts, gohai.WithDisabled(names...))
+	}
+	if withTimings {
+		opts = append(opts, gohai.WithTimings())
 	}
 
 	g, err := gohai.New(opts...)

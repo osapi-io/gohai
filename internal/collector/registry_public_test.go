@@ -314,8 +314,10 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			tt.setup(reg)
 
 			var errNames []string
-			results, err := reg.Run(context.Background(), tt.names, func(n string, _ error) {
-				errNames = append(errNames, n)
+			results, err := reg.Run(context.Background(), tt.names, collector.Hooks{
+				OnError: func(n string, _ error) {
+					errNames = append(errNames, n)
+				},
 			})
 			if tt.wantErr {
 				s.Error(err)
@@ -334,7 +336,7 @@ func (s *RegistryPublicTestSuite) TestRun() {
 
 func (s *RegistryPublicTestSuite) TestRunErrorsWithoutHandler() {
 	s.Require().NoError(s.reg.Register(&errCollector{name: "bad"}))
-	results, err := s.reg.Run(context.Background(), []string{"bad"}, nil)
+	results, err := s.reg.Run(context.Background(), []string{"bad"}, collector.Hooks{})
 	s.Require().NoError(err)
 	s.NotContains(results, "bad")
 }
