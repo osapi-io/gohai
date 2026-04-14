@@ -31,8 +31,8 @@ import (
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/cloud/gce"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
 )
 
 // gcePrior builds a PriorResults containing a dmi.Info whose product

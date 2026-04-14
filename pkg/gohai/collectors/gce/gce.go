@@ -31,7 +31,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 )
 
 // dmiProductName is the SMBIOS product_name signature GCE VMs
