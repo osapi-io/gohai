@@ -155,6 +155,45 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			wantBody: "ok",
 		},
 		{
+			name: "default User-Agent is sent when caller doesn't override",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				var got http.Header
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/ua": func(w http.ResponseWriter, r *http.Request) {
+						got = r.Header.Clone()
+						_, _ = w.Write([]byte("ok"))
+					},
+				})
+				return srv.URL, nil, func() {
+					srv.Close()
+					s.Equal(cloudmetadata.DefaultUserAgent, got.Get("User-Agent"))
+				}
+			},
+			path:     "/ua",
+			wantBody: "ok",
+		},
+		{
+			name: "WithHeader overrides the default User-Agent",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				var got http.Header
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/ua": func(w http.ResponseWriter, r *http.Request) {
+						got = r.Header.Clone()
+						_, _ = w.Write([]byte("ok"))
+					},
+				})
+				opts := []cloudmetadata.Option{
+					cloudmetadata.WithHeader("User-Agent", "custom/1.0"),
+				}
+				return srv.URL, opts, func() {
+					srv.Close()
+					s.Equal("custom/1.0", got.Get("User-Agent"))
+				}
+			},
+			path:     "/ua",
+			wantBody: "ok",
+		},
+		{
 			name: "404 wraps ErrNotAvailable",
 			setup: func() (string, []cloudmetadata.Option, func()) {
 				srv := newServer(nil)
@@ -288,6 +327,187 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 						"expected error chain to include %v, got %v",
 						tt.wantErrIs, err)
 				}
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.wantBody, string(body))
+		})
+	}
+}
+
+func (s *CloudMetadataPublicTestSuite) TestGetWithHeaders() {
+	var got http.Header
+	srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+		"/x": func(w http.ResponseWriter, r *http.Request) {
+			got = r.Header.Clone()
+			_, _ = w.Write([]byte("ok"))
+		},
+	})
+	defer srv.Close()
+
+	client := cloudmetadata.New(srv.URL)
+	body, err := client.GetWithHeaders(context.Background(), "/x", map[string]string{
+		"X-Token": "abc123",
+	})
+	s.Require().NoError(err)
+	s.Equal("ok", string(body))
+	s.Equal("abc123", got.Get("X-Token"))
+	s.Equal(cloudmetadata.DefaultUserAgent, got.Get("User-Agent"))
+}
+
+func (s *CloudMetadataPublicTestSuite) TestRawGet() {
+	tests := []struct {
+		name       string
+		setup      func() (baseURL string, cleanup func())
+		path       string
+		wantErr    bool
+		wantStatus int
+		wantBody   string
+	}{
+		{
+			name: "200 returns body + status",
+			setup: func() (string, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/ok": func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = w.Write([]byte("hello"))
+					},
+				})
+				return srv.URL, srv.Close
+			},
+			path:       "/ok",
+			wantStatus: http.StatusOK,
+			wantBody:   "hello",
+		},
+		{
+			name: "400 returns body + status without wrapping ErrNotAvailable",
+			setup: func() (string, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/v": func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusBadRequest)
+						_, _ = w.Write([]byte(`{"newest-versions":["2024-01-01"]}`))
+					},
+				})
+				return srv.URL, srv.Close
+			},
+			path:       "/v",
+			wantStatus: http.StatusBadRequest,
+			wantBody:   `{"newest-versions":["2024-01-01"]}`,
+		},
+		{
+			name: "connection refused wraps ErrNotAvailable",
+			setup: func() (string, func()) {
+				srv := newServer(nil)
+				url := srv.URL
+				srv.Close()
+				return url, func() {}
+			},
+			path:    "/x",
+			wantErr: true,
+		},
+		{
+			name: "invalid URL builds fail before transport",
+			setup: func() (string, func()) {
+				return "http://\x7f", func() {}
+			},
+			path:    "/x",
+			wantErr: true,
+		},
+		{
+			name: "body read failure returns non-ErrNotAvailable error",
+			setup: func() (string, func()) {
+				return "http://example.invalid", func() {}
+			},
+			path:    "/x",
+			wantErr: true,
+		},
+		{
+			name: "path without leading slash is normalized",
+			setup: func() (string, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/rel": func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = w.Write([]byte("relative-ok"))
+					},
+				})
+				return srv.URL, srv.Close
+			},
+			path:       "rel",
+			wantStatus: http.StatusOK,
+			wantBody:   "relative-ok",
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			baseURL, cleanup := tt.setup()
+			defer cleanup()
+
+			opts := []cloudmetadata.Option(nil)
+			if tt.name == "body read failure returns non-ErrNotAvailable error" {
+				opts = append(opts, cloudmetadata.WithHTTPClient(&http.Client{
+					Transport: brokenBodyTransport{},
+				}))
+			}
+
+			client := cloudmetadata.New(baseURL, opts...)
+			body, status, err := client.RawGet(context.Background(), tt.path)
+			if tt.wantErr {
+				s.Require().Error(err)
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.wantStatus, status)
+			s.Equal(tt.wantBody, string(body))
+		})
+	}
+}
+
+func (s *CloudMetadataPublicTestSuite) TestPut() {
+	tests := []struct {
+		name        string
+		setup       func() (baseURL string, cleanup func())
+		headers     map[string]string
+		wantErr     bool
+		wantBody    string
+		verifyAfter func(s *CloudMetadataPublicTestSuite)
+	}{
+		{
+			name: "200 with extra headers forwards the headers",
+			setup: func() (string, func()) {
+				var gotHdr string
+				var gotMethod string
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/token": func(w http.ResponseWriter, r *http.Request) {
+						gotHdr = r.Header.Get("X-TTL")
+						gotMethod = r.Method
+						_, _ = w.Write([]byte("TOKEN123"))
+					},
+				})
+				return srv.URL, func() {
+					srv.Close()
+					s.Equal("60", gotHdr)
+					s.Equal(http.MethodPut, gotMethod)
+				}
+			},
+			headers:  map[string]string{"X-TTL": "60"},
+			wantBody: "TOKEN123",
+		},
+		{
+			name: "404 wraps ErrNotAvailable",
+			setup: func() (string, func()) {
+				srv := newServer(nil)
+				return srv.URL, srv.Close
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			baseURL, cleanup := tt.setup()
+			defer cleanup()
+
+			client := cloudmetadata.New(baseURL)
+			body, err := client.Put(context.Background(), "/token", tt.headers)
+			if tt.wantErr {
+				s.Require().Error(err)
 				return
 			}
 			s.Require().NoError(err)

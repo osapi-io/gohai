@@ -322,7 +322,7 @@ func (s *GcePublicTestSuite) TestMetadata() {
 			s.Require().NoError(err)
 
 			if tt.wantNoHTTP {
-				s.False(httpCalled, "collector should have skipped the HTTP call")
+				s.False(httpCalled)
 			}
 
 			if tt.wantNil {
