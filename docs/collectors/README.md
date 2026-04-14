@@ -17,8 +17,8 @@ wires `WithDefaults()` automatically; pass `--no-defaults` to turn it off and
 use only explicit `--collector.X` flags. The "Default" column below indicates
 membership in the recommended set (`✅` = on when `WithDefaults()` is in effect,
 `❌` = opt-in only). The "Implemented" column shows shipping status: `✅` =
-implemented and tested, `⚠️` = partial, `🚧` = planned, `🪦` = deprecated,
-will not implement (low demand / upstream project archived).
+implemented and tested, `⚠️` = partial, `🚧` = planned, `🪦` = deprecated, will
+not implement (low demand / upstream project archived).
 
 **Schema:** Field names follow [OCSF][] (Open Cybersecurity Schema Framework) as
 the primary schema and [OpenTelemetry Resource Semantic
