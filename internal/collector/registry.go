@@ -26,7 +26,21 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 )
+
+// Hooks are optional per-run observability callbacks. Both fields may
+// be nil.
+type Hooks struct {
+	// OnError is invoked when a collector's Collect returns an error.
+	// Called from the collector's goroutine, concurrent with other
+	// collectors in the same level.
+	OnError func(name string, err error)
+	// OnComplete is invoked after every collector's Collect returns,
+	// regardless of success or failure, with the wall-clock duration
+	// of that call. Useful for --debug timing output.
+	OnComplete func(name string, dur time.Duration, err error)
+}
 
 // Registry holds the set of registered collectors.
 type Registry struct {
@@ -141,11 +155,12 @@ func (r *Registry) SelectedWith(
 // Run executes the named collectors in dependency order. Dependencies are
 // auto-included even if not in the names list. Collectors at the same level
 // (no inter-dependencies) run concurrently. Returns a map of collector name
-// to result. Failed collectors are omitted from the result map.
+// to result. Failed collectors are omitted from the result map. hooks may
+// be zero-valued; any non-nil field is invoked per collector.
 func (r *Registry) Run(
 	ctx context.Context,
 	names []string,
-	onError func(name string, err error),
+	hooks Hooks,
 ) (map[string]any, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -170,10 +185,15 @@ func (r *Registry) Run(
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
+				start := time.Now()
 				out, cerr := c.Collect(ctx)
+				dur := time.Since(start)
+				if hooks.OnComplete != nil {
+					hooks.OnComplete(c.Name(), dur, cerr)
+				}
 				if cerr != nil {
-					if onError != nil {
-						onError(c.Name(), cerr)
+					if hooks.OnError != nil {
+						hooks.OnError(c.Name(), cerr)
 					}
 					return
 				}

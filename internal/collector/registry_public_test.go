@@ -24,7 +24,9 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -237,12 +239,14 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 
 func (s *RegistryPublicTestSuite) TestRun() {
 	tests := []struct {
-		name         string
-		setup        func(reg *collector.Registry)
-		names        []string
-		wantResults  []string
-		wantErrNames []string
-		wantErr      bool
+		name            string
+		setup           func(reg *collector.Registry)
+		names           []string
+		hooks           func(mu *sync.Mutex, onErr *[]string, onComp *[]string) collector.Hooks
+		wantResults     []string
+		wantErrNames    []string
+		wantCompleteAll []string
+		wantErr         bool
 	}{
 		{
 			name: "orders by dependency",
@@ -306,6 +310,47 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			names:   []string{"missing"},
 			wantErr: true,
 		},
+		{
+			name: "zero-value hooks tolerates error without handler",
+			setup: func(reg *collector.Registry) {
+				s.Require().NoError(reg.Register(&errCollector{name: "bad"}))
+			},
+			names: []string{"bad"},
+			hooks: func(*sync.Mutex, *[]string, *[]string) collector.Hooks {
+				return collector.Hooks{}
+			},
+			wantResults: nil, // "bad" drops silently
+		},
+		{
+			name: "OnComplete fires for every collector (success and failure)",
+			setup: func(reg *collector.Registry) {
+				s.Require().NoError(reg.Register(&errCollector{name: "bad"}))
+				s.Require().
+					NoError(reg.Register(&fakeCollector{name: "good", defaultEnabled: true}))
+			},
+			names: []string{"bad", "good"},
+			hooks: func(
+				mu *sync.Mutex,
+				onErr *[]string,
+				onComp *[]string,
+			) collector.Hooks {
+				return collector.Hooks{
+					OnError: func(n string, _ error) {
+						mu.Lock()
+						defer mu.Unlock()
+						*onErr = append(*onErr, n)
+					},
+					OnComplete: func(n string, _ time.Duration, _ error) {
+						mu.Lock()
+						defer mu.Unlock()
+						*onComp = append(*onComp, n)
+					},
+				}
+			},
+			wantResults:     []string{"good"},
+			wantErrNames:    []string{"bad"},
+			wantCompleteAll: []string{"bad", "good"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -313,28 +358,37 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			reg := collector.NewRegistry()
 			tt.setup(reg)
 
-			var errNames []string
-			results, err := reg.Run(context.Background(), tt.names, func(n string, _ error) {
-				errNames = append(errNames, n)
-			})
+			var (
+				mu                      sync.Mutex
+				errNames, completeNames []string
+			)
+			hooks := collector.Hooks{
+				OnError: func(n string, _ error) {
+					mu.Lock()
+					defer mu.Unlock()
+					errNames = append(errNames, n)
+				},
+			}
+			if tt.hooks != nil {
+				hooks = tt.hooks(&mu, &errNames, &completeNames)
+			}
+			results, err := reg.Run(context.Background(), tt.names, hooks)
 			if tt.wantErr {
 				s.Error(err)
 				return
 			}
 			s.Require().NoError(err)
+			mu.Lock()
+			defer mu.Unlock()
 			for _, name := range tt.wantResults {
 				s.Contains(results, name)
 			}
 			for _, name := range tt.wantErrNames {
 				s.Contains(errNames, name)
 			}
+			for _, name := range tt.wantCompleteAll {
+				s.Contains(completeNames, name)
+			}
 		})
 	}
-}
-
-func (s *RegistryPublicTestSuite) TestRunErrorsWithoutHandler() {
-	s.Require().NoError(s.reg.Register(&errCollector{name: "bad"}))
-	results, err := s.reg.Run(context.Background(), []string{"bad"}, nil)
-	s.Require().NoError(err)
-	s.NotContains(results, "bad")
 }

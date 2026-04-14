@@ -61,175 +61,75 @@ go get github.com/osapi-io/gohai
 
 ## ✨ Features
 
-| Feature                                                       | Description                                    |
-| ------------------------------------------------------------- | ---------------------------------------------- |
-| [🔌 Pluggable Collectors](docs/features/collectors.md)        | Enable/disable individual fact collectors      |
-| [🏗️ Typed Structs](docs/features/typed-structs.md)            | Strongly-typed Go structs for all facts        |
-| [📄 JSON Output](docs/features/json-output.md)                | Nested JSON output for CLI and programmatic use |
-| [🗺️ Flat Map Access](docs/features/flat-map.md)               | Dot-separated key-value access                 |
-| [🐧 Cross-Platform](docs/features/cross-platform.md)          | Linux primary, macOS best-effort               |
-| [🔗 Collector Dependencies](docs/features/dependencies.md)    | Automatic dependency resolution between facts  |
-| [⚡ Concurrent Collection](docs/features/concurrency.md)      | Collectors run concurrently; dependency graph resolves order when any collector declares deps. |
-| [🎛️ Profiles](docs/features/profiles.md)                      | Predefined collector sets (minimal, standard, full) |
-| [📊 OCSF + OpenTelemetry + Ohai](docs/features/ocsf-ohai.md)   | Field names follow [OCSF](https://schema.ocsf.io/) then [OpenTelemetry](https://opentelemetry.io/docs/specs/semconv/resource/); data sources mirror Chef Ohai's plugins |
-| [🔌 SDK Integration](docs/features/sdk.md)                    | Import as a Go package for OSAPI and others    |
+| Feature                         | Description                                                                                                                                                           |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔌 Pluggable Collectors         | Enable/disable individual fact collectors                                                                                                                             |
+| 🏗️ Typed Structs                | Strongly-typed Go structs for all facts                                                                                                                               |
+| 📄 JSON Output                  | Nested JSON output for CLI and programmatic use                                                                                                                       |
+| 🗺️ Flat Map Access              | Dot-separated key-value access                                                                                                                                        |
+| 🐧 Cross-Platform               | Linux primary, macOS best-effort                                                                                                                                      |
+| 🔗 Collector Dependencies       | Automatic dependency resolution between facts                                                                                                                         |
+| ⚡ Concurrent Collection        | Collectors run concurrently; dependency graph resolves order when any collector declares deps.                                                                         |
+| ⏱️ Per-Collector Timings        | Opt-in `--with-timings` / `WithTimings()` embeds per-collector durations, status, and error messages under `_timings` in the JSON output                              |
+| 📊 OCSF + OpenTelemetry + Ohai  | Field names follow [OCSF](https://schema.ocsf.io/) then [OpenTelemetry](https://opentelemetry.io/docs/specs/semconv/resource/); data sources mirror Chef Ohai's plugins |
+| 🔌 SDK Integration              | Import as a Go package for OSAPI and others                                                                                                                           |
 
 ## 🔌 Collectors
 
-65 collectors across 9 categories. Collectors are individually toggled using
-node_exporter-style flags — `--collector.<name>` to opt in,
-`--no-collector.<name>` to opt out. SDK consumers use
-`gohai.WithEnabled(...)` / `gohai.WithDisabled(...)` / `gohai.WithCollectors(...)`.
+65 collectors across 9 categories. See the **[Collectors
+reference](docs/collectors/README.md)** for the full catalog —
+implementation status, default membership, schema mappings, and
+per-collector docs.
+
+Collectors are individually toggled using node_exporter-style flags —
+`--collector.<name>` to opt in, `--no-collector.<name>` to opt out. SDK
+consumers use `gohai.WithEnabled(...)` / `gohai.WithDisabled(...)` /
+`gohai.WithCollectors(...)`.
 
 **Defaults are opt-in.** `gohai.New()` returns an empty registry. Pass
 `gohai.WithDefaults()` for the recommended set (cheap + near-universal —
 identity, base hardware, network, load, virt detect). The CLI wires
 `WithDefaults()` automatically; pass `--no-defaults` to skip it and use only
-explicit `--collector.X` flags. The "Default" column reflects membership in the
-recommended set.
-
-Implementation status legend: ✅ = implemented and tested, ⚠️ = partial
-support (e.g., Linux only), 🚧 = planned but not yet built.
-
-### 🖥️ System
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [platform](docs/collectors/platform.md)            | OS name, version, family, architecture         | ✅      | ✅ |
-| [hostname](docs/collectors/hostname.md)            | FQDN, domain, hostname, machine name           | ✅      | ✅ |
-| [kernel](docs/collectors/kernel.md)                | Version, modules, parameters                   | ✅      | ✅ |
-| [uptime](docs/collectors/uptime.md)                | Boot time, uptime duration, idle time          | ✅      | ✅ |
-| [timezone](docs/collectors/timezone.md)            | System timezone                                | ✅      | ✅ |
-| [os_release](docs/collectors/os_release.md)        | `/etc/os-release` fields (Linux)               | ✅      | ✅         |
-| [init](docs/collectors/init.md)                    | Init system detection (systemd, init, etc.)    | ✅      | ✅         |
-| [fips](docs/collectors/fips.md)                    | FIPS mode detection                            | ✅      | ✅ |
-| [machine_id](docs/collectors/machine_id.md)        | Machine ID (`/etc/machine-id`)                 | ✅      | ✅ |
-| [root_group](docs/collectors/root_group.md)        | Root user's primary group                      | ✅      | ✅ |
-| [shells](docs/collectors/shells.md)                | Available shells from `/etc/shells`            | ✅      | ✅ |
-| [shard](docs/collectors/shard.md)                  | Deterministic shard seed from machine identity | ✅      | ✅         |
-
-### ⚙️ Hardware
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [cpu](docs/collectors/cpu.md)                      | Model, cores, flags, cache, NUMA topology      | ✅      | ✅ |
-| [memory](docs/collectors/memory.md)                | Total, free, swap, buffers, cached, hugepages  | ✅      | 🚧          |
-| [disk](docs/collectors/disk.md)                    | Block devices, I/O stats                       | ✅      | ✅ |
-| [filesystem](docs/collectors/filesystem.md)        | Mounts, capacity, usage, inodes, fs type       | ✅      | ✅ |
-| [dmi](docs/collectors/dmi.md)                      | BIOS, system manufacturer, serial, UUID        | ❌      | 🚧          |
-| [gpu](docs/collectors/gpu.md)                      | GPU model, driver, memory                      | ❌      | 🚧          |
-| [pci](docs/collectors/pci.md)                      | PCI devices (`lspci`)                          | ❌      | 🚧          |
-| [scsi](docs/collectors/scsi.md)                    | SCSI devices                                   | ❌      | 🚧          |
-| [hardware](docs/collectors/hardware.md)            | macOS hardware profile, battery, storage       | ❌      | 🚧          |
-
-### 🌐 Network
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [network](docs/collectors/network.md)              | Interfaces, IPs, MACs, routes, neighbours, link details, counters | ✅      | ✅         |
-| [dns](docs/collectors/dns.md)                      | `/etc/resolv.conf` nameservers + search        | ✅      | 🚧          |
-| [ethtool](docs/collectors/ethtool.md)              | Per-NIC ethtool detail (link/duplex/driver)    | ❌      | 🚧          |
-
-### ☁️ Cloud
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [cloud](docs/collectors/cloud.md)                  | Aggregated cloud provider info                 | ❌      | 🚧          |
-| [ec2](docs/collectors/ec2.md)                      | AWS EC2 instance metadata (IMDS)               | ❌      | 🚧          |
-| [gce](docs/collectors/gce.md)                      | Google Compute Engine metadata                 | ❌      | 🚧          |
-| [azure](docs/collectors/azure.md)                  | Azure instance metadata (IMDS)                 | ❌      | 🚧          |
-| [digital_ocean](docs/collectors/digital_ocean.md)  | DigitalOcean droplet metadata                  | ❌      | 🚧          |
-| [openstack](docs/collectors/openstack.md)          | OpenStack instance metadata                    | ❌      | 🚧          |
-| [alibaba](docs/collectors/alibaba.md)              | Alibaba Cloud ECS metadata                     | ❌      | 🚧          |
-| [rackspace](docs/collectors/rackspace.md)          | Rackspace server metadata                      | ❌      | 🚧          |
-| [linode](docs/collectors/linode.md)                | Linode instance metadata                       | ❌      | 🚧          |
-| [oci](docs/collectors/oci.md)                      | Oracle Cloud instance metadata                 | ❌      | 🚧          |
-| [scaleway](docs/collectors/scaleway.md)            | Scaleway instance metadata                     | ❌      | 🚧          |
-| [softlayer](docs/collectors/softlayer.md)          | IBM SoftLayer metadata                         | ❌      | 🚧          |
-| [eucalyptus](docs/collectors/eucalyptus.md)        | Eucalyptus instance metadata                   | ❌      | 🚧          |
-
-### 🔮 Virtualization
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [virtualization](docs/collectors/virtualization.md) | Hypervisor and container runtime detection     | ✅      | ✅ |
-| [vmware](docs/collectors/vmware.md)                | VMware guest tools data                        | ❌      | 🚧          |
-| [virtualbox](docs/collectors/virtualbox.md)        | VirtualBox guest additions data                | ❌      | 🚧          |
-| [libvirt](docs/collectors/libvirt.md)              | Libvirt domain information                     | ❌      | 🚧          |
-
-### 🔒 Security
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [selinux](docs/collectors/selinux.md)              | SELinux status, policy, contexts               | ❌      | 🚧          |
-| [ssh](docs/collectors/ssh.md)                      | Host keys (RSA, ECDSA, ED25519)                | ❌      | 🚧          |
-
-### 📦 Software
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [package_mgr](docs/collectors/package_mgr.md)      | Active package manager (apt, dnf, brew, etc.)  | ✅      | ✅         |
-| [packages](docs/collectors/packages.md)            | Installed packages (apt, yum, brew, etc.)      | ❌      | 🚧          |
-| [languages](docs/collectors/languages.md)          | Go, Python, Ruby, Node, Rust, Java, etc.       | ❌      | 🚧          |
-| [docker](docs/collectors/docker.md)                | Running containers, images, Docker info        | ❌      | 🚧          |
-| [services](docs/collectors/services.md)            | Systemd service states                         | ❌      | 🚧          |
-
-### 👥 Users & Sessions
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [users](docs/collectors/users.md)                  | passwd/group data, current user                | ❌      | ⚠️         |
-| [sessions](docs/collectors/sessions.md)            | Logged-in sessions (`loginctl`)                | ❌      | 🚧          |
-
-### 🐧 Linux-Specific
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [lsb](docs/collectors/lsb.md)                     | Linux Standard Base release info               | ✅      | ✅         |
-| [hostnamectl](docs/collectors/hostnamectl.md)      | `hostnamectl` output                           | ❌      | 🚧          |
-| [sysctl](docs/collectors/sysctl.md)               | Kernel parameters via `sysctl`                 | ❌      | 🚧          |
-| [systemd_paths](docs/collectors/systemd_paths.md)  | Systemd path directories                       | ❌      | 🚧          |
-| [interrupts](docs/collectors/interrupts.md)        | IRQ stats, SMP affinity                        | ❌      | 🚧          |
-| [ipc](docs/collectors/ipc.md)                      | IPC limits and status                          | ❌      | 🚧          |
-| [livepatch](docs/collectors/livepatch.md)          | Kernel livepatch status                        | ❌      | 🚧          |
-| [mdadm](docs/collectors/mdadm.md)                  | Software RAID arrays                           | ❌      | 🚧          |
-| [tc](docs/collectors/tc.md)                        | Traffic control (qdisc) info                   | ❌      | 🚧          |
-| [grub2](docs/collectors/grub2.md)                  | GRUB2 environment variables                    | ❌      | 🚧          |
-| [zpools](docs/collectors/zpools.md)                | ZFS pool status                                | ❌      | 🚧          |
-| [rpm](docs/collectors/rpm.md)                      | RPM macros and config                          | ❌      | 🚧          |
-| [block_device](docs/collectors/block_device.md)    | Block device attributes from sysfs             | ❌      | 🚧          |
-
-### 🔧 Miscellaneous
-
-| Collector                                          | Description                                    | Default | Implemented |
-| -------------------------------------------------- | ---------------------------------------------- | ------- | ----------- |
-| [process](docs/collectors/process.md)              | Process list (PID, name, user, cmdline)        | ❌      | ✅ |
-| [load](docs/collectors/load.md)                    | Load averages (1/5/15-minute)                  | ✅      | ✅         |
-| [command](docs/collectors/command.md)              | Full `ps` output (Ohai command/ps parity)      | ❌      | 🚧          |
-| [sysconf](docs/collectors/sysconf.md)             | POSIX sysconf values                           | ❌      | 🚧          |
+explicit `--collector.X` flags.
 
 ## 🎯 Usage
 
 ### CLI
 
 ```bash
-# Collect all default facts
+# Collect the recommended default collector set
 gohai
 
-# Enable specific collectors only
-gohai --collector.platform --collector.cpu --collector.memory
-
-# Disable specific collectors
-gohai --no-collector.cloud --no-collector.gpu
-
-# Output as pretty-printed JSON
+# Pretty-printed JSON
 gohai --pretty
 
-# Output flat key-value pairs
+# Flat key=value pairs instead of nested JSON
 gohai --flat
+
+# Enable specific collectors on top of the defaults
+gohai --collector.process --collector.packages
+
+# Disable specific collectors
+gohai --no-collector.virtualization --no-collector.network
+
+# Skip defaults entirely; run only what --collector.X turns on
+gohai --no-defaults --collector.platform --collector.cpu
+
+# Embed per-collector timings + errors under `_timings` in the JSON
+gohai --with-timings --pretty
+
+# List every registered collector and exit
+gohai --list-collectors
 ```
 
 ### SDK
+
+Importers should read the [full API reference on pkg.go.dev][Package
+documentation] for every `Option`, `Facts` field, and `Info` struct —
+that's the authoritative API surface. The examples below show the two
+usage shapes.
+
+**Collecting facts** (producer side):
 
 ```go
 package main
@@ -244,7 +144,8 @@ import (
 
 func main() {
     g, err := gohai.New(
-        gohai.WithCollectors("platform", "cpu", "memory"),
+        gohai.WithDefaults(),                      // the recommended set
+        gohai.WithEnabled("process", "packages"),  // plus these two
     )
     if err != nil {
         log.Fatal(err)
@@ -255,46 +156,47 @@ func main() {
         log.Fatal(err)
     }
 
-    // Access typed structs
-    fmt.Printf("OS: %s %s\n", facts.Platform.Name, facts.Platform.Version)
-    fmt.Printf("CPUs: %d\n", facts.CPU.Total)
-    fmt.Printf("Memory: %s\n", facts.Memory.Total)
+    // Typed access — pkg.go.dev documents every Info struct's fields.
+    fmt.Printf("OS:     %s %s\n", facts.Platform.Name, facts.Platform.Version)
+    fmt.Printf("Cores:  %d\n", facts.CPU.Cores)
+    fmt.Printf("Memory: %d bytes\n", facts.Memory.Total)
 
-    // Or get as JSON
-    json, _ := facts.JSON()
-    fmt.Println(string(json))
-
-    // Or get as flat map
-    flat := facts.Flat()
-    fmt.Println(flat["cpu.total"])
+    // Serialize for transport / storage.
+    b, _ := facts.PrettyJSON()
+    fmt.Println(string(b))
 }
 ```
 
+**Consuming stored facts** (decoder side — e.g. a server that received
+a fact blob from an agent):
 
-## 🔗 Integrations
+```go
+var facts gohai.Facts
+if err := json.Unmarshal(payload, &facts); err != nil {
+    log.Fatal(err)
+}
 
-Primary consumers of the gohai SDK:
+// Typed access on the decoded value — no map[string]any guessing.
+fmt.Println(facts.Platform.Name, facts.CPU.Cores)
+fmt.Println(facts.Network.DefaultInterface)
+```
 
-| Integration                                       | What it consumes                                               |
-| ------------------------------------------------- | -------------------------------------------------------------- |
-| [OSAPI](docs/integrations/osapi.md)               | Maps `job.FactsRegistration` → gohai collector fields          |
-
-The OSAPI integration doc is the authoritative mapping of OSAPI fact fields
-to gohai collectors — keep it in sync with any `Info` struct changes.
+Per-collector timings + error messages can be embedded in Facts by adding
+`gohai.WithTimings()` to `gohai.New(...)` — useful for debugging slow
+collectors or seeing why a collector failed without blocking the run.
+See the `Timings` field on [pkg.go.dev][Package documentation].
 
 ## 📖 Documentation
 
+- [Package documentation][] on pkg.go.dev — generated API reference. Every
+  `Option`, `Facts` field, and `Info` struct is documented there. This is
+  the authoritative SDK reference.
 - [Collectors reference](docs/collectors/README.md) — one doc per collector
   with fields, schema mappings (OCSF + OpenTelemetry), and Ohai source
   alignment.
-- [Features](docs/features/README.md) — SDK surface, concurrency model,
-  dependency resolution, OCSF + OpenTelemetry + Ohai schema, profiles.
-- [Integrations](docs/integrations/osapi.md) — how downstream services consume
-  the SDK.
 - [Development](docs/development.md) — prerequisites, setup, testing, commit
   conventions.
 - [Contributing](docs/contributing.md) — PR workflow.
-- [Package documentation][] on pkg.go.dev — generated API reference.
 
 ## 🤝 Contributing
 

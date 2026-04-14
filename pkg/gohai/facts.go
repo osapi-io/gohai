@@ -82,6 +82,28 @@ type Facts struct {
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
+
+	// Timings is populated only when the Gohai instance was built with
+	// WithTimings(). Contains per-collector wall-clock durations, status
+	// ("ok" / "err"), and — for failed collectors — the error message.
+	// Failed collectors are dropped from the typed fields above; their
+	// entry here is how the failure surfaces.
+	Timings *Timings `json:"_timings,omitempty"`
+}
+
+// Timings captures the runtime observability data surfaced into Facts
+// when WithTimings() is passed to gohai.New. Total wall-clock time
+// for the run lives on Facts.CollectDuration — this struct is purely
+// the per-collector breakdown.
+type Timings struct {
+	Collectors map[string]CollectorTiming `json:"collectors"`
+}
+
+// CollectorTiming is one collector's per-run observability entry.
+type CollectorTiming struct {
+	DurationNs int64  `json:"duration_ns"`
+	Status     string `json:"status"` // "ok" | "err"
+	Error      string `json:"error,omitempty"`
 }
 
 // JSON returns the compact JSON representation of the facts.

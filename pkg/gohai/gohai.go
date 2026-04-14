@@ -23,6 +23,7 @@ package gohai
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -53,8 +54,9 @@ import (
 
 // Gohai is the SDK entry point for collecting system facts.
 type Gohai struct {
-	registry *collector.Registry
-	selected []collector.Collector
+	registry    *collector.Registry
+	selected    []collector.Collector
+	withTimings bool
 }
 
 // New constructs a Gohai instance with the given options.
@@ -74,12 +76,15 @@ func New(
 		return nil, err
 	}
 	g.selected = sel
+	g.withTimings = cfg.withTimings
 	return g, nil
 }
 
 // Collect runs all selected collectors and returns Facts. Each collector's
 // typed result is written to the matching field on Facts; collectors that
-// error or aren't selected leave their field nil.
+// error or aren't selected leave their field nil. When the instance was
+// built with WithTimings, per-collector durations and error messages are
+// embedded in Facts.Timings.
 func (g *Gohai) Collect(
 	ctx context.Context,
 ) (*Facts, error) {
@@ -88,13 +93,40 @@ func (g *Gohai) Collect(
 		names = append(names, c.Name())
 	}
 	start := time.Now()
-	results, err := g.registry.Run(ctx, names, nil)
+
+	var (
+		samplesMu sync.Mutex
+		samples   map[string]CollectorTiming
+	)
+	hooks := collector.Hooks{}
+	if g.withTimings {
+		samples = make(map[string]CollectorTiming, len(names))
+		hooks.OnComplete = func(name string, dur time.Duration, err error) {
+			entry := CollectorTiming{
+				DurationNs: dur.Nanoseconds(),
+				Status:     "ok",
+			}
+			if err != nil {
+				entry.Status = "err"
+				entry.Error = err.Error()
+			}
+			samplesMu.Lock()
+			samples[name] = entry
+			samplesMu.Unlock()
+		}
+	}
+
+	results, err := g.registry.Run(ctx, names, hooks)
 	if err != nil {
 		return nil, fmt.Errorf("run collectors: %w", err)
 	}
+
 	facts := &Facts{
 		CollectTime:     start,
 		CollectDuration: time.Since(start),
+	}
+	if g.withTimings {
+		facts.Timings = &Timings{Collectors: samples}
 	}
 	for name, result := range results {
 		facts.set(name, result)

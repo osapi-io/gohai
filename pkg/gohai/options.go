@@ -28,6 +28,7 @@ type config struct {
 	enabled     []string
 	disabled    []string
 	only        []string
+	withTimings bool
 }
 
 // WithDefaults opts in to the recommended default collector set —
@@ -62,4 +63,15 @@ func WithCollectors(
 	names ...string,
 ) Option {
 	return func(c *config) { c.only = append(c.only, names...) }
+}
+
+// WithTimings embeds per-collector timing + error data into Facts
+// under a top-level `_timings` object. Each entry records the
+// collector's wall-clock duration, status (`ok` / `err`), and — for
+// failed collectors — the error string. Failed collectors are still
+// dropped from the typed output; their timing entry is how the
+// failure surfaces when this option is on. Disabled by default —
+// when off, Facts contain only collector results.
+func WithTimings() Option {
+	return func(c *config) { c.withTimings = true }
 }
