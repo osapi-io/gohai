@@ -33,9 +33,10 @@ import (
 
 // Info holds virtualization detection data.
 type Info struct {
-	System  string            `json:"system,omitempty"`  // primary / innermost runtime ("docker", "kvm", "vmware", "")
-	Role    string            `json:"role,omitempty"`    // "host" | "guest" | ""
-	Systems map[string]string `json:"systems,omitempty"` // every detected layer: {"kvm": "guest", "docker": "host"}
+	System         string            `json:"system,omitempty"`          // primary / innermost runtime ("docker", "kvm", "vmware", "")
+	Role           string            `json:"role,omitempty"`            // "host" | "guest" | ""
+	Systems        map[string]string `json:"systems,omitempty"`         // every detected layer: {"kvm": "guest", "docker": "host"}
+	HypervisorHost string            `json:"hypervisor_host,omitempty"` // hostname of the hypervisor, when the guest can see it (Hyper-V KVP pool)
 }
 
 // Collector is the public interface every variant satisfies.

@@ -21,11 +21,12 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field     | Type              | Description                                                                                                          | Schema mapping            |
-| --------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `system`  | string            | Primary / most-recent positive detection (`"docker"`, `"kvm"`, `"lxc"`, `""` for bare metal).                        | No direct schema mapping. |
-| `role`    | string            | `"host"`, `"guest"`, or `""`.                                                                                        | No direct schema mapping. |
-| `systems` | map[string]string | Every detected layer: `{"kvm": "guest", "docker": "host"}`. Single entry on single-layer hosts; empty on bare metal. | No direct schema mapping. |
+| Field             | Type              | Description                                                                                                          | Schema mapping            |
+| ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `system`          | string            | Primary / most-recent positive detection (`"docker"`, `"kvm"`, `"lxc"`, `""` for bare metal).                        | No direct schema mapping. |
+| `role`            | string            | `"host"`, `"guest"`, or `""`.                                                                                        | No direct schema mapping. |
+| `systems`         | map[string]string | Every detected layer: `{"kvm": "guest", "docker": "host"}`. Single entry on single-layer hosts; empty on bare metal. | No direct schema mapping. |
+| `hypervisor_host` | string            | Hostname of the hypervisor when the guest can see it. Populated from the Hyper-V KVP pool on Linux.                  | No direct schema mapping. |
 
 Empty `system` + empty `systems` means "no virtualization detected" (bare
 metal). When more than one layer is detected, `system`/`role` report the last
