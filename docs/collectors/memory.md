@@ -61,6 +61,12 @@ Consumers use this to:
 | `percpu`                   | uint64  | Per-CPU allocations (Linux).                              | No direct schema mapping.        |
 | `anon_pages`               | uint64  | Anonymous (non-file-backed) pages (Linux).                | No direct schema mapping.        |
 | `shmem`                    | uint64  | Shared memory (tmpfs + SysV shm) (Linux).                 | No direct schema mapping.        |
+| `high_total`               | uint64  | 32-bit kernel high memory total; zero on 64-bit.          | No direct schema mapping.        |
+| `high_free`                | uint64  | 32-bit kernel high memory free; zero on 64-bit.           | No direct schema mapping.        |
+| `low_total`                | uint64  | 32-bit kernel low memory total; zero on 64-bit.           | No direct schema mapping.        |
+| `low_free`                 | uint64  | 32-bit kernel low memory free; zero on 64-bit.            | No direct schema mapping.        |
+| `nfs_unstable`             | uint64  | NFS pages pending commit to server.                       | No direct schema mapping.        |
+| `bounce`                   | uint64  | Bounce-buffer memory (legacy DMA).                        | No direct schema mapping.        |
 | `commit_limit`             | uint64  | Overcommit ceiling.                                       | No direct schema mapping.        |
 | `committed_as`             | uint64  | Committed address space.                                  | No direct schema mapping.        |
 | `vmalloc_total`            | uint64  | vmalloc arena size.                                       | No direct schema mapping.        |
