@@ -25,6 +25,9 @@ explicit scrub.
 | `tags`             | `[]string`    | User-defined tags.                              | No direct schema mapping. |
 | `features`         | `[]string`    | DO feature flags enabled on this droplet.       | No direct schema mapping. |
 | `floating_ip`      | `string`      | Floating IPv4 attached to the droplet (if any). | No direct schema mapping. |
+| `reserved_ip`      | `string`      | DO's newer replacement for floating_ip (IPv4).  | No direct schema mapping. |
+| `auth_key`         | `string`      | DO internal auth token; often empty.            | No direct schema mapping. |
+| `user_data`        | `string`      | User-supplied cloud-init data.                  | No direct schema mapping. |
 | `ipv4_nameservers` | `[]string`    | DNS resolvers.                                  | No direct schema mapping. |
 | `interfaces`       | `[]Interface` | Attached VNICs — see below.                     | OCSF `network_interface`  |
 
