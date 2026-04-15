@@ -220,6 +220,45 @@ func (s *CPUPublicTestSuite) TestCollect() {
 				s.Equal(16, i.Count)
 				s.Equal(8, i.Cores)
 				s.Equal(1, i.Sockets)
+				// Per-CPU breakdown populated from gopsutil's InfoStat slice.
+				s.Require().Len(i.CPUs, 1)
+				s.Equal("GenuineIntel", i.CPUs[0].VendorID)
+				s.Equal("0", i.CPUs[0].PhysicalID)
+				s.Equal(int32(8), i.CPUs[0].Cores)
+			},
+		},
+		{
+			name:    "linux: hybrid-core per-CPU differs per socket",
+			variant: "linux",
+			infoFn: func(context.Context) ([]gpcpu.InfoStat, error) {
+				return []gpcpu.InfoStat{
+					{
+						PhysicalID: "0",
+						CoreID:     "0",
+						Cores:      8,
+						ModelName:  "P-core",
+						VendorID:   "GenuineIntel",
+						Mhz:        5200,
+					},
+					{
+						PhysicalID: "0",
+						CoreID:     "8",
+						Cores:      16,
+						ModelName:  "E-core",
+						VendorID:   "GenuineIntel",
+						Mhz:        3800,
+					},
+				}, nil
+			},
+			countsFn: func(context.Context, bool) (int, error) { return 24, nil },
+			fs:       newVulnFS(s, nil),
+			exec:     noLscpuExec,
+			validate: func(i *cpu.Info) {
+				s.Require().Len(i.CPUs, 2)
+				s.Equal("P-core", i.CPUs[0].ModelName)
+				s.Equal(float64(5200), i.CPUs[0].Mhz)
+				s.Equal("E-core", i.CPUs[1].ModelName)
+				s.Equal(float64(3800), i.CPUs[1].Mhz)
 			},
 		},
 		{
