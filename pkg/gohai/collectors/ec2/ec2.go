@@ -95,19 +95,41 @@ var metadataPaths = []string{
 	"/meta-data/ami-launch-index",
 	"/meta-data/ami-manifest-path",
 	"/meta-data/hostname",
+	"/meta-data/instance-action",
 	"/meta-data/instance-id",
 	"/meta-data/instance-type",
 	"/meta-data/instance-life-cycle",
+	"/meta-data/kernel-id",
 	"/meta-data/local-hostname",
 	"/meta-data/local-ipv4",
 	"/meta-data/mac",
 	"/meta-data/placement/availability-zone",
+	"/meta-data/placement/availability-zone-id",
+	"/meta-data/placement/group-name",
+	"/meta-data/placement/host-id",
+	"/meta-data/placement/partition-number",
 	"/meta-data/placement/region",
 	"/meta-data/public-hostname",
 	"/meta-data/public-ipv4",
+	"/meta-data/ramdisk-id",
 	"/meta-data/reservation-id",
 	"/meta-data/profile",
+	"/meta-data/services/domain",
+	"/meta-data/services/partition",
+	"/meta-data/spot/instance-action",
+	"/meta-data/spot/termination-time",
 }
+
+// blockDeviceMappingPath is the directory whose children (ami, root,
+// ebs0, ebs1, ephemeral0, ...) each resolve to a device path.
+const blockDeviceMappingPath = "/meta-data/block-device-mapping"
+
+// productCodesPath is a newline-delimited list of marketplace product codes.
+const productCodesPath = "/meta-data/product-codes"
+
+// publicKeysPath is the directory whose children (0, 1, 2, ...) each
+// hold an OpenSSH-format public key under `<N>/openssh-key`.
+const publicKeysPath = "/meta-data/public-keys"
 
 // securityGroupsPath is the newline-split leaf (Ohai's EC2_ARRAY_VALUES).
 const securityGroupsPath = "/meta-data/security-groups"
@@ -163,6 +185,41 @@ type Info struct {
 	Region           string `json:"region,omitempty"`
 	AvailabilityZone string `json:"availability_zone,omitempty"`
 	AccountID        string `json:"account_id,omitempty"`
+
+	// Placement extras (from meta-data/placement/*). Populated only
+	// when IMDS returns non-404 for the respective key — empty on
+	// classic VPC instances without dedicated-host / partition-
+	// placement features.
+	AvailabilityZoneID string `json:"availability_zone_id,omitempty"`
+	GroupName          string `json:"group_name,omitempty"`
+	HostID             string `json:"host_id,omitempty"`
+	PartitionNumber    string `json:"partition_number,omitempty"`
+
+	// AMI / kernel metadata (legacy paravirt instances).
+	KernelID  string `json:"kernel_id,omitempty"`
+	RamdiskID string `json:"ramdisk_id,omitempty"`
+
+	// Lifecycle + spot signals.
+	InstanceAction      string `json:"instance_action,omitempty"`
+	SpotInstanceAction  string `json:"spot_instance_action,omitempty"`
+	SpotTerminationTime string `json:"spot_termination_time,omitempty"`
+
+	// Services endpoint — useful on GovCloud / China regions.
+	ServicesDomain    string `json:"services_domain,omitempty"`
+	ServicesPartition string `json:"services_partition,omitempty"`
+
+	// Marketplace product codes (empty on non-marketplace AMIs).
+	ProductCodes []string `json:"product_codes,omitempty"`
+
+	// SSH public keys attached at launch (OpenSSH format, one per
+	// indexed child under public-keys/).
+	PublicKeys []string `json:"public_keys,omitempty"`
+
+	// BlockDeviceMapping maps the AMI's virtual disk names (`ami`,
+	// `root`, `ebs0`, `ephemeral0`, ...) to the EC2 device path
+	// (`/dev/sda1`, `/dev/xvdb`, ...). Matches Ohai's
+	// `block_device_mapping_*` keys.
+	BlockDeviceMapping map[string]string `json:"block_device_mapping,omitempty"`
 
 	// Reservation / IAM.
 	ReservationID string           `json:"reservation_id,omitempty"`
@@ -311,6 +368,13 @@ func (c *Collector) Collect(
 	if body, err := versionedGet(localIPv4sPath); err == nil {
 		info.LocalIPv4s = splitLines(string(body))
 	}
+	if body, err := versionedGet(productCodesPath); err == nil {
+		info.ProductCodes = splitLines(string(body))
+	}
+
+	// Variable-keyed subtrees — fetch the listing, then each entry.
+	info.BlockDeviceMapping = fetchBlockDeviceMapping(versionedGet)
+	info.PublicKeys = fetchPublicKeys(versionedGet)
 
 	// Per-ENI subtree. Tolerate missing on single-interface instances
 	// (older shapes sometimes 404 this tree).
@@ -358,6 +422,57 @@ func (c *Collector) Collect(
 	}
 
 	return info, nil
+}
+
+// fetchBlockDeviceMapping walks /meta-data/block-device-mapping/.
+// The directory listing is newline-separated child names (ami, root,
+// ebs0, ephemeral0, ...); each child resolves to a device path.
+func fetchBlockDeviceMapping(
+	get func(string) ([]byte, error),
+) map[string]string {
+	listing, err := get(blockDeviceMappingPath)
+	if err != nil {
+		return nil
+	}
+	out := map[string]string{}
+	for _, name := range splitLines(string(listing)) {
+		body, err := get(blockDeviceMappingPath + "/" + name)
+		if err != nil {
+			continue
+		}
+		out[name] = strings.TrimSpace(string(body))
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// fetchPublicKeys walks /meta-data/public-keys/. Listing is
+// "<index>=<key-name>"; each index has an `openssh-key` leaf.
+func fetchPublicKeys(
+	get func(string) ([]byte, error),
+) []string {
+	listing, err := get(publicKeysPath)
+	if err != nil {
+		return nil
+	}
+	var keys []string
+	for _, line := range splitLines(string(listing)) {
+		idx, _, ok := strings.Cut(line, "=")
+		if !ok {
+			idx = line
+		}
+		body, err := get(publicKeysPath + "/" + idx + "/openssh-key")
+		if err != nil {
+			continue
+		}
+		key := strings.TrimSpace(string(body))
+		if key != "" {
+			keys = append(keys, key)
+		}
+	}
+	return keys
 }
 
 // onEC2 runs Ohai's has_ec2_* chain (non-Windows):
@@ -452,22 +567,33 @@ func transformMetadata(
 	v map[string]string,
 ) *Info {
 	info := &Info{
-		InstanceID:        v["/meta-data/instance-id"],
-		InstanceType:      v["/meta-data/instance-type"],
-		InstanceLifecycle: v["/meta-data/instance-life-cycle"],
-		AMIID:             v["/meta-data/ami-id"],
-		AMILaunchIndex:    v["/meta-data/ami-launch-index"],
-		AMIManifestPath:   v["/meta-data/ami-manifest-path"],
-		Hostname:          v["/meta-data/hostname"],
-		LocalHostname:     v["/meta-data/local-hostname"],
-		PublicHostname:    v["/meta-data/public-hostname"],
-		LocalIPv4:         v["/meta-data/local-ipv4"],
-		PublicIPv4:        v["/meta-data/public-ipv4"],
-		MAC:               v["/meta-data/mac"],
-		Region:            v["/meta-data/placement/region"],
-		AvailabilityZone:  v["/meta-data/placement/availability-zone"],
-		ReservationID:     v["/meta-data/reservation-id"],
-		Profile:           v["/meta-data/profile"],
+		InstanceID:          v["/meta-data/instance-id"],
+		InstanceType:        v["/meta-data/instance-type"],
+		InstanceLifecycle:   v["/meta-data/instance-life-cycle"],
+		AMIID:               v["/meta-data/ami-id"],
+		AMILaunchIndex:      v["/meta-data/ami-launch-index"],
+		AMIManifestPath:     v["/meta-data/ami-manifest-path"],
+		Hostname:            v["/meta-data/hostname"],
+		LocalHostname:       v["/meta-data/local-hostname"],
+		PublicHostname:      v["/meta-data/public-hostname"],
+		LocalIPv4:           v["/meta-data/local-ipv4"],
+		PublicIPv4:          v["/meta-data/public-ipv4"],
+		MAC:                 v["/meta-data/mac"],
+		Region:              v["/meta-data/placement/region"],
+		AvailabilityZone:    v["/meta-data/placement/availability-zone"],
+		AvailabilityZoneID:  v["/meta-data/placement/availability-zone-id"],
+		GroupName:           v["/meta-data/placement/group-name"],
+		HostID:              v["/meta-data/placement/host-id"],
+		PartitionNumber:     v["/meta-data/placement/partition-number"],
+		ReservationID:       v["/meta-data/reservation-id"],
+		Profile:             v["/meta-data/profile"],
+		KernelID:            v["/meta-data/kernel-id"],
+		RamdiskID:           v["/meta-data/ramdisk-id"],
+		InstanceAction:      v["/meta-data/instance-action"],
+		SpotInstanceAction:  v["/meta-data/spot/instance-action"],
+		SpotTerminationTime: v["/meta-data/spot/termination-time"],
+		ServicesDomain:      v["/meta-data/services/domain"],
+		ServicesPartition:   v["/meta-data/services/partition"],
 	}
 	return info
 }

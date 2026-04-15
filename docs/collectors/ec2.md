@@ -29,31 +29,45 @@ If none match, the HTTP probe is skipped. The collector then fetches:
 
 ## Collected Fields
 
-| Field                 | Type                          | Description                                          | Schema mapping                 |
-| --------------------- | ----------------------------- | ---------------------------------------------------- | ------------------------------ |
-| `instance_id`         | `string`                      | EC2 instance ID.                                     | OTel `cloud.resource_id`       |
-| `instance_type`       | `string`                      | Instance type (e.g. `t3.micro`).                     | OTel `host.type`               |
-| `instance_life_cycle` | `string`                      | `on-demand` / `spot` / `scheduled`.                  | No direct schema mapping.      |
-| `ami_id`              | `string`                      | Boot AMI ID.                                         | OTel `host.image.id`           |
-| `ami_launch_index`    | `string`                      | Launch index within the reservation.                 | No direct schema mapping.      |
-| `ami_manifest_path`   | `string`                      | Legacy manifest path.                                | No direct schema mapping.      |
-| `hostname`            | `string`                      | EC2-supplied hostname.                               | No direct schema mapping.      |
-| `local_hostname`      | `string`                      | Internal DNS name.                                   | OCSF `device.hostname`         |
-| `public_hostname`     | `string`                      | Public DNS name (if assigned).                       | No direct schema mapping.      |
-| `local_ipv4`          | `string`                      | Primary private IPv4.                                | No direct schema mapping.      |
-| `public_ipv4`         | `string`                      | Primary public IPv4.                                 | No direct schema mapping.      |
-| `mac`                 | `string`                      | Primary interface MAC.                               | OCSF `network_interface.mac`   |
-| `security_groups`     | `[]string`                    | Security group names.                                | No direct schema mapping.      |
-| `region`              | `string`                      | AWS region (e.g. `us-east-1`).                       | OTel `cloud.region`            |
-| `availability_zone`   | `string`                      | Availability zone (e.g. `us-east-1a`).               | OTel `cloud.availability_zone` |
-| `account_id`          | `string`                      | AWS account ID (from identity document).             | OTel `cloud.account.id`        |
-| `reservation_id`      | `string`                      | Reservation ID.                                      | No direct schema mapping.      |
-| `profile`             | `string`                      | Virtualization profile (`default-hvm`).              | No direct schema mapping.      |
-| `iam_info`            | `*IAMInstanceInfo`            | Attached IAM profile — see below.                    | No direct schema mapping.      |
-| `local_ipv4s`         | `[]string`                    | All private IPv4s assigned to the primary interface. | No direct schema mapping.      |
-| `network_interfaces`  | `map[string]NetworkInterface` | Per-ENI subtree keyed by MAC — see below.            | OCSF `network_interface`       |
-| `api_version`         | `string`                      | The IMDS API version negotiated at collection time.  | No direct schema mapping.      |
-| `user_data`           | `string`                      | Raw user-data; base64-encoded when binary.           | No direct schema mapping.      |
+| Field                   | Type                          | Description                                                                   | Schema mapping                 |
+| ----------------------- | ----------------------------- | ----------------------------------------------------------------------------- | ------------------------------ |
+| `instance_id`           | `string`                      | EC2 instance ID.                                                              | OTel `cloud.resource_id`       |
+| `instance_type`         | `string`                      | Instance type (e.g. `t3.micro`).                                              | OTel `host.type`               |
+| `instance_life_cycle`   | `string`                      | `on-demand` / `spot` / `scheduled`.                                           | No direct schema mapping.      |
+| `ami_id`                | `string`                      | Boot AMI ID.                                                                  | OTel `host.image.id`           |
+| `ami_launch_index`      | `string`                      | Launch index within the reservation.                                          | No direct schema mapping.      |
+| `ami_manifest_path`     | `string`                      | Legacy manifest path.                                                         | No direct schema mapping.      |
+| `hostname`              | `string`                      | EC2-supplied hostname.                                                        | No direct schema mapping.      |
+| `local_hostname`        | `string`                      | Internal DNS name.                                                            | OCSF `device.hostname`         |
+| `public_hostname`       | `string`                      | Public DNS name (if assigned).                                                | No direct schema mapping.      |
+| `local_ipv4`            | `string`                      | Primary private IPv4.                                                         | No direct schema mapping.      |
+| `public_ipv4`           | `string`                      | Primary public IPv4.                                                          | No direct schema mapping.      |
+| `mac`                   | `string`                      | Primary interface MAC.                                                        | OCSF `network_interface.mac`   |
+| `security_groups`       | `[]string`                    | Security group names.                                                         | No direct schema mapping.      |
+| `region`                | `string`                      | AWS region (e.g. `us-east-1`).                                                | OTel `cloud.region`            |
+| `availability_zone`     | `string`                      | Availability zone (e.g. `us-east-1a`).                                        | OTel `cloud.availability_zone` |
+| `account_id`            | `string`                      | AWS account ID (from identity document).                                      | OTel `cloud.account.id`        |
+| `reservation_id`        | `string`                      | Reservation ID.                                                               | No direct schema mapping.      |
+| `profile`               | `string`                      | Virtualization profile (`default-hvm`).                                       | No direct schema mapping.      |
+| `iam_info`              | `*IAMInstanceInfo`            | Attached IAM profile — see below.                                             | No direct schema mapping.      |
+| `local_ipv4s`           | `[]string`                    | All private IPv4s assigned to the primary interface.                          | No direct schema mapping.      |
+| `network_interfaces`    | `map[string]NetworkInterface` | Per-ENI subtree keyed by MAC — see below.                                     | OCSF `network_interface`       |
+| `api_version`           | `string`                      | The IMDS API version negotiated at collection time.                           | No direct schema mapping.      |
+| `user_data`             | `string`                      | Raw user-data; base64-encoded when binary.                                    | No direct schema mapping.      |
+| `availability_zone_id`  | `string`                      | AZ identifier (e.g. `use1-az1`).                                              | No direct schema mapping.      |
+| `group_name`            | `string`                      | Placement group name.                                                         | No direct schema mapping.      |
+| `host_id`               | `string`                      | Dedicated Host id (empty on shared hosts).                                    | No direct schema mapping.      |
+| `partition_number`      | `string`                      | Partition placement index (partitioned placement).                            | No direct schema mapping.      |
+| `kernel_id`             | `string`                      | Legacy paravirt kernel id (empty on HVM).                                     | No direct schema mapping.      |
+| `ramdisk_id`            | `string`                      | Legacy paravirt ramdisk id.                                                   | No direct schema mapping.      |
+| `instance_action`       | `string`                      | Pending instance action (`none`, `shutdown`, `stop`, `terminate`).            | No direct schema mapping.      |
+| `spot_instance_action`  | `string`                      | Spot lifecycle signal (`stop`, `terminate`, `hibernate`).                     | No direct schema mapping.      |
+| `spot_termination_time` | `string`                      | ISO-8601 spot termination warning time.                                       | No direct schema mapping.      |
+| `services_domain`       | `string`                      | AWS services endpoint domain (GovCloud / China diverge from `amazonaws.com`). | No direct schema mapping.      |
+| `services_partition`    | `string`                      | AWS partition (`aws`, `aws-us-gov`, `aws-cn`).                                | No direct schema mapping.      |
+| `product_codes`         | `[]string`                    | Marketplace product codes attached to the AMI.                                | No direct schema mapping.      |
+| `public_keys`           | `[]string`                    | OpenSSH-format public keys injected at launch.                                | No direct schema mapping.      |
+| `block_device_mapping`  | `map[string]string`           | Virtual disk name → device path (`ami`→`/dev/xvda`).                          | No direct schema mapping.      |
 
 ### NetworkInterface
 
