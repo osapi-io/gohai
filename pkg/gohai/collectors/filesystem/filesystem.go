@@ -27,8 +27,10 @@ package filesystem
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 
+	"github.com/avfs/avfs"
 	"github.com/shirou/gopsutil/v4/disk"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -99,6 +101,35 @@ type Mount struct {
 	Label             string   `json:"label,omitempty"`      // filesystem label from lsblk
 	PartUUID          string   `json:"part_uuid,omitempty"`  // GPT partition UUID from lsblk
 	PartLabel         string   `json:"part_label,omitempty"` // GPT partition label from lsblk
+
+	// Btrfs is populated only for btrfs mounts on Linux when the
+	// /sys/fs/btrfs/<UUID>/allocation hierarchy is readable. Mirrors
+	// Ohai's btrfs sub-object.
+	Btrfs *BtrfsInfo `json:"btrfs,omitempty"`
+}
+
+// BtrfsInfo carries the btrfs-specific data the kernel exposes via
+// sysfs at /sys/fs/btrfs/<UUID>/. Mirrors Ohai's btrfs sub-object.
+type BtrfsInfo struct {
+	// RAID is the detected RAID profile name from
+	// /sys/fs/btrfs/<UUID>/allocation/<bg_type>/<profile>/. Common
+	// values: "single", "dup", "raid0", "raid1", "raid5", "raid6",
+	// "raid10", "raid1c3", "raid1c4". When multiple block-group types
+	// use the same profile (the typical case) the value is shared;
+	// when they diverge the most recent observed profile wins (Ohai
+	// has the same last-write-wins behaviour).
+	RAID string `json:"raid,omitempty"`
+	// Allocation is the per-block-group-type allocation map, keyed by
+	// the block-group type name ("data", "metadata", "system").
+	Allocation map[string]BtrfsAllocation `json:"allocation,omitempty"`
+}
+
+// BtrfsAllocation reports the bytes allocated and used for one
+// block-group type. Sourced from
+// /sys/fs/btrfs/<UUID>/allocation/<bg_type>/{total_bytes,bytes_used}.
+type BtrfsAllocation struct {
+	TotalBytes uint64 `json:"total_bytes"`
+	BytesUsed  uint64 `json:"bytes_used"`
 }
 
 // Filesystem describes a block device with a filesystem that isn't
@@ -243,6 +274,96 @@ type lsblkEntry struct {
 	Mountpoint string
 	PartUUID   string
 	PartLabel  string
+}
+
+// btrfsBlockGroupTypes is the canonical set of btrfs block-group
+// types Ohai walks under /sys/fs/btrfs/<uuid>/allocation/. Order is
+// stable so the resulting Allocation map JSON-marshals predictably
+// when consumers serialize for diffs.
+var btrfsBlockGroupTypes = []string{"data", "metadata", "system"}
+
+// readBtrfsInfo walks /sys/fs/btrfs/<uuid>/allocation/{data,metadata,system}/
+// via the injected avfs.VFS and returns BtrfsInfo populated with the
+// allocation totals + detected RAID profile. Returns nil when the
+// allocation directory is missing (non-btrfs filesystem, stripped /sys,
+// or kernel without sysfs btrfs export).
+//
+// Mirrors Ohai's collect_btrfs_data: total_bytes / bytes_used parsed
+// per block-group type, and a `raid` field set from the profile
+// subdirectory name. We extend Ohai's `single` / `dup` only check to
+// recognise every btrfs RAID profile (raid0, raid1, raid1c3, raid1c4,
+// raid5, raid6, raid10) since those exist in real /sys output and
+// carry the same semantic.
+func readBtrfsInfo(
+	fs avfs.VFS,
+	uuid string,
+) *BtrfsInfo {
+	allocRoot := "/sys/fs/btrfs/" + uuid + "/allocation"
+	if _, err := fs.Stat(allocRoot); err != nil {
+		return nil
+	}
+	info := &BtrfsInfo{Allocation: map[string]BtrfsAllocation{}}
+	for _, bg := range btrfsBlockGroupTypes {
+		dir := allocRoot + "/" + bg
+		if _, err := fs.Stat(dir); err != nil {
+			continue
+		}
+		info.Allocation[bg] = BtrfsAllocation{
+			TotalBytes: readUint(fs, dir+"/total_bytes"),
+			BytesUsed:  readUint(fs, dir+"/bytes_used"),
+		}
+		if r := detectBtrfsRAID(fs, dir); r != "" {
+			info.RAID = r
+		}
+	}
+	if len(info.Allocation) == 0 && info.RAID == "" {
+		return nil
+	}
+	return info
+}
+
+// btrfsRAIDProfiles is the full set of RAID profile subdirectory
+// names btrfs may publish under <bg_type>/. Iterated in the kernel's
+// own ordering — the first profile present wins for that block-group
+// type. Ohai checks only "single" / "dup" but real systems also see
+// raidN profiles, so we cover the lot.
+var btrfsRAIDProfiles = []string{
+	"single", "dup", "raid0", "raid1", "raid1c3", "raid1c4",
+	"raid5", "raid6", "raid10",
+}
+
+// detectBtrfsRAID returns the first RAID profile subdirectory present
+// under dir (e.g. "/sys/fs/btrfs/<uuid>/allocation/data/raid1"). Empty
+// when none of the known profile names exist.
+func detectBtrfsRAID(
+	fs avfs.VFS,
+	dir string,
+) string {
+	for _, p := range btrfsRAIDProfiles {
+		if _, err := fs.Stat(dir + "/" + p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+// readUint reads path through fs and returns the leading decimal
+// integer value. Returns 0 on missing file, read error, or unparseable
+// content — matches the silent-on-miss convention used elsewhere in
+// the package.
+func readUint(
+	fs avfs.VFS,
+	path string,
+) uint64 {
+	b, err := fs.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+	n, err := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // parseZFSGetAll parses tab-separated `zfs get -p -H all` output into

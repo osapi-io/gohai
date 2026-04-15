@@ -25,6 +25,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	gpdisk "github.com/shirou/gopsutil/v4/disk"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -49,6 +51,67 @@ func TestFilesystemPublicTestSuite(
 	t *testing.T,
 ) {
 	suite.Run(t, new(FilesystemPublicTestSuite))
+}
+
+// btrfsBgFixture is one block-group entry for the btrfs sysfs mock.
+// Either total/used (uint64) OR totalRaw (string) may be set —
+// totalRaw lets tests inject unparseable content for the silent-skip
+// path. raid is the profile subdirectory name to create.
+type btrfsBgFixture struct {
+	raid     string
+	total    uint64
+	used     uint64
+	totalRaw string // overrides total when non-empty
+}
+
+// btrfsFS builds a memfs prepared with /sys/fs/btrfs/<uuid>/allocation/...
+// matching the supplied per-block-group fixtures. Profile subdir is
+// created as an empty directory so detectBtrfsRAID's Stat hits.
+func btrfsFS(
+	s *FilesystemPublicTestSuite,
+	uuid string,
+	bgs map[string]btrfsBgFixture,
+) avfs.VFS {
+	fs := memfs.New()
+	root := "/sys/fs/btrfs/" + uuid + "/allocation"
+	s.Require().NoError(fs.MkdirAll(root, 0o755))
+	for bg, fix := range bgs {
+		dir := root + "/" + bg
+		s.Require().NoError(fs.MkdirAll(dir, 0o755))
+		if fix.raid != "" {
+			s.Require().NoError(fs.MkdirAll(dir+"/"+fix.raid, 0o755))
+		}
+		if fix.totalRaw != "" {
+			s.Require().NoError(fs.WriteFile(dir+"/total_bytes", []byte(fix.totalRaw), 0o644))
+		} else {
+			s.Require().NoError(fs.WriteFile(
+				dir+"/total_bytes",
+				[]byte(strconvBytes(fix.total)),
+				0o644,
+			))
+		}
+		s.Require().NoError(fs.WriteFile(
+			dir+"/bytes_used",
+			[]byte(strconvBytes(fix.used)),
+			0o644,
+		))
+	}
+	return fs
+}
+
+// strconvBytes is a tiny helper to avoid importing strconv here.
+func strconvBytes(
+	n uint64,
+) string {
+	if n == 0 {
+		return "0"
+	}
+	digits := []byte{}
+	for n > 0 {
+		digits = append([]byte{byte('0' + n%10)}, digits...)
+		n /= 10
+	}
+	return string(digits)
 }
 
 // noLsblkExec returns a mock Executor that errors on every call —
@@ -187,6 +250,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		partitionsFn func(context.Context, bool) ([]gpdisk.PartitionStat, error)
 		usageFn      func(context.Context, string) (*gpdisk.UsageStat, error)
 		exec         func(*testing.T) executor.Executor
+		fs           avfs.VFS // optional; nil → btrfs sysfs reads short-circuit
 		wantErr      bool
 		validate     func(*filesystem.Info)
 	}{
@@ -418,6 +482,168 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: btrfs mount enriched with allocation + raid profile",
+			variant: "linux",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return []gpdisk.PartitionStat{
+					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+				}, nil
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
+				return &gpdisk.UsageStat{Total: 1, Used: 0}, nil
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return lsblkExec(t, `{"blockdevices":[
+					{"name":"sda1","fstype":"btrfs","uuid":"abc-123","mountpoint":"/"}
+				]}`)
+			},
+			fs: btrfsFS(s, "abc-123", map[string]btrfsBgFixture{
+				"data":     {raid: "raid1", total: 1073741824, used: 524288000},
+				"metadata": {raid: "raid1", total: 268435456, used: 134217728},
+				"system":   {raid: "raid1", total: 33554432, used: 16384},
+			}),
+			validate: func(i *filesystem.Info) {
+				s.Require().Len(i.Mounts, 1)
+				m := i.Mounts[0]
+				s.Equal("btrfs", m.Fstype)
+				s.Equal("abc-123", m.UUID)
+				s.Require().NotNil(m.Btrfs)
+				s.Equal("raid1", m.Btrfs.RAID)
+				s.Equal(uint64(1073741824), m.Btrfs.Allocation["data"].TotalBytes)
+				s.Equal(uint64(524288000), m.Btrfs.Allocation["data"].BytesUsed)
+				s.Equal(uint64(268435456), m.Btrfs.Allocation["metadata"].TotalBytes)
+				s.Equal(uint64(33554432), m.Btrfs.Allocation["system"].TotalBytes)
+			},
+		},
+		{
+			name:    "linux: btrfs single profile recognised + zero-byte file tolerated",
+			variant: "linux",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return []gpdisk.PartitionStat{
+					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+				}, nil
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
+				return &gpdisk.UsageStat{}, nil
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return lsblkExec(t, `{"blockdevices":[
+					{"name":"sda1","fstype":"btrfs","uuid":"single-fs","mountpoint":"/"}
+				]}`)
+			},
+			fs: btrfsFS(s, "single-fs", map[string]btrfsBgFixture{
+				"data":     {raid: "single", totalRaw: "not-a-number"},
+				"metadata": {raid: "single", total: 1024, used: 256},
+			}),
+			validate: func(i *filesystem.Info) {
+				m := i.Mounts[0]
+				s.Require().NotNil(m.Btrfs)
+				s.Equal("single", m.Btrfs.RAID)
+				s.Equal(uint64(0), m.Btrfs.Allocation["data"].TotalBytes) // unparseable
+				s.Equal(uint64(1024), m.Btrfs.Allocation["metadata"].TotalBytes)
+			},
+		},
+		{
+			name:    "linux: btrfs mount without /sys/fs/btrfs entry leaves Btrfs nil",
+			variant: "linux",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return []gpdisk.PartitionStat{
+					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+				}, nil
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
+				return &gpdisk.UsageStat{}, nil
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return lsblkExec(t, `{"blockdevices":[
+					{"name":"sda1","fstype":"btrfs","uuid":"missing","mountpoint":"/"}
+				]}`)
+			},
+			fs: memfs.New(), // empty FS — no /sys/fs/btrfs at all
+			validate: func(i *filesystem.Info) {
+				s.Nil(i.Mounts[0].Btrfs)
+			},
+		},
+		{
+			name:    "linux: btrfs bg dirs exist but with no profile + missing files",
+			variant: "linux",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return []gpdisk.PartitionStat{
+					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+				}, nil
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
+				return &gpdisk.UsageStat{}, nil
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return lsblkExec(t, `{"blockdevices":[
+					{"name":"sda1","fstype":"btrfs","uuid":"empty-files","mountpoint":"/"}
+				]}`)
+			},
+			fs: func() avfs.VFS {
+				fs := memfs.New()
+				// bg dir exists, no profile subdirs, no total_bytes/bytes_used files —
+				// exercises detectBtrfsRAID's no-match path and readUint's missing-file path.
+				s.Require().NoError(
+					fs.MkdirAll("/sys/fs/btrfs/empty-files/allocation/data", 0o755),
+				)
+				return fs
+			}(),
+			validate: func(i *filesystem.Info) {
+				m := i.Mounts[0]
+				s.Require().NotNil(m.Btrfs)
+				s.Empty(m.Btrfs.RAID)
+				s.Equal(uint64(0), m.Btrfs.Allocation["data"].TotalBytes)
+				s.Equal(uint64(0), m.Btrfs.Allocation["data"].BytesUsed)
+			},
+		},
+		{
+			name:    "linux: btrfs allocation root exists but no bg subdirs yields nil Btrfs",
+			variant: "linux",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return []gpdisk.PartitionStat{
+					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+				}, nil
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
+				return &gpdisk.UsageStat{}, nil
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return lsblkExec(t, `{"blockdevices":[
+					{"name":"sda1","fstype":"btrfs","uuid":"empty-bg","mountpoint":"/"}
+				]}`)
+			},
+			fs: func() avfs.VFS {
+				fs := memfs.New()
+				s.Require().NoError(fs.MkdirAll("/sys/fs/btrfs/empty-bg/allocation", 0o755))
+				return fs
+			}(),
+			validate: func(i *filesystem.Info) {
+				s.Nil(i.Mounts[0].Btrfs)
+			},
+		},
+		{
+			name:    "linux: non-btrfs mount left alone even with FS configured",
+			variant: "linux",
+			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
+				return []gpdisk.PartitionStat{
+					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "ext4"},
+				}, nil
+			},
+			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
+				return &gpdisk.UsageStat{}, nil
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return lsblkExec(t, `{"blockdevices":[
+					{"name":"sda1","fstype":"ext4","uuid":"ext-uuid","mountpoint":"/"}
+				]}`)
+			},
+			fs: memfs.New(),
+			validate: func(i *filesystem.Info) {
+				s.Nil(i.Mounts[0].Btrfs)
+			},
+		},
+		{
 			name:         "darwin: APFS root populated",
 			variant:      "darwin",
 			partitionsFn: darwinPartitions,
@@ -446,7 +672,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			var c filesystem.Collector
 			switch tt.variant {
 			case "linux":
-				c = &filesystem.Linux{Exec: tt.exec(s.T())}
+				c = &filesystem.Linux{FS: tt.fs, Exec: tt.exec(s.T())}
 			case "darwin":
 				c = &filesystem.Darwin{}
 			}

@@ -23,6 +23,9 @@ package filesystem
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
@@ -32,19 +35,23 @@ import (
 // `disk.Usage` provides capacity + inodes per mount. When `lsblk` is
 // on PATH we layer UUID / label / partition-UUID / partition-label per
 // mount and surface block devices with a filesystem but no mountpoint
-// as `Info.Unmounted`.
+// as `Info.Unmounted`. For btrfs mounts we additionally read
+// /sys/fs/btrfs/<uuid>/allocation/* via the injected avfs.VFS for
+// allocation totals + RAID profile per Ohai parity.
 type Linux struct {
 	base
 
+	FS   avfs.VFS
 	Exec executor.Executor
 }
 
-// NewLinux returns a Linux variant wired to the production Executor
-// (wraps exec.CommandContext for the `lsblk` probe). The gopsutil base
-// is reached through package-level partitionsFn / usageFn, which tests
+// NewLinux returns a Linux variant wired to production dependencies:
+// the real OS filesystem for sysfs reads (btrfs allocation), and a
+// real `os/exec` wrapper for `lsblk` / `zfs`. The gopsutil base is
+// reached through package-level partitionsFn / usageFn, which tests
 // swap via SetPartitionsFn / SetUsageFn.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
 
 // Collect returns filesystem Info. Optional lsblk enrichment is
@@ -81,6 +88,18 @@ func (l *Linux) Collect(
 	// section, so non-ZFS hosts return zero ZFS datasets with no error.
 	if out, err := l.Exec.Execute(ctx, "zfs", "get", "-p", "-H", "all"); err == nil {
 		info.ZFSDatasets = parseZFSGetAll(out)
+	}
+
+	// Btrfs allocation enrichment — only mounts identified as btrfs
+	// AND carrying a UUID (lsblk-derived) are eligible. Pure sysfs
+	// reads via FS; nil FS or missing /sys/fs/btrfs paths skip cleanly.
+	if l.FS != nil {
+		for i := range info.Mounts {
+			m := &info.Mounts[i]
+			if m.Fstype == "btrfs" && m.UUID != "" {
+				m.Btrfs = readBtrfsInfo(l.FS, m.UUID)
+			}
+		}
 	}
 	return info, nil
 }
