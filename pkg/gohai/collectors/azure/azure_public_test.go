@@ -88,7 +88,16 @@ const cannedResponse = `{
         "lun": 0,
         "managedDisk": {"id": "/disks/data0", "storageAccountType": "Standard_LRS"}
       }]
-    }
+    },
+    "host": {"id": "/hosts/host-1"},
+    "hostGroup": {"id": "/hostgroups/hg-1"},
+    "osProfile": {
+      "adminUsername": "azureuser",
+      "computerName": "web-1",
+      "disablePasswordAuthentication": "true"
+    },
+    "additionalCapabilities": {"hibernationEnabled": "true"},
+    "extendedLocation": {"name": "losangeles", "type": "EdgeZone"}
   },
   "network": {
     "interface": [{
@@ -227,6 +236,21 @@ func (s *AzurePublicTestSuite) TestCollect() {
 				s.Require().NotNil(iface.IPv4)
 				s.Equal([]string{"10.0.0.4"}, info.LocalIPv4)
 				s.Equal([]string{"20.1.2.3"}, info.PublicIPv4)
+
+				// Newly added typed fields (Ohai-parity gap closure).
+				s.Require().NotNil(info.Host)
+				s.Equal("/hosts/host-1", info.Host.ID)
+				s.Require().NotNil(info.HostGroup)
+				s.Equal("/hostgroups/hg-1", info.HostGroup.ID)
+				s.Require().NotNil(info.OSProfile)
+				s.Equal("azureuser", info.OSProfile.AdminUsername)
+				s.Equal("web-1", info.OSProfile.ComputerName)
+				s.Equal("true", info.OSProfile.DisablePasswordAuthentication)
+				s.Require().NotNil(info.AdditionalCapabilities)
+				s.Equal("true", info.AdditionalCapabilities.HibernationEnabled)
+				s.Require().NotNil(info.ExtendedLocation)
+				s.Equal("losangeles", info.ExtendedLocation.Name)
+				s.Equal("EdgeZone", info.ExtendedLocation.Type)
 			},
 		},
 		{

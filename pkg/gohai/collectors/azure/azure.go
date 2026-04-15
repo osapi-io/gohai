@@ -132,6 +132,20 @@ type Info struct {
 	SecurityProfile *SecurityProfile `json:"security_profile,omitempty"`
 	PublicKeys      []PublicKey      `json:"public_keys,omitempty"`
 
+	// Dedicated host assignment (Azure Dedicated Hosts feature).
+	Host      *Host      `json:"host,omitempty"`
+	HostGroup *HostGroup `json:"host_group,omitempty"`
+
+	// OS-level profile (computer name, admin user).
+	OSProfile *OSProfile `json:"os_profile,omitempty"`
+
+	// Feature toggles (e.g. hibernation).
+	AdditionalCapabilities *AdditionalCapabilities `json:"additional_capabilities,omitempty"`
+
+	// Non-standard Azure region placement (Azure Arc, edge zones,
+	// Azure Local). Empty on standard Azure VMs.
+	ExtendedLocation *ExtendedLocation `json:"extended_location,omitempty"`
+
 	// Network. Interfaces is keyed by MAC to match Ohai's
 	// metadata.network.interfaces[<mac>] shape. The Public/Local
 	// top-level lists are aggregated across all interfaces.
@@ -191,6 +205,40 @@ type PublicKey struct {
 	Path    string `json:"path,omitempty"`
 }
 
+// Host is the Azure Dedicated Host a VM is pinned to, when present.
+// Empty on standard pooled-host VMs.
+type Host struct {
+	ID string `json:"id"`
+}
+
+// HostGroup is the Azure Dedicated Host Group containing the VM's
+// host, when present.
+type HostGroup struct {
+	ID string `json:"id"`
+}
+
+// OSProfile mirrors Azure's compute.osProfile object — the OS
+// provisioning settings applied at VM creation.
+type OSProfile struct {
+	AdminUsername                 string `json:"admin_username,omitempty"`
+	ComputerName                  string `json:"computer_name,omitempty"`
+	DisablePasswordAuthentication string `json:"disable_password_authentication,omitempty"`
+}
+
+// AdditionalCapabilities mirrors Azure's compute.additionalCapabilities.
+// Values are Azure-style string booleans ("true" / "false").
+type AdditionalCapabilities struct {
+	HibernationEnabled string `json:"hibernation_enabled,omitempty"`
+}
+
+// ExtendedLocation describes a non-standard Azure placement (edge
+// zone, Azure Arc, Azure Local). Matches Azure's
+// compute.extendedLocation.
+type ExtendedLocation struct {
+	Name string `json:"name,omitempty"`
+	Type string `json:"type,omitempty"`
+}
+
 // Interface is one attached network interface.
 type Interface struct {
 	MACAddress string   `json:"mac_address,omitempty"`
@@ -223,37 +271,65 @@ type raw struct {
 }
 
 type rawCompute struct {
-	AzEnvironment            string              `json:"azEnvironment"`
-	CustomData               string              `json:"customData"`
-	EvictionPolicy           string              `json:"evictionPolicy"`
-	IsHostCompatibilityLayer bool                `json:"isHostCompatibilityLayerVm"`
-	LicenseType              string              `json:"licenseType"`
-	Location                 string              `json:"location"`
-	Name                     string              `json:"name"`
-	Offer                    string              `json:"offer"`
-	OSType                   string              `json:"osType"`
-	PlacementGroupID         string              `json:"placementGroupId"`
-	Plan                     *Plan               `json:"plan"`
-	PlatformFaultDomain      string              `json:"platformFaultDomain"`
-	PlatformUpdateDomain     string              `json:"platformUpdateDomain"`
-	Priority                 string              `json:"priority"`
-	Provider                 string              `json:"provider"`
-	PublicKeys               []rawPublicKey      `json:"publicKeys"`
-	Publisher                string              `json:"publisher"`
-	ResourceGroupName        string              `json:"resourceGroupName"`
-	ResourceID               string              `json:"resourceId"`
-	SecurityProfile          *rawSecurityProfile `json:"securityProfile"`
-	SKU                      string              `json:"sku"`
-	StorageProfile           *rawStorageProfile  `json:"storageProfile"`
-	SubscriptionID           string              `json:"subscriptionId"`
-	Tags                     string              `json:"tags"`
-	TagsList                 []Tag               `json:"tagsList"`
-	UserData                 string              `json:"userData"`
-	Version                  string              `json:"version"`
-	VMID                     string              `json:"vmId"`
-	VMScaleSetName           string              `json:"vmScaleSetName"`
-	VMSize                   string              `json:"vmSize"`
-	Zone                     string              `json:"zone"`
+	AdditionalCapabilities   *rawAdditionalCapabilities `json:"additionalCapabilities"`
+	AzEnvironment            string                     `json:"azEnvironment"`
+	CustomData               string                     `json:"customData"`
+	EvictionPolicy           string                     `json:"evictionPolicy"`
+	ExtendedLocation         *rawExtendedLocation       `json:"extendedLocation"`
+	Host                     *rawHost                   `json:"host"`
+	HostGroup                *rawHostGroup              `json:"hostGroup"`
+	IsHostCompatibilityLayer bool                       `json:"isHostCompatibilityLayerVm"`
+	LicenseType              string                     `json:"licenseType"`
+	Location                 string                     `json:"location"`
+	Name                     string                     `json:"name"`
+	Offer                    string                     `json:"offer"`
+	OSProfile                *rawOSProfile              `json:"osProfile"`
+	OSType                   string                     `json:"osType"`
+	PlacementGroupID         string                     `json:"placementGroupId"`
+	Plan                     *Plan                      `json:"plan"`
+	PlatformFaultDomain      string                     `json:"platformFaultDomain"`
+	PlatformUpdateDomain     string                     `json:"platformUpdateDomain"`
+	Priority                 string                     `json:"priority"`
+	Provider                 string                     `json:"provider"`
+	PublicKeys               []rawPublicKey             `json:"publicKeys"`
+	Publisher                string                     `json:"publisher"`
+	ResourceGroupName        string                     `json:"resourceGroupName"`
+	ResourceID               string                     `json:"resourceId"`
+	SecurityProfile          *rawSecurityProfile        `json:"securityProfile"`
+	SKU                      string                     `json:"sku"`
+	StorageProfile           *rawStorageProfile         `json:"storageProfile"`
+	SubscriptionID           string                     `json:"subscriptionId"`
+	Tags                     string                     `json:"tags"`
+	TagsList                 []Tag                      `json:"tagsList"`
+	UserData                 string                     `json:"userData"`
+	Version                  string                     `json:"version"`
+	VMID                     string                     `json:"vmId"`
+	VMScaleSetName           string                     `json:"vmScaleSetName"`
+	VMSize                   string                     `json:"vmSize"`
+	Zone                     string                     `json:"zone"`
+}
+
+type rawHost struct {
+	ID string `json:"id"`
+}
+
+type rawHostGroup struct {
+	ID string `json:"id"`
+}
+
+type rawOSProfile struct {
+	AdminUsername                 string `json:"adminUsername"`
+	ComputerName                  string `json:"computerName"`
+	DisablePasswordAuthentication string `json:"disablePasswordAuthentication"`
+}
+
+type rawAdditionalCapabilities struct {
+	HibernationEnabled string `json:"hibernationEnabled"`
+}
+
+type rawExtendedLocation struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
 }
 
 type rawSecurityProfile struct {
@@ -470,6 +546,26 @@ func transform(
 		if r.Compute.SecurityProfile != nil {
 			sp := SecurityProfile(*r.Compute.SecurityProfile)
 			info.SecurityProfile = &sp
+		}
+		if r.Compute.Host != nil {
+			h := Host(*r.Compute.Host)
+			info.Host = &h
+		}
+		if r.Compute.HostGroup != nil {
+			hg := HostGroup(*r.Compute.HostGroup)
+			info.HostGroup = &hg
+		}
+		if r.Compute.OSProfile != nil {
+			op := OSProfile(*r.Compute.OSProfile)
+			info.OSProfile = &op
+		}
+		if r.Compute.AdditionalCapabilities != nil {
+			ac := AdditionalCapabilities(*r.Compute.AdditionalCapabilities)
+			info.AdditionalCapabilities = &ac
+		}
+		if r.Compute.ExtendedLocation != nil {
+			el := ExtendedLocation(*r.Compute.ExtendedLocation)
+			info.ExtendedLocation = &el
 		}
 		for _, pk := range r.Compute.PublicKeys {
 			info.PublicKeys = append(info.PublicKeys, PublicKey(pk))
