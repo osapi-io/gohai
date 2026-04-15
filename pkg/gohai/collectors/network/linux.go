@@ -75,6 +75,7 @@ func (l *Linux) Collect(
 	if l.Exec != nil {
 		applyRoutes(ctx, l.Exec, info)
 		applyEthtoolDriverInfo(ctx, l.Exec, info)
+		applyEthtoolTuning(ctx, l.Exec, info)
 	}
 	if entries, err := neighListFn(); err == nil {
 		info.Neighbours = entries
@@ -111,6 +112,57 @@ func applyEthtoolDriverInfo(
 			info.Interfaces[i].Ethtool = &EthtoolInfo{}
 		}
 		info.Interfaces[i].Ethtool.DriverInfo = di
+	}
+}
+
+// applyEthtoolTuning invokes the five tuning-oriented ethtool
+// subcommands (ring, channel, coalesce, offload, pause) per Ethernet
+// interface and attaches each parsed result to the corresponding
+// EthtoolInfo field. Mirrors Ohai's ethernet_{ring,channel,coalesce,
+// offload,pause}_parameters block. Each subcommand is independent —
+// failure of one doesn't suppress the others — and any per-call
+// error or empty parse silently skips that field.
+func applyEthtoolTuning(
+	ctx context.Context,
+	exec executor.Executor,
+	info *Info,
+) {
+	for i := range info.Interfaces {
+		if info.Interfaces[i].Encapsulation != "Ethernet" {
+			continue
+		}
+		name := info.Interfaces[i].Name
+		ensureEthtool := func() *EthtoolInfo {
+			if info.Interfaces[i].Ethtool == nil {
+				info.Interfaces[i].Ethtool = &EthtoolInfo{}
+			}
+			return info.Interfaces[i].Ethtool
+		}
+		if out, err := exec.Execute(ctx, "ethtool", "-g", name); err == nil {
+			if v := parseEthtoolSectionedInts(out, "Ring parameters for"); v != nil {
+				ensureEthtool().RingParams = v
+			}
+		}
+		if out, err := exec.Execute(ctx, "ethtool", "-l", name); err == nil {
+			if v := parseEthtoolSectionedInts(out, "Channel parameters for"); v != nil {
+				ensureEthtool().ChannelParams = v
+			}
+		}
+		if out, err := exec.Execute(ctx, "ethtool", "-c", name); err == nil {
+			if v := parseEthtoolCoalesceParams(out); v != nil {
+				ensureEthtool().CoalesceParams = v
+			}
+		}
+		if out, err := exec.Execute(ctx, "ethtool", "-k", name); err == nil {
+			if v := parseEthtoolOffloadParams(out); v != nil {
+				ensureEthtool().OffloadParams = v
+			}
+		}
+		if out, err := exec.Execute(ctx, "ethtool", "-a", name); err == nil {
+			if v := parseEthtoolPauseParams(out); v != nil {
+				ensureEthtool().PauseParams = v
+			}
+		}
 	}
 }
 

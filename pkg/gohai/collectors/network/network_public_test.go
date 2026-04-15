@@ -154,7 +154,8 @@ func ipRouteExec(
 		AnyTimes()
 	// ethtool calls — default to "command not found" so existing tests
 	// that don't care about ethtool keep passing. Tests that exercise
-	// the ethtool path use ethtoolExec instead.
+	// the ethtool path use ipRouteAndEthtoolExec / ipRouteAndEthtoolFullExec.
+	// Two arities to cover -i (one flag) and -g/-l/-c/-k/-a (all single flag).
 	m.EXPECT().
 		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
 		Return(nil, errors.New("ethtool: not found")).
@@ -162,9 +163,64 @@ func ipRouteExec(
 	return m
 }
 
+// ipRouteAndEthtoolFullExec extends ipRouteAndEthtoolExec with canned
+// outputs for the full ethtool tuning surface (-i / -g / -l / -c /
+// -k / -a). Each map keyed interface name → canned stdout for the
+// corresponding subcommand. Missing entries error out (looks like
+// the kernel doesn't support that query for that device).
+func ipRouteAndEthtoolFullExec(
+	t *testing.T,
+	driverInfo, ring, channel, coalesce, offload, pause map[string]string,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			if len(args) < 2 {
+				return nil, errors.New("usage: ethtool -<flag> <iface>")
+			}
+			flag, iface := args[0], args[1]
+			var src map[string]string
+			switch flag {
+			case "-i":
+				src = driverInfo
+			case "-g":
+				src = ring
+			case "-l":
+				src = channel
+			case "-c":
+				src = coalesce
+			case "-k":
+				src = offload
+			case "-a":
+				src = pause
+			default:
+				return nil, errors.New("ethtool: unsupported flag")
+			}
+			out, ok := src[iface]
+			if !ok {
+				return nil, errors.New("ethtool: no such device or unsupported")
+			}
+			return []byte(out), nil
+		}).
+		AnyTimes()
+	return m
+}
+
 // ipRouteAndEthtoolExec extends ipRouteExec with a canned `ethtool -i
 // <iface>` response. driverInfo maps interface name → ethtool stdout;
-// missing interfaces fall back to the "not found" error.
+// missing interfaces fall back to the "not found" error. Other
+// ethtool subcommands (-g/-l/-c/-k/-a) all return errors so the
+// tuning enrichment cleanly skips when this helper is in use.
 func ipRouteAndEthtoolExec(
 	t *testing.T,
 	driverInfo map[string]string,
@@ -180,10 +236,10 @@ func ipRouteAndEthtoolExec(
 		Return(nil, errors.New("nope")).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "ethtool", "-i", gomock.Any()).
+		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, _ string, args ...string) ([]byte, error) {
-			if len(args) < 2 {
-				return nil, errors.New("usage: ethtool -i <iface>")
+			if len(args) < 2 || args[0] != "-i" {
+				return nil, errors.New("ethtool: subcommand not supported by mock")
 			}
 			out, ok := driverInfo[args[1]]
 			if !ok {
@@ -347,6 +403,127 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			}),
 			validate: func(i *network.Info) {
 				s.Nil(i.Interfaces[1].Ethtool)
+			},
+		},
+		{
+			name:       "linux: ethtool tuning bundle populates ring/channel/coalesce/offload/pause",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/eth0/type": "1\n",
+			}),
+			exec: ipRouteAndEthtoolFullExec(s.T(),
+				map[string]string{"eth0": "driver: igb\n"},
+				map[string]string{"eth0": "Ring parameters for eth0:\n" +
+					"Pre-set maximums:\n" +
+					"RX:\t\t4096\n" +
+					"RX Mini:\t0\n" +
+					"RX Jumbo:\t0\n" +
+					"TX:\t\t4096\n" +
+					"Current hardware settings:\n" +
+					"RX:\t\t256\n" +
+					"RX Mini:\t0\n" +
+					"RX Jumbo:\t0\n" +
+					"TX:\t\t256\n"},
+				map[string]string{"eth0": "Channel parameters for eth0:\n" +
+					"Pre-set maximums:\n" +
+					"RX:\t\t0\n" +
+					"TX:\t\t0\n" +
+					"Other:\t\t1\n" +
+					"Combined:\t8\n" +
+					"Current hardware settings:\n" +
+					"RX:\t\t0\n" +
+					"TX:\t\t0\n" +
+					"Other:\t\t1\n" +
+					"Combined:\t4\n"},
+				map[string]string{"eth0": "Coalesce parameters for eth0:\n" +
+					"Adaptive RX: on  TX: off\n" +
+					"rx-usecs: 50\n" +
+					"tx-usecs: 8\n" +
+					"tx-max-coalesced-frames: 64\n"},
+				map[string]string{"eth0": "Features for eth0:\n" +
+					"rx-checksumming: on\n" +
+					"tx-checksumming: on [fixed]\n" +
+					"generic-receive-offload: off\n"},
+				map[string]string{"eth0": "Pause parameters for eth0:\n" +
+					"Autonegotiate: on\n" +
+					"RX: on\n" +
+					"TX: off\n"}),
+			validate: func(i *network.Info) {
+				et := i.Interfaces[1].Ethtool
+				s.Require().NotNil(et)
+
+				// ring
+				s.Equal(4096, et.RingParams["max_rx"])
+				s.Equal(256, et.RingParams["current_rx"])
+				s.Equal(0, et.RingParams["current_rx_mini"])
+
+				// channel
+				s.Equal(8, et.ChannelParams["max_combined"])
+				s.Equal(4, et.ChannelParams["current_combined"])
+
+				// coalesce — mixed types
+				s.Equal("on", et.CoalesceParams["adaptive_rx"])
+				s.Equal("off", et.CoalesceParams["adaptive_tx"])
+				s.Equal(50, et.CoalesceParams["rx_usecs"])
+				s.Equal(64, et.CoalesceParams["tx_max_coalesced_frames"])
+
+				// offload — [fixed] annotation stripped
+				s.Equal("on", et.OffloadParams["rx_checksumming"])
+				s.Equal("on", et.OffloadParams["tx_checksumming"])
+				s.Equal("off", et.OffloadParams["generic_receive_offload"])
+
+				// pause — booleans
+				s.True(et.PauseParams["autonegotiate"])
+				s.True(et.PauseParams["rx"])
+				s.False(et.PauseParams["tx"])
+
+				// loopback got nothing
+				s.Nil(i.Interfaces[0].Ethtool)
+			},
+		},
+		{
+			name:       "linux: ethtool tuning malformed lines silently skipped",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/eth0/type": "1\n",
+			}),
+			exec: ipRouteAndEthtoolFullExec(s.T(),
+				nil, // no -i
+				map[string]string{"eth0": "Ring parameters for eth0:\n" +
+					"junk before any section\n" +
+					"Pre-set maximums:\n" +
+					"RX: not-a-number\n" +
+					"RX Mini:   \n" + // empty value after colon
+					"  \n" +
+					"no-colon-here\n" +
+					"RX:\t\t4096\n"},
+				map[string]string{"eth0": "Channel parameters for eth0:\n"}, // no sections
+				map[string]string{"eth0": "Coalesce parameters for eth0:\n" +
+					"Adaptive bad-shape\n" + // adaptive parse fails (no TX:)
+					"Adaptive no-rx-colon TX: off\n" + // adaptive: TX: present but RX side has no colon
+					"missing-colon line\n" + // no colon at all
+					"empty-value:   \n" + // empty value
+					"non-numeric: not-int\n"}, // ParseInt fails
+				map[string]string{"eth0": "Features for eth0:\n" +
+					"no-colon-line\n" +
+					"weird:    \n" + // value blank after strip
+					"only-bracket: [fixed]\n"}, // value becomes empty after [ strip
+				map[string]string{"eth0": "Pause parameters for eth0:\n" +
+					"broken line\n" +
+					"empty-value:   \n"}, // empty after trim
+			),
+			validate: func(i *network.Info) {
+				et := i.Interfaces[1].Ethtool
+				// ring got the one valid RX after the bad lines
+				s.Require().NotNil(et)
+				s.Equal(4096, et.RingParams["max_rx"])
+				// channel/coalesce/offload/pause: all empty → nil
+				s.Nil(et.ChannelParams)
+				s.Nil(et.CoalesceParams)
+				s.Nil(et.OffloadParams)
+				s.Nil(et.PauseParams)
 			},
 		},
 		{
