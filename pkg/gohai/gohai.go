@@ -37,6 +37,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
@@ -236,5 +237,6 @@ func builtinCollectors() []collector.Collector {
 		openstack.New(),
 		scaleway.New(),
 		dmi.New(),
+		gpu.New(),
 	}
 }

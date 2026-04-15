@@ -36,6 +36,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
@@ -101,6 +102,7 @@ type Facts struct {
 	OpenStack      *openstack.Info      `json:"openstack,omitempty"`
 	Scaleway       *scaleway.Info       `json:"scaleway,omitempty"`
 	DMI            *dmi.Info            `json:"dmi,omitempty"`
+	GPU            *gpu.Info            `json:"gpu,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -265,6 +267,9 @@ func (f *Facts) countPopulated() int {
 	if f.DMI != nil {
 		n++
 	}
+	if f.GPU != nil {
+		n++
+	}
 	return n
 }
 
@@ -411,6 +416,10 @@ func (f *Facts) set(
 	case "dmi":
 		if v, ok := result.(*dmi.Info); ok {
 			f.DMI = v
+		}
+	case "gpu":
+		if v, ok := result.(*gpu.Info); ok {
+			f.GPU = v
 		}
 	}
 }
