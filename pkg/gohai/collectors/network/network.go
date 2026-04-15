@@ -54,19 +54,39 @@ type Info struct {
 
 // Interface describes a single network interface.
 type Interface struct {
-	Name          string    `json:"name"`
-	Number        int       `json:"number,omitempty"` // kernel interface index (Ohai: iface[:number])
-	State         string    `json:"state,omitempty"`  // admin state: "up" | "down" (Ohai: iface["state"])
-	MTU           int       `json:"mtu"`
-	HardwareAddr  string    `json:"hardware_addr,omitempty"` // OCSF: network_interface.mac
-	Encapsulation string    `json:"encapsulation,omitempty"` // canonical: Ethernet / Loopback / PPP / SLIP / IPIP / 6to4
-	Driver        string    `json:"driver,omitempty"`        // sysfs driver name (e1000e, virtio_net, ixgbe, ...)
-	Speed         string    `json:"speed,omitempty"`         // ghw link speed string ("1000Mb/s")
-	Duplex        string    `json:"duplex,omitempty"`        // half | full | unknown
-	Flags         []string  `json:"flags,omitempty"`
-	Addresses     []Address `json:"addresses,omitempty"`
-	Routes        []Route   `json:"routes,omitempty"`
-	Counters      *Counters `json:"counters,omitempty"`
+	Name          string       `json:"name"`
+	Number        int          `json:"number,omitempty"` // kernel interface index (Ohai: iface[:number])
+	State         string       `json:"state,omitempty"`  // admin state: "up" | "down" (Ohai: iface["state"])
+	MTU           int          `json:"mtu"`
+	HardwareAddr  string       `json:"hardware_addr,omitempty"` // OCSF: network_interface.mac
+	Encapsulation string       `json:"encapsulation,omitempty"` // canonical: Ethernet / Loopback / PPP / SLIP / IPIP / 6to4
+	Driver        string       `json:"driver,omitempty"`        // sysfs driver name (e1000e, virtio_net, ixgbe, ...)
+	Speed         string       `json:"speed,omitempty"`         // ghw link speed string ("1000Mb/s")
+	Duplex        string       `json:"duplex,omitempty"`        // half | full | unknown
+	Flags         []string     `json:"flags,omitempty"`
+	Addresses     []Address    `json:"addresses,omitempty"`
+	Routes        []Route      `json:"routes,omitempty"`
+	Counters      *Counters    `json:"counters,omitempty"`
+	Ethtool       *EthtoolInfo `json:"ethtool,omitempty"` // Linux only, when ethtool binary is on PATH
+}
+
+// EthtoolInfo holds data sourced from `ethtool` subcommands per
+// interface. Currently surfaces `driver_info` (`ethtool -i`); future
+// work will add `ring_params`, `channel_params`, `coalesce_params`,
+// `offload_params`, `pause_params` per Ohai parity.
+//
+// Populated only on Linux for interfaces whose Encapsulation is
+// "Ethernet" (matching Ohai's `iface[:encapsulation] == "Ethernet"`
+// gate). Hosts without the ethtool binary leave Ethtool nil.
+type EthtoolInfo struct {
+	// DriverInfo mirrors `ethtool -i <iface>` output as a map. Common
+	// keys: driver, version, firmware_version, bus_info,
+	// supports_statistics, supports_test, supports_eeprom_access,
+	// supports_register_dump, supports_priv_flags. Keys are normalized
+	// to snake_case (Ohai only replaces spaces; we additionally
+	// translate hyphens — `firmware-version` → `firmware_version` —
+	// for Go-idiomatic consistency).
+	DriverInfo map[string]string `json:"driver_info,omitempty"`
 }
 
 // Neighbour is one entry from the ARP / NDP cache.
@@ -236,6 +256,39 @@ func scopeOf(
 		return "Link"
 	}
 	return "Global"
+}
+
+// parseEthtoolDriverInfo turns `ethtool -i <iface>` output into the
+// DriverInfo map. Mirrors Ohai's ethernet_driver_info parse: split
+// each line on `<key>: <value>`, normalize the key to snake_case
+// (Ohai replaces only spaces; we additionally replace hyphens since
+// real ethtool keys like `firmware-version` and `bus-info` would
+// otherwise pollute Go consumers with non-idiomatic identifiers).
+//
+// Empty lines and lines without a colon are skipped. Trailing
+// whitespace on values is trimmed (matches Ohai's `.chomp`).
+func parseEthtoolDriverInfo(
+	raw []byte,
+) map[string]string {
+	out := map[string]string{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		key, val, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		key = strings.ToLower(key)
+		key = strings.ReplaceAll(key, " ", "_")
+		key = strings.ReplaceAll(key, "-", "_")
+		out[key] = strings.TrimSpace(val)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // stateFromFlags returns the admin state label (`"up"` / `"down"`)
