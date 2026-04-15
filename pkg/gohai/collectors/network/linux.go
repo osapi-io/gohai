@@ -76,6 +76,7 @@ func (l *Linux) Collect(
 		applyRoutes(ctx, l.Exec, info)
 		applyEthtoolDriverInfo(ctx, l.Exec, info)
 		applyEthtoolTuning(ctx, l.Exec, info)
+		applyIPLinkExtras(ctx, l.Exec, info)
 	}
 	if entries, err := neighListFn(); err == nil {
 		info.Neighbours = entries
@@ -112,6 +113,38 @@ func applyEthtoolDriverInfo(
 			info.Interfaces[i].Ethtool = &EthtoolInfo{}
 		}
 		info.Interfaces[i].Ethtool.DriverInfo = di
+	}
+}
+
+// applyIPLinkExtras runs `ip -d link` once and merges per-interface
+// VLAN, tunnel, and XDP annotations onto the matching Interface
+// entries. Mirrors the relevant subset of Ohai's link_statistics:
+// the three signals neither gopsutil nor the ethtool family covers.
+//
+// `ip` failures (binary missing, permission denied) silently leave
+// the three fields nil for every interface — same behaviour as the
+// existing applyRoutes path.
+func applyIPLinkExtras(
+	ctx context.Context,
+	exec executor.Executor,
+	info *Info,
+) {
+	out, err := exec.Execute(ctx, "ip", "-d", "link")
+	if err != nil {
+		return
+	}
+	annotations := parseIPLinkOutput(out)
+	if len(annotations) == 0 {
+		return
+	}
+	for i := range info.Interfaces {
+		ann, ok := annotations[info.Interfaces[i].Name]
+		if !ok {
+			continue
+		}
+		info.Interfaces[i].VLAN = ann.VLAN
+		info.Interfaces[i].TunnelInfo = ann.TunnelInfo
+		info.Interfaces[i].XDP = ann.XDP
 	}
 }
 

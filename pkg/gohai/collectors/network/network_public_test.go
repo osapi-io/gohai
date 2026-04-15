@@ -152,6 +152,13 @@ func ipRouteExec(
 		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
 		Return(v6, v6Err).
 		AnyTimes()
+	// `ip -d link` is invoked by applyIPLinkExtras for vlan / tunnel /
+	// xdp annotations. Default to "not found" so existing tests that
+	// don't care about those signals keep passing.
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-d", "link").
+		Return(nil, errors.New("ip: not found")).
+		AnyTimes()
 	// ethtool calls — default to "command not found" so existing tests
 	// that don't care about ethtool keep passing. Tests that exercise
 	// the ethtool path use ipRouteAndEthtoolExec / ipRouteAndEthtoolFullExec.
@@ -180,6 +187,10 @@ func ipRouteAndEthtoolFullExec(
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-d", "link").
 		Return(nil, errors.New("nope")).
 		AnyTimes()
 	m.EXPECT().
@@ -216,6 +227,35 @@ func ipRouteAndEthtoolFullExec(
 	return m
 }
 
+// ipRouteAndIPLinkExec returns a mock that returns `out` for the
+// `ip -d link` invocation and routes-not-found / ethtool-not-found
+// for everything else. Used by tests exercising the vlan / tunnel /
+// xdp annotation path.
+func ipRouteAndIPLinkExec(
+	t *testing.T,
+	ipLinkOut string,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-d", "link").
+		Return([]byte(ipLinkOut), nil).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("ethtool: not found")).
+		AnyTimes()
+	return m
+}
+
 // ipRouteAndEthtoolExec extends ipRouteExec with a canned `ethtool -i
 // <iface>` response. driverInfo maps interface name → ethtool stdout;
 // missing interfaces fall back to the "not found" error. Other
@@ -233,6 +273,10 @@ func ipRouteAndEthtoolExec(
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-d", "link").
 		Return(nil, errors.New("nope")).
 		AnyTimes()
 	m.EXPECT().
@@ -524,6 +568,209 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Nil(et.CoalesceParams)
 				s.Nil(et.OffloadParams)
 				s.Nil(et.PauseParams)
+			},
+		},
+		{
+			name:       "linux: ip -d link populates vlan + tunnel + xdp",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(
+				s.T(),
+				`1: lo: <LOOPBACK,UP> mtu 65536 qdisc noqueue state UNKNOWN
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state UP
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff
+    prog/xdpgeneric id 17 tag 4d0e1f3a
+    xdpgeneric  prog/xdp id 18 tag cafebabe
+`,
+			),
+			validate: func(i *network.Info) {
+				var eth0 *network.Interface
+				for j := range i.Interfaces {
+					if i.Interfaces[j].Name == "eth0" {
+						eth0 = &i.Interfaces[j]
+						break
+					}
+				}
+				s.Require().NotNil(eth0)
+				s.Require().NotNil(eth0.XDP)
+				s.Require().Len(eth0.XDP.Attached, 2)
+				// First prog line: direct mode token, no normalization.
+				s.Equal("xdpgeneric", eth0.XDP.Attached[0].Mode)
+				s.Equal("17", eth0.XDP.Attached[0].ID)
+				s.Equal("4d0e1f3a", eth0.XDP.Attached[0].Tag)
+				// Second prog line: xdpgeneric header set the mode, the
+				// bare `xdp` in `prog/xdp` normalises to it.
+				s.Equal("xdpgeneric", eth0.XDP.Attached[1].Mode)
+				s.Equal("18", eth0.XDP.Attached[1].ID)
+			},
+		},
+		{
+			name: "linux: ip -d link annotates eth0 vlan + ip6tun0 tunnel when present in gopsutil list",
+			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
+				return gpnet.InterfaceStatList{
+					{Index: 1, Name: "eth0.100", MTU: 1500, Flags: []string{"up"}},
+					{Index: 2, Name: "ip6tun0", MTU: 1452, Flags: []string{}},
+				}, nil
+			},
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(s.T(), `1: eth0.100@eth0: <BROADCAST,MULTICAST,UP> mtu 1500
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff
+    vlan id 100 LOOSE_BINDING REORDER_HDR
+2: ip6tun0: <NOARP> mtu 1452 qdisc noop
+    link/tunnel6 :: brd ::
+    ip6tnl any remote 2001:db8::1 local 2001:db8::2 encaplimit 4 hoplimit 64 tclass 0x00 flowlabel 0x00000 addrgenmode eui64 numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535 external
+3: xdp_only: <BROADCAST,UP> mtu 1500
+    link/ether aa:bb:cc:dd:ee:ff brd ff:ff:ff:ff:ff:ff
+    xdp xdpdrv/prog/xdpdrv id 42 tag deadbeef
+`),
+			validate: func(i *network.Info) {
+				var v, t *network.Interface
+				for j := range i.Interfaces {
+					switch i.Interfaces[j].Name {
+					case "eth0.100":
+						v = &i.Interfaces[j]
+					case "ip6tun0":
+						t = &i.Interfaces[j]
+					}
+				}
+				s.Require().NotNil(v)
+				s.Require().NotNil(v.VLAN)
+				s.Equal("100", v.VLAN.ID)
+				s.Empty(v.VLAN.Protocol) // "vlan id" form, no protocol qualifier
+				s.Contains(v.VLAN.Flags, "LOOSE_BINDING")
+				s.Contains(v.VLAN.Flags, "REORDER_HDR")
+
+				s.Require().NotNil(t)
+				s.Require().NotNil(t.TunnelInfo)
+				s.Equal("any", t.TunnelInfo.Proto)
+				s.Equal("2001:db8::1", t.TunnelInfo.Remote)
+				s.Equal("2001:db8::2", t.TunnelInfo.Local)
+				s.Equal("4", t.TunnelInfo.EncapLimit)
+				s.Equal("64", t.TunnelInfo.HopLimit)
+				s.Equal("0x00", t.TunnelInfo.TClass)
+				s.Equal("0x00000", t.TunnelInfo.Flowlabel)
+				s.Equal("eui64", t.TunnelInfo.AddrGenMode)
+				s.Equal("1", t.TunnelInfo.NumTxQueues)
+				s.Equal("1", t.TunnelInfo.NumRxQueues)
+				s.Equal("65536", t.TunnelInfo.GsoMaxSize)
+				s.Equal("65535", t.TunnelInfo.GsoMaxSegs)
+				s.True(t.TunnelInfo.External)
+			},
+		},
+		{
+			name:       "linux: ip -d link error leaves vlan/tunnel/xdp nil",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteExec(
+				s.T(),
+				nil,
+				errors.New("nope"),
+				nil,
+				errors.New("nope"),
+			), // ip -d link errors via the default mock
+			validate: func(i *network.Info) {
+				for j := range i.Interfaces {
+					s.Nil(i.Interfaces[j].VLAN)
+					s.Nil(i.Interfaces[j].TunnelInfo)
+					s.Nil(i.Interfaces[j].XDP)
+				}
+			},
+		},
+		{
+			name:       "linux: ip -d link with no annotations matches no interfaces",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(s.T(), `1: lo: <LOOPBACK,UP> mtu 65536
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,UP> mtu 1500
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff
+`),
+			validate: func(i *network.Info) {
+				for j := range i.Interfaces {
+					s.Nil(i.Interfaces[j].VLAN)
+					s.Nil(i.Interfaces[j].TunnelInfo)
+					s.Nil(i.Interfaces[j].XDP)
+				}
+			},
+		},
+		{
+			name: "linux: ip -d link vlan protocol-qualified form + tunnel trailing key",
+			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
+				return gpnet.InterfaceStatList{
+					{Index: 1, Name: "vlan10", MTU: 1500, Flags: []string{"up"}},
+					{Index: 2, Name: "tun0", MTU: 1452, Flags: []string{}},
+				}, nil
+			},
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(s.T(), `1: vlan10@eth0: <UP> mtu 1500
+    vlan protocol 802.1ad id 10
+2: tun0: <NOARP> mtu 1452
+    ipip ipip6 remote
+`),
+			validate: func(i *network.Info) {
+				var v, t *network.Interface
+				for j := range i.Interfaces {
+					switch i.Interfaces[j].Name {
+					case "vlan10":
+						v = &i.Interfaces[j]
+					case "tun0":
+						t = &i.Interfaces[j]
+					}
+				}
+				s.Require().NotNil(v.VLAN)
+				s.Equal("802.1ad", v.VLAN.Protocol)
+				s.Equal("10", v.VLAN.ID)
+				s.Empty(v.VLAN.Flags)
+
+				// `remote` is the last word — no following value — so
+				// the key is recognised but no field set. proto stays.
+				s.Require().NotNil(t.TunnelInfo)
+				s.Equal("ipip6", t.TunnelInfo.Proto)
+				s.Empty(t.TunnelInfo.Remote)
+			},
+		},
+		{
+			name:       "linux: ip -d link continuation lines before any header are dropped",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(s.T(), `   vlan id 999
+1: lo: <LOOPBACK,UP> mtu 65536
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+`),
+			validate: func(i *network.Info) {
+				for j := range i.Interfaces {
+					s.Nil(i.Interfaces[j].VLAN)
+				}
+			},
+		},
+		{
+			name: "linux: ip -d link malformed vlan + tunnel + xdp lines silently skipped",
+			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
+				return gpnet.InterfaceStatList{
+					{Index: 1, Name: "weird", MTU: 1500, Flags: []string{"up"}},
+				}, nil
+			},
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(s.T(), `1: weird: <UP> mtu 1500
+    vlan
+    vlan id no-digits-here
+    ip6tnl
+    xdp
+`),
+			validate: func(i *network.Info) {
+				// Bare keywords with no payload — parsers see substring matches but
+				// extract nothing; per-iface annotations stay nil.
+				s.Nil(i.Interfaces[0].VLAN)
+				s.Nil(i.Interfaces[0].TunnelInfo)
+				s.Nil(i.Interfaces[0].XDP)
 			},
 		},
 		{
