@@ -45,7 +45,10 @@ const vulnerabilitiesDir = "/sys/devices/system/cpu/vulnerabilities"
 // Info holds CPU information. Includes aggregate facts (logical count,
 // physical cores, socket count), model/feature data from the first CPU
 // (assumed homogeneous), per-level cache sizes, NUMA topology, and the
-// vulnerability mitigation status map on Linux.
+// vulnerability mitigation status map on Linux. Extended fields
+// (BIOS identity, frequency range, virtualization, execution modes,
+// additional cache levels) come from `lscpu` on Linux to match Ohai's
+// full cpu plugin coverage.
 type Info struct {
 	Count           int               `json:"count"`                // logical CPU count (OCSF: device.cpu_count)
 	Sockets         int               `json:"sockets"`              // physical packages
@@ -58,9 +61,39 @@ type Info struct {
 	Mhz             float64           `json:"mhz,omitempty"`
 	CacheSize       int32             `json:"cache_size,omitempty"` // KB — aggregate from /proc/cpuinfo
 	Flags           []string          `json:"flags,omitempty"`
-	Caches          *Caches           `json:"caches,omitempty"`          // per-level sizes from lscpu (Linux)
-	NumaNodes       map[int][]int     `json:"numa_nodes,omitempty"`      // node id → CPU indices (Linux)
-	Vulnerabilities map[string]string `json:"vulnerabilities,omitempty"` // mitigation → status (Linux)
+	Caches          *Caches           `json:"caches,omitempty"`           // per-level sizes from lscpu (Linux)
+	NumaNodes       map[int][]int     `json:"numa_nodes,omitempty"`       // node id → CPU indices (Linux)
+	NumaNodesCount  int               `json:"numa_nodes_count,omitempty"` // NUMA node count from "NUMA node(s):" line
+	Vulnerabilities map[string]string `json:"vulnerabilities,omitempty"`  // mitigation → status (Linux)
+
+	// CPU availability (Linux, from lscpu).
+	CPUsOnline  int `json:"cpus_online,omitempty"`
+	CPUsOffline int `json:"cpus_offline,omitempty"`
+
+	// BIOS / machine identity (Linux, from lscpu).
+	BIOSVendorID  string `json:"bios_vendor_id,omitempty"`
+	BIOSModelName string `json:"bios_model_name,omitempty"`
+	MachineType   string `json:"machine_type,omitempty"` // s390x mainframes
+
+	// Frequency range (Linux, from lscpu). Strings mirror lscpu output
+	// (e.g. `3200.0000`); same convention Ohai follows.
+	MhzMax     string `json:"mhz_max,omitempty"`
+	MhzMin     string `json:"mhz_min,omitempty"`
+	MhzDynamic string `json:"mhz_dynamic,omitempty"`
+	Bogomips   string `json:"bogomips,omitempty"`
+
+	// Execution mode metadata (Linux, from lscpu).
+	CPUOpmodes   []string `json:"cpu_opmodes,omitempty"`
+	ByteOrder    string   `json:"byte_order,omitempty"`
+	AddressSizes []string `json:"address_sizes,omitempty"`
+
+	// Virtualization capabilities (Linux, from lscpu). `HypervisorVendor`
+	// is the key signal our virtualization collector would consume when
+	// /sys/devices/virtual/misc/kvm is absent (Ohai does the same).
+	Virtualization     string `json:"virtualization,omitempty"`
+	VirtualizationType string `json:"virtualization_type,omitempty"`
+	HypervisorVendor   string `json:"hypervisor_vendor,omitempty"`
+	DispatchingMode    string `json:"dispatching_mode,omitempty"` // s390x
 }
 
 // Caches carries the per-level cache sizes reported by `lscpu`. Strings
@@ -70,7 +103,10 @@ type Caches struct {
 	L1d string `json:"l1d,omitempty"`
 	L1i string `json:"l1i,omitempty"`
 	L2  string `json:"l2,omitempty"`
+	L2d string `json:"l2d,omitempty"`
+	L2i string `json:"l2i,omitempty"`
 	L3  string `json:"l3,omitempty"`
+	L4  string `json:"l4,omitempty"`
 }
 
 // Collector is the public interface every cpu variant satisfies.
@@ -179,7 +215,26 @@ type lscpuSummary struct {
 	drawers         int
 	caches          Caches
 	numaNodes       map[int][]int
+	numaNodesCount  int
+	cpusOnline      int
+	cpusOffline     int
 	haveLscpuLayout bool // true once any of the topology fields was parsed
+
+	// Additional flat fields — merged onto Info verbatim.
+	biosVendorID       string
+	biosModelName      string
+	machineType        string
+	mhzMax             string
+	mhzMin             string
+	mhzDynamic         string
+	bogomips           string
+	cpuOpmodes         []string
+	byteOrder          string
+	addressSizes       []string
+	virtualization     string
+	virtualizationType string
+	hypervisorVendor   string
+	dispatchingMode    string
 }
 
 // parseLscpu parses `lscpu` line-oriented output. Mirrors the key set
@@ -239,8 +294,48 @@ func parseLscpu(
 			s.caches.L1i = val
 		case key == "L2 cache":
 			s.caches.L2 = val
+		case key == "L2d cache":
+			s.caches.L2d = val
+		case key == "L2i cache":
+			s.caches.L2i = val
 		case key == "L3 cache":
 			s.caches.L3 = val
+		case key == "L4 cache":
+			s.caches.L4 = val
+		case key == "NUMA node(s)":
+			s.numaNodesCount = atoi(val)
+		case key == "On-line CPU(s) list":
+			s.cpusOnline = len(parseCPURange(val))
+		case key == "Off-line CPU(s) list":
+			s.cpusOffline = len(parseCPURange(val))
+		case key == "BIOS Vendor ID":
+			s.biosVendorID = val
+		case key == "BIOS Model name":
+			s.biosModelName = val
+		case key == "Machine type":
+			s.machineType = val
+		case key == "CPU max MHz":
+			s.mhzMax = val
+		case key == "CPU min MHz":
+			s.mhzMin = val
+		case key == "CPU dynamic MHz":
+			s.mhzDynamic = val
+		case key == "BogoMIPS":
+			s.bogomips = val
+		case key == "CPU op-mode(s)":
+			s.cpuOpmodes = splitCSV(val)
+		case key == "Byte Order":
+			s.byteOrder = strings.ToLower(val)
+		case key == "Address sizes":
+			s.addressSizes = splitCSV(val)
+		case key == "Virtualization":
+			s.virtualization = val
+		case key == "Virtualization type":
+			s.virtualizationType = val
+		case key == "Hypervisor vendor":
+			s.hypervisorVendor = val
+		case key == "Dispatching mode":
+			s.dispatchingMode = val
 		case strings.HasPrefix(key, "NUMA node") && strings.HasSuffix(key, "CPU(s)"):
 			// "NUMA node0 CPU(s)" → node 0
 			mid := strings.TrimPrefix(key, "NUMA node")
@@ -265,6 +360,25 @@ func atoi(
 ) int {
 	n, _ := strconv.Atoi(v)
 	return n
+}
+
+// splitCSV splits a comma-separated lscpu value ("32-bit, 64-bit",
+// "48 bits physical, 48 bits virtual") into trimmed tokens. Empty
+// entries are dropped; fully-empty input returns nil.
+func splitCSV(
+	v string,
+) []string {
+	out := []string{}
+	for _, part := range strings.Split(v, ",") {
+		t := strings.TrimSpace(part)
+		if t != "" {
+			out = append(out, t)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // parseCPURange converts an lscpu-style CPU list like `0-3,8,10-11`
@@ -321,6 +435,29 @@ func applyLscpuToInfo(
 	if len(s.numaNodes) > 0 {
 		info.NumaNodes = s.numaNodes
 	}
+	if s.numaNodesCount > 0 {
+		info.NumaNodesCount = s.numaNodesCount
+	}
+	if s.cpusOnline > 0 {
+		info.CPUsOnline = s.cpusOnline
+	}
+	if s.cpusOffline > 0 {
+		info.CPUsOffline = s.cpusOffline
+	}
+	info.BIOSVendorID = s.biosVendorID
+	info.BIOSModelName = s.biosModelName
+	info.MachineType = s.machineType
+	info.MhzMax = s.mhzMax
+	info.MhzMin = s.mhzMin
+	info.MhzDynamic = s.mhzDynamic
+	info.Bogomips = s.bogomips
+	info.CPUOpmodes = s.cpuOpmodes
+	info.ByteOrder = s.byteOrder
+	info.AddressSizes = s.addressSizes
+	info.Virtualization = s.virtualization
+	info.VirtualizationType = s.virtualizationType
+	info.HypervisorVendor = s.hypervisorVendor
+	info.DispatchingMode = s.dispatchingMode
 	if !s.haveLscpuLayout {
 		return
 	}
