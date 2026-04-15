@@ -62,10 +62,16 @@ func noLsblkExec(
 		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, errors.New("not found")).
 		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "zfs", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("not found")).
+		AnyTimes()
 	return m
 }
 
 // lsblkExec returns a mock Executor that returns canned lsblk JSON.
+// Any `zfs` invocation returns an error (simulates `zfs` not installed —
+// the common case for Linux hosts without OpenZFS).
 func lsblkExec(
 	t *testing.T,
 	out string,
@@ -75,6 +81,29 @@ func lsblkExec(
 	m.EXPECT().
 		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
 		Return([]byte(out), nil).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "zfs", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("zfs: command not found")).
+		AnyTimes()
+	return m
+}
+
+// lsblkZFSExec behaves like lsblkExec but additionally returns canned
+// `zfs get -p -H all` output for the ZFS enumeration path.
+func lsblkZFSExec(
+	t *testing.T,
+	lsblkOut, zfsOut string,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
+		Return([]byte(lsblkOut), nil).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "zfs", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return([]byte(zfsOut), nil).
 		AnyTimes()
 	return m
 }
@@ -296,6 +325,96 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			validate: func(i *filesystem.Info) {
 				s.Len(i.Mounts, 2)
 				s.Zero(i.Mounts[0].Total)
+			},
+		},
+		{
+			name:         "linux: ZFS datasets parsed with pool + nested + mountpoints",
+			variant:      "linux",
+			partitionsFn: okPartitions,
+			usageFn:      okUsage,
+			exec: func(t *testing.T) executor.Executor {
+				// tab-separated `zfs get -p -H all` — realistic subset
+				// covering pool root + nested fs + snapshot (mountpoint
+				// absent) + dataset with `none` (skipped for mountpoint).
+				const zfs = "tank\ttype\tfilesystem\t-\n" +
+					"tank\tmountpoint\t/tank\tdefault\n" +
+					"tank\tused\t12345\t-\n" +
+					"tank/home\ttype\tfilesystem\t-\n" +
+					"tank/home\tmountpoint\t/home\tlocal\n" +
+					"tank/home\tcompression\tlz4\tlocal\n" +
+					"tank/home/john\ttype\tfilesystem\t-\n" +
+					"tank/home/john\tmountpoint\t/home/john\tinherited from tank/home\n" +
+					"tank/vol1\ttype\tvolume\t-\n" +
+					"tank/vol1\tmountpoint\tnone\tdefault\n" +
+					"tank@snap1\ttype\tsnapshot\t-\n"
+				return lsblkZFSExec(t, "", zfs)
+			},
+			validate: func(i *filesystem.Info) {
+				s.Require().Len(i.ZFSDatasets, 5)
+
+				tank := i.ZFSDatasets[0]
+				s.Equal("tank", tank.Name)
+				s.Equal("/tank", tank.Mountpoint)
+				s.True(tank.IsPool)
+				s.Empty(tank.Parents)
+				s.Equal("filesystem", tank.Properties["type"].Value)
+				s.Equal("default", tank.Properties["mountpoint"].Source)
+
+				home := i.ZFSDatasets[1]
+				s.Equal("tank/home", home.Name)
+				s.Equal("/home", home.Mountpoint)
+				s.False(home.IsPool)
+				s.Equal([]string{"tank"}, home.Parents)
+				s.Equal("lz4", home.Properties["compression"].Value)
+				s.Equal("local", home.Properties["compression"].Source)
+
+				john := i.ZFSDatasets[2]
+				s.Equal("tank/home/john", john.Name)
+				s.Equal("/home/john", john.Mountpoint)
+				s.Equal([]string{"tank", "tank/home"}, john.Parents)
+				s.Equal(
+					"inherited from tank/home",
+					john.Properties["mountpoint"].Source,
+				)
+
+				vol := i.ZFSDatasets[3]
+				s.Equal("tank/vol1", vol.Name)
+				s.Empty(vol.Mountpoint) // "none" is not an absolute path
+				s.Equal("none", vol.Properties["mountpoint"].Value)
+
+				snap := i.ZFSDatasets[4]
+				s.Equal("tank@snap1", snap.Name)
+				s.True(snap.IsPool) // no "/" → looks like a pool-level name
+			},
+		},
+		{
+			name:         "linux: zfs binary present but empty output yields no datasets",
+			variant:      "linux",
+			partitionsFn: okPartitions,
+			usageFn:      okUsage,
+			exec: func(t *testing.T) executor.Executor {
+				return lsblkZFSExec(t, "", "")
+			},
+			validate: func(i *filesystem.Info) {
+				s.Empty(i.ZFSDatasets)
+			},
+		},
+		{
+			name:         "linux: zfs malformed line skipped, well-formed line parsed",
+			variant:      "linux",
+			partitionsFn: okPartitions,
+			usageFn:      okUsage,
+			exec: func(t *testing.T) executor.Executor {
+				return lsblkZFSExec(
+					t,
+					"",
+					"garbage\nonly two\tfields\nname\tprop\tval\tsource\n\t\t\t\n",
+				)
+			},
+			validate: func(i *filesystem.Info) {
+				s.Require().Len(i.ZFSDatasets, 1)
+				s.Equal("name", i.ZFSDatasets[0].Name)
+				s.Equal("val", i.ZFSDatasets[0].Properties["prop"].Value)
 			},
 		},
 		{

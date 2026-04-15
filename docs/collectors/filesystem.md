@@ -50,6 +50,21 @@ non-empty filesystem type and empty mountpoint. Each entry carries `device`,
 `fstype`, `uuid`, `label`, `part_uuid`, `part_label` — capacity/usage are
 omitted because `statfs` requires a mount.
 
+Top-level `zfs_datasets[]` (Linux only, when `zfs` is on PATH): every ZFS
+dataset the kernel's ZFS module knows about — filesystems, volumes, snapshots,
+bookmarks — reported by `zfs get -p -H all`. Mirrors Ohai's `zfs_properties` /
+`zfs_parents` / `zfs_zpool` keys.
+
+| Field per dataset     | Type                | Description                                                                                                                  |
+| --------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `name`                | string              | Full dataset path (`tank`, `tank/home`, `tank/home/john`).                                                                   |
+| `mountpoint`          | string              | Mount path when `mountpoint` property is absolute. Empty when set to `none` / `legacy` / `-`, or for snapshots.              |
+| `is_pool`             | bool                | True when this dataset IS the zpool root (no proper ancestors). Mirrors Ohai's `zfs_zpool`.                                  |
+| `parents`             | []string            | Proper ancestor dataset paths, shallowest first. `tank/home/john` → `["tank", "tank/home"]`. Mirrors Ohai's `zfs_parents`.   |
+| `properties`          | map[string]Property | Every property from `zfs get all`. Keys are property names; each value carries the property value + source annotation below. |
+| `properties.*.value`  | string              | Property value verbatim from zfs.                                                                                            |
+| `properties.*.source` | string              | `"-"` (read-only), `"default"`, `"local"`, `"inherited from <ancestor>"`, `"received"`.                                      |
+
 Field-name choices follow node_exporter's `filesystem` collector (`mountpoint`
 over Ohai's `mount`, `fstype` over Ohai's `fs_type`).
 
