@@ -253,6 +253,26 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: high/low memory split + NFS + Bounce parity with Ohai",
+			variant: "linux",
+			vmFn:    zeroVM,
+			swapFn:  zeroSwap,
+			fs: meminfoFS(s, "HighTotal:    1048576 kB\n"+
+				"HighFree:      524288 kB\n"+
+				"LowTotal:     2097152 kB\n"+
+				"LowFree:       262144 kB\n"+
+				"NFS_Unstable:     128 kB\n"+
+				"Bounce:            64 kB\n"),
+			validate: func(i *memory.Info) {
+				s.Equal(uint64(1048576*1024), i.HighTotal)
+				s.Equal(uint64(524288*1024), i.HighFree)
+				s.Equal(uint64(2097152*1024), i.LowTotal)
+				s.Equal(uint64(262144*1024), i.LowFree)
+				s.Equal(uint64(128*1024), i.NFSUnstable)
+				s.Equal(uint64(64*1024), i.Bounce)
+			},
+		},
+		{
 			name:    "linux: Hugetlb without gopsutil hugepages still allocates struct",
 			variant: "linux",
 			vmFn:    zeroVM,

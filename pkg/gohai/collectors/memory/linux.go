@@ -105,6 +105,18 @@ func applyMeminfoExtension(
 			info.AnonPages = val
 		case "Shmem":
 			info.Shmem = val
+		case "HighTotal":
+			info.HighTotal = val
+		case "HighFree":
+			info.HighFree = val
+		case "LowTotal":
+			info.LowTotal = val
+		case "LowFree":
+			info.LowFree = val
+		case "NFS_Unstable":
+			info.NFSUnstable = val
+		case "Bounce":
+			info.Bounce = val
 		case "Hugetlb":
 			if info.HugePages == nil {
 				info.HugePages = &Hugepages{}

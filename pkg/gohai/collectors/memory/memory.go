@@ -83,6 +83,18 @@ type Info struct {
 	KernelStack  uint64 `json:"kernel_stack,omitempty"`
 	PerCPU       uint64 `json:"percpu,omitempty"`
 
+	// 32-bit legacy high/low memory split (HighTotal > 0 only on
+	// 32-bit kernels with >4GB RAM — parsed for Ohai parity; on 64-bit
+	// kernels these stay zero).
+	HighTotal uint64 `json:"high_total,omitempty"`
+	HighFree  uint64 `json:"high_free,omitempty"`
+	LowTotal  uint64 `json:"low_total,omitempty"`
+	LowFree   uint64 `json:"low_free,omitempty"`
+
+	// NFS and legacy DMA bounce buffers.
+	NFSUnstable uint64 `json:"nfs_unstable,omitempty"`
+	Bounce      uint64 `json:"bounce,omitempty"`
+
 	// Anonymous + shared (Linux-specific splits from /proc/meminfo
 	// that gopsutil doesn't expose on its cross-platform struct).
 	AnonPages uint64 `json:"anon_pages,omitempty"`
