@@ -71,13 +71,15 @@ type Interface struct {
 }
 
 // EthtoolInfo holds data sourced from `ethtool` subcommands per
-// interface. Currently surfaces `driver_info` (`ethtool -i`); future
-// work will add `ring_params`, `channel_params`, `coalesce_params`,
-// `offload_params`, `pause_params` per Ohai parity.
+// interface. Mirrors Ohai's six per-interface ethtool calls:
+// driver_info, ring_params, channel_params, coalesce_params,
+// offload_params, pause_params.
 //
 // Populated only on Linux for interfaces whose Encapsulation is
 // "Ethernet" (matching Ohai's `iface[:encapsulation] == "Ethernet"`
-// gate). Hosts without the ethtool binary leave Ethtool nil.
+// gate). Hosts without the ethtool binary leave Ethtool nil. Per-
+// subcommand failures are independent — one ethtool subcommand
+// erroring out doesn't suppress the others.
 type EthtoolInfo struct {
 	// DriverInfo mirrors `ethtool -i <iface>` output as a map. Common
 	// keys: driver, version, firmware_version, bus_info,
@@ -87,6 +89,37 @@ type EthtoolInfo struct {
 	// translate hyphens — `firmware-version` → `firmware_version` —
 	// for Go-idiomatic consistency).
 	DriverInfo map[string]string `json:"driver_info,omitempty"`
+
+	// RingParams mirrors `ethtool -g <iface>` output. Keys are
+	// prefixed with `max_` (from "Pre-set maximums") or `current_`
+	// (from "Current hardware settings") then the ethtool field name
+	// snake_cased — e.g. `max_rx`, `current_rx_jumbo`, `max_tx`.
+	// Values are integers (buffer descriptor counts).
+	RingParams map[string]int `json:"ring_params,omitempty"`
+
+	// ChannelParams mirrors `ethtool -l <iface>` output with the
+	// same `max_` / `current_` prefix convention. Keys: `rx`, `tx`,
+	// `other`, `combined`. Values are integers (queue counts).
+	ChannelParams map[string]int `json:"channel_params,omitempty"`
+
+	// CoalesceParams mirrors `ethtool -c <iface>` output. Most
+	// values are integers (microseconds, frame counts) — `rx_usecs`,
+	// `tx_max_coalesced_frames`, etc. The exception is the
+	// `Adaptive RX: on  TX: off` line which Ohai parses into two
+	// string entries `adaptive_rx` and `adaptive_tx` carrying
+	// "on"/"off". To preserve that mixed-type Ohai shape we use
+	// `any` here; JSON serializes integers and strings cleanly.
+	CoalesceParams map[string]any `json:"coalesce_params,omitempty"`
+
+	// OffloadParams mirrors `ethtool -k <iface>` output. Values are
+	// strings ("on" / "off"); Ohai strips the trailing
+	// `[fixed]` / `[requested ...]` annotations.
+	OffloadParams map[string]string `json:"offload_params,omitempty"`
+
+	// PauseParams mirrors `ethtool -a <iface>` output. Values are
+	// booleans — Ohai converts the "on"/"off" strings via
+	// `.eql? "on"`. Keys: `autonegotiate`, `rx`, `tx`.
+	PauseParams map[string]bool `json:"pause_params,omitempty"`
 }
 
 // Neighbour is one entry from the ARP / NDP cache.
@@ -289,6 +322,202 @@ func parseEthtoolDriverInfo(
 		return nil
 	}
 	return out
+}
+
+// parseEthtoolSectionedInts parses ethtool subcommand output that
+// has two sections — "Pre-set maximums:" and "Current hardware
+// settings:" — into a flat map keyed `max_<field>` / `current_<field>`
+// with integer values. Used for both ring_params (`ethtool -g`) and
+// channel_params (`ethtool -l`); Ohai's ethernet_ring_parameters and
+// ethernet_channel_parameters share this exact shape.
+//
+// headerPrefix is the per-iface header line ethtool prints first
+// ("Ring parameters for" / "Channel parameters for") which we skip.
+func parseEthtoolSectionedInts(
+	raw []byte,
+	headerPrefix string,
+) map[string]int {
+	out := map[string]int{}
+	section := ""
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, headerPrefix) {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(trimmed, "Pre-set maximums"):
+			section = "max"
+			continue
+		case strings.HasPrefix(trimmed, "Current hardware settings"):
+			section = "current"
+			continue
+		}
+		if section == "" {
+			continue
+		}
+		key, val, ok := strings.Cut(trimmed, ":")
+		if !ok {
+			continue
+		}
+		val = strings.TrimSpace(val)
+		if val == "" {
+			continue
+		}
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			continue
+		}
+		out[section+"_"+ethtoolKey(key)] = n
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// parseEthtoolCoalesceParams parses `ethtool -c <iface>` output. The
+// `Adaptive RX: on  TX: off` line splits into two string entries
+// (adaptive_rx / adaptive_tx); every other line is a `key: value`
+// pair where value is parsed as an integer. Mirrors Ohai's
+// ethernet_coalesce_parameters exactly, including the special
+// Adaptive handling.
+func parseEthtoolCoalesceParams(
+	raw []byte,
+) map[string]any {
+	out := map[string]any{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, "Coalesce parameters for") {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "Adaptive") {
+			rx, tx, ok := parseAdaptiveLine(trimmed)
+			if ok {
+				out["adaptive_rx"] = rx
+				out["adaptive_tx"] = tx
+			}
+			continue
+		}
+		key, val, ok := strings.Cut(trimmed, ":")
+		if !ok {
+			continue
+		}
+		val = strings.TrimSpace(val)
+		if val == "" {
+			continue
+		}
+		n, err := strconv.Atoi(val)
+		if err != nil {
+			continue
+		}
+		out[ethtoolKey(key)] = n
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// parseAdaptiveLine pulls the two on/off tokens out of an ethtool
+// "Adaptive RX: on  TX: off" line. Returns ok=false when the shape
+// doesn't match (so the caller skips a malformed line cleanly).
+func parseAdaptiveLine(
+	line string,
+) (rx, tx string, ok bool) {
+	rest := strings.TrimSpace(strings.TrimPrefix(line, "Adaptive"))
+	rxRaw, txPart, ok := strings.Cut(rest, "TX:")
+	if !ok {
+		return "", "", false
+	}
+	_, rxVal, ok := strings.Cut(rxRaw, ":")
+	if !ok {
+		return "", "", false
+	}
+	return strings.TrimSpace(rxVal), strings.TrimSpace(txPart), true
+}
+
+// parseEthtoolOffloadParams parses `ethtool -k <iface>` output. Each
+// non-header line is `feature: state[ annotation]`. Ohai lowercases
+// the value and strips bracketed annotations like `[fixed]` or
+// `[requested on]`. We mirror that exactly — the canonical state
+// (`on` / `off`) is what consumers want; the annotation is noise.
+func parseEthtoolOffloadParams(
+	raw []byte,
+) map[string]string {
+	out := map[string]string{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, "Features for") {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		key, val, ok := strings.Cut(trimmed, ":")
+		if !ok {
+			continue
+		}
+		val = strings.ToLower(strings.TrimSpace(val))
+		if i := strings.Index(val, "["); i >= 0 {
+			val = strings.TrimSpace(val[:i])
+		}
+		if val == "" {
+			continue
+		}
+		out[ethtoolKey(key)] = val
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// parseEthtoolPauseParams parses `ethtool -a <iface>` output. Values
+// are booleans — Ohai's `.eql? "on"` truthy-check, lowercased.
+func parseEthtoolPauseParams(
+	raw []byte,
+) map[string]bool {
+	out := map[string]bool{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, "Pause parameters for") {
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		key, val, ok := strings.Cut(trimmed, ":")
+		if !ok {
+			continue
+		}
+		val = strings.TrimSpace(val)
+		if val == "" {
+			continue
+		}
+		out[ethtoolKey(key)] = strings.EqualFold(val, "on")
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// ethtoolKey normalizes an ethtool field label to snake_case by
+// lowercasing and replacing both spaces and hyphens with underscores.
+// Same convention as parseEthtoolDriverInfo.
+func ethtoolKey(
+	k string,
+) string {
+	k = strings.TrimSpace(strings.ToLower(k))
+	k = strings.ReplaceAll(k, " ", "_")
+	k = strings.ReplaceAll(k, "-", "_")
+	return k
 }
 
 // stateFromFlags returns the admin state label (`"up"` / `"down"`)
