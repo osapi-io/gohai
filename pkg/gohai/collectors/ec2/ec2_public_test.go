@@ -27,6 +27,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -83,6 +84,31 @@ var ec2Responses = map[string]string{
 	"/2021-07-15/meta-data/network/interfaces/macs/" + macA + "/vpc-id":                 "vpc-222",
 	"/2021-07-15/meta-data/network/interfaces/macs/" + macA + "/security-groups":        "default\nssh",
 	"/2021-07-15/meta-data/network/interfaces/macs/" + macB + "/interface-id":           "eni-bbb",
+
+	// Placement extras, kernel/ramdisk, lifecycle, services, spot —
+	// fields added for Ohai-parity gap closure.
+	"/2021-07-15/meta-data/placement/availability-zone-id": "use1-az1",
+	"/2021-07-15/meta-data/placement/group-name":           "my-cluster",
+	"/2021-07-15/meta-data/placement/host-id":              "h-abc",
+	"/2021-07-15/meta-data/placement/partition-number":     "1",
+	"/2021-07-15/meta-data/kernel-id":                      "aki-xxxx",
+	"/2021-07-15/meta-data/ramdisk-id":                     "ari-yyyy",
+	"/2021-07-15/meta-data/instance-action":                "none",
+	"/2021-07-15/meta-data/spot/instance-action":           "terminate",
+	"/2021-07-15/meta-data/spot/termination-time":          "2026-05-01T00:00:00Z",
+	"/2021-07-15/meta-data/services/domain":                "amazonaws.com",
+	"/2021-07-15/meta-data/services/partition":             "aws",
+	"/2021-07-15/meta-data/product-codes":                  "abcdef12345",
+
+	// block-device-mapping tree: directory listing + per-key leaf.
+	"/2021-07-15/meta-data/block-device-mapping":      "ami\nroot\nebs0",
+	"/2021-07-15/meta-data/block-device-mapping/ami":  "/dev/xvda",
+	"/2021-07-15/meta-data/block-device-mapping/root": "/dev/xvda1",
+	"/2021-07-15/meta-data/block-device-mapping/ebs0": "/dev/xvdf",
+
+	// public-keys tree: listing + per-index openssh-key leaf.
+	"/2021-07-15/meta-data/public-keys":               "0=my-keypair",
+	"/2021-07-15/meta-data/public-keys/0/openssh-key": "ssh-rsa AAAA",
 }
 
 const iamInfo = `{
@@ -279,6 +305,22 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				s.Equal("123456789012", info.AccountID)
 				s.Equal("us-east-1", info.Region)
 				s.Equal("us-east-1a", info.AvailabilityZone)
+				s.Equal("use1-az1", info.AvailabilityZoneID)
+				s.Equal("my-cluster", info.GroupName)
+				s.Equal("h-abc", info.HostID)
+				s.Equal("1", info.PartitionNumber)
+				s.Equal("aki-xxxx", info.KernelID)
+				s.Equal("ari-yyyy", info.RamdiskID)
+				s.Equal("none", info.InstanceAction)
+				s.Equal("terminate", info.SpotInstanceAction)
+				s.Equal("2026-05-01T00:00:00Z", info.SpotTerminationTime)
+				s.Equal("amazonaws.com", info.ServicesDomain)
+				s.Equal("aws", info.ServicesPartition)
+				s.Equal([]string{"abcdef12345"}, info.ProductCodes)
+				s.Equal("/dev/xvda", info.BlockDeviceMapping["ami"])
+				s.Equal("/dev/xvda1", info.BlockDeviceMapping["root"])
+				s.Equal("/dev/xvdf", info.BlockDeviceMapping["ebs0"])
+				s.Equal([]string{"ssh-rsa AAAA"}, info.PublicKeys)
 				s.Require().NotNil(info.IAMInfo)
 				s.Equal(
 					"arn:aws:iam::123456789012:instance-profile/web",
@@ -342,6 +384,47 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
 				s.Require().NotNil(info)
 				s.Equal("latest", info.APIVersion)
+			},
+		},
+		{
+			name: "block-device-mapping listing with all-404 children yields nil",
+			opts: (&serverOpts{
+				responseMap: func() map[string]string {
+					m := make(map[string]string, len(ec2Responses))
+					for k, v := range ec2Responses {
+						if strings.HasPrefix(k, "/2021-07-15/meta-data/block-device-mapping/") {
+							continue // drop per-key leaves so all fetches 404
+						}
+						m[k] = v
+					}
+					// Override listing to only contain unknown entries.
+					m["/2021-07-15/meta-data/block-device-mapping"] = "ghost0\nghost1"
+					return m
+				}(),
+			}).withDefaults(),
+			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+				s.Require().NotNil(info)
+				s.Nil(info.BlockDeviceMapping)
+			},
+		},
+		{
+			name: "public-keys listing without = delimiter + per-key 404",
+			opts: (&serverOpts{
+				responseMap: func() map[string]string {
+					m := make(map[string]string, len(ec2Responses))
+					for k, v := range ec2Responses {
+						m[k] = v
+					}
+					// First line has no `=` (idx = line), second line's leaf 404s.
+					m["/2021-07-15/meta-data/public-keys"] = "0\n1=phantom"
+					m["/2021-07-15/meta-data/public-keys/0/openssh-key"] = "ssh-rsa BARE"
+					// index "1" has no leaf in the map → 404
+					return m
+				}(),
+			}).withDefaults(),
+			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+				s.Require().NotNil(info)
+				s.Equal([]string{"ssh-rsa BARE"}, info.PublicKeys)
 			},
 		},
 		{
