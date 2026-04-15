@@ -94,6 +94,30 @@ type Info struct {
 	VirtualizationType string `json:"virtualization_type,omitempty"`
 	HypervisorVendor   string `json:"hypervisor_vendor,omitempty"`
 	DispatchingMode    string `json:"dispatching_mode,omitempty"` // s390x
+
+	// CPUs is the per-logical-CPU breakdown. Matters on hybrid-core
+	// architectures (Intel Alder Lake P+E, Apple Silicon P+E) where
+	// cores genuinely differ. Mirrors Ohai's `cpu["0"]`, `cpu["1"]`,
+	// ... entries — one CPU per processor line in /proc/cpuinfo.
+	CPUs []CPU `json:"cpus,omitempty"`
+}
+
+// CPU is one logical CPU's identity + topology placement. Fields
+// align with Ohai's `cpuinfo[current_cpu][...]` assignments in
+// parse_cpuinfo. On homogeneous systems every entry is identical
+// save PhysicalID / CoreID.
+type CPU struct {
+	VendorID   string   `json:"vendor_id,omitempty"`
+	Family     string   `json:"family,omitempty"`
+	Model      string   `json:"model,omitempty"`
+	ModelName  string   `json:"model_name,omitempty"`
+	Stepping   int32    `json:"stepping,omitempty"`
+	PhysicalID string   `json:"physical_id,omitempty"` // socket index
+	CoreID     string   `json:"core_id,omitempty"`     // physical core within socket
+	Cores      int32    `json:"cores,omitempty"`       // cores on this socket
+	Mhz        float64  `json:"mhz,omitempty"`
+	CacheSize  int32    `json:"cache_size,omitempty"`
+	Flags      []string `json:"flags,omitempty"`
 }
 
 // Caches carries the per-level cache sizes reported by `lscpu`. Strings
@@ -170,6 +194,22 @@ func readCPU(
 		info.Mhz = s.Mhz
 		info.CacheSize = s.CacheSize
 		info.Flags = s.Flags
+	}
+	info.CPUs = make([]CPU, 0, len(stats))
+	for _, s := range stats {
+		info.CPUs = append(info.CPUs, CPU{
+			VendorID:   s.VendorID,
+			Family:     s.Family,
+			Model:      s.Model,
+			ModelName:  s.ModelName,
+			Stepping:   s.Stepping,
+			PhysicalID: s.PhysicalID,
+			CoreID:     s.CoreID,
+			Cores:      s.Cores,
+			Mhz:        s.Mhz,
+			CacheSize:  s.CacheSize,
+			Flags:      s.Flags,
+		})
 	}
 	return info, nil
 }
