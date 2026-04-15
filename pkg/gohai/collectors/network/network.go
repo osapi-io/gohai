@@ -29,6 +29,7 @@ package network
 import (
 	"context"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -67,7 +68,53 @@ type Interface struct {
 	Addresses     []Address    `json:"addresses,omitempty"`
 	Routes        []Route      `json:"routes,omitempty"`
 	Counters      *Counters    `json:"counters,omitempty"`
-	Ethtool       *EthtoolInfo `json:"ethtool,omitempty"` // Linux only, when ethtool binary is on PATH
+	Ethtool       *EthtoolInfo `json:"ethtool,omitempty"`     // Linux only, when ethtool binary is on PATH
+	VLAN          *VLANInfo    `json:"vlan,omitempty"`        // VLAN tag + protocol + flags (Linux, ip -d link)
+	TunnelInfo    *TunnelInfo  `json:"tunnel_info,omitempty"` // ip6tnl / ipip tunnel metadata (Linux, ip -d link)
+	XDP           *XDPInfo     `json:"xdp,omitempty"`         // attached XDP program info (Linux, ip -d link)
+}
+
+// VLANInfo describes a VLAN sub-interface as reported by `ip -d link`.
+// Mirrors Ohai's `iface[:vlan]` Mash. Populated only on Linux for
+// interfaces created with the VLAN device type.
+type VLANInfo struct {
+	ID       string   `json:"id"`                 // 802.1Q tag, decimal
+	Protocol string   `json:"protocol,omitempty"` // "802.1Q" / "802.1ad" — present only on the protocol-qualified ip-link line
+	Flags    []string `json:"flags,omitempty"`    // REORDER_HDR / GVRP / LOOSE_BINDING
+}
+
+// TunnelInfo describes an IP-in-IP / IP6 tunnel as reported by
+// `ip -d link` for `ip6tnl` and `ipip` device types. Mirrors Ohai's
+// `iface[:tunnel_info]` Mash. All numeric fields stay as strings —
+// `ip` prints them as decimals but Ohai never converts.
+type TunnelInfo struct {
+	Proto       string `json:"proto,omitempty"` // any / ipip6 / ip6ip6
+	External    bool   `json:"external,omitempty"`
+	Remote      string `json:"remote,omitempty"`
+	Local       string `json:"local,omitempty"`
+	EncapLimit  string `json:"encaplimit,omitempty"`
+	HopLimit    string `json:"hoplimit,omitempty"`
+	TClass      string `json:"tclass,omitempty"`
+	Flowlabel   string `json:"flowlabel,omitempty"`
+	AddrGenMode string `json:"addrgenmode,omitempty"`
+	NumTxQueues string `json:"numtxqueues,omitempty"`
+	NumRxQueues string `json:"numrxqueues,omitempty"`
+	GsoMaxSize  string `json:"gso_max_size,omitempty"`
+	GsoMaxSegs  string `json:"gso_max_segs,omitempty"`
+}
+
+// XDPInfo carries any attached XDP (eXpress Data Path) programs
+// reported on the interface's ip-link block. Mirrors Ohai's
+// `iface[:xdp]`.
+type XDPInfo struct {
+	Attached []XDPProgram `json:"attached,omitempty"`
+}
+
+// XDPProgram describes one attached eBPF program.
+type XDPProgram struct {
+	Mode string `json:"mode"` // xdpdrv / xdpgeneric / xdpoffload / xdpmulti
+	ID   string `json:"id"`
+	Tag  string `json:"tag,omitempty"`
 }
 
 // EthtoolInfo holds data sourced from `ethtool` subcommands per
@@ -518,6 +565,247 @@ func ethtoolKey(
 	k = strings.ReplaceAll(k, " ", "_")
 	k = strings.ReplaceAll(k, "-", "_")
 	return k
+}
+
+// ipLinkHeaderRE matches the iface header line from `ip -d link`:
+//
+//	2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 ...
+//
+// Captures the interface index and name. Mirrors Ohai's
+// IPROUTE_INT_REGEX.
+var ipLinkHeaderRE = regexp.MustCompile(`^(\d+):\s+([^@:\s]+)`)
+
+// vlanIDRE matches a vlan tag with optional protocol qualifier.
+var (
+	vlanIDOnlyRE     = regexp.MustCompile(`vlan id (\d+)`)
+	vlanProtocolIDRE = regexp.MustCompile(`vlan protocol ([\w.]+) id (\d+)`)
+	vlanFlagsRE      = regexp.MustCompile(`(REORDER_HDR|GVRP|LOOSE_BINDING)`)
+)
+
+// xdpHeaderRE picks the per-interface XDP mode token from the prog
+// line; xdpAttachedRE pulls each attached program's id + tag.
+var (
+	xdpHeaderRE   = regexp.MustCompile(`\s(xdp|xdpgeneric|xdpoffload|xdpmulti)\s`)
+	xdpAttachedRE = regexp.MustCompile(`prog/(\w+) id (\d+) tag (\w+)`)
+)
+
+// tunnelHeaderRE matches the tunnel-type qualifier `ip` prints inside
+// the iface block (after the header line). Captures the tunnel kind
+// (ip6tnl / ipip).
+var tunnelHeaderRE = regexp.MustCompile(`^\s+(ip6tnl|ipip)\b`)
+
+// tunnelKVKeys is the set of `<word> <value>` keys Ohai pulls out of
+// the tunnel info line. Stored as a set for fast membership checks
+// inside parseIPLinkOutput.
+var tunnelKVKeys = map[string]struct{}{
+	"remote":       {},
+	"local":        {},
+	"encaplimit":   {},
+	"hoplimit":     {},
+	"tclass":       {},
+	"flowlabel":    {},
+	"addrgenmode":  {},
+	"numtxqueues":  {},
+	"numrxqueues":  {},
+	"gso_max_size": {},
+	"gso_max_segs": {},
+}
+
+// tunnelProtoValues are the bare-word `proto` values ip emits.
+var tunnelProtoValues = map[string]struct{}{
+	"any":    {},
+	"ipip6":  {},
+	"ip6ip6": {},
+}
+
+// parseIPLinkOutput walks `ip -d link` output and produces a
+// per-interface annotation map. Tracks the "current interface" across
+// lines (each interface is a header line followed by indented
+// continuation lines) and dispatches each continuation to the vlan /
+// tunnel / xdp branch when its line shape matches. Mirrors Ohai's
+// link_statistics state machine, scoped to the three signals the
+// ethtool family doesn't already cover.
+//
+// Per Ohai-parity observations:
+//
+//   - vlan flags come from a `vlan id N` line whose tail may carry
+//     REORDER_HDR / GVRP / LOOSE_BINDING tokens.
+//   - tunnel_info lines come from `ip -d link` only for ip6tnl/ipip
+//     device types (other tunnel kinds — gre, vxlan — are not in
+//     scope; Ohai doesn't parse them either).
+//   - xdp shows a header line announcing the mode (xdp /
+//     xdpgeneric / xdpoffload / xdpmulti) and one or more `prog/<m>
+//     id N tag X` continuation lines per attached program. The bare
+//     `xdp` mode token is normalized to `xdpdrv` when used as the
+//     attached mode (matches Ohai's "keeping mode as xdpdrv" rule).
+type ipLinkAnnotations struct {
+	VLAN       *VLANInfo
+	TunnelInfo *TunnelInfo
+	XDP        *XDPInfo
+}
+
+func parseIPLinkOutput(
+	raw []byte,
+) map[string]*ipLinkAnnotations {
+	out := map[string]*ipLinkAnnotations{}
+	var currentName string
+	var xdpMode string
+	for _, line := range strings.Split(string(raw), "\n") {
+		if m := ipLinkHeaderRE.FindStringSubmatch(line); m != nil {
+			currentName = m[2]
+			xdpMode = ""
+			continue
+		}
+		if currentName == "" {
+			continue
+		}
+		ann := out[currentName]
+		if ann == nil {
+			ann = &ipLinkAnnotations{}
+			out[currentName] = ann
+		}
+
+		switch {
+		case tunnelHeaderRE.MatchString(line):
+			ann.TunnelInfo = parseTunnelLine(line)
+		case strings.Contains(line, "vlan id ") ||
+			strings.Contains(line, "vlan protocol "):
+			ann.VLAN = parseVLANLine(line)
+		case strings.Contains(line, "xdp"):
+			parseXDPLine(line, ann, &xdpMode)
+		}
+	}
+	// Drop interfaces with no annotations so callers can range over a
+	// dense map instead of probing nil sub-fields.
+	for name, ann := range out {
+		if ann.VLAN == nil && ann.TunnelInfo == nil && ann.XDP == nil {
+			delete(out, name)
+		}
+	}
+	return out
+}
+
+// parseVLANLine extracts the VLAN id, protocol qualifier (when
+// present), and flag set. Returns nil only when neither match
+// regex fires (caller already gated on substring presence).
+func parseVLANLine(
+	line string,
+) *VLANInfo {
+	v := &VLANInfo{}
+	if m := vlanProtocolIDRE.FindStringSubmatch(line); m != nil {
+		v.Protocol = m[1]
+		v.ID = m[2]
+	} else if m := vlanIDOnlyRE.FindStringSubmatch(line); m != nil {
+		v.ID = m[1]
+	}
+	if v.ID == "" {
+		return nil
+	}
+	flags := vlanFlagsRE.FindAllString(line, -1)
+	if len(flags) > 0 {
+		seen := map[string]bool{}
+		for _, f := range flags {
+			if !seen[f] {
+				seen[f] = true
+				v.Flags = append(v.Flags, f)
+			}
+		}
+	}
+	return v
+}
+
+// parseTunnelLine walks the whitespace-tokenized words of an ip6tnl /
+// ipip continuation line, picking out the keys Ohai recognises.
+// Bareword tokens that match tunnelProtoValues become Proto;
+// `external` becomes External=true; anything in tunnelKVKeys takes
+// the next token as its value.
+func parseTunnelLine(
+	line string,
+) *TunnelInfo {
+	t := &TunnelInfo{}
+	words := strings.Fields(line)
+	for i, w := range words {
+		if w == "external" {
+			t.External = true
+			continue
+		}
+		if _, ok := tunnelProtoValues[w]; ok {
+			t.Proto = w
+			continue
+		}
+		if _, ok := tunnelKVKeys[w]; !ok {
+			continue
+		}
+		if i+1 >= len(words) {
+			continue
+		}
+		val := words[i+1]
+		switch w {
+		case "remote":
+			t.Remote = val
+		case "local":
+			t.Local = val
+		case "encaplimit":
+			t.EncapLimit = val
+		case "hoplimit":
+			t.HopLimit = val
+		case "tclass":
+			t.TClass = val
+		case "flowlabel":
+			t.Flowlabel = val
+		case "addrgenmode":
+			t.AddrGenMode = val
+		case "numtxqueues":
+			t.NumTxQueues = val
+		case "numrxqueues":
+			t.NumRxQueues = val
+		case "gso_max_size":
+			t.GsoMaxSize = val
+		case "gso_max_segs":
+			t.GsoMaxSegs = val
+		}
+	}
+	if *t == (TunnelInfo{}) {
+		return nil
+	}
+	return t
+}
+
+// parseXDPLine handles the two XDP line shapes: a mode-announcing
+// header and one or more `prog/<mode> id N tag X` attached-program
+// lines. xdpModeTracker carries the per-interface mode state across
+// the multiple lines of an XDP block (the prog line uses the bare
+// `xdp` token to mean "use the announced mode" — Ohai's
+// "keeping mode as xdpdrv" comment).
+func parseXDPLine(
+	line string,
+	ann *ipLinkAnnotations,
+	xdpMode *string,
+) {
+	if m := xdpHeaderRE.FindStringSubmatch(line); m != nil {
+		mode := m[1]
+		if mode == "xdp" {
+			mode = "xdpdrv"
+		}
+		*xdpMode = mode
+		if ann.XDP == nil {
+			ann.XDP = &XDPInfo{}
+		}
+	}
+	if m := xdpAttachedRE.FindStringSubmatch(line); m != nil {
+		mode := m[1]
+		if mode == "xdp" {
+			mode = *xdpMode
+		}
+		if ann.XDP == nil {
+			ann.XDP = &XDPInfo{}
+		}
+		ann.XDP.Attached = append(ann.XDP.Attached, XDPProgram{
+			Mode: mode,
+			ID:   m[2],
+			Tag:  m[3],
+		})
+	}
 }
 
 // stateFromFlags returns the admin state label (`"up"` / `"down"`)
