@@ -74,11 +74,44 @@ func (l *Linux) Collect(
 	info := &Info{Interfaces: ifs}
 	if l.Exec != nil {
 		applyRoutes(ctx, l.Exec, info)
+		applyEthtoolDriverInfo(ctx, l.Exec, info)
 	}
 	if entries, err := neighListFn(); err == nil {
 		info.Neighbours = entries
 	}
 	return info, nil
+}
+
+// applyEthtoolDriverInfo invokes `ethtool -i <iface>` per Ethernet
+// interface and attaches the parsed driver info under
+// `Interface.Ethtool.DriverInfo`. Mirrors Ohai's
+// ethernet_driver_info: only Ethernet-encapsulated interfaces are
+// queried (loopback, tunnels, etc. are skipped). ethtool failures —
+// binary missing, unsupported by the driver — silently leave Ethtool
+// nil for that interface; non-Ethernet hosts get no Ethtool data at
+// all, matching Ohai's behaviour.
+func applyEthtoolDriverInfo(
+	ctx context.Context,
+	exec executor.Executor,
+	info *Info,
+) {
+	for i := range info.Interfaces {
+		if info.Interfaces[i].Encapsulation != "Ethernet" {
+			continue
+		}
+		out, err := exec.Execute(ctx, "ethtool", "-i", info.Interfaces[i].Name)
+		if err != nil {
+			continue
+		}
+		di := parseEthtoolDriverInfo(out)
+		if len(di) == 0 {
+			continue
+		}
+		if info.Interfaces[i].Ethtool == nil {
+			info.Interfaces[i].Ethtool = &EthtoolInfo{}
+		}
+		info.Interfaces[i].Ethtool.DriverInfo = di
+	}
 }
 
 // applyNICStats merges per-interface link-layer detail. Speed +

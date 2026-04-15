@@ -152,6 +152,46 @@ func ipRouteExec(
 		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
 		Return(v6, v6Err).
 		AnyTimes()
+	// ethtool calls — default to "command not found" so existing tests
+	// that don't care about ethtool keep passing. Tests that exercise
+	// the ethtool path use ethtoolExec instead.
+	m.EXPECT().
+		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("ethtool: not found")).
+		AnyTimes()
+	return m
+}
+
+// ipRouteAndEthtoolExec extends ipRouteExec with a canned `ethtool -i
+// <iface>` response. driverInfo maps interface name → ethtool stdout;
+// missing interfaces fall back to the "not found" error.
+func ipRouteAndEthtoolExec(
+	t *testing.T,
+	driverInfo map[string]string,
+) executor.Executor {
+	ctrl := gomock.NewController(t)
+	m := execmocks.NewMockExecutor(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ethtool", "-i", gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			if len(args) < 2 {
+				return nil, errors.New("usage: ethtool -i <iface>")
+			}
+			out, ok := driverInfo[args[1]]
+			if !ok {
+				return nil, errors.New("ethtool: no such device")
+			}
+			return []byte(out), nil
+		}).
+		AnyTimes()
 	return m
 }
 
@@ -243,6 +283,70 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal(7, i.Interfaces[0].Number)
 				s.Equal("down", i.Interfaces[0].State)
+			},
+		},
+		{
+			name:       "linux: ethtool -i populates DriverInfo on Ethernet interfaces only",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/lo/type":   "772\n", // Loopback
+				"/sys/class/net/eth0/type": "1\n",   // Ethernet
+			}),
+			exec: ipRouteAndEthtoolExec(s.T(), map[string]string{
+				"eth0": "driver: e1000e\n" +
+					"version: 5.15.0-91-generic\n" +
+					"firmware-version: 0.13-4\n" +
+					"bus-info: 0000:00:19.0\n" +
+					"supports-statistics: yes\n" +
+					"supports-priv-flags: no\n",
+			}),
+			validate: func(i *network.Info) {
+				s.Require().Len(i.Interfaces, 2)
+
+				// lo is Loopback — ethtool path skipped.
+				s.Nil(i.Interfaces[0].Ethtool)
+
+				// eth0 is Ethernet — DriverInfo populated.
+				s.Require().NotNil(i.Interfaces[1].Ethtool)
+				di := i.Interfaces[1].Ethtool.DriverInfo
+				s.Equal("e1000e", di["driver"])
+				s.Equal("5.15.0-91-generic", di["version"])
+				// hyphens in source keys translated to underscores
+				s.Equal("0.13-4", di["firmware_version"])
+				s.Equal("0000:00:19.0", di["bus_info"])
+				s.Equal("yes", di["supports_statistics"])
+				s.Equal("no", di["supports_priv_flags"])
+			},
+		},
+		{
+			name:       "linux: ethtool -i error skipped silently, Ethtool stays nil",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/eth0/type": "1\n",
+			}),
+			exec: ipRouteAndEthtoolExec(s.T(), nil), // no driver_info → all ethtool calls error
+			validate: func(i *network.Info) {
+				s.Require().Len(i.Interfaces, 2)
+				s.Nil(i.Interfaces[0].Ethtool)
+				s.Nil(i.Interfaces[1].Ethtool)
+			},
+		},
+		{
+			name:       "linux: ethtool empty output yields nil DriverInfo",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/eth0/type": "1\n",
+			}),
+			exec: ipRouteAndEthtoolExec(s.T(), map[string]string{
+				// whitespace-only lines + a colon-only line — exercises both
+				// the "no colon" continue and the "empty key" continue.
+				"eth0": "\n   \n: only-value\n",
+			}),
+			validate: func(i *network.Info) {
+				s.Nil(i.Interfaces[1].Ethtool)
 			},
 		},
 		{
