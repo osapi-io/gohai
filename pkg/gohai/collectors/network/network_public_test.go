@@ -159,11 +159,13 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 	canonicalInterfaces := func(context.Context) (gpnet.InterfaceStatList, error) {
 		return gpnet.InterfaceStatList{
 			{
-				Name: "lo", MTU: 65536, Flags: []string{"up", "loopback"},
+				Index: 1,
+				Name:  "lo", MTU: 65536, Flags: []string{"up", "loopback"},
 				Addrs: gpnet.InterfaceAddrList{{Addr: "127.0.0.1/8"}, {Addr: "::1/128"}},
 			},
 			{
-				Name: "eth0", MTU: 1500, HardwareAddr: "02:42:ac:11:00:02",
+				Index: 2,
+				Name:  "eth0", MTU: 1500, HardwareAddr: "02:42:ac:11:00:02",
 				Flags: []string{"up", "broadcast", "multicast"},
 				Addrs: gpnet.InterfaceAddrList{
 					{Addr: "10.0.0.5/24"},
@@ -171,6 +173,16 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					{Addr: "not-a-cidr"},
 				},
 			},
+		}, nil
+	}
+	adminDownInterfaces := func(context.Context) (gpnet.InterfaceStatList, error) {
+		return gpnet.InterfaceStatList{
+			{
+				Index: 7,
+				Name:  "eth7",
+				MTU:   1500,
+				Flags: []string{"broadcast"},
+			}, // no "up" → admin-down
 		}, nil
 	}
 	zeroCounters := func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
@@ -200,6 +212,8 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Interfaces, 2)
 				lo := i.Interfaces[0]
 				s.Equal("Loopback", lo.Encapsulation)
+				s.Equal(1, lo.Number)
+				s.Equal("up", lo.State)
 				s.Require().Len(lo.Addresses, 2)
 				s.Equal("inet", lo.Addresses[0].Family)
 				s.Equal(8, lo.Addresses[0].Prefixlen)
@@ -209,12 +223,26 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 
 				eth0 := i.Interfaces[1]
 				s.Equal("Ethernet", eth0.Encapsulation)
+				s.Equal(2, eth0.Number)
+				s.Equal("up", eth0.State)
 				// "not-a-cidr" silently skipped → 2 addresses parsed.
 				s.Require().Len(eth0.Addresses, 2)
 				s.Equal("Global", eth0.Addresses[0].Scope)
 				s.Equal("255.255.255.0", eth0.Addresses[0].Netmask)
 				s.Equal("10.0.0.255", eth0.Addresses[0].Broadcast)
 				s.Equal("Link", eth0.Addresses[1].Scope)
+			},
+		},
+		{
+			name:       "linux: admin-down interface reports state=down",
+			ifsFn:      adminDownInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec:       ipRouteExec(s.T(), nil, errors.New("n/a"), nil, errors.New("n/a")),
+			validate: func(i *network.Info) {
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal(7, i.Interfaces[0].Number)
+				s.Equal("down", i.Interfaces[0].State)
 			},
 		},
 		{

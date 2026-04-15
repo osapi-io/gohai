@@ -55,6 +55,8 @@ type Info struct {
 // Interface describes a single network interface.
 type Interface struct {
 	Name          string    `json:"name"`
+	Number        int       `json:"number,omitempty"` // kernel interface index (Ohai: iface[:number])
+	State         string    `json:"state,omitempty"`  // admin state: "up" | "down" (Ohai: iface["state"])
 	MTU           int       `json:"mtu"`
 	HardwareAddr  string    `json:"hardware_addr,omitempty"` // OCSF: network_interface.mac
 	Encapsulation string    `json:"encapsulation,omitempty"` // canonical: Ethernet / Loopback / PPP / SLIP / IPIP / 6to4
@@ -163,6 +165,8 @@ func readInterfaces(
 	for _, i := range ifs {
 		item := Interface{
 			Name:         i.Name,
+			Number:       i.Index,
+			State:        stateFromFlags(i.Flags),
 			MTU:          i.MTU,
 			HardwareAddr: i.HardwareAddr,
 			Flags:        i.Flags,
@@ -232,6 +236,21 @@ func scopeOf(
 		return "Link"
 	}
 	return "Global"
+}
+
+// stateFromFlags returns the admin state label (`"up"` / `"down"`)
+// mirroring Ohai's `iface["state"]` (which reads from `ip link show`).
+// gopsutil lowercases the `up` flag, so a simple membership check is
+// enough; absence means the kernel has the interface admin-down.
+func stateFromFlags(
+	flags []string,
+) string {
+	for _, f := range flags {
+		if strings.EqualFold(f, "up") {
+			return "up"
+		}
+	}
+	return "down"
 }
 
 // arphrdEncapsulation maps the ARPHRD_* integer (read from

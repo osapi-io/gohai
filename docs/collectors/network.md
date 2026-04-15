@@ -42,6 +42,8 @@ Per interface:
 | Field           | Type      | Description                                                                                                 | Schema mapping            |
 | --------------- | --------- | ----------------------------------------------------------------------------------------------------------- | ------------------------- |
 | `name`          | string    | Interface name (`eth0`, `en0`, `lo`).                                                                       | `network_interface.name`. |
+| `number`        | int       | Kernel interface index (`ip link show` column 1). Mirrors Ohai `iface[:number]`.                            | No direct schema mapping. |
+| `state`         | string    | Admin state (`"up"` / `"down"`) derived from the `up` flag. Mirrors Ohai `iface["state"]`.                  | No direct schema mapping. |
 | `mtu`           | int       | Maximum transmission unit (bytes).                                                                          | No direct schema mapping. |
 | `hardware_addr` | string    | MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                    | `network_interface.mac`.  |
 | `encapsulation` | string    | Canonical encapsulation: `Ethernet` / `Loopback` / `PPP` / `SLIP` / `IPIP` / `6to4` / `VJSLIP`. Linux only. | No direct schema mapping. |
