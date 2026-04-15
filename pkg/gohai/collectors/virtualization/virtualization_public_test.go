@@ -358,13 +358,32 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["openvz"]) },
 		},
 		{
-			name:    "linux: hyperv guest via kvp_pool_3",
+			name:    "linux: hyperv guest via kvp_pool_3 with hypervisor_host extraction",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/var/lib/hyperv/.kvp_pool_3": ""})
+				// KVP pool blob — Ohai scans for printable bytes between
+				// "HostName" and "HostingSystemEditionId". Embed NULs and
+				// mixed case so printable-filter + lowercasing both run.
+				blob := "junk\x00HostName\x00\x00HyperV-Host-01\x00\x00HostingSystemEditionId\x00more"
+				return fsWith(s.T(), map[string]string{"/var/lib/hyperv/.kvp_pool_3": blob})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["hyperv"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) {
+				s.Equal("guest", i.Systems["hyperv"])
+				s.Equal("hyperv-host-01", i.HypervisorHost)
+			},
+		},
+		{
+			name:    "linux: hyperv kvp_pool_3 without HostName leaves hypervisor_host empty",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{"/var/lib/hyperv/.kvp_pool_3": "empty-pool"})
+			},
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) {
+				s.Equal("guest", i.Systems["hyperv"])
+				s.Empty(i.HypervisorHost)
+			},
 		},
 		{
 			name:    "linux: linux-vserver host via s_context: 0",

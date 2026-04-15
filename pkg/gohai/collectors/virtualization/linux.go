@@ -128,9 +128,13 @@ func cascadeLinux(
 		addSystem(info, "openvz", "guest", false)
 	}
 
-	// 10. Hyper-V KVP.
-	if fileExists(fs, "/var/lib/hyperv/.kvp_pool_3") {
+	// 10. Hyper-V KVP. When we see the pool file, extract the host
+	// name between "HostName" and "HostingSystemEditionId" — matches
+	// Ohai's linux/virtualization.rb extraction. Keeps Raw printable
+	// bytes only and lowercases, same as Ohai's behaviour.
+	if b, err := fs.ReadFile("/var/lib/hyperv/.kvp_pool_3"); err == nil {
 		addSystem(info, "hyperv", "guest", false)
+		info.HypervisorHost = parseHypervKVPHostName(b)
 	}
 
 	// 11. linux-vserver.
@@ -296,4 +300,31 @@ func execBinaryOnPath(
 	}
 	_, err := exec.Execute(ctx, "command", "-v", name)
 	return err == nil
+}
+
+// hypervKVPHostRE matches the HostName → HostingSystemEditionId span
+// Ohai uses. The Hyper-V KVP pool file is a binary blob with embedded
+// NULs; Ohai keeps only printable bytes from the match and lowercases.
+var hypervKVPHostRE = regexp.MustCompile(`HostName([\s\S]*?)HostingSystemEditionId`)
+
+// parseHypervKVPHostName extracts the hypervisor hostname from a
+// /var/lib/hyperv/.kvp_pool_3 blob. Matches Ohai's linux/virtualization.rb
+// extraction exactly: regex between `HostName` and `HostingSystemEditionId`,
+// keep printable ASCII bytes only, lowercase. Returns "" when the pool
+// doesn't carry the HostName key (rare but possible on non-Hyper-V
+// hypervisors that create the file).
+func parseHypervKVPHostName(
+	b []byte,
+) string {
+	m := hypervKVPHostRE.FindSubmatch(b)
+	if m == nil {
+		return ""
+	}
+	var out []byte
+	for _, c := range m[1] {
+		if c >= 0x20 && c < 0x7f {
+			out = append(out, c)
+		}
+	}
+	return strings.ToLower(string(out))
 }
