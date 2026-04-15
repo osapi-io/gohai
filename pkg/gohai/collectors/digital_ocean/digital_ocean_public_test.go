@@ -51,6 +51,9 @@ const cannedResponse = `{
   "features": ["dhcp_enabled"],
   "vendor_data": "#cloud-config\nsecret: dropped",
   "floating_ip": {"ipv4": {"ip_address": "138.1.2.3"}},
+  "reserved_ip": {"ipv4": {"ip_address": "162.1.2.3"}},
+  "auth_key": "secret-auth-token",
+  "user_data": "#cloud-config\nhostname: web-1",
   "dns": {"nameservers": ["67.207.67.2", "67.207.67.3"]},
   "interfaces": {
     "public": [{
@@ -122,6 +125,9 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 				s.Equal([]string{"dhcp_enabled"}, info.Features)
 				s.Equal([]string{"ssh-rsa AAAA..."}, info.PublicKeys)
 				s.Equal("138.1.2.3", info.FloatingIP)
+				s.Equal("162.1.2.3", info.ReservedIP)
+				s.Equal("secret-auth-token", info.AuthKey)
+				s.Equal("#cloud-config\nhostname: web-1", info.UserData)
 				s.Equal([]string{"67.207.67.2", "67.207.67.3"}, info.IPv4NS)
 
 				s.Require().Len(info.Interfaces, 2)
