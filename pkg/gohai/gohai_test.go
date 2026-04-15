@@ -33,6 +33,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
 	kernelmodules "github.com/osapi-io/gohai/pkg/gohai/collectors/kernel_modules"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
@@ -230,6 +231,21 @@ func (s *GohaiTestSuite) TestFactsSet() {
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.KernelModules) },
 		},
 		{
+			name:  "gpu populates Facts.GPU",
+			key:   "gpu",
+			value: &gpu.Info{Cards: []gpu.Card{{Model: "M1"}}},
+			verify: func(s *GohaiTestSuite, f *Facts) {
+				s.Require().NotNil(f.GPU)
+				s.Equal("M1", f.GPU.Cards[0].Model)
+			},
+		},
+		{
+			name:   "gpu wrong type ignored",
+			key:    "gpu",
+			value:  "x",
+			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.GPU) },
+		},
+		{
 			name:  "dmi populates Facts.DMI",
 			key:   "dmi",
 			value: &dmi.Info{Product: &dmi.Product{Name: "Google Compute Engine"}},
@@ -292,6 +308,7 @@ func (s *GohaiTestSuite) TestFactsCountPopulated() {
 		{"openstack", &Facts{OpenStack: &openstack.Info{}}, 1},
 		{"scaleway", &Facts{Scaleway: &scaleway.Info{}}, 1},
 		{"kernel_modules", &Facts{KernelModules: &kernelmodules.Info{}}, 1},
+		{"gpu", &Facts{GPU: &gpu.Info{}}, 1},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
