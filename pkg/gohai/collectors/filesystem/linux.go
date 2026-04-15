@@ -63,17 +63,24 @@ func (l *Linux) Collect(
 	if l.Exec == nil {
 		return info, nil
 	}
+
+	// lsblk enrichment — best-effort; non-fatal on failure.
 	out, err := l.Exec.Execute(ctx,
 		"lsblk", "-J", "-o", "NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL")
-	if err != nil {
-		return info, nil
+	if err == nil {
+		if entries, err := parseLsblk(out); err == nil {
+			merged, unmounted := mergeLsblkIntoMounts(info.Mounts, entries)
+			info.Mounts = merged
+			info.Unmounted = unmounted
+		}
 	}
-	entries, err := parseLsblk(out)
-	if err != nil {
-		return info, nil
+
+	// ZFS enumeration — independent of lsblk; only fires when the
+	// `zfs` binary is on PATH. Any exec failure (binary missing,
+	// permission denied, module not loaded) silently skips this
+	// section, so non-ZFS hosts return zero ZFS datasets with no error.
+	if out, err := l.Exec.Execute(ctx, "zfs", "get", "-p", "-H", "all"); err == nil {
+		info.ZFSDatasets = parseZFSGetAll(out)
 	}
-	merged, unmounted := mergeLsblkIntoMounts(info.Mounts, entries)
-	info.Mounts = merged
-	info.Unmounted = unmounted
 	return info, nil
 }

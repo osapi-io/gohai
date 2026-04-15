@@ -27,6 +27,7 @@ package filesystem
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/shirou/gopsutil/v4/disk"
 
@@ -35,10 +36,49 @@ import (
 )
 
 // Info holds filesystem data: the active mount table plus (Linux only)
-// any block devices with a filesystem but no active mountpoint.
+// any block devices with a filesystem but no active mountpoint, and
+// (Linux only, when `zfs` is on PATH) every ZFS dataset reported by
+// `zfs get -p -H all`.
 type Info struct {
-	Mounts    []Mount      `json:"mounts"`
-	Unmounted []Filesystem `json:"unmounted,omitempty"`
+	Mounts      []Mount      `json:"mounts"`
+	Unmounted   []Filesystem `json:"unmounted,omitempty"`
+	ZFSDatasets []ZFSDataset `json:"zfs_datasets,omitempty"`
+}
+
+// ZFSDataset describes one ZFS dataset — a filesystem, volume,
+// snapshot, or bookmark the kernel's ZFS module knows about.
+// Populated by the Linux variant when the `zfs` binary is on PATH;
+// mirrors Ohai's `zfs_properties` / `zfs_parents` / `zfs_zpool` keys.
+type ZFSDataset struct {
+	// Name is the full dataset path: "tank", "tank/home", "tank/home/john".
+	Name string `json:"name"`
+	// Mountpoint is the dataset's mount path if the `mountpoint`
+	// property is set to a real path. Empty when the dataset is a
+	// snapshot, a volume, or has `mountpoint=none` / `legacy`.
+	Mountpoint string `json:"mountpoint,omitempty"`
+	// IsPool reports whether this dataset IS a zpool root (no slash
+	// in the name — no proper ancestors). Matches Ohai's
+	// `zfs_zpool` boolean.
+	IsPool bool `json:"is_pool,omitempty"`
+	// Parents holds every proper ancestor dataset path, shallowest
+	// first. E.g. "tank/a/b" → ["tank", "tank/a"]. Matches Ohai's
+	// `zfs_parents`.
+	Parents []string `json:"parents,omitempty"`
+	// Properties is the full property set from `zfs get all`.
+	// Keys are property names (e.g. "compression", "quota", "used").
+	// Values carry both the property value and the source (local /
+	// default / inherited from X / received / "-").
+	Properties map[string]ZFSProperty `json:"properties,omitempty"`
+}
+
+// ZFSProperty is one entry from `zfs get` — a property's value plus
+// its source annotation. Source is `"-"` when the property has no
+// source (read-only properties), `"default"` for kernel defaults,
+// `"local"` for properties set directly on the dataset, or
+// `"inherited from <ancestor>"` when inherited.
+type ZFSProperty struct {
+	Value  string `json:"value"`
+	Source string `json:"source,omitempty"`
 }
 
 // Mount represents a single mounted filesystem.
@@ -203,6 +243,75 @@ type lsblkEntry struct {
 	Mountpoint string
 	PartUUID   string
 	PartLabel  string
+}
+
+// parseZFSGetAll parses tab-separated `zfs get -p -H all` output into
+// a flat slice of ZFSDataset. Format per line:
+//
+//	<name>\t<property>\t<value>\t<source>
+//
+// Lines that don't match are skipped. Datasets are emitted in the
+// order they first appeared in the output, so consumers iterating the
+// slice see pool roots before their children (zfs get's natural
+// output order).
+//
+// The parser preserves Ohai's computed fields:
+//   - Mountpoint is lifted from the `mountpoint` property when the
+//     value is an absolute path (ignores `none` / `legacy` / `-`).
+//   - Parents enumerates proper ancestor paths (ohai zfs_parents).
+//   - IsPool is true when the dataset name has no `/` (ohai zfs_zpool).
+func parseZFSGetAll(
+	raw []byte,
+) []ZFSDataset {
+	byName := map[string]*ZFSDataset{}
+	order := []string{}
+	for _, line := range strings.Split(string(raw), "\n") {
+		fields := strings.Split(strings.TrimRight(line, "\r"), "\t")
+		if len(fields) != 4 {
+			continue
+		}
+		name, property, value, source := fields[0], fields[1], fields[2], fields[3]
+		if name == "" || property == "" {
+			continue
+		}
+		ds, ok := byName[name]
+		if !ok {
+			ds = &ZFSDataset{
+				Name:       name,
+				Properties: map[string]ZFSProperty{},
+				IsPool:     !strings.Contains(name, "/"),
+				Parents:    zfsParentsOf(name),
+			}
+			byName[name] = ds
+			order = append(order, name)
+		}
+		ds.Properties[property] = ZFSProperty{Value: value, Source: source}
+		if property == "mountpoint" && strings.HasPrefix(value, "/") {
+			ds.Mountpoint = value
+		}
+	}
+	out := make([]ZFSDataset, 0, len(order))
+	for _, n := range order {
+		out = append(out, *byName[n])
+	}
+	return out
+}
+
+// zfsParentsOf returns the proper-ancestor dataset paths of name,
+// shallowest first. "tank/a/b" → ["tank", "tank/a"]; "tank" → nil.
+// Matches Ohai's zfs_parents computation (parents.pop at the end).
+func zfsParentsOf(
+	name string,
+) []string {
+	parts := strings.Split(name, "/")
+	if len(parts) <= 1 {
+		return nil
+	}
+	out := make([]string, 0, len(parts)-1)
+	for i := 1; i < len(parts); i++ {
+		out = append(out, strings.Join(parts[:i], "/"))
+	}
+	return out
 }
 
 // mergeLsblkIntoMounts enriches the mount table with UUID/label from
