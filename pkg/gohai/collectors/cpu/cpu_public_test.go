@@ -258,14 +258,33 @@ func (s *CPUPublicTestSuite) TestCollect() {
 			fs:       newVulnFS(s, nil),
 			exec: func(t *testing.T) executor.Executor {
 				return lscpuExec(t, `Architecture:        x86_64
+CPU op-mode(s):      32-bit, 64-bit
+Byte Order:          Little Endian
+Address sizes:       46 bits physical, 48 bits virtual
+CPU(s):              16
+On-line CPU(s) list: 0-15
+Off-line CPU(s) list: 16-31
 Socket(s):           1
 Core(s) per socket:  8
 Thread(s) per core:  2
+Vendor ID:           GenuineIntel
+BIOS Vendor ID:      Dell Inc.
+BIOS Model name:     PowerEdge R750
+CPU max MHz:         3200.0000
+CPU min MHz:         800.0000
+CPU dynamic MHz:     2400
+BogoMIPS:            4600.00
+Virtualization:      VT-x
+Virtualization type: full
+Hypervisor vendor:   KVM
 L1d cache:           32 KiB
 L1i cache:           32 KiB
 L2 cache:            256 KiB
+L2d cache:           128 KiB
+L2i cache:           128 KiB
 L3 cache:            25 MiB
-NUMA node(s):        1
+L4 cache:            128 MiB
+NUMA node(s):        2
 NUMA node0 CPU(s):   0-15
 `)
 			},
@@ -274,12 +293,53 @@ NUMA node0 CPU(s):   0-15
 				s.Equal("32 KiB", i.Caches.L1d)
 				s.Equal("32 KiB", i.Caches.L1i)
 				s.Equal("256 KiB", i.Caches.L2)
+				s.Equal("128 KiB", i.Caches.L2d)
+				s.Equal("128 KiB", i.Caches.L2i)
 				s.Equal("25 MiB", i.Caches.L3)
+				s.Equal("128 MiB", i.Caches.L4)
 				s.Require().NotNil(i.NumaNodes)
 				s.Equal([]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, i.NumaNodes[0])
+				s.Equal(2, i.NumaNodesCount)
+				s.Equal(16, i.CPUsOnline)
+				s.Equal(16, i.CPUsOffline)
+				s.Equal("Dell Inc.", i.BIOSVendorID)
+				s.Equal("PowerEdge R750", i.BIOSModelName)
+				s.Equal("3200.0000", i.MhzMax)
+				s.Equal("800.0000", i.MhzMin)
+				s.Equal("2400", i.MhzDynamic)
+				s.Equal("4600.00", i.Bogomips)
+				s.Equal([]string{"32-bit", "64-bit"}, i.CPUOpmodes)
+				s.Equal("little endian", i.ByteOrder)
+				s.Equal([]string{"46 bits physical", "48 bits virtual"}, i.AddressSizes)
+				s.Equal("VT-x", i.Virtualization)
+				s.Equal("full", i.VirtualizationType)
+				s.Equal("KVM", i.HypervisorVendor)
 				s.Equal(16, i.Count)
 				s.Equal(8, i.Cores)
 				s.Equal(1, i.Sockets)
+			},
+		},
+		{
+			name:     "linux: s390x lscpu populates machine_type + dispatching_mode",
+			variant:  "linux",
+			infoFn:   onecoreInfo,
+			countsFn: onecoreCounts,
+			fs:       newVulnFS(s, nil),
+			exec: func(t *testing.T) executor.Executor {
+				return lscpuExec(t, `Architecture:        s390x
+Machine type:        3906
+Dispatching mode:    horizontal
+Thread(s) per core:  1
+Core(s) per socket:  3
+Socket(s) per book:  2
+Book(s) per drawer:  2
+Drawer(s):           2
+`)
+			},
+			validate: func(i *cpu.Info) {
+				s.Equal("3906", i.MachineType)
+				s.Equal("horizontal", i.DispatchingMode)
+				s.Equal(24, i.Count)
 			},
 		},
 		{
@@ -320,6 +380,19 @@ Socket(s):           2
 				s.Equal(160, i.Count)
 				s.Equal(40, i.Cores)
 				s.Equal(2, i.Sockets)
+			},
+		},
+		{
+			name:     "linux: lscpu whitespace-only CPU op-mode(s) leaves slice nil",
+			variant:  "linux",
+			infoFn:   linuxBaseInfo,
+			countsFn: linuxBaseCounts,
+			fs:       newVulnFS(s, nil),
+			exec: func(t *testing.T) executor.Executor {
+				return lscpuExec(t, "CPU op-mode(s):      ,   ,\n")
+			},
+			validate: func(i *cpu.Info) {
+				s.Nil(i.CPUOpmodes)
 			},
 		},
 		{
