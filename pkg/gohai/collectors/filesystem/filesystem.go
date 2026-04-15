@@ -43,21 +43,22 @@ type Info struct {
 
 // Mount represents a single mounted filesystem.
 type Mount struct {
-	Device      string   `json:"device"`
-	Mountpoint  string   `json:"mountpoint"`
-	Fstype      string   `json:"fstype"`
-	Opts        []string `json:"opts,omitempty"`
-	Total       uint64   `json:"total,omitempty"`
-	Used        uint64   `json:"used,omitempty"`
-	Free        uint64   `json:"free,omitempty"`
-	UsedPercent float64  `json:"used_percent,omitempty"`
-	InodesTotal uint64   `json:"inodes_total,omitempty"`
-	InodesUsed  uint64   `json:"inodes_used,omitempty"`
-	InodesFree  uint64   `json:"inodes_free,omitempty"`
-	UUID        string   `json:"uuid,omitempty"`       // filesystem UUID from lsblk
-	Label       string   `json:"label,omitempty"`      // filesystem label from lsblk
-	PartUUID    string   `json:"part_uuid,omitempty"`  // GPT partition UUID from lsblk
-	PartLabel   string   `json:"part_label,omitempty"` // GPT partition label from lsblk
+	Device            string   `json:"device"`
+	Mountpoint        string   `json:"mountpoint"`
+	Fstype            string   `json:"fstype"`
+	Opts              []string `json:"opts,omitempty"`
+	Total             uint64   `json:"total,omitempty"`
+	Used              uint64   `json:"used,omitempty"`
+	Free              uint64   `json:"free,omitempty"`
+	UsedPercent       float64  `json:"used_percent,omitempty"`
+	InodesTotal       uint64   `json:"inodes_total,omitempty"`
+	InodesUsed        uint64   `json:"inodes_used,omitempty"`
+	InodesFree        uint64   `json:"inodes_free,omitempty"`
+	InodesUsedPercent float64  `json:"inodes_used_percent,omitempty"`
+	UUID              string   `json:"uuid,omitempty"`       // filesystem UUID from lsblk
+	Label             string   `json:"label,omitempty"`      // filesystem label from lsblk
+	PartUUID          string   `json:"part_uuid,omitempty"`  // GPT partition UUID from lsblk
+	PartLabel         string   `json:"part_label,omitempty"` // GPT partition label from lsblk
 }
 
 // Filesystem describes a block device with a filesystem that isn't
@@ -129,6 +130,7 @@ func listMounts(
 			m.InodesTotal = u.InodesTotal
 			m.InodesUsed = u.InodesUsed
 			m.InodesFree = u.InodesFree
+			m.InodesUsedPercent = u.InodesUsedPercent
 		}
 		out = append(out, m)
 	}

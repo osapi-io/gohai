@@ -26,23 +26,24 @@ fields but keep the mount in the output.
 
 Top level: `mounts: []Mount`, plus (Linux only) `unmounted: []Filesystem`.
 
-| Field per mount | Type     | Description                                 | Schema mapping                            |
-| --------------- | -------- | ------------------------------------------- | ----------------------------------------- |
-| `device`        | string   | Block-device path (`/dev/sda1`).            | OCSF `device.path`.                       |
-| `mountpoint`    | string   | Mount path (`/`, `/boot`).                  | Nearest: OCSF `file.path` (event-scoped). |
-| `fstype`        | string   | Filesystem type (`ext4`, `xfs`, `apfs`).    | No direct schema mapping.                 |
-| `opts`          | []string | Mount options (`rw`, `relatime`, `nosuid`). | No direct schema mapping.                 |
-| `total`         | uint64   | Total bytes.                                | No direct schema mapping.                 |
-| `used`          | uint64   | Used bytes.                                 | No direct schema mapping.                 |
-| `free`          | uint64   | Free bytes.                                 | No direct schema mapping.                 |
-| `used_percent`  | float64  | Percent used (0–100).                       | No direct schema mapping.                 |
-| `inodes_total`  | uint64   | Total inodes.                               | No direct schema mapping.                 |
-| `inodes_used`   | uint64   | Used inodes.                                | No direct schema mapping.                 |
-| `inodes_free`   | uint64   | Free inodes.                                | No direct schema mapping.                 |
-| `uuid`          | string   | Filesystem UUID from `lsblk`.               | OCSF `device.uid`.                        |
-| `label`         | string   | Filesystem label from `lsblk`.              | No direct schema mapping.                 |
-| `part_uuid`     | string   | GPT partition UUID from `lsblk`.            | No direct schema mapping.                 |
-| `part_label`    | string   | GPT partition label from `lsblk`.           | No direct schema mapping.                 |
+| Field per mount       | Type     | Description                                 | Schema mapping                            |
+| --------------------- | -------- | ------------------------------------------- | ----------------------------------------- |
+| `device`              | string   | Block-device path (`/dev/sda1`).            | OCSF `device.path`.                       |
+| `mountpoint`          | string   | Mount path (`/`, `/boot`).                  | Nearest: OCSF `file.path` (event-scoped). |
+| `fstype`              | string   | Filesystem type (`ext4`, `xfs`, `apfs`).    | No direct schema mapping.                 |
+| `opts`                | []string | Mount options (`rw`, `relatime`, `nosuid`). | No direct schema mapping.                 |
+| `total`               | uint64   | Total bytes.                                | No direct schema mapping.                 |
+| `used`                | uint64   | Used bytes.                                 | No direct schema mapping.                 |
+| `free`                | uint64   | Free bytes.                                 | No direct schema mapping.                 |
+| `used_percent`        | float64  | Percent used (0–100).                       | No direct schema mapping.                 |
+| `inodes_total`        | uint64   | Total inodes.                               | No direct schema mapping.                 |
+| `inodes_used`         | uint64   | Used inodes.                                | No direct schema mapping.                 |
+| `inodes_free`         | uint64   | Free inodes.                                | No direct schema mapping.                 |
+| `inodes_used_percent` | float64  | Inodes used as a percentage (0–100).        | No direct schema mapping.                 |
+| `uuid`                | string   | Filesystem UUID from `lsblk`.               | OCSF `device.uid`.                        |
+| `label`               | string   | Filesystem label from `lsblk`.              | No direct schema mapping.                 |
+| `part_uuid`           | string   | GPT partition UUID from `lsblk`.            | No direct schema mapping.                 |
+| `part_label`          | string   | GPT partition label from `lsblk`.           | No direct schema mapping.                 |
 
 Top-level `unmounted[]` (Linux only): block devices that `lsblk` reports with a
 non-empty filesystem type and empty mountpoint. Each entry carries `device`,
