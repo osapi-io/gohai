@@ -124,7 +124,16 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 	}
 	okUsage := func(_ context.Context, mp string) (*gpdisk.UsageStat, error) {
 		if mp == "/" {
-			return &gpdisk.UsageStat{Total: 100, Used: 50, Free: 50, UsedPercent: 50}, nil
+			return &gpdisk.UsageStat{
+				Total:             100,
+				Used:              50,
+				Free:              50,
+				UsedPercent:       50,
+				InodesTotal:       1000,
+				InodesUsed:        250,
+				InodesFree:        750,
+				InodesUsedPercent: 25,
+			}, nil
 		}
 		return &gpdisk.UsageStat{}, nil
 	}
@@ -162,6 +171,8 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Len(i.Mounts, 2)
 				s.Empty(i.Unmounted)
 				s.Equal("", i.Mounts[0].UUID)
+				s.Equal(uint64(1000), i.Mounts[0].InodesTotal)
+				s.Equal(float64(25), i.Mounts[0].InodesUsedPercent)
 			},
 		},
 		{
