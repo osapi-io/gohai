@@ -88,12 +88,57 @@ type Info struct {
 	FreeformTags        map[string]string `json:"freeform_tags,omitempty"`
 	RegionInfo          *RegionInfo       `json:"region_info,omitempty"`
 
+	// Agent + availability + lifecycle.
+	AgentConfig        *AgentConfig        `json:"agent_config,omitempty"`
+	AvailabilityConfig *AvailabilityConfig `json:"availability_config,omitempty"`
+	InstancePoolID     string              `json:"instance_pool_id,omitempty"`
+	DedicatedVMHostID  string              `json:"dedicated_vm_host_id,omitempty"`
+
+	// Launch-time configuration (boot volume, firmware, IMDS encryption).
+	LaunchOptions  *LaunchOptions `json:"launch_options,omitempty"`
+	SourceDetails  *SourceDetails `json:"source_details,omitempty"`
+	PlatformConfig map[string]any `json:"platform_config,omitempty"`
+
 	// From /vnics — virtual NICs.
 	VNICs []VNIC `json:"vnics,omitempty"`
 
 	// From /allVolumeAttachments. Keyed by attachment OCID to match
 	// Ohai's metadata.volumes[<id>] = v shape.
 	VolumeAttachments map[string]VolumeAttachment `json:"volume_attachments,omitempty"`
+}
+
+// AgentConfig carries the Oracle Cloud Agent's enablement state and
+// plugin toggles. Populated from compute.agentConfig.
+type AgentConfig struct {
+	IsManagementDisabled bool `json:"is_management_disabled,omitempty"`
+	IsMonitoringDisabled bool `json:"is_monitoring_disabled,omitempty"`
+	AllPluginsDisabled   bool `json:"are_all_plugins_disabled,omitempty"`
+}
+
+// AvailabilityConfig is OCI's maintenance / recovery preferences.
+type AvailabilityConfig struct {
+	IsLiveMigrationPreferred bool   `json:"is_live_migration_preferred,omitempty"`
+	RecoveryAction           string `json:"recovery_action,omitempty"`
+}
+
+// LaunchOptions captures VM launch-time choices (firmware type, boot
+// volume backend, in-flight encryption). Populated from compute.launchOptions.
+type LaunchOptions struct {
+	BootVolumeType                  string `json:"boot_volume_type,omitempty"`
+	Firmware                        string `json:"firmware,omitempty"`
+	NetworkType                     string `json:"network_type,omitempty"`
+	RemoteDataVolumeType            string `json:"remote_data_volume_type,omitempty"`
+	IsConsistentVolumeNamingEnabled bool   `json:"is_consistent_volume_naming_enabled,omitempty"`
+	IsPVEncryptionInTransitEnabled  bool   `json:"is_pv_encryption_in_transit_enabled,omitempty"`
+}
+
+// SourceDetails describes the image the instance booted from.
+type SourceDetails struct {
+	SourceType          string `json:"source_type,omitempty"`
+	ImageID             string `json:"image_id,omitempty"`
+	BootVolumeID        string `json:"boot_volume_id,omitempty"`
+	BootVolumeSizeInGBs int    `json:"boot_volume_size_in_gbs,omitempty"`
+	KMSKeyID            string `json:"kms_key_id,omitempty"`
 }
 
 // ShapeConfig is the compute shape's resource profile.
@@ -159,6 +204,42 @@ type rawInstance struct {
 	DefinedTags         map[string]any    `json:"definedTags"`
 	FreeformTags        map[string]string `json:"freeformTags"`
 	RegionInfo          *rawRegionInfo    `json:"regionInfo"`
+
+	AgentConfig        *rawAgentConfig        `json:"agentConfig"`
+	AvailabilityConfig *rawAvailabilityConfig `json:"availabilityConfig"`
+	InstancePoolID     string                 `json:"instancePoolId"`
+	DedicatedVMHostID  string                 `json:"dedicatedVmHostId"`
+	LaunchOptions      *rawLaunchOptions      `json:"launchOptions"`
+	SourceDetails      *rawSourceDetails      `json:"sourceDetails"`
+	PlatformConfig     map[string]any         `json:"platformConfig"`
+}
+
+type rawAgentConfig struct {
+	IsManagementDisabled bool `json:"isManagementDisabled"`
+	IsMonitoringDisabled bool `json:"isMonitoringDisabled"`
+	AllPluginsDisabled   bool `json:"areAllPluginsDisabled"`
+}
+
+type rawAvailabilityConfig struct {
+	IsLiveMigrationPreferred bool   `json:"isLiveMigrationPreferred"`
+	RecoveryAction           string `json:"recoveryAction"`
+}
+
+type rawLaunchOptions struct {
+	BootVolumeType                  string `json:"bootVolumeType"`
+	Firmware                        string `json:"firmware"`
+	NetworkType                     string `json:"networkType"`
+	RemoteDataVolumeType            string `json:"remoteDataVolumeType"`
+	IsConsistentVolumeNamingEnabled bool   `json:"isConsistentVolumeNamingEnabled"`
+	IsPVEncryptionInTransitEnabled  bool   `json:"isPvEncryptionInTransitEnabled"`
+}
+
+type rawSourceDetails struct {
+	SourceType          string `json:"sourceType"`
+	ImageID             string `json:"imageId"`
+	BootVolumeID        string `json:"bootVolumeId"`
+	BootVolumeSizeInGBs int    `json:"bootVolumeSizeInGBs"`
+	KMSKeyID            string `json:"kmsKeyId"`
 }
 
 type rawShapeConfig struct {
@@ -323,6 +404,9 @@ func transformInstance(
 		Metadata:            r.Metadata,
 		DefinedTags:         r.DefinedTags,
 		FreeformTags:        r.FreeformTags,
+		InstancePoolID:      r.InstancePoolID,
+		DedicatedVMHostID:   r.DedicatedVMHostID,
+		PlatformConfig:      r.PlatformConfig,
 	}
 	if r.ShapeConfig != nil {
 		sc := ShapeConfig(*r.ShapeConfig)
@@ -331,6 +415,22 @@ func transformInstance(
 	if r.RegionInfo != nil {
 		ri := RegionInfo(*r.RegionInfo)
 		info.RegionInfo = &ri
+	}
+	if r.AgentConfig != nil {
+		ac := AgentConfig(*r.AgentConfig)
+		info.AgentConfig = &ac
+	}
+	if r.AvailabilityConfig != nil {
+		av := AvailabilityConfig(*r.AvailabilityConfig)
+		info.AvailabilityConfig = &av
+	}
+	if r.LaunchOptions != nil {
+		lo := LaunchOptions(*r.LaunchOptions)
+		info.LaunchOptions = &lo
+	}
+	if r.SourceDetails != nil {
+		sd := SourceDetails(*r.SourceDetails)
+		info.SourceDetails = &sd
 	}
 	return info
 }
