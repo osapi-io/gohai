@@ -35,6 +35,7 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 )
 
@@ -164,6 +165,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		variant  string
 		fs       func() avfs.VFS
 		exec     func(*testing.T) executor.Executor
+		prior    collector.PriorResults
 		validate func(*virtualization.Info)
 	}{
 		{
@@ -286,6 +288,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			variant: "linux",
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/sys_vendor":   "VMware, Inc.\n",
 					"/sys/class/dmi/id/product_name": "VMware Virtual Platform\n",
 				})
 			},
@@ -309,6 +312,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			variant: "linux",
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/sys_vendor":   "Parallels Software International Inc.\n",
 					"/sys/class/dmi/id/product_name": "Parallels Virtual Platform\n",
 				})
 			},
@@ -338,6 +342,194 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			},
 			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
 			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+		},
+		{
+			name:    "linux: DMI openstack via sys_vendor",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/sys_vendor":   "OpenStack Foundation\n",
+					"/sys/class/dmi/id/product_name": "OpenStack Nova\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["openstack"]) },
+		},
+		{
+			name:    "linux: DMI openstack via product_name (Red Hat variant)",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/sys_vendor":   "Red Hat\n",
+					"/sys/class/dmi/id/product_name": "OpenStack Compute\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["openstack"]) },
+		},
+		{
+			name:    "linux: DMI amazonec2",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/sys_vendor": "Amazon EC2\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["amazonec2"]) },
+		},
+		{
+			name:    "linux: DMI veertu",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/sys_vendor": "Veertu, Inc.\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["veertu"]) },
+		},
+		{
+			name:    "linux: DMI virtualbox via product_name",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/sys_vendor":   "innotek GmbH\n",
+					"/sys/class/dmi/id/product_name": "VirtualBox\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["vbox"]) },
+		},
+		{
+			name:    "linux: DMI kvm via RHEV product",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/sys_vendor":   "Red Hat\n",
+					"/sys/class/dmi/id/product_name": "RHEV Hypervisor\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+		},
+		{
+			name:    "linux: DMI bhyve via product_name",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/sys/class/dmi/id/product_name": "BHYVE\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["bhyve"]) },
+		},
+		{
+			name:    "linux: cpuinfo Common 32-bit KVM processor → kvm guest",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/cpuinfo": "model name : Common 32-bit KVM processor\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+		},
+		{
+			name:    "linux: cgroup nested docker (systemd /system.slice/docker-*.scope)",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup": "0::/system.slice/docker-47341cd3bba14d17d3d67e6b4bd3b46f.scope\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+		},
+		{
+			name:    "linux: cgroup nested docker (docker-ce layout)",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup": "0::/docker-ce/docker/b15b851234abcdef\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+		},
+		{
+			name:    "linux: kvm via cpu prior (nested VM without /sys/devices/virtual/misc/kvm)",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{})
+			},
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			prior: collector.PriorResults{
+				"cpu": &cpu.Info{HypervisorVendor: "KVM", VirtualizationType: "full"},
+			},
+			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+		},
+		{
+			name:    "linux: lxc host missing cgroup file → no lxc",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{})
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return virtExec(
+					t,
+					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
+				)
+			},
+			validate: func(i *virtualization.Info) { s.Empty(i.Systems["lxc"]) },
+		},
+		{
+			name:    "linux: lxc host cgroup root not / → no lxc",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup": "0::/some/subpath\n",
+				})
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return virtExec(
+					t,
+					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
+				)
+			},
+			validate: func(i *virtualization.Info) { s.Empty(i.Systems["lxc"]) },
+		},
+		{
+			name:    "linux: lxc host cgroup malformed line → no lxc",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup": "malformed\n",
+				})
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return virtExec(
+					t,
+					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
+				)
+			},
+			validate: func(i *virtualization.Info) { s.Empty(i.Systems["lxc"]) },
+		},
+		{
+			name:    "linux: lxc host via lxc-start on PATH + cgroup roots all /",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup": "0::/\n",
+				})
+			},
+			exec: func(t *testing.T) executor.Executor {
+				return virtExec(
+					t,
+					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
+				)
+			},
+			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["lxc"]) },
 		},
 		{
 			name:    "linux: openvz host then guest precedence (host wins)",
@@ -700,7 +892,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &virtualization.Darwin{FS: tt.fs(), Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
+			got, err := c.Collect(context.Background(), tt.prior)
 			s.Require().NoError(err)
 			info, ok := got.(*virtualization.Info)
 			s.Require().True(ok)

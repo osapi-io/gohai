@@ -128,22 +128,44 @@ positive hit. Order matters — the last positive detection sets primary
 3. **Xen:** `/proc/xen` exists → guest; `/proc/xen/capabilities` contains
    `control_d` → host.
 4. **VirtualBox:** `/proc/modules` line `vboxdrv` → host; `vboxguest` → guest.
-5. **KVM:** `/proc/cpuinfo` contains `QEMU Virtual CPU` or
-   `Common KVM processor` → guest. `/sys/devices/virtual/misc/kvm` exists → host
-   (or guest when the `hypervisor` cpuinfo flag is set).
-6. **DMI:** `/sys/class/dmi/id/product_name` / `sys_vendor` / `bios_vendor`
-   matched against vmware / hyperv / parallels / xen / qemu/kvm strings (Ohai's
-   `guest_from_dmi_data` table).
+5. **KVM:** `/proc/cpuinfo` contains `QEMU Virtual CPU`, `Common KVM processor`,
+   or `Common 32-bit KVM processor` → guest. `/sys/devices/virtual/misc/kvm`
+   exists → host (or guest when the `hypervisor` cpuinfo flag is set).
+   Additionally, if the `cpu` prior result has `HypervisorVendor == "KVM"` and
+   `VirtualizationType` in `{full, para}` (from `lscpu`), register as kvm guest
+   — covers nested VMs where the `/sys/devices/virtual/misc/kvm` node isn't
+   exposed.
+6. **DMI:** `/sys/class/dmi/id/sys_vendor` is matched first against Ohai's
+   `guest_from_dmi_data` manufacturer table — `OpenStack`, `Xen`, `VMware`,
+   `Microsoft` (combined with `Virtual Machine` in product) → hyperv,
+   `Amazon EC2`, `QEMU` → kvm, `Veertu`, `Parallels`. If no manufacturer match,
+   `/sys/class/dmi/id/product_name` is matched against the product table —
+   `VirtualBox` → vbox, `OpenStack` (Red Hat variant), `KVM` / `RHEV` → kvm,
+   `BHYVE`.
 7. **OpenVZ:** `/proc/bc/0` → host; `/proc/vz` → guest.
 8. **Hyper-V:** `/var/lib/hyperv/.kvp_pool_3` → guest.
 9. **linux-vserver:** `/proc/self/status` `s_context: 0` / `VxID: 0` → host;
    non-zero → guest.
-10. **Containers via cgroup / environ:** `/proc/self/cgroup` regex for `docker`
-    / `lxc` / `containerd` (containerd remaps to docker); `/proc/1/environ` for
-    `container=lxc` / `container=systemd-nspawn` / `container=podman`.
-11. **`.dockerenv` override:** `/.dockerenv` or `/.dockerinit` → docker guest
+10. **Containers via cgroup / environ:** `/proc/self/cgroup` matches two
+    regexes:
+
+    - Direct: `/(docker|lxc|containerd)/…` → matching runtime (containerd remaps
+      to docker).
+    - Nested (systemd-managed, docker-ce, cgroup v2): `/<parent>/docker-…` or
+      `/<parent>/lxc-…` — catches `/system.slice/docker-<hash>.scope`,
+      `/docker-ce/docker/<hash>`, `/kubepods/.../docker-<hash>.scope`, GitHub
+      Actions runner layouts.
+
+    `/proc/1/environ` is also checked for `container=lxc` /
+    `container=systemd-nspawn` / `container=podman`.
+
+11. **LXC host:** when nothing else set `system` and every line of
+    `/proc/self/cgroup` has root path `/` (i.e. not inside a container's own
+    cgroup namespace), `command -v lxc-version` or `command -v lxc-start`
+    succeeding registers the host as `lxc` host. Matches Ohai's OHAI-573 guard.
+12. **`.dockerenv` override:** `/.dockerenv` or `/.dockerinit` → docker guest
     (force overrides earlier registrations).
-12. **LXD:** `/dev/lxd/sock` → guest; `/var/lib/lxd/devlxd` or
+13. **LXD:** `/dev/lxd/sock` → guest; `/var/lib/lxd/devlxd` or
     `/var/snap/lxd/common/lxd/devlxd` → host.
 
 On macOS the cascade matches Ohai's `darwin/virtualization.rb`:
