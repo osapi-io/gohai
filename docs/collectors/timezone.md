@@ -91,15 +91,33 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                                                                                     | Ohai plugin ([`time.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/time.rb)) | Alignment                                                                                                                                                                                                                                                                   |
-| -------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `/etc/localtime` symlink (IANA name) → `/etc/timezone` file fallback → `time.Now().Zone()` for abbrev+offset     | Ohai reads only `Time.now.getlocal.zone` (abbreviation only); no IANA name.                | **Richer than Ohai.** We capture IANA name and offset on top of Ohai's abbreviation. Debian/container fallback covers hosts where `/etc/localtime` is a copied file rather than a symlink — Ohai doesn't have this problem because it doesn't try to resolve the IANA name. |
-| macOS    | `/etc/localtime` symlink stripped of `/var/db/timezone/zoneinfo/` prefix → `time.Now().Zone()` for abbrev+offset | Same as Linux — only the abbreviation.                                                     | **Richer than Ohai.**                                                                                                                                                                                                                                                       |
+On Linux:
 
-**Known gaps:** On macOS we don't ship a `/etc/timezone` fallback because Apple
-doesn't set that file. If `/etc/localtime` isn't a symlink on a mac (rare — seen
-in some CI sandboxes), `name` stays empty while `abbrev`/`offset` still
-populate.
+1. Resolve the IANA `name` by calling `Readlink("/etc/localtime")` through the
+   injected `avfs.VFS` and stripping the `/usr/share/zoneinfo/` prefix. This
+   gives values like `America/Los_Angeles`.
+2. When `/etc/localtime` isn't a symlink (Debian-style hosts where the timezone
+   data is copied rather than symlinked, some container images), fall back to
+   reading `/etc/timezone` through the VFS and trimming whitespace.
+3. If both sources fail, `name` stays empty — `abbrev` and `offset` still
+   populate from the Go runtime.
+4. `abbrev` and `offset` come from `time.Now().Zone()` — the runtime's cached
+   local-time rules. The offset is a snapshot at collect time, so a host on
+   `America/Los_Angeles` reports `-25200` in July (PDT) and `-28800` in January
+   (PST).
+
+On macOS:
+
+1. Resolve the IANA `name` by calling `Readlink("/etc/localtime")` and stripping
+   macOS's `/var/db/timezone/zoneinfo/` prefix instead of Linux's
+   `/usr/share/zoneinfo/`. No `/etc/timezone` fallback — Apple doesn't ship that
+   file, so if the symlink is missing (rare, some CI sandboxes) `name` stays
+   empty while `abbrev`/`offset` still populate.
+2. `abbrev` and `offset` come from `time.Now().Zone()` — same as Linux.
+
+Superset of Ohai's `time.rb`, which only reports `Time.now.getlocal.zone` (the
+abbreviation). We additionally surface the IANA name (`America/Los_Angeles` vs.
+just `PDT`) and the numeric offset.
 
 ## Backing library
 
