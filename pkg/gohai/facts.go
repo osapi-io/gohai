@@ -37,6 +37,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
@@ -109,6 +110,7 @@ type Facts struct {
 	GPU            *gpu.Info            `json:"gpu,omitempty"`
 	PCI            *pci.Info            `json:"pci,omitempty"`
 	SCSI           *scsi.Info           `json:"scsi,omitempty"`
+	Hardware       *hardware.Info       `json:"hardware,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -438,6 +440,10 @@ func (f *Facts) set(
 	case "scsi":
 		if v, ok := result.(*scsi.Info); ok {
 			f.SCSI = v
+		}
+	case "hardware":
+		if v, ok := result.(*hardware.Info); ok {
+			f.Hardware = v
 		}
 	}
 }
