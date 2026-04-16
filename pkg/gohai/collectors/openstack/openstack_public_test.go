@@ -68,8 +68,12 @@ const novaDoc = `{
   "project_id": "proj-1",
   "hostname": "prod-1",
   "availability_zone": "nova",
+  "launch_index": 0,
   "meta": {"owner": "sre"},
-  "public_keys": {"default": "ssh-rsa AAA..."}
+  "public_keys": {"default": "ssh-rsa AAA..."},
+  "devices": [
+    {"type": "disk", "bus": "virtio", "serial": "vda-1234", "path": "/dev/vda", "address": "0:0:0:0", "tags": ["boot"]}
+  ]
 }`
 
 type OpenStackPublicTestSuite struct {
@@ -169,9 +173,11 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				s.Equal("uuid-xxx", info.UUID)
 				s.Equal("proj-1", info.ProjectID)
 				s.Equal("sre", info.MetaData["owner"])
-				// Raw forward-compat
-				s.Require().NotNil(info.Raw)
-				s.Equal("i-abc", info.Raw["instance_id"])
+				s.Require().Len(info.Devices, 1)
+				s.Equal("disk", info.Devices[0].Type)
+				s.Equal("virtio", info.Devices[0].Bus)
+				s.Equal("/dev/vda", info.Devices[0].Path)
+				s.Equal([]string{"boot"}, info.Devices[0].Tags)
 			},
 		},
 		{
@@ -265,8 +271,6 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
 				s.Equal("ami-zzz", info.AMIID)
-				_, present := info.Raw["broken"]
-				s.False(present)
 			},
 		},
 		{
@@ -279,8 +283,6 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
 				s.Equal("ami-aaa", info.AMIID)
-				_, present := info.Raw["missing_leaf"]
-				s.False(present)
 			},
 		},
 		{

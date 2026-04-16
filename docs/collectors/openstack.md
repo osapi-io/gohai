@@ -36,8 +36,12 @@ DMI; we go directly to DMI for the same effect.
 | `uuid`              | `string`            | Nova UUID.                                                                                                                              | No direct schema mapping.      |
 | `meta_data`         | `map[string]string` | Nova `meta` key/values.                                                                                                                 | No direct schema mapping.      |
 | `public_keys`       | `map[string]string` | Name→key map of SSH keys.                                                                                                               | No direct schema mapping.      |
+| `launch_index`      | `int`               | Nova launch_index — position within a multi-instance launch request.                                                                    | No direct schema mapping.      |
+| `devices`           | `[]Device`          | Attached block-device list from meta_data.json (type / bus / serial / path / address / tags).                                           | No direct schema mapping.      |
 | `provider`          | `string`            | `"openstack"` or `"dreamhost"` (legacy Dreamhost OpenStack images shipped a `dhc-user` account). Matches Ohai's `openstack[:provider]`. | No direct schema mapping.      |
-| `raw`               | `map[string]any`    | Full EC2-mirror tree as walked recursively. Use when you need a field gohai's typed surface doesn't expose.                             | No direct schema mapping.      |
+
+Still skipped from meta_data.json: `network_info` (deployment-specific Neutron
+data) and `random_seed` (sensitive — no inventory value).
 
 ## Platform Support
 

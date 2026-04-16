@@ -98,25 +98,41 @@ type Info struct {
 	ReservationID string `json:"reservation_id,omitempty"`
 
 	// From the OpenStack-specific meta_data.json (when present).
-	Name       string            `json:"name,omitempty"`
-	ProjectID  string            `json:"project_id,omitempty"`
-	UUID       string            `json:"uuid,omitempty"`
-	MetaData   map[string]string `json:"meta_data,omitempty"`
-	PublicKeys map[string]string `json:"public_keys,omitempty"`
+	Name        string            `json:"name,omitempty"`
+	ProjectID   string            `json:"project_id,omitempty"`
+	UUID        string            `json:"uuid,omitempty"`
+	LaunchIndex int               `json:"launch_index,omitempty"`
+	MetaData    map[string]string `json:"meta_data,omitempty"`
+	PublicKeys  map[string]string `json:"public_keys,omitempty"`
+
+	// Devices is the attached-block-device list from meta_data.json.
+	// Each entry's shape varies by volume type (ephemeral/cinder
+	// attached/boot); we surface the common fields.
+	Devices []Device `json:"devices,omitempty"`
 
 	// Provider distinguishes "openstack" from the legacy "dreamhost"
 	// (pre-2016 Dreamhost OpenStack images shipped a `dhc-user`
 	// account). Matches Ohai's openstack[:provider].
 	Provider string `json:"provider,omitempty"`
+}
 
-	// Raw is the full EC2-mirror tree as walked recursively. Use
-	// when you need a field gohai's typed surface doesn't expose.
-	Raw map[string]any `json:"raw,omitempty"`
+// Device is one attached block-device entry from
+// /openstack/latest/meta_data.json `devices`. OpenStack reports
+// slightly different keys depending on the volume source; we capture
+// the common ones for inventory / audit.
+type Device struct {
+	Type    string   `json:"type,omitempty"`    // "disk" / "cdrom" / ...
+	Bus     string   `json:"bus,omitempty"`     // "virtio" / "scsi" / ...
+	Serial  string   `json:"serial,omitempty"`  // block-device serial
+	Path    string   `json:"path,omitempty"`    // device node path
+	Address string   `json:"address,omitempty"` // PCI address
+	Tags    []string `json:"tags,omitempty"`
 }
 
 // openStackMetaDoc mirrors the subset of /openstack/latest/meta_data.json
-// we extract. OpenStack ships additional fields (devices, network_info,
-// random_seed) that we skip — they're deployment-specific.
+// we extract. `network_info` and `random_seed` remain intentionally
+// skipped — the former is deployment-specific Neutron data, the latter
+// is sensitive and has no inventory value.
 type openStackMetaDoc struct {
 	UUID             string            `json:"uuid"`
 	Name             string            `json:"name"`
@@ -125,6 +141,17 @@ type openStackMetaDoc struct {
 	Meta             map[string]string `json:"meta"`
 	PublicKeys       map[string]string `json:"public_keys"`
 	AvailabilityZone string            `json:"availability_zone"`
+	LaunchIndex      int               `json:"launch_index"`
+	Devices          []rawDevice       `json:"devices"`
+}
+
+type rawDevice struct {
+	Type    string   `json:"type"`
+	Bus     string   `json:"bus"`
+	Serial  string   `json:"serial"`
+	Path    string   `json:"path"`
+	Address string   `json:"address"`
+	Tags    []string `json:"tags"`
 }
 
 // Collector fetches OpenStack's EC2-compatible + Nova-specific docs.
@@ -184,7 +211,6 @@ func (c *Collector) Collect(
 	}
 	info := &Info{
 		Provider: detectProvider(),
-		Raw:      tree,
 	}
 	if tree != nil {
 		populateFromTree(info, tree)
@@ -196,8 +222,12 @@ func (c *Collector) Collect(
 			info.UUID = doc.UUID
 			info.Name = doc.Name
 			info.ProjectID = doc.ProjectID
+			info.LaunchIndex = doc.LaunchIndex
 			info.MetaData = doc.Meta
 			info.PublicKeys = doc.PublicKeys
+			for _, d := range doc.Devices {
+				info.Devices = append(info.Devices, Device(d))
+			}
 			if info.AvailabilityZone == "" {
 				info.AvailabilityZone = doc.AvailabilityZone
 			}
