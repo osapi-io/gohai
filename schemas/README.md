@@ -88,9 +88,24 @@ self-identification.
 | **Chef Ohai** (`corpus/ohai/`) | Primary methodology reference for gohai. Plugin output shapes. |
 | **Puppet Facter** (`corpus/facter/`) | Puppet's fact collector; peer to Ohai. |
 
-### Tier 2+ (to be added)
+### Tier 2 — SIEM vocabularies, software identifiers, cloud schemas
 
-Planned additions to expand coverage for cloud-provider IMDS shapes,
-SIEM/security vocabularies (ASIM, UDM, Splunk CIM, OSSEM), software
-identifiers (CPE, SWID, SPDX, CycloneDX, PURL), DMTF CIM, and assorted
-vendor configs.
+| Source | Role |
+| ------ | ---- |
+| **ASIM** (`corpus/asim/`) | Azure Sentinel Advanced Security Information Model. Parsers + schema docs. |
+| **OSSEM** (`corpus/ossem/`) | Open Source Security Events Metadata. CDM + detection data model + data mapping. |
+| **Sigma** (`corpus/sigma/`) | SigmaHQ detection rules. Field-name sampling across thousands of real-world rules. |
+| **CycloneDX** (`corpus/cyclonedx/`) | SBOM schema — component / vulnerability / pedigree. |
+| **SPDX** (`corpus/spdx/`) | SPDX 3 model — document / package / file / snippet. |
+| **PURL** (`corpus/purl/`) | Package URL spec — universal package identifier. |
+| **Wazuh** (`corpus/wazuh-inventory/`) | Wazuh's syscollector module inventory schemas. |
+| **AWS CFN** (`corpus/cfn-lint-data/`) | AWS CloudFormation resource schemas for every AWS resource type. |
+| **Azure ARM** (`corpus/azure-arm/`) | Azure Resource Manager common JSON schemas. |
+| **hwids** (`corpus/hwids/`) | `pci.ids` + `usb.ids` — canonical vendor/product identifier databases. |
+
+### Tier 3+ (not yet pulled)
+
+Future candidates: Google UDM, Splunk CIM, DMTF CIM (separate from
+Redfish), CPE 2.3 + SWID, Terraform provider schemas (AWS / GCP /
+Azure), systemd hostnamectl / NetworkManager field names, Docker / OCI
+image-inspect annotations. Add as tier-2 analysis reveals gaps.

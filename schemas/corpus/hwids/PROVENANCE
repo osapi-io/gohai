@@ -1,0 +1,4 @@
+source_pci: https://github.com/pciutils/pciids (pci.ids)
+source_usb: https://github.com/gentoo/hwids (usb.ids)
+fetched_at: 2026-04-16T18:25:50Z
+note: Canonical PCI + USB vendor/device identifier databases.

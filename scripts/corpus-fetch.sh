@@ -92,4 +92,47 @@ fetched_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 note: Only the NodeStatus / NodeInfo / NodeSystemInfo types are relevant to gohai.
 EOF
 
+# Tier 2 — SIEM vocabularies + software identifiers + adjacent inventory.
+
+fetch ossem https://github.com/OTRF/OSSEM.git \
+    OSSEM-CDM OSSEM-DD OSSEM-DM docs resources
+
+fetch asim https://github.com/Azure/Azure-Sentinel.git \
+    ASIM
+
+fetch sigma https://github.com/SigmaHQ/sigma.git \
+    rules-threat-hunting documentation
+
+fetch cyclonedx https://github.com/CycloneDX/specification.git \
+    schema
+
+fetch spdx https://github.com/spdx/spdx-3-model.git \
+    model
+
+fetch purl https://github.com/package-url/purl-spec.git \
+    PURL-SPECIFICATION.rst PURL-TYPES.rst
+
+fetch wazuh-inventory https://github.com/wazuh/wazuh.git \
+    src/wazuh_modules/syscollector
+
+fetch cfn-lint-data https://github.com/aws-cloudformation/cfn-lint.git \
+    src/cfnlint/data/schemas
+
+fetch azure-arm https://github.com/Azure/azure-resource-manager-schemas.git \
+    schemas/common
+
+# pci.ids + usb.ids — hardware vendor/product databases referenced by
+# ghw, lspci, lsusb. Not schemas per se, but canonical data on vendor
+# naming / device_id conventions.
+echo "==> hwids"
+mkdir -p "$CORPUS/hwids"
+curl -sSL https://raw.githubusercontent.com/pciutils/pciids/master/pci.ids >"$CORPUS/hwids/pci.ids"
+curl -sSL https://raw.githubusercontent.com/gentoo/hwids/master/usb.ids >"$CORPUS/hwids/usb.ids"
+cat >"$CORPUS/hwids/PROVENANCE" <<EOF
+source_pci: https://github.com/pciutils/pciids (pci.ids)
+source_usb: https://github.com/gentoo/hwids (usb.ids)
+fetched_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+note: Canonical PCI + USB vendor/device identifier databases.
+EOF
+
 echo "==> done"

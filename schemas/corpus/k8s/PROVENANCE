@@ -1,5 +1,5 @@
 source: https://github.com/kubernetes/api
 path: core/v1/types.go
 fetched_sha: ddad8a9beb396a5147c927f99cc003d791f40d68
-fetched_at: 2026-04-16T17:29:05Z
+fetched_at: 2026-04-16T18:22:03Z
 note: Only the NodeStatus / NodeInfo / NodeSystemInfo types are relevant to gohai.

@@ -1,0 +1,207 @@
+# SPDX 3 model
+
+The System Package Data Exchange® (SPDX®) is a standard format for
+communicating information about components associated with systems.
+
+Components can include software, AI/ML models and dataset.
+More component types that make up modern systems are planned to be included in
+subsequent releases. See [scope](scope.md).
+
+The prior version of this format was focused on Software, is an ISO/IEC
+standard ([ISO/IEC 5962:2021](https://www.iso.org/standard/81870.html)) and has
+wide industry adoption as a standardized Software Bill of Materials (SBOM).
+All use cases supported by the prior version are supported here as well.
+
+This repository holds the model for the information captured in SPDX version 3
+standard.
+
+Translations of the information model may be available.
+English remains the normative language in all cases.
+
+## Table of contents
+
+- [Branch structure](#branch-structure)
+- [Formats](#formats)
+- [Model](#model)
+  - [Profiles](#profiles-of-the-model)
+- [Serialization and validation](#serialization-and-validation)
+- [Change log](#change-log)
+- [Glossary](#glossary)
+- [Contribute](#contribute)
+
+## Branch structure
+
+The SPDX 3 model repo follows the
+[Gitflow](https://gist.github.com/HeratPatel/271b5d2304de2e2cd1823b9b62bf43e0)
+workflow with the addition of support branches.
+
+The branches in use are:
+
+- `main` - This will always be the latest released specification.
+- `develop` - This branch will be where the active development for the next
+  major or minor version takes place.
+  Once released, the `develop` branch will be merged into the `main` branch.
+- `support/x.y` - These branches will be long-lived and contain any updates to
+  a minor version of the specification.
+  Additions such as translations can be added to the support branch.
+  `x.y` represents the MAJOR.MINOR version, following Semantic Versioning
+  (SemVer) conventions.
+  Once any changes are accepted and released, the support branch will be tagged
+  and merged into both `develop` and `main` branches.
+- General feature or fix branches - there may be feature branches made for
+  specific enhancements or fixes to the spec.
+  These will be short-lived and merged into either a `support` branch or the
+  `develop` branch.
+
+## Formats
+
+The editable files inside `model/` directory are written in a
+[constrained subset of Markdown][format],
+with specific headings for specific types of information,
+and are stored in the `main` branch.
+
+Textual description of these model files
+[can be translated][translation] into other natural languages.
+
+The editable files are automatically processed by
+[spec-parser](https://github.com/spdx/spec-parser/)
+and the following are generated:
+
+- Input for [MkDocs](https://www.mkdocs.org/), which then generates the
+  [specification](https://spdx.github.io/spdx-spec/v3.1-dev/)
+- [JSON-LD context](http://niem.github.io/json/reference/json-ld/context/)
+  file: [spdx-context.jsonld](https://spdx.github.io/spdx-spec/v3.1-dev/rdf/spdx-context.jsonld)
+- Model [SHACL](https://en.wikipedia.org/wiki/SHACL) and
+  [OWL](https://www.w3.org/OWL/) files:
+  - [Turtle format](https://en.wikipedia.org/wiki/Turtle_(syntax)):
+    [spdx-model.ttl](https://spdx.github.io/spdx-spec/v3.1-dev/rdf/spdx-model.ttl)
+  - [JSON-LD format](https://json-ld.org/):
+    [spdx-model.jsonld](https://spdx.github.io/spdx-spec/v3.1-dev/rdf/spdx-model.jsonld)
+
+People who wish to read the current version of the information
+should be viewing the generated files, while anyone wanting to edit
+should be working on the editable files.
+
+For the specification content other than the model, they are in the
+[spdx-spec](https://github.com/spdx/spdx-spec/) repository.
+
+## Model
+
+The SPDX model is described using profiles related to the software application.
+The profiles are organized as sub-directories under the `model/` directory.
+
+The model diagram is available in [model.drawio][model-diagram] file
+and in [`images/`](./images/) directory.
+
+<a href="./images/" title="Click to see more profile diagrams" ><img src="./images/model-Core.png" alt="Core profile diagram" height="120" /></a>
+
+Note:
+
+1. The ‘Licensing’ profile has three categories (sub-directories): ‘Licensing’,
+  ‘SimpleLicensing’, and ‘ExpandedLicensing’.
+2. The ‘extension’ namespace (sub-directory) provides for adding information
+  about the software application which is not otherwise covered under the SPDX
+  model.
+
+### Profiles of the model
+
+#### AI
+
+The AI profile describes an AI component's capabilities for a specific system
+(domain, model type, industry standards). It details its usage within the
+application, limitations, training methods, data handling, explainability, and
+energy consumption.
+
+#### Build
+
+The Build profile contains information about the build done for the software application.
+Fields include build type URI (of toolchain, platform, or infrastructure),
+locally unique build identifier assigned by the developer,
+entry point of creation of build, URI of the build configuration source if any,
+digest of build configuration source if any, build parameters,
+start time of the build, end time of the build,
+and the system’s environment variables at the time of the build.
+
+#### Core
+
+The Core profile describes the foundational classes and properties that are
+used by all profiles of the SPDX model.
+
+#### Dataset
+
+The Dataset profile describes a dataset's core aspects (type, size, collection
+method), access method, preparation (preprocessing, noise handling), intended
+use (e.g. hardware calibration, machine learning), and related considerations
+(data quality and privacy).
+
+#### Licensing
+
+The Licensing profile describes the aspects of licensing for the software
+application under three categories (sub-directories) -
+Licensing, SimpleLicensing, and ExpandedLicensing.
+
+- Licensing describes information about declared licenses and concluded
+  (detected) licenses.
+- SimpleLicensing describes information about text-formatted licenses.
+- ExpandedLicensing describes information about parseable and machine-readable
+  licenses.
+
+#### Lite
+
+The SPDX Lite profile defines a subset of the SPDX specification for use cases
+and workflows in some industries.
+
+#### Security
+
+The Security profile contains information about vulnerabilities and their
+assessments based on CVSS (versions 2, 3, and 4), EPSS, Exploit Catalog, SSVC,
+and VEX (affected, not affected, under investigation, and fixed categories).
+
+#### Software
+
+The Software profile contains information about files, packages, SBOMs,
+snippets, and artifacts of the software application.
+
+## Serialization and validation
+
+Information about serialization of SPDX 3 documents can be found in the
+[Serialization information][sr-spec] section in the "Model and serializations"
+chapter of the SPDX specification.
+
+For additional technical information about serialization,
+please see [Notes on serialization][sr-notes].
+
+For information about the validation of SPDX 3 JSON documents,
+using JSON Schema and the SHACL model,
+please see [Validating SPDX 3 JSON Documents][validate-spdx3].
+
+## Change log
+
+See [CHANGELOG.md](CHANGELOG.md) for changes between versions.
+
+## Glossary
+
+See [glossary][glossary] for definitions and explanations of terms used throughout the specification.
+
+## Contribute
+
+For information about how to contribute to a specific profile,
+please see [Contributing.md](Contributing.md).
+
+Feel free to join us and contribute!
+
+The discussions are happening on the
+[spdx-tech mailing list][spdx-tech-list]
+and during our [regular meetings][meetings].
+
+All the details are in: <https://spdx.dev/participate/tech/>
+
+[format]: ./docs/format.md
+[translation]: ./docs/translation.md
+[model-diagram]: ./docs/model.drawio
+[sr-spec]: https://github.com/spdx/spdx-spec/blob/develop/docs/serializations.md#serialization-information
+[sr-notes]: ./serialization/README.md
+[validate-spdx3]: ./serialization/jsonld/validation.md
+[glossary]: ./docs/glossary.md
+[meetings]: https://github.com/spdx/meetings/
+[spdx-tech-list]: https://lists.spdx.org/mailman/listinfo/spdx-tech
