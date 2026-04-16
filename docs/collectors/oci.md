@@ -155,8 +155,14 @@ gates on a substring match. Fails open when dmi wasn't run.
    shapes legitimately 404 those paths) — the sections are left empty in the
    Info struct.
 7. **Transformation:** raw camelCase fields are unmarshalled and mapped to
-   snake_case in the typed Info. Volume attachments are keyed by their OCID to
-   match Ohai's `metadata.volumes[<id>]` output shape.
+   snake_case in the typed Info. Optional sub-objects from the instance document
+   — `agent_config`, `availability_config`, `launch_options`, `source_details` —
+   become typed nested records when present. `platform_config` is kept as
+   `map[string]any` because its shape varies by shape family (AMD / Intel / GPU
+   each expose different sub-fields). `instance_pool_id` and
+   `dedicated_vm_host_id` are lifted straight from the instance document (empty
+   on stand-alone / shared-infrastructure VMs). Volume attachments are keyed by
+   their OCID to match Ohai's `metadata.volumes[<id>]` output shape.
 
 Mirrors Ohai's `Ohai::Mixin::OciMetadata` methodology — same endpoint, same auth
 header, same three sub-fetches, same volume keying, same 6s timeout.

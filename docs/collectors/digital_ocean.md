@@ -107,7 +107,13 @@ collector fails open and tries the endpoint anyway.
    `mixin/do_metadata.rb`.
 5. **Failure handling:** transport / 404 / other errors → `(nil, nil)`.
 6. **Security scrub:** `vendor_data` dropped from the output (matches Ohai). May
-   contain cloud-init scripts + credentials.
+   contain cloud-init scripts + credentials. `user_data` and `auth_key` are
+   retained — the former is the droplet owner's own cloud-init payload, the
+   latter is DO's internal token that Ohai also surfaces.
+7. **Transformation:** `reserved_ip` is lifted from the nested
+   `reserved_ip.ipv4.ip_address` path onto the flat top-level field (DO's newer
+   replacement for the legacy `floating_ip`; both fields coexist while older
+   droplets still use `floating_ip`).
 
 Mirrors Ohai's `Ohai::Mixin::DoMetadata` methodology — same endpoint, same DMI
 gate, same `vendor_data` scrub, same 6s timeout.

@@ -97,10 +97,18 @@ open when dmi wasn't run.
 2. **EC2-mirror walk:** starts at `/latest/meta-data/` and recursively walks the
    directory listing — entries ending in `/` are subdirectories (recurse),
    others are leaves. Matches Ohai's `fetch_metadata` style for the
-   EC2-compatible tree. Forward-compatible — fields OpenStack adds later surface
-   automatically under `Raw`.
+   EC2-compatible tree. Populates the identity / placement / network fields
+   (`instance_id`, `instance_type`, `ami_id`, `kernel_id`, `ramdisk_id`,
+   `reservation_id`, `local_ipv4`, `public_ipv4`, `availability_zone`,
+   `security_groups`, etc.).
 3. **Nova endpoint:** `GET /openstack/latest/meta_data.json` — the richer
-   Nova-native document with `uuid`, `project_id`, `meta`, etc.
+   Nova-native document. Populates `uuid`, `name`, `project_id`, `hostname`,
+   `launch_index`, `meta_data`, `public_keys`, and the `devices[]` attached
+   block-device list (type / bus / serial / path / address / tags). Fills
+   `availability_zone` / `hostname` when the EC2-mirror tree didn't supply them.
+   `network_info` and `random_seed` are intentionally skipped — the former is
+   deployment-specific Neutron data, the latter is sensitive and has no
+   inventory value.
 4. **Provider field:** read `/etc/passwd` for a `dhc-user` entry. Present →
    `"dreamhost"`. Absent → `"openstack"`. Matches Ohai's `openstack_provider`.
 5. **User-Agent:** `gohai` (the cloudmetadata default).
