@@ -20,31 +20,33 @@ their short forms; everything else is surfaced verbatim.
 
 ### Top-level
 
-| Field                 | Type                 | Description                                                                                                          | Schema mapping                        |
-| --------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `instance_id`         | `int64`              | GCE numeric instance ID.                                                                                             | OTel `cloud.resource_id` / `host.id`  |
-| `name`                | `string`             | VM instance name.                                                                                                    | OTel `host.name`                      |
-| `hostname`            | `string`             | Fully-qualified internal DNS name.                                                                                   | OCSF `device.hostname`                |
-| `cpu_platform`        | `string`             | Underlying CPU platform (e.g. `Intel Broadwell`).                                                                    | OTel `host.cpu.model.name`            |
-| `machine_type`        | `string`             | Short machine type (e.g. `n1-standard-1`).                                                                           | OTel `host.type`                      |
-| `image`               | `string`             | Short image name (e.g. `debian-12`).                                                                                 | OTel `host.image.name`                |
-| `description`         | `string`             | Free-form description set on the instance.                                                                           | No direct schema mapping.             |
-| `tags`                | `[]string`           | GCE instance tags (firewall-rule targets, not labels).                                                               | No direct schema mapping.             |
-| `preemptible`         | `bool`               | `true` when the VM is preemptible/spot.                                                                              | No direct schema mapping.             |
-| `automatic_restart`   | `string`             | `"TRUE"` / `"FALSE"` — restart policy on failure.                                                                    | No direct schema mapping.             |
-| `on_host_maintenance` | `string`             | `MIGRATE` / `TERMINATE` — host-maintenance behavior.                                                                 | No direct schema mapping.             |
-| `maintenance_event`   | `string`             | Current maintenance event (`NONE`, `MIGRATE_ON_HOST_MAINTENANCE`, etc.).                                             | No direct schema mapping.             |
-| `zone`                | `string`             | GCE zone (e.g. `us-central1-a`).                                                                                     | OTel `cloud.availability_zone`        |
-| `region`              | `string`             | GCE region, derived from zone (e.g. `us-central1`).                                                                  | OTel `cloud.region`                   |
-| `project_id`          | `string`             | GCP project ID.                                                                                                      | OTel `cloud.account.id`               |
-| `numeric_project_id`  | `int64`              | GCP project numeric ID.                                                                                              | No direct schema mapping.             |
-| `project_attributes`  | `map[string]string`  | Project-level metadata. Commonly contains `ssh-keys`, `enable-oslogin`, etc.                                         | No direct schema mapping.             |
-| `licenses`            | `[]string`           | GCP license IDs attached to the VM (for BYOL / compliance tracking).                                                 | No direct schema mapping.             |
-| `attributes`          | `map[string]string`  | Instance-level metadata. Often contains `ssh-keys`, `startup-script`, user tags.                                     | No direct schema mapping.             |
-| `network_interfaces`  | `[]NetworkInterface` | Attached VNICs — see below.                                                                                          | OCSF `network_interface` (per entry). |
-| `disks`               | `[]Disk`             | Attached disks — see below.                                                                                          | No direct schema mapping.             |
-| `service_accounts`    | `[]ServiceAccount`   | Service accounts attached to the VM — see below.                                                                     | No direct schema mapping.             |
-| `raw`                 | `map[string]any`     | Full metadata tree as returned by `?recursive=true`. Use when you need a field gohai's typed surface doesn't expose. | No direct schema mapping.             |
+| Field                       | Type                 | Description                                                                                             | Schema mapping                        |
+| --------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `instance_id`               | `int64`              | GCE numeric instance ID.                                                                                | OTel `cloud.resource_id` / `host.id`  |
+| `name`                      | `string`             | VM instance name.                                                                                       | OTel `host.name`                      |
+| `hostname`                  | `string`             | Fully-qualified internal DNS name.                                                                      | OCSF `device.hostname`                |
+| `cpu_platform`              | `string`             | Underlying CPU platform (e.g. `Intel Broadwell`).                                                       | OTel `host.cpu.model.name`            |
+| `machine_type`              | `string`             | Short machine type (e.g. `n1-standard-1`).                                                              | OTel `host.type`                      |
+| `image`                     | `string`             | Short image name (e.g. `debian-12`).                                                                    | OTel `host.image.name`                |
+| `description`               | `string`             | Free-form description set on the instance.                                                              | No direct schema mapping.             |
+| `tags`                      | `[]string`           | GCE instance tags (firewall-rule targets, not labels).                                                  | No direct schema mapping.             |
+| `preemptible`               | `bool`               | `true` when the VM is preemptible/spot.                                                                 | No direct schema mapping.             |
+| `automatic_restart`         | `string`             | `"TRUE"` / `"FALSE"` — restart policy on failure.                                                       | No direct schema mapping.             |
+| `on_host_maintenance`       | `string`             | `MIGRATE` / `TERMINATE` — host-maintenance behavior.                                                    | No direct schema mapping.             |
+| `maintenance_event`         | `string`             | Current maintenance event (`NONE`, `MIGRATE_ON_HOST_MAINTENANCE`, etc.).                                | No direct schema mapping.             |
+| `zone`                      | `string`             | GCE zone (e.g. `us-central1-a`).                                                                        | OTel `cloud.availability_zone`        |
+| `region`                    | `string`             | GCE region, derived from zone (e.g. `us-central1`).                                                     | OTel `cloud.region`                   |
+| `project_id`                | `string`             | GCP project ID.                                                                                         | OTel `cloud.account.id`               |
+| `numeric_project_id`        | `int64`              | GCP project numeric ID.                                                                                 | No direct schema mapping.             |
+| `project_attributes`        | `map[string]string`  | Project-level metadata. Commonly contains `ssh-keys`, `enable-oslogin`, etc.                            | No direct schema mapping.             |
+| `licenses`                  | `[]string`           | GCP license IDs attached to the VM (for BYOL / compliance tracking).                                    | No direct schema mapping.             |
+| `attributes`                | `map[string]string`  | Instance-level metadata. Often contains `ssh-keys`, `startup-script`, user tags.                        | No direct schema mapping.             |
+| `network_interfaces`        | `[]NetworkInterface` | Attached VNICs — see below.                                                                             | OCSF `network_interface` (per entry). |
+| `disks`                     | `[]Disk`             | Attached disks — see below.                                                                             | No direct schema mapping.             |
+| `service_accounts`          | `[]ServiceAccount`   | Service accounts attached to the VM — see below.                                                        | No direct schema mapping.             |
+| `virtual_clock_drift_token` | `string`             | Opaque drift token from `instance.virtualClock` — used by some monitoring tools to detect VM migration. | No direct schema mapping.             |
+| `remaining_cpu_time`        | `int64`              | Remaining CPU seconds before Spot VM preemption. Zero on standard instances.                            | No direct schema mapping.             |
+| `partner_attributes`        | `map[string]string`  | Opaque key/value pairs set by partner images (marketplace product metadata).                            | No direct schema mapping.             |
 
 ### NetworkInterface
 

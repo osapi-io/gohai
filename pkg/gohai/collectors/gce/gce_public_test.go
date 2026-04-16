@@ -108,7 +108,10 @@ const cannedResponse = `{
       "startup-script": "#!/bin/bash\\necho hi"
     },
     "licenses": [{"id": "8045211539491955793"}],
-    "maintenanceEvent": "NONE"
+    "maintenanceEvent": "NONE",
+    "virtualClock": {"driftToken": "abc-123"},
+    "remainingCpuTime": 3600,
+    "partnerAttributes": {"marketplace_product": "some-appliance"}
   },
   "project": {
     "projectId": "my-project",
@@ -166,6 +169,9 @@ func (s *GcePublicTestSuite) TestMetadata() {
 				s.Equal("TRUE", info.AutomaticRestart)
 				s.Equal("MIGRATE", info.OnHostMaintenance)
 				s.Equal("NONE", info.MaintenanceEvent)
+				s.Equal("abc-123", info.VirtualClockDriftToken)
+				s.Equal(int64(3600), info.RemainingCPUTime)
+				s.Equal("some-appliance", info.PartnerAttributes["marketplace_product"])
 				s.Equal("my-project", info.ProjectID)
 				s.Equal(int64(987654321), info.NumericProjectID)
 

@@ -106,11 +106,18 @@ type Info struct {
 	// Service accounts attached to the VM.
 	ServiceAccounts []ServiceAccount `json:"service_accounts,omitempty"`
 
-	// Raw is the full metadata tree as GCE returned it from
-	// `?recursive=true`. Use this when you need a field gohai's
-	// typed surface doesn't expose. Mirrors Ohai's full-tree dump
-	// under node['gce'].
-	Raw map[string]any `json:"raw,omitempty"`
+	// VirtualClockDriftToken is the opaque drift token from the
+	// instance's virtualClock subtree. Present on all modern GCE
+	// instances; used by some monitoring tools to detect VM migration.
+	VirtualClockDriftToken string `json:"virtual_clock_drift_token,omitempty"`
+
+	// RemainingCPUTime is the remaining CPU time in seconds for Spot
+	// VMs before preemption. -1 (or absent) on standard instances.
+	RemainingCPUTime int64 `json:"remaining_cpu_time,omitempty"`
+
+	// PartnerAttributes carries opaque key/value pairs set by
+	// GCE partner images (e.g. marketplace product metadata).
+	PartnerAttributes map[string]string `json:"partner_attributes,omitempty"`
 }
 
 // NetworkInterface is one attached VNIC. All fields GCE reports,
@@ -183,6 +190,13 @@ type rawInstance struct {
 	Attributes        map[string]string            `json:"attributes"`
 	Licenses          []rawLicense                 `json:"licenses"`
 	MaintenanceEvent  string                       `json:"maintenanceEvent"`
+	VirtualClock      *rawVirtualClock             `json:"virtualClock"`
+	RemainingCPUTime  int64                        `json:"remainingCpuTime"`
+	PartnerAttributes map[string]string            `json:"partnerAttributes"`
+}
+
+type rawVirtualClock struct {
+	DriftToken string `json:"driftToken"`
 }
 
 type rawDisk struct {
@@ -301,13 +315,7 @@ func (c *Collector) Collect(
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, err
 	}
-	info := transform(raw)
-	// If the typed Unmarshal succeeded, the body is valid JSON, so
-	// the generic Unmarshal also succeeds — no error check needed.
-	var generic map[string]any
-	_ = json.Unmarshal(body, &generic)
-	info.Raw = generic
-	return info, nil
+	return transform(raw), nil
 }
 
 // onGCE returns true when the dmi collector's product.name indicates
@@ -349,6 +357,11 @@ func transform(
 		NumericProjectID:  r.Project.NumericProjectID,
 		ProjectAttributes: r.Project.Attributes,
 		Attributes:        r.Instance.Attributes,
+		RemainingCPUTime:  r.Instance.RemainingCPUTime,
+		PartnerAttributes: r.Instance.PartnerAttributes,
+	}
+	if r.Instance.VirtualClock != nil {
+		info.VirtualClockDriftToken = r.Instance.VirtualClock.DriftToken
 	}
 	info.Region = zoneToRegion(info.Zone)
 
