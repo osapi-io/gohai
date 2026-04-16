@@ -30,6 +30,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 )
 
 // Linux runs the full Ohai-parity detection cascade on Linux. Every
@@ -52,10 +53,10 @@ func NewLinux() *Linux {
 // Collect runs the cascade and returns Info.
 func (l *Linux) Collect(
 	ctx context.Context,
-	_ collector.PriorResults,
+	prior collector.PriorResults,
 ) (any, error) {
 	info := &Info{}
-	cascadeLinux(ctx, l.FS, l.Exec, info)
+	cascadeLinux(ctx, l.FS, l.Exec, prior, info)
 	return info, nil
 }
 
@@ -67,6 +68,7 @@ func cascadeLinux(
 	ctx context.Context,
 	fs avfs.VFS,
 	exec executor.Executor,
+	prior collector.PriorResults,
 	info *Info,
 ) {
 	// 0. systemd-detect-virt fast-path (not from Ohai but cheap and
@@ -106,7 +108,8 @@ func cascadeLinux(
 	if b, err := fs.ReadFile("/proc/cpuinfo"); err == nil {
 		text := string(b)
 		if strings.Contains(text, "QEMU Virtual CPU") ||
-			strings.Contains(text, "Common KVM processor") {
+			strings.Contains(text, "Common KVM processor") ||
+			strings.Contains(text, "Common 32-bit KVM processor") {
 			addSystem(info, "kvm", "guest", false)
 		}
 		if fileExists(fs, "/sys/devices/virtual/misc/kvm") {
@@ -115,6 +118,16 @@ func cascadeLinux(
 				role = "guest"
 			}
 			addSystem(info, "kvm", role, false)
+		}
+	}
+	// 7b. KVM via cpu prior (lscpu's hypervisor_vendor / virtualization_type).
+	// Covers nested VMs where /sys/devices/virtual/misc/kvm isn't present
+	// but lscpu still reports a hypervisor. Matches Ohai's
+	// cpu[:hypervisor_vendor] == "KVM" + cpu[:virtualization_type] check.
+	if cpuInfo, ok := collector.GetDep[*cpu.Info](prior, "cpu"); ok && cpuInfo != nil {
+		if strings.EqualFold(cpuInfo.HypervisorVendor, "KVM") &&
+			(cpuInfo.VirtualizationType == "full" || cpuInfo.VirtualizationType == "para") {
+			addSystem(info, "kvm", "guest", false)
 		}
 	}
 
@@ -150,6 +163,17 @@ func cascadeLinux(
 
 	// 12. cgroup / environ container detection.
 	detectViaCgroup(fs, info)
+
+	// 12a. LXC host: lxc-version or lxc-start on PATH AND cgroup root
+	// paths are all "/" (host-side cgroup namespace, not a container).
+	// Only fires when nothing else set System — matches Ohai OHAI-573
+	// guard to prevent false positives on lxc hosts that also look
+	// container-like via other signals.
+	if info.System == "" && cgroupRootsAllSlash(fs) {
+		if execBinaryOnPath(ctx, exec, "lxc-version") || execBinaryOnPath(ctx, exec, "lxc-start") {
+			addSystem(info, "lxc", "host", false)
+		}
+	}
 
 	// 13. .dockerenv / .dockerinit override.
 	if fileExists(fs, "/.dockerenv") || fileExists(fs, "/.dockerinit") {
@@ -190,8 +214,9 @@ func detectViaSystemd(
 	}
 }
 
-// detectViaDMI reads sysfs DMI fields and matches against known
-// hypervisor strings. Mirrors Ohai's guest_from_dmi_data table.
+// detectViaDMI reads sysfs DMI fields and matches against Ohai's
+// full guest_from_dmi_data table. Manufacturer (sys_vendor) is
+// checked first, then product_name — matches mixin/dmi_decode.rb.
 func detectViaDMI(
 	fs avfs.VFS,
 	info *Info,
@@ -203,27 +228,59 @@ func detectViaDMI(
 		}
 		return strings.TrimSpace(string(b))
 	}
-	product := dmi("/sys/class/dmi/id/product_name")
-	vendor := dmi("/sys/class/dmi/id/sys_vendor")
-	bios := dmi("/sys/class/dmi/id/bios_vendor")
+	product := strings.ToLower(dmi("/sys/class/dmi/id/product_name"))
+	vendor := strings.ToLower(dmi("/sys/class/dmi/id/sys_vendor"))
 
-	all := strings.ToLower(product + "|" + vendor + "|" + bios)
+	// Manufacturer-keyed signals (Ohai checks these first).
 	switch {
-	case strings.Contains(all, "vmware"):
-		addSystem(info, "vmware", "guest", false)
-	case strings.Contains(all, "microsoft") && strings.Contains(all, "virtual"):
-		addSystem(info, "hyperv", "guest", false)
-	case strings.Contains(all, "parallels"):
-		addSystem(info, "parallels", "guest", false)
-	case strings.Contains(all, "xen"):
+	case strings.Contains(vendor, "openstack"):
+		addSystem(info, "openstack", "guest", false)
+		return
+	case strings.Contains(vendor, "xen"):
 		addSystem(info, "xen", "guest", false)
-	case strings.Contains(all, "qemu") || strings.Contains(all, "kvm"):
+		return
+	case strings.Contains(vendor, "vmware"):
+		addSystem(info, "vmware", "guest", false)
+		return
+	case strings.Contains(vendor, "microsoft") && strings.Contains(product, "virtual machine"):
+		addSystem(info, "hyperv", "guest", false)
+		return
+	case strings.Contains(vendor, "amazon ec2"):
+		addSystem(info, "amazonec2", "guest", false)
+		return
+	case strings.Contains(vendor, "qemu"):
 		addSystem(info, "kvm", "guest", false)
+		return
+	case strings.Contains(vendor, "veertu"):
+		addSystem(info, "veertu", "guest", false)
+		return
+	case strings.Contains(vendor, "parallels"):
+		addSystem(info, "parallels", "guest", false)
+		return
+	}
+	// Product-keyed signals (fallback when vendor didn't match).
+	switch {
+	case strings.Contains(product, "virtualbox"):
+		addSystem(info, "vbox", "guest", false)
+	case strings.Contains(product, "openstack"):
+		addSystem(info, "openstack", "guest", false)
+	case strings.Contains(product, "kvm") || strings.Contains(product, "rhev"):
+		addSystem(info, "kvm", "guest", false)
+	case strings.Contains(product, "bhyve"):
+		addSystem(info, "bhyve", "guest", false)
 	}
 }
 
-// cgroupContainerRE matches Docker / LXC / containerd cgroup paths.
+// cgroupContainerRE matches Docker / LXC / containerd cgroup paths
+// that sit directly under the cgroup root (classic docker/lxc layout).
 var cgroupContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]+:/(docker|lxc|containerd)/`)
+
+// cgroupNestedContainerRE matches systemd-managed and docker-ce layouts
+// where the runtime appears as a named cgroup under a parent slice —
+// `/system.slice/docker-<hash>.scope`, `/docker-ce/docker/<hash>`,
+// `/kubepods/.../docker-<hash>.scope`, etc. Mirrors Ohai's second regex
+// in linux/virtualization.rb.
+var cgroupNestedContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]*:/[^/]+/(docker|lxc)-?`)
 
 // detectViaCgroup parses /proc/self/cgroup and /proc/1/environ for
 // container hints. Mirrors Ohai's cascade in the linux plugin.
@@ -232,12 +289,20 @@ func detectViaCgroup(
 	info *Info,
 ) {
 	if b, err := fs.ReadFile("/proc/self/cgroup"); err == nil {
-		if m := cgroupContainerRE.FindStringSubmatch(string(b)); m != nil {
+		text := string(b)
+		matched := false
+		if m := cgroupContainerRE.FindStringSubmatch(text); m != nil {
 			name := m[1]
 			if name == "containerd" {
 				name = "docker"
 			}
 			addSystem(info, name, "guest", false)
+			matched = true
+		}
+		if !matched {
+			if m := cgroupNestedContainerRE.FindStringSubmatch(text); m != nil {
+				addSystem(info, m[1], "guest", false)
+			}
 		}
 	}
 	if b, err := fs.ReadFile("/proc/1/environ"); err == nil {
@@ -251,6 +316,30 @@ func detectViaCgroup(
 			addSystem(info, "podman", "guest", false)
 		}
 	}
+}
+
+// cgroupRootsAllSlash reports whether every line of /proc/self/cgroup
+// has a root path of "/". Ohai uses this as the "is a real LXC host,
+// not a container itself" signal. Matches Ohai's `roots.uniq == ["/"]`
+// check on `/proc/self/cgroup` field 2's trailing path.
+func cgroupRootsAllSlash(
+	fs avfs.VFS,
+) bool {
+	b, err := fs.ReadFile("/proc/self/cgroup")
+	if err != nil {
+		return false
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	for _, line := range lines {
+		fields := strings.SplitN(line, ":", 3)
+		if len(fields) < 3 {
+			return false
+		}
+		if strings.TrimSpace(fields[2]) != "/" {
+			return false
+		}
+	}
+	return true
 }
 
 // fileExists reports whether path exists on the FS.
