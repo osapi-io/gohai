@@ -18,14 +18,20 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package users
+package sessions
 
-// SetGeteuidFn swaps the os.Geteuid seam for tests. Returns a restore
-// func the caller must defer.
-func SetGeteuidFn(
-	fn func() int,
+import (
+	"context"
+
+	"github.com/shirou/gopsutil/v4/host"
+)
+
+// SetUsersFn swaps the private gopsutil host.UsersWithContext call
+// backing listSessions. Returns a restore func the caller must defer.
+func SetUsersFn(
+	fn func(context.Context) ([]host.UserStat, error),
 ) (restore func()) {
-	orig := geteuidFn
-	geteuidFn = fn
-	return func() { geteuidFn = orig }
+	orig := usersFn
+	usersFn = fn
+	return func() { usersFn = orig }
 }

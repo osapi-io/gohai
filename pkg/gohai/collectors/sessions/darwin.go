@@ -18,14 +18,34 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package users
+package sessions
 
-// SetGeteuidFn swaps the os.Geteuid seam for tests. Returns a restore
-// func the caller must defer.
-func SetGeteuidFn(
-	fn func() int,
-) (restore func()) {
-	orig := geteuidFn
-	geteuidFn = fn
-	return func() { geteuidFn = orig }
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+)
+
+// Darwin collects logged-in sessions on macOS via gopsutil (utmpx).
+// loginctl does not exist on Darwin so there's no exec path; gopsutil
+// reads utmpx directly through the package-level usersFn seam.
+type Darwin struct {
+	base
+}
+
+// NewDarwin returns a Darwin variant.
+func NewDarwin() *Darwin {
+	return &Darwin{}
+}
+
+// Collect returns logged-in session Info.
+func (d *Darwin) Collect(
+	ctx context.Context,
+	_ collector.PriorResults,
+) (any, error) {
+	ss, err := listSessions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &Info{LoggedIn: ss}, nil
 }
