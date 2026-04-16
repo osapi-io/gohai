@@ -57,7 +57,26 @@ const instanceResponse = `{
   "timeCreated": 1713000000000,
   "metadata": {"ssh_authorized_keys": "ssh-rsa AAA..."},
   "freeformTags": {"env": "prod"},
-  "regionInfo": {"realmKey": "oc1", "regionKey": "PHX", "regionIdentifier": "us-phoenix-1"}
+  "regionInfo": {"realmKey": "oc1", "regionKey": "PHX", "regionIdentifier": "us-phoenix-1"},
+  "agentConfig": {"isManagementDisabled": false, "isMonitoringDisabled": false, "areAllPluginsDisabled": false},
+  "availabilityConfig": {"isLiveMigrationPreferred": true, "recoveryAction": "RESTORE_INSTANCE"},
+  "instancePoolId": "ocid1.instancepool.oc1.phx.pool1",
+  "dedicatedVmHostId": "ocid1.dedicatedvmhost.oc1.phx.host1",
+  "launchOptions": {
+    "bootVolumeType": "PARAVIRTUALIZED",
+    "firmware": "UEFI_64",
+    "networkType": "PARAVIRTUALIZED",
+    "remoteDataVolumeType": "PARAVIRTUALIZED",
+    "isConsistentVolumeNamingEnabled": true,
+    "isPvEncryptionInTransitEnabled": true
+  },
+  "sourceDetails": {
+    "sourceType": "image",
+    "imageId": "ocid1.image.oc1.phx.src",
+    "bootVolumeSizeInGBs": 50,
+    "kmsKeyId": "ocid1.key.oc1.phx.k1"
+  },
+  "platformConfig": {"type": "AMD_VM", "isSecureBootEnabled": true}
 }`
 
 const vnicsResponse = `[
@@ -166,6 +185,23 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				va, ok := info.VolumeAttachments["ocid1.volumeattachment.oc1.phx.bbb"]
 				s.Require().True(ok)
 				s.Equal("ATTACHED", va.LifecycleState)
+
+				// New typed fields from Ohai blind compute dump.
+				s.Require().NotNil(info.AgentConfig)
+				s.False(info.AgentConfig.IsManagementDisabled)
+				s.Require().NotNil(info.AvailabilityConfig)
+				s.True(info.AvailabilityConfig.IsLiveMigrationPreferred)
+				s.Equal("RESTORE_INSTANCE", info.AvailabilityConfig.RecoveryAction)
+				s.Equal("ocid1.instancepool.oc1.phx.pool1", info.InstancePoolID)
+				s.Equal("ocid1.dedicatedvmhost.oc1.phx.host1", info.DedicatedVMHostID)
+				s.Require().NotNil(info.LaunchOptions)
+				s.Equal("PARAVIRTUALIZED", info.LaunchOptions.BootVolumeType)
+				s.Equal("UEFI_64", info.LaunchOptions.Firmware)
+				s.True(info.LaunchOptions.IsPVEncryptionInTransitEnabled)
+				s.Require().NotNil(info.SourceDetails)
+				s.Equal("image", info.SourceDetails.SourceType)
+				s.Equal(50, info.SourceDetails.BootVolumeSizeInGBs)
+				s.Equal("AMD_VM", info.PlatformConfig["type"])
 			},
 		},
 		{

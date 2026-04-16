@@ -36,6 +36,13 @@ that's the hardcoded secret).
 | `defined_tags`          | `map[string]any`              | OCI defined tags (namespaced).                                                                        | No direct schema mapping.      |
 | `freeform_tags`         | `map[string]string`           | OCI free-form tags.                                                                                   | No direct schema mapping.      |
 | `region_info`           | `*RegionInfo`                 | Geographic identification sub-record.                                                                 | No direct schema mapping.      |
+| `agent_config`          | `*AgentConfig`                | Oracle Cloud Agent state (management/monitoring/plugin toggles).                                      | No direct schema mapping.      |
+| `availability_config`   | `*AvailabilityConfig`         | Maintenance recovery preferences (live migration + recovery action).                                  | No direct schema mapping.      |
+| `instance_pool_id`      | `string`                      | Parent instance pool OCID (empty on stand-alone VMs).                                                 | No direct schema mapping.      |
+| `dedicated_vm_host_id`  | `string`                      | Dedicated VM host OCID (empty on shared infrastructure).                                              | No direct schema mapping.      |
+| `launch_options`        | `*LaunchOptions`              | VM launch-time config (boot volume type, firmware, network type, encryption-in-transit).              | No direct schema mapping.      |
+| `source_details`        | `*SourceDetails`              | Image/boot-volume source info (source_type, image_id, boot_volume_size_in_gbs, kms_key_id).           | No direct schema mapping.      |
+| `platform_config`       | `map[string]any`              | Shape-family-specific platform config (AMD / Intel / GPU variants have different sub-shapes).         | No direct schema mapping.      |
 | `vnics`                 | `[]VNIC`                      | Virtual NICs — see below.                                                                             | OCSF `network_interface`       |
 | `volume_attachments`    | `map[string]VolumeAttachment` | Attached volumes keyed by attachment OCID — matches Ohai's `metadata.volumes[<id>]` shape. See below. | No direct schema mapping.      |
 
