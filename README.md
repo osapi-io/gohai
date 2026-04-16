@@ -232,6 +232,45 @@ See the [Development](docs/development.md) guide for prerequisites, setup,
 and conventions. See the [Contributing](docs/contributing.md) guide before
 submitting a PR.
 
+## 🔗 Related Works
+
+gohai stands on the shoulders of the following projects — as methodology
+references, as backing libraries we wrap, or as peers solving adjacent
+problems:
+
+**Fact collectors (direct peers):**
+
+- [Chef Ohai][] — the canonical reference. Ruby-based plugin-driven fact
+  collector; every gohai collector cross-references the corresponding
+  Ohai plugin for data sources and per-distro edge cases.
+- [Puppet Facter](https://github.com/puppetlabs/facter) — Puppet's
+  equivalent. Different JSON shape, overlapping fact surface.
+- [Salt Grains](https://docs.saltproject.io/en/latest/topics/grains/) —
+  SaltStack's static facts.
+
+**Backing libraries (we import these):**
+
+- [gopsutil][] — primary source for dynamic runtime state (memory,
+  network I/O, process enumeration, virtualization detection).
+- [ghw][] — canonical for physical hardware topology (CPU NUMA,
+  DIMMs, block devices, DMI, GPU, PCI).
+- [procfs][] — Linux `/proc` and `/sys` parsing when a library doesn't
+  cover a field.
+- [go-sysinfo](https://github.com/elastic/go-sysinfo) — Elastic's
+  alternative for host/platform/kernel facts.
+- [avfs](https://github.com/avfs/avfs) — virtual filesystem
+  abstraction used in every collector that reads files, so tests can
+  run against in-memory fixtures.
+
+**Methodology references (we read, don't import):**
+
+- [node_exporter](https://github.com/prometheus/node_exporter) — gold
+  standard for tricky Linux `/proc` and `/sys` parsing. Apache-2, but
+  we rewrite in our style rather than import.
+- [psutil](https://github.com/giampaolo/psutil) — the Python library
+  gopsutil is a port of; the original design reference for the
+  dynamic-state facts.
+
 ## 📄 License
 
 The [MIT][] License.
