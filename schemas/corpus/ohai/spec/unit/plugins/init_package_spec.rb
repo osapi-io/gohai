@@ -1,0 +1,60 @@
+#
+# Author:: Caleb Tennis (<caleb.tennis@gmail.com>)
+# Copyright:: Copyright (c) 2009-2026 Progress Software Corporation and/or its subsidiaries or affiliates. All Rights Reserved.
+# License:: Apache License, Version 2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+require "spec_helper"
+
+describe Ohai::System, "Init package" do
+  let(:plugin) do
+    p = get_plugin("init_package")
+    allow(p).to receive(:collect_os).and_return("linux")
+    p
+  end
+
+  let(:proc1_content) { "init\n" }
+  let(:proc1_exists) { true }
+  let(:proc_1_file_path) { "/proc/1/comm" }
+  let(:proc_1_file) { double(proc_1_file_path, gets: proc1_content) }
+
+  before do
+    allow(File).to receive(:exist?).with(proc_1_file_path).and_return(proc1_exists)
+    allow(File).to receive(:open).with(proc_1_file_path).and_return(proc_1_file)
+  end
+
+  it "sets init_package to init" do
+    plugin.run
+    expect(plugin[:init_package]).to eq("init")
+  end
+
+  describe "when init_package is systemd" do
+    let(:proc1_content) { "systemd\n" }
+
+    it "sets init_package to systemd" do
+      plugin.run
+      expect(plugin[:init_package]).to eq("systemd")
+    end
+  end
+
+  describe "when /proc/1/comm doesn't exist" do
+    let(:proc1_exists) { false }
+
+    it "sets init_package to init" do
+      plugin.run
+      expect(plugin[:init_package]).to eq("init")
+    end
+  end
+end
