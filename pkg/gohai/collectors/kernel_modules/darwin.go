@@ -86,6 +86,9 @@ func parseKextstat(
 			continue
 		}
 		mod := Module{Version: m[5]}
+		if idx, err := strconv.Atoi(m[1]); err == nil {
+			mod.Index = idx
+		}
 		if rc, err := strconv.Atoi(m[2]); err == nil {
 			mod.RefCount = rc
 		}
