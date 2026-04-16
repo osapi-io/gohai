@@ -29,6 +29,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
@@ -78,6 +79,7 @@ func packageMgrInfoPtr() *packagemgr.Info { return &packagemgr.Info{} }
 func sessionsInfoPtr() *sessions.Info     { return &sessions.Info{} }
 func pciInfoPtr() *pci.Info               { return &pci.Info{} }
 func scsiInfoPtr() *scsi.Info             { return &scsi.Info{} }
+func hardwareInfoPtr() *hardware.Info     { return &hardware.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -298,6 +300,12 @@ func (s *FactsTestSuite) TestSet() {
 			collName: "scsi",
 			result:   scsiInfoPtr(),
 			check:    func(f *Facts) bool { return f.SCSI != nil },
+		},
+		{
+			name:     "hardware",
+			collName: "hardware",
+			result:   hardwareInfoPtr(),
+			check:    func(f *Facts) bool { return f.Hardware != nil },
 		},
 	}
 	for _, tt := range tests {
