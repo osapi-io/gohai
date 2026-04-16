@@ -92,12 +92,29 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                                                                 | Ohai plugin ([`uptime.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/uptime.rb)) | Alignment                                                                                                            |
-| -------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `host.InfoWithContext` (Uptime + BootTime) + `/proc/uptime` field 2 for IdleSeconds | Ohai reads `/proc/uptime` directly for both uptime and idle, then computes human form.         | **Equivalent.** gopsutil wraps the same `/proc/uptime` read. Our `/proc/uptime` parse for idle mirrors Ohai exactly. |
-| macOS    | gopsutil `host.InfoWithContext` (Uptime + BootTime)                                          | Ohai uses `sysctl kern.boottime` on darwin — same underlying kernel counter.                   | **Equivalent uptime.** macOS has no aggregate idle counter, so no idle fields on darwin (matches Ohai).              |
+On Linux:
 
-**Known gaps:** None. Ohai's idle field is Linux-only; ours is too.
+1. gopsutil's `host.InfoWithContext` reads `/proc/uptime` (field 1) for
+   `seconds` and synthesizes `boot_time` as `now - uptime`. We forward both
+   verbatim and render `human` via `HumanDuration(seconds)`.
+2. We additionally read `/proc/uptime` through the injected `avfs.VFS` and parse
+   field 2 (aggregate idle time across all CPUs — can exceed wall-clock uptime
+   on multi-core systems) into `idle_seconds`; `idle_human` renders via the same
+   helper. Missing file, malformed content, or a negative value leaves the idle
+   fields zero-valued.
+
+On macOS:
+
+1. gopsutil's `host.InfoWithContext` reads `kern.boottime` via sysctl and
+   computes `seconds` as `now - boot_epoch`. Same mapping to `seconds` /
+   `boot_time` / `human` as Linux. macOS has no aggregate idle counter, so
+   `idle_seconds` / `idle_human` are omitted from the output.
+
+Mirrors Ohai's `uptime.rb` — same `/proc/uptime` parse on Linux, same
+`kern.boottime`-derived uptime on Darwin. Our `boot_time` field is an additional
+surface not in Ohai. Human-rendering format is compact (`1d 2h 3m 4s`) rather
+than Ohai's verbose pluralized form (`1 day 02 hours 03 minutes 04 seconds`) —
+presentation choice.
 
 ## Backing library
 
