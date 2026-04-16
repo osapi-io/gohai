@@ -39,9 +39,11 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
 	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/pci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
@@ -72,6 +74,8 @@ func lsbInfoPtr() *lsb.Info               { return &lsb.Info{} }
 func initInfoPtr() *initd.Info            { return &initd.Info{} }
 func shardInfoPtr() *shard.Info           { return &shard.Info{} }
 func packageMgrInfoPtr() *packagemgr.Info { return &packagemgr.Info{} }
+func sessionsInfoPtr() *sessions.Info     { return &sessions.Info{} }
+func pciInfoPtr() *pci.Info               { return &pci.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -274,6 +278,18 @@ func (s *FactsTestSuite) TestSet() {
 			collName: "package_mgr",
 			result:   packageMgrInfoPtr(),
 			check:    func(f *Facts) bool { return f.PackageMgr != nil },
+		},
+		{
+			name:     "sessions",
+			collName: "sessions",
+			result:   sessionsInfoPtr(),
+			check:    func(f *Facts) bool { return f.Sessions != nil },
+		},
+		{
+			name:     "pci",
+			collName: "pci",
+			result:   pciInfoPtr(),
+			check:    func(f *Facts) bool { return f.PCI != nil },
 		},
 	}
 	for _, tt := range tests {
