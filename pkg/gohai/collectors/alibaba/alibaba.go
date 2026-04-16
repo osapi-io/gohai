@@ -56,26 +56,34 @@ const metadataTimeout = 6 * time.Second
 // /sys/class/dmi/id/sys_vendor. Matches Ohai's has_ali_dmi?.
 const dmiVendorSignature = "Alibaba"
 
-// Info is the Alibaba view. Well-known fields are extracted as typed
-// values; anything else (including fields Alibaba adds in the future)
-// is preserved under Raw so consumers don't need a code change to
-// access it. Mirrors Ohai's full-tree output while keeping our typed
-// convention for canonical fields.
+// Info is the Alibaba ECS view. Every field the IMDS exposes under
+// /meta-data/ is surfaced as a typed member. Credential-bearing paths
+// (ram/security-credentials, user-data, public-keys) are deliberately
+// skipped.
 type Info struct {
 	// Identity.
-	InstanceID   string `json:"instance_id"`
-	InstanceName string `json:"instance_name,omitempty"`
-	InstanceType string `json:"instance_type,omitempty"`
-	Hostname     string `json:"hostname,omitempty"`
-	ImageID      string `json:"image_id,omitempty"`
-	SerialNumber string `json:"serial_number,omitempty"`
-	NetworkType  string `json:"network_type,omitempty"`
+	InstanceID     string `json:"instance_id"`
+	InstanceName   string `json:"instance_name,omitempty"`
+	InstanceType   string `json:"instance_type,omitempty"`
+	Hostname       string `json:"hostname,omitempty"`
+	ImageID        string `json:"image_id,omitempty"`
+	SerialNumber   string `json:"serial_number,omitempty"`
+	NetworkType    string `json:"network_type,omitempty"`
+	OwnerAccountID string `json:"owner_account_id,omitempty"`
+	SourceAddress  string `json:"source_address,omitempty"`
 
 	// Location.
 	Region string `json:"region,omitempty"`
 	Zone   string `json:"zone,omitempty"`
 
-	// Network.
+	// Virtualization layer (meta-data/instance/).
+	VirtualizationSolution        string `json:"virtualization_solution,omitempty"`
+	VirtualizationSolutionVersion string `json:"virtualization_solution_version,omitempty"`
+
+	// Spot lifecycle.
+	SpotTerminationTime string `json:"spot_termination_time,omitempty"`
+
+	// Network — primary ENI flattened onto the top level.
 	MAC          string   `json:"mac,omitempty"`
 	PrivateIPv4  string   `json:"private_ipv4,omitempty"`
 	PublicIPv4   string   `json:"public_ipv4,omitempty"`
@@ -86,18 +94,56 @@ type Info struct {
 	Nameservers  []string `json:"dns_nameservers,omitempty"`
 	NTPServers   []string `json:"ntp_servers,omitempty"`
 
-	// Bandwidth caps (bytes/sec, when present).
+	// All ENIs (including the primary) keyed by MAC.
+	NetworkInterfaces map[string]NetworkInterface `json:"network_interfaces,omitempty"`
+
+	// Bandwidth caps (Mbps, when present).
 	MaxBandwidthIngress int64 `json:"max_bandwidth_ingress,omitempty"`
 	MaxBandwidthEgress  int64 `json:"max_bandwidth_egress,omitempty"`
 
 	// IAM.
 	RAMRoleName string `json:"ram_role_name,omitempty"`
 
-	// Raw is the entire metadata tree as walked recursively. Keys are
-	// sanitized per Ohai's rule (dashes/slashes → underscores, trailing
-	// underscore stripped). Use this when you need a field we don't
-	// surface as a typed member.
-	Raw map[string]any `json:"raw,omitempty"`
+	// Attached disks keyed by serial number.
+	Disks map[string]Disk `json:"disks,omitempty"`
+
+	// Marketplace info (only on Marketplace-sourced images).
+	Marketplace *Marketplace `json:"marketplace,omitempty"`
+
+	// User-defined instance tags.
+	Tags map[string]string `json:"tags,omitempty"`
+}
+
+// NetworkInterface is one ENI attached to the instance.
+type NetworkInterface struct {
+	NetworkInterfaceID   string   `json:"network_interface_id,omitempty"`
+	PrimaryIPAddress     string   `json:"primary_ip_address,omitempty"`
+	PrivateIPv4s         []string `json:"private_ipv4s,omitempty"`
+	IPv4Prefixes         []string `json:"ipv4_prefixes,omitempty"`
+	Netmask              string   `json:"netmask,omitempty"`
+	Gateway              string   `json:"gateway,omitempty"`
+	VPCID                string   `json:"vpc_id,omitempty"`
+	VPCCIDRBlock         string   `json:"vpc_cidr_block,omitempty"`
+	VPCIPv6CIDRBlocks    []string `json:"vpc_ipv6_cidr_blocks,omitempty"`
+	VSwitchID            string   `json:"vswitch_id,omitempty"`
+	VSwitchCIDRBlock     string   `json:"vswitch_cidr_block,omitempty"`
+	VSwitchIPv6CIDRBlock string   `json:"vswitch_ipv6_cidr_block,omitempty"`
+	IPv6s                []string `json:"ipv6s,omitempty"`
+	IPv6Prefixes         []string `json:"ipv6_prefixes,omitempty"`
+	IPv6Gateway          string   `json:"ipv6_gateway,omitempty"`
+}
+
+// Disk is one attached disk keyed by its serial number.
+type Disk struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
+// Marketplace describes billing metadata Alibaba surfaces on
+// Marketplace-sourced images.
+type Marketplace struct {
+	ProductCode string `json:"product_code,omitempty"`
+	ChargeType  string `json:"charge_type,omitempty"`
 }
 
 // Collector fetches Alibaba's metadata tree via a recursive walk.
@@ -230,12 +276,13 @@ func sanitizeKey(
 	return strings.TrimRight(k, "_")
 }
 
-// transform extracts the canonical typed fields from the walked tree
-// and keeps the full tree under Info.Raw for forward-compat.
+// transform extracts the canonical typed fields from the walked tree.
+// Every IMDS field surfaces as a typed member; credential-bearing
+// paths are never included.
 func transform(
 	tree map[string]any,
 ) *Info {
-	info := &Info{Raw: tree}
+	info := &Info{}
 	md, _ := tree["meta_data"].(map[string]any)
 	if md == nil {
 		return info
@@ -247,6 +294,8 @@ func transform(
 	info.ImageID = strVal(md, "image_id")
 	info.SerialNumber = strVal(md, "serial_number")
 	info.NetworkType = strVal(md, "network_type")
+	info.OwnerAccountID = strVal(md, "owner_account_id")
+	info.SourceAddress = strVal(md, "source_address")
 	info.MAC = strVal(md, "mac")
 	info.PrivateIPv4 = strVal(md, "private_ipv4")
 	info.PublicIPv4 = strVal(md, "eipv4")
@@ -260,6 +309,11 @@ func transform(
 		info.InstanceName = strVal(inst, "instance_name")
 		info.MaxBandwidthIngress = intVal(inst, "max_netbw_ingress")
 		info.MaxBandwidthEgress = intVal(inst, "max_netbw_egress")
+		info.VirtualizationSolution = strVal(inst, "virtualization_solution")
+		info.VirtualizationSolutionVersion = strVal(inst, "virtualization_solution_version")
+		if spot, ok := inst["spot"].(map[string]any); ok {
+			info.SpotTerminationTime = strVal(spot, "termination_time")
+		}
 	}
 	if dns, ok := md["dns_conf"].(map[string]any); ok {
 		info.Nameservers = splitSpace(strVal(dns, "nameservers"))
@@ -270,7 +324,106 @@ func transform(
 	if ram, ok := md["ram"].(map[string]any); ok {
 		info.RAMRoleName = strVal(ram, "role_name")
 	}
+	if img, ok := md["image"].(map[string]any); ok {
+		if mp, ok := img["market_place"].(map[string]any); ok {
+			m := &Marketplace{
+				ProductCode: strVal(mp, "product_code"),
+				ChargeType:  strVal(mp, "charge_type"),
+			}
+			if m.ProductCode != "" || m.ChargeType != "" {
+				info.Marketplace = m
+			}
+		}
+	}
+	if tags, ok := md["tags"].(map[string]any); ok {
+		if inst, ok := tags["instance"].(map[string]any); ok {
+			out := make(map[string]string, len(inst))
+			for k, v := range inst {
+				if s, ok := v.(string); ok {
+					out[k] = s
+				}
+			}
+			if len(out) > 0 {
+				info.Tags = out
+			}
+		}
+	}
+	if disks, ok := md["disks"].(map[string]any); ok {
+		out := make(map[string]Disk, len(disks))
+		for serial, v := range disks {
+			d, ok := v.(map[string]any)
+			if !ok {
+				continue
+			}
+			out[serial] = Disk{
+				ID:   strVal(d, "id"),
+				Name: strVal(d, "name"),
+			}
+		}
+		if len(out) > 0 {
+			info.Disks = out
+		}
+	}
+	if net, ok := md["network"].(map[string]any); ok {
+		if interfaces, ok := net["interfaces"].(map[string]any); ok {
+			if macs, ok := interfaces["macs"].(map[string]any); ok {
+				out := make(map[string]NetworkInterface, len(macs))
+				for mac, v := range macs {
+					e, ok := v.(map[string]any)
+					if !ok {
+						continue
+					}
+					out[mac] = NetworkInterface{
+						NetworkInterfaceID:   strVal(e, "network_interface_id"),
+						PrimaryIPAddress:     strVal(e, "primary_ip_address"),
+						PrivateIPv4s:         splitCommaOrSpace(strVal(e, "private_ipv4s")),
+						IPv4Prefixes:         splitCommaOrSpace(strVal(e, "ipv4_prefixes")),
+						Netmask:              strVal(e, "netmask"),
+						Gateway:              strVal(e, "gateway"),
+						VPCID:                strVal(e, "vpc_id"),
+						VPCCIDRBlock:         strVal(e, "vpc_cidr_block"),
+						VPCIPv6CIDRBlocks:    splitCommaOrSpace(strVal(e, "vpc_ipv6_cidr_blocks")),
+						VSwitchID:            strVal(e, "vswitch_id"),
+						VSwitchCIDRBlock:     strVal(e, "vswitch_cidr_block"),
+						VSwitchIPv6CIDRBlock: strVal(e, "vswitch_ipv6_cidr_block"),
+						IPv6s:                splitCommaOrSpace(strVal(e, "ipv6s")),
+						IPv6Prefixes:         splitCommaOrSpace(strVal(e, "ipv6_prefixes")),
+						IPv6Gateway:          strVal(e, "ipv6_gateway"),
+					}
+				}
+				if len(out) > 0 {
+					info.NetworkInterfaces = out
+				}
+			}
+		}
+	}
 	return info
+}
+
+// splitCommaOrSpace handles Alibaba's mixed list encoding — some
+// fields use comma separation, others use whitespace. Both collapse
+// to the same []string.
+func splitCommaOrSpace(
+	s string,
+) []string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	// Commas first; if none, whitespace.
+	if strings.Contains(s, ",") {
+		out := make([]string, 0)
+		for _, part := range strings.Split(s, ",") {
+			if p := strings.TrimSpace(part); p != "" {
+				out = append(out, p)
+			}
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
+	return strings.Fields(s)
 }
 
 // strVal returns the string value at key, or empty when absent / wrong type.
