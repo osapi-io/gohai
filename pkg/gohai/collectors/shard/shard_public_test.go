@@ -23,16 +23,17 @@ package shard_test
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"testing"
 
-	"github.com/avfs/avfs"
-	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 )
 
@@ -41,29 +42,26 @@ var (
 	_ collector.Collector = (*shard.Darwin)(nil)
 )
 
-// newShardFS builds a memfs populated with path→content for the
-// machine-id files the collector probes.
-func newShardFS(
-	contents map[string]string,
-) avfs.VFS {
-	f := memfs.New()
-	for path, body := range contents {
-		_ = f.MkdirAll(parentDir(path), 0o755)
-		_ = f.WriteFile(path, []byte(body), fs.FileMode(0o644))
+const (
+	machinename = "somehost004"
+	serial      = "234du3m4i498xdjr2"
+	uuid        = "48555CF4-5BB1-21D9-BC4C-E8B73DDE5801"
+)
+
+func priorWithDMI() collector.PriorResults {
+	return collector.PriorResults{
+		"hostname": &hostname.Info{MachineName: machinename},
+		"dmi": &dmi.Info{
+			Product: &dmi.Product{SerialNumber: serial, UUID: uuid},
+		},
 	}
-	return f
 }
 
-func parentDir(
-	p string,
-) string {
-	for i := len(p) - 1; i >= 0; i-- {
-		if p[i] == '/' {
-			return p[:i]
-		}
-	}
-	return "/"
-}
+// Ohai test vector: MD5("somehost004" + "234du3m4i498xdjr2" +
+// "48555CF4-5BB1-21D9-BC4C-E8B73DDE5801")[0:7] → 27767217
+const ohaiDefaultSeed = 27767217
+
+const sysProfJSON = `{"SPHardwareDataType": [{"serial_number": "234du3m4i498xdjr2"}]}`
 
 type ShardPublicTestSuite struct {
 	suite.Suite
@@ -86,8 +84,6 @@ func (s *ShardPublicTestSuite) TestNew() {
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
 		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
 		{"unknown dispatches to Linux", "", "linux"},
 	}
 	for _, tt := range tests {
@@ -97,7 +93,7 @@ func (s *ShardPublicTestSuite) TestNew() {
 			s.Equal("shard", c.Name())
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
-			s.Empty(c.Dependencies())
+			s.Equal([]string{"hostname", "dmi"}, c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*shard.Darwin)
@@ -112,78 +108,167 @@ func (s *ShardPublicTestSuite) TestNew() {
 
 func (s *ShardPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name          string
-		variant       string
-		files         map[string]string
-		hostFn        func(context.Context) (*host.InfoStat, error)
-		hostname      string
-		deterministic bool
+		name     string
+		variant  string
+		prior    collector.PriorResults
+		hostFn   func(context.Context) (*host.InfoStat, error)
+		spOut    []byte
+		spErr    error
+		wantSeed int
 	}{
 		{
-			name:     "linux: stable inputs produce stable seed",
+			name:     "linux: matches Ohai test vector (machinename + serial + uuid)",
 			variant:  "linux",
-			files:    map[string]string{"/etc/machine-id": "abc123\n"},
-			hostname: "web01",
+			prior:    priorWithDMI(),
+			wantSeed: ohaiDefaultSeed,
 		},
 		{
-			name:     "linux: dbus fallback when /etc/machine-id missing",
-			variant:  "linux",
-			files:    map[string]string{"/var/lib/dbus/machine-id": "dbus-id\n"},
-			hostname: "web01",
-		},
-		{
-			name:     "linux: empty machine-id still produces a seed",
-			variant:  "linux",
-			hostname: "laptop",
-		},
-		{
-			name:          "linux: repeated Collect is deterministic",
-			variant:       "linux",
-			files:         map[string]string{"/etc/machine-id": "stable-id"},
-			hostname:      "stable-host",
-			deterministic: true,
-		},
-		{
-			name:    "darwin: IOPlatformUUID + hostname",
-			variant: "darwin",
-			hostFn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{HostID: "uuid-1234"}, nil
+			name:    "linux: baseboard serial fallback when product serial empty",
+			variant: "linux",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+				"dmi": &dmi.Info{
+					Product:   &dmi.Product{UUID: uuid},
+					Baseboard: &dmi.Baseboard{SerialNumber: serial},
+				},
 			},
-			hostname: "johns-mac",
+			wantSeed: ohaiDefaultSeed,
 		},
 		{
-			name:     "darwin: gopsutil error → empty machine_id, seed still computes",
-			variant:  "darwin",
+			name:    "linux: chassis serial fallback",
+			variant: "linux",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+				"dmi": &dmi.Info{
+					Product: &dmi.Product{UUID: uuid},
+					Chassis: &dmi.Chassis{SerialNumber: serial},
+				},
+			},
+			wantSeed: ohaiDefaultSeed,
+		},
+		{
+			name:    "linux: no dmi → seed from machinename only",
+			variant: "linux",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			wantSeed: -1,
+		},
+		{
+			name:    "linux: no hostname prior → seed from serial+uuid only",
+			variant: "linux",
+			prior: collector.PriorResults{
+				"dmi": &dmi.Info{
+					Product: &dmi.Product{SerialNumber: serial, UUID: uuid},
+				},
+			},
+			wantSeed: -1,
+		},
+		{
+			name:     "linux: empty prior → deterministic zero-input seed",
+			variant:  "linux",
+			prior:    collector.PriorResults{},
+			wantSeed: -1,
+		},
+		{
+			name:    "linux: nil dmi sub-structs → empty serial+uuid",
+			variant: "linux",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+				"dmi":      &dmi.Info{},
+			},
+			wantSeed: -1,
+		},
+		{
+			name:    "darwin: matches Ohai test vector",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			hostFn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{HostID: uuid}, nil
+			},
+			spOut:    []byte(sysProfJSON),
+			wantSeed: ohaiDefaultSeed,
+		},
+		{
+			name:    "darwin: gopsutil error → empty uuid, seed still computes",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
 			hostFn:   func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			hostname: "johns-mac",
+			spOut:    []byte(sysProfJSON),
+			wantSeed: -1,
 		},
 		{
-			name:     "darwin: nil info upstream → seed still computes",
-			variant:  "darwin",
-			hostFn:   func(context.Context) (*host.InfoStat, error) { return nil, nil },
-			hostname: "johns-mac",
+			name:    "darwin: malformed system_profiler JSON → empty serial",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			hostFn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{HostID: uuid}, nil
+			},
+			spOut:    []byte("not json"),
+			wantSeed: -1,
+		},
+		{
+			name:    "darwin: empty items array → empty serial",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			hostFn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{HostID: uuid}, nil
+			},
+			spOut:    []byte(`{"SPHardwareDataType": []}`),
+			wantSeed: -1,
+		},
+		{
+			name:    "darwin: system_profiler error → empty serial",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			hostFn: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{HostID: uuid}, nil
+			},
+			spErr:    errors.New("not found"),
+			wantSeed: -1,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer shard.SetHostnameFn(func() (string, error) { return tt.hostname, nil })()
 			var c shard.Collector
 			switch tt.variant {
 			case "linux":
-				c = &shard.Linux{FS: newShardFS(tt.files)}
+				c = &shard.Linux{}
 			case "darwin":
 				defer shard.SetHostInfoFn(tt.hostFn)()
-				c = &shard.Darwin{}
+				ctrl := gomock.NewController(s.T())
+				mockExec := execmocks.NewMockExecutor(ctrl)
+				if tt.spErr != nil {
+					mockExec.EXPECT().
+						Execute(gomock.Any(), "system_profiler", "SPHardwareDataType", "-json").
+						Return(nil, tt.spErr)
+				} else {
+					mockExec.EXPECT().
+						Execute(gomock.Any(), "system_profiler", "SPHardwareDataType", "-json").
+						Return(tt.spOut, nil)
+				}
+				c = &shard.Darwin{Exec: mockExec}
 			}
-			got, err := c.Collect(context.Background(), nil)
+
+			got, err := c.Collect(context.Background(), tt.prior)
 			s.Require().NoError(err)
 			info, ok := got.(*shard.Info)
 			s.Require().True(ok)
-			s.Len(info.Seed, 64)
-			if tt.deterministic {
-				second, err := c.Collect(context.Background(), nil)
-				s.Require().NoError(err)
-				s.Equal(got, second)
+
+			if tt.wantSeed >= 0 {
+				s.Equal(tt.wantSeed, info.Seed)
+			} else {
+				s.GreaterOrEqual(info.Seed, 0)
 			}
 		})
 	}
