@@ -18,44 +18,93 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package users reports currently logged-in user sessions. On systemd
-// hosts we prefer `loginctl list-sessions` — the same data loginctl
-// itself shows — which surfaces graphical (GDM/KDE), remote-desktop,
-// and `systemd-run` sessions that never reach utmp. On non-systemd
-// hosts and macOS we fall back to utmp / utmpx via gopsutil, which
-// matches what `who` / `w` print.
-//
-// Despite the name, this collector covers logged-in sessions only —
-// it does NOT enumerate /etc/passwd. A planned `passwd` collector
-// will fill that gap, and a planned `sessions` collector may take
-// over the logged-in half entirely.
+// Package users enumerates system user and group accounts from
+// /etc/passwd and /etc/group, plus the effective current user.
+// Matches Ohai's passwd plugin on POSIX hosts. Logged-in session
+// data has moved to the sessions collector.
 package users
 
 import (
 	"bufio"
-	"context"
+	"bytes"
+	"os"
+	"strconv"
 	"strings"
 
-	"github.com/shirou/gopsutil/v4/host"
+	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 )
 
-// Info holds the set of logged-in sessions.
-type Info struct {
-	LoggedIn []Session `json:"logged_in"`
+// passwdPath / groupPath are the standard POSIX flat-file locations
+// shared by Linux and macOS.
+const (
+	passwdPath = "/etc/passwd"
+	groupPath  = "/etc/group"
+)
+
+// geteuidFn is the injection seam for os.Geteuid — tests swap it to
+// pin a deterministic current user.
+var geteuidFn = os.Geteuid
+
+// New returns the users variant for the host OS. Both Linux and
+// Darwin read the same /etc/passwd and /etc/group files — separate
+// structs preserve the per-OS dispatch pattern for consistency.
+func New() Collector {
+	if platform.Detect() == "darwin" {
+		return NewDarwin()
+	}
+	return NewLinux()
 }
 
-// Session represents one logged-in user session.
-type Session struct {
-	User      string `json:"user"`
-	Terminal  string `json:"terminal,omitempty"`
-	Host      string `json:"host,omitempty"`
-	Started   uint64 `json:"started,omitempty"`    // unix timestamp (utmp path only)
-	SessionID string `json:"session_id,omitempty"` // systemd session id (loginctl path only)
-	UID       string `json:"uid,omitempty"`        // numeric UID (loginctl path only)
-	Seat      string `json:"seat,omitempty"`       // systemd seat (loginctl path only)
+// collectPOSIX is the shared implementation used by both Linux and
+// Darwin: read /etc/passwd + /etc/group from the injected VFS and
+// look up the effective current user in the parsed passwd map.
+func collectPOSIX(
+	fs avfs.VFS,
+) (*Info, error) {
+	info := &Info{
+		Passwd: map[string]PasswdEntry{},
+		Group:  map[string]GroupEntry{},
+	}
+	if b, err := fs.ReadFile(passwdPath); err == nil {
+		info.Passwd = parsePasswd(b)
+	}
+	if b, err := fs.ReadFile(groupPath); err == nil {
+		info.Group = parseGroup(b)
+	}
+	euid := geteuidFn()
+	for name, entry := range info.Passwd {
+		if entry.UID == euid {
+			info.CurrentUser = name
+			break
+		}
+	}
+	return info, nil
+}
+
+// Info holds the enumerated user and group databases plus current user.
+type Info struct {
+	Passwd      map[string]PasswdEntry `json:"passwd"`
+	Group       map[string]GroupEntry  `json:"group"`
+	CurrentUser string                 `json:"current_user,omitempty"`
+}
+
+// PasswdEntry mirrors the per-user fields Ohai surfaces under
+// etc[:passwd][<username>].
+type PasswdEntry struct {
+	UID   int    `json:"uid"`
+	GID   int    `json:"gid"`
+	Dir   string `json:"dir,omitempty"`
+	Shell string `json:"shell,omitempty"`
+	GECOS string `json:"gecos,omitempty"`
+}
+
+// GroupEntry mirrors etc[:group][<groupname>].
+type GroupEntry struct {
+	GID     int      `json:"gid"`
+	Members []string `json:"members,omitempty"`
 }
 
 // Collector is the public interface every users variant satisfies.
@@ -68,69 +117,73 @@ type base struct{}
 func (base) Name() string     { return "users" }
 func (base) Category() string { return collector.CategoryUsers }
 
-// DefaultEnabled is false: passwd/group scan is niche and not useful
-// per-invocation. Opt in via --collector.users or
-// WithEnabled("users").
+// DefaultEnabled is false — enumerating /etc/passwd is opt-in
+// because consumers rarely need a full account dump.
 func (base) DefaultEnabled() bool   { return false }
 func (base) Dependencies() []string { return nil }
 
-// New returns the users variant for the host OS.
-func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
-	}
-	return NewLinux()
-}
-
-// usersFn is the injection seam for gopsutil's host.UsersWithContext.
-// Kept private so importers don't transitively need gopsutil. Swapped
-// via SetUsersFn (export_test.go).
-var usersFn = host.UsersWithContext
-
-// listSessions is the production bridge to gopsutil (which reads
-// utmp on Linux / utmpx on macOS).
-func listSessions(
-	ctx context.Context,
-) ([]Session, error) {
-	us, err := usersFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Session, 0, len(us))
-	for _, u := range us {
-		out = append(out, Session{
-			User:     u.User,
-			Terminal: u.Terminal,
-			Host:     u.Host,
-			Started:  uint64(u.Started),
-		})
-	}
-	return out, nil
-}
-
-// parseLoginctlSessions parses `loginctl --no-pager --no-legend
-// --no-ask-password list-sessions` output. Each non-empty line is
-// whitespace-split into `session uid user [seat]`. Lines with fewer
-// than 3 fields are skipped (defensive — Ohai assumes the format).
-func parseLoginctlSessions(
-	raw []byte,
-) []Session {
-	var out []Session
-	sc := bufio.NewScanner(strings.NewReader(string(raw)))
+// parsePasswd turns the contents of /etc/passwd into a name→entry map.
+// Duplicate usernames keep the first occurrence (matches Ohai's
+// Etc.passwd iteration, which the C library de-dupes the same way).
+// Malformed lines (fewer than 7 colon-separated fields) are skipped.
+func parsePasswd(
+	content []byte,
+) map[string]PasswdEntry {
+	out := make(map[string]PasswdEntry)
+	sc := bufio.NewScanner(bytes.NewReader(content))
 	for sc.Scan() {
-		fields := strings.Fields(sc.Text())
-		if len(fields) < 3 {
+		line := sc.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		s := Session{
-			SessionID: fields[0],
-			UID:       fields[1],
-			User:      fields[2],
+		fields := strings.Split(line, ":")
+		if len(fields) < 7 {
+			continue
 		}
-		if len(fields) >= 4 {
-			s.Seat = fields[3]
+		name := fields[0]
+		if _, exists := out[name]; exists {
+			continue
 		}
-		out = append(out, s)
+		uid, _ := strconv.Atoi(fields[2])
+		gid, _ := strconv.Atoi(fields[3])
+		out[name] = PasswdEntry{
+			UID:   uid,
+			GID:   gid,
+			GECOS: fields[4],
+			Dir:   fields[5],
+			Shell: fields[6],
+		}
+	}
+	return out
+}
+
+// parseGroup turns the contents of /etc/group into a name→entry map.
+// /etc/group format: name:passwd:gid:members(comma-separated).
+// Malformed lines (fewer than 4 fields) are skipped.
+func parseGroup(
+	content []byte,
+) map[string]GroupEntry {
+	out := make(map[string]GroupEntry)
+	sc := bufio.NewScanner(bytes.NewReader(content))
+	for sc.Scan() {
+		line := sc.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Split(line, ":")
+		if len(fields) < 4 {
+			continue
+		}
+		gid, _ := strconv.Atoi(fields[2])
+		var members []string
+		if m := strings.TrimSpace(fields[3]); m != "" {
+			for _, part := range strings.Split(m, ",") {
+				if p := strings.TrimSpace(part); p != "" {
+					members = append(members, p)
+				}
+			}
+		}
+		out[fields[0]] = GroupEntry{GID: gid, Members: members}
 	}
 	return out
 }

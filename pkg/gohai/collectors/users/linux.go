@@ -23,42 +23,28 @@ package users
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Linux collects logged-in sessions on Linux. Prefers
-// `loginctl list-sessions` on systemd hosts (catches GDM/KDE
-// graphical sessions, remote desktop, systemd-run sessions that
-// never reach utmp). Falls back to gopsutil's utmp read when
-// loginctl is absent or errors (non-systemd hosts, minimized
-// containers).
+// Linux enumerates users/groups from /etc/passwd and /etc/group.
 type Linux struct {
 	base
-
-	Exec executor.Executor
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to the production Executor.
+// NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns logged-in session Info.
+// Collect reads /etc/passwd + /etc/group and resolves the effective
+// current user. Matches Ohai's passwd plugin methodology.
 func (l *Linux) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	if l.Exec != nil {
-		out, err := l.Exec.Execute(ctx,
-			"loginctl", "--no-pager", "--no-legend", "--no-ask-password", "list-sessions")
-		if err == nil {
-			return &Info{LoggedIn: parseLoginctlSessions(out)}, nil
-		}
-	}
-	ss, err := listSessions(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{LoggedIn: ss}, nil
+	return collectPOSIX(l.FS)
 }

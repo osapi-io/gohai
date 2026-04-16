@@ -55,6 +55,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
@@ -83,6 +84,7 @@ type Facts struct {
 	Network        *network.Info        `json:"network,omitempty"`
 	Process        *process.Info        `json:"process,omitempty"`
 	Users          *users.Info          `json:"users,omitempty"`
+	Sessions       *sessions.Info       `json:"sessions,omitempty"`
 	Timezone       *timezone.Info       `json:"timezone,omitempty"`
 	RootGroup      *rootgroup.Info      `json:"root_group,omitempty"`
 	Shells         *shells.Info         `json:"shells,omitempty"`
@@ -340,6 +342,10 @@ func (f *Facts) set(
 	case "users":
 		if v, ok := result.(*users.Info); ok {
 			f.Users = v
+		}
+	case "sessions":
+		if v, ok := result.(*sessions.Info); ok {
+			f.Sessions = v
 		}
 	case "timezone":
 		if v, ok := result.(*timezone.Info); ok {

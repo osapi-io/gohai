@@ -56,6 +56,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
@@ -218,6 +219,7 @@ func builtinCollectors() []collector.Collector {
 		network.New(),
 		process.New(),
 		users.New(),
+		sessions.New(),
 		timezone.New(),
 		rootgroup.New(),
 		shells.New(),

@@ -18,14 +18,47 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package users
+package sessions
 
-// SetGeteuidFn swaps the os.Geteuid seam for tests. Returns a restore
-// func the caller must defer.
-func SetGeteuidFn(
-	fn func() int,
-) (restore func()) {
-	orig := geteuidFn
-	geteuidFn = fn
-	return func() { geteuidFn = orig }
+import (
+	"context"
+
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
+)
+
+// Linux collects logged-in sessions on Linux. Prefers
+// `loginctl list-sessions` on systemd hosts (catches GDM/KDE
+// graphical sessions, remote desktop, systemd-run sessions that
+// never reach utmp). Falls back to gopsutil's utmp read when
+// loginctl is absent or errors (non-systemd hosts, minimized
+// containers).
+type Linux struct {
+	base
+
+	Exec executor.Executor
+}
+
+// NewLinux returns a Linux variant wired to the production Executor.
+func NewLinux() *Linux {
+	return &Linux{Exec: executor.New()}
+}
+
+// Collect returns logged-in session Info.
+func (l *Linux) Collect(
+	ctx context.Context,
+	_ collector.PriorResults,
+) (any, error) {
+	if l.Exec != nil {
+		out, err := l.Exec.Execute(ctx,
+			"loginctl", "--no-pager", "--no-legend", "--no-ask-password", "list-sessions")
+		if err == nil {
+			return &Info{LoggedIn: parseLoginctlSessions(out)}, nil
+		}
+	}
+	ss, err := listSessions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &Info{LoggedIn: ss}, nil
 }

@@ -23,29 +23,31 @@ package users
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin collects logged-in sessions on macOS via gopsutil (utmpx).
-// loginctl does not exist on Darwin so there's no exec path; gopsutil
-// reads utmpx directly through the package-level usersFn seam.
+// Darwin enumerates users/groups from /etc/passwd and /etc/group.
+// macOS still ships POSIX-format flat files alongside the Directory
+// Services database — we read the flat files, matching Ohai's
+// `Etc.passwd` iteration (which also consults the flat files first).
 type Darwin struct {
 	base
+	FS avfs.VFS
 }
 
-// NewDarwin returns a Darwin variant.
+// NewDarwin returns a Darwin variant wired to the real OS filesystem.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns logged-in session Info.
+// Collect reads /etc/passwd + /etc/group and resolves the effective
+// current user.
 func (d *Darwin) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	ss, err := listSessions(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{LoggedIn: ss}, nil
+	return collectPOSIX(d.FS)
 }

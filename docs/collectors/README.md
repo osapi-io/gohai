@@ -140,7 +140,7 @@ is on.
 | Collector               | Key        | Description                     | Default | Implemented |
 | ----------------------- | ---------- | ------------------------------- | ------- | ----------- |
 | [users](users.md)       | `users`    | passwd/group data, current user | ❌      | ✅          |
-| [sessions](sessions.md) | `sessions` | Logged-in sessions              | ❌      | 🚧          |
+| [sessions](sessions.md) | `sessions` | Logged-in sessions              | ❌      | ✅          |
 
 ## 🐧 Linux-Specific
 

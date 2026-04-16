@@ -22,16 +22,14 @@ package users_test
 
 import (
 	"context"
-	"errors"
+	"io/fs"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
 )
@@ -41,6 +39,33 @@ var (
 	_ collector.Collector = (*users.Darwin)(nil)
 )
 
+const passwdFixture = `# comment
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+john:x:1000:1000:John Doe,,,:/home/john:/bin/zsh
+dup:x:2:2:first:/home/a:/bin/sh
+dup:x:99:99:second:/home/b:/bin/sh
+malformed-line-missing-fields
+`
+
+const groupFixture = `# comment
+root:x:0:
+wheel:x:10:john,root
+staff:x:20:
+users:x:1000:john,daemon
+malformed:x:`
+
+func newFS(
+	files map[string]string,
+) avfs.VFS {
+	f := memfs.New()
+	_ = f.MkdirAll("/etc", 0o755)
+	for path, content := range files {
+		_ = f.WriteFile(path, []byte(content), fs.FileMode(0o644))
+	}
+	return f
+}
+
 type UsersPublicTestSuite struct {
 	suite.Suite
 }
@@ -49,28 +74,6 @@ func TestUsersPublicTestSuite(
 	t *testing.T,
 ) {
 	suite.Run(t, new(UsersPublicTestSuite))
-}
-
-// loginctlExec returns a MockExecutor that canned-answers the
-// `loginctl list-sessions` command.
-func loginctlExec(
-	t *testing.T,
-	out []byte, err error,
-) executor.Executor {
-	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
-	m.EXPECT().
-		Execute(
-			gomock.Any(),
-			"loginctl",
-			"--no-pager",
-			"--no-legend",
-			"--no-ask-password",
-			"list-sessions",
-		).
-		Return(out, err).
-		AnyTimes()
-	return m
 }
 
 func (s *UsersPublicTestSuite) TestNew() {
@@ -84,8 +87,6 @@ func (s *UsersPublicTestSuite) TestNew() {
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
 		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
 		{"unknown dispatches to Linux", "", "linux"},
 	}
 	for _, tt := range tests {
@@ -109,123 +110,95 @@ func (s *UsersPublicTestSuite) TestNew() {
 }
 
 func (s *UsersPublicTestSuite) TestCollect() {
-	loginctlOutput := []byte(
-		"   c1   1000 john     seat0\n" +
-			"   2    0    root\n" +
-			"\n" +
-			"  bad-line\n",
-	)
-	utmpUsers := []host.UserStat{
-		{User: "fallback", Terminal: "pts/0", Host: "10.0.0.1", Started: 1712908800},
-	}
-
 	tests := []struct {
 		name     string
 		variant  string
-		exec     func(*testing.T) executor.Executor
-		usersFn  func(context.Context) ([]host.UserStat, error)
-		wantErr  bool
+		files    map[string]string
+		euid     int
 		validate func(*users.Info)
 	}{
 		{
-			name:    "linux: loginctl present, parses sessions ignores utmp",
+			name:    "linux: full fixture parses passwd + group + current_user",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, loginctlOutput, nil) },
-			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
-			validate: func(i *users.Info) {
-				s.Require().Len(i.LoggedIn, 2)
-				s.Equal("c1", i.LoggedIn[0].SessionID)
-				s.Equal("1000", i.LoggedIn[0].UID)
-				s.Equal("john", i.LoggedIn[0].User)
-				s.Equal("seat0", i.LoggedIn[0].Seat)
-				s.Equal("2", i.LoggedIn[1].SessionID)
-				s.Equal("root", i.LoggedIn[1].User)
-				s.Empty(i.LoggedIn[1].Seat)
+			files: map[string]string{
+				"/etc/passwd": passwdFixture,
+				"/etc/group":  groupFixture,
+			},
+			euid: 1000,
+			validate: func(info *users.Info) {
+				s.Require().Len(info.Passwd, 4)
+				root := info.Passwd["root"]
+				s.Equal(0, root.UID)
+				s.Equal("/bin/bash", root.Shell)
+				s.Equal("root", root.GECOS)
+				john := info.Passwd["john"]
+				s.Equal(1000, john.UID)
+				s.Equal("John Doe,,,", john.GECOS)
+				s.Equal("/home/john", john.Dir)
+				// Duplicate "dup" entry kept first.
+				dup := info.Passwd["dup"]
+				s.Equal(2, dup.UID)
+				s.Equal("/home/a", dup.Dir)
+
+				wheel := info.Group["wheel"]
+				s.Equal(10, wheel.GID)
+				s.Equal([]string{"john", "root"}, wheel.Members)
+				staff := info.Group["staff"]
+				s.Equal(20, staff.GID)
+				s.Empty(staff.Members)
+
+				s.Equal("john", info.CurrentUser)
 			},
 		},
 		{
-			name:    "linux: loginctl missing, falls back to utmp via gopsutil",
+			name:    "linux: missing files produces empty maps, no error",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
-				return loginctlExec(t, nil, errors.New("not found"))
-			},
-			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
-			validate: func(i *users.Info) {
-				s.Require().Len(i.LoggedIn, 1)
-				s.Equal("fallback", i.LoggedIn[0].User)
-				s.Equal("pts/0", i.LoggedIn[0].Terminal)
-				s.Empty(i.LoggedIn[0].SessionID)
+			files:   map[string]string{},
+			euid:    0,
+			validate: func(info *users.Info) {
+				s.Empty(info.Passwd)
+				s.Empty(info.Group)
+				s.Empty(info.CurrentUser)
 			},
 		},
 		{
-			name:    "linux: nil Exec, utmp path direct",
+			name:    "linux: current user lookup misses when euid absent",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
-			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
-			validate: func(i *users.Info) {
-				s.Require().Len(i.LoggedIn, 1)
-				s.Equal("fallback", i.LoggedIn[0].User)
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0:root:/root:/bin/bash\n",
+			},
+			euid: 9999,
+			validate: func(info *users.Info) {
+				s.Equal("", info.CurrentUser)
 			},
 		},
 		{
-			name:    "linux: loginctl returns empty output, empty session list not fallback",
-			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, []byte(""), nil) },
-			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
-			validate: func(i *users.Info) {
-				s.Empty(i.LoggedIn)
-			},
-		},
-		{
-			name:    "linux: loginctl missing AND gopsutil errors propagate",
-			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
-				return loginctlExec(t, nil, errors.New("not found"))
-			},
-			usersFn: func(context.Context) ([]host.UserStat, error) {
-				return nil, errors.New("utmp boom")
-			},
-			wantErr: true,
-		},
-		{
-			name:    "darwin: console session",
+			name:    "darwin: same POSIX parsing",
 			variant: "darwin",
-			usersFn: func(context.Context) ([]host.UserStat, error) {
-				return []host.UserStat{
-					{User: "john", Terminal: "console", Started: 1712908800},
-				}, nil
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0:root:/var/root:/bin/zsh\njohn:x:501:20:John:/Users/john:/bin/zsh\n",
+				"/etc/group":  "admin:x:80:root,john\n",
 			},
-			validate: func(i *users.Info) {
-				s.Require().Len(i.LoggedIn, 1)
-				s.Equal("john", i.LoggedIn[0].User)
-				s.Equal("console", i.LoggedIn[0].Terminal)
-				s.Equal(uint64(1712908800), i.LoggedIn[0].Started)
+			euid: 501,
+			validate: func(info *users.Info) {
+				s.Require().Len(info.Passwd, 2)
+				s.Equal(501, info.Passwd["john"].UID)
+				s.Equal([]string{"root", "john"}, info.Group["admin"].Members)
+				s.Equal("john", info.CurrentUser)
 			},
-		},
-		{
-			name:    "darwin: gopsutil error wrapped and returned",
-			variant: "darwin",
-			usersFn: func(context.Context) ([]host.UserStat, error) {
-				return nil, errors.New("utmpx error")
-			},
-			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer users.SetUsersFn(tt.usersFn)()
+			defer users.SetGeteuidFn(func() int { return tt.euid })()
 			var c users.Collector
 			switch tt.variant {
 			case "linux":
-				c = &users.Linux{Exec: tt.exec(s.T())}
+				c = &users.Linux{FS: newFS(tt.files)}
 			case "darwin":
-				c = &users.Darwin{}
+				c = &users.Darwin{FS: newFS(tt.files)}
 			}
 			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
 			s.Require().NoError(err)
 			info, ok := got.(*users.Info)
 			s.Require().True(ok)
