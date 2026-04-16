@@ -245,6 +245,12 @@ problems:
   Ohai plugin for data sources and per-distro edge cases.
 - [Puppet Facter](https://github.com/puppetlabs/facter) — Puppet's
   equivalent. Different JSON shape, overlapping fact surface.
+- [osquery](https://github.com/osquery/osquery) — Meta's SQL-based
+  endpoint visibility. Different abstraction (SQL), same data space;
+  common reference point when evaluating an inventory tool.
+- [Ansible setup](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/setup_module.html) —
+  Ansible's built-in fact gathering, exposed as `ansible_facts` in
+  playbooks.
 - [Salt Grains](https://docs.saltproject.io/en/latest/topics/grains/) —
   SaltStack's static facts.
 
@@ -261,6 +267,16 @@ problems:
 - [avfs](https://github.com/avfs/avfs) — virtual filesystem
   abstraction used in every collector that reads files, so tests can
   run against in-memory fixtures.
+
+**Other Go libraries in the space:**
+
+- [gosigar](https://github.com/cloudfoundry/gosigar) — Cloud Foundry's
+  Go port of Hyperic Sigar. Historical reference for Go-based host
+  metrics.
+- [go-ps](https://github.com/mitchellh/go-ps) — narrow process-listing
+  library. gopsutil supersedes it for our use.
+- [goprocinfo](https://github.com/c9s/goprocinfo) — lightweight `/proc`
+  parser. gopsutil + procfs cover the same ground for us.
 
 **Methodology references (we read, don't import):**
 
