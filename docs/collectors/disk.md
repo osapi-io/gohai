@@ -80,13 +80,22 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                               | Ohai plugin                                                                                                                                                                    | Alignment                                                                                                                                                                                    |
-| -------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `disk.IOCountersWithContext` (`/proc/diskstats`). | No Ohai equivalent — Ohai's `linux/block_device.rb` reports sysfs device metadata (model, rotational, block sizes) which is the future gohai `block_device` collector's scope. | **Gohai extension.** Ohai doesn't track I/O counters; we do so consumers can reason about storage workload without running `iostat`. Node_exporter's `diskstats` collector is the reference. |
-| macOS    | gopsutil `disk.IOCountersWithContext` (IOKit).             | —                                                                                                                                                                              | Same gohai-native scope.                                                                                                                                                                     |
+On Linux:
 
-**Known gaps:** None at this collector's scope. Physical device metadata is out
-of scope; see the planned `block_device` collector.
+1. gopsutil's `disk.IOCountersWithContext` reads `/proc/diskstats` and returns
+   per-device read/write counts, bytes, and time spent. We forward each device
+   as a `Device` row without transformation.
+
+On macOS:
+
+1. gopsutil's `disk.IOCountersWithContext` calls IOKit to produce the same
+   shape. Device names match what `iostat` reports (e.g. `disk0`).
+
+Physical device metadata (model, vendor, serial, rotational, block sizes) is out
+of this collector's scope — tracked in the planned `block_device` collector
+backed by `ghw/block`. Ohai splits the two concerns the same way (its
+`diskstats`-style data doesn't exist; `linux/block_device.rb` covers sysfs
+device metadata only).
 
 ## Backing library
 

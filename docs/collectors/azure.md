@@ -138,9 +138,14 @@ None. Detection uses Azure-specific file signals (waagent binary + DHCP option
 5. **User-Agent:** `gohai` (the cloudmetadata default).
 6. **Timeout:** 6 seconds — matches Ohai's `read_timeout`.
 7. **Failure handling:** transport / 404 / etc. → `(nil, nil)`.
-8. **Transformation:** per-interface IP addresses are aggregated into flat
-   top-level `public_ipv4` / `local_ipv4` / `public_ipv6` / `local_ipv6` lists
-   in addition to the per-interface map keyed by MAC address.
+8. **Transformation:** the `compute` sub-object is flattened onto the top-level
+   `Info` (identity, placement, marketplace, tags, user-data). Optional nested
+   records — `host`, `host_group`, `os_profile`, `additional_capabilities`,
+   `extended_location`, `plan`, `storage_profile`, `security_profile`,
+   `public_keys` — are retained as typed sub-structs when Azure populates them.
+   Per-interface IP addresses from `network.interface[].ipv4/ipv6` are also
+   aggregated into flat top-level `public_ipv4` / `local_ipv4` / `public_ipv6` /
+   `local_ipv6` lists in addition to the per-interface map keyed by MAC address.
 
 Mirrors Ohai's `Ohai::Mixin::AzureMetadata` methodology — same detection chain
 (non-Windows signals), same version-negotiation handshake, same 6s timeout, same

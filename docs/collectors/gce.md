@@ -237,9 +237,11 @@ probe anyway — slower on non-GCE hosts but still correct.
    `network`) are normalized to their short last-segment forms;
    `scheduling.preemptible` is converted from `"TRUE"`/`"FALSE"` to a real
    `bool`; `region` is derived by stripping the zone's trailing `-<letter>`
-   suffix. The full untransformed tree is also exposed as `Info.Raw` for
-   forward-compat — fields GCE adds in the future appear there without a code
-   change.
+   suffix. `instance.virtualClock.driftToken` is lifted to the flat
+   `virtual_clock_drift_token`; `instance.remainingCpuTime` and
+   `instance.partnerAttributes` are lifted to `remaining_cpu_time` and
+   `partner_attributes`. The full untransformed tree is not retained — all
+   surfaced fields are typed.
 
 Mirrors Ohai's `Ohai::Mixin::GCEMetadata` collection approach: same URL, same
 header, same single recursive call, same full-tree coverage.

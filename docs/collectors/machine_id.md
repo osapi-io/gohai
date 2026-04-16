@@ -92,14 +92,25 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                                                                                                                                      | Ohai plugin                                                                                                                                                                                                  | Alignment                                                                                                                                                              |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `host.InfoWithContext` (reads `/etc/machine-id` → DMI `product_uuid` → `boot_id`) + our `/var/lib/dbus/machine-id` fallback when gopsutil returns empty. | [`linux/machineid.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/machineid.rb) — reads `/etc/machine-id` primarily, falls back to `/var/lib/dbus/machine-id`. No DMI / boot_id fallback. | **Superset of Ohai.** We inherit gopsutil's DMI fallback (useful on minimal hosts without systemd) and extend with the dbus path to match Ohai's pre-systemd coverage. |
-| macOS    | gopsutil `host.InfoWithContext` (reads `IOPlatformUUID` via IOKit).                                                                                               | No Ohai `:darwin` handler for `machine_id`; Ohai surfaces the hardware UUID via [`darwin/hardware.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/darwin/hardware.rb) instead.                  | **Richer than Ohai.** gopsutil gives us `IOPlatformUUID` directly under `machine_id.id` for consistency with the Linux shape.                                          |
+On Linux:
 
-**Known gaps:** None. gopsutil's `boot_id` tail — which is reboot-unstable — is
-documented in the Description so consumers know to treat mismatched reboots as
-unknown rather than two different hosts.
+1. gopsutil's `host.InfoWithContext` populates `HostID` from a cascade —
+   `/etc/machine-id` first, DMI `product_uuid` next, then
+   `/proc/sys/kernel/random/boot_id` last. We forward that value as `id`.
+2. When gopsutil returns empty (minimal / pre-systemd hosts) we read
+   `/var/lib/dbus/machine-id` through the injected `avfs.VFS` as a final
+   fallback. Matches Ohai's `linux/machineid.rb` dbus fallback.
+
+On macOS:
+
+1. gopsutil's `host.InfoWithContext` reads `IOPlatformUUID` via IOKit and
+   returns it as `HostID`. Forwarded verbatim as `id` so the shape matches
+   Linux. Ohai has no `:darwin` `machineid` handler — its darwin plugin surfaces
+   the same UUID under `hardware.uuid` instead.
+
+gopsutil's `boot_id` tail is reboot-unstable; consumers seeing a new value after
+a reboot should treat that as "unknown", not as a different host. The
+Description section calls this out.
 
 ## Backing library
 

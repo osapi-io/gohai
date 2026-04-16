@@ -161,6 +161,10 @@ On Linux:
 1. gopsutil's `cpu.Info` parses `/proc/cpuinfo` for per-core model, flags, MHz,
    aggregate cache size, vendor, family/model/stepping; `cpu.Counts` gives the
    logical count and the distinct-`PhysicalID` count used for `sockets` on x86.
+   Each `cpu.Info` entry is also projected onto the `cpus[]` slice so
+   per-logical-CPU fields are preserved (matters on hybrid-core CPUs where the
+   homogeneous-CPU assumption breaks down; mirrors Ohai's `cpu["0"]`, `cpu["1"]`
+   entries).
 2. We walk `/sys/devices/system/cpu/vulnerabilities/` via the injected
    `avfs.VFS` and read each file; the basename becomes the map key, the trimmed
    contents become the value. Missing directory yields `vulnerabilities` absent
@@ -176,6 +180,8 @@ On macOS:
 
 1. gopsutil's `cpu.Info` sources `model_name`, `vendor_id`, `flags`, and the
    logical thread count (`total`) via the underlying `host_info()` mach call.
+   Each entry is projected onto the `cpus[]` slice in the same way as on Linux —
+   the homogeneous-CPU summary above comes from the first entry.
 2. We override via `sysctl -n <key>` through the injected `executor.Executor`:
    - `hw.physicalcpu` → `cores` (gopsutil reports logical here).
    - `hw.packages` → `sockets`.

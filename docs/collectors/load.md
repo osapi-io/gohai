@@ -85,15 +85,21 @@ would auto-include `cpu` even when the user disabled it. See
 
 ## Data Sources
 
-| Platform | What we read                                                | Ohai plugin                                                                    | Alignment                                                                                                                                                                 |
-| -------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `load.AvgWithContext` (reads `/proc/loadavg`).     | **No Ohai equivalent.** Ohai does not ship a loadavg plugin in current `main`. | **gohai extension.** The `one`/`five`/`fifteen` field names are a Go-idiomatic choice aligned with `getloadavg(3)`'s conceptual triple; they are not inherited from Ohai. |
-| macOS    | gopsutil `load.AvgWithContext` (reads `sysctl vm.loadavg`). | **No Ohai equivalent.**                                                        | Same as Linux — gohai extension.                                                                                                                                          |
+On Linux:
 
-**Known gaps vs. Ohai:** N/A — Ohai has no loadavg plugin, so there is no
-coverage to mirror. Trailing fields of `/proc/loadavg` (`runnable_tasks`,
-`last_pid`) aren't exposed by `getloadavg(3)`; deferred until a concrete
-consumer asks.
+1. gopsutil's `load.AvgWithContext` reads `/proc/loadavg` and returns the three
+   conventional floats. We forward them as `one`, `five`, `fifteen`.
+
+On macOS:
+
+1. gopsutil's `load.AvgWithContext` calls `sysctl vm.loadavg` and returns the
+   same three floats. Same field mapping as Linux.
+
+Ohai does not ship a loadavg plugin in current `main`, so this collector has no
+Ohai counterpart — the field names are a Go-idiomatic rendering of
+`getloadavg(3)`'s conceptual triple. The trailing `/proc/loadavg` fields
+(`runnable_tasks`, `last_pid`) are out of scope because `getloadavg(3)` doesn't
+expose them; deferred until a concrete consumer asks.
 
 ## Backing library
 

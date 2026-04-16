@@ -178,28 +178,45 @@ run.
    `"latest"` — which EC2 aliases to its newest supported version. Matches
    Ohai's `best_api_version` handshake.
 4. **Meta-data tree:** GETs against a curated list of `/<version>/meta-data/*`
-   paths. `security-groups` and `local-ipv4s` are split on newlines into arrays
+   paths. In addition to the core identity/network fields this includes
+   placement sub-paths (`placement/availability-zone-id`,
+   `placement/group-name`, `placement/host-id`, `placement/partition-number`),
+   legacy paravirt boot (`kernel-id`, `ramdisk-id`), lifecycle signals
+   (`instance-action`, `spot/instance-action`, `spot/termination-time`),
+   `product-codes`, and the `services/{domain,partition}` endpoints (needed to
+   distinguish GovCloud / China from the commercial partition).
+   `security-groups` and `local-ipv4s` are split on newlines into arrays
    (matches Ohai's `EC2_ARRAY_VALUES`).
 5. **Per-ENI subtree:** the collector walks
    `/<version>/meta-data/network/interfaces/macs/` to enumerate ENIs, then
    recurses into each MAC's subdirectory to populate the typed
    `NetworkInterface` (subnet, vpc, security groups, IP arrays). Matches Ohai's
    `fetch_dir_metadata` for `EC2_ARRAY_DIR`.
-6. **Security scrub:**
+6. **Directory-walking subroutines:** two listings are walked into typed
+   collections rather than stored as raw text:
+   - `GET /<version>/meta-data/public-keys/` yields lines like `0=my-key`; for
+     each index the collector fetches `public-keys/<i>/openssh-key` and appends
+     the OpenSSH-format string to `public_keys[]`. Missing `=` delimiters and
+     per-key fetch errors are tolerated.
+   - `GET /<version>/meta-data/block-device-mapping/` lists virtual names
+     (`ami`, `root`, `ebs1`, ...); each leaf is fetched and stored in
+     `block_device_mapping[<name>] = <device-path>`. Matches the shape Ohai
+     produces under `block_device_mapping`.
+7. **Security scrub:**
    `identity_credentials_ec2_security_credentials_ec2_instance` is dropped from
    any newline-split list (mirror's Ohai's explicit skip).
-7. **IAM info:** `GET /<version>/meta-data/iam/info` — parsed as JSON. We
+8. **IAM info:** `GET /<version>/meta-data/iam/info` — parsed as JSON. We
    deliberately do NOT fetch `iam/security-credentials/<role>/` because it
    contains short-lived AWS access keys — matches Ohai's scrub of secrets.
-8. **Identity document:** `GET /<version>/dynamic/instance-identity/document` —
+9. **Identity document:** `GET /<version>/dynamic/instance-identity/document` —
    JSON with `accountId`, `region`, `availabilityZone`, `instanceId`. Fills the
    top-level fields when the meta-data tree doesn't supply them.
-9. **User-data:** `GET /<version>/user-data/` — stored plaintext when valid
-   UTF-8, base64-encoded when binary. Matches Ohai's `Encoding::BINARY` check.
-10. **User-Agent:** `gohai` (the cloudmetadata default).
-11. **Timeout:** 10 seconds per request, matching Ohai's `read_timeout` and
+10. **User-data:** `GET /<version>/user-data/` — stored plaintext when valid
+    UTF-8, base64-encoded when binary. Matches Ohai's `Encoding::BINARY` check.
+11. **User-Agent:** `gohai` (the cloudmetadata default).
+12. **Timeout:** 10 seconds per request, matching Ohai's `read_timeout` and
     `keep_alive_timeout`.
-12. **Failure handling:** first-probe (`/ami-id`) failure returns `(nil, nil)`.
+13. **Failure handling:** first-probe (`/ami-id`) failure returns `(nil, nil)`.
     Per-path failures on subsequent paths are tolerated and leave their field
     zero-valued.
 

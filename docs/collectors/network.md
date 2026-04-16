@@ -210,7 +210,10 @@ None.
 On Linux:
 
 1. **gopsutil `net.Interfaces`** enumerates interfaces — name, MTU, hardware
-   address, flags, raw address CIDRs.
+   address, flags, raw address CIDRs, and `Index` (forwarded as the
+   per-interface `number` field to match Ohai's `iface[:number]`). Admin `state`
+   (`"up"` / `"down"`) is derived from gopsutil's `up` flag to match Ohai's
+   `iface[:state]`, which reads `ip link show`.
 2. **gopsutil `net.IOCounters`** per-interface bytes/packets/errors/drops.
 3. **Address structuring**: each gopsutil CIDR is parsed via `net.ParseCIDR`. We
    populate `family` from address kind, `prefixlen` from the mask, `netmask`
@@ -236,15 +239,37 @@ On Linux:
    `/sys/class/net/<iface>/device/driver`'s symlink target, read through the
    injected `avfs.VFS`. Virtual / loopback interfaces typically lack the driver
    symlink and stay empty.
-7. **Neighbours**: `vishvananda/netlink.NeighList(0, 0)` returns the kernel
+7. **Ethtool driver info**: for each Ethernet-like interface we run
+   `ethtool -i <iface>` through the shared `internal/executor` runner and parse
+   the key/value output into `interfaces[].ethtool.driver_info` (`driver`,
+   `version`, `firmware_version`, `bus_info`, `expansion_rom_version`,
+   `supports_statistics`, `supports_test`, `supports_eeprom_access`,
+   `supports_register_dump`, `supports_priv_flags`). Non-Ethernet interfaces
+   (loopback, tunnels) are skipped. Binary missing or per-call failures leave
+   the field empty.
+8. **Ethtool tuning bundle**: for the same interfaces we run five additional
+   ethtool probes via the executor and parse each into a typed sub-record under
+   `interfaces[].ethtool`:
+   - `ethtool -g <iface>` → `ring_params` (rx / rx-mini / rx-jumbo / tx
+     current + max values).
+   - `ethtool -l <iface>` → `channel_params` (combined / rx / tx / other
+     current + max).
+   - `ethtool -c <iface>` → `coalesce_params` (adaptive-rx / adaptive-tx,
+     `rx_usecs`, `tx_usecs`, ...).
+   - `ethtool -k <iface>` → `offload_params` (checksumming, TSO, GSO, GRO, LRO
+     on/off with `[fixed]` noted when the kernel won't allow changes).
+   - `ethtool -a <iface>` → `pause_params` (autoneg, rx, tx). Mirrors Ohai's
+     methodology re-audit of `linux/network.rb`; per-probe failures are
+     tolerated and leave only the failing sub-record empty.
+9. **Neighbours**: `vishvananda/netlink.NeighList(0, 0)` returns the kernel
    ARP + NDP cache. Each entry is mapped to a `Neighbour` with address / family
    / MAC / interface (resolved from LinkIndex) / state (NUD bitmask → ip-neigh
    canonical string).
-8. **OpenVZ alias merge**: detect OpenVZ guest via `/proc/vz` present AND
-   `/proc/bc/0` absent. When detected, any `<base>:<n>` interface (typically
-   `venet0:0`) has its addresses appended to the primary interface (`venet0`)
-   and the alias is removed from the output. Mirrors Ohai's behaviour so
-   `interfaces[venet0]` is queryable for the container's actual IPs.
+10. **OpenVZ alias merge**: detect OpenVZ guest via `/proc/vz` present AND
+    `/proc/bc/0` absent. When detected, any `<base>:<n>` interface (typically
+    `venet0:0`) has its addresses appended to the primary interface (`venet0`)
+    and the alias is removed from the output. Mirrors Ohai's behaviour so
+    `interfaces[venet0]` is queryable for the container's actual IPs.
 
 On macOS we use gopsutil's `getifaddrs` + `netstat -i` only — encapsulation,
 routing, and OpenVZ handling are Linux-specific. A future enhancement may add
