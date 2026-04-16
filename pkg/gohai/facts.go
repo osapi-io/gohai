@@ -56,6 +56,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/scsi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
@@ -107,6 +108,7 @@ type Facts struct {
 	DMI            *dmi.Info            `json:"dmi,omitempty"`
 	GPU            *gpu.Info            `json:"gpu,omitempty"`
 	PCI            *pci.Info            `json:"pci,omitempty"`
+	SCSI           *scsi.Info           `json:"scsi,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -432,6 +434,10 @@ func (f *Facts) set(
 	case "pci":
 		if v, ok := result.(*pci.Info); ok {
 			f.PCI = v
+		}
+	case "scsi":
+		if v, ok := result.(*scsi.Info); ok {
+			f.SCSI = v
 		}
 	}
 }
