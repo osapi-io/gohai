@@ -119,23 +119,23 @@ None.
 
 ## Data Sources
 
-| Platform | What we read  | Ohai plugin ([`shells.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/shells.rb)) | Alignment                                                                         |
-| -------- | ------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Linux    | `/etc/shells` | `/etc/shells` via `file_open` + line iteration; `line[0] == "/"` filter                        | **Identical.** Same file, same `/`-prefix filter, same soft-miss on missing file. |
-| macOS    | `/etc/shells` | Same (no `:darwin`-specific code path in Ohai — same plugin runs).                             | **Identical.**                                                                    |
+On Linux and macOS (identical — `/etc/shells` follows POSIX convention and
+Ohai's plugin has no `:darwin`-specific path):
 
-**Methodology notes vs. Ohai:**
+1. Read `/etc/shells` through the injected `avfs.VFS`. Missing file (distroless
+   containers, scratch images) soft-misses to `{paths: []}` rather than
+   erroring. Ohai omits the `shells` attribute entirely in the same situation —
+   our typed struct is always present; the empty slice is a Go-idiom divergence,
+   not a collection divergence.
+2. Scan the file line by line. Strip leading/trailing whitespace, skip blank
+   lines, skip comment lines (`#` prefix), skip any line that doesn't start with
+   `/` after trimming. The `TrimSpace` step is slightly more permissive than
+   Ohai's `line[0] == "/"` check on the raw line (we accept `  /bin/bash` as a
+   valid entry); intentional safer behavior.
+3. Append surviving absolute paths to `paths[]` in file order.
 
-- We `TrimSpace` each line before the `/`-prefix check, so paths with leading
-  whitespace (e.g. `  /bin/bash`) are accepted. Ohai tests `line[0] == "/"` on
-  the raw line and would skip a space-prefixed entry. Permissive by design —
-  indented entries in `/etc/shells` aren't a real case but trimming is safer
-  behavior.
-- On a missing `/etc/shells` we soft-miss to `{paths: []}`. Ohai omits the
-  `shells` attribute entirely. Our typed struct is always present — this is a
-  Go-idiom divergence, not a collection divergence.
-
-No tracked methodology gaps. Both divergences above are intentional.
+Permission-denied or other non-not-exist read errors propagate as a real failure
+— matches Ohai's behavior of letting `file_open` raise.
 
 ## Backing library
 
