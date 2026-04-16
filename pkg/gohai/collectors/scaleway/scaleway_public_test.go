@@ -50,7 +50,9 @@ const cannedResponse = `{
   "ssh_public_keys": [{"key": "ssh-rsa AAA..."}, {"key": "  "}],
   "volumes": {
     "0": {"id": "vol-a", "name": "root", "volume_type": "b_ssd", "size": 50000000000, "export_uri": "nbd://..."}
-  }
+  },
+  "timezone": "Europe/Paris",
+  "bootscript": {"id": "bs-1", "title": "x86_64 mainline 4.4.230 rev1", "architecture": "x86_64", "kernel": "https://s.scw.co/kernel", "initrd": "https://s.scw.co/initrd", "bootcmdargs": "LINUX_COMMON scaleway boot=local", "organization": "org-scw", "public": true}
 }`
 
 type ScalewayPublicTestSuite struct {
@@ -133,6 +135,11 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 				s.Equal("vol-a", info.Volumes[0].ID)
 				s.Equal("b_ssd", info.Volumes[0].VolumeType)
 				s.Equal(int64(50000000000), info.Volumes[0].Size)
+				s.Equal("Europe/Paris", info.Timezone)
+				s.Require().NotNil(info.Bootscript)
+				s.Equal("bs-1", info.Bootscript.ID)
+				s.Equal("x86_64", info.Bootscript.Architecture)
+				s.True(info.Bootscript.Public)
 			},
 		},
 		{

@@ -82,10 +82,22 @@ type Info struct {
 	SSHPublicKeys   []string `json:"ssh_public_keys,omitempty"`
 	Volumes         []Volume `json:"volumes,omitempty"`
 
-	// Raw is the full /conf response as Scaleway returned it. Use
-	// when you need a field gohai's typed surface doesn't expose.
-	// Mirrors Ohai's full-tree dump under node['scaleway'].
-	Raw map[string]any `json:"raw,omitempty"`
+	Timezone   string      `json:"timezone,omitempty"`
+	Bootscript *Bootscript `json:"bootscript,omitempty"`
+}
+
+// Bootscript is Scaleway's legacy boot configuration. Deprecated in
+// favor of local boot — modern instances may return null. Typed for
+// parity with Ohai which surfaces it when present.
+type Bootscript struct {
+	ID           string `json:"id"`
+	Title        string `json:"title,omitempty"`
+	Architecture string `json:"architecture,omitempty"`
+	Kernel       string `json:"kernel,omitempty"`
+	Initrd       string `json:"initrd,omitempty"`
+	Bootcmdargs  string `json:"bootcmdargs,omitempty"`
+	Organization string `json:"organization,omitempty"`
+	Public       bool   `json:"public,omitempty"`
 }
 
 // Volume is one attached volume.
@@ -101,20 +113,22 @@ type Volume struct {
 // from Info so we can reshape nested objects (public_ip, ipv6,
 // location, ssh_public_keys) into flat fields.
 type raw struct {
-	ID             string       `json:"id"`
-	Name           string       `json:"name"`
-	Hostname       string       `json:"hostname"`
-	Organization   string       `json:"organization"`
-	Project        string       `json:"project"`
-	CommercialType string       `json:"commercial_type"`
-	Tags           []string     `json:"tags"`
-	StateDetail    string       `json:"state_detail"`
-	PublicIP       *rawPublicIP `json:"public_ip"`
-	PrivateIP      string       `json:"private_ip"`
-	IPv6           *rawIPv6     `json:"ipv6"`
-	Location       *rawLocation `json:"location"`
-	SSHPublicKeys  []rawSSHKey  `json:"ssh_public_keys"`
-	Volumes        rawVolumes   `json:"volumes"`
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	Hostname       string         `json:"hostname"`
+	Organization   string         `json:"organization"`
+	Project        string         `json:"project"`
+	CommercialType string         `json:"commercial_type"`
+	Tags           []string       `json:"tags"`
+	StateDetail    string         `json:"state_detail"`
+	PublicIP       *rawPublicIP   `json:"public_ip"`
+	PrivateIP      string         `json:"private_ip"`
+	IPv6           *rawIPv6       `json:"ipv6"`
+	Location       *rawLocation   `json:"location"`
+	SSHPublicKeys  []rawSSHKey    `json:"ssh_public_keys"`
+	Volumes        rawVolumes     `json:"volumes"`
+	Timezone       string         `json:"timezone"`
+	Bootscript     *rawBootscript `json:"bootscript"`
 }
 
 type rawPublicIP struct {
@@ -136,6 +150,17 @@ type rawLocation struct {
 
 type rawSSHKey struct {
 	Key string `json:"key"`
+}
+
+type rawBootscript struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Architecture string `json:"architecture"`
+	Kernel       string `json:"kernel"`
+	Initrd       string `json:"initrd"`
+	Bootcmdargs  string `json:"bootcmdargs"`
+	Organization string `json:"organization"`
+	Public       bool   `json:"public"`
 }
 
 // rawVolumes is Scaleway's oddly-shaped `{"0": {...}, "1": {...}}`
@@ -189,11 +214,8 @@ func (*Collector) DefaultEnabled() bool { return false }
 func (*Collector) Dependencies() []string { return nil }
 
 // Collect probes /proc/cmdline for Scaleway's signature, then fetches
-// the single /conf?format=json document. The body is unmarshalled
-// twice — once into the typed raw struct for the curated Info, and
-// once into a generic map for the Raw forward-compat escape hatch.
-// Returns (nil, nil) when the signature is missing or the endpoint
-// is unreachable.
+// the single /conf?format=json document. Returns (nil, nil) when the
+// signature is missing or the endpoint is unreachable.
 func (c *Collector) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -212,13 +234,7 @@ func (c *Collector) Collect(
 	if err := json.Unmarshal(body, &r); err != nil {
 		return nil, err
 	}
-	info := transform(r)
-	// If the typed Unmarshal succeeded, the body is valid JSON, so
-	// the generic Unmarshal also succeeds — no error check needed.
-	var generic map[string]any
-	_ = json.Unmarshal(body, &generic)
-	info.Raw = generic
-	return info, nil
+	return transform(r), nil
 }
 
 // onScaleway returns true when /proc/cmdline contains Scaleway's
@@ -247,6 +263,7 @@ func transform(
 		Tags:           r.Tags,
 		StateDetail:    r.StateDetail,
 		PrivateIP:      r.PrivateIP,
+		Timezone:       r.Timezone,
 	}
 	if r.PublicIP != nil {
 		info.PublicIP = r.PublicIP.Address
@@ -270,6 +287,10 @@ func transform(
 	}
 	for _, v := range r.Volumes {
 		info.Volumes = append(info.Volumes, Volume(v))
+	}
+	if r.Bootscript != nil {
+		bs := Bootscript(*r.Bootscript)
+		info.Bootscript = &bs
 	}
 	return info
 }
