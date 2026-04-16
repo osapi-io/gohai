@@ -51,6 +51,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
 	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/pci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
@@ -105,6 +106,7 @@ type Facts struct {
 	Scaleway       *scaleway.Info       `json:"scaleway,omitempty"`
 	DMI            *dmi.Info            `json:"dmi,omitempty"`
 	GPU            *gpu.Info            `json:"gpu,omitempty"`
+	PCI            *pci.Info            `json:"pci,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -426,6 +428,10 @@ func (f *Facts) set(
 	case "gpu":
 		if v, ok := result.(*gpu.Info); ok {
 			f.GPU = v
+		}
+	case "pci":
+		if v, ok := result.(*pci.Info); ok {
+			f.PCI = v
 		}
 	}
 }

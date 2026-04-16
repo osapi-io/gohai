@@ -78,7 +78,7 @@ edge cases to handle) follows [Chef Ohai][]'s plugins.
 | [filesystem](filesystem.md) | `filesystem` | Mounts, capacity, usage, inodes          | ✅      | ✅          |
 | [dmi](dmi.md)               | `dmi`        | BIOS, manufacturer, serial, UUID         | ❌      | ✅          |
 | [gpu](gpu.md)               | `gpu`        | GPU model, vendor, cores (macOS)         | ❌      | ✅          |
-| [pci](pci.md)               | `pci`        | PCI devices                              | ❌      | 🚧          |
+| [pci](pci.md)               | `pci`        | PCI devices                              | ❌      | ✅          |
 | [scsi](scsi.md)             | `scsi`       | SCSI devices                             | ❌      | 🚧          |
 | [hardware](hardware.md)     | `hardware`   | macOS hardware profile, battery, storage | ❌      | 🚧          |
 
