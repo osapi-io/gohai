@@ -149,64 +149,33 @@ None.
 
 ## Data Sources
 
-1. **Linux:** ghw's `bios.New()`, `baseboard.New()`, `chassis.New()`, and
-   `product.New()` — each reads the corresponding `/sys/class/dmi/id/*` files
-   (`bios_vendor`, `bios_version`, `bios_date`, `board_*`, `chassis_*`,
-   `product_*`, `sys_vendor`). No root required for fields exposed as 0444;
-   root-only fields (`product_serial`, `product_uuid`) return empty strings for
-   non-root callers rather than erroring.
-2. **macOS:** SMBIOS/DMI is Linux-specific (exposed through the kernel's DMI
-   driver). macOS hardware identity lives in IOKit / `ioreg` / `system_profiler`
-   and is covered by the `hardware` collector (planned). The dmi collector
-   returns an empty Info so consumers can safely check `facts.DMI.Product`
-   without a per-OS branch.
-3. **Failure handling:** if ghw errors on any individual section (permission
-   denied, sysfs entry missing), that section is nil in the result — other
-   sections still populate. A completely empty host (container without
-   `/sys/class/dmi/id/`) yields an Info with all four sub-structs nil.
+On Linux:
 
-## Methodology gap vs. Ohai
+1. ghw's `bios.New()`, `baseboard.New()`, `chassis.New()`, and `product.New()`
+   each read the corresponding `/sys/class/dmi/id/*` files (`bios_vendor`,
+   `bios_version`, `bios_date`, `board_*`, `chassis_*`, `product_*`,
+   `sys_vendor`). No root required for fields exposed as 0444; root-only fields
+   (`product_serial`, `product_uuid`) return empty strings for non-root callers
+   rather than erroring.
+2. If ghw errors on any individual section (permission denied, sysfs entry
+   missing) that section stays nil; other sections still populate. A host
+   without `/sys/class/dmi/id/` at all (unprivileged containers) yields an Info
+   with all four sub-structs nil.
 
-Ohai's `dmi` plugin shells out to `dmidecode` and parses its text output,
-exposing the full SMBIOS record set across all DMI types (128+ types defined).
-gohai reads `/sys/class/dmi/id/*` via ghw, which only covers four DMI types. The
-tradeoff is deliberate — sysfs works in unprivileged containers, rootless
-daemons, and locked-down environments where `dmidecode` would fail — but the
-coverage gap is real.
+On macOS SMBIOS/DMI isn't exposed — the Linux DMI driver has no Darwin
+counterpart. We return an empty Info so consumers can check `facts.DMI.Product`
+without a per-OS branch. macOS hardware identity will be covered by the planned
+`hardware` collector via IOKit / `ioreg` / `system_profiler`.
 
-**What we cover** (same as Ohai's output for these types):
-
-- DMI type 0 — BIOS Information (`bios` field)
-- DMI type 1 — System Information (`product` field)
-- DMI type 2 — Base Board Information (`baseboard` field)
-- DMI type 3 — Chassis Information (`chassis` field)
-
-**What we don't cover** (`dmidecode` exposes these; sysfs doesn't):
-
-| DMI type                  | Content Ohai surfaces                                                      | Consumer impact                                                                                   |
-| ------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| 4 — Processor Information | Socket type, voltage, max/current speed, family, manufacturer, part number | Covered by our `cpu` collector via ghw (reads `/sys/devices/system/cpu/`, richer than dmidecode). |
-| 9 — System Slots          | PCI slot names and usage                                                   | Will be covered by the `pci` collector (planned, ghw-backed).                                     |
-| 16 — Memory Array         | DIMM slot count, max capacity, ECC capability                              | No current consumer. Partial overlap with `memory` (gopsutil/ghw).                                |
-| 17 — Memory Device        | DIMM slot location, size, speed, manufacturer, part number, serial         | No current consumer. ghw's memory package exposes some of this.                                   |
-| 11 — OEM Strings          | Vendor-specific strings                                                    | Occasionally used by cloud providers as out-of-band tags. Low-priority gap.                       |
-| 13 — BIOS Language        | Installed BIOS language codes                                              | No known consumer.                                                                                |
-| 22 — Portable Battery     | Battery info on laptops                                                    | Laptops rarely run gohai; macOS has this via IOKit in the planned `hardware` collector.           |
-| 41 — Onboard Devices Ext. | Ethernet / video controller locations                                      | Overlap with `network` (ghw) and `gpu` (planned).                                                 |
-| 27 — Cooling Device       | Fan info                                                                   | Niche; no consumer.                                                                               |
-| 39 — System Power Supply  | PSU info                                                                   | Niche; no consumer.                                                                               |
-
-**Access-level differences:**
-
-- Ohai requires root + `/dev/mem` to run `dmidecode`.
-- gohai runs without root for most fields. `product_serial` and `product_uuid`
-  are 0400 on Linux and return empty strings for non-root callers; everything
-  else is 0444 and readable by anyone.
-
-**If you need dmidecode's extra coverage** (DIMM part numbers, full processor
-sockets, OEM strings), file an issue and we'll add a second code path that
-shells out via `internal/executor` — same pattern other collectors use for
-optional, root-requiring data sources.
+Ohai's `dmi` plugin shells out to `dmidecode`, which reads `/dev/mem` and
+exposes the full SMBIOS record set across all 128+ DMI types, but requires root.
+Our sysfs approach covers only the four types sysfs exports (BIOS, baseboard,
+chassis, product) — intentional tradeoff for rootless, container-friendly
+operation. Consumer-relevant types we don't cover are either redundant with
+other collectors (processor details → `cpu`, PCI slots → planned `pci`, DIMMs →
+partially in `memory`) or niche enough that no consumer has asked (cooling
+devices, PSU, OEM strings). A dmidecode-based opt-in path can be added via
+`internal/executor` if a consumer needs it.
 
 ## Backing library
 

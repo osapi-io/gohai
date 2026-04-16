@@ -144,7 +144,10 @@ On Linux:
 
 1. gopsutil `disk.Partitions(true)` enumerates the mount table from
    `/proc/mounts`; gopsutil `disk.Usage(mountpoint)` per row provides
-   capacity/used/available and inode counters.
+   capacity/used/available plus inode counts (`inodes_total`, `inodes_used`,
+   `inodes_available`). `inodes_used_percent` is computed from
+   `used / total * 100` when `total > 0` so Ohai's
+   `filesystem[mount][:inodes_percent_used]` field is covered.
 2. When `lsblk` is on PATH we run
    `lsblk -J -o NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL` via the
    shared `internal/executor` runner and merge the result into the mount table
@@ -155,8 +158,22 @@ On Linux:
 4. When `lsblk` is missing (minimal containers, Alpine without util-linux) or
    its output is malformed, we skip the enrichment silently; capacity and inode
    data remain from gopsutil.
+5. **Btrfs allocation enrichment** — for each mount with `fstype == "btrfs"` and
+   a non-empty UUID we read `/sys/fs/btrfs/<uuid>/allocation/` through the
+   injected `avfs.VFS` and populate the mount's `btrfs` sub-record:
+   per-block-group (`data`, `metadata`, `system`) byte counters (`total`,
+   `used`, `reserved`) plus the RAID profile flag set (`single`, `raid0`,
+   `raid1`, `raid10`, `raid5`, `raid6`, `dup`). Missing sysfs paths (older
+   kernels, containers without /sys mounted) skip the enrichment silently.
+6. **ZFS datasets** — when `zfs` is on PATH we run `zfs get -p -H all` through
+   the shared `internal/executor` runner and parse its tab-separated
+   dataset/property/value/source rows into `ZFSDatasets` keyed by dataset name.
+   `-p` forces machine-readable byte values, `-H` drops the header. Non-ZFS
+   hosts (binary missing or exec error) return zero datasets with no error —
+   independent of `lsblk`.
 
-On macOS we use gopsutil's mount enumeration backed by `getfsstat(2)`.
+On macOS we use gopsutil's mount enumeration backed by `getfsstat(2)`. Btrfs and
+ZFS enrichment are Linux-only.
 
 ## Backing library
 

@@ -78,13 +78,15 @@ None.
 
 ## Data Sources
 
-| Platform | What we read   | Ohai plugin                                                                                                         | Alignment                                                                                                                                                                                      |
-| -------- | -------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `/proc/1/comm` | [`init_package.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/init_package.rb) — reads the same file. | **Equivalent**. We add light normalization: `init` → `sysvinit`, `openrc-init` → `openrc`. Ohai returns the raw value; we return the canonical form and pass unknown values through unchanged. |
-| macOS    | —              | No Ohai plugin (`init_package` is linux-only).                                                                      | **Richer than Ohai**: macOS always uses launchd, so we hard-code it rather than returning nothing.                                                                                             |
+On Linux:
 
-**Known gaps:** Windows (service control manager) is out of scope — gohai
-doesn't target Windows yet.
+1. Read `/proc/1/comm` via the injected `avfs.VFS` and trim whitespace. Apply a
+   small normalization table: `init` → `sysvinit`, `openrc-init` → `openrc`.
+   Other values pass through unchanged. Mirrors Ohai's `init_package.rb`, which
+   reads the same file; we add the canonicalization step that Ohai skips.
+
+On macOS we hard-code `launchd` — it's the only init system Darwin ships. Ohai's
+`init_package.rb` is Linux-only and returns nothing here.
 
 ## Backing library
 

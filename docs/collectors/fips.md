@@ -128,13 +128,24 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                                                  | Ohai plugin                                                                                                                  | Alignment                                                                                                                                                                                                                                             |
-| -------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `/proc/sys/crypto/fips_enabled` (bool) + `/etc/crypto-policies/config` (name) | [`fips.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/fips.rb) — `OpenSSL.fips_mode` from Ruby OpenSSL binding | Ohai reads the library-level FIPS flag; on Linux it's initialized from the same kernel flag we read, so `kernel.enabled` matches their `kernel.enabled`. We additionally probe `crypto-policies` to catch 140-3 post-boot drift, which Ohai does not. |
-| macOS    | —                                                                             | Ohai has no `:darwin` handler                                                                                                | Parity (both return nothing).                                                                                                                                                                                                                         |
+On Linux:
 
-**Known gaps:** None — our Linux coverage is a superset of Ohai's (kernel flag +
-crypto-policies), and we match Ohai's decision to skip macOS.
+1. Read `/proc/sys/crypto/fips_enabled` via the injected `avfs.VFS`. Trimmed
+   content `"1"` → `kernel.enabled = true`; anything else → `false`. Missing
+   file (kernel without the flag) leaves `kernel` nil.
+2. Read `/etc/crypto-policies/config` via the same VFS. The trimmed first line
+   is the policy name. `policy.fips_effective` is set when the name starts with
+   `FIPS` (case-sensitive — matches the file's convention). Missing file leaves
+   `policy` nil.
+
+Mirrors Ohai's `fips.rb` kernel-flag signal and extends it with the
+`crypto-policies` probe — which catches FIPS 140-3 post-boot drift that Ohai's
+OpenSSL-binding approach would miss.
+
+On macOS the collector returns no data. Apple's CoreCrypto module has no runtime
+FIPS toggle equivalent to Linux's kernel flag; FIPS 140 validation is a property
+of the compiled module and must be looked up via Apple's certificate list
+separately. Matches Ohai's decision to skip macOS.
 
 ## Backing library
 
