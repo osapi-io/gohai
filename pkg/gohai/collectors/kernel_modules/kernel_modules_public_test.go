@@ -202,7 +202,9 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 				s.Len(i.Modules, 2)
 				s.Equal("2.9", i.Modules["com.apple.iokit.IOPCIFamily"].Version)
 				s.Equal(uint64(0x8a8), i.Modules["com.apple.iokit.IOPCIFamily"].Size)
+				s.Equal(1, i.Modules["com.apple.iokit.IOPCIFamily"].Index)
 				s.Equal(12, i.Modules["com.apple.driver.AppleACPIPlatform"].RefCount)
+				s.Equal(2, i.Modules["com.apple.driver.AppleACPIPlatform"].Index)
 			},
 		},
 		{

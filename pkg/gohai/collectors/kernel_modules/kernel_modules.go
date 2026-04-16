@@ -41,6 +41,7 @@ type Module struct {
 	Size     uint64 `json:"size,omitempty"`     // bytes
 	RefCount int    `json:"refcount,omitempty"` // instances currently loaded
 	Version  string `json:"version,omitempty"`  // Linux: /sys/module/<m>/version; macOS: parens field from kextstat
+	Index    int    `json:"index,omitempty"`    // macOS only: kextstat column 1 — kext load order index
 }
 
 // Collector is the public interface every kernel_modules variant satisfies.
