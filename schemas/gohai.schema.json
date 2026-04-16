@@ -153,7 +153,10 @@
       "$ref": "#/$defs/Timings"
     }
   },
-  "required": ["collect_time", "collect_duration_ns"],
+  "required": [
+    "collect_time",
+    "collect_duration_ns"
+  ],
   "$defs": {
     "Timings": {
       "type": "object",
@@ -167,7 +170,9 @@
           }
         }
       },
-      "required": ["collectors"]
+      "required": [
+        "collectors"
+      ]
     },
     "CollectorTiming": {
       "type": "object",
@@ -186,7 +191,10 @@
           "description": "Error message when the collector failed. Absent on success."
         }
       },
-      "required": ["duration_ns", "status"]
+      "required": [
+        "duration_ns",
+        "status"
+      ]
     },
     "Platform": {
       "type": "object",
@@ -221,7 +229,13 @@
           "description": "OS build identifier. macOS BuildVersion (e.g. \"23F79\"); empty on Linux."
         }
       },
-      "required": ["os", "name", "version", "family", "architecture"]
+      "required": [
+        "os",
+        "name",
+        "version",
+        "family",
+        "architecture"
+      ]
     },
     "Hostname": {
       "type": "object",
@@ -244,7 +258,9 @@
           "description": "Domain portion of the FQDN (e.g. \"example.com\"). Empty when DNS canonicalization fails."
         }
       },
-      "required": ["name"]
+      "required": [
+        "name"
+      ]
     },
     "Kernel": {
       "type": "object",
@@ -279,7 +295,11 @@
           "description": "True when the current process is running under Apple Rosetta 2 translation (x86_64 binary on ARM Mac). macOS only."
         }
       },
-      "required": ["name", "release", "machine"]
+      "required": [
+        "name",
+        "release",
+        "machine"
+      ]
     },
     "KernelModules": {
       "type": "object",
@@ -341,7 +361,11 @@
           "description": "Human-readable aggregate idle time (Linux only)."
         }
       },
-      "required": ["seconds", "boot_time", "human"]
+      "required": [
+        "seconds",
+        "boot_time",
+        "human"
+      ]
     },
     "Virtualization": {
       "type": "object",
@@ -377,7 +401,9 @@
           "description": "Stable host identifier. Survives reboots; changes on re-provisioning or OS reinstall."
         }
       },
-      "required": ["id"]
+      "required": [
+        "id"
+      ]
     },
     "CPU": {
       "type": "object",
@@ -425,7 +451,9 @@
         },
         "flags": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "CPU feature flags (e.g. \"sse4_2\", \"avx2\", \"aes\"). From /proc/cpuinfo or sysctl."
         },
         "caches": {
@@ -437,7 +465,9 @@
           "description": "NUMA topology: map of node ID (integer key as string) to list of CPU indices assigned to that node. Linux only.",
           "additionalProperties": {
             "type": "array",
-            "items": { "type": "integer" }
+            "items": {
+              "type": "integer"
+            }
           }
         },
         "numa_nodes_count": {
@@ -447,7 +477,9 @@
         "vulnerabilities": {
           "type": "object",
           "description": "CPU hardware vulnerability mitigation status from /sys/devices/system/cpu/vulnerabilities/. Map of vulnerability name to status text. Linux only.",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "cpus_online": {
           "type": "integer",
@@ -487,7 +519,9 @@
         },
         "cpu_opmodes": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "CPU operation modes (e.g. [\"32-bit\", \"64-bit\"]). Linux, from lscpu."
         },
         "byte_order": {
@@ -496,7 +530,9 @@
         },
         "address_sizes": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Physical and virtual address sizes (e.g. [\"48 bits physical\", \"48 bits virtual\"]). Linux, from lscpu."
         },
         "virtualization": {
@@ -517,42 +553,101 @@
         },
         "cpus": {
           "type": "array",
-          "items": { "$ref": "#/$defs/CPUEntry" },
+          "items": {
+            "$ref": "#/$defs/CPUEntry"
+          },
           "description": "Per-logical-CPU breakdown. One entry per processor line in /proc/cpuinfo. Matters on hybrid-core architectures."
         }
       },
-      "required": ["count", "sockets", "cores"]
+      "required": [
+        "count",
+        "sockets",
+        "cores"
+      ]
     },
     "CPUCaches": {
       "type": "object",
       "description": "Per-level cache sizes from lscpu. Values are verbatim strings (e.g. \"32 KiB\", \"1 MiB\").",
       "properties": {
-        "l1d": { "type": "string", "description": "L1 data cache size." },
-        "l1i": { "type": "string", "description": "L1 instruction cache size." },
-        "l2": { "type": "string", "description": "L2 unified cache size." },
-        "l2d": { "type": "string", "description": "L2 data cache size (rare, some ARM)." },
-        "l2i": { "type": "string", "description": "L2 instruction cache size (rare, some ARM)." },
-        "l3": { "type": "string", "description": "L3 cache size." },
-        "l4": { "type": "string", "description": "L4 cache size (Intel eDRAM on some Broadwell models)." }
+        "l1d": {
+          "type": "string",
+          "description": "L1 data cache size."
+        },
+        "l1i": {
+          "type": "string",
+          "description": "L1 instruction cache size."
+        },
+        "l2": {
+          "type": "string",
+          "description": "L2 unified cache size."
+        },
+        "l2d": {
+          "type": "string",
+          "description": "L2 data cache size (rare, some ARM)."
+        },
+        "l2i": {
+          "type": "string",
+          "description": "L2 instruction cache size (rare, some ARM)."
+        },
+        "l3": {
+          "type": "string",
+          "description": "L3 cache size."
+        },
+        "l4": {
+          "type": "string",
+          "description": "L4 cache size (Intel eDRAM on some Broadwell models)."
+        }
       }
     },
     "CPUEntry": {
       "type": "object",
       "description": "One logical CPU's identity and topology placement from /proc/cpuinfo.",
       "properties": {
-        "vendor_id": { "type": "string", "description": "CPU vendor string for this logical CPU." },
-        "family": { "type": "string", "description": "CPU family for this logical CPU." },
-        "model": { "type": "string", "description": "CPU model for this logical CPU." },
-        "model_name": { "type": "string", "description": "Human-readable model name for this logical CPU." },
-        "stepping": { "type": "integer", "description": "Stepping/revision for this logical CPU." },
-        "physical_id": { "type": "string", "description": "Socket index this CPU belongs to." },
-        "core_id": { "type": "string", "description": "Physical core index within the socket." },
-        "cores": { "type": "integer", "description": "Number of cores on this CPU's socket." },
-        "mhz": { "type": "number", "description": "Current clock speed of this logical CPU in MHz." },
-        "cache_size": { "type": "integer", "description": "Cache size in KB for this logical CPU." },
+        "vendor_id": {
+          "type": "string",
+          "description": "CPU vendor string for this logical CPU."
+        },
+        "family": {
+          "type": "string",
+          "description": "CPU family for this logical CPU."
+        },
+        "model": {
+          "type": "string",
+          "description": "CPU model for this logical CPU."
+        },
+        "model_name": {
+          "type": "string",
+          "description": "Human-readable model name for this logical CPU."
+        },
+        "stepping": {
+          "type": "integer",
+          "description": "Stepping/revision for this logical CPU."
+        },
+        "physical_id": {
+          "type": "string",
+          "description": "Socket index this CPU belongs to."
+        },
+        "core_id": {
+          "type": "string",
+          "description": "Physical core index within the socket."
+        },
+        "cores": {
+          "type": "integer",
+          "description": "Number of cores on this CPU's socket."
+        },
+        "mhz": {
+          "type": "number",
+          "description": "Current clock speed of this logical CPU in MHz."
+        },
+        "cache_size": {
+          "type": "integer",
+          "description": "Cache size in KB for this logical CPU."
+        },
         "flags": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Feature flags for this logical CPU."
         }
       }
@@ -561,98 +656,296 @@
       "type": "object",
       "description": "System load averages representing runnable+uninterruptible task counts averaged over 1, 5, and 15 minute windows.",
       "properties": {
-        "one": { "type": "number", "description": "1-minute load average." },
-        "five": { "type": "number", "description": "5-minute load average." },
-        "fifteen": { "type": "number", "description": "15-minute load average." }
+        "one": {
+          "type": "number",
+          "description": "1-minute load average."
+        },
+        "five": {
+          "type": "number",
+          "description": "5-minute load average."
+        },
+        "fifteen": {
+          "type": "number",
+          "description": "15-minute load average."
+        }
       },
-      "required": ["one", "five", "fifteen"]
+      "required": [
+        "one",
+        "five",
+        "fifteen"
+      ]
     },
     "Memory": {
       "type": "object",
       "description": "System memory totals, usage buckets, kernel allocations, page-cache state, hugepages, and swap. Values are in bytes. Linux-only fields stay zero on macOS and vice versa.",
       "properties": {
-        "total": { "type": "integer", "description": "Total physical memory installed in bytes. OCSF: device.memory_size." },
-        "available": { "type": "integer", "description": "Memory available for new allocations without swapping (MemAvailable on Linux, free+inactive on macOS)." },
-        "used": { "type": "integer", "description": "Memory currently in use (total - available, approximately)." },
-        "used_percent": { "type": "number", "description": "Percentage of total memory currently in use (0.0-100.0)." },
-        "free": { "type": "integer", "description": "Memory not used for anything (MemFree). Much lower than available on Linux due to page cache." },
-        "active": { "type": "integer", "description": "Memory recently accessed and not easily reclaimable. Both Linux and macOS." },
-        "inactive": { "type": "integer", "description": "Memory not recently accessed, candidate for reclaim. Both Linux and macOS." },
-        "active_anon": { "type": "integer", "description": "Active anonymous memory (process heap/stack). Linux only." },
-        "inactive_anon": { "type": "integer", "description": "Inactive anonymous memory. Linux only." },
-        "active_file": { "type": "integer", "description": "Active file-backed memory (page cache). Linux only." },
-        "inactive_file": { "type": "integer", "description": "Inactive file-backed memory. Linux only." },
-        "unevictable": { "type": "integer", "description": "Memory that cannot be reclaimed (mlock, ramfs). Linux only." },
-        "wired": { "type": "integer", "description": "Memory wired down by the kernel, cannot be paged out. macOS only." },
-        "speculative": { "type": "integer", "description": "Speculatively allocated memory (macOS vm_stat). macOS only." },
-        "compressed": { "type": "integer", "description": "Memory compressed by the macOS compressor. macOS only." },
-        "buffers": { "type": "integer", "description": "Memory used for block device I/O buffers. Linux only." },
-        "cached": { "type": "integer", "description": "Memory used by the page cache (Cached in /proc/meminfo). Linux only." },
-        "dirty": { "type": "integer", "description": "Memory waiting to be written to disk. Linux only." },
-        "writeback": { "type": "integer", "description": "Memory actively being written back to disk. Linux only." },
-        "writeback_tmp": { "type": "integer", "description": "Memory used for FUSE writeback temporary buffers. Linux only." },
-        "shared": { "type": "integer", "description": "Memory used by tmpfs and shared memory segments (Shmem in /proc/meminfo)." },
-        "mapped": { "type": "integer", "description": "Memory mapped into process address spaces via mmap. Linux only." },
-        "slab": { "type": "integer", "description": "Total kernel slab allocator memory. Linux only." },
-        "s_reclaimable": { "type": "integer", "description": "Reclaimable slab memory (dentry/inode caches). Linux only." },
-        "s_unreclaim": { "type": "integer", "description": "Unreclaimable slab memory. Linux only." },
-        "k_reclaimable": { "type": "integer", "description": "Total reclaimable kernel memory (KReclaimable). Linux 4.20+." },
-        "page_tables": { "type": "integer", "description": "Memory used by page table entries. Linux only." },
-        "kernel_stack": { "type": "integer", "description": "Memory used for kernel thread stacks. Linux only." },
-        "percpu": { "type": "integer", "description": "Per-CPU kernel data structures. Linux only." },
-        "high_total": { "type": "integer", "description": "Total high memory (32-bit kernels with >4GB RAM only). Linux only." },
-        "high_free": { "type": "integer", "description": "Free high memory. Linux only." },
-        "low_total": { "type": "integer", "description": "Total low memory. Linux only." },
-        "low_free": { "type": "integer", "description": "Free low memory. Linux only." },
-        "nfs_unstable": { "type": "integer", "description": "NFS pages sent to the server but not yet committed. Linux only." },
-        "bounce": { "type": "integer", "description": "Memory used for block device bounce buffers. Linux only." },
-        "anon_pages": { "type": "integer", "description": "Anonymous pages mapped into user space. Linux only." },
-        "shmem": { "type": "integer", "description": "Shared memory and tmpfs usage (Shmem). Linux only." },
-        "direct_map": { "$ref": "#/$defs/DirectMap" },
-        "commit_limit": { "type": "integer", "description": "Maximum memory that can be committed (overcommit limit). Linux only." },
-        "committed_as": { "type": "integer", "description": "Currently committed memory (sum of all process allocations). Linux only." },
-        "vmalloc_total": { "type": "integer", "description": "Total vmalloc address space. Linux only." },
-        "vmalloc_used": { "type": "integer", "description": "Used vmalloc memory. Linux only." },
-        "vmalloc_chunk": { "type": "integer", "description": "Largest contiguous free vmalloc block. Linux only." },
-        "hugepages": { "$ref": "#/$defs/Hugepages" },
-        "swap": { "$ref": "#/$defs/Swap" }
+        "total": {
+          "type": "integer",
+          "description": "Total physical memory installed in bytes. OCSF: device.memory_size."
+        },
+        "available": {
+          "type": "integer",
+          "description": "Memory available for new allocations without swapping (MemAvailable on Linux, free+inactive on macOS)."
+        },
+        "used": {
+          "type": "integer",
+          "description": "Memory currently in use (total - available, approximately)."
+        },
+        "used_percent": {
+          "type": "number",
+          "description": "Percentage of total memory currently in use (0.0-100.0)."
+        },
+        "free": {
+          "type": "integer",
+          "description": "Memory not used for anything (MemFree). Much lower than available on Linux due to page cache."
+        },
+        "active": {
+          "type": "integer",
+          "description": "Memory recently accessed and not easily reclaimable. Both Linux and macOS."
+        },
+        "inactive": {
+          "type": "integer",
+          "description": "Memory not recently accessed, candidate for reclaim. Both Linux and macOS."
+        },
+        "active_anon": {
+          "type": "integer",
+          "description": "Active anonymous memory (process heap/stack). Linux only."
+        },
+        "inactive_anon": {
+          "type": "integer",
+          "description": "Inactive anonymous memory. Linux only."
+        },
+        "active_file": {
+          "type": "integer",
+          "description": "Active file-backed memory (page cache). Linux only."
+        },
+        "inactive_file": {
+          "type": "integer",
+          "description": "Inactive file-backed memory. Linux only."
+        },
+        "unevictable": {
+          "type": "integer",
+          "description": "Memory that cannot be reclaimed (mlock, ramfs). Linux only."
+        },
+        "wired": {
+          "type": "integer",
+          "description": "Memory wired down by the kernel, cannot be paged out. macOS only."
+        },
+        "speculative": {
+          "type": "integer",
+          "description": "Speculatively allocated memory (macOS vm_stat). macOS only."
+        },
+        "compressed": {
+          "type": "integer",
+          "description": "Memory compressed by the macOS compressor. macOS only."
+        },
+        "buffers": {
+          "type": "integer",
+          "description": "Memory used for block device I/O buffers. Linux only."
+        },
+        "cached": {
+          "type": "integer",
+          "description": "Memory used by the page cache (Cached in /proc/meminfo). Linux only."
+        },
+        "dirty": {
+          "type": "integer",
+          "description": "Memory waiting to be written to disk. Linux only."
+        },
+        "writeback": {
+          "type": "integer",
+          "description": "Memory actively being written back to disk. Linux only."
+        },
+        "writeback_tmp": {
+          "type": "integer",
+          "description": "Memory used for FUSE writeback temporary buffers. Linux only."
+        },
+        "shared": {
+          "type": "integer",
+          "description": "Memory used by tmpfs and shared memory segments (Shmem in /proc/meminfo)."
+        },
+        "mapped": {
+          "type": "integer",
+          "description": "Memory mapped into process address spaces via mmap. Linux only."
+        },
+        "slab": {
+          "type": "integer",
+          "description": "Total kernel slab allocator memory. Linux only."
+        },
+        "s_reclaimable": {
+          "type": "integer",
+          "description": "Reclaimable slab memory (dentry/inode caches). Linux only."
+        },
+        "s_unreclaim": {
+          "type": "integer",
+          "description": "Unreclaimable slab memory. Linux only."
+        },
+        "k_reclaimable": {
+          "type": "integer",
+          "description": "Total reclaimable kernel memory (KReclaimable). Linux 4.20+."
+        },
+        "page_tables": {
+          "type": "integer",
+          "description": "Memory used by page table entries. Linux only."
+        },
+        "kernel_stack": {
+          "type": "integer",
+          "description": "Memory used for kernel thread stacks. Linux only."
+        },
+        "percpu": {
+          "type": "integer",
+          "description": "Per-CPU kernel data structures. Linux only."
+        },
+        "high_total": {
+          "type": "integer",
+          "description": "Total high memory (32-bit kernels with >4GB RAM only). Linux only."
+        },
+        "high_free": {
+          "type": "integer",
+          "description": "Free high memory. Linux only."
+        },
+        "low_total": {
+          "type": "integer",
+          "description": "Total low memory. Linux only."
+        },
+        "low_free": {
+          "type": "integer",
+          "description": "Free low memory. Linux only."
+        },
+        "nfs_unstable": {
+          "type": "integer",
+          "description": "NFS pages sent to the server but not yet committed. Linux only."
+        },
+        "bounce": {
+          "type": "integer",
+          "description": "Memory used for block device bounce buffers. Linux only."
+        },
+        "anon_pages": {
+          "type": "integer",
+          "description": "Anonymous pages mapped into user space. Linux only."
+        },
+        "shmem": {
+          "type": "integer",
+          "description": "Shared memory and tmpfs usage (Shmem). Linux only."
+        },
+        "direct_map": {
+          "$ref": "#/$defs/DirectMap"
+        },
+        "commit_limit": {
+          "type": "integer",
+          "description": "Maximum memory that can be committed (overcommit limit). Linux only."
+        },
+        "committed_as": {
+          "type": "integer",
+          "description": "Currently committed memory (sum of all process allocations). Linux only."
+        },
+        "vmalloc_total": {
+          "type": "integer",
+          "description": "Total vmalloc address space. Linux only."
+        },
+        "vmalloc_used": {
+          "type": "integer",
+          "description": "Used vmalloc memory. Linux only."
+        },
+        "vmalloc_chunk": {
+          "type": "integer",
+          "description": "Largest contiguous free vmalloc block. Linux only."
+        },
+        "hugepages": {
+          "$ref": "#/$defs/Hugepages"
+        },
+        "swap": {
+          "$ref": "#/$defs/Swap"
+        }
       },
-      "required": ["total"]
+      "required": [
+        "total"
+      ]
     },
     "DirectMap": {
       "type": "object",
       "description": "Physical memory covered by each page-table mapping granularity. From /proc/meminfo DirectMap entries.",
       "properties": {
-        "map_4k": { "type": "integer", "description": "Physical memory mapped with 4K pages in bytes." },
-        "map_2m": { "type": "integer", "description": "Physical memory mapped with 2M huge pages in bytes." },
-        "map_1g": { "type": "integer", "description": "Physical memory mapped with 1G huge pages in bytes." }
+        "map_4k": {
+          "type": "integer",
+          "description": "Physical memory mapped with 4K pages in bytes."
+        },
+        "map_2m": {
+          "type": "integer",
+          "description": "Physical memory mapped with 2M huge pages in bytes."
+        },
+        "map_1g": {
+          "type": "integer",
+          "description": "Physical memory mapped with 1G huge pages in bytes."
+        }
       }
     },
     "Hugepages": {
       "type": "object",
       "description": "Hugepage configuration and usage from /proc/meminfo. Populated only when the kernel has hugepage support.",
       "properties": {
-        "total": { "type": "integer", "description": "Total number of persistent hugepages configured (HugePages_Total)." },
-        "free": { "type": "integer", "description": "Number of hugepages not yet allocated (HugePages_Free)." },
-        "reserved": { "type": "integer", "description": "Hugepages reserved but not yet faulted (HugePages_Rsvd)." },
-        "surplus": { "type": "integer", "description": "Surplus hugepages above the persistent pool (HugePages_Surp)." },
-        "size": { "type": "integer", "description": "Size of each hugepage in bytes (Hugepagesize)." },
-        "anon_hugepages": { "type": "integer", "description": "Transparent hugepage memory currently in use (AnonHugePages)." },
-        "hugetlb": { "type": "integer", "description": "Total hugepage memory (Hugetlb), including all page sizes." }
+        "total": {
+          "type": "integer",
+          "description": "Total number of persistent hugepages configured (HugePages_Total)."
+        },
+        "free": {
+          "type": "integer",
+          "description": "Number of hugepages not yet allocated (HugePages_Free)."
+        },
+        "reserved": {
+          "type": "integer",
+          "description": "Hugepages reserved but not yet faulted (HugePages_Rsvd)."
+        },
+        "surplus": {
+          "type": "integer",
+          "description": "Surplus hugepages above the persistent pool (HugePages_Surp)."
+        },
+        "size": {
+          "type": "integer",
+          "description": "Size of each hugepage in bytes (Hugepagesize)."
+        },
+        "anon_hugepages": {
+          "type": "integer",
+          "description": "Transparent hugepage memory currently in use (AnonHugePages)."
+        },
+        "hugetlb": {
+          "type": "integer",
+          "description": "Total hugepage memory (Hugetlb), including all page sizes."
+        }
       },
-      "required": ["total"]
+      "required": [
+        "total"
+      ]
     },
     "Swap": {
       "type": "object",
       "description": "Swap memory usage and capacity.",
       "properties": {
-        "total": { "type": "integer", "description": "Total swap space configured in bytes." },
-        "used": { "type": "integer", "description": "Swap space currently in use in bytes." },
-        "free": { "type": "integer", "description": "Free swap space in bytes." },
-        "used_percent": { "type": "number", "description": "Percentage of swap space in use (0.0-100.0)." },
-        "cached": { "type": "integer", "description": "Swap pages also present in RAM (SwapCached). Linux only." }
+        "total": {
+          "type": "integer",
+          "description": "Total swap space configured in bytes."
+        },
+        "used": {
+          "type": "integer",
+          "description": "Swap space currently in use in bytes."
+        },
+        "free": {
+          "type": "integer",
+          "description": "Free swap space in bytes."
+        },
+        "used_percent": {
+          "type": "number",
+          "description": "Percentage of swap space in use (0.0-100.0)."
+        },
+        "cached": {
+          "type": "integer",
+          "description": "Swap pages also present in RAM (SwapCached). Linux only."
+        }
       },
-      "required": ["total", "used", "free"]
+      "required": [
+        "total",
+        "used",
+        "free"
+      ]
     },
     "Filesystem": {
       "type": "object",
@@ -660,55 +953,125 @@
       "properties": {
         "mounts": {
           "type": "array",
-          "items": { "$ref": "#/$defs/FilesystemMount" },
+          "items": {
+            "$ref": "#/$defs/FilesystemMount"
+          },
           "description": "Active mount table with capacity, usage, and inode counters."
         },
         "unmounted": {
           "type": "array",
-          "items": { "$ref": "#/$defs/FilesystemUnmounted" },
+          "items": {
+            "$ref": "#/$defs/FilesystemUnmounted"
+          },
           "description": "Block devices with a filesystem but no active mountpoint (LUKS, inactive LVs, etc.). Linux only."
         },
         "zfs_datasets": {
           "type": "array",
-          "items": { "$ref": "#/$defs/ZFSDataset" },
+          "items": {
+            "$ref": "#/$defs/ZFSDataset"
+          },
           "description": "ZFS datasets with full property sets. Linux only, when zfs binary is on PATH."
         }
       },
-      "required": ["mounts"]
+      "required": [
+        "mounts"
+      ]
     },
     "FilesystemMount": {
       "type": "object",
       "description": "One mounted filesystem with capacity, usage, and inode counters.",
       "properties": {
-        "device": { "type": "string", "description": "Block device path (e.g. \"/dev/sda1\", \"/dev/mapper/vg-root\")." },
-        "mountpoint": { "type": "string", "description": "Filesystem mount path (e.g. \"/\", \"/home\")." },
-        "fstype": { "type": "string", "description": "Filesystem type (e.g. \"ext4\", \"xfs\", \"apfs\", \"btrfs\")." },
-        "opts": { "type": "array", "items": { "type": "string" }, "description": "Mount options (e.g. [\"rw\", \"relatime\", \"discard\"])." },
-        "total": { "type": "integer", "description": "Total filesystem capacity in bytes." },
-        "used": { "type": "integer", "description": "Used space in bytes." },
-        "free": { "type": "integer", "description": "Free space in bytes." },
-        "used_percent": { "type": "number", "description": "Percentage of filesystem capacity used (0.0-100.0)." },
-        "inodes_total": { "type": "integer", "description": "Total number of inodes." },
-        "inodes_used": { "type": "integer", "description": "Number of inodes in use." },
-        "inodes_free": { "type": "integer", "description": "Number of free inodes." },
-        "inodes_used_percent": { "type": "number", "description": "Percentage of inodes in use (0.0-100.0)." },
-        "uuid": { "type": "string", "description": "Filesystem UUID from lsblk. Linux only." },
-        "label": { "type": "string", "description": "Filesystem label from lsblk. Linux only." },
-        "part_uuid": { "type": "string", "description": "GPT partition UUID from lsblk. Linux only." },
-        "part_label": { "type": "string", "description": "GPT partition label from lsblk. Linux only." },
-        "btrfs": { "$ref": "#/$defs/BtrfsInfo" }
+        "device": {
+          "type": "string",
+          "description": "Block device path (e.g. \"/dev/sda1\", \"/dev/mapper/vg-root\")."
+        },
+        "mountpoint": {
+          "type": "string",
+          "description": "Filesystem mount path (e.g. \"/\", \"/home\")."
+        },
+        "fstype": {
+          "type": "string",
+          "description": "Filesystem type (e.g. \"ext4\", \"xfs\", \"apfs\", \"btrfs\")."
+        },
+        "opts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Mount options (e.g. [\"rw\", \"relatime\", \"discard\"])."
+        },
+        "total": {
+          "type": "integer",
+          "description": "Total filesystem capacity in bytes."
+        },
+        "used": {
+          "type": "integer",
+          "description": "Used space in bytes."
+        },
+        "free": {
+          "type": "integer",
+          "description": "Free space in bytes."
+        },
+        "used_percent": {
+          "type": "number",
+          "description": "Percentage of filesystem capacity used (0.0-100.0)."
+        },
+        "inodes_total": {
+          "type": "integer",
+          "description": "Total number of inodes."
+        },
+        "inodes_used": {
+          "type": "integer",
+          "description": "Number of inodes in use."
+        },
+        "inodes_free": {
+          "type": "integer",
+          "description": "Number of free inodes."
+        },
+        "inodes_used_percent": {
+          "type": "number",
+          "description": "Percentage of inodes in use (0.0-100.0)."
+        },
+        "uuid": {
+          "type": "string",
+          "description": "Filesystem UUID from lsblk. Linux only."
+        },
+        "label": {
+          "type": "string",
+          "description": "Filesystem label from lsblk. Linux only."
+        },
+        "part_uuid": {
+          "type": "string",
+          "description": "GPT partition UUID from lsblk. Linux only."
+        },
+        "part_label": {
+          "type": "string",
+          "description": "GPT partition label from lsblk. Linux only."
+        },
+        "btrfs": {
+          "$ref": "#/$defs/BtrfsInfo"
+        }
       },
-      "required": ["device", "mountpoint", "fstype"]
+      "required": [
+        "device",
+        "mountpoint",
+        "fstype"
+      ]
     },
     "BtrfsInfo": {
       "type": "object",
       "description": "Btrfs-specific allocation and RAID data from /sys/fs/btrfs/<uuid>/allocation/. Linux only.",
       "properties": {
-        "raid": { "type": "string", "description": "Detected RAID profile: \"single\", \"dup\", \"raid0\", \"raid1\", \"raid5\", \"raid6\", \"raid10\", etc." },
+        "raid": {
+          "type": "string",
+          "description": "Detected RAID profile: \"single\", \"dup\", \"raid0\", \"raid1\", \"raid5\", \"raid6\", \"raid10\", etc."
+        },
         "allocation": {
           "type": "object",
           "description": "Per-block-group-type allocation: keys are \"data\", \"metadata\", \"system\".",
-          "additionalProperties": { "$ref": "#/$defs/BtrfsAllocation" }
+          "additionalProperties": {
+            "$ref": "#/$defs/BtrfsAllocation"
+          }
         }
       }
     },
@@ -716,48 +1079,105 @@
       "type": "object",
       "description": "Bytes allocated and used for one btrfs block-group type.",
       "properties": {
-        "total_bytes": { "type": "integer", "description": "Total bytes allocated for this block-group type." },
-        "bytes_used": { "type": "integer", "description": "Bytes actually used within the allocation." }
+        "total_bytes": {
+          "type": "integer",
+          "description": "Total bytes allocated for this block-group type."
+        },
+        "bytes_used": {
+          "type": "integer",
+          "description": "Bytes actually used within the allocation."
+        }
       },
-      "required": ["total_bytes", "bytes_used"]
+      "required": [
+        "total_bytes",
+        "bytes_used"
+      ]
     },
     "FilesystemUnmounted": {
       "type": "object",
       "description": "A block device with a filesystem that is not currently mounted.",
       "properties": {
-        "device": { "type": "string", "description": "Block device path." },
-        "fstype": { "type": "string", "description": "Filesystem type." },
-        "uuid": { "type": "string", "description": "Filesystem UUID." },
-        "label": { "type": "string", "description": "Filesystem label." },
-        "part_uuid": { "type": "string", "description": "GPT partition UUID." },
-        "part_label": { "type": "string", "description": "GPT partition label." }
+        "device": {
+          "type": "string",
+          "description": "Block device path."
+        },
+        "fstype": {
+          "type": "string",
+          "description": "Filesystem type."
+        },
+        "uuid": {
+          "type": "string",
+          "description": "Filesystem UUID."
+        },
+        "label": {
+          "type": "string",
+          "description": "Filesystem label."
+        },
+        "part_uuid": {
+          "type": "string",
+          "description": "GPT partition UUID."
+        },
+        "part_label": {
+          "type": "string",
+          "description": "GPT partition label."
+        }
       },
-      "required": ["device", "fstype"]
+      "required": [
+        "device",
+        "fstype"
+      ]
     },
     "ZFSDataset": {
       "type": "object",
       "description": "One ZFS dataset (filesystem, volume, snapshot, or bookmark) with its full property set.",
       "properties": {
-        "name": { "type": "string", "description": "Full dataset path (e.g. \"tank\", \"tank/home/john\")." },
-        "mountpoint": { "type": "string", "description": "Mount path if set to a real path. Empty for snapshots, volumes, or mountpoint=none." },
-        "is_pool": { "type": "boolean", "description": "True when this dataset is a zpool root (no slash in the name)." },
-        "parents": { "type": "array", "items": { "type": "string" }, "description": "Every proper ancestor dataset path, shallowest first." },
+        "name": {
+          "type": "string",
+          "description": "Full dataset path (e.g. \"tank\", \"tank/home/john\")."
+        },
+        "mountpoint": {
+          "type": "string",
+          "description": "Mount path if set to a real path. Empty for snapshots, volumes, or mountpoint=none."
+        },
+        "is_pool": {
+          "type": "boolean",
+          "description": "True when this dataset is a zpool root (no slash in the name)."
+        },
+        "parents": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every proper ancestor dataset path, shallowest first."
+        },
         "properties": {
           "type": "object",
           "description": "Full ZFS property set from `zfs get all`. Keys are property names.",
-          "additionalProperties": { "$ref": "#/$defs/ZFSProperty" }
+          "additionalProperties": {
+            "$ref": "#/$defs/ZFSProperty"
+          }
         }
       },
-      "required": ["name"]
+      "required": [
+        "name"
+      ]
     },
     "ZFSProperty": {
       "type": "object",
       "description": "One ZFS property value with its source annotation.",
       "properties": {
-        "value": { "type": "string", "description": "The property value." },
-        "source": { "type": "string", "description": "Source: \"local\", \"default\", \"inherited from <ancestor>\", \"received\", or \"-\"." }
+        "value": {
+          "type": "string",
+          "description": "The property value."
+        },
+        "source": {
+          "type": "string",
+          "description": "Source: \"local\", \"default\", \"inherited from <ancestor>\", \"received\", or \"-\"."
+        }
       },
-      "required": ["value"]
+      "required": [
+        "value"
+      ]
     },
     "Disk": {
       "type": "object",
@@ -765,26 +1185,60 @@
       "properties": {
         "devices": {
           "type": "array",
-          "items": { "$ref": "#/$defs/DiskDevice" },
+          "items": {
+            "$ref": "#/$defs/DiskDevice"
+          },
           "description": "List of block devices with their I/O statistics."
         }
       },
-      "required": ["devices"]
+      "required": [
+        "devices"
+      ]
     },
     "DiskDevice": {
       "type": "object",
       "description": "I/O counters for a single block device.",
       "properties": {
-        "name": { "type": "string", "description": "Block device name (e.g. \"sda\", \"nvme0n1\", \"disk0\")." },
-        "read_count": { "type": "integer", "description": "Total completed read operations." },
-        "write_count": { "type": "integer", "description": "Total completed write operations." },
-        "read_bytes": { "type": "integer", "description": "Total bytes read from the device." },
-        "write_bytes": { "type": "integer", "description": "Total bytes written to the device." },
-        "read_time": { "type": "integer", "description": "Total milliseconds spent on read operations. Linux only." },
-        "write_time": { "type": "integer", "description": "Total milliseconds spent on write operations. Linux only." },
-        "io_time": { "type": "integer", "description": "Total milliseconds spent doing I/O (weighted). Linux only." }
+        "name": {
+          "type": "string",
+          "description": "Block device name (e.g. \"sda\", \"nvme0n1\", \"disk0\")."
+        },
+        "read_count": {
+          "type": "integer",
+          "description": "Total completed read operations."
+        },
+        "write_count": {
+          "type": "integer",
+          "description": "Total completed write operations."
+        },
+        "read_bytes": {
+          "type": "integer",
+          "description": "Total bytes read from the device."
+        },
+        "write_bytes": {
+          "type": "integer",
+          "description": "Total bytes written to the device."
+        },
+        "read_time": {
+          "type": "integer",
+          "description": "Total milliseconds spent on read operations. Linux only."
+        },
+        "write_time": {
+          "type": "integer",
+          "description": "Total milliseconds spent on write operations. Linux only."
+        },
+        "io_time": {
+          "type": "integer",
+          "description": "Total milliseconds spent doing I/O (weighted). Linux only."
+        }
       },
-      "required": ["name", "read_count", "write_count", "read_bytes", "write_bytes"]
+      "required": [
+        "name",
+        "read_count",
+        "write_count",
+        "read_bytes",
+        "write_bytes"
+      ]
     },
     "Network": {
       "type": "object",
@@ -792,152 +1246,404 @@
       "properties": {
         "interfaces": {
           "type": "array",
-          "items": { "$ref": "#/$defs/NetworkInterface" },
+          "items": {
+            "$ref": "#/$defs/NetworkInterface"
+          },
           "description": "All network interfaces on the host."
         },
         "routes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/NetworkRoute" },
+          "items": {
+            "$ref": "#/$defs/NetworkRoute"
+          },
           "description": "Kernel routing table entries."
         },
         "neighbours": {
           "type": "array",
-          "items": { "$ref": "#/$defs/NetworkNeighbour" },
+          "items": {
+            "$ref": "#/$defs/NetworkNeighbour"
+          },
           "description": "ARP (IPv4) and NDP (IPv6) neighbour cache entries."
         },
-        "default_interface": { "type": "string", "description": "Name of the interface carrying the IPv4 default route." },
-        "default_gateway": { "type": "string", "description": "IPv4 default gateway address." },
-        "default_inet6_interface": { "type": "string", "description": "Name of the interface carrying the IPv6 default route." },
-        "default_inet6_gateway": { "type": "string", "description": "IPv6 default gateway address." }
+        "default_interface": {
+          "type": "string",
+          "description": "Name of the interface carrying the IPv4 default route."
+        },
+        "default_gateway": {
+          "type": "string",
+          "description": "IPv4 default gateway address."
+        },
+        "default_inet6_interface": {
+          "type": "string",
+          "description": "Name of the interface carrying the IPv6 default route."
+        },
+        "default_inet6_gateway": {
+          "type": "string",
+          "description": "IPv6 default gateway address."
+        }
       },
-      "required": ["interfaces"]
+      "required": [
+        "interfaces"
+      ]
     },
     "NetworkInterface": {
       "type": "object",
       "description": "A single network interface with addresses, counters, driver info, and optional ethtool/VLAN/tunnel/XDP metadata.",
       "properties": {
-        "name": { "type": "string", "description": "Interface name (e.g. \"eth0\", \"en0\", \"bond0\")." },
-        "number": { "type": "integer", "description": "Kernel interface index." },
-        "state": { "type": "string", "description": "Administrative state: \"up\" or \"down\"." },
-        "mtu": { "type": "integer", "description": "Maximum transmission unit in bytes." },
-        "mac": { "type": "string", "description": "Hardware (MAC) address in colon-separated hex notation. OCSF: network_interface.mac." },
-        "encapsulation": { "type": "string", "description": "Link-layer encapsulation type: \"Ethernet\", \"Loopback\", \"PPP\", \"SLIP\", \"IPIP\", \"6to4\"." },
-        "driver": { "type": "string", "description": "Kernel driver name (e.g. \"e1000e\", \"virtio_net\", \"ixgbe\"). Linux only." },
-        "speed": { "type": "string", "description": "Link speed string from ghw (e.g. \"1000Mb/s\"). Linux only." },
-        "duplex": { "type": "string", "description": "Link duplex mode: \"half\", \"full\", or \"unknown\". Linux only." },
-        "flags": { "type": "array", "items": { "type": "string" }, "description": "Interface flags (e.g. [\"up\", \"broadcast\", \"multicast\"])." },
+        "name": {
+          "type": "string",
+          "description": "Interface name (e.g. \"eth0\", \"en0\", \"bond0\")."
+        },
+        "number": {
+          "type": "integer",
+          "description": "Kernel interface index."
+        },
+        "state": {
+          "type": "string",
+          "description": "Administrative state: \"up\" or \"down\"."
+        },
+        "mtu": {
+          "type": "integer",
+          "description": "Maximum transmission unit in bytes."
+        },
+        "mac": {
+          "type": "string",
+          "description": "Hardware (MAC) address in colon-separated hex notation. OCSF: network_interface.mac."
+        },
+        "encapsulation": {
+          "type": "string",
+          "description": "Link-layer encapsulation type: \"Ethernet\", \"Loopback\", \"PPP\", \"SLIP\", \"IPIP\", \"6to4\"."
+        },
+        "driver": {
+          "type": "string",
+          "description": "Kernel driver name (e.g. \"e1000e\", \"virtio_net\", \"ixgbe\"). Linux only."
+        },
+        "speed": {
+          "type": "string",
+          "description": "Link speed string from ghw (e.g. \"1000Mb/s\"). Linux only."
+        },
+        "duplex": {
+          "type": "string",
+          "description": "Link duplex mode: \"half\", \"full\", or \"unknown\". Linux only."
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Interface flags (e.g. [\"up\", \"broadcast\", \"multicast\"])."
+        },
         "addresses": {
           "type": "array",
-          "items": { "$ref": "#/$defs/NetworkAddress" },
+          "items": {
+            "$ref": "#/$defs/NetworkAddress"
+          },
           "description": "IP addresses bound to this interface."
         },
         "routes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/NetworkRoute" },
+          "items": {
+            "$ref": "#/$defs/NetworkRoute"
+          },
           "description": "Routes associated with this specific interface."
         },
-        "counters": { "$ref": "#/$defs/NetworkCounters" },
-        "ethtool": { "$ref": "#/$defs/NetworkEthtool" },
-        "vlan": { "$ref": "#/$defs/NetworkVLAN" },
-        "tunnel_info": { "$ref": "#/$defs/NetworkTunnel" },
-        "xdp": { "$ref": "#/$defs/NetworkXDP" }
+        "counters": {
+          "$ref": "#/$defs/NetworkCounters"
+        },
+        "ethtool": {
+          "$ref": "#/$defs/NetworkEthtool"
+        },
+        "vlan": {
+          "$ref": "#/$defs/NetworkVLAN"
+        },
+        "tunnel_info": {
+          "$ref": "#/$defs/NetworkTunnel"
+        },
+        "xdp": {
+          "$ref": "#/$defs/NetworkXDP"
+        }
       },
-      "required": ["name", "mtu"]
+      "required": [
+        "name",
+        "mtu"
+      ]
     },
     "NetworkAddress": {
       "type": "object",
       "description": "One IP address bound to an interface with family, prefix length, and scope.",
       "properties": {
-        "ip": { "type": "string", "description": "IP address string (IPv4 or IPv6)." },
-        "family": { "type": "string", "description": "Address family: \"inet\" (IPv4) or \"inet6\" (IPv6)." },
-        "prefixlen": { "type": "integer", "description": "Network prefix length (e.g. 24 for /24, 64 for /64)." },
-        "netmask": { "type": "string", "description": "Dotted-decimal netmask (IPv4 only, e.g. \"255.255.255.0\")." },
-        "broadcast": { "type": "string", "description": "Broadcast address (IPv4 only)." },
-        "scope": { "type": "string", "description": "Address scope: \"Global\", \"Link\", \"Host\", or \"Site\"." }
+        "ip": {
+          "type": "string",
+          "description": "IP address string (IPv4 or IPv6)."
+        },
+        "family": {
+          "type": "string",
+          "description": "Address family: \"inet\" (IPv4) or \"inet6\" (IPv6)."
+        },
+        "prefixlen": {
+          "type": "integer",
+          "description": "Network prefix length (e.g. 24 for /24, 64 for /64)."
+        },
+        "netmask": {
+          "type": "string",
+          "description": "Dotted-decimal netmask (IPv4 only, e.g. \"255.255.255.0\")."
+        },
+        "broadcast": {
+          "type": "string",
+          "description": "Broadcast address (IPv4 only)."
+        },
+        "scope": {
+          "type": "string",
+          "description": "Address scope: \"Global\", \"Link\", \"Host\", or \"Site\"."
+        }
       },
-      "required": ["ip", "family", "prefixlen"]
+      "required": [
+        "ip",
+        "family",
+        "prefixlen"
+      ]
     },
     "NetworkRoute": {
       "type": "object",
       "description": "One kernel routing table entry.",
       "properties": {
-        "destination": { "type": "string", "description": "Route destination network in CIDR notation (e.g. \"0.0.0.0/0\", \"10.0.0.0/8\")." },
-        "family": { "type": "string", "description": "Address family: \"inet\" or \"inet6\"." },
-        "gateway": { "type": "string", "description": "Next-hop gateway address. Empty for directly connected routes." },
-        "interface": { "type": "string", "description": "Egress interface name for this route." },
-        "source": { "type": "string", "description": "Preferred source address for this route." },
-        "scope": { "type": "string", "description": "Route scope: \"universe\", \"link\", \"host\"." },
-        "proto": { "type": "string", "description": "Routing protocol that installed this route (e.g. \"kernel\", \"dhcp\", \"bird\")." },
-        "metric": { "type": "integer", "description": "Route metric / priority. Lower values are preferred." }
+        "destination": {
+          "type": "string",
+          "description": "Route destination network in CIDR notation (e.g. \"0.0.0.0/0\", \"10.0.0.0/8\")."
+        },
+        "family": {
+          "type": "string",
+          "description": "Address family: \"inet\" or \"inet6\"."
+        },
+        "gateway": {
+          "type": "string",
+          "description": "Next-hop gateway address. Empty for directly connected routes."
+        },
+        "interface": {
+          "type": "string",
+          "description": "Egress interface name for this route."
+        },
+        "source": {
+          "type": "string",
+          "description": "Preferred source address for this route."
+        },
+        "scope": {
+          "type": "string",
+          "description": "Route scope: \"universe\", \"link\", \"host\"."
+        },
+        "proto": {
+          "type": "string",
+          "description": "Routing protocol that installed this route (e.g. \"kernel\", \"dhcp\", \"bird\")."
+        },
+        "metric": {
+          "type": "integer",
+          "description": "Route metric / priority. Lower values are preferred."
+        }
       },
-      "required": ["destination", "family"]
+      "required": [
+        "destination",
+        "family"
+      ]
     },
     "NetworkNeighbour": {
       "type": "object",
       "description": "One ARP or NDP cache entry.",
       "properties": {
-        "address": { "type": "string", "description": "Neighbour's IPv4 or IPv6 address." },
-        "family": { "type": "string", "description": "Address family: \"inet\" or \"inet6\"." },
-        "mac": { "type": "string", "description": "Neighbour's hardware (MAC) address." },
-        "interface": { "type": "string", "description": "Interface through which the neighbour is reachable." },
-        "state": { "type": "string", "description": "Neighbour state: REACHABLE, STALE, DELAY, PROBE, PERMANENT, NOARP, INCOMPLETE, FAILED." }
+        "address": {
+          "type": "string",
+          "description": "Neighbour's IPv4 or IPv6 address."
+        },
+        "family": {
+          "type": "string",
+          "description": "Address family: \"inet\" or \"inet6\"."
+        },
+        "mac": {
+          "type": "string",
+          "description": "Neighbour's hardware (MAC) address."
+        },
+        "interface": {
+          "type": "string",
+          "description": "Interface through which the neighbour is reachable."
+        },
+        "state": {
+          "type": "string",
+          "description": "Neighbour state: REACHABLE, STALE, DELAY, PROBE, PERMANENT, NOARP, INCOMPLETE, FAILED."
+        }
       },
-      "required": ["address", "family"]
+      "required": [
+        "address",
+        "family"
+      ]
     },
     "NetworkCounters": {
       "type": "object",
       "description": "I/O counters for one network interface.",
       "properties": {
-        "bytes_sent": { "type": "integer", "description": "Total bytes transmitted." },
-        "bytes_recv": { "type": "integer", "description": "Total bytes received." },
-        "packets_sent": { "type": "integer", "description": "Total packets transmitted." },
-        "packets_recv": { "type": "integer", "description": "Total packets received." },
-        "errin": { "type": "integer", "description": "Total receive errors." },
-        "errout": { "type": "integer", "description": "Total transmit errors." },
-        "dropin": { "type": "integer", "description": "Total incoming packets dropped." },
-        "dropout": { "type": "integer", "description": "Total outgoing packets dropped." }
+        "bytes_sent": {
+          "type": "integer",
+          "description": "Total bytes transmitted."
+        },
+        "bytes_recv": {
+          "type": "integer",
+          "description": "Total bytes received."
+        },
+        "packets_sent": {
+          "type": "integer",
+          "description": "Total packets transmitted."
+        },
+        "packets_recv": {
+          "type": "integer",
+          "description": "Total packets received."
+        },
+        "errin": {
+          "type": "integer",
+          "description": "Total receive errors."
+        },
+        "errout": {
+          "type": "integer",
+          "description": "Total transmit errors."
+        },
+        "dropin": {
+          "type": "integer",
+          "description": "Total incoming packets dropped."
+        },
+        "dropout": {
+          "type": "integer",
+          "description": "Total outgoing packets dropped."
+        }
       },
-      "required": ["bytes_sent", "bytes_recv", "packets_sent", "packets_recv"]
+      "required": [
+        "bytes_sent",
+        "bytes_recv",
+        "packets_sent",
+        "packets_recv"
+      ]
     },
     "NetworkEthtool": {
       "type": "object",
       "description": "Per-interface ethtool data sourced from ethtool subcommands. Linux only, Ethernet interfaces only.",
       "properties": {
-        "driver_info": { "type": "object", "description": "Driver metadata from `ethtool -i` (driver, version, firmware_version, bus_info, etc.).", "additionalProperties": { "type": "string" } },
-        "ring_params": { "type": "object", "description": "Ring buffer parameters from `ethtool -g` (max_rx, current_rx, etc.).", "additionalProperties": { "type": "integer" } },
-        "channel_params": { "type": "object", "description": "Channel/queue counts from `ethtool -l` (max_combined, current_combined, etc.).", "additionalProperties": { "type": "integer" } },
-        "coalesce_params": { "type": "object", "description": "Interrupt coalescing parameters from `ethtool -c` (rx_usecs, tx_max_coalesced_frames, adaptive_rx, etc.). Mixed integer and string values." },
-        "offload_params": { "type": "object", "description": "Offload feature toggles from `ethtool -k` (tx-checksum-ipv4: on, generic-receive-offload: off, etc.).", "additionalProperties": { "type": "string" } },
-        "pause_params": { "type": "object", "description": "Flow-control pause parameters from `ethtool -a` (autonegotiate, rx, tx).", "additionalProperties": { "type": "boolean" } }
+        "driver_info": {
+          "type": "object",
+          "description": "Driver metadata from `ethtool -i` (driver, version, firmware_version, bus_info, etc.).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "ring_params": {
+          "type": "object",
+          "description": "Ring buffer parameters from `ethtool -g` (max_rx, current_rx, etc.).",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "channel_params": {
+          "type": "object",
+          "description": "Channel/queue counts from `ethtool -l` (max_combined, current_combined, etc.).",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "coalesce_params": {
+          "type": "object",
+          "description": "Interrupt coalescing parameters from `ethtool -c` (rx_usecs, tx_max_coalesced_frames, adaptive_rx, etc.). Mixed integer and string values."
+        },
+        "offload_params": {
+          "type": "object",
+          "description": "Offload feature toggles from `ethtool -k` (tx-checksum-ipv4: on, generic-receive-offload: off, etc.).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "pause_params": {
+          "type": "object",
+          "description": "Flow-control pause parameters from `ethtool -a` (autonegotiate, rx, tx).",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        }
       }
     },
     "NetworkVLAN": {
       "type": "object",
       "description": "VLAN sub-interface metadata from `ip -d link`. Linux only.",
       "properties": {
-        "id": { "type": "string", "description": "802.1Q VLAN tag (decimal string)." },
-        "protocol": { "type": "string", "description": "VLAN protocol: \"802.1Q\" or \"802.1ad\"." },
-        "flags": { "type": "array", "items": { "type": "string" }, "description": "VLAN flags: REORDER_HDR, GVRP, LOOSE_BINDING, etc." }
+        "id": {
+          "type": "string",
+          "description": "802.1Q VLAN tag (decimal string)."
+        },
+        "protocol": {
+          "type": "string",
+          "description": "VLAN protocol: \"802.1Q\" or \"802.1ad\"."
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "VLAN flags: REORDER_HDR, GVRP, LOOSE_BINDING, etc."
+        }
       },
-      "required": ["id"]
+      "required": [
+        "id"
+      ]
     },
     "NetworkTunnel": {
       "type": "object",
       "description": "IP-in-IP or IP6 tunnel metadata from `ip -d link`. Linux only.",
       "properties": {
-        "proto": { "type": "string", "description": "Tunnel protocol: \"any\", \"ipip6\", \"ip6ip6\"." },
-        "external": { "type": "boolean", "description": "True for externally controlled tunnels." },
-        "remote": { "type": "string", "description": "Remote tunnel endpoint address." },
-        "local": { "type": "string", "description": "Local tunnel endpoint address." },
-        "encaplimit": { "type": "string", "description": "Tunnel encapsulation limit." },
-        "hoplimit": { "type": "string", "description": "Tunnel hop limit / TTL." },
-        "tclass": { "type": "string", "description": "Traffic class for tunnel packets." },
-        "flowlabel": { "type": "string", "description": "IPv6 flow label for tunnel packets." },
-        "addrgenmode": { "type": "string", "description": "Address generation mode." },
-        "numtxqueues": { "type": "string", "description": "Number of transmit queues." },
-        "numrxqueues": { "type": "string", "description": "Number of receive queues." },
-        "gso_max_size": { "type": "string", "description": "Maximum GSO segment size." },
-        "gso_max_segs": { "type": "string", "description": "Maximum GSO segments." }
+        "proto": {
+          "type": "string",
+          "description": "Tunnel protocol: \"any\", \"ipip6\", \"ip6ip6\"."
+        },
+        "external": {
+          "type": "boolean",
+          "description": "True for externally controlled tunnels."
+        },
+        "remote": {
+          "type": "string",
+          "description": "Remote tunnel endpoint address."
+        },
+        "local": {
+          "type": "string",
+          "description": "Local tunnel endpoint address."
+        },
+        "encaplimit": {
+          "type": "string",
+          "description": "Tunnel encapsulation limit."
+        },
+        "hoplimit": {
+          "type": "string",
+          "description": "Tunnel hop limit / TTL."
+        },
+        "tclass": {
+          "type": "string",
+          "description": "Traffic class for tunnel packets."
+        },
+        "flowlabel": {
+          "type": "string",
+          "description": "IPv6 flow label for tunnel packets."
+        },
+        "addrgenmode": {
+          "type": "string",
+          "description": "Address generation mode."
+        },
+        "numtxqueues": {
+          "type": "string",
+          "description": "Number of transmit queues."
+        },
+        "numrxqueues": {
+          "type": "string",
+          "description": "Number of receive queues."
+        },
+        "gso_max_size": {
+          "type": "string",
+          "description": "Maximum GSO segment size."
+        },
+        "gso_max_segs": {
+          "type": "string",
+          "description": "Maximum GSO segments."
+        }
       }
     },
     "NetworkXDP": {
@@ -946,7 +1652,9 @@
       "properties": {
         "attached": {
           "type": "array",
-          "items": { "$ref": "#/$defs/NetworkXDPProgram" },
+          "items": {
+            "$ref": "#/$defs/NetworkXDPProgram"
+          },
           "description": "List of attached XDP programs."
         }
       }
@@ -955,38 +1663,80 @@
       "type": "object",
       "description": "One attached XDP eBPF program.",
       "properties": {
-        "mode": { "type": "string", "description": "XDP attachment mode: \"xdpdrv\", \"xdpgeneric\", \"xdpoffload\", \"xdpmulti\"." },
-        "id": { "type": "string", "description": "eBPF program ID." },
-        "tag": { "type": "string", "description": "eBPF program tag (hash)." }
+        "mode": {
+          "type": "string",
+          "description": "XDP attachment mode: \"xdpdrv\", \"xdpgeneric\", \"xdpoffload\", \"xdpmulti\"."
+        },
+        "id": {
+          "type": "string",
+          "description": "eBPF program ID."
+        },
+        "tag": {
+          "type": "string",
+          "description": "eBPF program tag (hash)."
+        }
       },
-      "required": ["mode", "id"]
+      "required": [
+        "mode",
+        "id"
+      ]
     },
     "Process": {
       "type": "object",
       "description": "Snapshot of running processes at collection time.",
       "properties": {
-        "count": { "type": "integer", "description": "Total number of processes captured in this snapshot." },
+        "count": {
+          "type": "integer",
+          "description": "Total number of processes captured in this snapshot."
+        },
         "processes": {
           "type": "array",
-          "items": { "$ref": "#/$defs/ProcessEntry" },
+          "items": {
+            "$ref": "#/$defs/ProcessEntry"
+          },
           "description": "Individual process entries."
         }
       },
-      "required": ["count"]
+      "required": [
+        "count"
+      ]
     },
     "ProcessEntry": {
       "type": "object",
       "description": "One running process snapshot. Fields that cannot be read (permission denied, zombie) are left empty.",
       "properties": {
-        "pid": { "type": "integer", "description": "Process ID." },
-        "ppid": { "type": "integer", "description": "Parent process ID." },
-        "name": { "type": "string", "description": "Process name (comm)." },
-        "username": { "type": "string", "description": "Username of the process owner." },
-        "command_line": { "type": "string", "description": "Full command line with arguments. OCSF: process.cmd_line." },
-        "state": { "type": "string", "description": "Process state: R (running), S (sleeping), D (disk sleep), Z (zombie), T (stopped), I (idle)." },
-        "start_time": { "type": "integer", "description": "Process start time as Unix epoch seconds." }
+        "pid": {
+          "type": "integer",
+          "description": "Process ID."
+        },
+        "ppid": {
+          "type": "integer",
+          "description": "Parent process ID."
+        },
+        "name": {
+          "type": "string",
+          "description": "Process name (comm)."
+        },
+        "username": {
+          "type": "string",
+          "description": "Username of the process owner."
+        },
+        "command_line": {
+          "type": "string",
+          "description": "Full command line with arguments. OCSF: process.cmd_line."
+        },
+        "state": {
+          "type": "string",
+          "description": "Process state: R (running), S (sleeping), D (disk sleep), Z (zombie), T (stopped), I (idle)."
+        },
+        "start_time": {
+          "type": "integer",
+          "description": "Process start time as Unix epoch seconds."
+        }
       },
-      "required": ["pid"]
+      "required": [
+        "pid"
+      ]
     },
     "Users": {
       "type": "object",
@@ -995,37 +1745,76 @@
         "passwd": {
           "type": "object",
           "description": "Map of username to passwd entry.",
-          "additionalProperties": { "$ref": "#/$defs/PasswdEntry" }
+          "additionalProperties": {
+            "$ref": "#/$defs/PasswdEntry"
+          }
         },
         "group": {
           "type": "object",
           "description": "Map of group name to group entry.",
-          "additionalProperties": { "$ref": "#/$defs/GroupEntry" }
+          "additionalProperties": {
+            "$ref": "#/$defs/GroupEntry"
+          }
         },
-        "current_user": { "type": "string", "description": "Username of the effective current user (matching the EUID in the passwd map)." }
+        "current_user": {
+          "type": "string",
+          "description": "Username of the effective current user (matching the EUID in the passwd map)."
+        }
       },
-      "required": ["passwd", "group"]
+      "required": [
+        "passwd",
+        "group"
+      ]
     },
     "PasswdEntry": {
       "type": "object",
       "description": "One user account from /etc/passwd.",
       "properties": {
-        "uid": { "type": "integer", "description": "Numeric user ID." },
-        "gid": { "type": "integer", "description": "Numeric primary group ID." },
-        "dir": { "type": "string", "description": "Home directory path." },
-        "shell": { "type": "string", "description": "Login shell path." },
-        "gecos": { "type": "string", "description": "GECOS field (full name and contact info)." }
+        "uid": {
+          "type": "integer",
+          "description": "Numeric user ID."
+        },
+        "gid": {
+          "type": "integer",
+          "description": "Numeric primary group ID."
+        },
+        "dir": {
+          "type": "string",
+          "description": "Home directory path."
+        },
+        "shell": {
+          "type": "string",
+          "description": "Login shell path."
+        },
+        "gecos": {
+          "type": "string",
+          "description": "GECOS field (full name and contact info)."
+        }
       },
-      "required": ["uid", "gid"]
+      "required": [
+        "uid",
+        "gid"
+      ]
     },
     "GroupEntry": {
       "type": "object",
       "description": "One group account from /etc/group.",
       "properties": {
-        "gid": { "type": "integer", "description": "Numeric group ID." },
-        "members": { "type": "array", "items": { "type": "string" }, "description": "Usernames that are members of this group." }
+        "gid": {
+          "type": "integer",
+          "description": "Numeric group ID."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Usernames that are members of this group."
+        }
       },
-      "required": ["gid"]
+      "required": [
+        "gid"
+      ]
     },
     "Sessions": {
       "type": "object",
@@ -1033,43 +1822,87 @@
       "properties": {
         "logged_in": {
           "type": "array",
-          "items": { "$ref": "#/$defs/Session" },
+          "items": {
+            "$ref": "#/$defs/Session"
+          },
           "description": "List of active login sessions."
         }
       },
-      "required": ["logged_in"]
+      "required": [
+        "logged_in"
+      ]
     },
     "Session": {
       "type": "object",
       "description": "One active login session.",
       "properties": {
-        "user": { "type": "string", "description": "Username of the logged-in user." },
-        "terminal": { "type": "string", "description": "Terminal device (e.g. \"pts/0\", \"tty1\"). May be empty for graphical sessions." },
-        "host": { "type": "string", "description": "Remote host address for SSH sessions. Empty for local sessions." },
-        "started": { "type": "integer", "description": "Session start time as Unix epoch seconds (utmp path only)." },
-        "session_id": { "type": "string", "description": "Systemd session identifier (loginctl path only)." },
-        "uid": { "type": "string", "description": "Numeric user ID as string (loginctl path only)." },
-        "seat": { "type": "string", "description": "Systemd seat assignment (loginctl path only)." }
+        "user": {
+          "type": "string",
+          "description": "Username of the logged-in user."
+        },
+        "terminal": {
+          "type": "string",
+          "description": "Terminal device (e.g. \"pts/0\", \"tty1\"). May be empty for graphical sessions."
+        },
+        "host": {
+          "type": "string",
+          "description": "Remote host address for SSH sessions. Empty for local sessions."
+        },
+        "started": {
+          "type": "integer",
+          "description": "Session start time as Unix epoch seconds (utmp path only)."
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Systemd session identifier (loginctl path only)."
+        },
+        "uid": {
+          "type": "string",
+          "description": "Numeric user ID as string (loginctl path only)."
+        },
+        "seat": {
+          "type": "string",
+          "description": "Systemd seat assignment (loginctl path only)."
+        }
       },
-      "required": ["user"]
+      "required": [
+        "user"
+      ]
     },
     "Timezone": {
       "type": "object",
       "description": "System timezone: IANA name, short abbreviation, and UTC offset in seconds.",
       "properties": {
-        "name": { "type": "string", "description": "IANA timezone name (e.g. \"America/Los_Angeles\", \"Europe/Berlin\", \"UTC\")." },
-        "abbrev": { "type": "string", "description": "Short timezone abbreviation (e.g. \"PDT\", \"PST\", \"CET\", \"UTC\")." },
-        "offset": { "type": "integer", "description": "UTC offset in seconds. Negative for west of UTC (e.g. -28800 for PST)." }
+        "name": {
+          "type": "string",
+          "description": "IANA timezone name (e.g. \"America/Los_Angeles\", \"Europe/Berlin\", \"UTC\")."
+        },
+        "abbrev": {
+          "type": "string",
+          "description": "Short timezone abbreviation (e.g. \"PDT\", \"PST\", \"CET\", \"UTC\")."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "UTC offset in seconds. Negative for west of UTC (e.g. -28800 for PST)."
+        }
       },
-      "required": ["name", "offset"]
+      "required": [
+        "name",
+        "offset"
+      ]
     },
     "RootGroup": {
       "type": "object",
       "description": "Primary group of the root user. Typically \"root\" on Linux, \"wheel\" on macOS/BSD.",
       "properties": {
-        "name": { "type": "string", "description": "Group name for root's primary GID." }
+        "name": {
+          "type": "string",
+          "description": "Group name for root's primary GID."
+        }
       },
-      "required": ["name"]
+      "required": [
+        "name"
+      ]
     },
     "Shells": {
       "type": "object",
@@ -1077,11 +1910,15 @@
       "properties": {
         "paths": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Absolute paths to available login shells (e.g. [\"/bin/bash\", \"/bin/zsh\", \"/usr/bin/fish\"])."
         }
       },
-      "required": ["paths"]
+      "required": [
+        "paths"
+      ]
     },
     "FIPS": {
       "type": "object",
@@ -1094,512 +1931,2252 @@
           "$ref": "#/$defs/FIPSPolicy"
         }
       },
-      "required": ["kernel"]
+      "required": [
+        "kernel"
+      ]
     },
     "FIPSKernel": {
       "type": "object",
       "description": "Kernel-level FIPS flag from /proc/sys/crypto/fips_enabled.",
       "properties": {
-        "enabled": { "type": "boolean", "description": "True when the kernel booted with fips=1 (FIPS 140-2 mode)." }
+        "enabled": {
+          "type": "boolean",
+          "description": "True when the kernel booted with fips=1 (FIPS 140-2 mode)."
+        }
       },
-      "required": ["enabled"]
+      "required": [
+        "enabled"
+      ]
     },
     "FIPSPolicy": {
       "type": "object",
       "description": "User-space crypto policy state from /etc/crypto-policies/config (RHEL 8+, Fedora 30+).",
       "properties": {
-        "name": { "type": "string", "description": "Active crypto policy name (e.g. \"FIPS\", \"FIPS:OSPP\", \"DEFAULT\")." },
-        "fips_effective": { "type": "boolean", "description": "True when the policy name starts with \"FIPS\", indicating FIPS 140-3 mode is effectively active." }
+        "name": {
+          "type": "string",
+          "description": "Active crypto policy name (e.g. \"FIPS\", \"FIPS:OSPP\", \"DEFAULT\")."
+        },
+        "fips_effective": {
+          "type": "boolean",
+          "description": "True when the policy name starts with \"FIPS\", indicating FIPS 140-3 mode is effectively active."
+        }
       },
-      "required": ["name", "fips_effective"]
+      "required": [
+        "name",
+        "fips_effective"
+      ]
     },
     "OSRelease": {
       "type": "object",
       "description": "Fields parsed from /etc/os-release (os-release(5) format). Linux only.",
       "properties": {
-        "id": { "type": "string", "description": "Machine-readable OS identifier (e.g. \"ubuntu\", \"fedora\", \"rhel\")." },
-        "id_like": { "type": "array", "items": { "type": "string" }, "description": "Related OS identifiers (e.g. [\"debian\"] for Ubuntu, [\"rhel\", \"fedora\"] for CentOS)." },
-        "name": { "type": "string", "description": "Human-readable OS name (e.g. \"Ubuntu\")." },
-        "pretty_name": { "type": "string", "description": "Pretty OS name with version (e.g. \"Ubuntu 24.04 LTS (Noble Numbat)\")." },
-        "version": { "type": "string", "description": "Version string including codename (e.g. \"24.04 (Noble Numbat)\")." },
-        "version_id": { "type": "string", "description": "Machine-readable version (e.g. \"24.04\")." },
-        "version_codename": { "type": "string", "description": "Release codename (e.g. \"noble\")." },
-        "build_id": { "type": "string", "description": "Build identifier for rolling releases." },
-        "variant": { "type": "string", "description": "OS variant name (e.g. \"Server\", \"Workstation\")." },
-        "variant_id": { "type": "string", "description": "Machine-readable variant (e.g. \"server\")." },
-        "home_url": { "type": "string", "description": "OS project home page URL." },
-        "support_url": { "type": "string", "description": "OS support page URL." },
-        "bug_report_url": { "type": "string", "description": "OS bug reporting URL." },
-        "extra": { "type": "object", "description": "Any os-release keys not explicitly parsed above.", "additionalProperties": { "type": "string" } }
+        "id": {
+          "type": "string",
+          "description": "Machine-readable OS identifier (e.g. \"ubuntu\", \"fedora\", \"rhel\")."
+        },
+        "id_like": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Related OS identifiers (e.g. [\"debian\"] for Ubuntu, [\"rhel\", \"fedora\"] for CentOS)."
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable OS name (e.g. \"Ubuntu\")."
+        },
+        "pretty_name": {
+          "type": "string",
+          "description": "Pretty OS name with version (e.g. \"Ubuntu 24.04 LTS (Noble Numbat)\")."
+        },
+        "version": {
+          "type": "string",
+          "description": "Version string including codename (e.g. \"24.04 (Noble Numbat)\")."
+        },
+        "version_id": {
+          "type": "string",
+          "description": "Machine-readable version (e.g. \"24.04\")."
+        },
+        "version_codename": {
+          "type": "string",
+          "description": "Release codename (e.g. \"noble\")."
+        },
+        "build_id": {
+          "type": "string",
+          "description": "Build identifier for rolling releases."
+        },
+        "variant": {
+          "type": "string",
+          "description": "OS variant name (e.g. \"Server\", \"Workstation\")."
+        },
+        "variant_id": {
+          "type": "string",
+          "description": "Machine-readable variant (e.g. \"server\")."
+        },
+        "home_url": {
+          "type": "string",
+          "description": "OS project home page URL."
+        },
+        "support_url": {
+          "type": "string",
+          "description": "OS support page URL."
+        },
+        "bug_report_url": {
+          "type": "string",
+          "description": "OS bug reporting URL."
+        },
+        "extra": {
+          "type": "object",
+          "description": "Any os-release keys not explicitly parsed above.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
       }
     },
     "LSB": {
       "type": "object",
       "description": "Linux Standard Base identification fields from `lsb_release -a`.",
       "properties": {
-        "id": { "type": "string", "description": "Distributor ID (e.g. \"Ubuntu\", \"Debian\", \"CentOS\")." },
-        "release": { "type": "string", "description": "Release number (e.g. \"24.04\", \"12\")." },
-        "codename": { "type": "string", "description": "Release codename (e.g. \"noble\", \"bookworm\")." },
-        "description": { "type": "string", "description": "Human-readable distribution description." }
+        "id": {
+          "type": "string",
+          "description": "Distributor ID (e.g. \"Ubuntu\", \"Debian\", \"CentOS\")."
+        },
+        "release": {
+          "type": "string",
+          "description": "Release number (e.g. \"24.04\", \"12\")."
+        },
+        "codename": {
+          "type": "string",
+          "description": "Release codename (e.g. \"noble\", \"bookworm\")."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable distribution description."
+        }
       }
     },
     "Init": {
       "type": "object",
       "description": "Init system detection: identifies the process manager running as PID 1.",
       "properties": {
-        "name": { "type": "string", "description": "Canonical init system name: \"systemd\", \"upstart\", \"sysvinit\", \"openrc\", \"runit\", \"launchd\", etc." }
+        "name": {
+          "type": "string",
+          "description": "Canonical init system name: \"systemd\", \"upstart\", \"sysvinit\", \"openrc\", \"runit\", \"launchd\", etc."
+        }
       },
-      "required": ["name"]
+      "required": [
+        "name"
+      ]
     },
     "Shard": {
       "type": "object",
       "description": "Deterministic shard seed derived from stable host identity (machine name + DMI serial + DMI UUID, MD5-hashed). Same host always maps to the same bucket.",
       "properties": {
-        "seed": { "type": "integer", "description": "Shard seed integer (0 to 2^28-1). First 7 hex chars of the MD5 hash interpreted as base-16." }
+        "seed": {
+          "type": "integer",
+          "description": "Shard seed integer (0 to 2^28-1). First 7 hex chars of the MD5 hash interpreted as base-16."
+        }
       },
-      "required": ["seed"]
+      "required": [
+        "seed"
+      ]
     },
     "PackageMgr": {
       "type": "object",
       "description": "Active system package manager detection.",
       "properties": {
-        "name": { "type": "string", "description": "Package manager name: \"apt\", \"dnf\", \"yum\", \"zypper\", \"pacman\", \"apk\", \"brew\"." },
-        "path": { "type": "string", "description": "Absolute filesystem path to the package manager binary." }
+        "name": {
+          "type": "string",
+          "description": "Package manager name: \"apt\", \"dnf\", \"yum\", \"zypper\", \"pacman\", \"apk\", \"brew\"."
+        },
+        "path": {
+          "type": "string",
+          "description": "Absolute filesystem path to the package manager binary."
+        }
       },
-      "required": ["name"]
+      "required": [
+        "name"
+      ]
     },
     "GCE": {
       "type": "object",
       "description": "Google Compute Engine instance metadata from the GCE metadata server.",
       "properties": {
-        "instance_id": { "type": "integer", "description": "Numeric GCE instance ID." },
-        "name": { "type": "string", "description": "Instance name." },
-        "hostname": { "type": "string", "description": "Instance hostname from metadata." },
-        "cpu_platform": { "type": "string", "description": "CPU platform family (e.g. \"Intel Broadwell\", \"AMD Rome\")." },
-        "machine_type": { "type": "string", "description": "Short machine type (e.g. \"n1-standard-4\", \"e2-micro\")." },
-        "image": { "type": "string", "description": "Boot image short name." },
-        "description": { "type": "string", "description": "Instance description." },
-        "tags": { "type": "array", "items": { "type": "string" }, "description": "Network tags applied to the instance." },
-        "preemptible": { "type": "boolean", "description": "True if this is a preemptible (Spot) instance." },
-        "automatic_restart": { "type": "string", "description": "Whether the instance restarts automatically on host failures." },
-        "on_host_maintenance": { "type": "string", "description": "Behavior during host maintenance: \"MIGRATE\" or \"TERMINATE\"." },
-        "maintenance_event": { "type": "string", "description": "Current maintenance event status (usually \"NONE\")." },
-        "zone": { "type": "string", "description": "GCE zone short name (e.g. \"us-central1-a\")." },
-        "region": { "type": "string", "description": "GCE region derived from zone (e.g. \"us-central1\")." },
-        "project_id": { "type": "string", "description": "GCP project ID." },
-        "numeric_project_id": { "type": "integer", "description": "Numeric GCP project ID." },
-        "project_attributes": { "type": "object", "description": "Project-level metadata key-value pairs.", "additionalProperties": { "type": "string" } },
-        "licenses": { "type": "array", "items": { "type": "string" }, "description": "GCP license IDs attached to the instance." },
-        "attributes": { "type": "object", "description": "Instance-level metadata key-value pairs (SSH keys, startup scripts, etc.).", "additionalProperties": { "type": "string" } },
-        "network_interfaces": { "type": "array", "items": { "$ref": "#/$defs/GCENetworkInterface" }, "description": "Attached virtual NICs." },
-        "disks": { "type": "array", "items": { "$ref": "#/$defs/GCEDisk" }, "description": "Attached disks." },
-        "service_accounts": { "type": "array", "items": { "$ref": "#/$defs/GCEServiceAccount" }, "description": "GCP service accounts attached to the instance." },
-        "virtual_clock_drift_token": { "type": "string", "description": "Opaque drift token from the virtualClock subtree. Used to detect VM migration." },
-        "remaining_cpu_time": { "type": "integer", "description": "Remaining CPU time in seconds before preemption for Spot VMs. -1 on standard instances." },
-        "partner_attributes": { "type": "object", "description": "Opaque key-value pairs set by GCE partner images.", "additionalProperties": { "type": "string" } }
+        "instance_id": {
+          "type": "integer",
+          "description": "Numeric GCE instance ID."
+        },
+        "name": {
+          "type": "string",
+          "description": "Instance name."
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Instance hostname from metadata."
+        },
+        "cpu_platform": {
+          "type": "string",
+          "description": "CPU platform family (e.g. \"Intel Broadwell\", \"AMD Rome\")."
+        },
+        "machine_type": {
+          "type": "string",
+          "description": "Short machine type (e.g. \"n1-standard-4\", \"e2-micro\")."
+        },
+        "image": {
+          "type": "string",
+          "description": "Boot image short name."
+        },
+        "description": {
+          "type": "string",
+          "description": "Instance description."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Network tags applied to the instance."
+        },
+        "preemptible": {
+          "type": "boolean",
+          "description": "True if this is a preemptible (Spot) instance."
+        },
+        "automatic_restart": {
+          "type": "string",
+          "description": "Whether the instance restarts automatically on host failures."
+        },
+        "on_host_maintenance": {
+          "type": "string",
+          "description": "Behavior during host maintenance: \"MIGRATE\" or \"TERMINATE\"."
+        },
+        "maintenance_event": {
+          "type": "string",
+          "description": "Current maintenance event status (usually \"NONE\")."
+        },
+        "region": {
+          "type": "string",
+          "description": "GCE region derived from zone (e.g. \"us-central1\")."
+        },
+        "project_id": {
+          "type": "string",
+          "description": "GCP project ID."
+        },
+        "numeric_project_id": {
+          "type": "integer",
+          "description": "Numeric GCP project ID."
+        },
+        "project_attributes": {
+          "type": "object",
+          "description": "Project-level metadata key-value pairs.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "licenses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "GCP license IDs attached to the instance."
+        },
+        "attributes": {
+          "type": "object",
+          "description": "Instance-level metadata key-value pairs (SSH keys, startup scripts, etc.).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "network_interfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GCENetworkInterface"
+          },
+          "description": "Attached virtual NICs."
+        },
+        "disks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GCEDisk"
+          },
+          "description": "Attached disks."
+        },
+        "service_accounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GCEServiceAccount"
+          },
+          "description": "GCP service accounts attached to the instance."
+        },
+        "virtual_clock_drift_token": {
+          "type": "string",
+          "description": "Opaque drift token from the virtualClock subtree. Used to detect VM migration."
+        },
+        "remaining_cpu_time": {
+          "type": "integer",
+          "description": "Remaining CPU time in seconds before preemption for Spot VMs. -1 on standard instances."
+        },
+        "partner_attributes": {
+          "type": "object",
+          "description": "Opaque key-value pairs set by GCE partner images.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "availability_zone": {
+          "type": "string",
+          "description": "GCE zone (e.g. us-central1-a)."
+        }
       },
-      "required": ["instance_id", "name", "hostname", "machine_type", "zone", "project_id"]
+      "required": [
+        "instance_id",
+        "name",
+        "hostname",
+        "machine_type",
+        "availability_zone",
+        "project_id"
+      ]
     },
     "GCENetworkInterface": {
       "type": "object",
       "description": "One GCE virtual NIC.",
       "properties": {
-        "ip": { "type": "string", "description": "Internal IP address." },
-        "mac": { "type": "string", "description": "MAC address." },
-        "network": { "type": "string", "description": "VPC network short name." },
-        "subnetmask": { "type": "string", "description": "Subnet mask." },
-        "gateway": { "type": "string", "description": "Default gateway for this NIC." },
-        "dns_servers": { "type": "array", "items": { "type": "string" }, "description": "DNS server addresses." },
-        "ip_aliases": { "type": "array", "items": { "type": "string" }, "description": "Alias IP ranges assigned to this NIC." },
-        "forwarded_ips": { "type": "array", "items": { "type": "string" }, "description": "Forwarded IP addresses." },
-        "target_instance_ips": { "type": "array", "items": { "type": "string" }, "description": "Target instance IPs." },
-        "mtu": { "type": "integer", "description": "NIC MTU." },
-        "access_configs": { "type": "array", "items": { "$ref": "#/$defs/GCEAccessConfig" }, "description": "External access configurations (public IPs)." }
+        "ip": {
+          "type": "string",
+          "description": "Internal IP address."
+        },
+        "mac": {
+          "type": "string",
+          "description": "MAC address."
+        },
+        "network": {
+          "type": "string",
+          "description": "VPC network short name."
+        },
+        "subnetmask": {
+          "type": "string",
+          "description": "Subnet mask."
+        },
+        "gateway": {
+          "type": "string",
+          "description": "Default gateway for this NIC."
+        },
+        "dns_servers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "DNS server addresses."
+        },
+        "ip_aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Alias IP ranges assigned to this NIC."
+        },
+        "forwarded_ips": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Forwarded IP addresses."
+        },
+        "target_instance_ips": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Target instance IPs."
+        },
+        "mtu": {
+          "type": "integer",
+          "description": "NIC MTU."
+        },
+        "access_configs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GCEAccessConfig"
+          },
+          "description": "External access configurations (public IPs)."
+        }
       },
-      "required": ["ip", "mac", "network"]
+      "required": [
+        "ip",
+        "mac",
+        "network"
+      ]
     },
     "GCEAccessConfig": {
       "type": "object",
       "description": "External access configuration on a GCE NIC (public IP + NAT type).",
       "properties": {
-        "external_ip": { "type": "string", "description": "Public IP address." },
-        "type": { "type": "string", "description": "NAT type (e.g. \"ONE_TO_ONE_NAT\")." }
+        "external_ip": {
+          "type": "string",
+          "description": "Public IP address."
+        },
+        "type": {
+          "type": "string",
+          "description": "NAT type (e.g. \"ONE_TO_ONE_NAT\")."
+        }
       },
-      "required": ["external_ip"]
+      "required": [
+        "external_ip"
+      ]
     },
     "GCEDisk": {
       "type": "object",
       "description": "One GCE attached disk.",
       "properties": {
-        "device_name": { "type": "string", "description": "Device name." },
-        "type": { "type": "string", "description": "Disk type (e.g. \"PERSISTENT\", \"SCRATCH\")." },
-        "mode": { "type": "string", "description": "Attach mode: \"READ_WRITE\" or \"READ_ONLY\"." },
-        "index": { "type": "integer", "description": "Disk index (0 = boot disk)." },
-        "interface": { "type": "string", "description": "Bus interface: \"SCSI\" or \"NVME\"." },
-        "encrypted": { "type": "boolean", "description": "True if the disk is encrypted." }
+        "device_name": {
+          "type": "string",
+          "description": "Device name."
+        },
+        "type": {
+          "type": "string",
+          "description": "Disk type (e.g. \"PERSISTENT\", \"SCRATCH\")."
+        },
+        "mode": {
+          "type": "string",
+          "description": "Attach mode: \"READ_WRITE\" or \"READ_ONLY\"."
+        },
+        "index": {
+          "type": "integer",
+          "description": "Disk index (0 = boot disk)."
+        },
+        "interface": {
+          "type": "string",
+          "description": "Bus interface: \"SCSI\" or \"NVME\"."
+        },
+        "encrypted": {
+          "type": "boolean",
+          "description": "True if the disk is encrypted."
+        }
       },
-      "required": ["device_name", "type", "mode", "index"]
+      "required": [
+        "device_name",
+        "type",
+        "mode",
+        "index"
+      ]
     },
     "GCEServiceAccount": {
       "type": "object",
       "description": "One GCP service account attached to the instance.",
       "properties": {
-        "key": { "type": "string", "description": "Service account key (usually \"default\" or the SA email)." },
-        "email": { "type": "string", "description": "Service account email address." },
-        "aliases": { "type": "array", "items": { "type": "string" }, "description": "Service account aliases." },
-        "scopes": { "type": "array", "items": { "type": "string" }, "description": "OAuth scopes granted to this service account." }
+        "key": {
+          "type": "string",
+          "description": "Service account key (usually \"default\" or the SA email)."
+        },
+        "email": {
+          "type": "string",
+          "description": "Service account email address."
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Service account aliases."
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "OAuth scopes granted to this service account."
+        }
       },
-      "required": ["key", "email"]
+      "required": [
+        "key",
+        "email"
+      ]
     },
     "EC2": {
       "type": "object",
       "description": "AWS EC2 instance metadata from IMDS (IMDSv2 with IMDSv1 fallback).",
       "properties": {
-        "instance_id": { "type": "string", "description": "EC2 instance ID (e.g. \"i-0abc1234def56789\")." },
-        "instance_type": { "type": "string", "description": "Instance type (e.g. \"m5.xlarge\", \"t3.micro\")." },
-        "instance_life_cycle": { "type": "string", "description": "Instance lifecycle: \"on-demand\" or \"spot\"." },
-        "ami_id": { "type": "string", "description": "AMI ID the instance was launched from." },
-        "ami_launch_index": { "type": "string", "description": "Launch index when multiple instances started from same request." },
-        "ami_manifest_path": { "type": "string", "description": "S3 path to the AMI manifest (instance-store AMIs only)." },
-        "hostname": { "type": "string", "description": "Instance hostname from metadata." },
-        "local_hostname": { "type": "string", "description": "Internal DNS hostname." },
-        "public_hostname": { "type": "string", "description": "Public DNS hostname (empty when no public IP)." },
-        "local_ipv4": { "type": "string", "description": "Primary private IPv4 address." },
-        "local_ipv4s": { "type": "array", "items": { "type": "string" }, "description": "All private IPv4 addresses." },
-        "public_ipv4": { "type": "string", "description": "Public IPv4 address (empty in VPC without EIP)." },
-        "mac": { "type": "string", "description": "Primary network interface MAC address." },
-        "security_groups": { "type": "array", "items": { "type": "string" }, "description": "Security group names." },
-        "network_interfaces": { "type": "object", "description": "Per-ENI metadata keyed by MAC address.", "additionalProperties": { "$ref": "#/$defs/EC2NetworkInterface" } },
-        "region": { "type": "string", "description": "AWS region (e.g. \"us-east-1\")." },
-        "availability_zone": { "type": "string", "description": "Availability Zone (e.g. \"us-east-1a\")." },
-        "account_id": { "type": "string", "description": "AWS account ID." },
-        "availability_zone_id": { "type": "string", "description": "AZ ID (e.g. \"use1-az1\"). Consistent across accounts." },
-        "group_name": { "type": "string", "description": "Placement group name." },
-        "host_id": { "type": "string", "description": "Dedicated Host ID." },
-        "partition_number": { "type": "string", "description": "Partition placement group partition number." },
-        "kernel_id": { "type": "string", "description": "AKI ID (legacy paravirt instances only)." },
-        "ramdisk_id": { "type": "string", "description": "ARI ID (legacy paravirt instances only)." },
-        "instance_action": { "type": "string", "description": "Pending instance action (e.g. \"none\", \"stop\", \"terminate\")." },
-        "spot_instance_action": { "type": "string", "description": "Spot instance interruption action." },
-        "spot_termination_time": { "type": "string", "description": "Spot termination notice timestamp." },
-        "services_domain": { "type": "string", "description": "AWS services domain (e.g. \"amazonaws.com\", \"amazonaws.com.cn\")." },
-        "services_partition": { "type": "string", "description": "AWS partition: \"aws\", \"aws-cn\", \"aws-us-gov\"." },
-        "product_codes": { "type": "array", "items": { "type": "string" }, "description": "Marketplace product codes." },
-        "public_keys": { "type": "array", "items": { "type": "string" }, "description": "SSH public keys in OpenSSH format." },
-        "block_device_mapping": { "type": "object", "description": "Map of virtual disk name (ami, root, ebs0) to device path (/dev/sda1).", "additionalProperties": { "type": "string" } },
-        "reservation_id": { "type": "string", "description": "EC2 reservation ID." },
-        "profile": { "type": "string", "description": "Instance profile name." },
-        "iam_info": { "$ref": "#/$defs/EC2IAMInfo" },
-        "api_version": { "type": "string", "description": "IMDS API version negotiated for this collection." },
-        "user_data": { "type": "string", "description": "Raw user-data blob. Base64-encoded when binary, plaintext when UTF-8." }
+        "instance_id": {
+          "type": "string",
+          "description": "EC2 instance ID (e.g. \"i-0abc1234def56789\")."
+        },
+        "instance_type": {
+          "type": "string",
+          "description": "Instance type (e.g. \"m5.xlarge\", \"t3.micro\")."
+        },
+        "instance_life_cycle": {
+          "type": "string",
+          "description": "Instance lifecycle: \"on-demand\" or \"spot\"."
+        },
+        "ami_id": {
+          "type": "string",
+          "description": "AMI ID the instance was launched from."
+        },
+        "ami_launch_index": {
+          "type": "string",
+          "description": "Launch index when multiple instances started from same request."
+        },
+        "ami_manifest_path": {
+          "type": "string",
+          "description": "S3 path to the AMI manifest (instance-store AMIs only)."
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Instance hostname from metadata."
+        },
+        "local_hostname": {
+          "type": "string",
+          "description": "Internal DNS hostname."
+        },
+        "public_hostname": {
+          "type": "string",
+          "description": "Public DNS hostname (empty when no public IP)."
+        },
+        "local_ipv4s": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All private IPv4 addresses."
+        },
+        "mac": {
+          "type": "string",
+          "description": "Primary network interface MAC address."
+        },
+        "security_groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Security group names."
+        },
+        "network_interfaces": {
+          "type": "object",
+          "description": "Per-ENI metadata keyed by MAC address.",
+          "additionalProperties": {
+            "$ref": "#/$defs/EC2NetworkInterface"
+          }
+        },
+        "region": {
+          "type": "string",
+          "description": "AWS region (e.g. \"us-east-1\")."
+        },
+        "availability_zone": {
+          "type": "string",
+          "description": "Availability Zone (e.g. \"us-east-1a\")."
+        },
+        "account_id": {
+          "type": "string",
+          "description": "AWS account ID."
+        },
+        "availability_zone_id": {
+          "type": "string",
+          "description": "AZ ID (e.g. \"use1-az1\"). Consistent across accounts."
+        },
+        "group_name": {
+          "type": "string",
+          "description": "Placement group name."
+        },
+        "host_id": {
+          "type": "string",
+          "description": "Dedicated Host ID."
+        },
+        "partition_number": {
+          "type": "string",
+          "description": "Partition placement group partition number."
+        },
+        "kernel_id": {
+          "type": "string",
+          "description": "AKI ID (legacy paravirt instances only)."
+        },
+        "ramdisk_id": {
+          "type": "string",
+          "description": "ARI ID (legacy paravirt instances only)."
+        },
+        "instance_action": {
+          "type": "string",
+          "description": "Pending instance action (e.g. \"none\", \"stop\", \"terminate\")."
+        },
+        "spot_instance_action": {
+          "type": "string",
+          "description": "Spot instance interruption action."
+        },
+        "spot_termination_time": {
+          "type": "string",
+          "description": "Spot termination notice timestamp."
+        },
+        "services_domain": {
+          "type": "string",
+          "description": "AWS services domain (e.g. \"amazonaws.com\", \"amazonaws.com.cn\")."
+        },
+        "services_partition": {
+          "type": "string",
+          "description": "AWS partition: \"aws\", \"aws-cn\", \"aws-us-gov\"."
+        },
+        "product_codes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Marketplace product codes."
+        },
+        "public_keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SSH public keys in OpenSSH format."
+        },
+        "block_device_mapping": {
+          "type": "object",
+          "description": "Map of virtual disk name (ami, root, ebs0) to device path (/dev/sda1).",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "reservation_id": {
+          "type": "string",
+          "description": "EC2 reservation ID."
+        },
+        "profile": {
+          "type": "string",
+          "description": "Instance profile name."
+        },
+        "iam_info": {
+          "$ref": "#/$defs/EC2IAMInfo"
+        },
+        "api_version": {
+          "type": "string",
+          "description": "IMDS API version negotiated for this collection."
+        },
+        "user_data": {
+          "type": "string",
+          "description": "Raw user-data blob. Base64-encoded when binary, plaintext when UTF-8."
+        },
+        "private_ip": {
+          "type": "string",
+          "description": "Primary private IPv4."
+        },
+        "public_ip": {
+          "type": "string",
+          "description": "Primary public IPv4."
+        }
       },
-      "required": ["instance_id"]
+      "required": [
+        "instance_id"
+      ]
     },
     "EC2NetworkInterface": {
       "type": "object",
       "description": "One EC2 ENI's metadata subtree.",
       "properties": {
-        "device_number": { "type": "string", "description": "ENI device index." },
-        "interface_id": { "type": "string", "description": "ENI ID (e.g. \"eni-0abc1234\")." },
-        "local_hostname": { "type": "string", "description": "Internal DNS hostname for this ENI." },
-        "local_ipv4s": { "type": "array", "items": { "type": "string" }, "description": "Private IPv4 addresses on this ENI." },
-        "mac": { "type": "string", "description": "ENI MAC address." },
-        "network_card_index": { "type": "string", "description": "Network card index for multi-card instances." },
-        "owner_id": { "type": "string", "description": "AWS account ID that owns this ENI." },
-        "public_hostname": { "type": "string", "description": "Public DNS hostname." },
-        "public_ipv4s": { "type": "array", "items": { "type": "string" }, "description": "Public/Elastic IPs on this ENI." },
-        "security_group_ids": { "type": "array", "items": { "type": "string" }, "description": "Security group IDs." },
-        "security_groups": { "type": "array", "items": { "type": "string" }, "description": "Security group names." },
-        "subnet_id": { "type": "string", "description": "Subnet ID." },
-        "subnet_ipv4_cidr_block": { "type": "string", "description": "Subnet CIDR block." },
-        "subnet_ipv6_cidr_blocks": { "type": "array", "items": { "type": "string" }, "description": "Subnet IPv6 CIDR blocks." },
-        "vpc_id": { "type": "string", "description": "VPC ID." },
-        "vpc_ipv4_cidr_block": { "type": "string", "description": "VPC primary IPv4 CIDR." },
-        "vpc_ipv4_cidr_blocks": { "type": "array", "items": { "type": "string" }, "description": "All VPC IPv4 CIDRs." },
-        "vpc_ipv6_cidr_blocks": { "type": "array", "items": { "type": "string" }, "description": "VPC IPv6 CIDRs." },
-        "ipv6s": { "type": "array", "items": { "type": "string" }, "description": "IPv6 addresses on this ENI." }
+        "device_number": {
+          "type": "string",
+          "description": "ENI device index."
+        },
+        "interface_id": {
+          "type": "string",
+          "description": "ENI ID (e.g. \"eni-0abc1234\")."
+        },
+        "local_hostname": {
+          "type": "string",
+          "description": "Internal DNS hostname for this ENI."
+        },
+        "local_ipv4s": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Private IPv4 addresses on this ENI."
+        },
+        "mac": {
+          "type": "string",
+          "description": "ENI MAC address."
+        },
+        "network_card_index": {
+          "type": "string",
+          "description": "Network card index for multi-card instances."
+        },
+        "owner_id": {
+          "type": "string",
+          "description": "AWS account ID that owns this ENI."
+        },
+        "public_hostname": {
+          "type": "string",
+          "description": "Public DNS hostname."
+        },
+        "public_ipv4s": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Public/Elastic IPs on this ENI."
+        },
+        "security_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Security group IDs."
+        },
+        "security_groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Security group names."
+        },
+        "subnet_id": {
+          "type": "string",
+          "description": "Subnet ID."
+        },
+        "subnet_ipv4_cidr_block": {
+          "type": "string",
+          "description": "Subnet CIDR block."
+        },
+        "subnet_ipv6_cidr_blocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Subnet IPv6 CIDR blocks."
+        },
+        "vpc_id": {
+          "type": "string",
+          "description": "VPC ID."
+        },
+        "vpc_ipv4_cidr_block": {
+          "type": "string",
+          "description": "VPC primary IPv4 CIDR."
+        },
+        "vpc_ipv4_cidr_blocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All VPC IPv4 CIDRs."
+        },
+        "vpc_ipv6_cidr_blocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "VPC IPv6 CIDRs."
+        },
+        "ipv6s": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "IPv6 addresses on this ENI."
+        }
       }
     },
     "EC2IAMInfo": {
       "type": "object",
       "description": "IAM instance profile info (credentials are excluded).",
       "properties": {
-        "code": { "type": "string", "description": "IAM info status code (e.g. \"Success\")." },
-        "last_updated": { "type": "string", "description": "ISO 8601 timestamp of last credential refresh." },
-        "instance_profile_arn": { "type": "string", "description": "Instance profile ARN." },
-        "instance_profile_id": { "type": "string", "description": "Instance profile unique ID." }
+        "code": {
+          "type": "string",
+          "description": "IAM info status code (e.g. \"Success\")."
+        },
+        "last_updated": {
+          "type": "string",
+          "description": "ISO 8601 timestamp of last credential refresh."
+        },
+        "instance_profile_arn": {
+          "type": "string",
+          "description": "Instance profile ARN."
+        },
+        "instance_profile_id": {
+          "type": "string",
+          "description": "Instance profile unique ID."
+        }
       }
     },
     "Azure": {
       "type": "object",
       "description": "Azure instance metadata from the IMDS at 169.254.169.254.",
       "properties": {
-        "vm_id": { "type": "string", "description": "Azure VM unique identifier." },
-        "name": { "type": "string", "description": "VM name." },
-        "vm_size": { "type": "string", "description": "VM size (e.g. \"Standard_D4s_v3\")." },
-        "resource_id": { "type": "string", "description": "Full Azure resource ID path." },
-        "resource_group_name": { "type": "string", "description": "Resource group containing the VM." },
-        "vm_scale_set_name": { "type": "string", "description": "VM Scale Set name (if applicable)." },
-        "priority": { "type": "string", "description": "VM priority: \"Regular\" or \"Spot\"." },
-        "eviction_policy": { "type": "string", "description": "Spot eviction policy: \"Deallocate\" or \"Delete\"." },
-        "location": { "type": "string", "description": "Azure region (e.g. \"eastus\")." },
-        "zone": { "type": "string", "description": "Availability zone number." },
-        "placement_group_id": { "type": "string", "description": "Proximity placement group ID." },
-        "platform_fault_domain": { "type": "string", "description": "Fault domain index." },
-        "platform_update_domain": { "type": "string", "description": "Update domain index." },
-        "subscription_id": { "type": "string", "description": "Azure subscription ID." },
-        "az_environment": { "type": "string", "description": "Azure environment (e.g. \"AzurePublicCloud\", \"AzureUSGovernmentCloud\")." },
-        "offer": { "type": "string", "description": "Marketplace image offer." },
-        "publisher": { "type": "string", "description": "Marketplace image publisher." },
-        "sku": { "type": "string", "description": "Marketplace image SKU." },
-        "version": { "type": "string", "description": "Marketplace image version." },
-        "license_type": { "type": "string", "description": "License type for hybrid benefit." },
-        "os_type": { "type": "string", "description": "OS type: \"Linux\" or \"Windows\"." },
-        "provider": { "type": "string", "description": "Compute provider." },
-        "plan": { "$ref": "#/$defs/AzurePlan" },
-        "storage_profile": { "$ref": "#/$defs/AzureStorageProfile" },
-        "tags": { "type": "string", "description": "Semicolon-separated key:value tag pairs." },
-        "tags_list": { "type": "array", "items": { "$ref": "#/$defs/AzureTag" }, "description": "Structured tag list." },
-        "user_data": { "type": "string", "description": "User-data blob." },
-        "custom_data": { "type": "string", "description": "Custom data blob." },
-        "is_host_compatibility_layer_vm": { "type": "boolean", "description": "True if running in Azure's host compatibility layer." },
-        "security_profile": { "$ref": "#/$defs/AzureSecurityProfile" },
-        "public_keys": { "type": "array", "items": { "$ref": "#/$defs/AzurePublicKey" }, "description": "SSH public keys from the VM profile." },
-        "host": { "$ref": "#/$defs/AzureHost" },
-        "host_group": { "$ref": "#/$defs/AzureHostGroup" },
-        "os_profile": { "$ref": "#/$defs/AzureOSProfile" },
-        "additional_capabilities": { "$ref": "#/$defs/AzureAdditionalCapabilities" },
-        "extended_location": { "$ref": "#/$defs/AzureExtendedLocation" },
-        "interfaces": { "type": "object", "description": "Network interfaces keyed by MAC address.", "additionalProperties": { "$ref": "#/$defs/AzureInterface" } },
-        "public_ipv4": { "type": "array", "items": { "type": "string" }, "description": "All public IPv4 addresses across all interfaces." },
-        "local_ipv4": { "type": "array", "items": { "type": "string" }, "description": "All private IPv4 addresses across all interfaces." },
-        "public_ipv6": { "type": "array", "items": { "type": "string" }, "description": "All public IPv6 addresses across all interfaces." },
-        "local_ipv6": { "type": "array", "items": { "type": "string" }, "description": "All private IPv6 addresses across all interfaces." }
+        "name": {
+          "type": "string",
+          "description": "VM name."
+        },
+        "vm_size": {
+          "type": "string",
+          "description": "VM size (e.g. \"Standard_D4s_v3\")."
+        },
+        "resource_id": {
+          "type": "string",
+          "description": "Full Azure resource ID path."
+        },
+        "resource_group_name": {
+          "type": "string",
+          "description": "Resource group containing the VM."
+        },
+        "vm_scale_set_name": {
+          "type": "string",
+          "description": "VM Scale Set name (if applicable)."
+        },
+        "priority": {
+          "type": "string",
+          "description": "VM priority: \"Regular\" or \"Spot\"."
+        },
+        "eviction_policy": {
+          "type": "string",
+          "description": "Spot eviction policy: \"Deallocate\" or \"Delete\"."
+        },
+        "zone": {
+          "type": "string",
+          "description": "Availability zone number."
+        },
+        "placement_group_id": {
+          "type": "string",
+          "description": "Proximity placement group ID."
+        },
+        "platform_fault_domain": {
+          "type": "string",
+          "description": "Fault domain index."
+        },
+        "platform_update_domain": {
+          "type": "string",
+          "description": "Update domain index."
+        },
+        "subscription_id": {
+          "type": "string",
+          "description": "Azure subscription ID."
+        },
+        "az_environment": {
+          "type": "string",
+          "description": "Azure environment (e.g. \"AzurePublicCloud\", \"AzureUSGovernmentCloud\")."
+        },
+        "offer": {
+          "type": "string",
+          "description": "Marketplace image offer."
+        },
+        "publisher": {
+          "type": "string",
+          "description": "Marketplace image publisher."
+        },
+        "sku": {
+          "type": "string",
+          "description": "Marketplace image SKU."
+        },
+        "version": {
+          "type": "string",
+          "description": "Marketplace image version."
+        },
+        "license_type": {
+          "type": "string",
+          "description": "License type for hybrid benefit."
+        },
+        "os_type": {
+          "type": "string",
+          "description": "OS type: \"Linux\" or \"Windows\"."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Compute provider."
+        },
+        "plan": {
+          "$ref": "#/$defs/AzurePlan"
+        },
+        "storage_profile": {
+          "$ref": "#/$defs/AzureStorageProfile"
+        },
+        "tags": {
+          "type": "string",
+          "description": "Semicolon-separated key:value tag pairs."
+        },
+        "tags_list": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AzureTag"
+          },
+          "description": "Structured tag list."
+        },
+        "user_data": {
+          "type": "string",
+          "description": "User-data blob."
+        },
+        "custom_data": {
+          "type": "string",
+          "description": "Custom data blob."
+        },
+        "is_host_compatibility_layer_vm": {
+          "type": "boolean",
+          "description": "True if running in Azure's host compatibility layer."
+        },
+        "security_profile": {
+          "$ref": "#/$defs/AzureSecurityProfile"
+        },
+        "public_keys": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AzurePublicKey"
+          },
+          "description": "SSH public keys from the VM profile."
+        },
+        "host": {
+          "$ref": "#/$defs/AzureHost"
+        },
+        "host_group": {
+          "$ref": "#/$defs/AzureHostGroup"
+        },
+        "os_profile": {
+          "$ref": "#/$defs/AzureOSProfile"
+        },
+        "additional_capabilities": {
+          "$ref": "#/$defs/AzureAdditionalCapabilities"
+        },
+        "extended_location": {
+          "$ref": "#/$defs/AzureExtendedLocation"
+        },
+        "interfaces": {
+          "type": "object",
+          "description": "Network interfaces keyed by MAC address.",
+          "additionalProperties": {
+            "$ref": "#/$defs/AzureInterface"
+          }
+        },
+        "public_ipv4": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All public IPv4 addresses across all interfaces."
+        },
+        "public_ipv6": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All public IPv6 addresses across all interfaces."
+        },
+        "local_ipv6": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All private IPv6 addresses across all interfaces."
+        },
+        "instance_id": {
+          "type": "string",
+          "description": "Instance identifier (Azure VM ID)."
+        },
+        "region": {
+          "type": "string",
+          "description": "Azure region (e.g. eastus)."
+        },
+        "local_ipv4": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "All private IPv4 addresses across all interfaces."
+        }
       },
-      "required": ["vm_id"]
+      "required": [
+        "instance_id"
+      ]
     },
-    "AzurePlan": { "type": "object", "description": "Marketplace plan.", "properties": { "name": { "type": "string" }, "publisher": { "type": "string" }, "product": { "type": "string" } } },
-    "AzureStorageProfile": { "type": "object", "description": "VM storage layout.", "properties": { "os_disk": { "$ref": "#/$defs/AzureDisk" }, "data_disks": { "type": "array", "items": { "$ref": "#/$defs/AzureDisk" } } } },
-    "AzureDisk": { "type": "object", "description": "One Azure OS or data disk.", "properties": { "name": { "type": "string" }, "disk_size_gb": { "type": "string" }, "caching": { "type": "string" }, "create_option": { "type": "string" }, "write_accelerator_enabled": { "type": "string" }, "managed_disk": { "$ref": "#/$defs/AzureManagedDisk" }, "lun": { "type": "integer", "description": "Logical unit number (data disks only)." } } },
-    "AzureManagedDisk": { "type": "object", "properties": { "id": { "type": "string" }, "storage_account_type": { "type": "string" } } },
-    "AzureTag": { "type": "object", "description": "One Azure resource tag.", "properties": { "name": { "type": "string" }, "value": { "type": "string" } }, "required": ["name", "value"] },
-    "AzureSecurityProfile": { "type": "object", "properties": { "secure_boot_enabled": { "type": "string" }, "virtual_tpm_enabled": { "type": "string" }, "encryption_at_host": { "type": "string" } } },
-    "AzurePublicKey": { "type": "object", "properties": { "key_data": { "type": "string", "description": "SSH public key data." }, "path": { "type": "string", "description": "Path where the key is deployed." } }, "required": ["key_data"] },
-    "AzureHost": { "type": "object", "description": "Azure Dedicated Host assignment.", "properties": { "id": { "type": "string" } }, "required": ["id"] },
-    "AzureHostGroup": { "type": "object", "description": "Azure Dedicated Host Group.", "properties": { "id": { "type": "string" } }, "required": ["id"] },
-    "AzureOSProfile": { "type": "object", "description": "OS provisioning settings.", "properties": { "admin_username": { "type": "string" }, "computer_name": { "type": "string" }, "disable_password_authentication": { "type": "string" } } },
-    "AzureAdditionalCapabilities": { "type": "object", "properties": { "hibernation_enabled": { "type": "string" } } },
-    "AzureExtendedLocation": { "type": "object", "description": "Non-standard Azure placement (edge zone, Arc, Azure Local).", "properties": { "name": { "type": "string" }, "type": { "type": "string" } } },
-    "AzureInterface": { "type": "object", "description": "One Azure network interface.", "properties": { "mac_address": { "type": "string" }, "ipv4": { "$ref": "#/$defs/AzureIPAddrs" }, "ipv6": { "$ref": "#/$defs/AzureIPAddrs" } } },
-    "AzureIPAddrs": { "type": "object", "properties": { "ip_addresses": { "type": "array", "items": { "$ref": "#/$defs/AzureIPAddress" } }, "subnets": { "type": "array", "items": { "$ref": "#/$defs/AzureSubnet" } } } },
-    "AzureIPAddress": { "type": "object", "properties": { "private_ip": { "type": "string" }, "public_ip": { "type": "string" } } },
-    "AzureSubnet": { "type": "object", "properties": { "address": { "type": "string" }, "prefix": { "type": "string" } } },
+    "AzurePlan": {
+      "type": "object",
+      "description": "Marketplace plan.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        }
+      }
+    },
+    "AzureStorageProfile": {
+      "type": "object",
+      "description": "VM storage layout.",
+      "properties": {
+        "os_disk": {
+          "$ref": "#/$defs/AzureDisk"
+        },
+        "data_disks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AzureDisk"
+          }
+        }
+      }
+    },
+    "AzureDisk": {
+      "type": "object",
+      "description": "One Azure OS or data disk.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "disk_size_gb": {
+          "type": "string"
+        },
+        "caching": {
+          "type": "string"
+        },
+        "create_option": {
+          "type": "string"
+        },
+        "write_accelerator_enabled": {
+          "type": "string"
+        },
+        "managed_disk": {
+          "$ref": "#/$defs/AzureManagedDisk"
+        },
+        "lun": {
+          "type": "integer",
+          "description": "Logical unit number (data disks only)."
+        }
+      }
+    },
+    "AzureManagedDisk": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "storage_account_type": {
+          "type": "string"
+        }
+      }
+    },
+    "AzureTag": {
+      "type": "object",
+      "description": "One Azure resource tag.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ]
+    },
+    "AzureSecurityProfile": {
+      "type": "object",
+      "properties": {
+        "secure_boot_enabled": {
+          "type": "string"
+        },
+        "virtual_tpm_enabled": {
+          "type": "string"
+        },
+        "encryption_at_host": {
+          "type": "string"
+        }
+      }
+    },
+    "AzurePublicKey": {
+      "type": "object",
+      "properties": {
+        "key_data": {
+          "type": "string",
+          "description": "SSH public key data."
+        },
+        "path": {
+          "type": "string",
+          "description": "Path where the key is deployed."
+        }
+      },
+      "required": [
+        "key_data"
+      ]
+    },
+    "AzureHost": {
+      "type": "object",
+      "description": "Azure Dedicated Host assignment.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "AzureHostGroup": {
+      "type": "object",
+      "description": "Azure Dedicated Host Group.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "AzureOSProfile": {
+      "type": "object",
+      "description": "OS provisioning settings.",
+      "properties": {
+        "admin_username": {
+          "type": "string"
+        },
+        "computer_name": {
+          "type": "string"
+        },
+        "disable_password_authentication": {
+          "type": "string"
+        }
+      }
+    },
+    "AzureAdditionalCapabilities": {
+      "type": "object",
+      "properties": {
+        "hibernation_enabled": {
+          "type": "string"
+        }
+      }
+    },
+    "AzureExtendedLocation": {
+      "type": "object",
+      "description": "Non-standard Azure placement (edge zone, Arc, Azure Local).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "AzureInterface": {
+      "type": "object",
+      "description": "One Azure network interface.",
+      "properties": {
+        "mac_address": {
+          "type": "string"
+        },
+        "ipv4": {
+          "$ref": "#/$defs/AzureIPAddrs"
+        },
+        "ipv6": {
+          "$ref": "#/$defs/AzureIPAddrs"
+        }
+      }
+    },
+    "AzureIPAddrs": {
+      "type": "object",
+      "properties": {
+        "ip_addresses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AzureIPAddress"
+          }
+        },
+        "subnets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AzureSubnet"
+          }
+        }
+      }
+    },
+    "AzureIPAddress": {
+      "type": "object",
+      "properties": {
+        "private_ip": {
+          "type": "string"
+        },
+        "public_ip": {
+          "type": "string"
+        }
+      }
+    },
+    "AzureSubnet": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        }
+      }
+    },
     "DigitalOcean": {
       "type": "object",
       "description": "DigitalOcean droplet metadata from /metadata/v1.json.",
       "properties": {
-        "droplet_id": { "type": "integer", "description": "Numeric droplet ID." },
-        "hostname": { "type": "string", "description": "Droplet hostname." },
-        "region": { "type": "string", "description": "Datacenter region slug (e.g. \"nyc3\", \"sfo3\")." },
-        "public_keys": { "type": "array", "items": { "type": "string" }, "description": "SSH public keys." },
-        "tags": { "type": "array", "items": { "type": "string" }, "description": "Droplet tags." },
-        "features": { "type": "array", "items": { "type": "string" }, "description": "Enabled features." },
-        "floating_ip": { "type": "string", "description": "Floating (legacy) IPv4 address." },
-        "reserved_ip": { "type": "string", "description": "Reserved IPv4 address (replacement for floating_ip)." },
-        "auth_key": { "type": "string", "description": "Internal authentication token." },
-        "user_data": { "type": "string", "description": "User-supplied cloud-init data." },
-        "ipv4_nameservers": { "type": "array", "items": { "type": "string" }, "description": "DNS nameserver addresses." },
-        "interfaces": { "type": "array", "items": { "$ref": "#/$defs/DOInterface" }, "description": "Network interfaces (public + private)." }
+        "hostname": {
+          "type": "string",
+          "description": "Droplet hostname."
+        },
+        "region": {
+          "type": "string",
+          "description": "Datacenter region slug (e.g. \"nyc3\", \"sfo3\")."
+        },
+        "public_keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SSH public keys."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Droplet tags."
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Enabled features."
+        },
+        "floating_ip": {
+          "type": "string",
+          "description": "Floating (legacy) IPv4 address."
+        },
+        "reserved_ip": {
+          "type": "string",
+          "description": "Reserved IPv4 address (replacement for floating_ip)."
+        },
+        "auth_key": {
+          "type": "string",
+          "description": "Internal authentication token."
+        },
+        "user_data": {
+          "type": "string",
+          "description": "User-supplied cloud-init data."
+        },
+        "ipv4_nameservers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "DNS nameserver addresses."
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DOInterface"
+          },
+          "description": "Network interfaces (public + private)."
+        },
+        "instance_id": {
+          "type": "integer",
+          "description": "Droplet numeric identifier."
+        }
       },
-      "required": ["droplet_id"]
+      "required": [
+        "instance_id"
+      ]
     },
     "DOInterface": {
       "type": "object",
       "description": "One DigitalOcean network interface.",
       "properties": {
-        "scope": { "type": "string", "description": "Interface scope: \"public\" or \"private\"." },
-        "mac": { "type": "string", "description": "MAC address." },
-        "type": { "type": "string", "description": "Interface type." },
-        "ipv4": { "type": "string", "description": "IPv4 address." },
-        "ipv4_netmask": { "type": "string", "description": "IPv4 netmask." },
-        "ipv4_gateway": { "type": "string", "description": "IPv4 gateway." },
-        "ipv6": { "type": "string", "description": "IPv6 address." },
-        "ipv6_cidr": { "type": "integer", "description": "IPv6 CIDR prefix length." },
-        "ipv6_gateway": { "type": "string", "description": "IPv6 gateway." },
-        "anchor_ipv4": { "type": "string", "description": "Anchor IPv4 for floating/reserved IP routing." }
+        "scope": {
+          "type": "string",
+          "description": "Interface scope: \"public\" or \"private\"."
+        },
+        "mac": {
+          "type": "string",
+          "description": "MAC address."
+        },
+        "type": {
+          "type": "string",
+          "description": "Interface type."
+        },
+        "ipv4": {
+          "type": "string",
+          "description": "IPv4 address."
+        },
+        "ipv4_netmask": {
+          "type": "string",
+          "description": "IPv4 netmask."
+        },
+        "ipv4_gateway": {
+          "type": "string",
+          "description": "IPv4 gateway."
+        },
+        "ipv6": {
+          "type": "string",
+          "description": "IPv6 address."
+        },
+        "ipv6_cidr": {
+          "type": "integer",
+          "description": "IPv6 CIDR prefix length."
+        },
+        "ipv6_gateway": {
+          "type": "string",
+          "description": "IPv6 gateway."
+        },
+        "anchor_ipv4": {
+          "type": "string",
+          "description": "Anchor IPv4 for floating/reserved IP routing."
+        }
       },
-      "required": ["scope", "mac"]
+      "required": [
+        "scope",
+        "mac"
+      ]
     },
     "OCI": {
       "type": "object",
       "description": "Oracle Cloud Infrastructure instance metadata from OCI IMDS.",
       "properties": {
-        "id": { "type": "string", "description": "Instance OCID." },
-        "display_name": { "type": "string", "description": "Instance display name." },
-        "hostname": { "type": "string", "description": "Instance hostname." },
-        "shape": { "type": "string", "description": "Compute shape (e.g. \"VM.Standard.E4.Flex\")." },
-        "shape_config": { "$ref": "#/$defs/OCIShapeConfig" },
-        "image": { "type": "string", "description": "Boot image OCID." },
-        "region": { "type": "string", "description": "OCI region." },
-        "canonical_region_name": { "type": "string", "description": "Canonical region name." },
-        "availability_domain": { "type": "string", "description": "Availability domain." },
-        "fault_domain": { "type": "string", "description": "Fault domain." },
-        "compartment_id": { "type": "string", "description": "Compartment OCID." },
-        "tenant_id": { "type": "string", "description": "Tenancy OCID." },
-        "state": { "type": "string", "description": "Instance lifecycle state." },
-        "time_created": { "type": "integer", "description": "Creation timestamp." },
-        "metadata": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Instance metadata key-value pairs." },
-        "defined_tags": { "type": "object", "description": "Defined tags (namespace-scoped)." },
-        "freeform_tags": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Freeform tags." },
-        "region_info": { "$ref": "#/$defs/OCIRegionInfo" },
-        "agent_config": { "$ref": "#/$defs/OCIAgentConfig" },
-        "availability_config": { "$ref": "#/$defs/OCIAvailabilityConfig" },
-        "instance_pool_id": { "type": "string" },
-        "dedicated_vm_host_id": { "type": "string" },
-        "launch_options": { "$ref": "#/$defs/OCILaunchOptions" },
-        "source_details": { "$ref": "#/$defs/OCISourceDetails" },
-        "platform_config": { "type": "object", "description": "Platform configuration (free-form)." },
-        "vnics": { "type": "array", "items": { "$ref": "#/$defs/OCIVNIC" }, "description": "Attached virtual NICs." },
-        "volume_attachments": { "type": "object", "description": "Attached volumes keyed by attachment OCID.", "additionalProperties": { "$ref": "#/$defs/OCIVolumeAttachment" } }
+        "display_name": {
+          "type": "string",
+          "description": "Instance display name."
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Instance hostname."
+        },
+        "shape": {
+          "type": "string",
+          "description": "Compute shape (e.g. \"VM.Standard.E4.Flex\")."
+        },
+        "shape_config": {
+          "$ref": "#/$defs/OCIShapeConfig"
+        },
+        "image": {
+          "type": "string",
+          "description": "Boot image OCID."
+        },
+        "region": {
+          "type": "string",
+          "description": "OCI region."
+        },
+        "canonical_region_name": {
+          "type": "string",
+          "description": "Canonical region name."
+        },
+        "fault_domain": {
+          "type": "string",
+          "description": "Fault domain."
+        },
+        "compartment_id": {
+          "type": "string",
+          "description": "Compartment OCID."
+        },
+        "tenant_id": {
+          "type": "string",
+          "description": "Tenancy OCID."
+        },
+        "state": {
+          "type": "string",
+          "description": "Instance lifecycle state."
+        },
+        "time_created": {
+          "type": "integer",
+          "description": "Creation timestamp."
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Instance metadata key-value pairs."
+        },
+        "defined_tags": {
+          "type": "object",
+          "description": "Defined tags (namespace-scoped)."
+        },
+        "freeform_tags": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Freeform tags."
+        },
+        "region_info": {
+          "$ref": "#/$defs/OCIRegionInfo"
+        },
+        "agent_config": {
+          "$ref": "#/$defs/OCIAgentConfig"
+        },
+        "availability_config": {
+          "$ref": "#/$defs/OCIAvailabilityConfig"
+        },
+        "instance_pool_id": {
+          "type": "string"
+        },
+        "dedicated_vm_host_id": {
+          "type": "string"
+        },
+        "launch_options": {
+          "$ref": "#/$defs/OCILaunchOptions"
+        },
+        "source_details": {
+          "$ref": "#/$defs/OCISourceDetails"
+        },
+        "platform_config": {
+          "type": "object",
+          "description": "Platform configuration (free-form)."
+        },
+        "vnics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OCIVNIC"
+          },
+          "description": "Attached virtual NICs."
+        },
+        "volume_attachments": {
+          "type": "object",
+          "description": "Attached volumes keyed by attachment OCID.",
+          "additionalProperties": {
+            "$ref": "#/$defs/OCIVolumeAttachment"
+          }
+        },
+        "availability_zone": {
+          "type": "string",
+          "description": "OCI availability domain."
+        },
+        "instance_id": {
+          "type": "string",
+          "description": "Instance OCID (Oracle Cloud resource identifier)."
+        }
       },
-      "required": ["id"]
+      "required": [
+        "instance_id"
+      ]
     },
-    "OCIShapeConfig": { "type": "object", "properties": { "ocpus": { "type": "number" }, "memory_in_gbs": { "type": "number" }, "networking_bandwidth_in_gbps": { "type": "number" }, "max_vnic_attachments": { "type": "integer" }, "gpus": { "type": "integer" } } },
-    "OCIRegionInfo": { "type": "object", "properties": { "realm_key": { "type": "string" }, "realm_domain_component": { "type": "string" }, "region_key": { "type": "string" }, "region_identifier": { "type": "string" } } },
-    "OCIAgentConfig": { "type": "object", "properties": { "is_management_disabled": { "type": "boolean" }, "is_monitoring_disabled": { "type": "boolean" }, "are_all_plugins_disabled": { "type": "boolean" } } },
-    "OCIAvailabilityConfig": { "type": "object", "properties": { "is_live_migration_preferred": { "type": "boolean" }, "recovery_action": { "type": "string" } } },
-    "OCILaunchOptions": { "type": "object", "properties": { "boot_volume_type": { "type": "string" }, "firmware": { "type": "string" }, "network_type": { "type": "string" }, "remote_data_volume_type": { "type": "string" }, "is_consistent_volume_naming_enabled": { "type": "boolean" }, "is_pv_encryption_in_transit_enabled": { "type": "boolean" } } },
-    "OCISourceDetails": { "type": "object", "properties": { "source_type": { "type": "string" }, "image_id": { "type": "string" }, "boot_volume_id": { "type": "string" }, "boot_volume_size_in_gbs": { "type": "integer" }, "kms_key_id": { "type": "string" } } },
-    "OCIVNIC": { "type": "object", "properties": { "vnic_id": { "type": "string" }, "private_ip": { "type": "string" }, "vlan_tag": { "type": "integer" }, "mac_addr": { "type": "string" }, "virtual_router_ip": { "type": "string" }, "subnet_cidr_block": { "type": "string" }, "nic_index": { "type": "integer" } }, "required": ["vnic_id"] },
-    "OCIVolumeAttachment": { "type": "object", "properties": { "id": { "type": "string" }, "attachment_type": { "type": "string" }, "display_name": { "type": "string" }, "volume_id": { "type": "string" }, "is_read_only": { "type": "boolean" }, "lifecycle_state": { "type": "string" }, "device": { "type": "string" }, "iqn": { "type": "string" }, "ipv4": { "type": "string" }, "port": { "type": "integer" }, "encryption_in_transit": { "type": "boolean" } }, "required": ["id"] },
+    "OCIShapeConfig": {
+      "type": "object",
+      "properties": {
+        "ocpus": {
+          "type": "number"
+        },
+        "memory_in_gbs": {
+          "type": "number"
+        },
+        "networking_bandwidth_in_gbps": {
+          "type": "number"
+        },
+        "max_vnic_attachments": {
+          "type": "integer"
+        },
+        "gpus": {
+          "type": "integer"
+        }
+      }
+    },
+    "OCIRegionInfo": {
+      "type": "object",
+      "properties": {
+        "realm_key": {
+          "type": "string"
+        },
+        "realm_domain_component": {
+          "type": "string"
+        },
+        "region_key": {
+          "type": "string"
+        },
+        "region_identifier": {
+          "type": "string"
+        }
+      }
+    },
+    "OCIAgentConfig": {
+      "type": "object",
+      "properties": {
+        "is_management_disabled": {
+          "type": "boolean"
+        },
+        "is_monitoring_disabled": {
+          "type": "boolean"
+        },
+        "are_all_plugins_disabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OCIAvailabilityConfig": {
+      "type": "object",
+      "properties": {
+        "is_live_migration_preferred": {
+          "type": "boolean"
+        },
+        "recovery_action": {
+          "type": "string"
+        }
+      }
+    },
+    "OCILaunchOptions": {
+      "type": "object",
+      "properties": {
+        "boot_volume_type": {
+          "type": "string"
+        },
+        "firmware": {
+          "type": "string"
+        },
+        "network_type": {
+          "type": "string"
+        },
+        "remote_data_volume_type": {
+          "type": "string"
+        },
+        "is_consistent_volume_naming_enabled": {
+          "type": "boolean"
+        },
+        "is_pv_encryption_in_transit_enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OCISourceDetails": {
+      "type": "object",
+      "properties": {
+        "source_type": {
+          "type": "string"
+        },
+        "image_id": {
+          "type": "string"
+        },
+        "boot_volume_id": {
+          "type": "string"
+        },
+        "boot_volume_size_in_gbs": {
+          "type": "integer"
+        },
+        "kms_key_id": {
+          "type": "string"
+        }
+      }
+    },
+    "OCIVNIC": {
+      "type": "object",
+      "properties": {
+        "vnic_id": {
+          "type": "string"
+        },
+        "private_ip": {
+          "type": "string"
+        },
+        "vlan_tag": {
+          "type": "integer"
+        },
+        "mac_addr": {
+          "type": "string"
+        },
+        "virtual_router_ip": {
+          "type": "string"
+        },
+        "subnet_cidr_block": {
+          "type": "string"
+        },
+        "nic_index": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "vnic_id"
+      ]
+    },
+    "OCIVolumeAttachment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "attachment_type": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "volume_id": {
+          "type": "string"
+        },
+        "is_read_only": {
+          "type": "boolean"
+        },
+        "lifecycle_state": {
+          "type": "string"
+        },
+        "device": {
+          "type": "string"
+        },
+        "iqn": {
+          "type": "string"
+        },
+        "ipv4": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "encryption_in_transit": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
     "Alibaba": {
       "type": "object",
       "description": "Alibaba Cloud ECS instance metadata from the IMDS at 100.100.100.200.",
       "properties": {
-        "instance_id": { "type": "string", "description": "ECS instance ID." },
-        "instance_name": { "type": "string", "description": "Instance display name." },
-        "instance_type": { "type": "string", "description": "Instance type (e.g. \"ecs.g6.xlarge\")." },
-        "hostname": { "type": "string", "description": "Instance hostname." },
-        "image_id": { "type": "string", "description": "Boot image ID." },
-        "serial_number": { "type": "string", "description": "Instance serial number." },
-        "network_type": { "type": "string", "description": "Network type (\"classic\" or \"vpc\")." },
-        "owner_account_id": { "type": "string", "description": "Alibaba Cloud account ID." },
-        "source_address": { "type": "string", "description": "Source address." },
-        "region": { "type": "string", "description": "Region ID." },
-        "zone": { "type": "string", "description": "Availability zone ID." },
-        "virtualization_solution": { "type": "string", "description": "Hypervisor type." },
-        "virtualization_solution_version": { "type": "string", "description": "Hypervisor version." },
-        "spot_termination_time": { "type": "string", "description": "Spot instance termination notice time." },
-        "mac": { "type": "string", "description": "Primary ENI MAC address." },
-        "private_ipv4": { "type": "string", "description": "Primary private IPv4 address." },
-        "public_ipv4": { "type": "string", "description": "Elastic/public IPv4 address." },
-        "vpc_id": { "type": "string", "description": "VPC ID." },
-        "vpc_cidr_block": { "type": "string", "description": "VPC CIDR block." },
-        "vswitch_id": { "type": "string", "description": "VSwitch ID." },
-        "vswitch_cidr_block": { "type": "string", "description": "VSwitch CIDR block." },
-        "dns_nameservers": { "type": "array", "items": { "type": "string" }, "description": "DNS nameservers." },
-        "ntp_servers": { "type": "array", "items": { "type": "string" }, "description": "NTP server addresses." },
-        "network_interfaces": { "type": "object", "description": "ENIs keyed by MAC address.", "additionalProperties": { "$ref": "#/$defs/AlibabaNetworkInterface" } },
-        "max_bandwidth_ingress": { "type": "integer", "description": "Maximum ingress bandwidth in Mbps." },
-        "max_bandwidth_egress": { "type": "integer", "description": "Maximum egress bandwidth in Mbps." },
-        "ram_role_name": { "type": "string", "description": "RAM role name attached to the instance." },
-        "disks": { "type": "object", "description": "Attached disks keyed by serial number.", "additionalProperties": { "$ref": "#/$defs/AlibabaDisk" } },
-        "marketplace": { "$ref": "#/$defs/AlibabaMarketplace" },
-        "tags": { "type": "object", "description": "User-defined instance tags.", "additionalProperties": { "type": "string" } }
+        "instance_id": {
+          "type": "string",
+          "description": "ECS instance ID."
+        },
+        "instance_name": {
+          "type": "string",
+          "description": "Instance display name."
+        },
+        "instance_type": {
+          "type": "string",
+          "description": "Instance type (e.g. \"ecs.g6.xlarge\")."
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Instance hostname."
+        },
+        "image_id": {
+          "type": "string",
+          "description": "Boot image ID."
+        },
+        "serial_number": {
+          "type": "string",
+          "description": "Instance serial number."
+        },
+        "network_type": {
+          "type": "string",
+          "description": "Network type (\"classic\" or \"vpc\")."
+        },
+        "owner_account_id": {
+          "type": "string",
+          "description": "Alibaba Cloud account ID."
+        },
+        "source_address": {
+          "type": "string",
+          "description": "Source address."
+        },
+        "region": {
+          "type": "string",
+          "description": "Region ID."
+        },
+        "virtualization_solution": {
+          "type": "string",
+          "description": "Hypervisor type."
+        },
+        "virtualization_solution_version": {
+          "type": "string",
+          "description": "Hypervisor version."
+        },
+        "spot_termination_time": {
+          "type": "string",
+          "description": "Spot instance termination notice time."
+        },
+        "mac": {
+          "type": "string",
+          "description": "Primary ENI MAC address."
+        },
+        "vpc_id": {
+          "type": "string",
+          "description": "VPC ID."
+        },
+        "vpc_cidr_block": {
+          "type": "string",
+          "description": "VPC CIDR block."
+        },
+        "vswitch_id": {
+          "type": "string",
+          "description": "VSwitch ID."
+        },
+        "vswitch_cidr_block": {
+          "type": "string",
+          "description": "VSwitch CIDR block."
+        },
+        "dns_nameservers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "DNS nameservers."
+        },
+        "ntp_servers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "NTP server addresses."
+        },
+        "network_interfaces": {
+          "type": "object",
+          "description": "ENIs keyed by MAC address.",
+          "additionalProperties": {
+            "$ref": "#/$defs/AlibabaNetworkInterface"
+          }
+        },
+        "max_bandwidth_ingress": {
+          "type": "integer",
+          "description": "Maximum ingress bandwidth in Mbps."
+        },
+        "max_bandwidth_egress": {
+          "type": "integer",
+          "description": "Maximum egress bandwidth in Mbps."
+        },
+        "ram_role_name": {
+          "type": "string",
+          "description": "RAM role name attached to the instance."
+        },
+        "disks": {
+          "type": "object",
+          "description": "Attached disks keyed by serial number.",
+          "additionalProperties": {
+            "$ref": "#/$defs/AlibabaDisk"
+          }
+        },
+        "marketplace": {
+          "$ref": "#/$defs/AlibabaMarketplace"
+        },
+        "tags": {
+          "type": "object",
+          "description": "User-defined instance tags.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "availability_zone": {
+          "type": "string",
+          "description": "Alibaba availability zone (e.g. cn-hangzhou-b)."
+        },
+        "private_ip": {
+          "type": "string",
+          "description": "Primary private IPv4."
+        },
+        "public_ip": {
+          "type": "string",
+          "description": "Elastic IP when attached."
+        }
       },
-      "required": ["instance_id"]
+      "required": [
+        "instance_id"
+      ]
     },
-    "AlibabaNetworkInterface": { "type": "object", "properties": { "network_interface_id": { "type": "string" }, "primary_ip_address": { "type": "string" }, "private_ipv4s": { "type": "array", "items": { "type": "string" } }, "ipv4_prefixes": { "type": "array", "items": { "type": "string" } }, "netmask": { "type": "string" }, "gateway": { "type": "string" }, "vpc_id": { "type": "string" }, "vpc_cidr_block": { "type": "string" }, "vpc_ipv6_cidr_blocks": { "type": "array", "items": { "type": "string" } }, "vswitch_id": { "type": "string" }, "vswitch_cidr_block": { "type": "string" }, "vswitch_ipv6_cidr_block": { "type": "string" }, "ipv6s": { "type": "array", "items": { "type": "string" } }, "ipv6_prefixes": { "type": "array", "items": { "type": "string" } }, "ipv6_gateway": { "type": "string" } } },
-    "AlibabaDisk": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" } } },
-    "AlibabaMarketplace": { "type": "object", "properties": { "product_code": { "type": "string" }, "charge_type": { "type": "string" } } },
+    "AlibabaNetworkInterface": {
+      "type": "object",
+      "properties": {
+        "network_interface_id": {
+          "type": "string"
+        },
+        "primary_ip_address": {
+          "type": "string"
+        },
+        "private_ipv4s": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ipv4_prefixes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "netmask": {
+          "type": "string"
+        },
+        "gateway": {
+          "type": "string"
+        },
+        "vpc_id": {
+          "type": "string"
+        },
+        "vpc_cidr_block": {
+          "type": "string"
+        },
+        "vpc_ipv6_cidr_blocks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "vswitch_id": {
+          "type": "string"
+        },
+        "vswitch_cidr_block": {
+          "type": "string"
+        },
+        "vswitch_ipv6_cidr_block": {
+          "type": "string"
+        },
+        "ipv6s": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ipv6_prefixes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ipv6_gateway": {
+          "type": "string"
+        }
+      }
+    },
+    "AlibabaDisk": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "AlibabaMarketplace": {
+      "type": "object",
+      "properties": {
+        "product_code": {
+          "type": "string"
+        },
+        "charge_type": {
+          "type": "string"
+        }
+      }
+    },
     "Linode": {
       "type": "object",
       "description": "Linode instance metadata. Detected via apt sources or domain heuristic; IPs come from host network interfaces.",
       "properties": {
-        "public_ip": { "type": "string", "description": "Public IPv4 address from eth0." },
-        "private_ip": { "type": "string", "description": "Private IPv4 address from eth0:1." }
+        "public_ip": {
+          "type": "string",
+          "description": "Public IPv4 address from eth0."
+        },
+        "private_ip": {
+          "type": "string",
+          "description": "Private IPv4 address from eth0:1."
+        }
       }
     },
     "OpenStack": {
       "type": "object",
       "description": "OpenStack (Nova) instance metadata from the EC2-compatible metadata service and Nova's meta_data.json.",
       "properties": {
-        "instance_id": { "type": "string", "description": "EC2-compatible instance ID." },
-        "instance_type": { "type": "string", "description": "Instance flavor." },
-        "hostname": { "type": "string", "description": "Instance hostname." },
-        "local_hostname": { "type": "string", "description": "Local hostname." },
-        "public_hostname": { "type": "string", "description": "Public hostname." },
-        "availability_zone": { "type": "string", "description": "Availability zone." },
-        "local_ipv4": { "type": "string", "description": "Private IPv4 address." },
-        "public_ipv4": { "type": "string", "description": "Public/floating IPv4 address." },
-        "security_groups": { "type": "array", "items": { "type": "string" }, "description": "Security group names." },
-        "ami_id": { "type": "string", "description": "Image ID (EC2-compatible)." },
-        "kernel_id": { "type": "string", "description": "Kernel ID." },
-        "ramdisk_id": { "type": "string", "description": "Ramdisk ID." },
-        "reservation_id": { "type": "string", "description": "Reservation ID." },
-        "name": { "type": "string", "description": "Instance name from Nova." },
-        "project_id": { "type": "string", "description": "OpenStack project/tenant ID." },
-        "uuid": { "type": "string", "description": "Instance UUID from Nova." },
-        "launch_index": { "type": "integer", "description": "Launch index." },
-        "meta_data": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Instance metadata key-value pairs." },
-        "public_keys": { "type": "object", "additionalProperties": { "type": "string" }, "description": "SSH public keys keyed by name." },
-        "devices": { "type": "array", "items": { "$ref": "#/$defs/OpenStackDevice" }, "description": "Attached block devices." },
-        "provider": { "type": "string", "description": "Provider: \"openstack\" or \"dreamhost\"." }
+        "instance_id": {
+          "type": "string",
+          "description": "EC2-compatible instance ID."
+        },
+        "instance_type": {
+          "type": "string",
+          "description": "Instance flavor."
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Instance hostname."
+        },
+        "local_hostname": {
+          "type": "string",
+          "description": "Local hostname."
+        },
+        "public_hostname": {
+          "type": "string",
+          "description": "Public hostname."
+        },
+        "availability_zone": {
+          "type": "string",
+          "description": "Availability zone."
+        },
+        "security_groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Security group names."
+        },
+        "ami_id": {
+          "type": "string",
+          "description": "Image ID (EC2-compatible)."
+        },
+        "kernel_id": {
+          "type": "string",
+          "description": "Kernel ID."
+        },
+        "ramdisk_id": {
+          "type": "string",
+          "description": "Ramdisk ID."
+        },
+        "reservation_id": {
+          "type": "string",
+          "description": "Reservation ID."
+        },
+        "name": {
+          "type": "string",
+          "description": "Instance name from Nova."
+        },
+        "project_id": {
+          "type": "string",
+          "description": "OpenStack project/tenant ID."
+        },
+        "uuid": {
+          "type": "string",
+          "description": "Instance UUID from Nova."
+        },
+        "launch_index": {
+          "type": "integer",
+          "description": "Launch index."
+        },
+        "meta_data": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Instance metadata key-value pairs."
+        },
+        "public_keys": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "SSH public keys keyed by name."
+        },
+        "devices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OpenStackDevice"
+          },
+          "description": "Attached block devices."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Provider: \"openstack\" or \"dreamhost\"."
+        },
+        "private_ip": {
+          "type": "string",
+          "description": "Primary private IPv4."
+        },
+        "public_ip": {
+          "type": "string",
+          "description": "Primary public IPv4."
+        }
       },
-      "required": ["instance_id"]
+      "required": [
+        "instance_id"
+      ]
     },
-    "OpenStackDevice": { "type": "object", "properties": { "type": { "type": "string" }, "bus": { "type": "string" }, "serial": { "type": "string" }, "path": { "type": "string" }, "address": { "type": "string" }, "tags": { "type": "array", "items": { "type": "string" } } } },
+    "OpenStackDevice": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "bus": {
+          "type": "string"
+        },
+        "serial": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "Scaleway": {
       "type": "object",
       "description": "Scaleway instance metadata from the metadata server at 169.254.42.42.",
       "properties": {
-        "id": { "type": "string", "description": "Instance UUID." },
-        "name": { "type": "string", "description": "Instance name." },
-        "hostname": { "type": "string", "description": "Instance hostname." },
-        "organization": { "type": "string", "description": "Organization ID." },
-        "project": { "type": "string", "description": "Project ID." },
-        "commercial_type": { "type": "string", "description": "Instance type (e.g. \"DEV1-S\", \"GP1-XS\")." },
-        "tags": { "type": "array", "items": { "type": "string" }, "description": "Instance tags." },
-        "state_detail": { "type": "string", "description": "Instance state detail." },
-        "public_ip": { "type": "string", "description": "Public IPv4 address." },
-        "public_ip_id": { "type": "string", "description": "Public IP resource ID." },
-        "public_ip_dynamic": { "type": "boolean", "description": "True if the public IP is dynamically assigned." },
-        "private_ip": { "type": "string", "description": "Private IPv4 address." },
-        "ipv6_address": { "type": "string", "description": "IPv6 address." },
-        "ipv6_netmask": { "type": "string", "description": "IPv6 netmask." },
-        "ipv6_gateway": { "type": "string", "description": "IPv6 gateway." },
-        "zone": { "type": "string", "description": "Availability zone." },
-        "platform_id": { "type": "string", "description": "Platform/hardware ID." },
-        "ssh_public_keys": { "type": "array", "items": { "type": "string" }, "description": "SSH public keys." },
-        "volumes": { "type": "array", "items": { "$ref": "#/$defs/ScalewayVolume" }, "description": "Attached volumes." },
-        "timezone": { "type": "string", "description": "Instance timezone." },
-        "bootscript": { "$ref": "#/$defs/ScalewayBootscript" }
+        "name": {
+          "type": "string",
+          "description": "Instance name."
+        },
+        "hostname": {
+          "type": "string",
+          "description": "Instance hostname."
+        },
+        "organization": {
+          "type": "string",
+          "description": "Organization ID."
+        },
+        "project": {
+          "type": "string",
+          "description": "Project ID."
+        },
+        "commercial_type": {
+          "type": "string",
+          "description": "Instance type (e.g. \"DEV1-S\", \"GP1-XS\")."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Instance tags."
+        },
+        "state_detail": {
+          "type": "string",
+          "description": "Instance state detail."
+        },
+        "public_ip": {
+          "type": "string",
+          "description": "Public IPv4 address."
+        },
+        "public_ip_id": {
+          "type": "string",
+          "description": "Public IP resource ID."
+        },
+        "public_ip_dynamic": {
+          "type": "boolean",
+          "description": "True if the public IP is dynamically assigned."
+        },
+        "private_ip": {
+          "type": "string",
+          "description": "Private IPv4 address."
+        },
+        "ipv6_address": {
+          "type": "string",
+          "description": "IPv6 address."
+        },
+        "ipv6_netmask": {
+          "type": "string",
+          "description": "IPv6 netmask."
+        },
+        "ipv6_gateway": {
+          "type": "string",
+          "description": "IPv6 gateway."
+        },
+        "platform_id": {
+          "type": "string",
+          "description": "Platform/hardware ID."
+        },
+        "ssh_public_keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SSH public keys."
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ScalewayVolume"
+          },
+          "description": "Attached volumes."
+        },
+        "timezone": {
+          "type": "string",
+          "description": "Instance timezone."
+        },
+        "bootscript": {
+          "$ref": "#/$defs/ScalewayBootscript"
+        },
+        "availability_zone": {
+          "type": "string",
+          "description": "Scaleway availability zone (e.g. fr-par-1)."
+        },
+        "instance_id": {
+          "type": "string",
+          "description": "Scaleway instance UUID."
+        }
       },
-      "required": ["id"]
+      "required": [
+        "instance_id"
+      ]
     },
-    "ScalewayVolume": { "type": "object", "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "volume_type": { "type": "string" }, "size": { "type": "integer" }, "export_uri": { "type": "string" } }, "required": ["id"] },
-    "ScalewayBootscript": { "type": "object", "description": "Legacy Scaleway boot configuration.", "properties": { "id": { "type": "string" }, "title": { "type": "string" }, "architecture": { "type": "string" }, "kernel": { "type": "string" }, "initrd": { "type": "string" }, "bootcmdargs": { "type": "string" }, "organization": { "type": "string" }, "public": { "type": "boolean" } }, "required": ["id"] },
+    "ScalewayVolume": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "volume_type": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "export_uri": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ScalewayBootscript": {
+      "type": "object",
+      "description": "Legacy Scaleway boot configuration.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "architecture": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "initrd": {
+          "type": "string"
+        },
+        "bootcmdargs": {
+          "type": "string"
+        },
+        "organization": {
+          "type": "string"
+        },
+        "public": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
     "DMI": {
       "type": "object",
       "description": "SMBIOS/DMI data: BIOS, baseboard, chassis, and product identity from /sys/class/dmi/id/ via ghw.",
       "properties": {
-        "bios": { "$ref": "#/$defs/DMIBIOS" },
-        "baseboard": { "$ref": "#/$defs/DMIBaseboard" },
-        "chassis": { "$ref": "#/$defs/DMIChassis" },
-        "product": { "$ref": "#/$defs/DMIProduct" }
+        "bios": {
+          "$ref": "#/$defs/DMIBIOS"
+        },
+        "baseboard": {
+          "$ref": "#/$defs/DMIBaseboard"
+        },
+        "chassis": {
+          "$ref": "#/$defs/DMIChassis"
+        },
+        "product": {
+          "$ref": "#/$defs/DMIProduct"
+        }
       }
     },
-    "DMIBIOS": { "type": "object", "description": "Firmware identity (DMI type 0).", "properties": { "vendor": { "type": "string", "description": "BIOS vendor (e.g. \"American Megatrends Inc.\", \"Amazon\")." }, "version": { "type": "string", "description": "BIOS version string." }, "date": { "type": "string", "description": "BIOS release date." } } },
-    "DMIBaseboard": { "type": "object", "description": "Motherboard identity (DMI type 2).", "properties": { "vendor": { "type": "string" }, "product": { "type": "string" }, "version": { "type": "string" }, "serial_number": { "type": "string" }, "asset_tag": { "type": "string" } } },
-    "DMIChassis": { "type": "object", "description": "Enclosure identity (DMI type 3).", "properties": { "vendor": { "type": "string" }, "type": { "type": "string" }, "type_description": { "type": "string" }, "version": { "type": "string" }, "serial_number": { "type": "string" }, "asset_tag": { "type": "string" } } },
-    "DMIProduct": { "type": "object", "description": "System identity (DMI type 1). Product.name is the primary signal cloud collectors use.", "properties": { "vendor": { "type": "string" }, "name": { "type": "string", "description": "System product name (e.g. \"Google Compute Engine\", \"Amazon EC2\")." }, "family": { "type": "string" }, "version": { "type": "string" }, "serial_number": { "type": "string" }, "uuid": { "type": "string", "description": "System UUID from DMI." }, "sku": { "type": "string" } } },
+    "DMIBIOS": {
+      "type": "object",
+      "description": "Firmware identity (DMI type 0).",
+      "properties": {
+        "vendor": {
+          "type": "string",
+          "description": "BIOS vendor (e.g. \"American Megatrends Inc.\", \"Amazon\")."
+        },
+        "version": {
+          "type": "string",
+          "description": "BIOS version string."
+        },
+        "date": {
+          "type": "string",
+          "description": "BIOS release date."
+        }
+      }
+    },
+    "DMIBaseboard": {
+      "type": "object",
+      "description": "Motherboard identity (DMI type 2).",
+      "properties": {
+        "vendor": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "asset_tag": {
+          "type": "string"
+        }
+      }
+    },
+    "DMIChassis": {
+      "type": "object",
+      "description": "Enclosure identity (DMI type 3).",
+      "properties": {
+        "vendor": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "type_description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "asset_tag": {
+          "type": "string"
+        }
+      }
+    },
+    "DMIProduct": {
+      "type": "object",
+      "description": "System identity (DMI type 1). Product.name is the primary signal cloud collectors use.",
+      "properties": {
+        "vendor": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string",
+          "description": "System product name (e.g. \"Google Compute Engine\", \"Amazon EC2\")."
+        },
+        "family": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "uuid": {
+          "type": "string",
+          "description": "System UUID from DMI."
+        },
+        "sku": {
+          "type": "string"
+        }
+      }
+    },
     "GPU": {
       "type": "object",
       "description": "Graphics/compute cards. Linux: from ghw/gpu via /sys/class/drm. macOS: from system_profiler SPDisplaysDataType.",
       "properties": {
         "cards": {
           "type": "array",
-          "items": { "$ref": "#/$defs/GPUCard" },
+          "items": {
+            "$ref": "#/$defs/GPUCard"
+          },
           "description": "List of detected GPU/graphics devices. Empty on headless servers or containers without /sys/class/drm."
         }
       }
@@ -1608,13 +4185,34 @@
       "type": "object",
       "description": "A single GPU/graphics device.",
       "properties": {
-        "vendor": { "type": "string", "description": "GPU vendor (e.g. \"Apple\", \"NVIDIA Corporation\")." },
-        "model": { "type": "string", "description": "GPU model (e.g. \"Apple M1 Pro\", \"GP107 [GeForce GTX 1050 Ti]\")." },
-        "address": { "type": "string", "description": "PCI address on Linux, bus descriptor on macOS." },
-        "vendor_id": { "type": "string", "description": "PCI vendor hex (Linux only)." },
-        "device_id": { "type": "string", "description": "PCI device hex (Linux only)." },
-        "cores": { "type": "integer", "description": "GPU core count (macOS integrated Apple GPUs only)." },
-        "bus": { "type": "string", "description": "Bus type: \"builtin\" or \"pcie\" (macOS only)." }
+        "vendor": {
+          "type": "string",
+          "description": "GPU vendor (e.g. \"Apple\", \"NVIDIA Corporation\")."
+        },
+        "model": {
+          "type": "string",
+          "description": "GPU model (e.g. \"Apple M1 Pro\", \"GP107 [GeForce GTX 1050 Ti]\")."
+        },
+        "address": {
+          "type": "string",
+          "description": "PCI address on Linux, bus descriptor on macOS."
+        },
+        "vendor_id": {
+          "type": "string",
+          "description": "PCI vendor hex (Linux only)."
+        },
+        "device_id": {
+          "type": "string",
+          "description": "PCI device hex (Linux only)."
+        },
+        "cores": {
+          "type": "integer",
+          "description": "GPU core count (macOS integrated Apple GPUs only)."
+        },
+        "bus": {
+          "type": "string",
+          "description": "Bus type: \"builtin\" or \"pcie\" (macOS only)."
+        }
       }
     },
     "PCI": {
@@ -1624,29 +4222,75 @@
         "devices": {
           "type": "object",
           "description": "PCI devices keyed by address (e.g. \"0000:03:00.0\").",
-          "additionalProperties": { "$ref": "#/$defs/PCIDevice" }
+          "additionalProperties": {
+            "$ref": "#/$defs/PCIDevice"
+          }
         }
       },
-      "required": ["devices"]
+      "required": [
+        "devices"
+      ]
     },
     "PCIDevice": {
       "type": "object",
       "description": "One PCI device.",
       "properties": {
-        "vendor_id": { "type": "string", "description": "PCI vendor hex ID." },
-        "vendor_name": { "type": "string", "description": "Resolved vendor name." },
-        "device_id": { "type": "string", "description": "PCI device hex ID." },
-        "device_name": { "type": "string", "description": "Resolved device name." },
-        "class_id": { "type": "string", "description": "PCI class hex ID." },
-        "class_name": { "type": "string", "description": "Resolved class name." },
-        "subclass_id": { "type": "string", "description": "PCI subclass hex ID." },
-        "subclass_name": { "type": "string", "description": "Resolved subclass name." },
-        "sdevice_id": { "type": "string", "description": "Subsystem device hex ID." },
-        "sdevice_name": { "type": "string", "description": "Resolved subsystem device name." },
-        "revision": { "type": "string", "description": "PCI revision." },
-        "driver": { "type": "string", "description": "Kernel driver bound to this device." },
-        "iommu_group": { "type": "string", "description": "IOMMU group ID." },
-        "parent_address": { "type": "string", "description": "Parent PCI bridge address." }
+        "vendor_id": {
+          "type": "string",
+          "description": "PCI vendor hex ID."
+        },
+        "vendor_name": {
+          "type": "string",
+          "description": "Resolved vendor name."
+        },
+        "device_id": {
+          "type": "string",
+          "description": "PCI device hex ID."
+        },
+        "device_name": {
+          "type": "string",
+          "description": "Resolved device name."
+        },
+        "class_id": {
+          "type": "string",
+          "description": "PCI class hex ID."
+        },
+        "class_name": {
+          "type": "string",
+          "description": "Resolved class name."
+        },
+        "subclass_id": {
+          "type": "string",
+          "description": "PCI subclass hex ID."
+        },
+        "subclass_name": {
+          "type": "string",
+          "description": "Resolved subclass name."
+        },
+        "sdevice_id": {
+          "type": "string",
+          "description": "Subsystem device hex ID."
+        },
+        "sdevice_name": {
+          "type": "string",
+          "description": "Resolved subsystem device name."
+        },
+        "revision": {
+          "type": "string",
+          "description": "PCI revision."
+        },
+        "driver": {
+          "type": "string",
+          "description": "Kernel driver bound to this device."
+        },
+        "iommu_group": {
+          "type": "string",
+          "description": "IOMMU group ID."
+        },
+        "parent_address": {
+          "type": "string",
+          "description": "Parent PCI bridge address."
+        }
       }
     },
     "SCSI": {
@@ -1656,91 +4300,238 @@
         "devices": {
           "type": "object",
           "description": "SCSI devices keyed by SCSI address (e.g. \"0:0:0:0\").",
-          "additionalProperties": { "$ref": "#/$defs/SCSIDevice" }
+          "additionalProperties": {
+            "$ref": "#/$defs/SCSIDevice"
+          }
         }
       },
-      "required": ["devices"]
+      "required": [
+        "devices"
+      ]
     },
     "SCSIDevice": {
       "type": "object",
       "description": "One SCSI device.",
       "properties": {
-        "scsi_addr": { "type": "string", "description": "SCSI address (H:C:T:L format)." },
-        "type": { "type": "string", "description": "Device type (e.g. \"disk\", \"cd/dvd\")." },
-        "transport": { "type": "string", "description": "Transport protocol (e.g. \"sas\", \"sata\", \"fc\")." },
-        "name": { "type": "string", "description": "Vendor and model combined." },
-        "revision": { "type": "string", "description": "Firmware revision." },
-        "device": { "type": "string", "description": "Device node path (e.g. \"/dev/sda\")." }
+        "scsi_addr": {
+          "type": "string",
+          "description": "SCSI address (H:C:T:L format)."
+        },
+        "type": {
+          "type": "string",
+          "description": "Device type (e.g. \"disk\", \"cd/dvd\")."
+        },
+        "transport": {
+          "type": "string",
+          "description": "Transport protocol (e.g. \"sas\", \"sata\", \"fc\")."
+        },
+        "name": {
+          "type": "string",
+          "description": "Vendor and model combined."
+        },
+        "revision": {
+          "type": "string",
+          "description": "Firmware revision."
+        },
+        "device": {
+          "type": "string",
+          "description": "Device node path (e.g. \"/dev/sda\")."
+        }
       },
-      "required": ["scsi_addr"]
+      "required": [
+        "scsi_addr"
+      ]
     },
     "Hardware": {
       "type": "object",
       "description": "macOS-specific hardware facts from system_profiler (SPHardwareDataType, SPStorageDataType, SPPowerDataType). Empty on Linux.",
       "properties": {
-        "machine_model": { "type": "string", "description": "Machine model identifier (e.g. \"MacBookPro18,1\")." },
-        "machine_name": { "type": "string", "description": "Marketing name (e.g. \"MacBook Pro\")." },
-        "serial_number": { "type": "string", "description": "Hardware serial number." },
-        "platform_uuid": { "type": "string", "description": "Platform UUID." },
-        "provisioning_udid": { "type": "string", "description": "Provisioning UDID." },
-        "cpu_type": { "type": "string", "description": "CPU type (Intel Macs)." },
-        "chip_type": { "type": "string", "description": "Chip type (Apple Silicon)." },
-        "current_processor_speed": { "type": "string", "description": "Processor speed (Intel only)." },
-        "number_processors": { "type": "string", "description": "Number of processors/cores string." },
-        "packages": { "type": "integer", "description": "CPU package count." },
-        "l2_cache_core": { "type": "string", "description": "Per-core L2 cache size string." },
-        "l3_cache": { "type": "string", "description": "L3 cache size string." },
-        "physical_memory": { "type": "string", "description": "Total physical memory (e.g. \"16 GB\")." },
-        "boot_rom_version": { "type": "string", "description": "Boot ROM version." },
-        "os_loader_version": { "type": "string", "description": "OS loader version." },
-        "smc_version_system": { "type": "string", "description": "SMC firmware version." },
-        "storage": { "type": "array", "items": { "$ref": "#/$defs/HardwareStorage" }, "description": "Attached storage volumes." },
-        "battery": { "$ref": "#/$defs/HardwareBattery" },
-        "charger": { "$ref": "#/$defs/HardwareCharger" }
+        "machine_model": {
+          "type": "string",
+          "description": "Machine model identifier (e.g. \"MacBookPro18,1\")."
+        },
+        "machine_name": {
+          "type": "string",
+          "description": "Marketing name (e.g. \"MacBook Pro\")."
+        },
+        "serial_number": {
+          "type": "string",
+          "description": "Hardware serial number."
+        },
+        "platform_uuid": {
+          "type": "string",
+          "description": "Platform UUID."
+        },
+        "provisioning_udid": {
+          "type": "string",
+          "description": "Provisioning UDID."
+        },
+        "cpu_type": {
+          "type": "string",
+          "description": "CPU type (Intel Macs)."
+        },
+        "chip_type": {
+          "type": "string",
+          "description": "Chip type (Apple Silicon)."
+        },
+        "current_processor_speed": {
+          "type": "string",
+          "description": "Processor speed (Intel only)."
+        },
+        "number_processors": {
+          "type": "string",
+          "description": "Number of processors/cores string."
+        },
+        "packages": {
+          "type": "integer",
+          "description": "CPU package count."
+        },
+        "l2_cache_core": {
+          "type": "string",
+          "description": "Per-core L2 cache size string."
+        },
+        "l3_cache": {
+          "type": "string",
+          "description": "L3 cache size string."
+        },
+        "physical_memory": {
+          "type": "string",
+          "description": "Total physical memory (e.g. \"16 GB\")."
+        },
+        "boot_rom_version": {
+          "type": "string",
+          "description": "Boot ROM version."
+        },
+        "os_loader_version": {
+          "type": "string",
+          "description": "OS loader version."
+        },
+        "smc_version_system": {
+          "type": "string",
+          "description": "SMC firmware version."
+        },
+        "storage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HardwareStorage"
+          },
+          "description": "Attached storage volumes."
+        },
+        "battery": {
+          "$ref": "#/$defs/HardwareBattery"
+        },
+        "charger": {
+          "$ref": "#/$defs/HardwareCharger"
+        }
       }
     },
     "HardwareStorage": {
       "type": "object",
       "description": "One macOS storage volume from SPStorageDataType.",
       "properties": {
-        "name": { "type": "string" },
-        "bsd_name": { "type": "string", "description": "BSD device name (e.g. \"disk3s5\")." },
-        "capacity": { "type": "integer", "description": "Volume capacity in bytes." },
-        "file_system": { "type": "string", "description": "Filesystem type (e.g. \"apfs\")." },
-        "mount_point": { "type": "string" },
-        "free_space": { "type": "integer", "description": "Free space in bytes." },
-        "writable": { "type": "boolean" },
-        "drive_type": { "type": "string" },
-        "smart_status": { "type": "string" },
-        "partitions": { "type": "integer" }
+        "name": {
+          "type": "string"
+        },
+        "bsd_name": {
+          "type": "string",
+          "description": "BSD device name (e.g. \"disk3s5\")."
+        },
+        "capacity": {
+          "type": "integer",
+          "description": "Volume capacity in bytes."
+        },
+        "file_system": {
+          "type": "string",
+          "description": "Filesystem type (e.g. \"apfs\")."
+        },
+        "mount_point": {
+          "type": "string"
+        },
+        "free_space": {
+          "type": "integer",
+          "description": "Free space in bytes."
+        },
+        "writable": {
+          "type": "boolean"
+        },
+        "drive_type": {
+          "type": "string"
+        },
+        "smart_status": {
+          "type": "string"
+        },
+        "partitions": {
+          "type": "integer"
+        }
       }
     },
     "HardwareBattery": {
       "type": "object",
       "description": "MacOS battery information from SPPowerDataType.",
       "properties": {
-        "current_capacity": { "type": "integer", "description": "Current charge capacity." },
-        "max_capacity": { "type": "integer", "description": "Maximum charge capacity." },
-        "fully_charged": { "type": "boolean" },
-        "is_charging": { "type": "boolean" },
-        "charge_cycle_count": { "type": "integer", "description": "Battery cycle count." },
-        "health": { "type": "string", "description": "Battery health status (e.g. \"Normal\")." },
-        "serial": { "type": "string", "description": "Battery serial number." },
-        "remaining": { "type": "integer", "description": "Remaining charge percentage." },
-        "amperage": { "type": "integer", "description": "Current amperage in mA." },
-        "voltage": { "type": "integer", "description": "Current voltage in mV." }
+        "current_capacity": {
+          "type": "integer",
+          "description": "Current charge capacity."
+        },
+        "max_capacity": {
+          "type": "integer",
+          "description": "Maximum charge capacity."
+        },
+        "fully_charged": {
+          "type": "boolean"
+        },
+        "is_charging": {
+          "type": "boolean"
+        },
+        "charge_cycle_count": {
+          "type": "integer",
+          "description": "Battery cycle count."
+        },
+        "health": {
+          "type": "string",
+          "description": "Battery health status (e.g. \"Normal\")."
+        },
+        "serial": {
+          "type": "string",
+          "description": "Battery serial number."
+        },
+        "remaining": {
+          "type": "integer",
+          "description": "Remaining charge percentage."
+        },
+        "amperage": {
+          "type": "integer",
+          "description": "Current amperage in mA."
+        },
+        "voltage": {
+          "type": "integer",
+          "description": "Current voltage in mV."
+        }
       }
     },
     "HardwareCharger": {
       "type": "object",
       "description": "MacOS AC charger info from SPPowerDataType.",
       "properties": {
-        "id": { "type": "string" },
-        "family": { "type": "string" },
-        "revision": { "type": "string" },
-        "serial_number": { "type": "string" },
-        "watts": { "type": "string", "description": "Charger wattage." },
-        "connected": { "type": "boolean" }
+        "id": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "watts": {
+          "type": "string",
+          "description": "Charger wattage."
+        },
+        "connected": {
+          "type": "boolean"
+        }
       }
     }
   }
