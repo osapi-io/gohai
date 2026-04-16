@@ -46,10 +46,15 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "virtualization" }
-func (base) Category() string       { return collector.CategoryVirtualization }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string         { return "virtualization" }
+func (base) Category() string     { return collector.CategoryVirtualization }
+func (base) DefaultEnabled() bool { return true }
+
+// Dependencies declares cpu — the Linux cascade consults the cpu
+// prior result's HypervisorVendor/VirtualizationType as a KVM
+// fallback when /sys/devices/virtual/misc/kvm isn't exposed
+// (nested VMs). Every other signal reads /proc or /sys directly.
+func (base) Dependencies() []string { return []string{"cpu"} }
 
 // New returns the variant for the host OS.
 func New() Collector {

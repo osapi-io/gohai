@@ -146,7 +146,7 @@ func (s *VirtualizationPublicTestSuite) TestNew() {
 			s.Equal("virtualization", c.Name())
 			s.Equal("virtualization", c.Category())
 			s.True(c.DefaultEnabled())
-			s.Empty(c.Dependencies())
+			s.Equal([]string{"cpu"}, c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*virtualization.Darwin)
