@@ -174,23 +174,23 @@ is on.
 Some collectors depend on data from other collectors. Dependencies are resolved
 automatically — enabling a collector also enables its dependencies.
 
-| Collector        | Depends On                      |
-| ---------------- | ------------------------------- |
-| `platform`       | `kernel`                        |
-| `package_mgr`    | `platform`                      |
-| `ec2`            | `dmi`                           |
-| `gce`            | `dmi`                           |
-| `azure`          | —                               |
-| `digital_ocean`  | `dmi`                           |
-| `oci`            | `dmi`                           |
-| `alibaba`        | `dmi`                           |
-| `openstack`      | `dmi`                           |
-| `linode`         | `hostname`                      |
-| `scaleway`       | —                               |
-| `virtualization` | `dmi`, `cpu`                    |
-| `docker`         | `virtualization`                |
-| `packages`       | `platform`                      |
-| `services`       | `platform`                      |
-| `shard`          | `hostname`, `dmi`, `machine_id` |
-| `interrupts`     | `cpu`                           |
-| `sessions`       | —                               |
+| Collector        | Depends On        |
+| ---------------- | ----------------- |
+| `platform`       | `kernel`          |
+| `package_mgr`    | `platform`        |
+| `ec2`            | `dmi`             |
+| `gce`            | `dmi`             |
+| `azure`          | —                 |
+| `digital_ocean`  | `dmi`             |
+| `oci`            | `dmi`             |
+| `alibaba`        | `dmi`             |
+| `openstack`      | `dmi`             |
+| `linode`         | `hostname`        |
+| `scaleway`       | —                 |
+| `virtualization` | `dmi`, `cpu`      |
+| `docker`         | `virtualization`  |
+| `packages`       | `platform`        |
+| `services`       | `platform`        |
+| `shard`          | `hostname`, `dmi` |
+| `interrupts`     | `cpu`             |
+| `sessions`       | —                 |

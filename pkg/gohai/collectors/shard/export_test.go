@@ -26,21 +26,11 @@ import (
 	"github.com/shirou/gopsutil/v4/host"
 )
 
-// SetHostInfoFn swaps the private gopsutil call backing
-// readMachineUUID.
+// SetHostInfoFn swaps the gopsutil host.InfoWithContext call for tests.
 func SetHostInfoFn(
 	fn func(context.Context) (*host.InfoStat, error),
-) (restore func()) {
+) func() {
 	orig := hostInfoFn
 	hostInfoFn = fn
 	return func() { hostInfoFn = orig }
-}
-
-// SetHostnameFn swaps the os.Hostname seam used by both variants.
-func SetHostnameFn(
-	fn func() (string, error),
-) (restore func()) {
-	orig := hostnameFn
-	hostnameFn = fn
-	return func() { hostnameFn = orig }
 }

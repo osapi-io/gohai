@@ -23,32 +23,28 @@ package shard
 import (
 	"context"
 
-	"github.com/avfs/avfs"
-	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 )
 
-// Linux computes a shard seed on Linux from /etc/machine-id (or
-// /var/lib/dbus/machine-id fallback) + os.Hostname.
+// Linux computes a shard seed from machinename + DMI serial + DMI uuid.
 type Linux struct {
 	base
-
-	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to the real OS filesystem.
+// NewLinux returns a Linux variant.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm()}
+	return &Linux{}
 }
 
-// Collect derives the shard seed. A missing machine_id still produces
-// a (less useful) seed from the hostname alone — that matches Ohai's
-// semantics and avoids the collector returning nil for minimal hosts.
+// Collect derives the shard seed from hostname + dmi prior results.
 func (l *Linux) Collect(
 	_ context.Context,
-	_ collector.PriorResults,
+	prior collector.PriorResults,
 ) (any, error) {
-	mid := readMachineID(l.FS.ReadFile)
-	host, _ := hostnameFn()
-	return &Info{Seed: computeSeed(mid, host)}, nil
+	machinename := getMachineName(prior)
+	dmiInfo, _ := collector.GetDep[*dmi.Info](prior, "dmi")
+	serial := getDMISerial(dmiInfo)
+	uuid := getDMIUUID(dmiInfo)
+	return &Info{Seed: computeSeed(machinename, serial, uuid)}, nil
 }

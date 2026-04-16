@@ -22,30 +22,73 @@ package shard
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
+
+	"github.com/shirou/gopsutil/v4/host"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin computes a shard seed on macOS from IOPlatformUUID (via
-// gopsutil under the hood) + os.Hostname.
+// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
+var hostInfoFn = host.InfoWithContext
+
+// Darwin computes a shard seed on macOS from machinename +
+// serial (system_profiler) + IOPlatformUUID (gopsutil).
+// DMI is empty on macOS so we source serial/uuid directly.
 type Darwin struct {
 	base
+	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant.
+// NewDarwin returns a Darwin variant wired to real executors.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{Exec: executor.New()}
 }
 
-// Collect derives the shard seed. macOS has no /etc/machine-id; we use
-// the IOPlatformUUID. A lookup error is treated as "no stable ID" —
-// the seed still computes deterministically over the hostname (matches
-// the Linux collector's behavior when /etc/machine-id is missing).
+// Collect derives the shard seed. On macOS, Ohai uses
+// hardware["serial_number"] and hardware["platform_UUID"] — we read
+// the same sources via system_profiler and gopsutil respectively.
 func (d *Darwin) Collect(
 	ctx context.Context,
-	_ collector.PriorResults,
+	prior collector.PriorResults,
 ) (any, error) {
-	mid, _ := readMachineUUID(ctx)
-	host, _ := hostnameFn()
-	return &Info{Seed: computeSeed(mid, host)}, nil
+	machinename := getMachineName(prior)
+	serial := readDarwinSerial(ctx, d.Exec)
+	uuid := readDarwinUUID(ctx)
+	return &Info{Seed: computeSeed(machinename, serial, uuid)}, nil
+}
+
+// readDarwinSerial gets the hardware serial from system_profiler,
+// matching Ohai's hardware["serial_number"] source.
+func readDarwinSerial(
+	ctx context.Context,
+	exec executor.Executor,
+) string {
+	out, err := exec.Execute(ctx, "system_profiler", "SPHardwareDataType", "-json")
+	if err != nil {
+		return ""
+	}
+	var sp struct {
+		Items []struct {
+			SerialNumber string `json:"serial_number"`
+		} `json:"SPHardwareDataType"`
+	}
+	if err := json.Unmarshal(out, &sp); err != nil || len(sp.Items) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(sp.Items[0].SerialNumber)
+}
+
+// readDarwinUUID reads IOPlatformUUID via gopsutil, matching Ohai's
+// hardware["platform_UUID"] source.
+func readDarwinUUID(
+	ctx context.Context,
+) string {
+	h, err := hostInfoFn(ctx)
+	if err != nil || h == nil {
+		return ""
+	}
+	return h.HostID
 }
