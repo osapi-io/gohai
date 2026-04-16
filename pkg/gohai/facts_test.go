@@ -43,6 +43,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/scsi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
@@ -76,6 +77,7 @@ func shardInfoPtr() *shard.Info           { return &shard.Info{} }
 func packageMgrInfoPtr() *packagemgr.Info { return &packagemgr.Info{} }
 func sessionsInfoPtr() *sessions.Info     { return &sessions.Info{} }
 func pciInfoPtr() *pci.Info               { return &pci.Info{} }
+func scsiInfoPtr() *scsi.Info             { return &scsi.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -290,6 +292,12 @@ func (s *FactsTestSuite) TestSet() {
 			collName: "pci",
 			result:   pciInfoPtr(),
 			check:    func(f *Facts) bool { return f.PCI != nil },
+		},
+		{
+			name:     "scsi",
+			collName: "scsi",
+			result:   scsiInfoPtr(),
+			check:    func(f *Facts) bool { return f.SCSI != nil },
 		},
 	}
 	for _, tt := range tests {

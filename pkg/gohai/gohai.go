@@ -57,6 +57,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/scsi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
@@ -242,5 +243,6 @@ func builtinCollectors() []collector.Collector {
 		dmi.New(),
 		gpu.New(),
 		pci.New(),
+		scsi.New(),
 	}
 }
