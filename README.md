@@ -16,6 +16,9 @@ facts, inspired by [Chef Ohai][]. Import it into your Go application for
 typed access to system facts — or use the standalone `gohai` CLI, a thin
 wrapper over the same SDK.
 
+> 🐧 **Linux-first.** macOS is supported with a narrower field surface
+> (see per-collector docs for platform coverage); Windows is not supported.
+
 Each collector wraps a well-maintained backing source ([gopsutil][],
 [ghw][], [procfs][], cloud SDKs) and reshapes its output into typed Go
 structs. gohai's value is the unified API, typed structs, and pluggable
