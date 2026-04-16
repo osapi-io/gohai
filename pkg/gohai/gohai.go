@@ -52,6 +52,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
 	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/pci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
@@ -240,5 +241,6 @@ func builtinCollectors() []collector.Collector {
 		scaleway.New(),
 		dmi.New(),
 		gpu.New(),
+		pci.New(),
 	}
 }
