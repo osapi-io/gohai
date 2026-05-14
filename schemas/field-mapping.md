@@ -420,6 +420,116 @@ Three-tier naming ladder applied to every gohai JSON field.
 
 | Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
 | --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
+| ec2 | InstanceID | `instance_id` | T1 | `instance_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — EC2 instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| ec2 | InstanceType | `instance_type` | T3 | `instance_type` | no | No OCSF/OTel equivalent — EC2 instance size/shape | Convention — EC2 IMDS `instance-type` |
+| ec2 | InstanceLifecycle | `instance_life_cycle` | T3 | `instance_life_cycle` | no | No OCSF/OTel equivalent — on-demand vs spot lifecycle | Convention — EC2 IMDS `instance-life-cycle` |
+| ec2 | AMIID | `ami_id` | T3 | `ami_id` | no | No OCSF/OTel equivalent — AMI image identifier | Convention — EC2 IMDS `ami-id` |
+| ec2 | AMILaunchIndex | `ami_launch_index` | T3 | `ami_launch_index` | no | No OCSF/OTel equivalent — launch index within batch | Convention — EC2 IMDS `ami-launch-index` |
+| ec2 | AMIManifestPath | `ami_manifest_path` | T3 | `ami_manifest_path` | no | No OCSF/OTel equivalent — S3 manifest path for instance-store AMIs | Convention — EC2 IMDS `ami-manifest-path` |
+| ec2 | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance IMDS hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| ec2 | LocalHostname | `local_hostname` | T3 | `local_hostname` | no | No OCSF/OTel equivalent — private DNS hostname | Convention — EC2 IMDS `local-hostname` |
+| ec2 | PublicHostname | `public_hostname` | T3 | `public_hostname` | no | No OCSF/OTel equivalent — public DNS hostname | Convention — EC2 IMDS `public-hostname` |
+| ec2 | LocalIPv4 | `local_ipv4` | T3 | `local_ipv4` | no | No OCSF/OTel equivalent — primary private IPv4 address | Convention — EC2 IMDS `local-ipv4` |
+| ec2 | LocalIPv4s | `local_ipv4s` | T3 | `local_ipv4s` | no | No OCSF/OTel equivalent — all private IPv4 addresses | Convention — EC2 IMDS `local-ipv4s` |
+| ec2 | PublicIPv4 | `public_ipv4` | T3 | `public_ipv4` | no | No OCSF/OTel equivalent — primary public IPv4 address | Convention — EC2 IMDS `public-ipv4` |
+| ec2 | MAC | `mac` | T3 | `mac` | no | No OCSF/OTel equivalent — primary ENI MAC address | Convention — EC2 IMDS `mac` |
+| ec2 | SecurityGroups | `security_groups` | T3 | `security_groups` | no | No OCSF/OTel equivalent — attached security group names | Convention — EC2 IMDS `security-groups` |
+| ec2 | NetworkInterfaces | `network_interfaces` | T3 | `network_interfaces` | no | No OCSF/OTel equivalent — per-ENI metadata map keyed by MAC | Convention — EC2 IMDS `network/interfaces/macs/` |
+| ec2 | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — AWS region | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| ec2 | AvailabilityZone | `availability_zone` | T1 | `availability_zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — AWS AZ | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| ec2 | AccountID | `account_id` | T1 | `account_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — AWS account | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| ec2 | AvailabilityZoneID | `availability_zone_id` | T3 | `availability_zone_id` | no | No OCSF/OTel equivalent — AZ ID (consistent across accounts) | Convention — EC2 IMDS `placement/availability-zone-id` |
+| ec2 | GroupName | `group_name` | T3 | `group_name` | no | No OCSF/OTel equivalent — placement group name | Convention — EC2 IMDS `placement/group-name` |
+| ec2 | HostID | `host_id` | T3 | `host_id` | no | No OCSF/OTel equivalent — dedicated host ID | Convention — EC2 IMDS `placement/host-id` |
+| ec2 | PartitionNumber | `partition_number` | T3 | `partition_number` | no | No OCSF/OTel equivalent — partition placement number | Convention — EC2 IMDS `placement/partition-number` |
+| ec2 | KernelID | `kernel_id` | T3 | `kernel_id` | no | No OCSF/OTel equivalent — paravirt kernel ID (legacy) | Convention — EC2 IMDS `kernel-id` |
+| ec2 | RamdiskID | `ramdisk_id` | T3 | `ramdisk_id` | no | No OCSF/OTel equivalent — paravirt ramdisk ID (legacy) | Convention — EC2 IMDS `ramdisk-id` |
+| ec2 | InstanceAction | `instance_action` | T3 | `instance_action` | no | No OCSF/OTel equivalent — pending instance action | Convention — EC2 IMDS `instance-action` |
+| ec2 | SpotInstanceAction | `spot_instance_action` | T3 | `spot_instance_action` | no | No OCSF/OTel equivalent — spot interruption action signal | Convention — EC2 IMDS `spot/instance-action` |
+| ec2 | SpotTerminationTime | `spot_termination_time` | T3 | `spot_termination_time` | no | No OCSF/OTel equivalent — spot termination timestamp | Convention — EC2 IMDS `spot/termination-time` |
+| ec2 | ServicesDomain | `services_domain` | T3 | `services_domain` | no | No OCSF/OTel equivalent — AWS services DNS domain | Convention — EC2 IMDS `services/domain` |
+| ec2 | ServicesPartition | `services_partition` | T1 | `services_partition` | no | OCSF `cloud.cloud_partition` — AWS partition (aws, aws-cn, aws-us-gov) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| ec2 | ProductCodes | `product_codes` | T3 | `product_codes` | no | No OCSF/OTel equivalent — marketplace product codes | Convention — EC2 IMDS `product-codes` |
+| ec2 | PublicKeys | `public_keys` | T3 | `public_keys` | no | No OCSF/OTel equivalent — SSH public keys attached at launch | Convention — EC2 IMDS `public-keys/` |
+| ec2 | BlockDeviceMapping | `block_device_mapping` | T3 | `block_device_mapping` | no | No OCSF/OTel equivalent — AMI virtual disk → device path map | Convention — EC2 IMDS `block-device-mapping/` |
+| ec2 | ReservationID | `reservation_id` | T3 | `reservation_id` | no | No OCSF/OTel equivalent — EC2 reservation identifier | Convention — EC2 IMDS `reservation-id` |
+| ec2 | Profile | `profile` | T3 | `profile` | no | No OCSF/OTel equivalent — instance launch profile | Convention — EC2 IMDS `profile` |
+| ec2 | IAMInfo | `iam_info` | T3 | `iam_info` | no | No OCSF/OTel equivalent — IAM instance profile container | Convention — EC2 IMDS `iam/info` |
+| ec2 | APIVersion | `api_version` | T3 | `api_version` | no | No OCSF/OTel equivalent — negotiated IMDS API version | Convention — EC2 IMDS version negotiation |
+| ec2 | UserData | `user_data` | T3 | `user_data` | no | No OCSF/OTel equivalent — instance user-data (base64 if binary) | Convention — EC2 IMDS `user-data` |
+| ec2.network_interfaces[] | DeviceNumber | `device_number` | T3 | `device_number` | no | No OCSF/OTel equivalent — ENI device index | Convention — EC2 IMDS `device-number` |
+| ec2.network_interfaces[] | InterfaceID | `interface_id` | T3 | `interface_id` | no | No OCSF/OTel equivalent — ENI interface ID (eni-xxx) | Convention — EC2 IMDS `interface-id` |
+| ec2.network_interfaces[] | LocalHostname | `local_hostname` | T3 | `local_hostname` | no | No OCSF/OTel equivalent — per-ENI private DNS hostname | Convention — EC2 IMDS `local-hostname` |
+| ec2.network_interfaces[] | LocalIPv4s | `local_ipv4s` | T3 | `local_ipv4s` | no | No OCSF/OTel equivalent — per-ENI private IPv4 addresses | Convention — EC2 IMDS `local-ipv4s` |
+| ec2.network_interfaces[] | MAC | `mac` | T3 | `mac` | no | No OCSF/OTel equivalent — ENI MAC address | Convention — EC2 IMDS ENI mac |
+| ec2.network_interfaces[] | NetworkCardIndex | `network_card_index` | T3 | `network_card_index` | no | No OCSF/OTel equivalent — network card slot index | Convention — EC2 IMDS `network-card-index` |
+| ec2.network_interfaces[] | OwnerID | `owner_id` | T3 | `owner_id` | no | No OCSF/OTel equivalent — ENI owner account ID | Convention — EC2 IMDS `owner-id` |
+| ec2.network_interfaces[] | PublicHostname | `public_hostname` | T3 | `public_hostname` | no | No OCSF/OTel equivalent — per-ENI public DNS hostname | Convention — EC2 IMDS `public-hostname` |
+| ec2.network_interfaces[] | PublicIPv4s | `public_ipv4s` | T3 | `public_ipv4s` | no | No OCSF/OTel equivalent — per-ENI public IPv4 addresses | Convention — EC2 IMDS `public-ipv4s` |
+| ec2.network_interfaces[] | SecurityGroupIDs | `security_group_ids` | T3 | `security_group_ids` | no | No OCSF/OTel equivalent — per-ENI security group IDs | Convention — EC2 IMDS `security-group-ids` |
+| ec2.network_interfaces[] | SecurityGroups | `security_groups` | T3 | `security_groups` | no | No OCSF/OTel equivalent — per-ENI security group names | Convention — EC2 IMDS `security-groups` |
+| ec2.network_interfaces[] | SubnetID | `subnet_id` | T3 | `subnet_id` | no | No OCSF/OTel equivalent — per-ENI VPC subnet ID | Convention — EC2 IMDS `subnet-id` |
+| ec2.network_interfaces[] | SubnetIPv4CIDRBlock | `subnet_ipv4_cidr_block` | T3 | `subnet_ipv4_cidr_block` | no | No OCSF/OTel equivalent — per-ENI subnet IPv4 CIDR | Convention — EC2 IMDS `subnet-ipv4-cidr-block` |
+| ec2.network_interfaces[] | SubnetIPv6CIDRBlocks | `subnet_ipv6_cidr_blocks` | T3 | `subnet_ipv6_cidr_blocks` | no | No OCSF/OTel equivalent — per-ENI subnet IPv6 CIDRs | Convention — EC2 IMDS `subnet-ipv6-cidr-blocks` |
+| ec2.network_interfaces[] | VPCID | `vpc_id` | T3 | `vpc_id` | no | No OCSF/OTel equivalent — per-ENI VPC ID | Convention — EC2 IMDS `vpc-id` |
+| ec2.network_interfaces[] | VPCIPv4CIDRBlock | `vpc_ipv4_cidr_block` | T3 | `vpc_ipv4_cidr_block` | no | No OCSF/OTel equivalent — per-ENI VPC IPv4 CIDR | Convention — EC2 IMDS `vpc-ipv4-cidr-block` |
+| ec2.network_interfaces[] | VPCIPv4CIDRBlocks | `vpc_ipv4_cidr_blocks` | T3 | `vpc_ipv4_cidr_blocks` | no | No OCSF/OTel equivalent — per-ENI VPC IPv4 CIDRs | Convention — EC2 IMDS `vpc-ipv4-cidr-blocks` |
+| ec2.network_interfaces[] | VPCIPv6CIDRBlocks | `vpc_ipv6_cidr_blocks` | T3 | `vpc_ipv6_cidr_blocks` | no | No OCSF/OTel equivalent — per-ENI VPC IPv6 CIDRs | Convention — EC2 IMDS `vpc-ipv6-cidr-blocks` |
+| ec2.network_interfaces[] | IPv6s | `ipv6s` | T3 | `ipv6s` | no | No OCSF/OTel equivalent — per-ENI IPv6 addresses | Convention — EC2 IMDS `ipv6s` |
+| ec2.iam_info | Code | `code` | T3 | `code` | no | No OCSF/OTel equivalent — IAM info response code | Convention — EC2 IMDS `iam/info` JSON |
+| ec2.iam_info | LastUpdated | `last_updated` | T3 | `last_updated` | no | No OCSF/OTel equivalent — IAM info last-updated timestamp | Convention — EC2 IMDS `iam/info` JSON |
+| ec2.iam_info | InstanceProfileArn | `instance_profile_arn` | T3 | `instance_profile_arn` | no | No OCSF/OTel equivalent — instance profile ARN | Convention — EC2 IMDS `iam/info` JSON |
+| ec2.iam_info | InstanceProfileID | `instance_profile_id` | T3 | `instance_profile_id` | no | No OCSF/OTel equivalent — instance profile ID | Convention — EC2 IMDS `iam/info` JSON |
+| gce | InstanceID | `instance_id` | T1 | `instance_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — GCE instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| gce | Name | `name` | T1 | `name` | no | OCSF `device.hostname` — instance name (GCE names are unique per project+zone) | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| gce | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — custom hostname if set | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| gce | CPUPlatform | `cpu_platform` | T3 | `cpu_platform` | no | No OCSF/OTel equivalent — underlying CPU platform (Intel Haswell, etc.) | Convention — GCE metadata `cpuPlatform` |
+| gce | MachineType | `machine_type` | T3 | `machine_type` | no | No OCSF/OTel equivalent — GCE machine type (short form) | Convention — GCE metadata `machineType` |
+| gce | Image | `image` | T3 | `image` | no | No OCSF/OTel equivalent — source image (short form) | Convention — GCE metadata `image` |
+| gce | Description | `description` | T3 | `description` | no | No OCSF/OTel equivalent — instance description text | Convention — GCE metadata `description` |
+| gce | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — instance network tags | Convention — GCE metadata `tags` |
+| gce | Preemptible | `preemptible` | T3 | `preemptible` | no | No OCSF/OTel equivalent — preemptible/spot scheduling flag | Convention — GCE metadata `scheduling.preemptible` |
+| gce | AutomaticRestart | `automatic_restart` | T3 | `automatic_restart` | no | No OCSF/OTel equivalent — automatic restart on failure | Convention — GCE metadata `scheduling.automaticRestart` |
+| gce | OnHostMaintenance | `on_host_maintenance` | T3 | `on_host_maintenance` | no | No OCSF/OTel equivalent — maintenance event behavior (MIGRATE/TERMINATE) | Convention — GCE metadata `scheduling.onHostMaintenance` |
+| gce | MaintenanceEvent | `maintenance_event` | T3 | `maintenance_event` | no | No OCSF/OTel equivalent — current maintenance event signal | Convention — GCE metadata `maintenanceEvent` |
+| gce | Zone | `zone` | T1 | `zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — GCE zone (short form) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| gce | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — GCE region (derived from zone) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| gce | ProjectID | `project_id` | T1 | `project_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — GCP project identifier | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| gce | NumericProjectID | `numeric_project_id` | T1 | `numeric_project_id` | no | OCSF `cloud.project_uid` — GCP numeric project ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| gce | ProjectAttributes | `project_attributes` | T3 | `project_attributes` | no | No OCSF/OTel equivalent — project-level metadata key/value pairs | Convention — GCE metadata `project.attributes` |
+| gce | Licenses | `licenses` | T3 | `licenses` | no | No OCSF/OTel equivalent — GCP license IDs attached to the VM | Convention — GCE metadata `licenses` |
+| gce | Attributes | `attributes` | T3 | `attributes` | no | No OCSF/OTel equivalent — instance-level metadata key/value pairs | Convention — GCE metadata `instance.attributes` |
+| gce | NetworkInterfaces | `network_interfaces` | T3 | `network_interfaces` | no | No OCSF/OTel equivalent — attached VNIC array | Convention — GCE metadata `networkInterfaces` |
+| gce | Disks | `disks` | T3 | `disks` | no | No OCSF/OTel equivalent — attached disk array | Convention — GCE metadata `disks` |
+| gce | ServiceAccounts | `service_accounts` | T3 | `service_accounts` | no | No OCSF/OTel equivalent — attached service account array | Convention — GCE metadata `serviceAccounts` |
+| gce | VirtualClockDriftToken | `virtual_clock_drift_token` | T3 | `virtual_clock_drift_token` | no | No OCSF/OTel equivalent — virtualClock drift detection token | Convention — GCE metadata `virtualClock.driftToken` |
+| gce | RemainingCPUTime | `remaining_cpu_time` | T3 | `remaining_cpu_time` | no | No OCSF/OTel equivalent — remaining CPU time before spot preemption | Convention — GCE metadata `remainingCpuTime` |
+| gce | PartnerAttributes | `partner_attributes` | T3 | `partner_attributes` | no | No OCSF/OTel equivalent — partner image metadata key/value pairs | Convention — GCE metadata `partnerAttributes` |
+| gce.network_interfaces[] | IP | `ip` | T3 | `ip` | no | No OCSF/OTel equivalent — VNIC private IPv4 address | Convention — GCE metadata `networkInterfaces[].ip` |
+| gce.network_interfaces[] | MAC | `mac` | T3 | `mac` | no | No OCSF/OTel equivalent — VNIC MAC address | Convention — GCE metadata `networkInterfaces[].mac` |
+| gce.network_interfaces[] | Network | `network` | T3 | `network` | no | No OCSF/OTel equivalent — VPC network name (short form) | Convention — GCE metadata `networkInterfaces[].network` |
+| gce.network_interfaces[] | Subnetmask | `subnetmask` | T3 | `subnetmask` | no | No OCSF/OTel equivalent — subnet mask | Convention — GCE metadata `networkInterfaces[].subnetmask` |
+| gce.network_interfaces[] | Gateway | `gateway` | T3 | `gateway` | no | No OCSF/OTel equivalent — default gateway address | Convention — GCE metadata `networkInterfaces[].gateway` |
+| gce.network_interfaces[] | DNSServers | `dns_servers` | T3 | `dns_servers` | no | No OCSF/OTel equivalent — VNIC DNS server list | Convention — GCE metadata `networkInterfaces[].dnsServers` |
+| gce.network_interfaces[] | IPAliases | `ip_aliases` | T3 | `ip_aliases` | no | No OCSF/OTel equivalent — alias IP ranges | Convention — GCE metadata `networkInterfaces[].ipAliases` |
+| gce.network_interfaces[] | ForwardedIPs | `forwarded_ips` | T3 | `forwarded_ips` | no | No OCSF/OTel equivalent — forwarded IP addresses | Convention — GCE metadata `networkInterfaces[].forwardedIps` |
+| gce.network_interfaces[] | TargetInstanceIPs | `target_instance_ips` | T3 | `target_instance_ips` | no | No OCSF/OTel equivalent — target instance IP addresses | Convention — GCE metadata `networkInterfaces[].targetInstanceIps` |
+| gce.network_interfaces[] | MTU | `mtu` | T3 | `mtu` | no | No OCSF/OTel equivalent — VNIC MTU | Convention — GCE metadata `networkInterfaces[].mtu` |
+| gce.network_interfaces[] | AccessConfigs | `access_configs` | T3 | `access_configs` | no | No OCSF/OTel equivalent — external access config array | Convention — GCE metadata `networkInterfaces[].accessConfigs` |
+| gce.network_interfaces[].access_configs[] | ExternalIP | `external_ip` | T3 | `external_ip` | no | No OCSF/OTel equivalent — external/public IP address | Convention — GCE metadata `accessConfigs[].externalIp` |
+| gce.network_interfaces[].access_configs[] | Type | `type` | T3 | `type` | no | No OCSF/OTel equivalent — access config type (ONE_TO_ONE_NAT) | Convention — GCE metadata `accessConfigs[].type` |
+| gce.disks[] | DeviceName | `device_name` | T3 | `device_name` | no | No OCSF/OTel equivalent — disk device name | Convention — GCE metadata `disks[].deviceName` |
+| gce.disks[] | Type | `type` | T3 | `type` | no | No OCSF/OTel equivalent — disk type (PERSISTENT / SCRATCH) | Convention — GCE metadata `disks[].type` |
+| gce.disks[] | Mode | `mode` | T3 | `mode` | no | No OCSF/OTel equivalent — disk access mode (READ_WRITE / READ_ONLY) | Convention — GCE metadata `disks[].mode` |
+| gce.disks[] | Index | `index` | T3 | `index` | no | No OCSF/OTel equivalent — disk attachment index | Convention — GCE metadata `disks[].index` |
+| gce.disks[] | Interface | `interface` | T3 | `interface` | no | No OCSF/OTel equivalent — bus interface (SCSI / NVME) | Convention — GCE metadata `disks[].interface` |
+| gce.disks[] | Encrypted | `encrypted` | T3 | `encrypted` | no | No OCSF/OTel equivalent — customer-managed encryption flag | Convention — GCE metadata `disks[].encrypted` |
+| gce.service_accounts[] | Key | `key` | T3 | `key` | no | No OCSF/OTel equivalent — service account map key (default/email) | Convention — GCE metadata `serviceAccounts` map key |
+| gce.service_accounts[] | Email | `email` | T3 | `email` | no | No OCSF/OTel equivalent — service account email | Convention — GCE metadata `serviceAccounts[].email` |
+| gce.service_accounts[] | Aliases | `aliases` | T3 | `aliases` | no | No OCSF/OTel equivalent — service account aliases | Convention — GCE metadata `serviceAccounts[].aliases` |
+| gce.service_accounts[] | Scopes | `scopes` | T3 | `scopes` | no | No OCSF/OTel equivalent — OAuth scopes granted | Convention — GCE metadata `serviceAccounts[].scopes` |
+| linode | PublicIP | `public_ip` | T3 | `public_ip` | no | No OCSF/OTel equivalent — eth0 public IPv4 address | Convention — Linode host interface detection |
+| linode | PrivateIP | `private_ip` | T3 | `private_ip` | no | No OCSF/OTel equivalent — eth0:1 private IPv4 address | Convention — Linode host interface detection |
 
 ## Other Collectors
 
