@@ -216,12 +216,39 @@ and consumer expectations.
 
 ### Field naming
 
-**OCSF is our data schema.** When adding or renaming a collector field,
-**always check [schema.ocsf.io](https://schema.ocsf.io/) first** — OCSF
-(Open Cybersecurity Schema Framework, backed by AWS and Splunk) has
-canonical names for ~99% of what we collect. Using OCSF names means
-gohai output feeds SIEMs, data lakes, and inventory tools without
-translation, so the lookup is mandatory, not aspirational.
+**Three-tier naming ladder.** Every JSON field name comes from one of
+three tiers, applied in strict order of precedence:
+
+1. **[OCSF][]** (Open Cybersecurity Schema Framework) — primary
+   authority. When OCSF has a field for the concept, use its name.
+   Browse [schema.ocsf.io][ocsf-schema] objects: `device`,
+   `device_hw_info`, `os`, `network_interface`, `package`, `process`,
+   `cloud`. (~97 gohai fields are tier 1.)
+2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** —
+   when OCSF is silent. Covers CPU microarchitecture (`host.cpu.*`),
+   memory states (`system.memory.*`), filesystem attributes
+   (`system.filesystem.*`), hardware detail (`hardware.*`), and
+   process attributes (`process.*`). (~73 gohai fields are tier 2.)
+3. **gohai convention** — for the long tail where no standard has an
+   opinion (~633 fields):
+   - Start from the backing library's field name (gopsutil/ghw),
+     converted to `snake_case`.
+   - `/proc` and `/sys` mirrors use the kernel's name in `snake_case`.
+   - Unit suffixes (`_bytes`, `_seconds`, `_percent`, `_mhz`) when
+     the unit is ambiguous.
+   - No abbreviations except universals: `ip`, `mac`, `pid`, `uid`,
+     `gid`, `mtu`, `fqdn`, `uuid`, `cidr`, `arn`, `id`.
+
+The complete per-field mapping with verifiable citations lives in
+[`schemas/field-mapping.md`](schemas/field-mapping.md). Fields where
+OCSF is silent are tracked in
+[`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md) as upstream
+contribution candidates.
+
+**Not a naming reference:** Ohai (methodology only, not naming),
+node_exporter (methodology only), OCP (hardware design spec),
+CIS/SCAP/XCCDF (compliance policies). ECS, osquery, and Facter are
+useful cross-references but not naming authorities.
 
 **Both Go field names AND JSON tags derive from the chosen schema
 (OCSF primary, OpenTelemetry when OCSF is silent).**
@@ -253,45 +280,10 @@ Go idiom on initialisms conflicts (OCSF `cpu_id` → Go `CPUID`, not
 follows the rule above. Don't invent internal names that have no
 schema-mapping claim.
 
-Collector JSON field names use `snake_case`. Precedence:
-
-1. **OCSF** — if OCSF has a name for the field, use it. Examples:
-   `process.cmd_line` (not `cmdline`), `network_interface.mac` (not
-   `hardware_addr`), `os.kernel_release` (not `kernel_version`),
-   `device.hostname`, `os.name`, `file.path`. Browse OCSF's
-   [objects](https://schema.ocsf.io/objects), [data types][], and
-   [dictionary][] to find the right field. When OCSF has a field we
-   don't emit yet but easily could (e.g. `device.hw_info.serial_number`,
-   `os.build`), consider adding it — they've thought about what a
-   consumer wants.
-2. **OpenTelemetry semantic conventions** — when OCSF is silent.
-   Well-maintained, widely adopted for observability telemetry; covers
-   areas OCSF hasn't (e.g. per-CPU `host.cpu.model.name`,
-   `host.cpu.family`, `host.cpu.stepping`, `process.runtime.name`).
-   Browse [OpenTelemetry Resource Semantic Conventions][otel-semconv].
-3. **Industry standard** — when OCSF and OpenTelemetry are silent,
-   use whatever node_exporter / systemd / Prometheus exporters
-   standardized on. Example: filesystem `mountpoint` / `fstype`
-   follow node_exporter.
-4. **Ohai's name** — only when OCSF / OpenTelemetry / industry
-   standards are silent AND Ohai has a clear, meaningful name.
-5. **Our own name** — last resort. Go-idiomatic snake_case.
-
-**Not a reference for our schema:** Open Compute Project (OCP) is a
-hardware design spec, not a data schema. CIS / SCAP / XCCDF describe
-compliance policies, not field naming. Ignore for naming purposes.
-
 **Do not mirror Ohai's JSON shape.** Ohai is for **data-source**
 reference (what file/command to read, which distro edge cases, which
-fallback) — not field names or struct layout. Ruby Mash ↔ Go struct
-translation isn't worth pinning byte-for-byte.
+fallback) — not field names or struct layout.
 
-Record OCSF alignment in the collector doc's **Data Sources** section:
-call out which OCSF object each field maps to, or note "no OCSF
-equivalent" with a one-line reason.
-
-[data types]: https://schema.ocsf.io/data_types
-[dictionary]: https://schema.ocsf.io/dictionary
 [otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 
 ### MANDATORY: Cross-reference Ohai's data sources before implementing
