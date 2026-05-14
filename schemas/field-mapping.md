@@ -663,6 +663,138 @@ Three-tier naming ladder applied to every gohai JSON field.
 | oci.volume_attachments[] | IPv4 | `ipv4` | T3 | `ipv4` | no | No OCSF/OTel equivalent — iSCSI target IPv4 address | Convention — OCI IMDS `allVolumeAttachments[].ipv4` |
 | oci.volume_attachments[] | Port | `port` | T3 | `port` | no | No OCSF/OTel equivalent — iSCSI target port | Convention — OCI IMDS `allVolumeAttachments[].port` |
 | oci.volume_attachments[] | EncryptionInTransit | `encryption_in_transit` | T3 | `encryption_in_transit` | no | No OCSF/OTel equivalent — in-transit encryption flag | Convention — OCI IMDS `allVolumeAttachments[].encryptionInTransit` |
+| digital_ocean | DropletID | `droplet_id` | T1 | `droplet_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — DO droplet identity (instance_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| digital_ocean | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — droplet hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| digital_ocean | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — DO datacenter region slug | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| digital_ocean | PublicKeys | `public_keys` | T3 | `public_keys` | no | No OCSF/OTel equivalent — SSH public keys attached at launch | Convention — DigitalOcean metadata `public_keys` |
+| digital_ocean | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — user-defined droplet tags | Convention — DigitalOcean metadata `tags` |
+| digital_ocean | Features | `features` | T3 | `features` | no | No OCSF/OTel equivalent — enabled droplet features (IPv6, monitoring, etc.) | Convention — DigitalOcean metadata `features` |
+| digital_ocean | FloatingIP | `floating_ip` | T3 | `floating_ip` | no | No OCSF/OTel equivalent — legacy floating IP (deprecated in favor of reserved_ip) | Convention — DigitalOcean metadata `floating_ip` |
+| digital_ocean | ReservedIP | `reserved_ip` | T3 | `reserved_ip` | no | No OCSF/OTel equivalent — reserved IP address (replacement for floating_ip) | Convention — DigitalOcean metadata `reserved_ip` |
+| digital_ocean | AuthKey | `auth_key` | T3 | `auth_key` | no | No OCSF/OTel equivalent — DO internal authentication token (often empty) | Convention — DigitalOcean metadata `auth_key` |
+| digital_ocean | UserData | `user_data` | T3 | `user_data` | no | No OCSF/OTel equivalent — user-supplied cloud-init data | Convention — DigitalOcean metadata `user_data` |
+| digital_ocean | IPv4NS | `ipv4_nameservers` | T3 | `ipv4_nameservers` | no | No OCSF/OTel equivalent — IPv4 DNS nameserver addresses | Convention — DigitalOcean metadata `dns.nameservers` |
+| digital_ocean | Interfaces | `interfaces` | T3 | `interfaces` | no | No OCSF/OTel equivalent — attached network interfaces array | Convention — DigitalOcean metadata `interfaces` |
+| digital_ocean.interfaces[] | Scope | `scope` | T3 | `scope` | no | No OCSF/OTel equivalent — interface scope ("public" / "private") | Convention — DigitalOcean metadata interface scope key |
+| digital_ocean.interfaces[] | MAC | `mac` | T1 | `mac` | no | OCSF `network_interface.mac` — interface MAC address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| digital_ocean.interfaces[] | Type | `type` | T3 | `type` | no | No OCSF/OTel equivalent — interface type | Convention — DigitalOcean metadata `interfaces[].type` |
+| digital_ocean.interfaces[] | IPv4 | `ipv4` | T3 | `ipv4` | no | No OCSF/OTel equivalent — IPv4 address | Convention — DigitalOcean metadata `interfaces[].ipv4.ip_address` |
+| digital_ocean.interfaces[] | IPv4Mask | `ipv4_netmask` | T3 | `ipv4_netmask` | no | No OCSF/OTel equivalent — IPv4 netmask | Convention — DigitalOcean metadata `interfaces[].ipv4.netmask` |
+| digital_ocean.interfaces[] | IPv4GW | `ipv4_gateway` | T3 | `ipv4_gateway` | no | No OCSF/OTel equivalent — IPv4 gateway address | Convention — DigitalOcean metadata `interfaces[].ipv4.gateway` |
+| digital_ocean.interfaces[] | IPv6 | `ipv6` | T3 | `ipv6` | no | No OCSF/OTel equivalent — IPv6 address | Convention — DigitalOcean metadata `interfaces[].ipv6.ip_address` |
+| digital_ocean.interfaces[] | IPv6Mask | `ipv6_cidr` | T3 | `ipv6_cidr` | no | No OCSF/OTel equivalent — IPv6 CIDR prefix length | Convention — DigitalOcean metadata `interfaces[].ipv6.cidr` |
+| digital_ocean.interfaces[] | IPv6GW | `ipv6_gateway` | T3 | `ipv6_gateway` | no | No OCSF/OTel equivalent — IPv6 gateway address | Convention — DigitalOcean metadata `interfaces[].ipv6.gateway` |
+| digital_ocean.interfaces[] | Anchor | `anchor_ipv4` | T3 | `anchor_ipv4` | no | No OCSF/OTel equivalent — anchor IPv4 address (DO internal) | Convention — DigitalOcean metadata `interfaces[].anchor_ipv4` |
+| openstack | InstanceID | `instance_id` | T1 | `instance_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — OpenStack instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| openstack | InstanceType | `instance_type` | T3 | `instance_type` | no | No OCSF/OTel equivalent — Nova flavor / instance type | Convention — OpenStack EC2-compat metadata `instance-type` |
+| openstack | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| openstack | LocalHostname | `local_hostname` | T3 | `local_hostname` | no | No OCSF/OTel equivalent — private DNS hostname | Convention — OpenStack EC2-compat metadata `local-hostname` |
+| openstack | PublicHostname | `public_hostname` | T3 | `public_hostname` | no | No OCSF/OTel equivalent — public DNS hostname | Convention — OpenStack EC2-compat metadata `public-hostname` |
+| openstack | AvailabilityZone | `availability_zone` | T1 | `availability_zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — OpenStack AZ | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| openstack | LocalIPv4 | `local_ipv4` | T3 | `local_ipv4` | no | No OCSF/OTel equivalent — primary private IPv4 address | Convention — OpenStack EC2-compat metadata `local-ipv4` |
+| openstack | PublicIPv4 | `public_ipv4` | T3 | `public_ipv4` | no | No OCSF/OTel equivalent — primary public IPv4 address | Convention — OpenStack EC2-compat metadata `public-ipv4` |
+| openstack | SecurityGroups | `security_groups` | T3 | `security_groups` | no | No OCSF/OTel equivalent — attached security group names | Convention — OpenStack EC2-compat metadata `security-groups` |
+| openstack | AMIID | `ami_id` | T3 | `ami_id` | no | No OCSF/OTel equivalent — AMI image identifier (EC2-compat) | Convention — OpenStack EC2-compat metadata `ami-id` |
+| openstack | KernelID | `kernel_id` | T3 | `kernel_id` | no | No OCSF/OTel equivalent — paravirt kernel ID (EC2-compat) | Convention — OpenStack EC2-compat metadata `kernel-id` |
+| openstack | RamdiskID | `ramdisk_id` | T3 | `ramdisk_id` | no | No OCSF/OTel equivalent — paravirt ramdisk ID (EC2-compat) | Convention — OpenStack EC2-compat metadata `ramdisk-id` |
+| openstack | ReservationID | `reservation_id` | T3 | `reservation_id` | no | No OCSF/OTel equivalent — instance reservation identifier | Convention — OpenStack EC2-compat metadata `reservation-id` |
+| openstack | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — Nova instance display name | Convention — OpenStack meta_data.json `name` |
+| openstack | ProjectID | `project_id` | T1 | `project_id` | no | OCSF `cloud.project_uid` / OTel `cloud.account.id` — OpenStack project/tenant identifier | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| openstack | UUID | `uuid` | T3 | `uuid` | no | No OCSF/OTel equivalent — Nova instance UUID (alternate identity) | Convention — OpenStack meta_data.json `uuid` |
+| openstack | LaunchIndex | `launch_index` | T3 | `launch_index` | no | No OCSF/OTel equivalent — launch order index within a batch | Convention — OpenStack meta_data.json `launch_index` |
+| openstack | MetaData | `meta_data` | T3 | `meta_data` | no | No OCSF/OTel equivalent — user-defined instance metadata key/value pairs | Convention — OpenStack meta_data.json `meta` |
+| openstack | PublicKeys | `public_keys` | T3 | `public_keys` | no | No OCSF/OTel equivalent — SSH public keys keyed by name | Convention — OpenStack meta_data.json `public_keys` |
+| openstack | Devices | `devices` | T3 | `devices` | no | No OCSF/OTel equivalent — attached block-device array | Convention — OpenStack meta_data.json `devices` |
+| openstack | Provider | `provider` | T1 | `provider` | no | OCSF `cloud.provider` / OTel `cloud.provider` — "openstack" or "dreamhost" sub-provider | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| openstack.devices[] | Type | `type` | T3 | `type` | no | No OCSF/OTel equivalent — device type (disk / cdrom) | Convention — OpenStack meta_data.json `devices[].type` |
+| openstack.devices[] | Bus | `bus` | T3 | `bus` | no | No OCSF/OTel equivalent — bus interface (virtio / scsi) | Convention — OpenStack meta_data.json `devices[].bus` |
+| openstack.devices[] | Serial | `serial` | T3 | `serial` | no | No OCSF/OTel equivalent — block-device serial number | Convention — OpenStack meta_data.json `devices[].serial` |
+| openstack.devices[] | Path | `path` | T3 | `path` | no | No OCSF/OTel equivalent — device node path | Convention — OpenStack meta_data.json `devices[].path` |
+| openstack.devices[] | Address | `address` | T3 | `address` | no | No OCSF/OTel equivalent — PCI address | Convention — OpenStack meta_data.json `devices[].address` |
+| openstack.devices[] | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — device tags | Convention — OpenStack meta_data.json `devices[].tags` |
+| alibaba | InstanceID | `instance_id` | T1 | `instance_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — Alibaba ECS instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| alibaba | InstanceName | `instance_name` | T3 | `instance_name` | no | No OCSF/OTel equivalent — ECS instance display name | Convention — Alibaba IMDS `instance.instance_name` |
+| alibaba | InstanceType | `instance_type` | T3 | `instance_type` | no | No OCSF/OTel equivalent — ECS instance type (ecs.g7.xlarge, etc.) | Convention — Alibaba IMDS `instance.instance_type` |
+| alibaba | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| alibaba | ImageID | `image_id` | T3 | `image_id` | no | No OCSF/OTel equivalent — source image identifier | Convention — Alibaba IMDS `image_id` |
+| alibaba | SerialNumber | `serial_number` | T3 | `serial_number` | no | No OCSF/OTel equivalent — instance serial number | Convention — Alibaba IMDS `serial_number` |
+| alibaba | NetworkType | `network_type` | T3 | `network_type` | no | No OCSF/OTel equivalent — network type (vpc / classic) | Convention — Alibaba IMDS `network_type` |
+| alibaba | OwnerAccountID | `owner_account_id` | T1 | `owner_account_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — Alibaba Cloud account ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| alibaba | SourceAddress | `source_address` | T3 | `source_address` | no | No OCSF/OTel equivalent — metadata source address | Convention — Alibaba IMDS `source_address` |
+| alibaba | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — Alibaba region ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| alibaba | Zone | `zone` | T1 | `zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — Alibaba zone ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| alibaba | VirtualizationSolution | `virtualization_solution` | T3 | `virtualization_solution` | no | No OCSF/OTel equivalent — virtualization solution name | Convention — Alibaba IMDS `instance.virtualization_solution` |
+| alibaba | VirtualizationSolutionVersion | `virtualization_solution_version` | T3 | `virtualization_solution_version` | no | No OCSF/OTel equivalent — virtualization solution version | Convention — Alibaba IMDS `instance.virtualization_solution_version` |
+| alibaba | SpotTerminationTime | `spot_termination_time` | T3 | `spot_termination_time` | no | No OCSF/OTel equivalent — preemptible instance termination timestamp | Convention — Alibaba IMDS `instance.spot.termination_time` |
+| alibaba | MAC | `mac` | T1 | `mac` | no | OCSF `network_interface.mac` — primary ENI MAC address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| alibaba | PrivateIPv4 | `private_ipv4` | T3 | `private_ipv4` | no | No OCSF/OTel equivalent — primary private IPv4 address | Convention — Alibaba IMDS `private_ipv4` |
+| alibaba | PublicIPv4 | `public_ipv4` | T3 | `public_ipv4` | no | No OCSF/OTel equivalent — elastic IP (EIP) v4 address | Convention — Alibaba IMDS `eipv4` |
+| alibaba | VPCID | `vpc_id` | T3 | `vpc_id` | no | No OCSF/OTel equivalent — VPC identifier | Convention — Alibaba IMDS `vpc_id` |
+| alibaba | VPCCIDRBlock | `vpc_cidr_block` | T3 | `vpc_cidr_block` | no | No OCSF/OTel equivalent — VPC CIDR block | Convention — Alibaba IMDS `vpc_cidr_block` |
+| alibaba | VSwitchID | `vswitch_id` | T3 | `vswitch_id` | no | No OCSF/OTel equivalent — VSwitch identifier | Convention — Alibaba IMDS `vswitch_id` |
+| alibaba | VSwitchCIDR | `vswitch_cidr_block` | T3 | `vswitch_cidr_block` | no | No OCSF/OTel equivalent — VSwitch CIDR block | Convention — Alibaba IMDS `vswitch_cidr_block` |
+| alibaba | Nameservers | `dns_nameservers` | T3 | `dns_nameservers` | no | No OCSF/OTel equivalent — DNS nameserver addresses | Convention — Alibaba IMDS `dns_conf.nameservers` |
+| alibaba | NTPServers | `ntp_servers` | T3 | `ntp_servers` | no | No OCSF/OTel equivalent — NTP server addresses | Convention — Alibaba IMDS `ntp_conf.ntp_servers` |
+| alibaba | NetworkInterfaces | `network_interfaces` | T3 | `network_interfaces` | no | No OCSF/OTel equivalent — attached ENIs keyed by MAC | Convention — Alibaba IMDS `network.interfaces.macs` |
+| alibaba | MaxBandwidthIngress | `max_bandwidth_ingress` | T3 | `max_bandwidth_ingress` | no | No OCSF/OTel equivalent — maximum inbound bandwidth in Mbps | Convention — Alibaba IMDS `instance.max_netbw_ingress` |
+| alibaba | MaxBandwidthEgress | `max_bandwidth_egress` | T3 | `max_bandwidth_egress` | no | No OCSF/OTel equivalent — maximum outbound bandwidth in Mbps | Convention — Alibaba IMDS `instance.max_netbw_egress` |
+| alibaba | RAMRoleName | `ram_role_name` | T3 | `ram_role_name` | no | No OCSF/OTel equivalent — attached RAM role name | Convention — Alibaba IMDS `ram.role_name` |
+| alibaba | Disks | `disks` | T3 | `disks` | no | No OCSF/OTel equivalent — attached disks keyed by serial number | Convention — Alibaba IMDS `disks` |
+| alibaba | Marketplace | `marketplace` | T3 | `marketplace` | no | No OCSF/OTel equivalent — marketplace billing metadata | Convention — Alibaba IMDS `image.market_place` |
+| alibaba | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — user-defined instance tags | Convention — Alibaba IMDS `tags.instance` |
+| alibaba.network_interfaces[] | NetworkInterfaceID | `network_interface_id` | T3 | `network_interface_id` | no | No OCSF/OTel equivalent — ENI identifier | Convention — Alibaba IMDS ENI `network_interface_id` |
+| alibaba.network_interfaces[] | PrimaryIPAddress | `primary_ip_address` | T3 | `primary_ip_address` | no | No OCSF/OTel equivalent — ENI primary private IP | Convention — Alibaba IMDS ENI `primary_ip_address` |
+| alibaba.network_interfaces[] | PrivateIPv4s | `private_ipv4s` | T3 | `private_ipv4s` | no | No OCSF/OTel equivalent — ENI secondary private IPv4 addresses | Convention — Alibaba IMDS ENI `private_ipv4s` |
+| alibaba.network_interfaces[] | IPv4Prefixes | `ipv4_prefixes` | T3 | `ipv4_prefixes` | no | No OCSF/OTel equivalent — ENI IPv4 prefix delegations | Convention — Alibaba IMDS ENI `ipv4_prefixes` |
+| alibaba.network_interfaces[] | Netmask | `netmask` | T3 | `netmask` | no | No OCSF/OTel equivalent — ENI netmask | Convention — Alibaba IMDS ENI `netmask` |
+| alibaba.network_interfaces[] | Gateway | `gateway` | T3 | `gateway` | no | No OCSF/OTel equivalent — ENI default gateway | Convention — Alibaba IMDS ENI `gateway` |
+| alibaba.network_interfaces[] | VPCID | `vpc_id` | T3 | `vpc_id` | no | No OCSF/OTel equivalent — ENI VPC identifier | Convention — Alibaba IMDS ENI `vpc_id` |
+| alibaba.network_interfaces[] | VPCCIDRBlock | `vpc_cidr_block` | T3 | `vpc_cidr_block` | no | No OCSF/OTel equivalent — ENI VPC CIDR block | Convention — Alibaba IMDS ENI `vpc_cidr_block` |
+| alibaba.network_interfaces[] | VPCIPv6CIDRBlocks | `vpc_ipv6_cidr_blocks` | T3 | `vpc_ipv6_cidr_blocks` | no | No OCSF/OTel equivalent — ENI VPC IPv6 CIDR blocks | Convention — Alibaba IMDS ENI `vpc_ipv6_cidr_blocks` |
+| alibaba.network_interfaces[] | VSwitchID | `vswitch_id` | T3 | `vswitch_id` | no | No OCSF/OTel equivalent — ENI VSwitch identifier | Convention — Alibaba IMDS ENI `vswitch_id` |
+| alibaba.network_interfaces[] | VSwitchCIDRBlock | `vswitch_cidr_block` | T3 | `vswitch_cidr_block` | no | No OCSF/OTel equivalent — ENI VSwitch CIDR block | Convention — Alibaba IMDS ENI `vswitch_cidr_block` |
+| alibaba.network_interfaces[] | VSwitchIPv6CIDRBlock | `vswitch_ipv6_cidr_block` | T3 | `vswitch_ipv6_cidr_block` | no | No OCSF/OTel equivalent — ENI VSwitch IPv6 CIDR block | Convention — Alibaba IMDS ENI `vswitch_ipv6_cidr_block` |
+| alibaba.network_interfaces[] | IPv6s | `ipv6s` | T3 | `ipv6s` | no | No OCSF/OTel equivalent — ENI IPv6 addresses | Convention — Alibaba IMDS ENI `ipv6s` |
+| alibaba.network_interfaces[] | IPv6Prefixes | `ipv6_prefixes` | T3 | `ipv6_prefixes` | no | No OCSF/OTel equivalent — ENI IPv6 prefix delegations | Convention — Alibaba IMDS ENI `ipv6_prefixes` |
+| alibaba.network_interfaces[] | IPv6Gateway | `ipv6_gateway` | T3 | `ipv6_gateway` | no | No OCSF/OTel equivalent — ENI IPv6 gateway | Convention — Alibaba IMDS ENI `ipv6_gateway` |
+| alibaba.disks[] | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — disk identifier | Convention — Alibaba IMDS `disks[].id` |
+| alibaba.disks[] | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — disk display name | Convention — Alibaba IMDS `disks[].name` |
+| alibaba.marketplace | ProductCode | `product_code` | T3 | `product_code` | no | No OCSF/OTel equivalent — marketplace product code | Convention — Alibaba IMDS `image.market_place.product_code` |
+| alibaba.marketplace | ChargeType | `charge_type` | T3 | `charge_type` | no | No OCSF/OTel equivalent — marketplace charge type | Convention — Alibaba IMDS `image.market_place.charge_type` |
+| scaleway | ID | `id` | T1 | `id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — Scaleway instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| scaleway | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — instance display name | Convention — Scaleway metadata `name` |
+| scaleway | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| scaleway | Organization | `organization` | T3 | `organization` | no | No OCSF/OTel equivalent — Scaleway organization ID | Convention — Scaleway metadata `organization` |
+| scaleway | Project | `project` | T1 | `project` | no | OCSF `cloud.project_uid` / OTel `cloud.account.id` — Scaleway project ID (account_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| scaleway | CommercialType | `commercial_type` | T3 | `commercial_type` | no | No OCSF/OTel equivalent — instance type (DEV1-S, GP1-M, etc.) | Convention — Scaleway metadata `commercial_type` |
+| scaleway | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — user-defined instance tags | Convention — Scaleway metadata `tags` |
+| scaleway | StateDetail | `state_detail` | T3 | `state_detail` | no | No OCSF/OTel equivalent — instance lifecycle state detail | Convention — Scaleway metadata `state_detail` |
+| scaleway | PublicIP | `public_ip` | T3 | `public_ip` | no | No OCSF/OTel equivalent — public IPv4 address | Convention — Scaleway metadata `public_ip.address` |
+| scaleway | PublicIPID | `public_ip_id` | T3 | `public_ip_id` | no | No OCSF/OTel equivalent — public IP resource ID | Convention — Scaleway metadata `public_ip.id` |
+| scaleway | PublicIPDynamic | `public_ip_dynamic` | T3 | `public_ip_dynamic` | no | No OCSF/OTel equivalent — public IP dynamic allocation flag | Convention — Scaleway metadata `public_ip.dynamic` |
+| scaleway | PrivateIP | `private_ip` | T3 | `private_ip` | no | No OCSF/OTel equivalent — private IPv4 address | Convention — Scaleway metadata `private_ip` |
+| scaleway | IPv6Address | `ipv6_address` | T3 | `ipv6_address` | no | No OCSF/OTel equivalent — IPv6 address | Convention — Scaleway metadata `ipv6.address` |
+| scaleway | IPv6Netmask | `ipv6_netmask` | T3 | `ipv6_netmask` | no | No OCSF/OTel equivalent — IPv6 netmask | Convention — Scaleway metadata `ipv6.netmask` |
+| scaleway | IPv6Gateway | `ipv6_gateway` | T3 | `ipv6_gateway` | no | No OCSF/OTel equivalent — IPv6 gateway address | Convention — Scaleway metadata `ipv6.gateway` |
+| scaleway | Zone | `zone` | T1 | `zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — Scaleway zone ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| scaleway | PlatformID | `platform_id` | T3 | `platform_id` | no | No OCSF/OTel equivalent — underlying hardware platform identifier | Convention — Scaleway metadata `location.platform_id` |
+| scaleway | SSHPublicKeys | `ssh_public_keys` | T3 | `ssh_public_keys` | no | No OCSF/OTel equivalent — SSH public keys attached at launch | Convention — Scaleway metadata `ssh_public_keys` |
+| scaleway | Volumes | `volumes` | T3 | `volumes` | no | No OCSF/OTel equivalent — attached volumes array | Convention — Scaleway metadata `volumes` |
+| scaleway | Timezone | `timezone` | T3 | `timezone` | no | No OCSF/OTel equivalent — instance timezone setting | Convention — Scaleway metadata `timezone` |
+| scaleway | Bootscript | `bootscript` | T3 | `bootscript` | no | No OCSF/OTel equivalent — legacy boot configuration (deprecated) | Convention — Scaleway metadata `bootscript` |
+| scaleway.volumes[] | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — volume identifier | Convention — Scaleway metadata `volumes[].id` |
+| scaleway.volumes[] | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — volume display name | Convention — Scaleway metadata `volumes[].name` |
+| scaleway.volumes[] | VolumeType | `volume_type` | T3 | `volume_type` | no | No OCSF/OTel equivalent — volume type (l_ssd, b_ssd, etc.) | Convention — Scaleway metadata `volumes[].volume_type` |
+| scaleway.volumes[] | Size | `size` | T3 | `size` | no | No OCSF/OTel equivalent — volume size in bytes | Convention — Scaleway metadata `volumes[].size` |
+| scaleway.volumes[] | ExportURI | `export_uri` | T3 | `export_uri` | no | No OCSF/OTel equivalent — volume export URI | Convention — Scaleway metadata `volumes[].export_uri` |
+| scaleway.bootscript | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — bootscript identifier | Convention — Scaleway metadata `bootscript.id` |
+| scaleway.bootscript | Title | `title` | T3 | `title` | no | No OCSF/OTel equivalent — bootscript title | Convention — Scaleway metadata `bootscript.title` |
+| scaleway.bootscript | Architecture | `architecture` | T3 | `architecture` | no | No OCSF/OTel equivalent — bootscript target architecture | Convention — Scaleway metadata `bootscript.architecture` |
+| scaleway.bootscript | Kernel | `kernel` | T3 | `kernel` | no | No OCSF/OTel equivalent — bootscript kernel path | Convention — Scaleway metadata `bootscript.kernel` |
+| scaleway.bootscript | Initrd | `initrd` | T3 | `initrd` | no | No OCSF/OTel equivalent — bootscript initrd path | Convention — Scaleway metadata `bootscript.initrd` |
+| scaleway.bootscript | Bootcmdargs | `bootcmdargs` | T3 | `bootcmdargs` | no | No OCSF/OTel equivalent — bootscript kernel command-line arguments | Convention — Scaleway metadata `bootscript.bootcmdargs` |
+| scaleway.bootscript | Organization | `organization` | T3 | `organization` | no | No OCSF/OTel equivalent — bootscript organization owner | Convention — Scaleway metadata `bootscript.organization` |
+| scaleway.bootscript | Public | `public` | T3 | `public` | no | No OCSF/OTel equivalent — bootscript public visibility flag | Convention — Scaleway metadata `bootscript.public` |
 
 ## Other Collectors
 
