@@ -338,6 +338,83 @@ Three-tier naming ladder applied to every gohai JSON field.
 
 | Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
 | --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
+| network | Interfaces | `interfaces` | T3 | `interfaces` | no | No OCSF/OTel equivalent — per-interface array container | Convention — gopsutil `net.Interfaces` |
+| network | Routes | `routes` | T3 | `routes` | no | No OCSF/OTel equivalent — kernel routing table array | Convention — netlink route dump |
+| network | Neighbours | `neighbours` | T3 | `neighbours` | no | No OCSF/OTel equivalent — ARP/NDP neighbour cache array | Convention — netlink neigh dump |
+| network | DefaultInterface | `default_interface` | T3 | `default_interface` | no | No OCSF/OTel equivalent — IPv4 default route egress interface | Convention — Ohai `network/default_interface` |
+| network | DefaultGateway | `default_gateway` | T3 | `default_gateway` | no | No OCSF/OTel equivalent — IPv4 default gateway address | Convention — Ohai `network/default_gateway` |
+| network | DefaultInet6Interface | `default_inet6_interface` | T3 | `default_inet6_interface` | no | No OCSF/OTel equivalent — IPv6 default route egress interface | Convention — Ohai `network/default_inet6_interface` |
+| network | DefaultInet6Gateway | `default_inet6_gateway` | T3 | `default_inet6_gateway` | no | No OCSF/OTel equivalent — IPv6 default gateway address | Convention — Ohai `network/default_inet6_gateway` |
+| network.interfaces[] | Name | `name` | T1 | `name` | no | OCSF `network_interface.name` — interface name | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| network.interfaces[] | Number | `number` | T1 | `number` | no | OCSF `network_interface.uid` — unique interface index | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| network.interfaces[] | State | `state` | T2 | `state` | no | OTel `hw.network.up` — admin state ("up" / "down") | [OTel hardware](https://github.com/open-telemetry/semantic-conventions/blob/main/model/hardware/network-metrics.yaml) |
+| network.interfaces[] | MTU | `mtu` | T3 | `mtu` | no | No OCSF/OTel equivalent — maximum transmission unit | Convention — gopsutil `InterfaceStat.MTU` |
+| network.interfaces[] | HardwareAddr | `hardware_addr` | T1 | `hardware_addr` | no | OCSF `network_interface.mac` — MAC address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| network.interfaces[] | Encapsulation | `encapsulation` | T1 | `encapsulation` | no | OCSF `network_interface.type` — link layer type (Ethernet, Loopback, etc.) | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| network.interfaces[] | Driver | `driver` | T3 | `driver` | no | No OCSF/OTel equivalent — sysfs driver name (e1000e, virtio_net) | Convention — /sys/class/net/*/device/driver |
+| network.interfaces[] | Speed | `speed` | T2 | `speed` | no | OTel `hw.network.bandwidth.limit` — link speed string | [OTel hardware](https://github.com/open-telemetry/semantic-conventions/blob/main/model/hardware/network-metrics.yaml) |
+| network.interfaces[] | Duplex | `duplex` | T3 | `duplex` | no | No OCSF/OTel equivalent — link duplex (half / full / unknown) | Convention — ghw `NIC.Duplex` |
+| network.interfaces[] | Flags | `flags` | T3 | `flags` | no | No OCSF/OTel equivalent — interface flag set | Convention — gopsutil `InterfaceStat.Flags` |
+| network.interfaces[] | Addresses | `addresses` | T3 | `addresses` | no | No OCSF/OTel equivalent — per-address array container | Convention — gopsutil `InterfaceStat.Addrs` |
+| network.interfaces[] | Routes | `routes` | T3 | `routes` | no | No OCSF/OTel equivalent — per-interface route array | Convention — netlink route dump |
+| network.interfaces[] | Counters | `counters` | T3 | `counters` | no | No OCSF/OTel equivalent — I/O counter container | Convention — gopsutil `IOCountersStat` |
+| network.interfaces[] | Ethtool | `ethtool` | T3 | `ethtool` | no | No OCSF/OTel equivalent — ethtool data container (Linux only) | Convention — Ohai `network/interfaces/*/ethtool` |
+| network.interfaces[] | VLAN | `vlan` | T3 | `vlan` | no | No OCSF/OTel equivalent — VLAN sub-interface data container | Convention — Ohai `network/interfaces/*/vlan` |
+| network.interfaces[] | TunnelInfo | `tunnel_info` | T3 | `tunnel_info` | no | No OCSF/OTel equivalent — IP tunnel metadata container | Convention — Ohai `network/interfaces/*/tunnel_info` |
+| network.interfaces[] | XDP | `xdp` | T3 | `xdp` | no | No OCSF/OTel equivalent — XDP program info container | Convention — Ohai `network/interfaces/*/xdp` |
+| network.interfaces[].addresses[] | Addr | `addr` | T1 | `addr` | no | OCSF `network_interface.ip` — IP address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| network.interfaces[].addresses[] | Family | `family` | T3 | `family` | no | No OCSF/OTel equivalent — address family (inet / inet6) | Convention — Ohai address `family` |
+| network.interfaces[].addresses[] | Prefixlen | `prefixlen` | T1 | `prefixlen` | no | OCSF `network_interface.subnet_prefix` — CIDR prefix length | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| network.interfaces[].addresses[] | Netmask | `netmask` | T3 | `netmask` | no | No OCSF/OTel equivalent — IPv4 dotted-decimal netmask | Convention — Ohai address `netmask` |
+| network.interfaces[].addresses[] | Broadcast | `broadcast` | T3 | `broadcast` | no | No OCSF/OTel equivalent — IPv4 broadcast address | Convention — Ohai address `broadcast` |
+| network.interfaces[].addresses[] | Scope | `scope` | T3 | `scope` | no | No OCSF/OTel equivalent — address scope (Global / Link / Host) | Convention — Ohai address `scope` |
+| network.interfaces[].counters | BytesSent | `bytes_sent` | T2 | `bytes_sent` | no | OTel `system.network.io` with `direction=transmit` — bytes transmitted | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
+| network.interfaces[].counters | BytesRecv | `bytes_recv` | T2 | `bytes_recv` | no | OTel `system.network.io` with `direction=receive` — bytes received | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
+| network.interfaces[].counters | PacketsSent | `packets_sent` | T2 | `packets_sent` | no | OTel `system.network.packet.count` with `direction=transmit` — packets transmitted | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
+| network.interfaces[].counters | PacketsRecv | `packets_recv` | T2 | `packets_recv` | no | OTel `system.network.packet.count` with `direction=receive` — packets received | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
+| network.interfaces[].counters | Errin | `errin` | T2 | `errin` | no | OTel `system.network.errors` with `direction=receive` — receive errors | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
+| network.interfaces[].counters | Errout | `errout` | T2 | `errout` | no | OTel `system.network.errors` with `direction=transmit` — transmit errors | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
+| network.interfaces[].counters | Dropin | `dropin` | T2 | `dropin` | no | OTel `system.network.packet.dropped` with `direction=receive` — receive drops | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
+| network.interfaces[].counters | Dropout | `dropout` | T2 | `dropout` | no | OTel `system.network.packet.dropped` with `direction=transmit` — transmit drops | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
+| network.interfaces[].ethtool | DriverInfo | `driver_info` | T3 | `driver_info` | no | No OCSF/OTel equivalent — `ethtool -i` driver info map | Convention — Ohai `ethtool/driver_info` |
+| network.interfaces[].ethtool | RingParams | `ring_params` | T3 | `ring_params` | no | No OCSF/OTel equivalent — `ethtool -g` ring parameters map | Convention — Ohai `ethtool/ring_params` |
+| network.interfaces[].ethtool | ChannelParams | `channel_params` | T3 | `channel_params` | no | No OCSF/OTel equivalent — `ethtool -l` channel parameters map | Convention — Ohai `ethtool/channel_params` |
+| network.interfaces[].ethtool | CoalesceParams | `coalesce_params` | T3 | `coalesce_params` | no | No OCSF/OTel equivalent — `ethtool -c` coalesce parameters map | Convention — Ohai `ethtool/coalesce_params` |
+| network.interfaces[].ethtool | OffloadParams | `offload_params` | T3 | `offload_params` | no | No OCSF/OTel equivalent — `ethtool -k` offload parameters map | Convention — Ohai `ethtool/offload_params` |
+| network.interfaces[].ethtool | PauseParams | `pause_params` | T3 | `pause_params` | no | No OCSF/OTel equivalent — `ethtool -a` pause parameters map | Convention — Ohai `ethtool/pause_params` |
+| network.interfaces[].vlan | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — 802.1Q VLAN tag | Convention — Ohai `vlan/id` |
+| network.interfaces[].vlan | Protocol | `protocol` | T3 | `protocol` | no | No OCSF/OTel equivalent — VLAN protocol (802.1Q / 802.1ad) | Convention — Ohai `vlan/protocol` |
+| network.interfaces[].vlan | Flags | `flags` | T3 | `flags` | no | No OCSF/OTel equivalent — VLAN flag set | Convention — Ohai `vlan/flags` |
+| network.interfaces[].tunnel_info | Proto | `proto` | T3 | `proto` | no | No OCSF/OTel equivalent — tunnel protocol (any / ipip6 / ip6ip6) | Convention — Ohai `tunnel_info/proto` |
+| network.interfaces[].tunnel_info | External | `external` | T3 | `external` | no | No OCSF/OTel equivalent — tunnel external flag | Convention — Ohai `tunnel_info/external` |
+| network.interfaces[].tunnel_info | Remote | `remote` | T3 | `remote` | no | No OCSF/OTel equivalent — tunnel remote endpoint address | Convention — Ohai `tunnel_info/remote` |
+| network.interfaces[].tunnel_info | Local | `local` | T3 | `local` | no | No OCSF/OTel equivalent — tunnel local endpoint address | Convention — Ohai `tunnel_info/local` |
+| network.interfaces[].tunnel_info | EncapLimit | `encaplimit` | T3 | `encaplimit` | no | No OCSF/OTel equivalent — tunnel encapsulation limit | Convention — Ohai `tunnel_info/encaplimit` |
+| network.interfaces[].tunnel_info | HopLimit | `hoplimit` | T3 | `hoplimit` | no | No OCSF/OTel equivalent — tunnel hop limit | Convention — Ohai `tunnel_info/hoplimit` |
+| network.interfaces[].tunnel_info | TClass | `tclass` | T3 | `tclass` | no | No OCSF/OTel equivalent — tunnel traffic class | Convention — Ohai `tunnel_info/tclass` |
+| network.interfaces[].tunnel_info | Flowlabel | `flowlabel` | T3 | `flowlabel` | no | No OCSF/OTel equivalent — tunnel IPv6 flow label | Convention — Ohai `tunnel_info/flowlabel` |
+| network.interfaces[].tunnel_info | AddrGenMode | `addrgenmode` | T3 | `addrgenmode` | no | No OCSF/OTel equivalent — address generation mode | Convention — Ohai `tunnel_info/addrgenmode` |
+| network.interfaces[].tunnel_info | NumTxQueues | `numtxqueues` | T3 | `numtxqueues` | no | No OCSF/OTel equivalent — transmit queue count | Convention — Ohai `tunnel_info/numtxqueues` |
+| network.interfaces[].tunnel_info | NumRxQueues | `numrxqueues` | T3 | `numrxqueues` | no | No OCSF/OTel equivalent — receive queue count | Convention — Ohai `tunnel_info/numrxqueues` |
+| network.interfaces[].tunnel_info | GsoMaxSize | `gso_max_size` | T3 | `gso_max_size` | no | No OCSF/OTel equivalent — GSO maximum segment size | Convention — Ohai `tunnel_info/gso_max_size` |
+| network.interfaces[].tunnel_info | GsoMaxSegs | `gso_max_segs` | T3 | `gso_max_segs` | no | No OCSF/OTel equivalent — GSO maximum segment count | Convention — Ohai `tunnel_info/gso_max_segs` |
+| network.interfaces[].xdp | Attached | `attached` | T3 | `attached` | no | No OCSF/OTel equivalent — attached XDP program array | Convention — Ohai `xdp/attached` |
+| network.interfaces[].xdp.attached[] | Mode | `mode` | T3 | `mode` | no | No OCSF/OTel equivalent — XDP mode (xdpdrv / xdpgeneric / xdpoffload) | Convention — Ohai `xdp/mode` |
+| network.interfaces[].xdp.attached[] | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — eBPF program ID | Convention — Ohai `xdp/id` |
+| network.interfaces[].xdp.attached[] | Tag | `tag` | T3 | `tag` | no | No OCSF/OTel equivalent — eBPF program tag | Convention — Ohai `xdp/tag` |
+| network.routes[] | Destination | `destination` | T3 | `destination` | no | No OCSF/OTel equivalent — route destination CIDR | Convention — Ohai `network/routes/destination` |
+| network.routes[] | Family | `family` | T3 | `family` | no | No OCSF/OTel equivalent — address family (inet / inet6) | Convention — Ohai `network/routes/family` |
+| network.routes[] | Gateway | `gateway` | T3 | `gateway` | no | No OCSF/OTel equivalent — route next-hop gateway | Convention — Ohai `network/routes/gateway` |
+| network.routes[] | Interface | `interface` | T3 | `interface` | no | No OCSF/OTel equivalent — route egress interface | Convention — Ohai `network/routes/interface` |
+| network.routes[] | Source | `source` | T3 | `source` | no | No OCSF/OTel equivalent — route source address | Convention — Ohai `network/routes/source` |
+| network.routes[] | Scope | `scope` | T3 | `scope` | no | No OCSF/OTel equivalent — route scope (link / global / host) | Convention — Ohai `network/routes/scope` |
+| network.routes[] | Proto | `proto` | T3 | `proto` | no | No OCSF/OTel equivalent — route protocol origin (kernel / boot / static) | Convention — Ohai `network/routes/proto` |
+| network.routes[] | Metric | `metric` | T3 | `metric` | no | No OCSF/OTel equivalent — route metric / priority | Convention — Ohai `network/routes/metric` |
+| network.neighbours[] | Address | `address` | T3 | `address` | no | No OCSF/OTel equivalent — neighbour IPv4/IPv6 address | Convention — `ip neigh` address field |
+| network.neighbours[] | Family | `family` | T3 | `family` | no | No OCSF/OTel equivalent — address family (inet / inet6) | Convention — netlink `AF_INET` / `AF_INET6` |
+| network.neighbours[] | MAC | `mac` | T1 | `mac` | no | OCSF `network_interface.mac` — neighbour hardware address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| network.neighbours[] | Interface | `interface` | T3 | `interface` | no | No OCSF/OTel equivalent — neighbour egress interface | Convention — `ip neigh` dev field |
+| network.neighbours[] | State | `state` | T3 | `state` | no | No OCSF/OTel equivalent — NUD state (REACHABLE / STALE / etc.) | Convention — `ip neigh` state field |
 
 ## Cloud Collectors
 
