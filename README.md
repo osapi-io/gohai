@@ -24,25 +24,32 @@ Each collector wraps a well-maintained backing source ([gopsutil][],
 structs. gohai's value is the unified API, typed structs, and pluggable
 collector model — not reimplementing `/proc` parsing from scratch.
 
-### Schema: OCSF + OpenTelemetry + Ohai
+### Schema: OCSF + OpenTelemetry
 
-Fact naming and structure follow, in order of precedence:
+Field names follow a three-tier naming ladder:
 
-1. **[OCSF][]** (Open Cybersecurity Schema Framework) — the primary
-   schema. Backed by AWS and Splunk for asset, observability, and
+1. **[OCSF][]** (Open Cybersecurity Schema Framework) — primary
+   authority. Backed by AWS and Splunk for asset, observability, and
    security data. Aligning means gohai output feeds SIEMs, data lakes,
-   and inventory tools without translation. Browse
-   [schema.ocsf.io][ocsf-schema] to see field names and object shapes.
+   and inventory tools without translation. ~97 fields are OCSF-named.
+   Browse [schema.ocsf.io][ocsf-schema] to see canonical names.
 2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** —
-   used when OCSF is silent. Widely adopted for observability
-   telemetry; covers areas OCSF hasn't (per-CPU vendor/family/model,
-   system load averages, process runtime, host uptime).
+   when OCSF is silent. Covers areas OCSF hasn't: CPU microarchitecture,
+   memory states, filesystem attributes, hardware detail. ~73 fields.
+3. **gohai convention** — for the ~633 remaining fields where no
+   standard has an opinion. Starts from the backing library's field
+   name (gopsutil/ghw) in `snake_case`, with unit suffixes when
+   ambiguous.
 
-What we collect (which facts, which distro edge cases, which fallback
-sources) draws on [Chef Ohai][]'s years of accumulated plugin logic.
-What we call each field draws on OCSF + OpenTelemetry. We do **not**
-pursue Ohai JSON shape parity — Ruby Mash ↔ Go struct translation
-isn't worth pinning byte-for-byte.
+The complete per-field mapping with verifiable citations lives in
+[`schemas/field-mapping.md`](schemas/field-mapping.md). Fields where
+OCSF is silent are tracked in [`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md)
+as upstream OCSF contribution candidates.
+
+What we **collect** (which facts, which distro edge cases, which
+fallback sources) draws on [Chef Ohai][]'s years of accumulated plugin
+logic. What we **call** each field draws on OCSF + OpenTelemetry. We
+do not pursue Ohai JSON shape parity.
 
 ### Primary consumer
 
