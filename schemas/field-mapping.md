@@ -530,6 +530,139 @@ Three-tier naming ladder applied to every gohai JSON field.
 | gce.service_accounts[] | Scopes | `scopes` | T3 | `scopes` | no | No OCSF/OTel equivalent — OAuth scopes granted | Convention — GCE metadata `serviceAccounts[].scopes` |
 | linode | PublicIP | `public_ip` | T3 | `public_ip` | no | No OCSF/OTel equivalent — eth0 public IPv4 address | Convention — Linode host interface detection |
 | linode | PrivateIP | `private_ip` | T3 | `private_ip` | no | No OCSF/OTel equivalent — eth0:1 private IPv4 address | Convention — Linode host interface detection |
+| azure | VMID | `vm_id` | T1 | `vm_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — Azure VM unique identifier (instance_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| azure | Name | `name` | T1 | `name` | no | OCSF `device.hostname` — VM display name (hostname canonical) | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| azure | VMSize | `vm_size` | T3 | `vm_size` | no | No OCSF/OTel equivalent — Azure VM size (instance_type canonical) | Convention — Azure IMDS `compute.vmSize` |
+| azure | ResourceID | `resource_id` | T2 | `resource_id` | no | OTel `cloud.resource_id` — fully qualified Azure resource ID | [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| azure | ResourceGroupName | `resource_group_name` | T3 | `resource_group_name` | no | No OCSF/OTel equivalent — Azure resource group name | Convention — Azure IMDS `compute.resourceGroupName` |
+| azure | VMScaleSetName | `vm_scale_set_name` | T3 | `vm_scale_set_name` | no | No OCSF/OTel equivalent — VM Scale Set name if member | Convention — Azure IMDS `compute.vmScaleSetName` |
+| azure | Priority | `priority` | T3 | `priority` | no | No OCSF/OTel equivalent — VM priority (Regular / Low / Spot) | Convention — Azure IMDS `compute.priority` |
+| azure | EvictionPolicy | `eviction_policy` | T3 | `eviction_policy` | no | No OCSF/OTel equivalent — Spot VM eviction policy | Convention — Azure IMDS `compute.evictionPolicy` |
+| azure | Location | `location` | T1 | `location` | no | OCSF `cloud.region` / OTel `cloud.region` — Azure region (region canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| azure | Zone | `zone` | T1 | `zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — Azure availability zone | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| azure | PlacementGroupID | `placement_group_id` | T3 | `placement_group_id` | no | No OCSF/OTel equivalent — proximity placement group ID | Convention — Azure IMDS `compute.placementGroupId` |
+| azure | PlatformFaultDomain | `platform_fault_domain` | T3 | `platform_fault_domain` | no | No OCSF/OTel equivalent — fault domain index | Convention — Azure IMDS `compute.platformFaultDomain` |
+| azure | PlatformUpdateDomain | `platform_update_domain` | T3 | `platform_update_domain` | no | No OCSF/OTel equivalent — update domain index | Convention — Azure IMDS `compute.platformUpdateDomain` |
+| azure | SubscriptionID | `subscription_id` | T1 | `subscription_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — Azure subscription (account_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| azure | AzEnvironment | `az_environment` | T1 | `az_environment` | no | OCSF `cloud.cloud_partition` — Azure cloud partition (AzureCloud, AzureUSGovernment, etc.) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| azure | Offer | `offer` | T3 | `offer` | no | No OCSF/OTel equivalent — marketplace image offer name | Convention — Azure IMDS `compute.offer` |
+| azure | Publisher | `publisher` | T3 | `publisher` | no | No OCSF/OTel equivalent — marketplace image publisher | Convention — Azure IMDS `compute.publisher` |
+| azure | SKU | `sku` | T3 | `sku` | no | No OCSF/OTel equivalent — marketplace image SKU | Convention — Azure IMDS `compute.sku` |
+| azure | Version | `version` | T3 | `version` | no | No OCSF/OTel equivalent — marketplace image version | Convention — Azure IMDS `compute.version` |
+| azure | LicenseType | `license_type` | T3 | `license_type` | no | No OCSF/OTel equivalent — Azure Hybrid Benefit license type | Convention — Azure IMDS `compute.licenseType` |
+| azure | OSType | `os_type` | T3 | `os_type` | no | No OCSF/OTel equivalent — OS type (Windows / Linux) | Convention — Azure IMDS `compute.osType` |
+| azure | Provider | `provider` | T1 | `provider` | no | OCSF `cloud.provider` / OTel `cloud.provider` — Azure resource provider namespace | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| azure | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — semicolon-delimited tag string (tags canonical) | Convention — Azure IMDS `compute.tags` |
+| azure | TagsList | `tags_list` | T3 | `tags_list` | no | No OCSF/OTel equivalent — structured tag array | Convention — Azure IMDS `compute.tagsList` |
+| azure | UserData | `user_data` | T3 | `user_data` | no | No OCSF/OTel equivalent — base64-encoded user data | Convention — Azure IMDS `compute.userData` |
+| azure | CustomData | `custom_data` | T3 | `custom_data` | no | No OCSF/OTel equivalent — custom provisioning data | Convention — Azure IMDS `compute.customData` |
+| azure | IsHostCompatibilityLayer | `is_host_compatibility_layer_vm` | T3 | `is_host_compatibility_layer_vm` | no | No OCSF/OTel equivalent — host compatibility layer flag | Convention — Azure IMDS `compute.isHostCompatibilityLayerVm` |
+| azure | Interfaces | `interfaces` | T3 | `interfaces` | no | No OCSF/OTel equivalent — network interfaces keyed by MAC | Convention — Azure IMDS `network.interface` |
+| azure | PublicIPv4 | `public_ipv4` | T3 | `public_ipv4` | no | No OCSF/OTel equivalent — aggregated public IPv4 addresses | Convention — Azure IMDS native |
+| azure | LocalIPv4 | `local_ipv4` | T3 | `local_ipv4` | no | No OCSF/OTel equivalent — aggregated private IPv4 addresses | Convention — Azure IMDS native |
+| azure | PublicIPv6 | `public_ipv6` | T3 | `public_ipv6` | no | No OCSF/OTel equivalent — aggregated public IPv6 addresses | Convention — Azure IMDS native |
+| azure | LocalIPv6 | `local_ipv6` | T3 | `local_ipv6` | no | No OCSF/OTel equivalent — aggregated private IPv6 addresses | Convention — Azure IMDS native |
+| azure.plan | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — marketplace plan name | Convention — Azure IMDS `compute.plan.name` |
+| azure.plan | Publisher | `publisher` | T3 | `publisher` | no | No OCSF/OTel equivalent — marketplace plan publisher | Convention — Azure IMDS `compute.plan.publisher` |
+| azure.plan | Product | `product` | T3 | `product` | no | No OCSF/OTel equivalent — marketplace plan product | Convention — Azure IMDS `compute.plan.product` |
+| azure.storage_profile | OSDisk | `os_disk` | T3 | `os_disk` | no | No OCSF/OTel equivalent — OS disk configuration | Convention — Azure IMDS `compute.storageProfile.osDisk` |
+| azure.storage_profile | DataDisks | `data_disks` | T3 | `data_disks` | no | No OCSF/OTel equivalent — attached data disks array | Convention — Azure IMDS `compute.storageProfile.dataDisks` |
+| azure.storage_profile.disk | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — disk name | Convention — Azure IMDS `storageProfile.*.name` |
+| azure.storage_profile.disk | DiskSizeGB | `disk_size_gb` | T3 | `disk_size_gb` | no | No OCSF/OTel equivalent — disk size in GB | Convention — Azure IMDS `storageProfile.*.diskSizeGB` |
+| azure.storage_profile.disk | Caching | `caching` | T3 | `caching` | no | No OCSF/OTel equivalent — disk caching mode (None / ReadOnly / ReadWrite) | Convention — Azure IMDS `storageProfile.*.caching` |
+| azure.storage_profile.disk | CreateOption | `create_option` | T3 | `create_option` | no | No OCSF/OTel equivalent — disk creation method (FromImage / Empty / Attach) | Convention — Azure IMDS `storageProfile.*.createOption` |
+| azure.storage_profile.disk | WriteAccelEnabled | `write_accelerator_enabled` | T3 | `write_accelerator_enabled` | no | No OCSF/OTel equivalent — write accelerator flag | Convention — Azure IMDS `storageProfile.*.writeAcceleratorEnabled` |
+| azure.storage_profile.disk | Lun | `lun` | T3 | `lun` | no | No OCSF/OTel equivalent — logical unit number (data disks only) | Convention — Azure IMDS `storageProfile.dataDisks[].lun` |
+| azure.storage_profile.disk.managed_disk | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — managed disk resource ID | Convention — Azure IMDS `storageProfile.*.managedDisk.id` |
+| azure.storage_profile.disk.managed_disk | StorageAccountType | `storage_account_type` | T3 | `storage_account_type` | no | No OCSF/OTel equivalent — disk storage tier (Premium_LRS, Standard_LRS, etc.) | Convention — Azure IMDS `storageProfile.*.managedDisk.storageAccountType` |
+| azure.tags_list[] | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — tag key name | Convention — Azure IMDS `compute.tagsList[].name` |
+| azure.tags_list[] | Value | `value` | T3 | `value` | no | No OCSF/OTel equivalent — tag value | Convention — Azure IMDS `compute.tagsList[].value` |
+| azure.security_profile | SecureBootEnabled | `secure_boot_enabled` | T3 | `secure_boot_enabled` | no | No OCSF/OTel equivalent — Secure Boot enabled flag | Convention — Azure IMDS `compute.securityProfile.secureBootEnabled` |
+| azure.security_profile | VirtualTpmEnabled | `virtual_tpm_enabled` | T3 | `virtual_tpm_enabled` | no | No OCSF/OTel equivalent — Virtual TPM enabled flag | Convention — Azure IMDS `compute.securityProfile.virtualTpmEnabled` |
+| azure.security_profile | EncryptionAtHost | `encryption_at_host` | T3 | `encryption_at_host` | no | No OCSF/OTel equivalent — host-level encryption flag | Convention — Azure IMDS `compute.securityProfile.encryptionAtHost` |
+| azure.public_keys[] | KeyData | `key_data` | T3 | `key_data` | no | No OCSF/OTel equivalent — SSH public key data | Convention — Azure IMDS `compute.publicKeys[].keyData` |
+| azure.public_keys[] | Path | `path` | T3 | `path` | no | No OCSF/OTel equivalent — SSH key file path on VM | Convention — Azure IMDS `compute.publicKeys[].path` |
+| azure.host | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — dedicated host resource ID | Convention — Azure IMDS `compute.host.id` |
+| azure.host_group | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — dedicated host group resource ID | Convention — Azure IMDS `compute.hostGroup.id` |
+| azure.os_profile | AdminUsername | `admin_username` | T3 | `admin_username` | no | No OCSF/OTel equivalent — provisioned admin username | Convention — Azure IMDS `compute.osProfile.adminUsername` |
+| azure.os_profile | ComputerName | `computer_name` | T3 | `computer_name` | no | No OCSF/OTel equivalent — OS-level computer name | Convention — Azure IMDS `compute.osProfile.computerName` |
+| azure.os_profile | DisablePasswordAuthentication | `disable_password_authentication` | T3 | `disable_password_authentication` | no | No OCSF/OTel equivalent — password auth disabled flag | Convention — Azure IMDS `compute.osProfile.disablePasswordAuthentication` |
+| azure.additional_capabilities | HibernationEnabled | `hibernation_enabled` | T3 | `hibernation_enabled` | no | No OCSF/OTel equivalent — hibernation capability flag | Convention — Azure IMDS `compute.additionalCapabilities.hibernationEnabled` |
+| azure.extended_location | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — extended location name (edge zone / Arc) | Convention — Azure IMDS `compute.extendedLocation.name` |
+| azure.extended_location | Type | `type` | T3 | `type` | no | No OCSF/OTel equivalent — extended location type | Convention — Azure IMDS `compute.extendedLocation.type` |
+| azure.interfaces[] | MACAddress | `mac_address` | T1 | `mac_address` | no | OCSF `network_interface.mac` — interface MAC address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| azure.interfaces[].ipv4 | IPAddresses | `ip_addresses` | T3 | `ip_addresses` | no | No OCSF/OTel equivalent — IPv4 address array | Convention — Azure IMDS `network.interface[].ipv4.ipAddress` |
+| azure.interfaces[].ipv4 | Subnets | `subnets` | T3 | `subnets` | no | No OCSF/OTel equivalent — IPv4 subnet array | Convention — Azure IMDS `network.interface[].ipv4.subnet` |
+| azure.interfaces[].ipv6 | IPAddresses | `ip_addresses` | T3 | `ip_addresses` | no | No OCSF/OTel equivalent — IPv6 address array | Convention — Azure IMDS `network.interface[].ipv6.ipAddress` |
+| azure.interfaces[].ipv6 | Subnets | `subnets` | T3 | `subnets` | no | No OCSF/OTel equivalent — IPv6 subnet array | Convention — Azure IMDS `network.interface[].ipv6.subnet` |
+| azure.interfaces[].ip_addresses[] | PrivateIP | `private_ip` | T3 | `private_ip` | no | No OCSF/OTel equivalent — private IP address | Convention — Azure IMDS `network.interface[].ipAddress[].privateIpAddress` |
+| azure.interfaces[].ip_addresses[] | PublicIP | `public_ip` | T3 | `public_ip` | no | No OCSF/OTel equivalent — public IP address | Convention — Azure IMDS `network.interface[].ipAddress[].publicIpAddress` |
+| azure.interfaces[].subnets[] | Address | `address` | T3 | `address` | no | No OCSF/OTel equivalent — subnet address | Convention — Azure IMDS `network.interface[].subnet[].address` |
+| azure.interfaces[].subnets[] | Prefix | `prefix` | T3 | `prefix` | no | No OCSF/OTel equivalent — subnet prefix length | Convention — Azure IMDS `network.interface[].subnet[].prefix` |
+| oci | ID | `id` | T1 | `id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — OCI instance OCID (instance_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| oci | DisplayName | `display_name` | T3 | `display_name` | no | No OCSF/OTel equivalent — instance display name | Convention — OCI IMDS `instance.displayName` |
+| oci | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance hostname (hostname canonical) | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| oci | Shape | `shape` | T3 | `shape` | no | No OCSF/OTel equivalent — OCI compute shape (instance_type canonical) | Convention — OCI IMDS `instance.shape` |
+| oci | Image | `image` | T3 | `image` | no | No OCSF/OTel equivalent — source image OCID (image_id canonical) | Convention — OCI IMDS `instance.image` |
+| oci | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — OCI region name (region canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| oci | CanonicalRegionName | `canonical_region_name` | T3 | `canonical_region_name` | no | No OCSF/OTel equivalent — OCI canonical region identifier | Convention — OCI IMDS `instance.canonicalRegionName` |
+| oci | AvailabilityDomain | `availability_domain` | T1 | `availability_domain` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — OCI availability domain (zone canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| oci | FaultDomain | `fault_domain` | T3 | `fault_domain` | no | No OCSF/OTel equivalent — OCI fault domain within availability domain | Convention — OCI IMDS `instance.faultDomain` |
+| oci | CompartmentID | `compartment_id` | T1 | `compartment_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — OCI compartment OCID (account_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| oci | TenantID | `tenant_id` | T3 | `tenant_id` | no | No OCSF/OTel equivalent — OCI tenancy OCID | Convention — OCI IMDS `instance.tenantId` |
+| oci | State | `state` | T3 | `state` | no | No OCSF/OTel equivalent — instance lifecycle state | Convention — OCI IMDS `instance.state` |
+| oci | TimeCreated | `time_created` | T3 | `time_created` | no | No OCSF/OTel equivalent — instance creation timestamp (epoch millis) | Convention — OCI IMDS `instance.timeCreated` |
+| oci | Metadata | `metadata` | T3 | `metadata` | no | No OCSF/OTel equivalent — user-defined metadata key/value pairs | Convention — OCI IMDS `instance.metadata` |
+| oci | DefinedTags | `defined_tags` | T3 | `defined_tags` | no | No OCSF/OTel equivalent — namespace-scoped defined tags (tags canonical) | Convention — OCI IMDS `instance.definedTags` |
+| oci | FreeformTags | `freeform_tags` | T3 | `freeform_tags` | no | No OCSF/OTel equivalent — free-form tags (tags canonical) | Convention — OCI IMDS `instance.freeformTags` |
+| oci | InstancePoolID | `instance_pool_id` | T3 | `instance_pool_id` | no | No OCSF/OTel equivalent — instance pool OCID if member | Convention — OCI IMDS `instance.instancePoolId` |
+| oci | DedicatedVMHostID | `dedicated_vm_host_id` | T3 | `dedicated_vm_host_id` | no | No OCSF/OTel equivalent — dedicated VM host OCID | Convention — OCI IMDS `instance.dedicatedVmHostId` |
+| oci | PlatformConfig | `platform_config` | T3 | `platform_config` | no | No OCSF/OTel equivalent — platform-specific config (NUMA, SMT, etc.) | Convention — OCI IMDS `instance.platformConfig` |
+| oci | VNICs | `vnics` | T3 | `vnics` | no | No OCSF/OTel equivalent — attached virtual NICs array | Convention — OCI IMDS `/vnics` |
+| oci | VolumeAttachments | `volume_attachments` | T3 | `volume_attachments` | no | No OCSF/OTel equivalent — attached volumes keyed by OCID | Convention — OCI IMDS `/allVolumeAttachments` |
+| oci.shape_config | OCPUs | `ocpus` | T3 | `ocpus` | no | No OCSF/OTel equivalent — allocated OCPU count | Convention — OCI IMDS `instance.shapeConfig.ocpus` |
+| oci.shape_config | MemoryInGBs | `memory_in_gbs` | T3 | `memory_in_gbs` | no | No OCSF/OTel equivalent — allocated memory in GB | Convention — OCI IMDS `instance.shapeConfig.memoryInGBs` |
+| oci.shape_config | NetworkingBandwidthInGbps | `networking_bandwidth_in_gbps` | T3 | `networking_bandwidth_in_gbps` | no | No OCSF/OTel equivalent — network bandwidth in Gbps | Convention — OCI IMDS `instance.shapeConfig.networkingBandwidthInGbps` |
+| oci.shape_config | MaxVNICAttachments | `max_vnic_attachments` | T3 | `max_vnic_attachments` | no | No OCSF/OTel equivalent — maximum VNIC attachment count | Convention — OCI IMDS `instance.shapeConfig.maxVnicAttachments` |
+| oci.shape_config | GPUs | `gpus` | T3 | `gpus` | no | No OCSF/OTel equivalent — GPU count on shape | Convention — OCI IMDS `instance.shapeConfig.gpus` |
+| oci.region_info | RealmKey | `realm_key` | T3 | `realm_key` | no | No OCSF/OTel equivalent — OCI realm key (oc1, oc2, etc.) | Convention — OCI IMDS `instance.regionInfo.realmKey` |
+| oci.region_info | RealmDomainComponent | `realm_domain_component` | T3 | `realm_domain_component` | no | No OCSF/OTel equivalent — realm DNS domain component | Convention — OCI IMDS `instance.regionInfo.realmDomainComponent` |
+| oci.region_info | RegionKey | `region_key` | T3 | `region_key` | no | No OCSF/OTel equivalent — short region key (IAD, PHX, etc.) | Convention — OCI IMDS `instance.regionInfo.regionKey` |
+| oci.region_info | RegionIdentifier | `region_identifier` | T3 | `region_identifier` | no | No OCSF/OTel equivalent — full region identifier (us-ashburn-1) | Convention — OCI IMDS `instance.regionInfo.regionIdentifier` |
+| oci.agent_config | IsManagementDisabled | `is_management_disabled` | T3 | `is_management_disabled` | no | No OCSF/OTel equivalent — Oracle Cloud Agent management disabled | Convention — OCI IMDS `instance.agentConfig.isManagementDisabled` |
+| oci.agent_config | IsMonitoringDisabled | `is_monitoring_disabled` | T3 | `is_monitoring_disabled` | no | No OCSF/OTel equivalent — Oracle Cloud Agent monitoring disabled | Convention — OCI IMDS `instance.agentConfig.isMonitoringDisabled` |
+| oci.agent_config | AllPluginsDisabled | `are_all_plugins_disabled` | T3 | `are_all_plugins_disabled` | no | No OCSF/OTel equivalent — all agent plugins disabled | Convention — OCI IMDS `instance.agentConfig.areAllPluginsDisabled` |
+| oci.availability_config | IsLiveMigrationPreferred | `is_live_migration_preferred` | T3 | `is_live_migration_preferred` | no | No OCSF/OTel equivalent — live migration preference | Convention — OCI IMDS `instance.availabilityConfig.isLiveMigrationPreferred` |
+| oci.availability_config | RecoveryAction | `recovery_action` | T3 | `recovery_action` | no | No OCSF/OTel equivalent — recovery action on infrastructure failure | Convention — OCI IMDS `instance.availabilityConfig.recoveryAction` |
+| oci.launch_options | BootVolumeType | `boot_volume_type` | T3 | `boot_volume_type` | no | No OCSF/OTel equivalent — boot volume emulation type | Convention — OCI IMDS `instance.launchOptions.bootVolumeType` |
+| oci.launch_options | Firmware | `firmware` | T3 | `firmware` | no | No OCSF/OTel equivalent — firmware type (BIOS / UEFI) | Convention — OCI IMDS `instance.launchOptions.firmware` |
+| oci.launch_options | NetworkType | `network_type` | T3 | `network_type` | no | No OCSF/OTel equivalent — VNIC emulation type (PARAVIRTUALIZED / VFIO) | Convention — OCI IMDS `instance.launchOptions.networkType` |
+| oci.launch_options | RemoteDataVolumeType | `remote_data_volume_type` | T3 | `remote_data_volume_type` | no | No OCSF/OTel equivalent — remote data volume emulation type | Convention — OCI IMDS `instance.launchOptions.remoteDataVolumeType` |
+| oci.launch_options | IsConsistentVolumeNamingEnabled | `is_consistent_volume_naming_enabled` | T3 | `is_consistent_volume_naming_enabled` | no | No OCSF/OTel equivalent — consistent volume naming flag | Convention — OCI IMDS `instance.launchOptions.isConsistentVolumeNamingEnabled` |
+| oci.launch_options | IsPVEncryptionInTransitEnabled | `is_pv_encryption_in_transit_enabled` | T3 | `is_pv_encryption_in_transit_enabled` | no | No OCSF/OTel equivalent — paravirtualized encryption in transit | Convention — OCI IMDS `instance.launchOptions.isPvEncryptionInTransitEnabled` |
+| oci.source_details | SourceType | `source_type` | T3 | `source_type` | no | No OCSF/OTel equivalent — source type (image / bootVolume) | Convention — OCI IMDS `instance.sourceDetails.sourceType` |
+| oci.source_details | ImageID | `image_id` | T3 | `image_id` | no | No OCSF/OTel equivalent — source image OCID | Convention — OCI IMDS `instance.sourceDetails.imageId` |
+| oci.source_details | BootVolumeID | `boot_volume_id` | T3 | `boot_volume_id` | no | No OCSF/OTel equivalent — boot volume OCID | Convention — OCI IMDS `instance.sourceDetails.bootVolumeId` |
+| oci.source_details | BootVolumeSizeInGBs | `boot_volume_size_in_gbs` | T3 | `boot_volume_size_in_gbs` | no | No OCSF/OTel equivalent — boot volume size in GB | Convention — OCI IMDS `instance.sourceDetails.bootVolumeSizeInGBs` |
+| oci.source_details | KMSKeyID | `kms_key_id` | T3 | `kms_key_id` | no | No OCSF/OTel equivalent — KMS key OCID for volume encryption | Convention — OCI IMDS `instance.sourceDetails.kmsKeyId` |
+| oci.vnics[] | VNICID | `vnic_id` | T3 | `vnic_id` | no | No OCSF/OTel equivalent — VNIC OCID | Convention — OCI IMDS `vnics[].vnicId` |
+| oci.vnics[] | PrivateIP | `private_ip` | T3 | `private_ip` | no | No OCSF/OTel equivalent — VNIC private IPv4 address | Convention — OCI IMDS `vnics[].privateIp` |
+| oci.vnics[] | VLANTag | `vlan_tag` | T3 | `vlan_tag` | no | No OCSF/OTel equivalent — VLAN tag for traffic isolation | Convention — OCI IMDS `vnics[].vlanTag` |
+| oci.vnics[] | MACAddr | `mac_addr` | T1 | `mac_addr` | no | OCSF `network_interface.mac` — VNIC MAC address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| oci.vnics[] | VirtualRouterIP | `virtual_router_ip` | T3 | `virtual_router_ip` | no | No OCSF/OTel equivalent — subnet virtual router IP (default gateway) | Convention — OCI IMDS `vnics[].virtualRouterIp` |
+| oci.vnics[] | SubnetCIDRBlock | `subnet_cidr_block` | T3 | `subnet_cidr_block` | no | No OCSF/OTel equivalent — subnet CIDR block | Convention — OCI IMDS `vnics[].subnetCidrBlock` |
+| oci.vnics[] | NICIndex | `nic_index` | T3 | `nic_index` | no | No OCSF/OTel equivalent — physical NIC index | Convention — OCI IMDS `vnics[].nicIndex` |
+| oci.volume_attachments[] | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — volume attachment OCID | Convention — OCI IMDS `allVolumeAttachments[].id` |
+| oci.volume_attachments[] | AttachmentType | `attachment_type` | T3 | `attachment_type` | no | No OCSF/OTel equivalent — attachment type (iscsi / paravirtualized) | Convention — OCI IMDS `allVolumeAttachments[].attachmentType` |
+| oci.volume_attachments[] | DisplayName | `display_name` | T3 | `display_name` | no | No OCSF/OTel equivalent — volume attachment display name | Convention — OCI IMDS `allVolumeAttachments[].displayName` |
+| oci.volume_attachments[] | VolumeID | `volume_id` | T3 | `volume_id` | no | No OCSF/OTel equivalent — attached volume OCID | Convention — OCI IMDS `allVolumeAttachments[].volumeId` |
+| oci.volume_attachments[] | IsReadOnly | `is_read_only` | T3 | `is_read_only` | no | No OCSF/OTel equivalent — read-only attachment flag | Convention — OCI IMDS `allVolumeAttachments[].isReadOnly` |
+| oci.volume_attachments[] | LifecycleState | `lifecycle_state` | T3 | `lifecycle_state` | no | No OCSF/OTel equivalent — attachment lifecycle state | Convention — OCI IMDS `allVolumeAttachments[].lifecycleState` |
+| oci.volume_attachments[] | DevicePath | `device` | T3 | `device` | no | No OCSF/OTel equivalent — device path (/dev/oracleoci/...) | Convention — OCI IMDS `allVolumeAttachments[].device` |
+| oci.volume_attachments[] | IQN | `iqn` | T3 | `iqn` | no | No OCSF/OTel equivalent — iSCSI qualified name | Convention — OCI IMDS `allVolumeAttachments[].iqn` |
+| oci.volume_attachments[] | IPv4 | `ipv4` | T3 | `ipv4` | no | No OCSF/OTel equivalent — iSCSI target IPv4 address | Convention — OCI IMDS `allVolumeAttachments[].ipv4` |
+| oci.volume_attachments[] | Port | `port` | T3 | `port` | no | No OCSF/OTel equivalent — iSCSI target port | Convention — OCI IMDS `allVolumeAttachments[].port` |
+| oci.volume_attachments[] | EncryptionInTransit | `encryption_in_transit` | T3 | `encryption_in_transit` | no | No OCSF/OTel equivalent — in-transit encryption flag | Convention — OCI IMDS `allVolumeAttachments[].encryptionInTransit` |
 
 ## Other Collectors
 
