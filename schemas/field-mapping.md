@@ -800,3 +800,43 @@ Three-tier naming ladder applied to every gohai JSON field.
 
 | Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
 | --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
+| virtualization | System | `system` | T1 | `system` | no | OCSF `device.hypervisor` — primary virtualization system name | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| virtualization | Role | `role` | T3 | `role` | no | No OCSF/OTel equivalent — "host" or "guest" participation role | Convention — gopsutil `VirtualizationRole` |
+| virtualization | Systems | `systems` | T3 | `systems` | no | No OCSF/OTel equivalent — all detected layers (name→role map) | Convention — Ohai `virtualization/systems` |
+| virtualization | HypervisorHost | `hypervisor_host` | T3 | `hypervisor_host` | no | No OCSF/OTel equivalent — hostname of the hypervisor (Hyper-V KVP) | Convention — Hyper-V guest metadata |
+| users | Passwd | `passwd` | T3 | `passwd` | no | No OCSF/OTel equivalent — /etc/passwd user account map | Convention — Ohai `etc/passwd` |
+| users | Group | `group` | T3 | `group` | no | No OCSF/OTel equivalent — /etc/group group account map | Convention — Ohai `etc/group` |
+| users | CurrentUser | `current_user` | T1 | `current_user` | no | OCSF `actor.user.name` — effective user running the collector | [OCSF user](https://schema.ocsf.io/1.8.0/objects/user) |
+| users.passwd | UID | `uid` | T1 | `uid` | no | OCSF `user.uid` — numeric POSIX user identifier | [OCSF user](https://schema.ocsf.io/1.8.0/objects/user) |
+| users.passwd | GID | `gid` | T3 | `gid` | no | No OCSF/OTel equivalent — primary group ID from /etc/passwd | Convention — POSIX /etc/passwd field |
+| users.passwd | Dir | `dir` | T3 | `dir` | no | No OCSF/OTel equivalent — home directory from /etc/passwd | Convention — POSIX /etc/passwd field |
+| users.passwd | Shell | `shell` | T3 | `shell` | no | No OCSF/OTel equivalent — login shell from /etc/passwd | Convention — POSIX /etc/passwd field |
+| users.passwd | GECOS | `gecos` | T3 | `gecos` | no | No OCSF/OTel equivalent — GECOS comment field from /etc/passwd | Convention — POSIX /etc/passwd field |
+| users.group | GID | `gid` | T3 | `gid` | no | No OCSF/OTel equivalent — numeric group ID from /etc/group | Convention — POSIX /etc/group field |
+| users.group | Members | `members` | T3 | `members` | no | No OCSF/OTel equivalent — group member usernames from /etc/group | Convention — POSIX /etc/group field |
+| sessions | LoggedIn | `logged_in` | T3 | `logged_in` | no | No OCSF/OTel equivalent — array of active login sessions | Convention — Ohai `sessions/logged_in` |
+| sessions.session | User | `user` | T1 | `user` | no | OCSF `session.user` — user associated with the session | [OCSF session](https://schema.ocsf.io/1.8.0/objects/session) |
+| sessions.session | Terminal | `terminal` | T3 | `terminal` | no | No OCSF/OTel equivalent — tty/pts terminal name from utmp | Convention — POSIX utmp `ut_line` |
+| sessions.session | Host | `host` | T3 | `host` | no | No OCSF/OTel equivalent — remote host from utmp | Convention — POSIX utmp `ut_host` |
+| sessions.session | Started | `started` | T1 | `started` | no | OCSF `session.created_time` — unix timestamp when session began | [OCSF session](https://schema.ocsf.io/1.8.0/objects/session) |
+| sessions.session | SessionID | `session_id` | T1 | `session_id` | no | OCSF `session.uid` — systemd session identifier | [OCSF session](https://schema.ocsf.io/1.8.0/objects/session) |
+| sessions.session | UID | `uid` | T1 | `uid` | no | OCSF `user.uid` — numeric user ID from loginctl | [OCSF user](https://schema.ocsf.io/1.8.0/objects/user) |
+| sessions.session | Seat | `seat` | T3 | `seat` | no | No OCSF/OTel equivalent — systemd seat assignment | Convention — systemd loginctl field |
+| process | Count | `count` | T3 | `count` | no | No OCSF/OTel equivalent — total number of running processes | Convention — snapshot aggregate |
+| process | Processes | `processes` | T3 | `processes` | no | No OCSF/OTel equivalent — array of process snapshots | Convention — collection container |
+| process.process | PID | `pid` | T1 | `pid` | no | OCSF `process.pid` — process identifier | [OCSF process](https://schema.ocsf.io/1.8.0/objects/process) |
+| process.process | PPID | `ppid` | T2 | `ppid` | no | OTel `process.parent_pid` — parent process identifier | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
+| process.process | Name | `name` | T1 | `name` | no | OCSF `process.name` — process name | [OCSF process](https://schema.ocsf.io/1.8.0/objects/process) |
+| process.process | Username | `username` | T2 | `username` | no | OTel `process.owner` — username of the process owner | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
+| process.process | CmdLine | `cmd_line` | T1 | `cmd_line` | no | OCSF `process.cmd_line` — full command line string | [OCSF process](https://schema.ocsf.io/1.8.0/objects/process) |
+| process.process | State | `state` | T2 | `state` | no | OTel `process.state` — process state code (R/S/D/Z/T/I) | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
+| process.process | StartTime | `start_time` | T1 | `start_time` | no | OCSF `process.created_time` — unix timestamp of process creation | [OCSF process](https://schema.ocsf.io/1.8.0/objects/process) |
+| load | One | `one` | T3 | `one` | no | No OCSF/OTel equivalent — 1-minute load average | Convention — getloadavg(3) field 1 |
+| load | Five | `five` | T3 | `five` | no | No OCSF/OTel equivalent — 5-minute load average | Convention — getloadavg(3) field 2 |
+| load | Fifteen | `fifteen` | T3 | `fifteen` | no | No OCSF/OTel equivalent — 15-minute load average | Convention — getloadavg(3) field 3 |
+| lsb | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — LSB distributor ID | Convention — lsb_release(1) `Distributor ID` |
+| lsb | Release | `release` | T3 | `release` | no | No OCSF/OTel equivalent — LSB release number | Convention — lsb_release(1) `Release` |
+| lsb | Codename | `codename` | T3 | `codename` | no | No OCSF/OTel equivalent — LSB release codename | Convention — lsb_release(1) `Codename` |
+| lsb | Description | `description` | T3 | `description` | no | No OCSF/OTel equivalent — LSB human-readable description | Convention — lsb_release(1) `Description` |
+| package_mgr | Name | `name` | T1 | `name` | no | OCSF `package.name` — package manager name | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
+| package_mgr | Path | `path` | T3 | `path` | no | No OCSF/OTel equivalent — absolute path to package manager binary | Convention — exec.LookPath result |
