@@ -24,25 +24,32 @@ Each collector wraps a well-maintained backing source ([gopsutil][],
 structs. gohai's value is the unified API, typed structs, and pluggable
 collector model — not reimplementing `/proc` parsing from scratch.
 
-### Schema: OCSF + OpenTelemetry + Ohai
+### Schema: OCSF + OpenTelemetry
 
-Fact naming and structure follow, in order of precedence:
+Field names follow a three-tier naming ladder:
 
-1. **[OCSF][]** (Open Cybersecurity Schema Framework) — the primary
-   schema. Backed by AWS and Splunk for asset, observability, and
+1. **[OCSF][]** (Open Cybersecurity Schema Framework) — primary
+   authority. Backed by AWS and Splunk for asset, observability, and
    security data. Aligning means gohai output feeds SIEMs, data lakes,
-   and inventory tools without translation. Browse
-   [schema.ocsf.io][ocsf-schema] to see field names and object shapes.
+   and inventory tools without translation. ~97 fields are OCSF-named.
+   Browse [schema.ocsf.io][ocsf-schema] to see canonical names.
 2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** —
-   used when OCSF is silent. Widely adopted for observability
-   telemetry; covers areas OCSF hasn't (per-CPU vendor/family/model,
-   system load averages, process runtime, host uptime).
+   when OCSF is silent. Covers areas OCSF hasn't: CPU microarchitecture,
+   memory states, filesystem attributes, hardware detail. ~73 fields.
+3. **gohai convention** — for the ~633 remaining fields where no
+   standard has an opinion. Starts from the backing library's field
+   name (gopsutil/ghw) in `snake_case`, with unit suffixes when
+   ambiguous.
 
-What we collect (which facts, which distro edge cases, which fallback
-sources) draws on [Chef Ohai][]'s years of accumulated plugin logic.
-What we call each field draws on OCSF + OpenTelemetry. We do **not**
-pursue Ohai JSON shape parity — Ruby Mash ↔ Go struct translation
-isn't worth pinning byte-for-byte.
+The complete per-field mapping with verifiable citations lives in
+[`schemas/field-mapping.md`](schemas/field-mapping.md). Fields where
+OCSF is silent are tracked in [`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md)
+as upstream OCSF contribution candidates.
+
+What we **collect** (which facts, which distro edge cases, which
+fallback sources) draws on [Chef Ohai][]'s years of accumulated plugin
+logic. What we **call** each field draws on OCSF + OpenTelemetry. We
+do not pursue Ohai JSON shape parity.
 
 ### Primary consumer
 
@@ -52,11 +59,23 @@ compliance. The CLI is a convenience — the SDK is the product.
 
 ## 📦 Install
 
+**One-line installer** (macOS / Linux):
+
 ```bash
-go install github.com/osapi-io/gohai/cmd/gohai@latest
+curl -fsSL https://github.com/osapi-io/gohai/raw/main/install.sh | bash
 ```
 
-As a library dependency:
+The installer downloads the latest release, verifies the SHA-256 checksum,
+strips macOS quarantine, and installs to `~/.local/bin` (or `/usr/local/bin`
+when run as root). Override with `GOHAI_VERSION` or `GOHAI_INSTALL_DIR`.
+
+**Go install:**
+
+```bash
+go install github.com/osapi-io/gohai@latest
+```
+
+**As a library dependency:**
 
 ```bash
 go get github.com/osapi-io/gohai
@@ -101,28 +120,35 @@ explicit `--collector.X` flags.
 
 ```bash
 # Collect the recommended default collector set
-gohai
+gohai collect
 
 # Pretty-printed JSON
-gohai --pretty
+gohai collect --pretty
 
 # Flat key=value pairs instead of nested JSON
-gohai --flat
+gohai collect --flat
 
 # Enable specific collectors on top of the defaults
-gohai --collector.process --collector.packages
+gohai collect --collector.process --collector.packages
 
 # Disable specific collectors
-gohai --no-collector.virtualization --no-collector.network
+gohai collect --no-collector.virtualization --no-collector.network
 
 # Skip defaults entirely; run only what --collector.X turns on
-gohai --no-defaults --collector.platform --collector.cpu
+gohai collect --no-defaults --collector.platform --collector.cpu
 
 # Embed per-collector timings + errors under `_timings` in the JSON
-gohai --with-timings --pretty
+gohai collect --with-timings --pretty
 
 # List every registered collector and exit
-gohai --list-collectors
+gohai collect --list-collectors
+
+# Validate output against the embedded JSON Schema
+gohai collect --pretty | gohai validate
+gohai validate --file facts.json
+
+# Display version information
+gohai version
 ```
 
 ### SDK
@@ -222,6 +248,8 @@ for the full pattern.
 - [Collectors reference](docs/collectors/README.md) — one doc per collector
   with fields, schema mappings (OCSF + OpenTelemetry), and Ohai source
   alignment.
+- [Schemas](schemas/README.md) — JSON Schema, field-naming strategy
+  (OCSF > OTel > convention), OCSF gap analysis, and cloud canonical overlay.
 - [Development](docs/development.md) — prerequisites, setup, testing, commit
   conventions.
 - [Contributing](docs/contributing.md) — PR workflow.

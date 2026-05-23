@@ -1,0 +1,3906 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gohai.dev/schemas/gohai.schema.json",
+  "$ref": "#/$defs/Facts",
+  "$defs": {
+    "AlibabaDisk": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AlibabaInfo": {
+      "properties": {
+        "instance_id": {
+          "type": "string"
+        },
+        "instance_name": {
+          "type": "string"
+        },
+        "instance_type": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "image_id": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "network_type": {
+          "type": "string"
+        },
+        "owner_account_id": {
+          "type": "string"
+        },
+        "source_address": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "zone": {
+          "type": "string"
+        },
+        "virtualization_solution": {
+          "type": "string"
+        },
+        "virtualization_solution_version": {
+          "type": "string"
+        },
+        "spot_termination_time": {
+          "type": "string"
+        },
+        "mac": {
+          "type": "string"
+        },
+        "private_ipv4": {
+          "type": "string"
+        },
+        "public_ipv4": {
+          "type": "string"
+        },
+        "vpc_id": {
+          "type": "string"
+        },
+        "vpc_cidr_block": {
+          "type": "string"
+        },
+        "vswitch_id": {
+          "type": "string"
+        },
+        "vswitch_cidr_block": {
+          "type": "string"
+        },
+        "dns_nameservers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ntp_servers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "network_interfaces": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AlibabaNetworkInterface"
+          },
+          "type": "object"
+        },
+        "max_bandwidth_ingress": {
+          "type": "integer"
+        },
+        "max_bandwidth_egress": {
+          "type": "integer"
+        },
+        "ram_role_name": {
+          "type": "string"
+        },
+        "disks": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AlibabaDisk"
+          },
+          "type": "object"
+        },
+        "marketplace": {
+          "$ref": "#/$defs/AlibabaMarketplace"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "instance_id"
+      ]
+    },
+    "AlibabaMarketplace": {
+      "properties": {
+        "product_code": {
+          "type": "string"
+        },
+        "charge_type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AlibabaNetworkInterface": {
+      "properties": {
+        "network_interface_id": {
+          "type": "string"
+        },
+        "primary_ip_address": {
+          "type": "string"
+        },
+        "private_ipv4s": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ipv4_prefixes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "netmask": {
+          "type": "string"
+        },
+        "gateway": {
+          "type": "string"
+        },
+        "vpc_id": {
+          "type": "string"
+        },
+        "vpc_cidr_block": {
+          "type": "string"
+        },
+        "vpc_ipv6_cidr_blocks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "vswitch_id": {
+          "type": "string"
+        },
+        "vswitch_cidr_block": {
+          "type": "string"
+        },
+        "vswitch_ipv6_cidr_block": {
+          "type": "string"
+        },
+        "ipv6s": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ipv6_prefixes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ipv6_gateway": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureAdditionalCapabilities": {
+      "properties": {
+        "hibernation_enabled": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureDisk": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "disk_size_gb": {
+          "type": "string"
+        },
+        "caching": {
+          "type": "string"
+        },
+        "create_option": {
+          "type": "string"
+        },
+        "write_accelerator_enabled": {
+          "type": "string"
+        },
+        "managed_disk": {
+          "$ref": "#/$defs/AzureManagedDisk"
+        },
+        "lun": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureExtendedLocation": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureHost": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "AzureHostGroup": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "AzureIPAddress": {
+      "properties": {
+        "private_ip": {
+          "type": "string"
+        },
+        "public_ip": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureIPAddrs": {
+      "properties": {
+        "ip_addresses": {
+          "items": {
+            "$ref": "#/$defs/AzureIPAddress"
+          },
+          "type": "array"
+        },
+        "subnets": {
+          "items": {
+            "$ref": "#/$defs/AzureSubnet"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureInfo": {
+      "properties": {
+        "vm_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "vm_size": {
+          "type": "string"
+        },
+        "resource_id": {
+          "type": "string"
+        },
+        "resource_group_name": {
+          "type": "string"
+        },
+        "vm_scale_set_name": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string"
+        },
+        "eviction_policy": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "zone": {
+          "type": "string"
+        },
+        "placement_group_id": {
+          "type": "string"
+        },
+        "platform_fault_domain": {
+          "type": "string"
+        },
+        "platform_update_domain": {
+          "type": "string"
+        },
+        "subscription_id": {
+          "type": "string"
+        },
+        "az_environment": {
+          "type": "string"
+        },
+        "offer": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "sku": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "license_type": {
+          "type": "string"
+        },
+        "os_type": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "plan": {
+          "$ref": "#/$defs/AzurePlan"
+        },
+        "storage_profile": {
+          "$ref": "#/$defs/AzureStorageProfile"
+        },
+        "tags": {
+          "type": "string"
+        },
+        "tags_list": {
+          "items": {
+            "$ref": "#/$defs/AzureTag"
+          },
+          "type": "array"
+        },
+        "user_data": {
+          "type": "string"
+        },
+        "custom_data": {
+          "type": "string"
+        },
+        "is_host_compatibility_layer_vm": {
+          "type": "boolean"
+        },
+        "security_profile": {
+          "$ref": "#/$defs/AzureSecurityProfile"
+        },
+        "public_keys": {
+          "items": {
+            "$ref": "#/$defs/AzurePublicKey"
+          },
+          "type": "array"
+        },
+        "host": {
+          "$ref": "#/$defs/AzureHost"
+        },
+        "host_group": {
+          "$ref": "#/$defs/AzureHostGroup"
+        },
+        "os_profile": {
+          "$ref": "#/$defs/AzureOSProfile"
+        },
+        "additional_capabilities": {
+          "$ref": "#/$defs/AzureAdditionalCapabilities"
+        },
+        "extended_location": {
+          "$ref": "#/$defs/AzureExtendedLocation"
+        },
+        "interfaces": {
+          "additionalProperties": {
+            "$ref": "#/$defs/AzureInterface"
+          },
+          "type": "object"
+        },
+        "public_ipv4": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "local_ipv4": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "public_ipv6": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "local_ipv6": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "vm_id"
+      ]
+    },
+    "AzureInterface": {
+      "properties": {
+        "mac_address": {
+          "type": "string"
+        },
+        "ipv4": {
+          "$ref": "#/$defs/AzureIPAddrs"
+        },
+        "ipv6": {
+          "$ref": "#/$defs/AzureIPAddrs"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureManagedDisk": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "storage_account_type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureOSProfile": {
+      "properties": {
+        "admin_username": {
+          "type": "string"
+        },
+        "computer_name": {
+          "type": "string"
+        },
+        "disable_password_authentication": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzurePlan": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzurePublicKey": {
+      "properties": {
+        "key_data": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "key_data"
+      ]
+    },
+    "AzureSecurityProfile": {
+      "properties": {
+        "secure_boot_enabled": {
+          "type": "string"
+        },
+        "virtual_tpm_enabled": {
+          "type": "string"
+        },
+        "encryption_at_host": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureStorageProfile": {
+      "properties": {
+        "os_disk": {
+          "$ref": "#/$defs/AzureDisk"
+        },
+        "data_disks": {
+          "items": {
+            "$ref": "#/$defs/AzureDisk"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureSubnet": {
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AzureTag": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "value"
+      ]
+    },
+    "CollectorTiming": {
+      "properties": {
+        "duration_ns": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "duration_ns",
+        "status"
+      ]
+    },
+    "CpuCPU": {
+      "properties": {
+        "vendor_id": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "model_name": {
+          "type": "string"
+        },
+        "stepping": {
+          "type": "integer"
+        },
+        "physical_id": {
+          "type": "string"
+        },
+        "core_id": {
+          "type": "string"
+        },
+        "cores": {
+          "type": "integer"
+        },
+        "mhz": {
+          "type": "number"
+        },
+        "cache_size": {
+          "type": "integer"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CpuCaches": {
+      "properties": {
+        "l1d": {
+          "type": "string"
+        },
+        "l1i": {
+          "type": "string"
+        },
+        "l2": {
+          "type": "string"
+        },
+        "l2d": {
+          "type": "string"
+        },
+        "l2i": {
+          "type": "string"
+        },
+        "l3": {
+          "type": "string"
+        },
+        "l4": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CpuInfo": {
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "sockets": {
+          "type": "integer"
+        },
+        "cores": {
+          "type": "integer"
+        },
+        "model_name": {
+          "type": "string"
+        },
+        "vendor_id": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "stepping": {
+          "type": "integer"
+        },
+        "mhz": {
+          "type": "number"
+        },
+        "cache_size": {
+          "type": "integer"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "caches": {
+          "$ref": "#/$defs/CpuCaches"
+        },
+        "numa_nodes": {
+          "patternProperties": {
+            "^[0-9]+$": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object"
+        },
+        "numa_nodes_count": {
+          "type": "integer"
+        },
+        "vulnerabilities": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "cpus_online": {
+          "type": "integer"
+        },
+        "cpus_offline": {
+          "type": "integer"
+        },
+        "bios_vendor_id": {
+          "type": "string"
+        },
+        "bios_model_name": {
+          "type": "string"
+        },
+        "machine_type": {
+          "type": "string"
+        },
+        "mhz_max": {
+          "type": "string"
+        },
+        "mhz_min": {
+          "type": "string"
+        },
+        "mhz_dynamic": {
+          "type": "string"
+        },
+        "bogomips": {
+          "type": "string"
+        },
+        "cpu_opmodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "byte_order": {
+          "type": "string"
+        },
+        "address_sizes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "virtualization": {
+          "type": "string"
+        },
+        "virtualization_type": {
+          "type": "string"
+        },
+        "hypervisor_vendor": {
+          "type": "string"
+        },
+        "dispatching_mode": {
+          "type": "string"
+        },
+        "cpus": {
+          "items": {
+            "$ref": "#/$defs/CpuCPU"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "count",
+        "sockets",
+        "cores"
+      ]
+    },
+    "DigitaloceanInfo": {
+      "properties": {
+        "droplet_id": {
+          "type": "integer"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "public_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "features": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "floating_ip": {
+          "type": "string"
+        },
+        "reserved_ip": {
+          "type": "string"
+        },
+        "auth_key": {
+          "type": "string"
+        },
+        "user_data": {
+          "type": "string"
+        },
+        "ipv4_nameservers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "interfaces": {
+          "items": {
+            "$ref": "#/$defs/DigitaloceanInterface"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "droplet_id"
+      ]
+    },
+    "DigitaloceanInterface": {
+      "properties": {
+        "scope": {
+          "type": "string"
+        },
+        "mac": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "ipv4": {
+          "type": "string"
+        },
+        "ipv4_netmask": {
+          "type": "string"
+        },
+        "ipv4_gateway": {
+          "type": "string"
+        },
+        "ipv6": {
+          "type": "string"
+        },
+        "ipv6_cidr": {
+          "type": "integer"
+        },
+        "ipv6_gateway": {
+          "type": "string"
+        },
+        "anchor_ipv4": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "scope",
+        "mac"
+      ]
+    },
+    "DiskDevice": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "read_count": {
+          "type": "integer"
+        },
+        "write_count": {
+          "type": "integer"
+        },
+        "read_bytes": {
+          "type": "integer"
+        },
+        "write_bytes": {
+          "type": "integer"
+        },
+        "read_time": {
+          "type": "integer"
+        },
+        "write_time": {
+          "type": "integer"
+        },
+        "io_time": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "read_count",
+        "write_count",
+        "read_bytes",
+        "write_bytes"
+      ]
+    },
+    "DiskInfo": {
+      "properties": {
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/DiskDevice"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "devices"
+      ]
+    },
+    "DmiBIOS": {
+      "properties": {
+        "vendor": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DmiBaseboard": {
+      "properties": {
+        "vendor": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "asset_tag": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DmiChassis": {
+      "properties": {
+        "vendor": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "type_description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "asset_tag": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DmiInfo": {
+      "properties": {
+        "bios": {
+          "$ref": "#/$defs/DmiBIOS"
+        },
+        "baseboard": {
+          "$ref": "#/$defs/DmiBaseboard"
+        },
+        "chassis": {
+          "$ref": "#/$defs/DmiChassis"
+        },
+        "product": {
+          "$ref": "#/$defs/DmiProduct"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DmiProduct": {
+      "properties": {
+        "vendor": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "sku": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Ec2IAMInstanceInfo": {
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "last_updated": {
+          "type": "string"
+        },
+        "instance_profile_arn": {
+          "type": "string"
+        },
+        "instance_profile_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Ec2Info": {
+      "properties": {
+        "instance_id": {
+          "type": "string"
+        },
+        "instance_type": {
+          "type": "string"
+        },
+        "instance_life_cycle": {
+          "type": "string"
+        },
+        "ami_id": {
+          "type": "string"
+        },
+        "ami_launch_index": {
+          "type": "string"
+        },
+        "ami_manifest_path": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "local_hostname": {
+          "type": "string"
+        },
+        "public_hostname": {
+          "type": "string"
+        },
+        "local_ipv4": {
+          "type": "string"
+        },
+        "local_ipv4s": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "public_ipv4": {
+          "type": "string"
+        },
+        "mac": {
+          "type": "string"
+        },
+        "security_groups": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "network_interfaces": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Ec2NetworkInterface"
+          },
+          "type": "object"
+        },
+        "region": {
+          "type": "string"
+        },
+        "availability_zone": {
+          "type": "string"
+        },
+        "account_id": {
+          "type": "string"
+        },
+        "availability_zone_id": {
+          "type": "string"
+        },
+        "group_name": {
+          "type": "string"
+        },
+        "host_id": {
+          "type": "string"
+        },
+        "partition_number": {
+          "type": "string"
+        },
+        "kernel_id": {
+          "type": "string"
+        },
+        "ramdisk_id": {
+          "type": "string"
+        },
+        "instance_action": {
+          "type": "string"
+        },
+        "spot_instance_action": {
+          "type": "string"
+        },
+        "spot_termination_time": {
+          "type": "string"
+        },
+        "services_domain": {
+          "type": "string"
+        },
+        "services_partition": {
+          "type": "string"
+        },
+        "product_codes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "public_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "block_device_mapping": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "string"
+        },
+        "iam_info": {
+          "$ref": "#/$defs/Ec2IAMInstanceInfo"
+        },
+        "api_version": {
+          "type": "string"
+        },
+        "user_data": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "instance_id"
+      ]
+    },
+    "Ec2NetworkInterface": {
+      "properties": {
+        "device_number": {
+          "type": "string"
+        },
+        "interface_id": {
+          "type": "string"
+        },
+        "local_hostname": {
+          "type": "string"
+        },
+        "local_ipv4s": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mac": {
+          "type": "string"
+        },
+        "network_card_index": {
+          "type": "string"
+        },
+        "owner_id": {
+          "type": "string"
+        },
+        "public_hostname": {
+          "type": "string"
+        },
+        "public_ipv4s": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "security_group_ids": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "security_groups": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "subnet_id": {
+          "type": "string"
+        },
+        "subnet_ipv4_cidr_block": {
+          "type": "string"
+        },
+        "subnet_ipv6_cidr_blocks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "vpc_id": {
+          "type": "string"
+        },
+        "vpc_ipv4_cidr_block": {
+          "type": "string"
+        },
+        "vpc_ipv4_cidr_blocks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "vpc_ipv6_cidr_blocks": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ipv6s": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Facts": {
+      "properties": {
+        "platform": {
+          "$ref": "#/$defs/PlatformInfo"
+        },
+        "hostname": {
+          "$ref": "#/$defs/HostnameInfo"
+        },
+        "kernel": {
+          "$ref": "#/$defs/KernelInfo"
+        },
+        "kernel_modules": {
+          "$ref": "#/$defs/KernelmodulesInfo"
+        },
+        "uptime": {
+          "$ref": "#/$defs/UptimeInfo"
+        },
+        "virtualization": {
+          "$ref": "#/$defs/VirtualizationInfo"
+        },
+        "machine_id": {
+          "$ref": "#/$defs/MachineidInfo"
+        },
+        "cpu": {
+          "$ref": "#/$defs/CpuInfo"
+        },
+        "load": {
+          "$ref": "#/$defs/LoadInfo"
+        },
+        "memory": {
+          "$ref": "#/$defs/MemoryInfo"
+        },
+        "filesystem": {
+          "$ref": "#/$defs/FilesystemInfo"
+        },
+        "disk": {
+          "$ref": "#/$defs/DiskInfo"
+        },
+        "network": {
+          "$ref": "#/$defs/NetworkInfo"
+        },
+        "process": {
+          "$ref": "#/$defs/ProcessInfo"
+        },
+        "users": {
+          "$ref": "#/$defs/UsersInfo"
+        },
+        "sessions": {
+          "$ref": "#/$defs/SessionsInfo"
+        },
+        "timezone": {
+          "$ref": "#/$defs/TimezoneInfo"
+        },
+        "root_group": {
+          "$ref": "#/$defs/RootgroupInfo"
+        },
+        "shells": {
+          "$ref": "#/$defs/ShellsInfo"
+        },
+        "fips": {
+          "$ref": "#/$defs/FipsInfo"
+        },
+        "os_release": {
+          "$ref": "#/$defs/OsreleaseInfo"
+        },
+        "lsb": {
+          "$ref": "#/$defs/LsbInfo"
+        },
+        "init": {
+          "$ref": "#/$defs/InitInfo"
+        },
+        "shard": {
+          "$ref": "#/$defs/ShardInfo"
+        },
+        "package_mgr": {
+          "$ref": "#/$defs/PackagemgrInfo"
+        },
+        "gce": {
+          "$ref": "#/$defs/GceInfo"
+        },
+        "ec2": {
+          "$ref": "#/$defs/Ec2Info"
+        },
+        "azure": {
+          "$ref": "#/$defs/AzureInfo"
+        },
+        "digital_ocean": {
+          "$ref": "#/$defs/DigitaloceanInfo"
+        },
+        "oci": {
+          "$ref": "#/$defs/OciInfo"
+        },
+        "alibaba": {
+          "$ref": "#/$defs/AlibabaInfo"
+        },
+        "linode": {
+          "$ref": "#/$defs/LinodeInfo"
+        },
+        "openstack": {
+          "$ref": "#/$defs/OpenstackInfo"
+        },
+        "scaleway": {
+          "$ref": "#/$defs/ScalewayInfo"
+        },
+        "dmi": {
+          "$ref": "#/$defs/DmiInfo"
+        },
+        "gpu": {
+          "$ref": "#/$defs/GpuInfo"
+        },
+        "pci": {
+          "$ref": "#/$defs/PciInfo"
+        },
+        "scsi": {
+          "$ref": "#/$defs/ScsiInfo"
+        },
+        "hardware": {
+          "$ref": "#/$defs/HardwareInfo"
+        },
+        "collect_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "collect_duration_ns": {
+          "type": "integer"
+        },
+        "_timings": {
+          "$ref": "#/$defs/Timings"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "collect_time",
+        "collect_duration_ns"
+      ]
+    },
+    "FilesystemBtrfsAllocation": {
+      "properties": {
+        "total_bytes": {
+          "type": "integer"
+        },
+        "bytes_used": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "total_bytes",
+        "bytes_used"
+      ]
+    },
+    "FilesystemBtrfsInfo": {
+      "properties": {
+        "raid": {
+          "type": "string"
+        },
+        "allocation": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FilesystemBtrfsAllocation"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "FilesystemFilesystem": {
+      "properties": {
+        "device": {
+          "type": "string"
+        },
+        "fstype": {
+          "type": "string"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "part_uuid": {
+          "type": "string"
+        },
+        "part_label": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "device",
+        "fstype"
+      ]
+    },
+    "FilesystemInfo": {
+      "properties": {
+        "mounts": {
+          "items": {
+            "$ref": "#/$defs/FilesystemMount"
+          },
+          "type": "array"
+        },
+        "unmounted": {
+          "items": {
+            "$ref": "#/$defs/FilesystemFilesystem"
+          },
+          "type": "array"
+        },
+        "zfs_datasets": {
+          "items": {
+            "$ref": "#/$defs/FilesystemZFSDataset"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "mounts"
+      ]
+    },
+    "FilesystemMount": {
+      "properties": {
+        "device": {
+          "type": "string"
+        },
+        "mountpoint": {
+          "type": "string"
+        },
+        "fstype": {
+          "type": "string"
+        },
+        "opts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "used": {
+          "type": "integer"
+        },
+        "free": {
+          "type": "integer"
+        },
+        "used_percent": {
+          "type": "number"
+        },
+        "inodes_total": {
+          "type": "integer"
+        },
+        "inodes_used": {
+          "type": "integer"
+        },
+        "inodes_free": {
+          "type": "integer"
+        },
+        "inodes_used_percent": {
+          "type": "number"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "part_uuid": {
+          "type": "string"
+        },
+        "part_label": {
+          "type": "string"
+        },
+        "btrfs": {
+          "$ref": "#/$defs/FilesystemBtrfsInfo"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "device",
+        "mountpoint",
+        "fstype"
+      ]
+    },
+    "FilesystemZFSDataset": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "mountpoint": {
+          "type": "string"
+        },
+        "is_pool": {
+          "type": "boolean"
+        },
+        "parents": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "properties": {
+          "additionalProperties": {
+            "$ref": "#/$defs/FilesystemZFSProperty"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "FilesystemZFSProperty": {
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "value"
+      ]
+    },
+    "FipsInfo": {
+      "properties": {
+        "kernel": {
+          "$ref": "#/$defs/FipsKernel"
+        },
+        "policy": {
+          "$ref": "#/$defs/FipsPolicy"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kernel"
+      ]
+    },
+    "FipsKernel": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled"
+      ]
+    },
+    "FipsPolicy": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "fips_effective": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "fips_effective"
+      ]
+    },
+    "GceAccessConfig": {
+      "properties": {
+        "external_ip": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "external_ip"
+      ]
+    },
+    "GceDisk": {
+      "properties": {
+        "device_name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer"
+        },
+        "interface": {
+          "type": "string"
+        },
+        "encrypted": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "device_name",
+        "type",
+        "mode",
+        "index"
+      ]
+    },
+    "GceInfo": {
+      "properties": {
+        "instance_id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "cpu_platform": {
+          "type": "string"
+        },
+        "machine_type": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "preemptible": {
+          "type": "boolean"
+        },
+        "automatic_restart": {
+          "type": "string"
+        },
+        "on_host_maintenance": {
+          "type": "string"
+        },
+        "maintenance_event": {
+          "type": "string"
+        },
+        "zone": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "numeric_project_id": {
+          "type": "integer"
+        },
+        "project_attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "licenses": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "network_interfaces": {
+          "items": {
+            "$ref": "#/$defs/GceNetworkInterface"
+          },
+          "type": "array"
+        },
+        "disks": {
+          "items": {
+            "$ref": "#/$defs/GceDisk"
+          },
+          "type": "array"
+        },
+        "service_accounts": {
+          "items": {
+            "$ref": "#/$defs/GceServiceAccount"
+          },
+          "type": "array"
+        },
+        "virtual_clock_drift_token": {
+          "type": "string"
+        },
+        "remaining_cpu_time": {
+          "type": "integer"
+        },
+        "partner_attributes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "instance_id",
+        "name",
+        "hostname",
+        "machine_type",
+        "preemptible",
+        "zone",
+        "region",
+        "project_id",
+        "numeric_project_id"
+      ]
+    },
+    "GceNetworkInterface": {
+      "properties": {
+        "ip": {
+          "type": "string"
+        },
+        "mac": {
+          "type": "string"
+        },
+        "network": {
+          "type": "string"
+        },
+        "subnetmask": {
+          "type": "string"
+        },
+        "gateway": {
+          "type": "string"
+        },
+        "dns_servers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ip_aliases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "forwarded_ips": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "target_instance_ips": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mtu": {
+          "type": "integer"
+        },
+        "access_configs": {
+          "items": {
+            "$ref": "#/$defs/GceAccessConfig"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "ip",
+        "mac",
+        "network"
+      ]
+    },
+    "GceServiceAccount": {
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "key",
+        "email"
+      ]
+    },
+    "GpuCard": {
+      "properties": {
+        "vendor": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "vendor_id": {
+          "type": "string"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "cores": {
+          "type": "integer"
+        },
+        "bus": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "GpuInfo": {
+      "properties": {
+        "cards": {
+          "items": {
+            "$ref": "#/$defs/GpuCard"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HardwareBattery": {
+      "properties": {
+        "current_capacity": {
+          "type": "integer"
+        },
+        "max_capacity": {
+          "type": "integer"
+        },
+        "fully_charged": {
+          "type": "boolean"
+        },
+        "is_charging": {
+          "type": "boolean"
+        },
+        "charge_cycle_count": {
+          "type": "integer"
+        },
+        "health": {
+          "type": "string"
+        },
+        "serial": {
+          "type": "string"
+        },
+        "remaining": {
+          "type": "integer"
+        },
+        "amperage": {
+          "type": "integer"
+        },
+        "voltage": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HardwareCharger": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "watts": {
+          "type": "string"
+        },
+        "connected": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HardwareInfo": {
+      "properties": {
+        "machine_model": {
+          "type": "string"
+        },
+        "machine_name": {
+          "type": "string"
+        },
+        "serial_number": {
+          "type": "string"
+        },
+        "platform_uuid": {
+          "type": "string"
+        },
+        "provisioning_udid": {
+          "type": "string"
+        },
+        "cpu_type": {
+          "type": "string"
+        },
+        "chip_type": {
+          "type": "string"
+        },
+        "current_processor_speed": {
+          "type": "string"
+        },
+        "number_processors": {
+          "type": "string"
+        },
+        "packages": {
+          "type": "integer"
+        },
+        "l2_cache_core": {
+          "type": "string"
+        },
+        "l3_cache": {
+          "type": "string"
+        },
+        "physical_memory": {
+          "type": "string"
+        },
+        "boot_rom_version": {
+          "type": "string"
+        },
+        "os_loader_version": {
+          "type": "string"
+        },
+        "smc_version_system": {
+          "type": "string"
+        },
+        "storage": {
+          "items": {
+            "$ref": "#/$defs/HardwareStorage"
+          },
+          "type": "array"
+        },
+        "battery": {
+          "$ref": "#/$defs/HardwareBattery"
+        },
+        "charger": {
+          "$ref": "#/$defs/HardwareCharger"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HardwareStorage": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bsd_name": {
+          "type": "string"
+        },
+        "capacity": {
+          "type": "integer"
+        },
+        "file_system": {
+          "type": "string"
+        },
+        "mount_point": {
+          "type": "string"
+        },
+        "free_space": {
+          "type": "integer"
+        },
+        "writable": {
+          "type": "boolean"
+        },
+        "drive_type": {
+          "type": "string"
+        },
+        "smart_status": {
+          "type": "string"
+        },
+        "partitions": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HostnameInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "machine_name": {
+          "type": "string"
+        },
+        "fqdn": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "InitInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "KernelInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "release": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "processor": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "rosetta_translated": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "release",
+        "machine"
+      ]
+    },
+    "KernelmodulesInfo": {
+      "properties": {
+        "modules": {
+          "additionalProperties": {
+            "$ref": "#/$defs/KernelmodulesModule"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "KernelmodulesModule": {
+      "properties": {
+        "size": {
+          "type": "integer"
+        },
+        "refcount": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LinodeInfo": {
+      "properties": {
+        "public_ip": {
+          "type": "string"
+        },
+        "private_ip": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LoadInfo": {
+      "properties": {
+        "one": {
+          "type": "number"
+        },
+        "five": {
+          "type": "number"
+        },
+        "fifteen": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "one",
+        "five",
+        "fifteen"
+      ]
+    },
+    "LsbInfo": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "release": {
+          "type": "string"
+        },
+        "codename": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "MachineidInfo": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "MemoryDirectMap": {
+      "properties": {
+        "map_4k": {
+          "type": "integer"
+        },
+        "map_2m": {
+          "type": "integer"
+        },
+        "map_1g": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "MemoryHugepages": {
+      "properties": {
+        "total": {
+          "type": "integer"
+        },
+        "free": {
+          "type": "integer"
+        },
+        "reserved": {
+          "type": "integer"
+        },
+        "surplus": {
+          "type": "integer"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "anon_hugepages": {
+          "type": "integer"
+        },
+        "hugetlb": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "total"
+      ]
+    },
+    "MemoryInfo": {
+      "properties": {
+        "total": {
+          "type": "integer"
+        },
+        "available": {
+          "type": "integer"
+        },
+        "used": {
+          "type": "integer"
+        },
+        "used_percent": {
+          "type": "number"
+        },
+        "free": {
+          "type": "integer"
+        },
+        "active": {
+          "type": "integer"
+        },
+        "inactive": {
+          "type": "integer"
+        },
+        "active_anon": {
+          "type": "integer"
+        },
+        "inactive_anon": {
+          "type": "integer"
+        },
+        "active_file": {
+          "type": "integer"
+        },
+        "inactive_file": {
+          "type": "integer"
+        },
+        "unevictable": {
+          "type": "integer"
+        },
+        "wired": {
+          "type": "integer"
+        },
+        "speculative": {
+          "type": "integer"
+        },
+        "compressed": {
+          "type": "integer"
+        },
+        "buffers": {
+          "type": "integer"
+        },
+        "cached": {
+          "type": "integer"
+        },
+        "dirty": {
+          "type": "integer"
+        },
+        "writeback": {
+          "type": "integer"
+        },
+        "writeback_tmp": {
+          "type": "integer"
+        },
+        "shared": {
+          "type": "integer"
+        },
+        "mapped": {
+          "type": "integer"
+        },
+        "slab": {
+          "type": "integer"
+        },
+        "s_reclaimable": {
+          "type": "integer"
+        },
+        "s_unreclaim": {
+          "type": "integer"
+        },
+        "k_reclaimable": {
+          "type": "integer"
+        },
+        "page_tables": {
+          "type": "integer"
+        },
+        "kernel_stack": {
+          "type": "integer"
+        },
+        "percpu": {
+          "type": "integer"
+        },
+        "high_total": {
+          "type": "integer"
+        },
+        "high_free": {
+          "type": "integer"
+        },
+        "low_total": {
+          "type": "integer"
+        },
+        "low_free": {
+          "type": "integer"
+        },
+        "nfs_unstable": {
+          "type": "integer"
+        },
+        "bounce": {
+          "type": "integer"
+        },
+        "anon_pages": {
+          "type": "integer"
+        },
+        "shmem": {
+          "type": "integer"
+        },
+        "direct_map": {
+          "$ref": "#/$defs/MemoryDirectMap"
+        },
+        "commit_limit": {
+          "type": "integer"
+        },
+        "committed_as": {
+          "type": "integer"
+        },
+        "vmalloc_total": {
+          "type": "integer"
+        },
+        "vmalloc_used": {
+          "type": "integer"
+        },
+        "vmalloc_chunk": {
+          "type": "integer"
+        },
+        "hugepages": {
+          "$ref": "#/$defs/MemoryHugepages"
+        },
+        "swap": {
+          "$ref": "#/$defs/MemorySwap"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "total"
+      ]
+    },
+    "MemorySwap": {
+      "properties": {
+        "total": {
+          "type": "integer"
+        },
+        "used": {
+          "type": "integer"
+        },
+        "free": {
+          "type": "integer"
+        },
+        "used_percent": {
+          "type": "number"
+        },
+        "cached": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "total",
+        "used",
+        "free"
+      ]
+    },
+    "NetworkAddress": {
+      "properties": {
+        "addr": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "prefixlen": {
+          "type": "integer"
+        },
+        "netmask": {
+          "type": "string"
+        },
+        "broadcast": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "addr",
+        "family",
+        "prefixlen"
+      ]
+    },
+    "NetworkCounters": {
+      "properties": {
+        "bytes_sent": {
+          "type": "integer"
+        },
+        "bytes_recv": {
+          "type": "integer"
+        },
+        "packets_sent": {
+          "type": "integer"
+        },
+        "packets_recv": {
+          "type": "integer"
+        },
+        "errin": {
+          "type": "integer"
+        },
+        "errout": {
+          "type": "integer"
+        },
+        "dropin": {
+          "type": "integer"
+        },
+        "dropout": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "bytes_sent",
+        "bytes_recv",
+        "packets_sent",
+        "packets_recv"
+      ]
+    },
+    "NetworkEthtoolInfo": {
+      "properties": {
+        "driver_info": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "ring_params": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "channel_params": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "coalesce_params": {
+          "type": "object"
+        },
+        "offload_params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "pause_params": {
+          "additionalProperties": {
+            "type": "boolean"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "NetworkInfo": {
+      "properties": {
+        "interfaces": {
+          "items": {
+            "$ref": "#/$defs/NetworkInterface"
+          },
+          "type": "array"
+        },
+        "routes": {
+          "items": {
+            "$ref": "#/$defs/NetworkRoute"
+          },
+          "type": "array"
+        },
+        "neighbours": {
+          "items": {
+            "$ref": "#/$defs/NetworkNeighbour"
+          },
+          "type": "array"
+        },
+        "default_interface": {
+          "type": "string"
+        },
+        "default_gateway": {
+          "type": "string"
+        },
+        "default_inet6_interface": {
+          "type": "string"
+        },
+        "default_inet6_gateway": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "interfaces"
+      ]
+    },
+    "NetworkInterface": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "state": {
+          "type": "string"
+        },
+        "mtu": {
+          "type": "integer"
+        },
+        "hardware_addr": {
+          "type": "string"
+        },
+        "encapsulation": {
+          "type": "string"
+        },
+        "driver": {
+          "type": "string"
+        },
+        "speed": {
+          "type": "string"
+        },
+        "duplex": {
+          "type": "string"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "addresses": {
+          "items": {
+            "$ref": "#/$defs/NetworkAddress"
+          },
+          "type": "array"
+        },
+        "routes": {
+          "items": {
+            "$ref": "#/$defs/NetworkRoute"
+          },
+          "type": "array"
+        },
+        "counters": {
+          "$ref": "#/$defs/NetworkCounters"
+        },
+        "ethtool": {
+          "$ref": "#/$defs/NetworkEthtoolInfo"
+        },
+        "vlan": {
+          "$ref": "#/$defs/NetworkVLANInfo"
+        },
+        "tunnel_info": {
+          "$ref": "#/$defs/NetworkTunnelInfo"
+        },
+        "xdp": {
+          "$ref": "#/$defs/NetworkXDPInfo"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "mtu"
+      ]
+    },
+    "NetworkNeighbour": {
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "mac": {
+          "type": "string"
+        },
+        "interface": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "address",
+        "family"
+      ]
+    },
+    "NetworkRoute": {
+      "properties": {
+        "destination": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "gateway": {
+          "type": "string"
+        },
+        "interface": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "proto": {
+          "type": "string"
+        },
+        "metric": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "destination",
+        "family"
+      ]
+    },
+    "NetworkTunnelInfo": {
+      "properties": {
+        "proto": {
+          "type": "string"
+        },
+        "external": {
+          "type": "boolean"
+        },
+        "remote": {
+          "type": "string"
+        },
+        "local": {
+          "type": "string"
+        },
+        "encaplimit": {
+          "type": "string"
+        },
+        "hoplimit": {
+          "type": "string"
+        },
+        "tclass": {
+          "type": "string"
+        },
+        "flowlabel": {
+          "type": "string"
+        },
+        "addrgenmode": {
+          "type": "string"
+        },
+        "numtxqueues": {
+          "type": "string"
+        },
+        "numrxqueues": {
+          "type": "string"
+        },
+        "gso_max_size": {
+          "type": "string"
+        },
+        "gso_max_segs": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "NetworkVLANInfo": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "NetworkXDPInfo": {
+      "properties": {
+        "attached": {
+          "items": {
+            "$ref": "#/$defs/NetworkXDPProgram"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "NetworkXDPProgram": {
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "mode",
+        "id"
+      ]
+    },
+    "OciAgentConfig": {
+      "properties": {
+        "is_management_disabled": {
+          "type": "boolean"
+        },
+        "is_monitoring_disabled": {
+          "type": "boolean"
+        },
+        "are_all_plugins_disabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OciAvailabilityConfig": {
+      "properties": {
+        "is_live_migration_preferred": {
+          "type": "boolean"
+        },
+        "recovery_action": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OciInfo": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "shape": {
+          "type": "string"
+        },
+        "shape_config": {
+          "$ref": "#/$defs/OciShapeConfig"
+        },
+        "image": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "canonical_region_name": {
+          "type": "string"
+        },
+        "availability_domain": {
+          "type": "string"
+        },
+        "fault_domain": {
+          "type": "string"
+        },
+        "compartment_id": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "time_created": {
+          "type": "integer"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "defined_tags": {
+          "type": "object"
+        },
+        "freeform_tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "region_info": {
+          "$ref": "#/$defs/OciRegionInfo"
+        },
+        "agent_config": {
+          "$ref": "#/$defs/OciAgentConfig"
+        },
+        "availability_config": {
+          "$ref": "#/$defs/OciAvailabilityConfig"
+        },
+        "instance_pool_id": {
+          "type": "string"
+        },
+        "dedicated_vm_host_id": {
+          "type": "string"
+        },
+        "launch_options": {
+          "$ref": "#/$defs/OciLaunchOptions"
+        },
+        "source_details": {
+          "$ref": "#/$defs/OciSourceDetails"
+        },
+        "platform_config": {
+          "type": "object"
+        },
+        "vnics": {
+          "items": {
+            "$ref": "#/$defs/OciVNIC"
+          },
+          "type": "array"
+        },
+        "volume_attachments": {
+          "additionalProperties": {
+            "$ref": "#/$defs/OciVolumeAttachment"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "OciLaunchOptions": {
+      "properties": {
+        "boot_volume_type": {
+          "type": "string"
+        },
+        "firmware": {
+          "type": "string"
+        },
+        "network_type": {
+          "type": "string"
+        },
+        "remote_data_volume_type": {
+          "type": "string"
+        },
+        "is_consistent_volume_naming_enabled": {
+          "type": "boolean"
+        },
+        "is_pv_encryption_in_transit_enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OciRegionInfo": {
+      "properties": {
+        "realm_key": {
+          "type": "string"
+        },
+        "realm_domain_component": {
+          "type": "string"
+        },
+        "region_key": {
+          "type": "string"
+        },
+        "region_identifier": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OciShapeConfig": {
+      "properties": {
+        "ocpus": {
+          "type": "number"
+        },
+        "memory_in_gbs": {
+          "type": "number"
+        },
+        "networking_bandwidth_in_gbps": {
+          "type": "number"
+        },
+        "max_vnic_attachments": {
+          "type": "integer"
+        },
+        "gpus": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OciSourceDetails": {
+      "properties": {
+        "source_type": {
+          "type": "string"
+        },
+        "image_id": {
+          "type": "string"
+        },
+        "boot_volume_id": {
+          "type": "string"
+        },
+        "boot_volume_size_in_gbs": {
+          "type": "integer"
+        },
+        "kms_key_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OciVNIC": {
+      "properties": {
+        "vnic_id": {
+          "type": "string"
+        },
+        "private_ip": {
+          "type": "string"
+        },
+        "vlan_tag": {
+          "type": "integer"
+        },
+        "mac_addr": {
+          "type": "string"
+        },
+        "virtual_router_ip": {
+          "type": "string"
+        },
+        "subnet_cidr_block": {
+          "type": "string"
+        },
+        "nic_index": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "vnic_id"
+      ]
+    },
+    "OciVolumeAttachment": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "attachment_type": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "volume_id": {
+          "type": "string"
+        },
+        "is_read_only": {
+          "type": "boolean"
+        },
+        "lifecycle_state": {
+          "type": "string"
+        },
+        "device": {
+          "type": "string"
+        },
+        "iqn": {
+          "type": "string"
+        },
+        "ipv4": {
+          "type": "string"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "encryption_in_transit": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "OpenstackDevice": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "bus": {
+          "type": "string"
+        },
+        "serial": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OpenstackInfo": {
+      "properties": {
+        "instance_id": {
+          "type": "string"
+        },
+        "instance_type": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "local_hostname": {
+          "type": "string"
+        },
+        "public_hostname": {
+          "type": "string"
+        },
+        "availability_zone": {
+          "type": "string"
+        },
+        "local_ipv4": {
+          "type": "string"
+        },
+        "public_ipv4": {
+          "type": "string"
+        },
+        "security_groups": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ami_id": {
+          "type": "string"
+        },
+        "kernel_id": {
+          "type": "string"
+        },
+        "ramdisk_id": {
+          "type": "string"
+        },
+        "reservation_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "launch_index": {
+          "type": "integer"
+        },
+        "meta_data": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "public_keys": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/OpenstackDevice"
+          },
+          "type": "array"
+        },
+        "provider": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "instance_id"
+      ]
+    },
+    "OsreleaseInfo": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "id_like": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "pretty_name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "version_id": {
+          "type": "string"
+        },
+        "version_codename": {
+          "type": "string"
+        },
+        "build_id": {
+          "type": "string"
+        },
+        "variant": {
+          "type": "string"
+        },
+        "variant_id": {
+          "type": "string"
+        },
+        "home_url": {
+          "type": "string"
+        },
+        "support_url": {
+          "type": "string"
+        },
+        "bug_report_url": {
+          "type": "string"
+        },
+        "extra": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PackagemgrInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "PciDevice": {
+      "properties": {
+        "vendor_id": {
+          "type": "string"
+        },
+        "vendor_name": {
+          "type": "string"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "device_name": {
+          "type": "string"
+        },
+        "class_id": {
+          "type": "string"
+        },
+        "class_name": {
+          "type": "string"
+        },
+        "subclass_id": {
+          "type": "string"
+        },
+        "subclass_name": {
+          "type": "string"
+        },
+        "sdevice_id": {
+          "type": "string"
+        },
+        "sdevice_name": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "driver": {
+          "type": "string"
+        },
+        "iommu_group": {
+          "type": "string"
+        },
+        "parent_address": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PciInfo": {
+      "properties": {
+        "devices": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PciDevice"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "devices"
+      ]
+    },
+    "PlatformInfo": {
+      "properties": {
+        "os": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "version_extra": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string"
+        },
+        "architecture": {
+          "type": "string"
+        },
+        "build": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "os",
+        "name",
+        "version",
+        "family",
+        "architecture"
+      ]
+    },
+    "ProcessInfo": {
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "processes": {
+          "items": {
+            "$ref": "#/$defs/ProcessProcess"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "count"
+      ]
+    },
+    "ProcessProcess": {
+      "properties": {
+        "pid": {
+          "type": "integer"
+        },
+        "ppid": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "cmd_line": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "pid"
+      ]
+    },
+    "RootgroupInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "ScalewayBootscript": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "architecture": {
+          "type": "string"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "initrd": {
+          "type": "string"
+        },
+        "bootcmdargs": {
+          "type": "string"
+        },
+        "organization": {
+          "type": "string"
+        },
+        "public": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "ScalewayInfo": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "organization": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        },
+        "commercial_type": {
+          "type": "string"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "state_detail": {
+          "type": "string"
+        },
+        "public_ip": {
+          "type": "string"
+        },
+        "public_ip_id": {
+          "type": "string"
+        },
+        "public_ip_dynamic": {
+          "type": "boolean"
+        },
+        "private_ip": {
+          "type": "string"
+        },
+        "ipv6_address": {
+          "type": "string"
+        },
+        "ipv6_netmask": {
+          "type": "string"
+        },
+        "ipv6_gateway": {
+          "type": "string"
+        },
+        "zone": {
+          "type": "string"
+        },
+        "platform_id": {
+          "type": "string"
+        },
+        "ssh_public_keys": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "volumes": {
+          "items": {
+            "$ref": "#/$defs/ScalewayVolume"
+          },
+          "type": "array"
+        },
+        "timezone": {
+          "type": "string"
+        },
+        "bootscript": {
+          "$ref": "#/$defs/ScalewayBootscript"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "ScalewayVolume": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "volume_type": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "export_uri": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id"
+      ]
+    },
+    "ScsiDevice": {
+      "properties": {
+        "scsi_addr": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "transport": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "device": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "scsi_addr"
+      ]
+    },
+    "ScsiInfo": {
+      "properties": {
+        "devices": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ScsiDevice"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "devices"
+      ]
+    },
+    "SessionsInfo": {
+      "properties": {
+        "logged_in": {
+          "items": {
+            "$ref": "#/$defs/SessionsSession"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "logged_in"
+      ]
+    },
+    "SessionsSession": {
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "terminal": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "started": {
+          "type": "integer"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "string"
+        },
+        "seat": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "user"
+      ]
+    },
+    "ShardInfo": {
+      "properties": {
+        "seed": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "seed"
+      ]
+    },
+    "ShellsInfo": {
+      "properties": {
+        "paths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "paths"
+      ]
+    },
+    "TimezoneInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "abbrev": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "offset"
+      ]
+    },
+    "Timings": {
+      "properties": {
+        "collectors": {
+          "additionalProperties": {
+            "$ref": "#/$defs/CollectorTiming"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "collectors"
+      ]
+    },
+    "UptimeInfo": {
+      "properties": {
+        "seconds": {
+          "type": "integer"
+        },
+        "boot_time": {
+          "type": "integer"
+        },
+        "human": {
+          "type": "string"
+        },
+        "idle_seconds": {
+          "type": "integer"
+        },
+        "idle_human": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "seconds",
+        "boot_time",
+        "human"
+      ]
+    },
+    "UsersGroupEntry": {
+      "properties": {
+        "gid": {
+          "type": "integer"
+        },
+        "members": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "gid"
+      ]
+    },
+    "UsersInfo": {
+      "properties": {
+        "passwd": {
+          "additionalProperties": {
+            "$ref": "#/$defs/UsersPasswdEntry"
+          },
+          "type": "object"
+        },
+        "group": {
+          "additionalProperties": {
+            "$ref": "#/$defs/UsersGroupEntry"
+          },
+          "type": "object"
+        },
+        "current_user": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "passwd",
+        "group"
+      ]
+    },
+    "UsersPasswdEntry": {
+      "properties": {
+        "uid": {
+          "type": "integer"
+        },
+        "gid": {
+          "type": "integer"
+        },
+        "dir": {
+          "type": "string"
+        },
+        "shell": {
+          "type": "string"
+        },
+        "gecos": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "uid",
+        "gid"
+      ]
+    },
+    "VirtualizationInfo": {
+      "properties": {
+        "system": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "systems": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "hypervisor_host": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  "title": "gohai Facts",
+  "description": "System facts collected by gohai (https://github.com/osapi-io/gohai)"
+}

@@ -578,7 +578,8 @@ func transform(
 			}
 			for _, d := range r.Compute.StorageProfile.DataDisks {
 				info.StorageProfile.DataDisks = append(
-					info.StorageProfile.DataDisks, convertDisk(d))
+					info.StorageProfile.DataDisks, convertDisk(d),
+				)
 			}
 		}
 	}

@@ -33,7 +33,14 @@ marketplace:
 ## Project Structure
 
 ```
-cmd/gohai/                 # CLI entrypoint (Cobra)
+cmd/                       # CLI layer (Cobra subcommands)
+  root.go                  # Root command, banner, context setup
+  collect.go               # `gohai collect` — flags, collector wiring
+  validate.go              # `gohai validate` — JSON Schema validation
+  version.go               # `gohai version` — build info
+internal/cli/              # CLI output helpers (theme, formatting)
+  theme.go                 # Maxheadroom palette, Banner, styled output
+  output.go                # WriteJSON, WriteFlat, WriteCollectorList
 pkg/gohai/                 # Public SDK (Gohai struct, Facts, options)
   gohai.go                 # New(), Collect(), functional options
   facts.go                 # Typed Facts struct with all collector results
@@ -46,6 +53,12 @@ internal/collector/        # Collector implementations (one sub-package each)
   cpu/                     # CPU information
   memory/                  # Memory information
   ...                      # One package per collector
+schemas/
+  gen/                     # JSON Schema generator tool
+  gohai.schema.json        # Generated schema (committed)
+  schema.go                # Embeds gohai.schema.json for validate cmd
+  field-mapping.md         # Per-field tier mapping (OCSF/OTel/convention)
+  ocsf-gaps.md             # OCSF upstream PR candidates
 docs/
   collectors/              # Per-collector reference (one doc per collector)
     README.md              # Master index with tier tables
@@ -144,14 +157,14 @@ go test -run TestName -v ./internal/collector/platform/...  # Run a single test
   exercising both success and error paths. See `pkg/gohai/collectors/load/` for
   the canonical shape.
 
-### Upcoming: VFS + Executor (Phase 1, WIP)
+### VFS + Executor abstractions
 
-The per-field `Fn` injection pattern is being replaced by shared
-`vfs.Filesystem` and `executor.Executor` abstractions (avfs + gomock-backed)
-threaded through `Collect` the same way `context.Context` is. Until Phase 1
-lands, use `export_test.go` + private var + setter for gopsutil / syscall /
-file-read seams. Do NOT add new `Fn` struct fields for new seams. See the
-"Upcoming: VFS + Executor Abstractions" section in CLAUDE.md.
+Collectors that read files use `avfs.VFS`; collectors that shell out use
+`executor.Executor` (gomock-backed). Both are injected as struct fields on
+per-OS variants. New collectors MUST use these — do not add `Fn` struct fields
+for new seams. See the "VFS + Executor Abstractions" section in CLAUDE.md for
+the full pattern and test shapes. Canonical reference:
+`pkg/gohai/collectors/shells/`.
 
 ## Before committing
 
@@ -190,6 +203,33 @@ Follow [Conventional Commits][] with the 50/72 rule:
 Try to write meaningful commit messages and avoid having too many commits on a
 PR. Most PRs should likely have a single commit (although for bigger PRs it may
 be reasonable to split it in a few). Git squash and rebase is your friend!
+
+## Color Palette (Max Headroom)
+
+```
+#b4a7d6  lavender  accent, banner
+#00d4ff  cyan      info hints
+#50fa7b  green     success
+#ff6ec7  pink      errors
+```
+
+All palette values are defined as named constants in `internal/cli/theme.go`.
+Never pass raw ANSI escape strings in command code — reference the theme roles
+(`Accent`, `OK`, `Err`, `Info`, `Mute`) instead. `install.sh` uses the same
+`#b4a7d6` hex value as a truecolor escape so the install banner and the running
+CLI paint with the exact same hue.
+
+## CLI Architecture
+
+All CLI output styling and formatting lives in `internal/cli/`:
+
+- **`theme.go`** — maxheadroom palette, `Banner()`, role-based color helpers
+  (`Mute`, `Accent`, `OK`, `Err`, `Info`, `Success`, `Failure`)
+- **`output.go`** — `WriteOutput`, `WriteJSON`, `WriteFlat`,
+  `WriteCollectorList` — facts formatting for the collect subcommand
+
+`cmd/` files are thin wiring: they parse flags, call the SDK, and delegate all
+output to `internal/cli/`. No raw `fmt.Fprintf` with color codes in `cmd/`.
 
 [mise]: https://mise.jdx.dev
 [Go]: https://go.dev

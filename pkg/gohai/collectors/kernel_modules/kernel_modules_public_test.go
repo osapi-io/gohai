@@ -133,7 +133,8 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		`Index Refs Address            Size       Wired      Name (Version) <Linked Against>
     1    0 0xffffff7f80000000 0x8a8      0xa8       com.apple.iokit.IOPCIFamily (2.9)
     2   12 0xffffff7f80001000 0x1000     0x100      com.apple.driver.AppleACPIPlatform (6.1)
-`)
+`,
+	)
 
 	tests := []struct {
 		name     string

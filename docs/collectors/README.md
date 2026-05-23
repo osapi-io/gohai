@@ -36,13 +36,16 @@ membership in the recommended set (`✅` = on when `WithDefaults()` is in effect
 implemented and tested, `⚠️` = partial, `🚧` = planned, `🪦` = deprecated, will
 not implement (low demand / upstream project archived).
 
-**Schema:** Field names follow [OCSF][] (Open Cybersecurity Schema Framework) as
-the primary schema and [OpenTelemetry Resource Semantic
-Conventions][otel-semconv] as the secondary when OCSF is silent. Browse
+**Schema:** Field names follow a three-tier naming ladder: [OCSF][] (Open
+Cybersecurity Schema Framework) as the primary authority (~97 fields),
+[OpenTelemetry Resource Semantic Conventions][otel-semconv] when OCSF is silent
+(~73 fields), and a documented convention for the remaining ~633 fields. Browse
 [schema.ocsf.io][ocsf-schema] and the [OpenTelemetry resource
-attributes][otel-semconv] to see canonical names and object shapes. Each
-collector's doc includes a **Collected Fields** table with a schema mapping
-column citing the canonical path. Collection logic (what to read, which distro
+attributes][otel-semconv] to see canonical names. The complete per-field mapping
+with citations lives in
+[`schemas/field-mapping.md`](../schemas/field-mapping.md). Fields where OCSF is
+silent are tracked in [`schemas/ocsf-gaps.md`](../schemas/ocsf-gaps.md) as
+upstream contribution candidates. Collection logic (what to read, which distro
 edge cases to handle) follows [Chef Ohai][]'s plugins.
 
 [OCSF]: https://ocsf.io/
