@@ -59,27 +59,38 @@ compliance. The CLI is a convenience — the SDK is the product.
 
 ## 📦 Install
 
-**One-line installer** (macOS / Linux):
-
 ```bash
 curl -fsSL https://github.com/osapi-io/gohai/raw/main/install.sh | bash
 ```
 
-The installer downloads the latest release, verifies the SHA-256 checksum,
-strips macOS quarantine, and installs to `~/.local/bin` (or `/usr/local/bin`
-when run as root). Override with `GOHAI_VERSION` or `GOHAI_INSTALL_DIR`.
+Installs to `~/.local/bin` (or `/usr/local/bin` as root) — SHA-256 checksums
+verified. Override with `GOHAI_INSTALL_DIR=/some/path` or pin a version with
+`GOHAI_VERSION=1.0.0`.
 
-**Go install:**
+<details>
+<summary>Other install methods</summary>
+
+### Go install
 
 ```bash
 go install github.com/osapi-io/gohai@latest
 ```
 
-**As a library dependency:**
+### As a library dependency
 
 ```bash
 go get github.com/osapi-io/gohai
 ```
+
+### Build from source
+
+```bash
+git clone https://github.com/osapi-io/gohai.git
+cd gohai
+go build -o gohai .
+```
+
+</details>
 
 ## ✨ Features
 
