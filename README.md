@@ -31,12 +31,12 @@ Field names follow a three-tier naming ladder:
 1. **[OCSF][]** (Open Cybersecurity Schema Framework) — primary
    authority. Backed by AWS and Splunk for asset, observability, and
    security data. Aligning means gohai output feeds SIEMs, data lakes,
-   and inventory tools without translation. ~97 fields are OCSF-named.
+   and inventory tools without translation. ~108 fields are OCSF-named.
    Browse [schema.ocsf.io][ocsf-schema] to see canonical names.
 2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** —
    when OCSF is silent. Covers areas OCSF hasn't: CPU microarchitecture,
-   memory states, filesystem attributes, hardware detail. ~73 fields.
-3. **gohai convention** — for the ~633 remaining fields where no
+   memory states, filesystem attributes, hardware detail. ~74 fields.
+3. **gohai convention** — for the ~768 remaining fields where no
    standard has an opinion. Starts from the backing library's field
    name (gopsutil/ghw) in `snake_case`, with unit suffixes when
    ambiguous.

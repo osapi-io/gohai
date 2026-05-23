@@ -37,9 +37,9 @@ implemented and tested, `⚠️` = partial, `✅` = planned, `🪦` = deprecated
 not implement (low demand / upstream project archived).
 
 **Schema:** Field names follow a three-tier naming ladder: [OCSF][] (Open
-Cybersecurity Schema Framework) as the primary authority (~97 fields),
+Cybersecurity Schema Framework) as the primary authority (~108 fields),
 [OpenTelemetry Resource Semantic Conventions][otel-semconv] when OCSF is silent
-(~73 fields), and a documented convention for the remaining ~633 fields. Browse
+(~74 fields), and a documented convention for the remaining ~768 fields. Browse
 [schema.ocsf.io][ocsf-schema] and the [OpenTelemetry resource
 attributes][otel-semconv] to see canonical names. The complete per-field mapping
 with citations lives in
