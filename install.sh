@@ -180,6 +180,10 @@ detect_os() {
 }
 
 detect_arch() {
+    if [ "$os" = "darwin" ]; then
+        arch=all
+        return
+    fi
     machine=$(uname -m)
     case "$machine" in
         arm64|aarch64) arch=arm64 ;;
