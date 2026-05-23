@@ -20,11 +20,7 @@
 
 package cli
 
-// IsTTY exposes isTTY for external tests.
-var IsTTY = isTTY
-
-// Colorize exposes colorize for external tests.
-var Colorize = colorize
+import "github.com/osapi-io/gohai/pkg/gohai"
 
 // SetIsTerminalFn swaps the terminal-detection function for testing.
 func SetIsTerminalFn(
@@ -34,4 +30,14 @@ func SetIsTerminalFn(
 	isTerminalFn = fn
 
 	return func() { isTerminalFn = old }
+}
+
+// SetMarshalFactsFn swaps the facts marshaling function for testing.
+func SetMarshalFactsFn(
+	fn func(*gohai.Facts, bool) ([]byte, error),
+) func() {
+	old := marshalFactsFn
+	marshalFactsFn = fn
+
+	return func() { marshalFactsFn = old }
 }

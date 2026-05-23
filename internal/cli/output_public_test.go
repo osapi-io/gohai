@@ -77,21 +77,24 @@ func (s *OutputPublicTestSuite) TestWriteOutput() {
 	}
 
 	for _, tc := range tests {
-		var buf bytes.Buffer
-		err := cli.WriteOutput(&buf, &gohai.Facts{}, tc.pretty, tc.flat)
+		s.Run(tc.name, func() {
+			var buf bytes.Buffer
+			err := cli.WriteOutput(&buf, &gohai.Facts{}, tc.pretty, tc.flat)
 
-		s.NoError(err)
-		tc.verify(buf.String())
+			s.NoError(err)
+			tc.verify(buf.String())
+		})
 	}
 }
 
 func (s *OutputPublicTestSuite) TestWriteJSON() {
 	tests := []struct {
-		name     string
-		w        io.Writer
-		pretty   bool
-		wantErr  string
-		validate func(string)
+		name      string
+		w         io.Writer
+		pretty    bool
+		marshalFn func(*gohai.Facts, bool) ([]byte, error)
+		wantErr   string
+		validate  func(string)
 	}{
 		{
 			name:   "compact",
@@ -116,17 +119,33 @@ func (s *OutputPublicTestSuite) TestWriteJSON() {
 			pretty:  false,
 			wantErr: "write output",
 		},
+		{
+			name:   "marshal error",
+			w:      &bytes.Buffer{},
+			pretty: false,
+			marshalFn: func(_ *gohai.Facts, _ bool) ([]byte, error) {
+				return nil, errors.New("marshal boom")
+			},
+			wantErr: "encode output",
+		},
 	}
 
 	for _, tc := range tests {
-		err := cli.WriteJSON(tc.w, &gohai.Facts{}, tc.pretty)
+		s.Run(tc.name, func() {
+			if tc.marshalFn != nil {
+				restore := cli.SetMarshalFactsFn(tc.marshalFn)
+				defer restore()
+			}
 
-		if tc.wantErr != "" {
-			s.ErrorContains(err, tc.wantErr)
-		} else {
-			s.NoError(err)
-			tc.validate(tc.w.(*bytes.Buffer).String())
-		}
+			err := cli.WriteJSON(tc.w, &gohai.Facts{}, tc.pretty)
+
+			if tc.wantErr != "" {
+				s.ErrorContains(err, tc.wantErr)
+			} else {
+				s.NoError(err)
+				tc.validate(tc.w.(*bytes.Buffer).String())
+			}
+		})
 	}
 }
 
@@ -148,14 +167,16 @@ func (s *OutputPublicTestSuite) TestWriteFlat() {
 	}
 
 	for _, tc := range tests {
-		err := cli.WriteFlat(tc.w, &gohai.Facts{})
+		s.Run(tc.name, func() {
+			err := cli.WriteFlat(tc.w, &gohai.Facts{})
 
-		if tc.wantErr != "" {
-			s.ErrorContains(err, tc.wantErr)
-		} else {
-			s.NoError(err)
-			s.Contains(tc.w.(*bytes.Buffer).String(), "collect_time=")
-		}
+			if tc.wantErr != "" {
+				s.ErrorContains(err, tc.wantErr)
+			} else {
+				s.NoError(err)
+				s.Contains(tc.w.(*bytes.Buffer).String(), "collect_time=")
+			}
+		})
 	}
 }
 
@@ -182,16 +203,18 @@ func (s *OutputPublicTestSuite) TestWriteCollectorList() {
 	}
 
 	for _, tc := range tests {
-		err := cli.WriteCollectorList(tc.w)
+		s.Run(tc.name, func() {
+			err := cli.WriteCollectorList(tc.w)
 
-		if tc.wantErr != "" {
-			s.ErrorContains(err, tc.wantErr)
-		} else {
-			s.NoError(err)
-			out := tc.w.(*bytes.Buffer).String()
-			s.Contains(out, "[")
-			s.Contains(out, "platform")
-		}
+			if tc.wantErr != "" {
+				s.ErrorContains(err, tc.wantErr)
+			} else {
+				s.NoError(err)
+				out := tc.w.(*bytes.Buffer).String()
+				s.Contains(out, "[")
+				s.Contains(out, "platform")
+			}
+		})
 	}
 }
 
