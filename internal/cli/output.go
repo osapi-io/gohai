@@ -64,23 +64,24 @@ func WriteFlat(
 	return nil
 }
 
+var marshalFactsFn = func(
+	facts *gohai.Facts,
+	pretty bool,
+) ([]byte, error) {
+	if pretty {
+		return facts.PrettyJSON()
+	}
+
+	return facts.JSON()
+}
+
 // WriteJSON writes facts as JSON, optionally pretty-printed.
 func WriteJSON(
 	out io.Writer,
 	facts *gohai.Facts,
 	pretty bool,
 ) error {
-	var (
-		b   []byte
-		err error
-	)
-
-	if pretty {
-		b, err = facts.PrettyJSON()
-	} else {
-		b, err = facts.JSON()
-	}
-
+	b, err := marshalFactsFn(facts, pretty)
 	if err != nil {
 		return fmt.Errorf("encode output: %w", err)
 	}

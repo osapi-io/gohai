@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -88,7 +89,7 @@ func runValidate(
 			return fmt.Errorf("write validation error: %w", wErr)
 		}
 
-		return fmt.Errorf("schema validation failed")
+		return errors.New("schema validation failed")
 	}
 
 	if _, err := fmt.Fprintln(out, "valid"); err != nil {

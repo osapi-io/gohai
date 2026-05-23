@@ -33,7 +33,9 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
-func qualifiedNamer(t reflect.Type) string {
+func qualifiedNamer(
+	t reflect.Type,
+) string {
 	pkg := t.PkgPath()
 	name := t.Name()
 
