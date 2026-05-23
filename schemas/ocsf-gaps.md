@@ -884,3 +884,52 @@ objects.
   and is a common source of cross-platform bugs.
 - **OTel precedent:** None.
 - **gohai type:** `string` / `"name"` (under `root_group` collector)
+
+## New Objects (from new collectors)
+
+### SELinux Security Posture (`selinux.status`, `selinux.current_mode`)
+
+- **What:** SELinux enabled/disabled status and runtime enforcement mode
+  (enforcing/permissive/disabled).
+- **Why OCSF lacks it:** OCSF models security events but does not model host
+  security configuration state.
+- **Why it should exist:** SELinux is a major Linux Mandatory Access Control
+  framework. Knowing whether a host is in enforcing, permissive, or disabled
+  mode is fundamental to security posture assessment. This affects vulnerability
+  management, compliance (CIS benchmarks), and incident response.
+- **OTel precedent:** None. OTel does not model host security posture.
+- **gohai types:** `string` / `"status"`, `string` / `"current_mode"`,
+  `string` / `"config_mode"`, `string` / `"policy_version"`,
+  `string` / `"loaded_policy_name"` (under `selinux` collector)
+
+### SSH Host Key (`ssh.keys[]`)
+
+- **What:** SSH host key algorithm, fingerprint (SHA-256 and MD5), and key
+  length for each key type (RSA, ECDSA, Ed25519).
+- **Why OCSF lacks it:** OCSF has a `tls` object for TLS certificate
+  fingerprints in network events, but no equivalent for SSH host keys.
+- **Why it should exist:** SSH host keys are a critical part of host identity
+  in infrastructure. Key rotation, algorithm deprecation (RSA < 2048, DSA),
+  and fingerprint verification are security-relevant operations. An
+  `ssh_host_key` object would complement the existing `tls` object.
+- **OTel precedent:** None.
+- **gohai types:** `string` / `"type"`, `string` / `"fingerprint_sha256"`,
+  `string` / `"fingerprint_md5"`, `int` / `"key_length"` (under `ssh`
+  collector)
+
+### Container Inventory (`docker.containers[]`)
+
+- **What:** Docker container inventory with container ID, name, image, state,
+  and status.
+- **Why OCSF lacks it:** OCSF has a `container` profile extension but it
+  describes the container *context* of a security event, not host-level
+  container inventory.
+- **Why it should exist:** Container inventory is increasingly important for
+  asset management and vulnerability scanning. Knowing which containers are
+  running on a host is a security posture signal.
+- **OTel precedent:** OTel has `container.id`, `container.name`,
+  `container.image.name`, `container.image.tag` — but scoped to per-container
+  resource identity, not host-level inventory.
+- **gohai types:** `string` / `"id"`, `string` / `"name"`,
+  `string` / `"image"`, `string` / `"state"`, `string` / `"status"` (under
+  `docker` collector)

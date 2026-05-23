@@ -223,14 +223,14 @@ three tiers, applied in strict order of precedence:
    authority. When OCSF has a field for the concept, use its name.
    Browse [schema.ocsf.io][ocsf-schema] objects: `device`,
    `device_hw_info`, `os`, `network_interface`, `package`, `process`,
-   `cloud`. (~97 gohai fields are tier 1.)
+   `cloud`. (~108 gohai fields are tier 1.)
 2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** —
    when OCSF is silent. Covers CPU microarchitecture (`host.cpu.*`),
    memory states (`system.memory.*`), filesystem attributes
    (`system.filesystem.*`), hardware detail (`hardware.*`), and
-   process attributes (`process.*`). (~73 gohai fields are tier 2.)
+   process attributes (`process.*`). (~74 gohai fields are tier 2.)
 3. **gohai convention** — for the long tail where no standard has an
-   opinion (~633 fields):
+   opinion (~768 fields):
    - Start from the backing library's field name (gopsutil/ghw),
      converted to `snake_case`.
    - `/proc` and `/sys` mirrors use the kernel's name in `snake_case`.

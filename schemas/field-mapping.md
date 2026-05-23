@@ -840,3 +840,175 @@ Three-tier naming ladder applied to every gohai JSON field.
 | lsb | Description | `description` | T3 | `description` | no | No OCSF/OTel equivalent — LSB human-readable description | Convention — lsb_release(1) `Description` |
 | package_mgr | Name | `name` | T1 | `name` | no | OCSF `package.name` — package manager name | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
 | package_mgr | Path | `path` | T3 | `path` | no | No OCSF/OTel equivalent — absolute path to package manager binary | Convention — exec.LookPath result |
+
+## Linux-Specific Collectors (New)
+
+| Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
+| --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
+| hostnamectl | StaticHostname | `static_hostname` | T1 | `static_hostname` | no | OCSF `device.hostname` | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| hostnamectl | Chassis | `chassis` | T1 | `chassis` | no | OCSF `device_hw_info.chassis` | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
+| hostnamectl | KernelRelease | `kernel_release` | T1 | `kernel_release` | no | OCSF `os.kernel_release` | [OCSF os](https://schema.ocsf.io/1.8.0/objects/os) |
+| hostnamectl | OperatingSystemCPEName | `operating_system_cpe_name` | T1 | `operating_system_cpe_name` | no | OCSF `os.cpe_name` | [OCSF os](https://schema.ocsf.io/1.8.0/objects/os) |
+| hostnamectl | Virtualization | `virtualization` | T1 | `virtualization` | no | OCSF `device.hypervisor` | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| hostnamectl | HardwareVendor | `hardware_vendor` | T1 | `hardware_vendor` | no | OCSF `device_hw_info.vendor_name` | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
+| hostnamectl | HardwareModel | `hardware_model` | T1 | `hardware_model` | no | OCSF `device.model` | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| hostnamectl | FirmwareVersion | `firmware_version` | T1 | `firmware_version` | no | OCSF `device_hw_info.bios_ver` | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
+| hostnamectl | OperatingSystemPrettyName | `operating_system_pretty_name` | T2 | `operating_system_pretty_name` | no | OTel `os.description` | [OTel os](https://github.com/open-telemetry/semantic-conventions/blob/main/model/os/registry.yaml) |
+| hostnamectl | IconName | `icon_name` | T3 | `icon_name` | no | No OCSF/OTel equivalent — systemd icon name | Convention — hostnamectl output |
+| hostnamectl | Deployment | `deployment` | T3 | `deployment` | no | No OCSF/OTel equivalent — systemd deployment environment | Convention — hostnamectl output |
+| hostnamectl | Location | `location` | T3 | `location` | no | No OCSF/OTel equivalent — physical location string | Convention — hostnamectl output |
+| hostnamectl | KernelName | `kernel_name` | T3 | `kernel_name` | no | No OCSF/OTel equivalent — kernel name from hostnamectl | Convention — hostnamectl Kernel field |
+| block_device | Devices | `devices` | T3 | `devices` | no | No OCSF/OTel equivalent — block device array | Convention — /sys/block enumeration |
+| block_device.device | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — kernel block device name | Convention — /sys/block entry name |
+| block_device.device | Size | `size` | T3 | `size` | no | No OCSF/OTel equivalent — device capacity in 512-byte sectors | Convention — /sys/block/DEV/size |
+| block_device.device | Removable | `removable` | T3 | `removable` | no | No OCSF/OTel equivalent — removable media flag | Convention — /sys/block/DEV/removable |
+| block_device.device | Rotational | `rotational` | T3 | `rotational` | no | No OCSF/OTel equivalent — SSD vs spinning disk | Convention — /sys/block/DEV/queue/rotational |
+| block_device.device | PhysicalBlockSize | `physical_block_size` | T3 | `physical_block_size` | no | No OCSF/OTel equivalent — physical sector size | Convention — sysfs queue attribute |
+| block_device.device | LogicalBlockSize | `logical_block_size` | T3 | `logical_block_size` | no | No OCSF/OTel equivalent — logical sector size | Convention — sysfs queue attribute |
+| block_device.device | Model | `model` | T3 | `model` | no | No OCSF/OTel equivalent — device model string | Convention — /sys/block/DEV/device/model |
+| block_device.device | Vendor | `vendor` | T3 | `vendor` | no | No OCSF/OTel equivalent — device vendor string | Convention — /sys/block/DEV/device/vendor |
+| block_device.device | Rev | `rev` | T3 | `rev` | no | No OCSF/OTel equivalent — firmware revision | Convention — /sys/block/DEV/device/rev |
+| block_device.device | State | `state` | T3 | `state` | no | No OCSF/OTel equivalent — SCSI device state | Convention — sysfs device attribute |
+| block_device.device | Timeout | `timeout` | T3 | `timeout` | no | No OCSF/OTel equivalent — SCSI command timeout | Convention — sysfs device attribute |
+| block_device.device | QueueDepth | `queue_depth` | T3 | `queue_depth` | no | No OCSF/OTel equivalent — SCSI queue depth | Convention — sysfs device attribute |
+| block_device.device | FirmwareRev | `firmware_rev` | T3 | `firmware_rev` | no | No OCSF/OTel equivalent — alternate firmware revision | Convention — sysfs device attribute |
+| sysctl | Params | `params` | T3 | `params` | no | No OCSF/OTel equivalent — kernel parameter table | Convention — sysctl -a output |
+| sysconf | ClkTck | `clk_tck` | T3 | `clk_tck` | no | No OCSF/OTel equivalent — SC_CLK_TCK | Convention — sysconf(3) |
+| sysconf | Pagesize | `pagesize` | T3 | `pagesize` | no | No OCSF/OTel equivalent — SC_PAGESIZE | Convention — sysconf(3) |
+| sysconf | NprocessorsConf | `nprocessors_conf` | T3 | `nprocessors_conf` | no | No OCSF/OTel equivalent — SC_NPROCESSORS_CONF | Convention — sysconf(3) |
+| sysconf | NprocessorsOnln | `nprocessors_onln` | T3 | `nprocessors_onln` | no | No OCSF/OTel equivalent — SC_NPROCESSORS_ONLN | Convention — sysconf(3) |
+| systemd_paths | Paths | `paths` | T3 | `paths` | no | No OCSF/OTel equivalent — systemd directory path map | Convention — systemd-path output |
+| interrupts | IRQs | `irqs` | T3 | `irqs` | no | No OCSF/OTel equivalent — IRQ line array | Convention — /proc/interrupts |
+| interrupts.irq | Number | `number` | T3 | `number` | no | No OCSF/OTel equivalent — IRQ identifier | Convention — /proc/interrupts field |
+| interrupts.irq | Type | `type` | T3 | `type` | no | No OCSF/OTel equivalent — interrupt controller type | Convention — /proc/interrupts field |
+| interrupts.irq | Device | `device` | T3 | `device` | no | No OCSF/OTel equivalent — driver/device name | Convention — /proc/interrupts field |
+| interrupts.irq | CountsPerCPU | `counts_per_cpu` | T3 | `counts_per_cpu` | no | No OCSF/OTel equivalent — per-CPU event count array | Convention — /proc/interrupts field |
+| ipc | Sem | `sem` | T3 | `sem` | no | No OCSF/OTel equivalent — semaphore limits | Convention — /proc/sys/kernel/sem |
+| ipc.sem | SEMMSL | `semmsl` | T3 | `semmsl` | no | No OCSF/OTel equivalent — max semaphores per set | Convention — kernel parameter |
+| ipc.sem | SEMMNS | `semmns` | T3 | `semmns` | no | No OCSF/OTel equivalent — max semaphores system-wide | Convention — kernel parameter |
+| ipc.sem | SEMOPM | `semopm` | T3 | `semopm` | no | No OCSF/OTel equivalent — max semop operations per call | Convention — kernel parameter |
+| ipc.sem | SEMMNI | `semmni` | T3 | `semmni` | no | No OCSF/OTel equivalent — max semaphore sets | Convention — kernel parameter |
+| ipc | Msg | `msg` | T3 | `msg` | no | No OCSF/OTel equivalent — message queue limits | Convention — /proc/sys/kernel/msg* |
+| ipc.msg | MSGMNB | `msgmnb` | T3 | `msgmnb` | no | No OCSF/OTel equivalent — default max queue size | Convention — kernel parameter |
+| ipc.msg | MSGMNI | `msgmni` | T3 | `msgmni` | no | No OCSF/OTel equivalent — max queue identifiers | Convention — kernel parameter |
+| ipc.msg | MSGMAX | `msgmax` | T3 | `msgmax` | no | No OCSF/OTel equivalent — max message size | Convention — kernel parameter |
+| ipc | Shm | `shm` | T3 | `shm` | no | No OCSF/OTel equivalent — shared memory limits | Convention — /proc/sys/kernel/shm* |
+| ipc.shm | SHMALL | `shmall` | T3 | `shmall` | no | No OCSF/OTel equivalent — total shared memory pages | Convention — kernel parameter |
+| ipc.shm | SHMMAX | `shmmax` | T3 | `shmmax` | no | No OCSF/OTel equivalent — max segment size | Convention — kernel parameter |
+| ipc.shm | SHMMNI | `shmmni` | T3 | `shmmni` | no | No OCSF/OTel equivalent — max segments | Convention — kernel parameter |
+| livepatch | Patches | `patches` | T3 | `patches` | no | No OCSF/OTel equivalent — loaded livepatch module map | Convention — /sys/kernel/livepatch/ |
+| livepatch.patch | Enabled | `enabled` | T3 | `enabled` | no | No OCSF/OTel equivalent — livepatch active state | Convention — sysfs attribute |
+| livepatch.patch | Transition | `transition` | T3 | `transition` | no | No OCSF/OTel equivalent — livepatch mid-transition flag | Convention — sysfs attribute |
+| mdadm | Arrays | `arrays` | T3 | `arrays` | no | No OCSF/OTel equivalent — MD RAID array list | Convention — /proc/mdstat |
+| mdadm.array | Device | `device` | T3 | `device` | no | No OCSF/OTel equivalent — MD device name | Convention — /proc/mdstat |
+| mdadm.array | Level | `level` | T3 | `level` | no | No OCSF/OTel equivalent — RAID level | Convention — mdadm --detail |
+| mdadm.array | State | `state` | T3 | `state` | no | No OCSF/OTel equivalent — array state | Convention — mdadm --detail |
+| mdadm.array | UUID | `uuid` | T3 | `uuid` | no | No OCSF/OTel equivalent — MD array UUID | Convention — mdadm --detail |
+| mdadm.array | ActiveDisks | `active_disks` | T3 | `active_disks` | no | No OCSF/OTel equivalent — active member count | Convention — mdadm --detail |
+| mdadm.array | TotalDisks | `total_disks` | T3 | `total_disks` | no | No OCSF/OTel equivalent — total configured slots | Convention — mdadm --detail |
+| mdadm.array | SpareDisks | `spare_disks` | T3 | `spare_disks` | no | No OCSF/OTel equivalent — spare disk count | Convention — mdadm --detail |
+| mdadm.array | Members | `members` | T3 | `members` | no | No OCSF/OTel equivalent — active member devices | Convention — /proc/mdstat |
+| mdadm.array | Spares | `spares` | T3 | `spares` | no | No OCSF/OTel equivalent — spare member devices | Convention — /proc/mdstat |
+| tc | Interfaces | `interfaces` | T3 | `interfaces` | no | No OCSF/OTel equivalent — per-interface qdisc container | Convention — tc -s qdisc show |
+| tc.interface | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — network interface name | Convention — tc output dev field |
+| tc.interface | QDiscs | `qdiscs` | T3 | `qdiscs` | no | No OCSF/OTel equivalent — queuing discipline list | Convention — tc output |
+| tc.qdisc | Kind | `kind` | T3 | `kind` | no | No OCSF/OTel equivalent — qdisc type | Convention — tc output field |
+| tc.qdisc | Handle | `handle` | T3 | `handle` | no | No OCSF/OTel equivalent — qdisc handle | Convention — tc output field |
+| tc.qdisc | Parent | `parent` | T3 | `parent` | no | No OCSF/OTel equivalent — parent qdisc handle | Convention — tc output field |
+| grub2 | Environment | `environment` | T3 | `environment` | no | No OCSF/OTel equivalent — GRUB2 grubenv key=value pairs | Convention — /boot/grub2/grubenv |
+| zpools | Pools | `pools` | T3 | `pools` | no | No OCSF/OTel equivalent — ZFS pool list | Convention — zpool list |
+| zpools.pool | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — ZFS pool name | Convention — zpool list field |
+| zpools.pool | Size | `size` | T3 | `size` | no | No OCSF/OTel equivalent — total pool size | Convention — zpool list SIZE |
+| zpools.pool | Alloc | `alloc` | T3 | `alloc` | no | No OCSF/OTel equivalent — allocated space | Convention — zpool list ALLOC |
+| zpools.pool | Free | `free` | T3 | `free` | no | No OCSF/OTel equivalent — free space | Convention — zpool list FREE |
+| zpools.pool | Health | `health` | T3 | `health` | no | No OCSF/OTel equivalent — pool health status | Convention — zpool list HEALTH |
+| zpools.pool | Altroot | `altroot` | T3 | `altroot` | no | No OCSF/OTel equivalent — alternate root directory | Convention — zpool list ALTROOT |
+| rpm | Macros | `macros` | T3 | `macros` | no | No OCSF/OTel equivalent — RPM macro definitions | Convention — rpm --showrc |
+
+## Security Collectors (New)
+
+| Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
+| --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
+| selinux | Status | `status` | T3 | `status` | no | No OCSF/OTel equivalent — SELinux enabled/disabled | Convention — sestatus output |
+| selinux | CurrentMode | `current_mode` | T3 | `current_mode` | no | No OCSF/OTel equivalent — runtime enforcement mode | Convention — sestatus output |
+| selinux | ConfigMode | `config_mode` | T3 | `config_mode` | no | No OCSF/OTel equivalent — configured SELINUX= value | Convention — /etc/selinux/config |
+| selinux | PolicyVersion | `policy_version` | T3 | `policy_version` | no | No OCSF/OTel equivalent — running policy version | Convention — sestatus output |
+| selinux | MaxKernelPolicyVersion | `max_kernel_policy_version` | T3 | `max_kernel_policy_version` | no | No OCSF/OTel equivalent — max supported policy version | Convention — sestatus output |
+| selinux | LoadedPolicyName | `loaded_policy_name` | T3 | `loaded_policy_name` | no | No OCSF/OTel equivalent — loaded policy module name | Convention — sestatus output |
+| ssh | Keys | `keys` | T3 | `keys` | no | No OCSF/OTel equivalent — SSH host key list | Convention — /etc/ssh/*.pub |
+| ssh.key | Type | `type` | T3 | `type` | no | No OCSF/OTel equivalent — key algorithm | Convention — SSH public key field |
+| ssh.key | FingerprintSHA256 | `fingerprint_sha256` | T3 | `fingerprint_sha256` | no | No OCSF/OTel equivalent — SHA-256 fingerprint | Convention — ssh-keygen -E sha256 |
+| ssh.key | FingerprintMD5 | `fingerprint_md5` | T3 | `fingerprint_md5` | no | No OCSF/OTel equivalent — MD5 fingerprint | Convention — ssh-keygen -E md5 |
+| ssh.key | KeyLength | `key_length` | T3 | `key_length` | no | No OCSF/OTel equivalent — key length in bits | Convention — SSH key spec |
+
+## Software Collectors (New)
+
+| Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
+| --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
+| packages | Packages | `packages` | T3 | `packages` | no | No OCSF/OTel equivalent — installed package list | Convention — dpkg/rpm/brew output |
+| packages.package | Name | `name` | T1 | `name` | no | OCSF `package.name` | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
+| packages.package | Version | `version` | T1 | `version` | no | OCSF `package.version` | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
+| packages.package | Arch | `arch` | T1 | `arch` | no | OCSF `package.architecture` | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
+| packages.package | Source | `source` | T3 | `source` | no | No OCSF/OTel equivalent — package manager provenance | Convention — gohai internal tag |
+| languages | Go | `go` | T3 | `go` | no | No OCSF/OTel equivalent — Go runtime version | Convention — go version output |
+| languages | Python | `python` | T3 | `python` | no | No OCSF/OTel equivalent — Python runtime version | Convention — python3 --version |
+| languages | Ruby | `ruby` | T3 | `ruby` | no | No OCSF/OTel equivalent — Ruby runtime version | Convention — ruby --version |
+| languages | Node | `node` | T3 | `node` | no | No OCSF/OTel equivalent — Node.js runtime version | Convention — node --version |
+| languages | Java | `java` | T3 | `java` | no | No OCSF/OTel equivalent — Java runtime version | Convention — java -version |
+| languages | Perl | `perl` | T3 | `perl` | no | No OCSF/OTel equivalent — Perl runtime version | Convention — perl --version |
+| services | Services | `services` | T3 | `services` | no | No OCSF/OTel equivalent — systemd service list | Convention — systemctl output |
+| services.service | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — systemd unit name | Convention — systemctl field |
+| services.service | State | `state` | T3 | `state` | no | No OCSF/OTel equivalent — systemd SUB state | Convention — systemctl field |
+| services.service | Enabled | `enabled` | T3 | `enabled` | no | No OCSF/OTel equivalent — whether ACTIVE is "active" | Convention — systemctl field |
+| services.service | Type | `type` | T3 | `type` | no | No OCSF/OTel equivalent — systemd service type | Convention — systemctl field |
+| docker | Version | `version` | T3 | `version` | no | No OCSF/OTel equivalent — Docker server version | Convention — docker version |
+| docker | Containers | `containers` | T3 | `containers` | no | No OCSF/OTel equivalent — Docker container list | Convention — docker ps |
+| docker | Images | `images` | T3 | `images` | no | No OCSF/OTel equivalent — Docker image list | Convention — docker images |
+| docker.container | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — container ID hash | Convention — docker ps ID |
+| docker.container | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — container name | Convention — docker ps Names |
+| docker.container | Image | `image` | T3 | `image` | no | No OCSF/OTel equivalent — image reference | Convention — docker ps Image |
+| docker.container | State | `state` | T3 | `state` | no | No OCSF/OTel equivalent — container state | Convention — docker ps State |
+| docker.container | Status | `status` | T3 | `status` | no | No OCSF/OTel equivalent — container status string | Convention — docker ps Status |
+| docker.image | ID | `id` | T3 | `id` | no | No OCSF/OTel equivalent — image ID hash | Convention — docker images ID |
+| docker.image | Repository | `repository` | T3 | `repository` | no | No OCSF/OTel equivalent — image repository name | Convention — docker images Repository |
+| docker.image | Tag | `tag` | T3 | `tag` | no | No OCSF/OTel equivalent — image tag | Convention — docker images Tag |
+| docker.image | Size | `size` | T3 | `size` | no | No OCSF/OTel equivalent — image size | Convention — docker images Size |
+
+## Virtualization Collectors (New)
+
+| Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
+| --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
+| vmware | Version | `version` | T3 | `version` | no | No OCSF/OTel equivalent — VMware Tools version | Convention — vmware-toolbox-cmd -v |
+| vmware | Hosttime | `hosttime` | T3 | `hosttime` | no | No OCSF/OTel equivalent — ESXi host time | Convention — vmware-toolbox-cmd stat |
+| vmware | Speed | `speed` | T3 | `speed` | no | No OCSF/OTel equivalent — vCPU speed | Convention — vmware-toolbox-cmd stat |
+| vmware | SessionID | `session_id` | T3 | `session_id` | no | No OCSF/OTel equivalent — VMware session identifier | Convention — vmware-toolbox-cmd stat |
+| vmware | Balloon | `balloon` | T3 | `balloon` | no | No OCSF/OTel equivalent — balloon memory value | Convention — vmware-toolbox-cmd stat |
+| vmware | Swap | `swap` | T3 | `swap` | no | No OCSF/OTel equivalent — VMware swap stat | Convention — vmware-toolbox-cmd stat |
+| vmware | MemLimit | `mem_limit` | T3 | `mem_limit` | no | No OCSF/OTel equivalent — memory limit | Convention — vmware-toolbox-cmd stat |
+| vmware | MemRes | `mem_res` | T3 | `mem_res` | no | No OCSF/OTel equivalent — memory reservation | Convention — vmware-toolbox-cmd stat |
+| vmware | CPURes | `cpu_res` | T3 | `cpu_res` | no | No OCSF/OTel equivalent — CPU reservation | Convention — vmware-toolbox-cmd stat |
+| vmware | CPULimit | `cpu_limit` | T3 | `cpu_limit` | no | No OCSF/OTel equivalent — CPU limit | Convention — vmware-toolbox-cmd stat |
+| vmware | UpgradeStatus | `upgrade_status` | T3 | `upgrade_status` | no | No OCSF/OTel equivalent — Tools upgrade status | Convention — vmware-toolbox-cmd |
+| vmware | TimesyncStatus | `timesync_status` | T3 | `timesync_status` | no | No OCSF/OTel equivalent — time sync status | Convention — vmware-toolbox-cmd |
+| vmware | HostType | `host_type` | T3 | `host_type` | no | No OCSF/OTel equivalent — VMware host type | Convention — derived from session |
+| vmware | HostVersion | `host_version` | T3 | `host_version` | no | No OCSF/OTel equivalent — vSphere host version | Convention — derived from session JSON |
+| virtualbox | HostVersion | `version` | T3 | `version` | no | No OCSF/OTel equivalent — VirtualBox host version | Convention — VBoxControl VBoxVer |
+| virtualbox | HostRevision | `revision` | T3 | `revision` | no | No OCSF/OTel equivalent — VirtualBox host revision | Convention — VBoxControl VBoxRev |
+| virtualbox | GuestAdditionsVersion | `guest_additions_version` | T3 | `guest_additions_version` | no | No OCSF/OTel equivalent — Guest Additions version | Convention — VBoxControl |
+| virtualbox | GuestAdditionsRevision | `guest_additions_revision` | T3 | `guest_additions_revision` | no | No OCSF/OTel equivalent — Guest Additions revision | Convention — VBoxControl |
+| virtualbox | LanguageID | `language_id` | T3 | `language_id` | no | No OCSF/OTel equivalent — host locale language ID | Convention — VBoxControl |
+| libvirt | URI | `uri` | T3 | `uri` | no | No OCSF/OTel equivalent — libvirt connection URI | Convention — virsh uri |
+| libvirt | Version | `version` | T3 | `version` | no | No OCSF/OTel equivalent — libvirt daemon version | Convention — virsh version |
+| libvirt | Domains | `domains` | T3 | `domains` | no | No OCSF/OTel equivalent — libvirt domain list | Convention — virsh list |
+| libvirt.domain | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — domain name | Convention — virsh list field |
+| libvirt.domain | UUID | `uuid` | T3 | `uuid` | no | No OCSF/OTel equivalent — domain UUID | Convention — virsh dominfo |
+| libvirt.domain | State | `state` | T3 | `state` | no | No OCSF/OTel equivalent — domain state | Convention — virsh list field |
+| libvirt.domain | VCPUs | `vcpus` | T3 | `vcpus` | no | No OCSF/OTel equivalent — virtual CPU count | Convention — virsh dominfo |
+| libvirt.domain | MaxMemory | `max_memory` | T3 | `max_memory` | no | No OCSF/OTel equivalent — max memory allocation | Convention — virsh dominfo |
+| libvirt.domain | Autostart | `autostart` | T3 | `autostart` | no | No OCSF/OTel equivalent — domain autostart flag | Convention — virsh dominfo |
+
+## Miscellaneous Collectors (New)
+
+| Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
+| --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
+| command | PS | `ps` | T3 | `ps` | no | No OCSF/OTel equivalent — raw ps -ef output lines | Convention — Ohai command plugin |

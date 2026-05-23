@@ -20,12 +20,12 @@ artifacts for gohai's ~803 JSON fields.
 
 Every JSON field name comes from one of three tiers, applied in strict order:
 
-1. **OCSF** (~97 fields) — primary authority. Browse
+1. **OCSF** (~108 fields) — primary authority. Browse
    [schema.ocsf.io](https://schema.ocsf.io/).
-2. **OpenTelemetry Resource Semantic Conventions** (~73 fields) — when OCSF is
+2. **OpenTelemetry Resource Semantic Conventions** (~74 fields) — when OCSF is
    silent. See
    [OTel semconv](https://opentelemetry.io/docs/specs/semconv/resource/).
-3. **gohai convention** (~633 fields) — backing library names in `snake_case`
+3. **gohai convention** (~768 fields) — backing library names in `snake_case`
    with unit suffixes when ambiguous.
 
 The complete per-field mapping with verifiable citations lives in
@@ -57,7 +57,7 @@ command works without the source tree.
 
 ## OCSF gap analysis
 
-[`ocsf-gaps.md`](ocsf-gaps.md) lists 73 fields that gohai emits but OCSF
+[`ocsf-gaps.md`](ocsf-gaps.md) lists 76 fields that gohai emits but OCSF
 doesn't yet cover. Each entry includes:
 
 - What the field is
