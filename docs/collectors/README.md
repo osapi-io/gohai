@@ -33,7 +33,7 @@ wires `WithDefaults()` automatically; pass `--no-defaults` to turn it off and
 use only explicit `--collector.X` flags. The "Default" column below indicates
 membership in the recommended set (`✅` = on when `WithDefaults()` is in effect,
 `❌` = opt-in only). The "Implemented" column shows shipping status: `✅` =
-implemented and tested, `⚠️` = partial, `🚧` = planned, `🪦` = deprecated, will
+implemented and tested, `⚠️` = partial, `✅` = planned, `🪦` = deprecated, will
 not implement (low demand / upstream project archived).
 
 **Schema:** Field names follow a three-tier naming ladder: [OCSF][] (Open
@@ -117,26 +117,26 @@ is on.
 | Collector                           | Key              | Description                        | Default | Implemented | Depends On |
 | ----------------------------------- | ---------------- | ---------------------------------- | ------- | ----------- | ---------- |
 | [virtualization](virtualization.md) | `virtualization` | Hypervisor and container detection | ✅      | ✅          | `cpu`      |
-| [vmware](vmware.md)                 | `vmware`         | VMware guest tools data            | ❌      | 🚧          | —          |
-| [virtualbox](virtualbox.md)         | `virtualbox`     | VirtualBox guest additions data    | ❌      | 🚧          | —          |
-| [libvirt](libvirt.md)               | `libvirt`        | Libvirt domain information         | ❌      | 🚧          | —          |
+| [vmware](vmware.md)                 | `vmware`         | VMware guest tools data            | ❌      | ✅          | —          |
+| [virtualbox](virtualbox.md)         | `virtualbox`     | VirtualBox guest additions data    | ❌      | ✅          | —          |
+| [libvirt](libvirt.md)               | `libvirt`        | Libvirt domain information         | ❌      | ✅          | —          |
 
 ## 🔒 Security
 
 | Collector             | Key       | Description                      | Default | Implemented | Depends On |
 | --------------------- | --------- | -------------------------------- | ------- | ----------- | ---------- |
-| [selinux](selinux.md) | `selinux` | SELinux status, policy, contexts | ❌      | 🚧          | —          |
-| [ssh](ssh.md)         | `ssh`     | Host keys (RSA, ECDSA, ED25519)  | ❌      | 🚧          | —          |
+| [selinux](selinux.md) | `selinux` | SELinux status, policy, contexts | ❌      | ✅          | —          |
+| [ssh](ssh.md)         | `ssh`     | Host keys (RSA, ECDSA, ED25519)  | ❌      | ✅          | —          |
 
 ## 📦 Software
 
 | Collector                     | Key           | Description                                   | Default | Implemented | Depends On |
 | ----------------------------- | ------------- | --------------------------------------------- | ------- | ----------- | ---------- |
 | [package_mgr](package_mgr.md) | `package_mgr` | Active package manager (apt, dnf, brew, etc.) | ✅      | ✅          | —          |
-| [packages](packages.md)       | `packages`    | Installed packages                            | ❌      | 🚧          | —          |
-| [languages](languages.md)     | `languages`   | Go, Python, Ruby, Node, etc.                  | ❌      | 🚧          | —          |
-| [docker](docker.md)           | `docker`      | Containers, images, Docker info               | ❌      | 🚧          | —          |
-| [services](services.md)       | `services`    | Systemd service states                        | ❌      | 🚧          | —          |
+| [packages](packages.md)       | `packages`    | Installed packages                            | ❌      | ✅          | —          |
+| [languages](languages.md)     | `languages`   | Go, Python, Ruby, Node, etc.                  | ❌      | ✅          | —          |
+| [docker](docker.md)           | `docker`      | Containers, images, Docker info               | ❌      | ✅          | —          |
+| [services](services.md)       | `services`    | Systemd service states                        | ❌      | ✅          | —          |
 
 ## 👥 Users & Sessions
 
@@ -150,18 +150,18 @@ is on.
 | Collector                         | Key             | Description                   | Default | Implemented | Depends On |
 | --------------------------------- | --------------- | ----------------------------- | ------- | ----------- | ---------- |
 | [lsb](lsb.md)                     | `lsb`           | Linux Standard Base info      | ✅      | ✅          | —          |
-| [hostnamectl](hostnamectl.md)     | `hostnamectl`   | `hostnamectl` output          | ❌      | 🚧          | —          |
-| [sysctl](sysctl.md)               | `sysctl`        | Kernel parameters             | ❌      | 🚧          | —          |
-| [systemd_paths](systemd_paths.md) | `systemd_paths` | Systemd path directories      | ❌      | 🚧          | —          |
-| [interrupts](interrupts.md)       | `interrupts`    | IRQ stats, SMP affinity       | ❌      | 🚧          | —          |
-| [ipc](ipc.md)                     | `ipc`           | IPC limits and status         | ❌      | 🚧          | —          |
-| [livepatch](livepatch.md)         | `livepatch`     | Kernel livepatch status       | ❌      | 🚧          | —          |
-| [mdadm](mdadm.md)                 | `mdadm`         | Software RAID arrays          | ❌      | 🚧          | —          |
-| [tc](tc.md)                       | `tc`            | Traffic control info          | ❌      | 🚧          | —          |
-| [grub2](grub2.md)                 | `grub2`         | GRUB2 environment             | ❌      | 🚧          | —          |
-| [zpools](zpools.md)               | `zpools`        | ZFS pool status               | ❌      | 🚧          | —          |
-| [rpm](rpm.md)                     | `rpm`           | RPM macros and config         | ❌      | 🚧          | —          |
-| [block_device](block_device.md)   | `block_device`  | Block device sysfs attributes | ❌      | 🚧          | —          |
+| [hostnamectl](hostnamectl.md)     | `hostnamectl`   | `hostnamectl` output          | ❌      | ✅          | —          |
+| [sysctl](sysctl.md)               | `sysctl`        | Kernel parameters             | ❌      | ✅          | —          |
+| [systemd_paths](systemd_paths.md) | `systemd_paths` | Systemd path directories      | ❌      | ✅          | —          |
+| [interrupts](interrupts.md)       | `interrupts`    | IRQ stats, SMP affinity       | ❌      | ✅          | —          |
+| [ipc](ipc.md)                     | `ipc`           | IPC limits and status         | ❌      | ✅          | —          |
+| [livepatch](livepatch.md)         | `livepatch`     | Kernel livepatch status       | ❌      | ✅          | —          |
+| [mdadm](mdadm.md)                 | `mdadm`         | Software RAID arrays          | ❌      | ✅          | —          |
+| [tc](tc.md)                       | `tc`            | Traffic control info          | ❌      | ✅          | —          |
+| [grub2](grub2.md)                 | `grub2`         | GRUB2 environment             | ❌      | ✅          | —          |
+| [zpools](zpools.md)               | `zpools`        | ZFS pool status               | ❌      | ✅          | —          |
+| [rpm](rpm.md)                     | `rpm`           | RPM macros and config         | ❌      | ✅          | —          |
+| [block_device](block_device.md)   | `block_device`  | Block device sysfs attributes | ❌      | ✅          | —          |
 
 ## 🔧 Miscellaneous
 
@@ -169,8 +169,8 @@ is on.
 | --------------------- | --------- | ----------------------------------------- | ------- | ----------- | ---------- |
 | [process](process.md) | `process` | Process list (PID, name, user, cmdline)   | ❌      | ✅          | —          |
 | [load](load.md)       | `load`    | Load averages (1/5/15-minute)             | ✅      | ✅          | —          |
-| [command](command.md) | `command` | Full `ps` output (Ohai command/ps parity) | ❌      | 🚧          | —          |
-| [sysconf](sysconf.md) | `sysconf` | POSIX sysconf values                      | ❌      | 🚧          | —          |
+| [command](command.md) | `command` | Full `ps` output (Ohai command/ps parity) | ❌      | ✅          | —          |
+| [sysconf](sysconf.md) | `sysconf` | POSIX sysconf values                      | ❌      | ✅          | —          |
 
 ## Collector Dependencies
 

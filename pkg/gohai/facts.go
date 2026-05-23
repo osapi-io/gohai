@@ -28,43 +28,66 @@ import (
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
+	blockdevice "github.com/osapi-io/gohai/pkg/gohai/collectors/block_device"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/command"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	digitalocean "github.com/osapi-io/gohai/pkg/gohai/collectors/digital_ocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/docker"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/grub2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostnamectl"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/interrupts"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ipc"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	kernelmodules "github.com/osapi-io/gohai/pkg/gohai/collectors/kernel_modules"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/languages"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/libvirt"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/livepatch"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/mdadm"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
 	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/packages"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/pci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/rpm"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scsi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/selinux"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/services"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ssh"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysconf"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysctl"
+	systemdpaths "github.com/osapi-io/gohai/pkg/gohai/collectors/systemd_paths"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/tc"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualbox"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/vmware"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
 )
 
 // Facts holds the result of a collection run. Each collector populates its
@@ -111,6 +134,29 @@ type Facts struct {
 	PCI            *pci.Info            `json:"pci,omitempty"`
 	SCSI           *scsi.Info           `json:"scsi,omitempty"`
 	Hardware       *hardware.Info       `json:"hardware,omitempty"`
+	BlockDevice    *blockdevice.Info    `json:"block_device,omitempty"`
+	Command        *command.Info        `json:"command,omitempty"`
+	Docker         *docker.Info         `json:"docker,omitempty"`
+	Grub2          *grub2.Info          `json:"grub2,omitempty"`
+	Hostnamectl    *hostnamectl.Info    `json:"hostnamectl,omitempty"`
+	Interrupts     *interrupts.Info     `json:"interrupts,omitempty"`
+	IPC            *ipc.Info            `json:"ipc,omitempty"`
+	Languages      *languages.Info      `json:"languages,omitempty"`
+	Libvirt        *libvirt.Info        `json:"libvirt,omitempty"`
+	Livepatch      *livepatch.Info      `json:"livepatch,omitempty"`
+	Mdadm          *mdadm.Info          `json:"mdadm,omitempty"`
+	Packages       *packages.Info       `json:"packages,omitempty"`
+	RPM            *rpm.Info            `json:"rpm,omitempty"`
+	SELinux        *selinux.Info        `json:"selinux,omitempty"`
+	Services       *services.Info       `json:"services,omitempty"`
+	SSH            *ssh.Info            `json:"ssh,omitempty"`
+	Sysconf        *sysconf.Info        `json:"sysconf,omitempty"`
+	Sysctl         *sysctl.Info         `json:"sysctl,omitempty"`
+	SystemdPaths   *systemdpaths.Info   `json:"systemd_paths,omitempty"`
+	TC             *tc.Info             `json:"tc,omitempty"`
+	VirtualBox     *virtualbox.Info     `json:"virtualbox,omitempty"`
+	VMware         *vmware.Info         `json:"vmware,omitempty"`
+	Zpools         *zpools.Info         `json:"zpools,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -276,6 +322,75 @@ func (f *Facts) countPopulated() int {
 		n++
 	}
 	if f.GPU != nil {
+		n++
+	}
+	if f.BlockDevice != nil {
+		n++
+	}
+	if f.Command != nil {
+		n++
+	}
+	if f.Docker != nil {
+		n++
+	}
+	if f.Grub2 != nil {
+		n++
+	}
+	if f.Hostnamectl != nil {
+		n++
+	}
+	if f.Interrupts != nil {
+		n++
+	}
+	if f.IPC != nil {
+		n++
+	}
+	if f.Languages != nil {
+		n++
+	}
+	if f.Libvirt != nil {
+		n++
+	}
+	if f.Livepatch != nil {
+		n++
+	}
+	if f.Mdadm != nil {
+		n++
+	}
+	if f.Packages != nil {
+		n++
+	}
+	if f.RPM != nil {
+		n++
+	}
+	if f.SELinux != nil {
+		n++
+	}
+	if f.Services != nil {
+		n++
+	}
+	if f.SSH != nil {
+		n++
+	}
+	if f.Sysconf != nil {
+		n++
+	}
+	if f.Sysctl != nil {
+		n++
+	}
+	if f.SystemdPaths != nil {
+		n++
+	}
+	if f.TC != nil {
+		n++
+	}
+	if f.VirtualBox != nil {
+		n++
+	}
+	if f.VMware != nil {
+		n++
+	}
+	if f.Zpools != nil {
 		n++
 	}
 	return n
@@ -444,6 +559,98 @@ func (f *Facts) set(
 	case "hardware":
 		if v, ok := result.(*hardware.Info); ok {
 			f.Hardware = v
+		}
+	case "block_device":
+		if v, ok := result.(*blockdevice.Info); ok {
+			f.BlockDevice = v
+		}
+	case "command":
+		if v, ok := result.(*command.Info); ok {
+			f.Command = v
+		}
+	case "docker":
+		if v, ok := result.(*docker.Info); ok {
+			f.Docker = v
+		}
+	case "grub2":
+		if v, ok := result.(*grub2.Info); ok {
+			f.Grub2 = v
+		}
+	case "hostnamectl":
+		if v, ok := result.(*hostnamectl.Info); ok {
+			f.Hostnamectl = v
+		}
+	case "interrupts":
+		if v, ok := result.(*interrupts.Info); ok {
+			f.Interrupts = v
+		}
+	case "ipc":
+		if v, ok := result.(*ipc.Info); ok {
+			f.IPC = v
+		}
+	case "languages":
+		if v, ok := result.(*languages.Info); ok {
+			f.Languages = v
+		}
+	case "libvirt":
+		if v, ok := result.(*libvirt.Info); ok {
+			f.Libvirt = v
+		}
+	case "livepatch":
+		if v, ok := result.(*livepatch.Info); ok {
+			f.Livepatch = v
+		}
+	case "mdadm":
+		if v, ok := result.(*mdadm.Info); ok {
+			f.Mdadm = v
+		}
+	case "packages":
+		if v, ok := result.(*packages.Info); ok {
+			f.Packages = v
+		}
+	case "rpm":
+		if v, ok := result.(*rpm.Info); ok {
+			f.RPM = v
+		}
+	case "selinux":
+		if v, ok := result.(*selinux.Info); ok {
+			f.SELinux = v
+		}
+	case "services":
+		if v, ok := result.(*services.Info); ok {
+			f.Services = v
+		}
+	case "ssh":
+		if v, ok := result.(*ssh.Info); ok {
+			f.SSH = v
+		}
+	case "sysconf":
+		if v, ok := result.(*sysconf.Info); ok {
+			f.Sysconf = v
+		}
+	case "sysctl":
+		if v, ok := result.(*sysctl.Info); ok {
+			f.Sysctl = v
+		}
+	case "systemd_paths":
+		if v, ok := result.(*systemdpaths.Info); ok {
+			f.SystemdPaths = v
+		}
+	case "tc":
+		if v, ok := result.(*tc.Info); ok {
+			f.TC = v
+		}
+	case "virtualbox":
+		if v, ok := result.(*virtualbox.Info); ok {
+			f.VirtualBox = v
+		}
+	case "vmware":
+		if v, ok := result.(*vmware.Info); ok {
+			f.VMware = v
+		}
+	case "zpools":
+		if v, ok := result.(*zpools.Info); ok {
+			f.Zpools = v
 		}
 	}
 }
