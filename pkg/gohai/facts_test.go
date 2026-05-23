@@ -25,61 +25,107 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	blockdevice "github.com/osapi-io/gohai/pkg/gohai/collectors/block_device"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/command"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/docker"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/grub2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostnamectl"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/interrupts"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ipc"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/languages"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/libvirt"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/livepatch"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/mdadm"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
 	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/packages"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/pci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/rpm"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scsi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/selinux"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/services"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ssh"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysconf"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysctl"
+	systemdpaths "github.com/osapi-io/gohai/pkg/gohai/collectors/systemd_paths"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/tc"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualbox"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/vmware"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
 )
 
-func hostnameInfoPtr() *hostname.Info     { return &hostname.Info{} }
-func kernelInfoPtr() *kernel.Info         { return &kernel.Info{} }
-func uptimeInfoPtr() *uptime.Info         { return &uptime.Info{} }
-func virtInfoPtr() *virtualization.Info   { return &virtualization.Info{} }
-func machineIDInfoPtr() *machineid.Info   { return &machineid.Info{} }
-func cpuInfoPtr() *cpu.Info               { return &cpu.Info{} }
-func memoryInfoPtr() *memory.Info         { return &memory.Info{} }
-func filesystemInfoPtr() *filesystem.Info { return &filesystem.Info{} }
-func diskInfoPtr() *disk.Info             { return &disk.Info{} }
-func networkInfoPtr() *network.Info       { return &network.Info{} }
-func processInfoPtr() *process.Info       { return &process.Info{} }
-func usersInfoPtr() *users.Info           { return &users.Info{} }
-func timezoneInfoPtr() *timezone.Info     { return &timezone.Info{} }
-func rootGroupInfoPtr() *rootgroup.Info   { return &rootgroup.Info{} }
-func shellsInfoPtr() *shells.Info         { return &shells.Info{} }
-func fipsInfoPtr() *fips.Info             { return &fips.Info{} }
-func loadInfoPtr() *load.Info             { return &load.Info{} }
-func osReleaseInfoPtr() *osrelease.Info   { return &osrelease.Info{} }
-func lsbInfoPtr() *lsb.Info               { return &lsb.Info{} }
-func initInfoPtr() *initd.Info            { return &initd.Info{} }
-func shardInfoPtr() *shard.Info           { return &shard.Info{} }
-func packageMgrInfoPtr() *packagemgr.Info { return &packagemgr.Info{} }
-func sessionsInfoPtr() *sessions.Info     { return &sessions.Info{} }
-func pciInfoPtr() *pci.Info               { return &pci.Info{} }
-func scsiInfoPtr() *scsi.Info             { return &scsi.Info{} }
-func hardwareInfoPtr() *hardware.Info     { return &hardware.Info{} }
+func hostnameInfoPtr() *hostname.Info         { return &hostname.Info{} }
+func kernelInfoPtr() *kernel.Info             { return &kernel.Info{} }
+func uptimeInfoPtr() *uptime.Info             { return &uptime.Info{} }
+func virtInfoPtr() *virtualization.Info       { return &virtualization.Info{} }
+func machineIDInfoPtr() *machineid.Info       { return &machineid.Info{} }
+func cpuInfoPtr() *cpu.Info                   { return &cpu.Info{} }
+func memoryInfoPtr() *memory.Info             { return &memory.Info{} }
+func filesystemInfoPtr() *filesystem.Info     { return &filesystem.Info{} }
+func diskInfoPtr() *disk.Info                 { return &disk.Info{} }
+func networkInfoPtr() *network.Info           { return &network.Info{} }
+func processInfoPtr() *process.Info           { return &process.Info{} }
+func usersInfoPtr() *users.Info               { return &users.Info{} }
+func timezoneInfoPtr() *timezone.Info         { return &timezone.Info{} }
+func rootGroupInfoPtr() *rootgroup.Info       { return &rootgroup.Info{} }
+func shellsInfoPtr() *shells.Info             { return &shells.Info{} }
+func fipsInfoPtr() *fips.Info                 { return &fips.Info{} }
+func loadInfoPtr() *load.Info                 { return &load.Info{} }
+func osReleaseInfoPtr() *osrelease.Info       { return &osrelease.Info{} }
+func lsbInfoPtr() *lsb.Info                   { return &lsb.Info{} }
+func initInfoPtr() *initd.Info                { return &initd.Info{} }
+func shardInfoPtr() *shard.Info               { return &shard.Info{} }
+func packageMgrInfoPtr() *packagemgr.Info     { return &packagemgr.Info{} }
+func sessionsInfoPtr() *sessions.Info         { return &sessions.Info{} }
+func pciInfoPtr() *pci.Info                   { return &pci.Info{} }
+func scsiInfoPtr() *scsi.Info                 { return &scsi.Info{} }
+func hardwareInfoPtr() *hardware.Info         { return &hardware.Info{} }
+func blockDeviceInfoPtr() *blockdevice.Info   { return &blockdevice.Info{} }
+func commandInfoPtr() *command.Info           { return &command.Info{} }
+func dockerInfoPtr() *docker.Info             { return &docker.Info{} }
+func grub2InfoPtr() *grub2.Info               { return &grub2.Info{} }
+func hostnamectlInfoPtr() *hostnamectl.Info   { return &hostnamectl.Info{} }
+func interruptsInfoPtr() *interrupts.Info     { return &interrupts.Info{} }
+func ipcInfoPtr() *ipc.Info                   { return &ipc.Info{} }
+func languagesInfoPtr() *languages.Info       { return &languages.Info{} }
+func libvirtInfoPtr() *libvirt.Info           { return &libvirt.Info{} }
+func livepatchInfoPtr() *livepatch.Info       { return &livepatch.Info{} }
+func mdadmInfoPtr() *mdadm.Info               { return &mdadm.Info{} }
+func packagesInfoPtr() *packages.Info         { return &packages.Info{} }
+func rpmInfoPtr() *rpm.Info                   { return &rpm.Info{} }
+func selinuxInfoPtr() *selinux.Info           { return &selinux.Info{} }
+func servicesInfoPtr() *services.Info         { return &services.Info{} }
+func sshInfoPtr() *ssh.Info                   { return &ssh.Info{} }
+func sysconfInfoPtr() *sysconf.Info           { return &sysconf.Info{} }
+func sysctlInfoPtr() *sysctl.Info             { return &sysctl.Info{} }
+func systemdPathsInfoPtr() *systemdpaths.Info { return &systemdpaths.Info{} }
+func tcInfoPtr() *tc.Info                     { return &tc.Info{} }
+func virtualboxInfoPtr() *virtualbox.Info     { return &virtualbox.Info{} }
+func vmwareInfoPtr() *vmware.Info             { return &vmware.Info{} }
+func zpoolsInfoPtr() *zpools.Info             { return &zpools.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -307,6 +353,144 @@ func (s *FactsTestSuite) TestSet() {
 			result:   hardwareInfoPtr(),
 			check:    func(f *Facts) bool { return f.Hardware != nil },
 		},
+		{
+			name:     "block_device",
+			collName: "block_device",
+			result:   blockDeviceInfoPtr(),
+			check:    func(f *Facts) bool { return f.BlockDevice != nil },
+		},
+		{
+			name:     "command",
+			collName: "command",
+			result:   commandInfoPtr(),
+			check:    func(f *Facts) bool { return f.Command != nil },
+		},
+		{
+			name:     "docker",
+			collName: "docker",
+			result:   dockerInfoPtr(),
+			check:    func(f *Facts) bool { return f.Docker != nil },
+		},
+		{
+			name:     "grub2",
+			collName: "grub2",
+			result:   grub2InfoPtr(),
+			check:    func(f *Facts) bool { return f.Grub2 != nil },
+		},
+		{
+			name:     "hostnamectl",
+			collName: "hostnamectl",
+			result:   hostnamectlInfoPtr(),
+			check:    func(f *Facts) bool { return f.Hostnamectl != nil },
+		},
+		{
+			name:     "interrupts",
+			collName: "interrupts",
+			result:   interruptsInfoPtr(),
+			check:    func(f *Facts) bool { return f.Interrupts != nil },
+		},
+		{
+			name:     "ipc",
+			collName: "ipc",
+			result:   ipcInfoPtr(),
+			check:    func(f *Facts) bool { return f.IPC != nil },
+		},
+		{
+			name:     "languages",
+			collName: "languages",
+			result:   languagesInfoPtr(),
+			check:    func(f *Facts) bool { return f.Languages != nil },
+		},
+		{
+			name:     "libvirt",
+			collName: "libvirt",
+			result:   libvirtInfoPtr(),
+			check:    func(f *Facts) bool { return f.Libvirt != nil },
+		},
+		{
+			name:     "livepatch",
+			collName: "livepatch",
+			result:   livepatchInfoPtr(),
+			check:    func(f *Facts) bool { return f.Livepatch != nil },
+		},
+		{
+			name:     "mdadm",
+			collName: "mdadm",
+			result:   mdadmInfoPtr(),
+			check:    func(f *Facts) bool { return f.Mdadm != nil },
+		},
+		{
+			name:     "packages",
+			collName: "packages",
+			result:   packagesInfoPtr(),
+			check:    func(f *Facts) bool { return f.Packages != nil },
+		},
+		{
+			name:     "rpm",
+			collName: "rpm",
+			result:   rpmInfoPtr(),
+			check:    func(f *Facts) bool { return f.RPM != nil },
+		},
+		{
+			name:     "selinux",
+			collName: "selinux",
+			result:   selinuxInfoPtr(),
+			check:    func(f *Facts) bool { return f.SELinux != nil },
+		},
+		{
+			name:     "services",
+			collName: "services",
+			result:   servicesInfoPtr(),
+			check:    func(f *Facts) bool { return f.Services != nil },
+		},
+		{
+			name:     "ssh",
+			collName: "ssh",
+			result:   sshInfoPtr(),
+			check:    func(f *Facts) bool { return f.SSH != nil },
+		},
+		{
+			name:     "sysconf",
+			collName: "sysconf",
+			result:   sysconfInfoPtr(),
+			check:    func(f *Facts) bool { return f.Sysconf != nil },
+		},
+		{
+			name:     "sysctl",
+			collName: "sysctl",
+			result:   sysctlInfoPtr(),
+			check:    func(f *Facts) bool { return f.Sysctl != nil },
+		},
+		{
+			name:     "systemd_paths",
+			collName: "systemd_paths",
+			result:   systemdPathsInfoPtr(),
+			check:    func(f *Facts) bool { return f.SystemdPaths != nil },
+		},
+		{
+			name:     "tc",
+			collName: "tc",
+			result:   tcInfoPtr(),
+			check:    func(f *Facts) bool { return f.TC != nil },
+		},
+		{
+			name:     "virtualbox",
+			collName: "virtualbox",
+			result:   virtualboxInfoPtr(),
+			check:    func(f *Facts) bool { return f.VirtualBox != nil },
+		},
+		{
+			name:     "vmware",
+			collName: "vmware",
+			result:   vmwareInfoPtr(),
+			check:    func(f *Facts) bool { return f.VMware != nil },
+		},
+		{
+			name:     "zpools",
+			collName: "zpools",
+			result:   zpoolsInfoPtr(),
+			check:    func(f *Facts) bool { return f.Zpools != nil },
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -351,8 +535,31 @@ func (s *FactsTestSuite) TestCountPopulated() {
 				Init:           initInfoPtr(),
 				Shard:          shardInfoPtr(),
 				PackageMgr:     packageMgrInfoPtr(),
+				BlockDevice:    blockDeviceInfoPtr(),
+				Command:        commandInfoPtr(),
+				Docker:         dockerInfoPtr(),
+				Grub2:          grub2InfoPtr(),
+				Hostnamectl:    hostnamectlInfoPtr(),
+				Interrupts:     interruptsInfoPtr(),
+				IPC:            ipcInfoPtr(),
+				Languages:      languagesInfoPtr(),
+				Libvirt:        libvirtInfoPtr(),
+				Livepatch:      livepatchInfoPtr(),
+				Mdadm:          mdadmInfoPtr(),
+				Packages:       packagesInfoPtr(),
+				RPM:            rpmInfoPtr(),
+				SELinux:        selinuxInfoPtr(),
+				Services:       servicesInfoPtr(),
+				SSH:            sshInfoPtr(),
+				Sysconf:        sysconfInfoPtr(),
+				Sysctl:         sysctlInfoPtr(),
+				SystemdPaths:   systemdPathsInfoPtr(),
+				TC:             tcInfoPtr(),
+				VirtualBox:     virtualboxInfoPtr(),
+				VMware:         vmwareInfoPtr(),
+				Zpools:         zpoolsInfoPtr(),
 			},
-			want: 23,
+			want: 46,
 		},
 	}
 	for _, tt := range tests {
