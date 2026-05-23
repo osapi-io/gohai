@@ -592,6 +592,69 @@
         "value"
       ]
     },
+    "BlockdeviceBlockDevice": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string"
+        },
+        "removable": {
+          "type": "string"
+        },
+        "rotational": {
+          "type": "string"
+        },
+        "physical_block_size": {
+          "type": "string"
+        },
+        "logical_block_size": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "vendor": {
+          "type": "string"
+        },
+        "rev": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "timeout": {
+          "type": "string"
+        },
+        "queue_depth": {
+          "type": "string"
+        },
+        "firmware_rev": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "BlockdeviceInfo": {
+      "properties": {
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/BlockdeviceBlockDevice"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "devices"
+      ]
+    },
     "CollectorTiming": {
       "properties": {
         "duration_ns": {
@@ -609,6 +672,21 @@
       "required": [
         "duration_ns",
         "status"
+      ]
+    },
+    "CommandInfo": {
+      "properties": {
+        "ps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "ps"
       ]
     },
     "CpuCPU": {
@@ -1068,6 +1146,84 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "DockerContainer": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "image": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "image",
+        "state",
+        "status"
+      ]
+    },
+    "DockerImage": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "repository",
+        "tag",
+        "size"
+      ]
+    },
+    "DockerInfo": {
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "containers": {
+          "items": {
+            "$ref": "#/$defs/DockerContainer"
+          },
+          "type": "array"
+        },
+        "images": {
+          "items": {
+            "$ref": "#/$defs/DockerImage"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "version",
+        "containers",
+        "images"
+      ]
+    },
     "Ec2IAMInstanceInfo": {
       "properties": {
         "code": {
@@ -1429,6 +1585,75 @@
         },
         "hardware": {
           "$ref": "#/$defs/HardwareInfo"
+        },
+        "block_device": {
+          "$ref": "#/$defs/BlockdeviceInfo"
+        },
+        "command": {
+          "$ref": "#/$defs/CommandInfo"
+        },
+        "docker": {
+          "$ref": "#/$defs/DockerInfo"
+        },
+        "grub2": {
+          "$ref": "#/$defs/Grub2Info"
+        },
+        "hostnamectl": {
+          "$ref": "#/$defs/HostnamectlInfo"
+        },
+        "interrupts": {
+          "$ref": "#/$defs/InterruptsInfo"
+        },
+        "ipc": {
+          "$ref": "#/$defs/IpcInfo"
+        },
+        "languages": {
+          "$ref": "#/$defs/LanguagesInfo"
+        },
+        "libvirt": {
+          "$ref": "#/$defs/LibvirtInfo"
+        },
+        "livepatch": {
+          "$ref": "#/$defs/LivepatchInfo"
+        },
+        "mdadm": {
+          "$ref": "#/$defs/MdadmInfo"
+        },
+        "packages": {
+          "$ref": "#/$defs/PackagesInfo"
+        },
+        "rpm": {
+          "$ref": "#/$defs/RpmInfo"
+        },
+        "selinux": {
+          "$ref": "#/$defs/SelinuxInfo"
+        },
+        "services": {
+          "$ref": "#/$defs/ServicesInfo"
+        },
+        "ssh": {
+          "$ref": "#/$defs/SshInfo"
+        },
+        "sysconf": {
+          "$ref": "#/$defs/SysconfInfo"
+        },
+        "sysctl": {
+          "$ref": "#/$defs/SysctlInfo"
+        },
+        "systemd_paths": {
+          "$ref": "#/$defs/SystemdpathsInfo"
+        },
+        "tc": {
+          "$ref": "#/$defs/TcInfo"
+        },
+        "virtualbox": {
+          "$ref": "#/$defs/VirtualboxInfo"
+        },
+        "vmware": {
+          "$ref": "#/$defs/VmwareInfo"
+        },
+        "zpools": {
+          "$ref": "#/$defs/ZpoolsInfo"
         },
         "collect_time": {
           "type": "string",
@@ -1974,6 +2199,21 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "Grub2Info": {
+      "properties": {
+        "environment": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "environment"
+      ]
+    },
     "HardwareBattery": {
       "properties": {
         "current_capacity": {
@@ -2157,6 +2397,51 @@
         "name"
       ]
     },
+    "HostnamectlInfo": {
+      "properties": {
+        "static_hostname": {
+          "type": "string"
+        },
+        "icon_name": {
+          "type": "string"
+        },
+        "chassis": {
+          "type": "string"
+        },
+        "deployment": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "kernel_name": {
+          "type": "string"
+        },
+        "kernel_release": {
+          "type": "string"
+        },
+        "operating_system_pretty_name": {
+          "type": "string"
+        },
+        "operating_system_cpe_name": {
+          "type": "string"
+        },
+        "virtualization": {
+          "type": "string"
+        },
+        "hardware_vendor": {
+          "type": "string"
+        },
+        "hardware_model": {
+          "type": "string"
+        },
+        "firmware_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "InitInfo": {
       "properties": {
         "name": {
@@ -2167,6 +2452,130 @@
       "type": "object",
       "required": [
         "name"
+      ]
+    },
+    "InterruptsIRQ": {
+      "properties": {
+        "number": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "device": {
+          "type": "string"
+        },
+        "counts_per_cpu": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "number",
+        "counts_per_cpu"
+      ]
+    },
+    "InterruptsInfo": {
+      "properties": {
+        "irqs": {
+          "items": {
+            "$ref": "#/$defs/InterruptsIRQ"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "irqs"
+      ]
+    },
+    "IpcInfo": {
+      "properties": {
+        "sem": {
+          "$ref": "#/$defs/IpcSemLimits"
+        },
+        "msg": {
+          "$ref": "#/$defs/IpcMsgLimits"
+        },
+        "shm": {
+          "$ref": "#/$defs/IpcShmLimits"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "sem",
+        "msg",
+        "shm"
+      ]
+    },
+    "IpcMsgLimits": {
+      "properties": {
+        "msgmnb": {
+          "type": "string"
+        },
+        "msgmni": {
+          "type": "string"
+        },
+        "msgmax": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "msgmnb",
+        "msgmni",
+        "msgmax"
+      ]
+    },
+    "IpcSemLimits": {
+      "properties": {
+        "semmsl": {
+          "type": "string"
+        },
+        "semmns": {
+          "type": "string"
+        },
+        "semopm": {
+          "type": "string"
+        },
+        "semmni": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "semmsl",
+        "semmns",
+        "semopm",
+        "semmni"
+      ]
+    },
+    "IpcShmLimits": {
+      "properties": {
+        "shmall": {
+          "type": "string"
+        },
+        "shmmax": {
+          "type": "string"
+        },
+        "shmmni": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "shmall",
+        "shmmax",
+        "shmmni"
       ]
     },
     "KernelInfo": {
@@ -2231,6 +2640,76 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "LanguagesInfo": {
+      "properties": {
+        "go": {
+          "type": "string"
+        },
+        "python": {
+          "type": "string"
+        },
+        "ruby": {
+          "type": "string"
+        },
+        "node": {
+          "type": "string"
+        },
+        "java": {
+          "type": "string"
+        },
+        "perl": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "LibvirtDomain": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "vcpus": {
+          "type": "integer"
+        },
+        "max_memory": {
+          "type": "string"
+        },
+        "autostart": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "autostart"
+      ]
+    },
+    "LibvirtInfo": {
+      "properties": {
+        "uri": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "domains": {
+          "items": {
+            "$ref": "#/$defs/LibvirtDomain"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "LinodeInfo": {
       "properties": {
         "public_ip": {
@@ -2242,6 +2721,37 @@
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "LivepatchInfo": {
+      "properties": {
+        "patches": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LivepatchPatch"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "patches"
+      ]
+    },
+    "LivepatchPatch": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "transition": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "enabled",
+        "transition"
+      ]
     },
     "LoadInfo": {
       "properties": {
@@ -2291,6 +2801,68 @@
       "type": "object",
       "required": [
         "id"
+      ]
+    },
+    "MdadmArray": {
+      "properties": {
+        "device": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "active_disks": {
+          "type": "integer"
+        },
+        "total_disks": {
+          "type": "integer"
+        },
+        "spare_disks": {
+          "type": "integer"
+        },
+        "members": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "spares": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "device",
+        "active_disks",
+        "total_disks",
+        "spare_disks",
+        "members",
+        "spares"
+      ]
+    },
+    "MdadmInfo": {
+      "properties": {
+        "arrays": {
+          "items": {
+            "$ref": "#/$defs/MdadmArray"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "arrays"
       ]
     },
     "MemoryDirectMap": {
@@ -3342,6 +3914,44 @@
         "name"
       ]
     },
+    "PackagesInfo": {
+      "properties": {
+        "packages": {
+          "items": {
+            "$ref": "#/$defs/PackagesPackage"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "packages"
+      ]
+    },
+    "PackagesPackage": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "arch": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "source"
+      ]
+    },
     "PciDevice": {
       "properties": {
         "vendor_id": {
@@ -3497,6 +4107,21 @@
       "type": "object",
       "required": [
         "name"
+      ]
+    },
+    "RpmInfo": {
+      "properties": {
+        "macros": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "macros"
       ]
     },
     "ScalewayBootscript": {
@@ -3679,6 +4304,71 @@
         "devices"
       ]
     },
+    "SelinuxInfo": {
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "current_mode": {
+          "type": "string"
+        },
+        "config_mode": {
+          "type": "string"
+        },
+        "policy_version": {
+          "type": "string"
+        },
+        "max_kernel_policy_version": {
+          "type": "string"
+        },
+        "loaded_policy_name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "status"
+      ]
+    },
+    "ServicesInfo": {
+      "properties": {
+        "services": {
+          "items": {
+            "$ref": "#/$defs/ServicesService"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "services"
+      ]
+    },
+    "ServicesService": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "state",
+        "enabled"
+      ]
+    },
     "SessionsInfo": {
       "properties": {
         "logged_in": {
@@ -3749,6 +4439,151 @@
       "type": "object",
       "required": [
         "paths"
+      ]
+    },
+    "SshHostKey": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "fingerprint_sha256": {
+          "type": "string"
+        },
+        "fingerprint_md5": {
+          "type": "string"
+        },
+        "key_length": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "fingerprint_sha256",
+        "fingerprint_md5",
+        "key_length"
+      ]
+    },
+    "SshInfo": {
+      "properties": {
+        "keys": {
+          "items": {
+            "$ref": "#/$defs/SshHostKey"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "keys"
+      ]
+    },
+    "SysconfInfo": {
+      "properties": {
+        "clk_tck": {
+          "type": "integer"
+        },
+        "pagesize": {
+          "type": "integer"
+        },
+        "nprocessors_conf": {
+          "type": "integer"
+        },
+        "nprocessors_onln": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "clk_tck",
+        "pagesize",
+        "nprocessors_conf",
+        "nprocessors_onln"
+      ]
+    },
+    "SysctlInfo": {
+      "properties": {
+        "params": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "params"
+      ]
+    },
+    "SystemdpathsInfo": {
+      "properties": {
+        "paths": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "paths"
+      ]
+    },
+    "TcInfo": {
+      "properties": {
+        "interfaces": {
+          "items": {
+            "$ref": "#/$defs/TcInterface"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "interfaces"
+      ]
+    },
+    "TcInterface": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "qdiscs": {
+          "items": {
+            "$ref": "#/$defs/TcQDisc"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "qdiscs"
+      ]
+    },
+    "TcQDisc": {
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "handle": {
+          "type": "string"
+        },
+        "parent": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "kind"
       ]
     },
     "TimezoneInfo": {
@@ -3879,6 +4714,27 @@
         "gid"
       ]
     },
+    "VirtualboxInfo": {
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "guest_additions_version": {
+          "type": "string"
+        },
+        "guest_additions_revision": {
+          "type": "string"
+        },
+        "language_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "VirtualizationInfo": {
       "properties": {
         "system": {
@@ -3899,6 +4755,96 @@
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "VmwareInfo": {
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "hosttime": {
+          "type": "string"
+        },
+        "speed": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "balloon": {
+          "type": "string"
+        },
+        "swap": {
+          "type": "string"
+        },
+        "mem_limit": {
+          "type": "string"
+        },
+        "mem_res": {
+          "type": "string"
+        },
+        "cpu_res": {
+          "type": "string"
+        },
+        "cpu_limit": {
+          "type": "string"
+        },
+        "upgrade_status": {
+          "type": "string"
+        },
+        "timesync_status": {
+          "type": "string"
+        },
+        "host_type": {
+          "type": "string"
+        },
+        "host_version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ZpoolsInfo": {
+      "properties": {
+        "pools": {
+          "items": {
+            "$ref": "#/$defs/ZpoolsPool"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "pools"
+      ]
+    },
+    "ZpoolsPool": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string"
+        },
+        "alloc": {
+          "type": "string"
+        },
+        "free": {
+          "type": "string"
+        },
+        "health": {
+          "type": "string"
+        },
+        "altroot": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
     }
   },
   "title": "gohai Facts",

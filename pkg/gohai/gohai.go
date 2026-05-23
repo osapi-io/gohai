@@ -29,43 +29,66 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
+	blockdevice "github.com/osapi-io/gohai/pkg/gohai/collectors/block_device"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/command"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	digitalocean "github.com/osapi-io/gohai/pkg/gohai/collectors/digital_ocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/docker"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/grub2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostnamectl"
 	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/interrupts"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ipc"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	kernelmodules "github.com/osapi-io/gohai/pkg/gohai/collectors/kernel_modules"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/languages"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/libvirt"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/livepatch"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
 	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/mdadm"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	osrelease "github.com/osapi-io/gohai/pkg/gohai/collectors/os_release"
 	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/packages"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/pci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 	rootgroup "github.com/osapi-io/gohai/pkg/gohai/collectors/root_group"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/rpm"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scsi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/selinux"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/services"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ssh"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysconf"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysctl"
+	systemdpaths "github.com/osapi-io/gohai/pkg/gohai/collectors/systemd_paths"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/tc"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualbox"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/vmware"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
 )
 
 // Gohai is the SDK entry point for collecting system facts.
@@ -246,5 +269,28 @@ func builtinCollectors() []collector.Collector {
 		pci.New(),
 		scsi.New(),
 		hardware.New(),
+		blockdevice.New(),
+		command.New(),
+		docker.New(),
+		grub2.New(),
+		hostnamectl.New(),
+		interrupts.New(),
+		ipc.New(),
+		languages.New(),
+		libvirt.New(),
+		livepatch.New(),
+		mdadm.New(),
+		packages.New(),
+		rpm.New(),
+		selinux.New(),
+		services.New(),
+		ssh.New(),
+		sysconf.New(),
+		sysctl.New(),
+		systemdpaths.New(),
+		tc.New(),
+		virtualbox.New(),
+		vmware.New(),
+		zpools.New(),
 	}
 }
