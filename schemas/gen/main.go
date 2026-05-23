@@ -18,64 +18,62 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package cmd
+package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
-	"io"
-	"sort"
+	"os"
+	"reflect"
+	"strings"
+
+	"github.com/invopop/jsonschema"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
-func writeOutput(
-	out io.Writer,
-	facts *gohai.Facts,
-	pretty, flat bool,
-) error {
-	if flat {
-		return writeFlat(out, facts)
+func qualifiedNamer(t reflect.Type) string {
+	pkg := t.PkgPath()
+	name := t.Name()
+
+	if !strings.Contains(pkg, "gohai/pkg/gohai/collectors/") {
+		return name
 	}
-	return writeJSON(out, facts, pretty)
+
+	parts := strings.Split(pkg, "/")
+	collector := parts[len(parts)-1]
+	collector = strings.ReplaceAll(collector, "_", "")
+	collector = strings.ToUpper(collector[:1]) + collector[1:]
+
+	return collector + name
 }
 
-func writeFlat(
-	out io.Writer,
-	facts *gohai.Facts,
-) error {
-	flatMap := facts.Flat()
-	keys := make([]string, 0, len(flatMap))
-	for k := range flatMap {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		if _, err := fmt.Fprintf(out, "%s=%v\n", k, flatMap[k]); err != nil {
-			return fmt.Errorf("write flat output: %w", err)
-		}
-	}
-	return nil
-}
+func main() {
+	out := flag.String("out", "gohai.schema.json", "output file path")
+	flag.Parse()
 
-func writeJSON(
-	out io.Writer,
-	facts *gohai.Facts,
-	pretty bool,
-) error {
-	var (
-		b   []byte
-		err error
-	)
-	if pretty {
-		b, err = facts.PrettyJSON()
-	} else {
-		b, err = facts.JSON()
+	r := &jsonschema.Reflector{
+		Namer: qualifiedNamer,
 	}
+	schema := r.Reflect(&gohai.Facts{})
+
+	schema.ID = "https://gohai.dev/schemas/gohai.schema.json"
+	schema.Title = "gohai Facts"
+	schema.Description = "System facts collected by gohai (https://github.com/osapi-io/gohai)"
+
+	data, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
-		return fmt.Errorf("encode output: %w", err)
+		fmt.Fprintf(os.Stderr, "marshal: %v\n", err)
+		os.Exit(1)
 	}
-	if _, err := out.Write(append(b, '\n')); err != nil {
-		return fmt.Errorf("write output: %w", err)
+
+	data = append(data, '\n')
+
+	if err := os.WriteFile(*out, data, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "write %s: %v\n", *out, err)
+		os.Exit(1)
 	}
-	return nil
+
+	fmt.Printf("wrote %s (%d bytes)\n", *out, len(data))
 }

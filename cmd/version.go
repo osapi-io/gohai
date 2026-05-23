@@ -18,72 +18,71 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package cmd implements the gohai CLI.
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 
+	goversion "github.com/caarlos0/go-version"
 	"github.com/spf13/cobra"
-
-	"github.com/osapi-io/gohai/internal/cli"
 )
 
-// Execute runs the gohai CLI. Called from main.go.
-func Execute() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+var (
+	version   = ""
+	commit    = ""
+	treestate = ""
+	date      = ""
+	builtBy   = ""
+)
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-sigChan
-		cancel()
-	}()
-
-	cmd := newRootCommand()
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
+func buildVersion() goversion.Info {
+	return goversion.GetVersionInfo(
+		goversion.WithAppDetails(
+			"gohai",
+			"SDK-first Go library for collecting system facts.\n",
+			"https://github.com/osapi-io/gohai",
+		),
+		func(i *goversion.Info) {
+			if commit != "" {
+				i.GitCommit = commit
+			}
+			if treestate != "" {
+				i.GitTreeState = treestate
+			}
+			if date != "" {
+				i.BuildDate = date
+			}
+			if version != "" {
+				i.GitVersion = version
+			}
+			if builtBy != "" {
+				i.BuiltBy = builtBy
+			}
+		},
+	)
 }
 
-func newRootCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:           "gohai",
-		Short:         "Collect system facts",
+func newVersionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:           "version",
+		Short:         "Display the version of gohai",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(
 			c *cobra.Command,
 			_ []string,
 		) error {
-			return c.Help()
+			v := buildVersion()
+			jsonOut, err := v.JSONString()
+			if err != nil {
+				return fmt.Errorf("render version JSON: %w", err)
+			}
+
+			if _, err := fmt.Fprintln(c.OutOrStdout(), jsonOut); err != nil {
+				return fmt.Errorf("write version: %w", err)
+			}
+
+			return nil
 		},
 	}
-
-	defaultHelp := cmd.HelpFunc()
-	cmd.SetHelpFunc(func(
-		c *cobra.Command,
-		args []string,
-	) {
-		if c == cmd {
-			out := c.OutOrStdout()
-			_, _ = fmt.Fprintln(out)
-			_, _ = fmt.Fprint(out, cli.Banner(out))
-			_, _ = fmt.Fprintln(out)
-		}
-		defaultHelp(c, args)
-	})
-
-	cmd.AddCommand(newCollectCommand())
-	cmd.AddCommand(newValidateCommand())
-	cmd.AddCommand(newVersionCommand())
-
-	return cmd
 }

@@ -533,7 +533,8 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), map[string]string{
 				"/sys/class/net/eth0/type": "1\n",
 			}),
-			exec: ipRouteAndEthtoolFullExec(s.T(),
+			exec: ipRouteAndEthtoolFullExec(
+				s.T(),
 				nil, // no -i
 				map[string]string{"eth0": "Ring parameters for eth0:\n" +
 					"junk before any section\n" +

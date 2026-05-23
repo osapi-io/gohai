@@ -71,8 +71,8 @@ the collector's Data Sources doc.
    endpoints when the SDK is too heavy.
 6. **Our own extension** — last resort. ONLY the fields the
    libraries above don't expose. Extensions read files via
-   `vfs.Filesystem` and shell out via `executor.Executor` (Phase 1,
-   WIP) so tests never touch the real host.
+   `avfs.VFS` and shell out via `executor.Executor` so tests never
+   touch the real host.
 7. **[Ohai's Ruby plugin][ohai-plugins] as methodology reference
    only** — NOT an import. We read Ohai to learn WHICH edge cases
    exist (fallback chains, distro quirks, retries). We then check
@@ -98,9 +98,9 @@ Before implementing or extending a collector, verify in this order:
 2. If no: does a secondary library (the next one down in the Decision
    order) expose it?
 3. If still no: we need an extension. The extension uses
-   `vfs.Filesystem` for file reads and `executor.Executor` for exec
+   `avfs.VFS` for file reads and `executor.Executor` for exec
    calls — never plain `os.ReadFile` / `exec.Command` in collector
-   Collect methods (Phase 1 constraint once those abstractions land).
+   Collect methods.
 
 ### Per-collector library stack
 
@@ -132,9 +132,9 @@ this table with rationale.
 | timezone        | stdlib              | —                                      |
 | root_group      | stdlib (`os/user`)  | —                                      |
 | package_mgr     | stdlib exec         | executor-based                         |
-| dmi (planned)   | **ghw**             | baseboard + BIOS + chassis + product   |
-| gpu (planned)   | **ghw**             | —                                      |
-| pci (planned)   | **ghw**             | —                                      |
+| dmi             | **ghw**             | baseboard + BIOS + chassis + product   |
+| gpu             | **ghw**             | —                                      |
+| pci             | **ghw**             | —                                      |
 | block_device (planned) | **ghw**      | —                                      |
 
 New collectors must justify library choice in their PR.
@@ -376,53 +376,91 @@ coverage we lack, either add it in the same PR or open a tracked issue
 
 For setup, prerequisites, and contributing guidelines:
 
-- @docs/development.md - Prerequisites, setup, code style, testing, commits
+- @docs/development.md - Prerequisites, setup, code style, testing, commits,
+  color palette, CLI architecture
 - @docs/contributing.md - PR workflow and contribution guidelines
 - @docs/collectors/README.md - Per-collector reference
+- @schemas/README.md - JSON Schema, field-naming strategy, OCSF gap analysis
 
 ## Quick Reference
 
 ```bash
 just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
+gohai collect --pretty             # run default collectors
+gohai collect --no-defaults --collector.cpu  # specific collectors
+gohai collect --pretty | gohai validate      # validate against schema
+gohai version                      # build info
 ```
 
 ## Package Structure
 
 - **`main.go`** — repo-root entry point; just calls `cmd.Execute()`
-- **`cmd/`** — Cobra CLI: `root.go`, `flags.go`, `output.go`
+- **`cmd/`** — Cobra CLI subcommands
+  - `root.go` — root command, banner, context setup, `AddCommand` wiring
+  - `collect.go` — `gohai collect` — collector flags, SDK wiring,
+    delegates output to `internal/cli/`
+  - `validate.go` — `gohai validate` — JSON Schema validation against
+    embedded schema (stdin or `--file`)
+  - `version.go` — `gohai version` — build-time identity via
+    `caarlos0/go-version`
+- **`internal/cli/`** — CLI output helpers (never imported by `pkg/gohai/`)
+  - `theme.go` — maxheadroom palette (`#b4a7d6` lavender accent),
+    `Banner()`, role-based color helpers (`Mute`, `Accent`, `OK`, `Err`,
+    `Info`, `Success`, `Failure`)
+  - `output.go` — `WriteOutput`, `WriteJSON`, `WriteFlat`,
+    `WriteCollectorList` — facts formatting for the collect subcommand
 - **`pkg/gohai/`** — Public SDK
   - `gohai.go` — `Gohai` struct, `New()`, `Collect()`
-  - `facts.go` — `Facts` struct with `Data map[string]any` and JSON/Flat methods
-  - `options.go` — functional options (`WithEnabled`, `WithDisabled`, `WithCollectors`)
+  - `facts.go` — `Facts` struct with typed collector fields and JSON/Flat
+    methods
+  - `options.go` — functional options (`WithEnabled`, `WithDisabled`,
+    `WithCollectors`)
   - `registry.go` — `PublicRegistry` used by CLI for flag enumeration
 - **`pkg/gohai/collectors/<name>/`** — Public per-collector sub-packages.
   Use the osapi-style per-OS struct pattern (no build tags). See
   `pkg/gohai/collectors/shells/` for the canonical reference.
   - `<name>.go` — `Info` struct, `Collector` interface, `base` struct
-    (holds shared `Name()`/`DefaultEnabled()`/`Dependencies()`), `New()` factory
-    that dispatches on `platform.Detect()`, and any cross-OS helpers
-    (shared parsing, shared constants).
-  - `linux.go` — `type Linux struct { base; FS avfs.VFS; Exec executor.Executor }`
-    (fields only when the collector needs them) with `NewLinux()` and
-    `(l *Linux) Collect(ctx)` method. **No build tag.**
-  - `darwin.go` — `type Darwin struct { base; FS; Exec }` with `NewDarwin()`
-    and `(d *Darwin) Collect(ctx)` method. **No build tag.**
-  - `debian.go` / `rhel.go` (only when distro genuinely diverges) — same
-    pattern, added to the `New()` dispatch switch.
-  - `<name>_public_test.go` — the **only** test file. Contains compile-time
-    `collector.Collector` asserts at the top, `TestNew` for the factory
-    dispatch, a single table-driven `TestCollect` whose rows carry a
-    `variant: "linux" | "darwin"` column and construct the right per-OS
-    struct, and optionally separate test methods for genuinely-pure
+    (holds shared `Name()`/`DefaultEnabled()`/`Dependencies()`), `New()`
+    factory that dispatches on `platform.Detect()`, and any cross-OS
+    helpers (shared parsing, shared constants).
+  - `linux.go` — `type Linux struct { base; FS avfs.VFS; Exec
+    executor.Executor }` (fields only when the collector needs them)
+    with `NewLinux()` and `(l *Linux) Collect(ctx)` method. **No build
+    tag.**
+  - `darwin.go` — `type Darwin struct { base; FS; Exec }` with
+    `NewDarwin()` and `(d *Darwin) Collect(ctx)` method. **No build
+    tag.**
+  - `debian.go` / `rhel.go` (only when distro genuinely diverges) —
+    same pattern, added to the `New()` dispatch switch.
+  - `<name>_public_test.go` — the **only** test file. Contains
+    compile-time `collector.Collector` asserts at the top, `TestNew` for
+    the factory dispatch, a single table-driven `TestCollect` whose rows
+    carry a `variant: "linux" | "darwin"` column and construct the right
+    per-OS struct, and optionally separate test methods for genuinely-pure
     public helpers (e.g. `TestHumanDuration`, `TestBytesToString`).
     No `linux_public_test.go` / `darwin_public_test.go` files.
+- **`schemas/`** — JSON Schema and field-naming artifacts
+  - `gen/` — generator tool (`go run .` reflects `gohai.Facts` into JSON
+    Schema via `invopop/jsonschema`); `//go:generate` directive picked up
+    by `just generate`
+  - `gohai.schema.json` — generated schema (draft 2020-12), committed
+  - `schema.go` — `//go:embed` of `gohai.schema.json` for the validate
+    subcommand
+  - `field-mapping.md` — 803-row per-field tier mapping (OCSF/OTel/
+    convention) with citations
+  - `ocsf-gaps.md` — 73 OCSF upstream PR candidates
 - **`internal/platform/`** — OS/distro detection wrapping gopsutil.
   `Detect()` is a swappable `var` so collector tests can force any
   branch without importing gopsutil. `hostInfoFn` is private, exposed
   only to platform's own tests via `export_test.go`.
 - **`internal/collector/`** — Collector interface + registry plumbing
   - `collector.go` — `Collector` interface
-  - `registry.go` — `Registry` (register, resolve deps, run concurrently)
+  - `registry.go` — `Registry` (register, resolve deps, run
+    concurrently)
+- **`internal/executor/`** — command execution abstraction
+  - `executor.go` — `Executor` interface (`Execute(ctx, name, args...)`)
+  - `gen/` — gomock mock generation (`go generate`)
+  - `mocks/` — generated mocks (committed)
 
 ## Code Standards (MANDATORY)
 
@@ -625,9 +663,9 @@ divergences from Ohai.
 
 ## VFS + Executor Abstractions
 
-Collectors that read files or shell out use two shared abstractions,
-injected as struct fields on the per-OS variant (same pattern as
-osapi's Agent struct).
+Collectors that read files or shell out **MUST** use two shared
+abstractions, injected as struct fields on the per-OS variant (same
+pattern as osapi's Agent struct).
 
 ### `avfs.VFS` — filesystem
 
@@ -713,12 +751,11 @@ uses the deprecated `golang/mock`; we picked the fork).
 
 ### Migration status
 
-New code and new collectors MUST use these abstractions. Existing
+All new code and new collectors MUST use these abstractions. Existing
 collectors still on the legacy `ReadFileFn` / `RunCmdFn` struct-field
-pattern migrate as methodology work touches them. Canonical migrated
-reference: `pkg/gohai/collectors/shells/` (file-read only). A combined
-FS + Executor example will land with the first collector that needs
-both.
+pattern migrate as methodology work touches them. Canonical reference:
+`pkg/gohai/collectors/shells/` (VFS only),
+`pkg/gohai/collectors/platform/` (VFS + Executor).
 
 [Chef Ohai]: https://docs.chef.io/ohai/
 [OSAPI]: https://github.com/osapi-io/osapi

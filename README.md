@@ -59,11 +59,23 @@ compliance. The CLI is a convenience — the SDK is the product.
 
 ## 📦 Install
 
+**One-line installer** (macOS / Linux):
+
 ```bash
-go install github.com/osapi-io/gohai/cmd/gohai@latest
+curl -fsSL https://github.com/osapi-io/gohai/raw/main/install.sh | bash
 ```
 
-As a library dependency:
+The installer downloads the latest release, verifies the SHA-256 checksum,
+strips macOS quarantine, and installs to `~/.local/bin` (or `/usr/local/bin`
+when run as root). Override with `GOHAI_VERSION` or `GOHAI_INSTALL_DIR`.
+
+**Go install:**
+
+```bash
+go install github.com/osapi-io/gohai@latest
+```
+
+**As a library dependency:**
 
 ```bash
 go get github.com/osapi-io/gohai
@@ -108,28 +120,35 @@ explicit `--collector.X` flags.
 
 ```bash
 # Collect the recommended default collector set
-gohai
+gohai collect
 
 # Pretty-printed JSON
-gohai --pretty
+gohai collect --pretty
 
 # Flat key=value pairs instead of nested JSON
-gohai --flat
+gohai collect --flat
 
 # Enable specific collectors on top of the defaults
-gohai --collector.process --collector.packages
+gohai collect --collector.process --collector.packages
 
 # Disable specific collectors
-gohai --no-collector.virtualization --no-collector.network
+gohai collect --no-collector.virtualization --no-collector.network
 
 # Skip defaults entirely; run only what --collector.X turns on
-gohai --no-defaults --collector.platform --collector.cpu
+gohai collect --no-defaults --collector.platform --collector.cpu
 
 # Embed per-collector timings + errors under `_timings` in the JSON
-gohai --with-timings --pretty
+gohai collect --with-timings --pretty
 
 # List every registered collector and exit
-gohai --list-collectors
+gohai collect --list-collectors
+
+# Validate output against the embedded JSON Schema
+gohai collect --pretty | gohai validate
+gohai validate --file facts.json
+
+# Display version information
+gohai version
 ```
 
 ### SDK
@@ -229,6 +248,8 @@ for the full pattern.
 - [Collectors reference](docs/collectors/README.md) — one doc per collector
   with fields, schema mappings (OCSF + OpenTelemetry), and Ohai source
   alignment.
+- [Schemas](schemas/README.md) — JSON Schema, field-naming strategy
+  (OCSF > OTel > convention), OCSF gap analysis, and cloud canonical overlay.
 - [Development](docs/development.md) — prerequisites, setup, testing, commit
   conventions.
 - [Contributing](docs/contributing.md) — PR workflow.

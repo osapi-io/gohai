@@ -18,94 +18,113 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package cmd
+package cli
 
 import (
 	"fmt"
 	"io"
 	"sort"
 
-	"github.com/spf13/cobra"
-
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
-// flagSet captures collector names toggled on or off via CLI flags.
-type flagSet struct {
-	set map[string]bool
-}
-
-func newFlagSet() *flagSet {
-	return &flagSet{set: map[string]bool{}}
-}
-
-func (f *flagSet) values() []string {
-	out := make([]string, 0, len(f.set))
-	for n := range f.set {
-		out = append(out, n)
+// WriteOutput writes facts to out in the requested format.
+func WriteOutput(
+	out io.Writer,
+	facts *gohai.Facts,
+	pretty, flat bool,
+) error {
+	if flat {
+		return WriteFlat(out, facts)
 	}
-	sort.Strings(out)
-	return out
+
+	return WriteJSON(out, facts, pretty)
 }
 
-// registerCollectorFlags adds --collector.<name> / --no-collector.<name>
-// flags for every registered collector.
-func registerCollectorFlags(
-	cmd *cobra.Command,
-	enabled, disabled *flagSet,
-) {
-	names := listAllCollectorNames()
-	for _, n := range names {
-		cmd.Flags().Bool("collector."+n, false, fmt.Sprintf("enable %s collector", n))
-		cmd.Flags().Bool("no-collector."+n, false, fmt.Sprintf("disable %s collector", n))
+// WriteFlat writes facts as sorted dot-separated key=value pairs.
+func WriteFlat(
+	out io.Writer,
+	facts *gohai.Facts,
+) error {
+	flatMap := facts.Flat()
+	keys := make([]string, 0, len(flatMap))
+
+	for k := range flatMap {
+		keys = append(keys, k)
 	}
-	cmd.PreRunE = func(
-		c *cobra.Command,
-		_ []string,
-	) error {
-		for _, n := range names {
-			if v, _ := c.Flags().GetBool("collector." + n); v {
-				enabled.set[n] = true
-			}
-			if v, _ := c.Flags().GetBool("no-collector." + n); v {
-				disabled.set[n] = true
-			}
+
+	sort.Strings(keys)
+
+	for _, k := range keys {
+		if _, err := fmt.Fprintf(out, "%s=%v\n", k, flatMap[k]); err != nil {
+			return fmt.Errorf("write flat output: %w", err)
 		}
-		return nil
 	}
+
+	return nil
 }
 
-func listAllCollectorNames() []string {
-	names := gohai.NewRegistry().Names()
-	sort.Strings(names)
-	return names
+// WriteJSON writes facts as JSON, optionally pretty-printed.
+func WriteJSON(
+	out io.Writer,
+	facts *gohai.Facts,
+	pretty bool,
+) error {
+	var (
+		b   []byte
+		err error
+	)
+
+	if pretty {
+		b, err = facts.PrettyJSON()
+	} else {
+		b, err = facts.JSON()
+	}
+
+	if err != nil {
+		return fmt.Errorf("encode output: %w", err)
+	}
+
+	if _, err := out.Write(append(b, '\n')); err != nil {
+		return fmt.Errorf("write output: %w", err)
+	}
+
+	return nil
 }
 
-func printCollectorList(
+// WriteCollectorList writes the collector registry grouped by category.
+func WriteCollectorList(
 	out io.Writer,
 ) error {
 	reg := gohai.NewRegistry()
 	byCat := map[string][]string{}
+
 	for _, n := range reg.Names() {
 		cat := reg.CategoryOf(n)
 		byCat[cat] = append(byCat[cat], n)
 	}
+
 	cats := make([]string, 0, len(byCat))
 	for c := range byCat {
 		cats = append(cats, c)
 	}
+
 	sort.Strings(cats)
+
 	for _, cat := range cats {
 		names := byCat[cat]
 		sort.Strings(names)
+
 		if _, err := fmt.Fprintf(out, "[%s]\n", cat); err != nil {
 			return fmt.Errorf("write collector list: %w", err)
 		}
+
 		for _, n := range names {
 			if _, err := fmt.Fprintf(out, "  %s\n", n); err != nil {
 				return fmt.Errorf("write collector list: %w", err)
 			}
 		}
 	}
+
 	return nil
 }
