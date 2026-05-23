@@ -32,6 +32,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
 
+	"github.com/osapi-io/gohai/internal/cli"
 	"github.com/osapi-io/gohai/schemas"
 )
 
@@ -85,16 +86,15 @@ func runValidate(
 	}
 
 	if err := sch.Validate(instance); err != nil {
-		if _, wErr := fmt.Fprintf(errOut, "validation failed:\n%s\n", err); wErr != nil {
-			return fmt.Errorf("write validation error: %w", wErr)
-		}
+		cli.Print(errOut, cli.Failure(errOut, "schema validation failed"))
+		cli.Print(errOut, "")
+		cli.Print(errOut, cli.Mute(errOut, err.Error()))
+		cli.Print(errOut, "")
 
 		return errors.New("schema validation failed")
 	}
 
-	if _, err := fmt.Fprintln(out, "valid"); err != nil {
-		return fmt.Errorf("write output: %w", err)
-	}
+	cli.Print(out, cli.Success(out, "schema valid"))
 
 	return nil
 }
