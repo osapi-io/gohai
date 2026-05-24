@@ -15,12 +15,12 @@ the `tc` command output, recording each qdisc's kind, handle, and parent.
 
 | Field                          | Type     | Description                                           | Schema mapping              |
 | ------------------------------ | -------- | ----------------------------------------------------- | --------------------------- |
-| `interfaces`                   | `list`   | List of interfaces with qdisc configuration            | —                           |
-| `interfaces[].name`            | `string` | Network interface name, e.g. `eth0`                    | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs`          | `list`   | Qdiscs attached to this interface                      | —                           |
+| `interfaces`                   | `list`   | List of interfaces with qdisc configuration           | —                           |
+| `interfaces[].name`            | `string` | Network interface name, e.g. `eth0`                   | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs`          | `list`   | Qdiscs attached to this interface                     | —                           |
 | `interfaces[].qdiscs[].kind`   | `string` | Qdisc type: `fq_codel`, `pfifo_fast`, `noqueue`, etc. | No direct OCSF/OTel mapping |
 | `interfaces[].qdiscs[].handle` | `string` | Qdisc handle (e.g. `1:`, `0:`)                        | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].parent` | `string` | Parent handle; empty for root qdiscs                   | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].parent` | `string` | Parent handle; empty for root qdiscs                  | No direct OCSF/OTel mapping |
 
 ## Platform Support
 

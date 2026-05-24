@@ -11,13 +11,13 @@ absent (containers, minimal base images).
 
 ## Collected Fields
 
-| Field                        | Type     | Description                               | Schema mapping              |
-| ---------------------------- | -------- | ----------------------------------------- | --------------------------- |
-| `packages`                   | `list`   | List of installed package objects          | —                           |
-| `packages[].name`            | `string` | Package name                               | OCSF `package.name`         |
-| `packages[].version`         | `string` | Installed version                          | OCSF `package.version`      |
-| `packages[].architecture`    | `string` | CPU architecture; empty for brew packages  | OCSF `package.architecture` |
-| `packages[].package_manager` | `string` | Package manager: `dpkg`, `rpm`, or `brew`  | OCSF `package.package_manager` |
+| Field                        | Type     | Description                               | Schema mapping                 |
+| ---------------------------- | -------- | ----------------------------------------- | ------------------------------ |
+| `packages`                   | `list`   | List of installed package objects         | —                              |
+| `packages[].name`            | `string` | Package name                              | OCSF `package.name`            |
+| `packages[].version`         | `string` | Installed version                         | OCSF `package.version`         |
+| `packages[].architecture`    | `string` | CPU architecture; empty for brew packages | OCSF `package.architecture`    |
+| `packages[].package_manager` | `string` | Package manager: `dpkg`, `rpm`, or `brew` | OCSF `package.package_manager` |
 
 ## Platform Support
 
@@ -32,19 +32,19 @@ absent (containers, minimal base images).
 {
   "packages": {
     "packages": [
-    {
-      "name": "bash",
-      "version": "5.1-6",
-      "architecture": "amd64",
-      "package_manager": "dpkg"
-    },
-    {
-      "name": "libc6",
-      "version": "2.35-0ubuntu3.6",
-      "architecture": "amd64",
-      "package_manager": "dpkg"
-    }
-  ]
+      {
+        "name": "bash",
+        "version": "5.1-6",
+        "architecture": "amd64",
+        "package_manager": "dpkg"
+      },
+      {
+        "name": "libc6",
+        "version": "2.35-0ubuntu3.6",
+        "architecture": "amd64",
+        "package_manager": "dpkg"
+      }
+    ]
   }
 }
 ```

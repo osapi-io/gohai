@@ -143,8 +143,8 @@ None.
 Ohai's `filesystem.rb` combines `mount`, `df`, and `lsblk` output to build a
 per-device view with mount points, capacity, and filesystem types. gohai uses
 gopsutil instead, which reads `/proc/mounts` and `statfs` syscalls directly —
-same underlying data, different parsing path. gohai extends Ohai's surface
-with btrfs subvolume detail and ZFS dataset properties via VFS reads.
+same underlying data, different parsing path. gohai extends Ohai's surface with
+btrfs subvolume detail and ZFS dataset properties via VFS reads.
 
 On Linux:
 

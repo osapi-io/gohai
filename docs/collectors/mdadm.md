@@ -96,10 +96,10 @@ None.
 ## Data Sources
 
 Ohai's `linux/mdadm.rb` reads `/proc/mdstat` for array detection and parses
-member/spare disk lists. gohai follows the same approach for `/proc/mdstat`
-and extends it by optionally running `mdadm --detail` for UUID, state, and
-disk counts — which Ohai does not do. When `mdadm` is not installed, gohai
-still emits arrays with the information available from `/proc/mdstat` alone.
+member/spare disk lists. gohai follows the same approach for `/proc/mdstat` and
+extends it by optionally running `mdadm --detail` for UUID, state, and disk
+counts — which Ohai does not do. When `mdadm` is not installed, gohai still
+emits arrays with the information available from `/proc/mdstat` alone.
 
 On Linux:
 

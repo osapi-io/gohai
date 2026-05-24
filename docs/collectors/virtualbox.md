@@ -85,9 +85,9 @@ None.
 Ohai's `virtualbox.rb` has two modes: host-side (via `VBoxManage`) and
 guest-side (via `VBoxControl`). gohai implements guest-side only, using
 `VBoxControl guestproperty enumerate` and extracting the same five properties
-(VBoxVer, VBoxRev, GuestAdd/VersionExt, GuestAdd/Revision, LanguageID) via
-regex patterns matching Ohai's approach. Host-side `VBoxManage` enumeration
-is not implemented.
+(VBoxVer, VBoxRev, GuestAdd/VersionExt, GuestAdd/Revision, LanguageID) via regex
+patterns matching Ohai's approach. Host-side `VBoxManage` enumeration is not
+implemented.
 
 On both Linux and macOS the collector runs
 `VBoxControl guestproperty enumerate`. `VBoxControl` is part of the VirtualBox

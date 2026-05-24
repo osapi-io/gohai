@@ -16,20 +16,20 @@ visibility.
 
 ## Collected Fields
 
-| Field                 | Type     | Description                                       | Schema mapping                |
-| --------------------- | -------- | ------------------------------------------------- | ----------------------------- |
-| `version`             | `string` | Docker server version, e.g. `24.0.5`              | No direct OCSF/OTel mapping   |
-| `containers`          | `list`   | All containers (running and stopped)               | —                             |
-| `containers[].id`     | `string` | Short container ID                                 | OCSF `container.uid`          |
-| `containers[].name`   | `string` | Container name, leading `/` stripped               | OCSF `container.name`         |
-| `containers[].image`  | `string` | Image reference used to start the container        | OCSF `container.image.name`   |
-| `containers[].state`  | `string` | Docker state: `running`, `exited`, `paused`, etc.  | No direct OCSF/OTel mapping   |
-| `containers[].status` | `string` | Human-readable status string from `docker ps`      | No direct OCSF/OTel mapping   |
-| `images`              | `list`   | Locally pulled images                              | —                             |
-| `images[].id`         | `string` | Image ID (full SHA256 digest)                      | No direct OCSF/OTel mapping   |
-| `images[].repository` | `string` | Repository name                                    | No direct OCSF/OTel mapping   |
-| `images[].tag`        | `string` | Image tag                                          | No direct OCSF/OTel mapping   |
-| `images[].size`       | `string` | Human-readable size from `docker images`           | No direct OCSF/OTel mapping   |
+| Field                 | Type     | Description                                       | Schema mapping              |
+| --------------------- | -------- | ------------------------------------------------- | --------------------------- |
+| `version`             | `string` | Docker server version, e.g. `24.0.5`              | No direct OCSF/OTel mapping |
+| `containers`          | `list`   | All containers (running and stopped)              | —                           |
+| `containers[].id`     | `string` | Short container ID                                | OCSF `container.uid`        |
+| `containers[].name`   | `string` | Container name, leading `/` stripped              | OCSF `container.name`       |
+| `containers[].image`  | `string` | Image reference used to start the container       | OCSF `container.image.name` |
+| `containers[].state`  | `string` | Docker state: `running`, `exited`, `paused`, etc. | No direct OCSF/OTel mapping |
+| `containers[].status` | `string` | Human-readable status string from `docker ps`     | No direct OCSF/OTel mapping |
+| `images`              | `list`   | Locally pulled images                             | —                           |
+| `images[].id`         | `string` | Image ID (full SHA256 digest)                     | No direct OCSF/OTel mapping |
+| `images[].repository` | `string` | Repository name                                   | No direct OCSF/OTel mapping |
+| `images[].tag`        | `string` | Image tag                                         | No direct OCSF/OTel mapping |
+| `images[].size`       | `string` | Human-readable size from `docker images`          | No direct OCSF/OTel mapping |
 
 ## Platform Support
 

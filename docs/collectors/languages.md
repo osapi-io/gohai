@@ -12,14 +12,14 @@ consolidates them into a single collector).
 
 ## Collected Fields
 
-| Field    | Type       | Description                                   | Schema mapping                                                    |
-| -------- | ---------- | --------------------------------------------- | ----------------------------------------------------------------- |
-| `go`     | `*string`  | Go toolchain version, e.g. `1.21.0`           | No direct OCSF/OTel mapping (host inventory, not process runtime) |
-| `python` | `*string`  | Python 3 version from `python3 --version`     | No direct OCSF/OTel mapping                                      |
-| `ruby`   | `*string`  | Ruby version from `ruby --version`            | No direct OCSF/OTel mapping                                      |
-| `node`   | `*string`  | Node.js version, leading `v` stripped         | No direct OCSF/OTel mapping                                      |
-| `java`   | `*string`  | Java version extracted from quoted string     | No direct OCSF/OTel mapping                                      |
-| `perl`   | `*string`  | Perl version, `(vX.Y.Z)` form extracted      | No direct OCSF/OTel mapping                                      |
+| Field    | Type      | Description                               | Schema mapping                                                    |
+| -------- | --------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| `go`     | `*string` | Go toolchain version, e.g. `1.21.0`       | No direct OCSF/OTel mapping (host inventory, not process runtime) |
+| `python` | `*string` | Python 3 version from `python3 --version` | No direct OCSF/OTel mapping                                       |
+| `ruby`   | `*string` | Ruby version from `ruby --version`        | No direct OCSF/OTel mapping                                       |
+| `node`   | `*string` | Node.js version, leading `v` stripped     | No direct OCSF/OTel mapping                                       |
+| `java`   | `*string` | Java version extracted from quoted string | No direct OCSF/OTel mapping                                       |
+| `perl`   | `*string` | Perl version, `(vX.Y.Z)` form extracted   | No direct OCSF/OTel mapping                                       |
 
 Fields are omitted from JSON output when nil (runtime absent).
 

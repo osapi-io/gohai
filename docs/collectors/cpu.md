@@ -157,12 +157,12 @@ None.
 ## Data Sources
 
 Ohai's `cpu.rb` uses two sources on Linux: direct `/proc/cpuinfo` parsing for
-per-core identity (model, flags, MHz, vendor, family, stepping) and `lscpu`
-for topology (sockets, NUMA nodes, caches, vulnerabilities, byte order,
-op-modes). gohai follows the same two-source approach — gopsutil wraps
-`/proc/cpuinfo` for the base, and we shell out to `lscpu` via Executor for
-the extended topology fields. On macOS, Ohai reads `sysctl` for CPU info;
-gohai does the same via `sysctl -n` for cores, sockets, and frequency.
+per-core identity (model, flags, MHz, vendor, family, stepping) and `lscpu` for
+topology (sockets, NUMA nodes, caches, vulnerabilities, byte order, op-modes).
+gohai follows the same two-source approach — gopsutil wraps `/proc/cpuinfo` for
+the base, and we shell out to `lscpu` via Executor for the extended topology
+fields. On macOS, Ohai reads `sysctl` for CPU info; gohai does the same via
+`sysctl -n` for cores, sockets, and frequency.
 
 On Linux:
 

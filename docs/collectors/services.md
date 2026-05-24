@@ -14,13 +14,13 @@ service-list plugin. This is a gohai-native addition.
 
 ## Collected Fields
 
-| Field                | Type      | Description                                | Schema mapping            |
-| -------------------- | --------- | ------------------------------------------ | ------------------------- |
-| `services`           | `list`    | List of service objects                     | —                         |
-| `services[].name`    | `string`  | Unit name with `.service` suffix stripped   | No direct OCSF/OTel mapping |
-| `services[].state`   | `string`  | systemd SUB state: `running`, `dead`, etc. | No direct OCSF/OTel mapping |
-| `services[].enabled` | `bool`    | `true` when ACTIVE state is `active`       | No direct OCSF/OTel mapping |
-| `services[].type`    | `string`  | Reserved for future use; currently empty    | No direct OCSF/OTel mapping |
+| Field                | Type     | Description                                | Schema mapping              |
+| -------------------- | -------- | ------------------------------------------ | --------------------------- |
+| `services`           | `list`   | List of service objects                    | —                           |
+| `services[].name`    | `string` | Unit name with `.service` suffix stripped  | No direct OCSF/OTel mapping |
+| `services[].state`   | `string` | systemd SUB state: `running`, `dead`, etc. | No direct OCSF/OTel mapping |
+| `services[].enabled` | `bool`   | `true` when ACTIVE state is `active`       | No direct OCSF/OTel mapping |
+| `services[].type`    | `string` | Reserved for future use; currently empty   | No direct OCSF/OTel mapping |
 
 ## Platform Support
 
@@ -35,17 +35,17 @@ service-list plugin. This is a gohai-native addition.
 {
   "services": {
     "services": [
-    {
-      "name": "ssh",
-      "state": "running",
-      "enabled": true
-    },
-    {
-      "name": "NetworkManager",
-      "state": "dead",
-      "enabled": false
-    }
-  ]
+      {
+        "name": "ssh",
+        "state": "running",
+        "enabled": true
+      },
+      {
+        "name": "NetworkManager",
+        "state": "dead",
+        "enabled": false
+      }
+    ]
   }
 }
 ```
@@ -73,8 +73,8 @@ None.
 
 ## Data Sources
 
-There is no Ohai equivalent for this collector — Ohai does not ship a
-systemd service enumeration plugin. This is a gohai-native addition.
+There is no Ohai equivalent for this collector — Ohai does not ship a systemd
+service enumeration plugin. This is a gohai-native addition.
 
 On Linux:
 
