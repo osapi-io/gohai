@@ -287,10 +287,6 @@ func buildCloud(
 func findPrimaryIP(
 	f *gohai.Facts,
 ) string {
-	if f.Network == nil {
-		return ""
-	}
-
 	for _, iface := range f.Network.Interfaces {
 		if iface.Name == f.Network.DefaultInterface {
 			for _, addr := range iface.Addresses {
