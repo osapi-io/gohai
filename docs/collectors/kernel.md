@@ -127,6 +127,13 @@ None.
 
 ## Data Sources
 
+Ohai's `kernel.rb` shells out to `uname -s`, `uname -r`, `uname -v`,
+`uname -m`, `uname -p` individually. gohai calls `unix.Uname()` (the Go
+syscall wrapper) which returns all fields in one call — same data, no
+subprocess overhead. Both produce `name`, `release`, `version`, `machine`.
+gohai adds `processor` and `os` (from `uname -p` and `uname -o` equivalents)
+and `rosetta_translated` on macOS (gohai extension, no Ohai equivalent).
+
 On Linux:
 
 1. `unix.Uname()` provides `name`, `release`, `version`, `machine`.

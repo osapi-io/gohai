@@ -120,6 +120,10 @@ None.
 
 ## Data Sources
 
+Ohai's `linux/livepatch.rb` uses the same sysfs approach — `dir_glob` over
+`/sys/kernel/livepatch/*` and reading `enabled`/`transition` files for each
+patch module. gohai follows this methodology exactly via VFS reads.
+
 On Linux:
 
 1. Attempt to read the directory listing of `/sys/kernel/livepatch/` via the

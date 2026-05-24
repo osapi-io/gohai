@@ -182,6 +182,12 @@ None.
 
 ## Data Sources
 
+Ohai's `linux/memory.rb` reads `/proc/meminfo` line by line and exposes each
+field. gohai uses gopsutil, which reads the same `/proc/meminfo` file and
+exposes the same fields as typed Go values. The field coverage is identical —
+both surface total, free, available, buffers, cached, active, inactive, swap,
+hugepages, directmap, and all /proc/meminfo detail fields.
+
 On Linux:
 
 1. gopsutil `mem.VirtualMemory` reads `/proc/meminfo` and exposes 27+ fields on

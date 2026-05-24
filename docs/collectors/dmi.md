@@ -149,6 +149,14 @@ None.
 
 ## Data Sources
 
+Ohai's `dmi.rb` shells out to `dmidecode`, which reads `/dev/mem` and requires
+root. gohai uses `ghw` instead, which reads `/sys/class/dmi/id/*` — the sysfs
+entries are world-readable and don't require elevated privileges. This is an
+intentional deviation: sysfs is the modern, unprivileged way to access SMBIOS
+data on Linux. The fields exposed are identical (BIOS vendor/version/date,
+baseboard, chassis, product), but gohai doesn't parse `dmidecode`'s freeform
+text output.
+
 On Linux:
 
 1. ghw's `bios.New()`, `baseboard.New()`, `chassis.New()`, and `product.New()`

@@ -75,6 +75,11 @@ None.
 
 ## Data Sources
 
+Ohai's `linux/tc.rb` runs `tc -s qdisc show` and parses per-interface qdisc
+entries, recording kind, handle, and parent. gohai follows the same parsing
+strategy — extracting fields from `qdisc` lines and grouping by the `dev`
+keyword. No methodology deviation from Ohai.
+
 On Linux:
 
 1. Runs `tc -s qdisc show`.

@@ -109,6 +109,11 @@ None.
 
 ## Data Sources
 
+Ohai's `kernel.rb` includes module enumeration as part of the kernel plugin —
+parsing `/proc/modules` on Linux and `kextstat` on macOS. gohai separates
+modules into their own collector for independent enable/disable control but
+follows Ohai's same parsing approach for both platforms.
+
 On Linux:
 
 1. `/proc/modules` is read through the injected `avfs.VFS` and parsed

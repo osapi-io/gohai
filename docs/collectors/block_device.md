@@ -117,6 +117,12 @@ None.
 
 ## Data Sources
 
+Ohai's `linux/block_device.rb` reads the same `/sys/block/` tree — top-level
+`size` and `removable`, `queue/` for `rotational`, `physical_block_size`,
+`logical_block_size`, and `device/` for `model`, `rev`, `state`, `timeout`,
+`vendor`, `queue_depth`, `firmware_rev`. gohai reads the identical sysfs paths
+in the same order. No methodology deviation from Ohai.
+
 On Linux:
 
 1. Read the `/sys/block` directory via the injected `avfs.VFS`. If the directory
