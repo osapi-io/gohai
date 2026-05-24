@@ -218,6 +218,62 @@ func (s *OutputPublicTestSuite) TestWriteCollectorList() {
 	}
 }
 
+func (s *OutputPublicTestSuite) TestWriteOCSF() {
+	tests := []struct {
+		name      string
+		w         io.Writer
+		pretty    bool
+		marshalFn func(*gohai.Facts, bool) ([]byte, error)
+		wantErr   string
+	}{
+		{
+			name:   "compact",
+			w:      &bytes.Buffer{},
+			pretty: false,
+		},
+		{
+			name:   "pretty",
+			w:      &bytes.Buffer{},
+			pretty: true,
+		},
+		{
+			name:    "write error",
+			w:       &errWriter{err: errors.New("disk full")},
+			pretty:  false,
+			wantErr: "write ocsf output",
+		},
+		{
+			name:   "marshal error",
+			w:      &bytes.Buffer{},
+			pretty: false,
+			marshalFn: func(_ *gohai.Facts, _ bool) ([]byte, error) {
+				return nil, errors.New("marshal boom")
+			},
+			wantErr: "encode ocsf output",
+		},
+	}
+
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			if tc.marshalFn != nil {
+				restore := cli.SetMarshalOCSFFn(tc.marshalFn)
+				defer restore()
+			}
+
+			err := cli.WriteOCSF(tc.w, &gohai.Facts{}, tc.pretty)
+
+			if tc.wantErr != "" {
+				s.ErrorContains(err, tc.wantErr)
+			} else {
+				s.NoError(err)
+				out := tc.w.(*bytes.Buffer).String()
+				s.Contains(out, "class_uid")
+				s.Contains(out, "5001")
+			}
+		})
+	}
+}
+
 type errWriter struct {
 	err       error
 	failAfter int

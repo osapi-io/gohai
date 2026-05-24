@@ -18,36 +18,14 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package cli
+package validate
 
-import "github.com/osapi-io/gohai/pkg/gohai"
-
-// SetIsTerminalFn swaps the terminal-detection function for testing.
-func SetIsTerminalFn(
-	fn func(int) bool,
+// SetSchemaJSONFn swaps the schema source for testing.
+func SetSchemaJSONFn(
+	fn func() []byte,
 ) func() {
-	old := isTerminalFn
-	isTerminalFn = fn
+	old := schemaJSONFn
+	schemaJSONFn = fn
 
-	return func() { isTerminalFn = old }
-}
-
-// SetMarshalFactsFn swaps the facts marshaling function for testing.
-func SetMarshalFactsFn(
-	fn func(*gohai.Facts, bool) ([]byte, error),
-) func() {
-	old := marshalFactsFn
-	marshalFactsFn = fn
-
-	return func() { marshalFactsFn = old }
-}
-
-// SetMarshalOCSFFn swaps the OCSF marshaling function for testing.
-func SetMarshalOCSFFn(
-	fn func(*gohai.Facts, bool) ([]byte, error),
-) func() {
-	old := marshalOCSFFn
-	marshalOCSFFn = fn
-
-	return func() { marshalOCSFFn = old }
+	return func() { schemaJSONFn = old }
 }

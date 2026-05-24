@@ -31,10 +31,12 @@ import (
 	"github.com/osapi-io/gohai/schemas"
 )
 
+var schemaJSONFn = func() []byte { return schemas.SchemaJSON }
+
 // CompileSchema compiles the embedded gohai JSON Schema and returns
 // the compiled schema ready for validation.
 func CompileSchema() (*jsonschema.Schema, error) {
-	schemaDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemas.SchemaJSON))
+	schemaDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaJSONFn()))
 	if err != nil {
 		return nil, fmt.Errorf("unmarshal embedded schema: %w", err)
 	}

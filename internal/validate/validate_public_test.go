@@ -52,17 +52,48 @@ func TestValidatePublicTestSuite(
 }
 
 func (s *ValidatePublicTestSuite) TestCompileSchema() {
-	sch, err := validate.CompileSchema()
+	tests := []struct {
+		name     string
+		schemaFn func() []byte
+		wantErr  bool
+	}{
+		{
+			name:    "valid embedded schema compiles",
+			wantErr: false,
+		},
+		{
+			name:     "invalid JSON schema fails",
+			schemaFn: func() []byte { return []byte(`{not json}`) },
+			wantErr:  true,
+		},
+	}
 
-	s.NoError(err)
-	s.NotNil(sch)
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			if tc.schemaFn != nil {
+				restore := validate.SetSchemaJSONFn(tc.schemaFn)
+				defer restore()
+			}
+
+			sch, err := validate.CompileSchema()
+
+			if tc.wantErr {
+				s.Error(err)
+				s.Nil(sch)
+			} else {
+				s.NoError(err)
+				s.NotNil(sch)
+			}
+		})
+	}
 }
 
-func (s *ValidatePublicTestSuite) TestValidateJSON() {
+func (s *ValidatePublicTestSuite) TestJSON() {
 	tests := []struct {
-		name    string
-		data    []byte
-		wantErr bool
+		name     string
+		data     []byte
+		schemaFn func() []byte
+		wantErr  bool
 	}{
 		{
 			name:    "valid minimal facts",
@@ -84,10 +115,21 @@ func (s *ValidatePublicTestSuite) TestValidateJSON() {
 			data:    []byte(`{"platform": {"os": 123}}`),
 			wantErr: true,
 		},
+		{
+			name:     "compile schema error",
+			data:     []byte(`{}`),
+			schemaFn: func() []byte { return []byte(`{bad}`) },
+			wantErr:  true,
+		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
+			if tc.schemaFn != nil {
+				restore := validate.SetSchemaJSONFn(tc.schemaFn)
+				defer restore()
+			}
+
 			err := validate.JSON(tc.data)
 
 			if tc.wantErr {

@@ -95,6 +95,19 @@ func WriteJSON(
 	return nil
 }
 
+var marshalOCSFFn = func(
+	facts *gohai.Facts,
+	pretty bool,
+) ([]byte, error) {
+	event := ocsf.FromFacts(facts)
+
+	if pretty {
+		return json.MarshalIndent(event, "", "  ")
+	}
+
+	return json.Marshal(event)
+}
+
 // WriteOCSF converts facts to an OCSF inventory_info event and writes
 // the JSON to out.
 func WriteOCSF(
@@ -102,19 +115,7 @@ func WriteOCSF(
 	facts *gohai.Facts,
 	pretty bool,
 ) error {
-	event := ocsf.FromFacts(facts)
-
-	var (
-		b   []byte
-		err error
-	)
-
-	if pretty {
-		b, err = json.MarshalIndent(event, "", "  ")
-	} else {
-		b, err = json.Marshal(event)
-	}
-
+	b, err := marshalOCSFFn(facts, pretty)
 	if err != nil {
 		return fmt.Errorf("encode ocsf output: %w", err)
 	}
