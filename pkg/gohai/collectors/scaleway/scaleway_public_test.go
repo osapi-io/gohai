@@ -121,7 +121,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 				s.Require().NotNil(info)
 				s.Equal("sc-abc", info.ID)
 				s.Equal("prod-1", info.Name)
-				s.Equal("DEV1-S", info.CommercialType)
+				s.Equal("DEV1-S", info.Type)
 				s.Equal("51.0.0.1", info.PublicIP)
 				s.Equal("pip-1", info.PublicIPID)
 				s.False(info.PublicIPDynamic)

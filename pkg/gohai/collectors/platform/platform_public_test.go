@@ -163,7 +163,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "ubuntu", Version: "24.04",
-				Family: "debian", Architecture: runtime.GOARCH,
+				Family: "debian", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -179,7 +179,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "centos", Version: "7.9.2009",
-				Family: "rhel", Architecture: runtime.GOARCH,
+				Family: "rhel", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -195,7 +195,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "redhat", Version: "9.3",
-				Family: "rhel", Architecture: runtime.GOARCH,
+				Family: "rhel", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -209,7 +209,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "centos", Version: "7",
-				Family: "rhel", Architecture: runtime.GOARCH,
+				Family: "rhel", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -225,7 +225,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "debian", Version: "trixie/sid",
-				Family: "debian", Architecture: runtime.GOARCH,
+				Family: "debian", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -239,7 +239,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "centos", Version: "6.10",
-				Family: "rhel", Architecture: runtime.GOARCH,
+				Family: "rhel", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -253,7 +253,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "suse", Version: "11.4",
-				Family: "suse", Architecture: runtime.GOARCH,
+				Family: "suse", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -267,7 +267,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "suse", Version: "12",
-				Family: "suse", Architecture: runtime.GOARCH,
+				Family: "suse", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -281,7 +281,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "debian", Version: "11.7",
-				Family: "debian", Architecture: runtime.GOARCH,
+				Family: "debian", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -295,7 +295,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "arch", Version: "",
-				Family: "arch", Architecture: runtime.GOARCH,
+				Family: "arch", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -309,7 +309,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "amazon", Version: "2",
-				Family: "rhel", Architecture: runtime.GOARCH,
+				Family: "rhel", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -323,7 +323,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "gentoo", Version: "2.13",
-				Family: "gentoo", Architecture: runtime.GOARCH,
+				Family: "gentoo", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -338,7 +338,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "debian", Version: "12",
-				Family: "debian", Architecture: runtime.GOARCH,
+				Family: "debian", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -353,7 +353,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			}),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "debian", Version: "12",
-				Family: "debian", Architecture: runtime.GOARCH,
+				Family: "debian", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -364,7 +364,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			},
 			fs: fsWith(s.T(), nil),
 			want: platform.Info{
-				OS: runtime.GOOS, Architecture: runtime.GOARCH,
+				OS: runtime.GOOS, CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -378,7 +378,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "rocky", Version: "9.3",
-				Family: "rhel", Architecture: runtime.GOARCH,
+				Family: "rhel", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -392,7 +392,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "kali", Version: "2023",
-				Family: "debian", Architecture: runtime.GOARCH,
+				Family: "debian", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -406,7 +406,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "arch", Version: "rolling",
-				Family: "arch", Architecture: runtime.GOARCH,
+				Family: "arch", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -420,7 +420,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "cumulus", Version: "5.0",
-				Family: "debian", Architecture: runtime.GOARCH,
+				Family: "debian", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -434,7 +434,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), nil),
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "suse", Version: "15-SP5",
-				Family: "suse", Architecture: runtime.GOARCH,
+				Family: "suse", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -448,7 +448,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			fs: nil,
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "almalinux", Version: "9.3",
-				Family: "rhel", Architecture: runtime.GOARCH,
+				Family: "rhel", CPUArchitecture: runtime.GOARCH,
 			},
 		},
 		{
@@ -456,7 +456,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			variant:  "linux",
 			hostInfo: func(context.Context) (*host.InfoStat, error) { return nil, nil },
 			fs:       fsWith(s.T(), nil),
-			want:     platform.Info{OS: runtime.GOOS, Architecture: runtime.GOARCH},
+			want:     platform.Info{OS: runtime.GOOS, CPUArchitecture: runtime.GOARCH},
 		},
 		{
 			name:    "linux: gopsutil error propagated",
@@ -483,7 +483,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "darwin", Version: "14.4.1",
 				VersionExtra: "(a)", Family: "Standalone Workstation",
-				Architecture: runtime.GOARCH, Build: "23E224",
+				CPUArchitecture: runtime.GOARCH, Build: "23E224",
 			},
 		},
 		{
@@ -498,7 +498,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor { return swVersExec(t, []byte(swVersNoRSR), nil) },
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "darwin", Version: "13.5",
-				Architecture: runtime.GOARCH, Build: "22G74",
+				CPUArchitecture: runtime.GOARCH, Build: "22G74",
 			},
 		},
 		{
@@ -513,7 +513,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor { return swVersExec(t, nil, errors.New("not found")) },
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "darwin", Version: "12.6",
-				Architecture: runtime.GOARCH, Build: "21G115",
+				CPUArchitecture: runtime.GOARCH, Build: "21G115",
 			},
 		},
 		{
@@ -529,7 +529,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			},
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "darwin", Version: "14.0",
-				Architecture: runtime.GOARCH, Build: "23A344",
+				CPUArchitecture: runtime.GOARCH, Build: "23A344",
 			},
 		},
 		{
@@ -544,7 +544,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			exec: func(*testing.T) executor.Executor { return nil },
 			want: platform.Info{
 				OS: runtime.GOOS, Name: "darwin", Version: "14.0",
-				Architecture: runtime.GOARCH, Build: "23A344",
+				CPUArchitecture: runtime.GOARCH, Build: "23A344",
 			},
 		},
 		{

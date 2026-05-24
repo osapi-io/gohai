@@ -65,9 +65,9 @@ type Info struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name,omitempty"`
 	Hostname        string   `json:"hostname,omitempty"`
-	Organization    string   `json:"organization,omitempty"`
-	Project         string   `json:"project,omitempty"`
-	CommercialType  string   `json:"commercial_type,omitempty"`
+	AccountUID      string   `json:"account_uid,omitempty"`
+	ProjectUID      string   `json:"project_uid,omitempty"`
+	Type            string   `json:"type,omitempty"`
 	Tags            []string `json:"tags,omitempty"`
 	StateDetail     string   `json:"state_detail,omitempty"`
 	PublicIP        string   `json:"public_ip,omitempty"`
@@ -254,16 +254,16 @@ func transform(
 	r raw,
 ) *Info {
 	info := &Info{
-		ID:             r.ID,
-		Name:           r.Name,
-		Hostname:       r.Hostname,
-		Organization:   r.Organization,
-		Project:        r.Project,
-		CommercialType: r.CommercialType,
-		Tags:           r.Tags,
-		StateDetail:    r.StateDetail,
-		PrivateIP:      r.PrivateIP,
-		Timezone:       r.Timezone,
+		ID:          r.ID,
+		Name:        r.Name,
+		Hostname:    r.Hostname,
+		AccountUID:  r.Organization,
+		ProjectUID:  r.Project,
+		Type:        r.CommercialType,
+		Tags:        r.Tags,
+		StateDetail: r.StateDetail,
+		PrivateIP:   r.PrivateIP,
+		Timezone:    r.Timezone,
 	}
 	if r.PublicIP != nil {
 		info.PublicIP = r.PublicIP.Address

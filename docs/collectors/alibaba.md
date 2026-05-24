@@ -16,9 +16,9 @@ Detection is gated on DMI `sys_vendor` containing `"Alibaba"` — matches Ohai's
 
 | Field                             | Type                          | Description                                                          | Schema mapping                 |
 | --------------------------------- | ----------------------------- | -------------------------------------------------------------------- | ------------------------------ |
-| `instance_id`                     | `string`                      | ECS instance ID.                                                     | OTel `cloud.resource_id`       |
-| `instance_name`                   | `string`                      | Instance display name.                                               | OTel `host.name`               |
-| `instance_type`                   | `string`                      | ECS instance type (e.g. `ecs.g6.large`).                             | OTel `host.type`               |
+| `id`                              | `string`                      | ECS instance ID.                                                     | OTel `cloud.resource_id`       |
+| `name`                            | `string`                      | Instance display name.                                               | OTel `host.name`               |
+| `type`                            | `string`                      | ECS instance type (e.g. `ecs.g6.large`).                             | OTel `host.type`               |
 | `hostname`                        | `string`                      | Hostname.                                                            | OCSF `device.hostname`         |
 | `image_id`                        | `string`                      | Source image ID.                                                     | OTel `host.image.id`           |
 | `serial_number`                   | `string`                      | Instance serial.                                                     | No direct schema mapping.      |
@@ -37,7 +37,7 @@ Detection is gated on DMI `sys_vendor` containing `"Alibaba"` — matches Ohai's
 | `max_bandwidth_ingress`           | `int64`                       | Ingress bandwidth cap (bytes/sec).                                   | No direct schema mapping.      |
 | `max_bandwidth_egress`            | `int64`                       | Egress bandwidth cap (bytes/sec).                                    | No direct schema mapping.      |
 | `ram_role_name`                   | `string`                      | Attached RAM (role) name.                                            | No direct schema mapping.      |
-| `owner_account_id`                | `string`                      | Alibaba Cloud account that owns the instance.                        | No direct schema mapping.      |
+| `account_uid`                     | `string`                      | Alibaba Cloud account that owns the instance.                        | No direct schema mapping.      |
 | `source_address`                  | `string`                      | Package-manager mirror URL Alibaba surfaces for the region.          | No direct schema mapping.      |
 | `virtualization_solution`         | `string`                      | Hypervisor family (e.g. `ECS Virt`).                                 | No direct schema mapping.      |
 | `virtualization_solution_version` | `string`                      | Build version of the hypervisor.                                     | No direct schema mapping.      |
@@ -94,10 +94,10 @@ Detection is gated on DMI `sys_vendor` containing `"Alibaba"` — matches Ohai's
 ```json
 {
   "alibaba": {
-    "instance_id": "i-abc",
+    "id": "i-abc",
     "region": "cn-hangzhou",
     "zone": "cn-hangzhou-b",
-    "instance_type": "ecs.g6.large",
+    "type": "ecs.g6.large",
     "private_ipv4": "172.16.0.5",
     "public_ipv4": "47.1.2.3",
     "vpc_id": "vpc-1",
@@ -113,7 +113,7 @@ g, _ := gohai.New(gohai.WithCollectors("alibaba"))
 facts, _ := g.Collect(context.Background())
 
 if facts.Alibaba != nil {
-    fmt.Println(facts.Alibaba.Region, facts.Alibaba.InstanceType)
+    fmt.Println(facts.Alibaba.Region, facts.Alibaba.Type)
 }
 ```
 
@@ -132,8 +132,8 @@ wasn't run.
 
 ## Data Sources
 
-1. **DMI gate:** `dmi.Product.Vendor` contains `"Alibaba"`. ghw reads
-   `/sys/class/dmi/id/sys_vendor` into `Product.Vendor`, so this check is
+1. **DMI gate:** `dmi.Product.VendorName` contains `"Alibaba"`. ghw reads
+   `/sys/class/dmi/id/sys_vendor` into `Product.VendorName`, so this check is
    equivalent to Ohai's `has_ali_dmi?`.
 2. **Endpoint:** `http://100.100.100.200/2016-01-01/` — note the non-standard
    `100.100.100.200` link-local address, not `169.254.169.254`.

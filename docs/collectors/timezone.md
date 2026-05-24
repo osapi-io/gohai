@@ -91,6 +91,12 @@ None.
 
 ## Data Sources
 
+Ohai's `timezone.rb` reports only `Time.now.getlocal.zone` (the short
+abbreviation like "EST"). gohai is a superset — it adds the IANA name (e.g.
+"America/New_York") via `/etc/localtime` symlink resolution and the numeric UTC
+offset in seconds, giving consumers both human-readable and machine-parseable
+timezone identification.
+
 On Linux:
 
 1. Resolve the IANA `name` by calling `Readlink("/etc/localtime")` through the

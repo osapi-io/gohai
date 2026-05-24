@@ -36,7 +36,7 @@ import (
 
 func aliPrior() collector.PriorResults {
 	return collector.PriorResults{
-		"dmi": &dmi.Info{Product: &dmi.Product{Vendor: "Alibaba Cloud"}},
+		"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "Alibaba Cloud"}},
 	}
 }
 
@@ -169,12 +169,12 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			tree: treeResponses,
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, hitUserData bool) {
 				s.Require().NotNil(info)
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 				s.Equal("prod-1", info.Hostname)
 				s.Equal("cn-hangzhou", info.Region)
 				s.Equal("cn-hangzhou-b", info.Zone)
-				s.Equal("ecs.g6.large", info.InstanceType)
-				s.Equal("prod-1", info.InstanceName)
+				s.Equal("ecs.g6.large", info.Type)
+				s.Equal("prod-1", info.Name)
 				s.Equal("172.16.0.5", info.PrivateIPv4)
 				s.Equal("47.1.2.3", info.PublicIPv4)
 				s.Equal("vpc-1", info.VPCID)
@@ -183,7 +183,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				s.Equal([]string{"ntp1.aliyun.com", "ntp2.aliyun.com"}, info.NTPServers)
 				s.Equal("ecs-default", info.RAMRoleName)
 				s.Equal(int64(1048576), info.MaxBandwidthIngress)
-				s.Equal("acct-1234567890", info.OwnerAccountID)
+				s.Equal("acct-1234567890", info.AccountUID)
 				s.Equal("http://mirrors.cloud.aliyuncs.com", info.SourceAddress)
 				s.Equal("ECS Virt", info.VirtualizationSolution)
 				s.Equal("build123", info.VirtualizationSolutionVersion)
@@ -217,7 +217,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "dmi says not Alibaba short-circuits",
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{Product: &dmi.Product{Vendor: "Dell Inc."}},
+				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "Dell Inc."}},
 			},
 			tree:       treeResponses,
 			wantNil:    true,
@@ -229,7 +229,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			tree:  treeResponses,
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
 				s.Require().NotNil(info)
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
@@ -301,7 +301,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
 				s.Require().NotNil(info)
-				s.Empty(info.InstanceID)
+				s.Empty(info.ID)
 				s.Empty(info.Hostname)
 			},
 		},
@@ -322,7 +322,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
 				s.Equal("h", info.Hostname)
-				s.Empty(info.InstanceType)
+				s.Empty(info.Type)
 				s.Nil(info.Nameservers)
 				s.Nil(info.NTPServers)
 				s.Empty(info.RAMRoleName)
@@ -369,7 +369,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/instance-id": `123`, // parses as JSON number, not string
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
-				s.Empty(info.InstanceID) // strVal returns "" when type isn't string
+				s.Empty(info.ID) // strVal returns "" when type isn't string
 			},
 		},
 		{
@@ -392,7 +392,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/instance/instance-type": "ecs.g6.large",
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
-				s.Equal("ecs.g6.large", info.InstanceType)
+				s.Equal("ecs.g6.large", info.Type)
 				s.Equal(int64(0), info.MaxBandwidthIngress)
 				s.Equal(int64(0), info.MaxBandwidthEgress)
 			},

@@ -90,9 +90,9 @@ const dhcpOption245Signature = "unknown-245"
 // merged into the flat struct pattern.
 type Info struct {
 	// Identity.
-	VMID              string `json:"vm_id"`
+	ID                string `json:"id"`
 	Name              string `json:"name,omitempty"`
-	VMSize            string `json:"vm_size,omitempty"`
+	Type              string `json:"type,omitempty"`
 	ResourceID        string `json:"resource_id,omitempty"`
 	ResourceGroupName string `json:"resource_group_name,omitempty"`
 	VMScaleSetName    string `json:"vm_scale_set_name,omitempty"`
@@ -100,15 +100,15 @@ type Info struct {
 	EvictionPolicy    string `json:"eviction_policy,omitempty"`
 
 	// Placement.
-	Location             string `json:"location,omitempty"`
+	Region               string `json:"region,omitempty"`
 	Zone                 string `json:"zone,omitempty"`
 	PlacementGroupID     string `json:"placement_group_id,omitempty"`
 	PlatformFaultDomain  string `json:"platform_fault_domain,omitempty"`
 	PlatformUpdateDomain string `json:"platform_update_domain,omitempty"`
 
 	// Account.
-	SubscriptionID string `json:"subscription_id,omitempty"`
-	AzEnvironment  string `json:"az_environment,omitempty"`
+	AccountUID     string `json:"account_uid,omitempty"`
+	CloudPartition string `json:"cloud_partition,omitempty"`
 
 	// Image.
 	Offer          string          `json:"offer,omitempty"`
@@ -514,21 +514,21 @@ func transform(
 ) *Info {
 	info := &Info{}
 	if r.Compute != nil {
-		info.VMID = r.Compute.VMID
+		info.ID = r.Compute.VMID
 		info.Name = r.Compute.Name
-		info.VMSize = r.Compute.VMSize
+		info.Type = r.Compute.VMSize
 		info.ResourceID = r.Compute.ResourceID
 		info.ResourceGroupName = r.Compute.ResourceGroupName
 		info.VMScaleSetName = r.Compute.VMScaleSetName
 		info.Priority = r.Compute.Priority
 		info.EvictionPolicy = r.Compute.EvictionPolicy
-		info.Location = r.Compute.Location
+		info.Region = r.Compute.Location
 		info.Zone = r.Compute.Zone
 		info.PlacementGroupID = r.Compute.PlacementGroupID
 		info.PlatformFaultDomain = r.Compute.PlatformFaultDomain
 		info.PlatformUpdateDomain = r.Compute.PlatformUpdateDomain
-		info.SubscriptionID = r.Compute.SubscriptionID
-		info.AzEnvironment = r.Compute.AzEnvironment
+		info.AccountUID = r.Compute.SubscriptionID
+		info.CloudPartition = r.Compute.AzEnvironment
 		info.Offer = r.Compute.Offer
 		info.Publisher = r.Compute.Publisher
 		info.SKU = r.Compute.SKU

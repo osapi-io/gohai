@@ -113,6 +113,9 @@ None.
 
 ## Data Sources
 
+There is no Ohai equivalent for GPU enumeration — Ohai does not ship a GPU
+plugin. This is a gohai-native collector backed by ghw.
+
 On Linux:
 
 1. ghw/gpu reads `/sys/class/drm` for each `cardN` symlink, follows it to the

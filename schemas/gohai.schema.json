@@ -17,13 +17,13 @@
     },
     "AlibabaInfo": {
       "properties": {
-        "instance_id": {
+        "id": {
           "type": "string"
         },
-        "instance_name": {
+        "name": {
           "type": "string"
         },
-        "instance_type": {
+        "type": {
           "type": "string"
         },
         "hostname": {
@@ -38,7 +38,7 @@
         "network_type": {
           "type": "string"
         },
-        "owner_account_id": {
+        "account_uid": {
           "type": "string"
         },
         "source_address": {
@@ -126,7 +126,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "instance_id"
+        "id"
       ]
     },
     "AlibabaMarketplace": {
@@ -311,13 +311,13 @@
     },
     "AzureInfo": {
       "properties": {
-        "vm_id": {
+        "id": {
           "type": "string"
         },
         "name": {
           "type": "string"
         },
-        "vm_size": {
+        "type": {
           "type": "string"
         },
         "resource_id": {
@@ -335,7 +335,7 @@
         "eviction_policy": {
           "type": "string"
         },
-        "location": {
+        "region": {
           "type": "string"
         },
         "zone": {
@@ -350,10 +350,10 @@
         "platform_update_domain": {
           "type": "string"
         },
-        "subscription_id": {
+        "account_uid": {
           "type": "string"
         },
-        "az_environment": {
+        "cloud_partition": {
           "type": "string"
         },
         "offer": {
@@ -459,7 +459,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "vm_id"
+        "id"
       ]
     },
     "AzureInterface": {
@@ -697,7 +697,7 @@
         "family": {
           "type": "string"
         },
-        "model": {
+        "model_id": {
           "type": "string"
         },
         "model_name": {
@@ -715,7 +715,7 @@
         "cores": {
           "type": "integer"
         },
-        "mhz": {
+        "speed": {
           "type": "number"
         },
         "cache_size": {
@@ -778,13 +778,13 @@
         "family": {
           "type": "string"
         },
-        "model": {
+        "model_id": {
           "type": "string"
         },
         "stepping": {
           "type": "integer"
         },
-        "mhz": {
+        "speed": {
           "type": "number"
         },
         "cache_size": {
@@ -820,10 +820,10 @@
           },
           "type": "object"
         },
-        "cpus_online": {
+        "online": {
           "type": "integer"
         },
-        "cpus_offline": {
+        "offline": {
           "type": "integer"
         },
         "bios_vendor_id": {
@@ -847,7 +847,7 @@
         "bogomips": {
           "type": "string"
         },
-        "cpu_opmodes": {
+        "opmodes": {
           "items": {
             "type": "string"
           },
@@ -891,7 +891,7 @@
     },
     "DigitaloceanInfo": {
       "properties": {
-        "droplet_id": {
+        "id": {
           "type": "integer"
         },
         "hostname": {
@@ -946,7 +946,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "droplet_id"
+        "id"
       ]
     },
     "DigitaloceanInterface": {
@@ -1043,10 +1043,10 @@
     },
     "DmiBIOS": {
       "properties": {
-        "vendor": {
+        "manufacturer": {
           "type": "string"
         },
-        "version": {
+        "ver": {
           "type": "string"
         },
         "date": {
@@ -1121,7 +1121,7 @@
     },
     "DmiProduct": {
       "properties": {
-        "vendor": {
+        "vendor_name": {
           "type": "string"
         },
         "name": {
@@ -1244,16 +1244,16 @@
     },
     "Ec2Info": {
       "properties": {
-        "instance_id": {
+        "id": {
           "type": "string"
         },
-        "instance_type": {
+        "type": {
           "type": "string"
         },
         "instance_life_cycle": {
           "type": "string"
         },
-        "ami_id": {
+        "image_id": {
           "type": "string"
         },
         "ami_launch_index": {
@@ -1301,10 +1301,10 @@
         "region": {
           "type": "string"
         },
-        "availability_zone": {
+        "zone": {
           "type": "string"
         },
-        "account_id": {
+        "account_uid": {
           "type": "string"
         },
         "availability_zone_id": {
@@ -1337,7 +1337,7 @@
         "services_domain": {
           "type": "string"
         },
-        "services_partition": {
+        "cloud_partition": {
           "type": "string"
         },
         "product_codes": {
@@ -1377,7 +1377,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "instance_id"
+        "id"
       ]
     },
     "Ec2NetworkInterface": {
@@ -1709,7 +1709,7 @@
         "device": {
           "type": "string"
         },
-        "fstype": {
+        "type": {
           "type": "string"
         },
         "uuid": {
@@ -1729,7 +1729,7 @@
       "type": "object",
       "required": [
         "device",
-        "fstype"
+        "type"
       ]
     },
     "FilesystemInfo": {
@@ -1767,7 +1767,7 @@
         "mountpoint": {
           "type": "string"
         },
-        "fstype": {
+        "type": {
           "type": "string"
         },
         "opts": {
@@ -1821,7 +1821,7 @@
       "required": [
         "device",
         "mountpoint",
-        "fstype"
+        "type"
       ]
     },
     "FilesystemZFSDataset": {
@@ -1959,7 +1959,7 @@
     },
     "GceInfo": {
       "properties": {
-        "instance_id": {
+        "id": {
           "type": "integer"
         },
         "name": {
@@ -1971,10 +1971,10 @@
         "cpu_platform": {
           "type": "string"
         },
-        "machine_type": {
+        "type": {
           "type": "string"
         },
-        "image": {
+        "image_id": {
           "type": "string"
         },
         "description": {
@@ -2004,7 +2004,7 @@
         "region": {
           "type": "string"
         },
-        "project_id": {
+        "project_uid": {
           "type": "string"
         },
         "numeric_project_id": {
@@ -2062,14 +2062,14 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "instance_id",
+        "id",
         "name",
         "hostname",
-        "machine_type",
+        "type",
         "preemptible",
         "zone",
         "region",
-        "project_id",
+        "project_uid",
         "numeric_project_id"
       ]
     },
@@ -3237,7 +3237,7 @@
         "mtu": {
           "type": "integer"
         },
-        "hardware_addr": {
+        "mac": {
           "type": "string"
         },
         "encapsulation": {
@@ -3481,19 +3481,19 @@
         "id": {
           "type": "string"
         },
-        "display_name": {
+        "name": {
           "type": "string"
         },
         "hostname": {
           "type": "string"
         },
-        "shape": {
+        "type": {
           "type": "string"
         },
         "shape_config": {
           "$ref": "#/$defs/OciShapeConfig"
         },
-        "image": {
+        "image_id": {
           "type": "string"
         },
         "region": {
@@ -3502,7 +3502,7 @@
         "canonical_region_name": {
           "type": "string"
         },
-        "availability_domain": {
+        "zone": {
           "type": "string"
         },
         "fault_domain": {
@@ -3511,7 +3511,7 @@
         "compartment_id": {
           "type": "string"
         },
-        "tenant_id": {
+        "account_uid": {
           "type": "string"
         },
         "state": {
@@ -3763,10 +3763,10 @@
     },
     "OpenstackInfo": {
       "properties": {
-        "instance_id": {
+        "id": {
           "type": "string"
         },
-        "instance_type": {
+        "type": {
           "type": "string"
         },
         "hostname": {
@@ -3778,7 +3778,7 @@
         "public_hostname": {
           "type": "string"
         },
-        "availability_zone": {
+        "zone": {
           "type": "string"
         },
         "local_ipv4": {
@@ -3793,7 +3793,7 @@
           },
           "type": "array"
         },
-        "ami_id": {
+        "image_id": {
           "type": "string"
         },
         "kernel_id": {
@@ -3808,7 +3808,7 @@
         "name": {
           "type": "string"
         },
-        "project_id": {
+        "project_uid": {
           "type": "string"
         },
         "uuid": {
@@ -3842,7 +3842,7 @@
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "instance_id"
+        "id"
       ]
     },
     "OsreleaseInfo": {
@@ -3937,10 +3937,10 @@
         "version": {
           "type": "string"
         },
-        "arch": {
+        "architecture": {
           "type": "string"
         },
-        "source": {
+        "package_manager": {
           "type": "string"
         }
       },
@@ -3949,7 +3949,7 @@
       "required": [
         "name",
         "version",
-        "source"
+        "package_manager"
       ]
     },
     "PciDevice": {
@@ -4032,7 +4032,7 @@
         "family": {
           "type": "string"
         },
-        "architecture": {
+        "cpu_architecture": {
           "type": "string"
         },
         "build": {
@@ -4046,7 +4046,7 @@
         "name",
         "version",
         "family",
-        "architecture"
+        "cpu_architecture"
       ]
     },
     "ProcessInfo": {
@@ -4072,13 +4072,13 @@
         "pid": {
           "type": "integer"
         },
-        "ppid": {
+        "parent_pid": {
           "type": "integer"
         },
         "name": {
           "type": "string"
         },
-        "username": {
+        "owner": {
           "type": "string"
         },
         "cmd_line": {
@@ -4087,7 +4087,7 @@
         "state": {
           "type": "string"
         },
-        "start_time": {
+        "creation_time": {
           "type": "integer"
         }
       },
@@ -4168,13 +4168,13 @@
         "hostname": {
           "type": "string"
         },
-        "organization": {
+        "account_uid": {
           "type": "string"
         },
-        "project": {
+        "project_uid": {
           "type": "string"
         },
-        "commercial_type": {
+        "type": {
           "type": "string"
         },
         "tags": {

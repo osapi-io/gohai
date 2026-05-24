@@ -309,7 +309,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Len(i.Mounts, 2)
 				s.Len(i.Unmounted, 1)
 				s.Equal("/dev/sdb1", i.Unmounted[0].Device)
-				s.Equal("crypto_LUKS", i.Unmounted[0].Fstype)
+				s.Equal("crypto_LUKS", i.Unmounted[0].Type)
 				s.Equal("luks-uuid", i.Unmounted[0].UUID)
 				s.Equal("data", i.Unmounted[0].Label)
 			},
@@ -505,7 +505,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			validate: func(i *filesystem.Info) {
 				s.Require().Len(i.Mounts, 1)
 				m := i.Mounts[0]
-				s.Equal("btrfs", m.Fstype)
+				s.Equal("btrfs", m.Type)
 				s.Equal("abc-123", m.UUID)
 				s.Require().NotNil(m.Btrfs)
 				s.Equal("raid1", m.Btrfs.RAID)
@@ -651,7 +651,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			validate: func(i *filesystem.Info) {
 				s.Require().Len(i.Mounts, 1)
 				s.Equal("/dev/disk3s1", i.Mounts[0].Device)
-				s.Equal("apfs", i.Mounts[0].Fstype)
+				s.Equal("apfs", i.Mounts[0].Type)
 				s.Equal(uint64(500), i.Mounts[0].Total)
 			},
 		},

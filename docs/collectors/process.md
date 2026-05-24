@@ -17,21 +17,21 @@ Consumers use this to:
 
 - Detect unexpected processes (security — is `cryptominer` running?).
 - Map process → owner for accountability.
-- Reconstruct the parent/child tree via `pid`/`ppid`.
+- Reconstruct the parent/child tree via `pid`/`parent_pid`.
 - Enumerate things listening on services by name.
 
 ## Collected Fields
 
-| Field                    | Type   | Description                                  | Schema mapping                |
-| ------------------------ | ------ | -------------------------------------------- | ----------------------------- |
-| `count`                  | int    | Total process count.                         | No direct schema mapping.     |
-| `processes[].pid`        | int32  | Process ID.                                  | `process.pid`.                |
-| `processes[].ppid`       | int32  | Parent process ID.                           | `process.parent_process.pid`. |
-| `processes[].name`       | string | Executable name (no path / args).            | `process.name`.               |
-| `processes[].username`   | string | Owner username.                              | `process.user.name`.          |
-| `processes[].cmd_line`   | string | Full command line (space-joined argv).       | `process.cmd_line`.           |
-| `processes[].state`      | string | POSIX state letter: `R`/`S`/`D`/`Z`/`T`/`I`. | No direct schema mapping.     |
-| `processes[].start_time` | uint64 | Process start time (unix seconds).           | `process.created_time`.       |
+| Field                       | Type   | Description                                  | Schema mapping                |
+| --------------------------- | ------ | -------------------------------------------- | ----------------------------- |
+| `count`                     | int    | Total process count.                         | No direct schema mapping.     |
+| `processes[].pid`           | int32  | Process ID.                                  | `process.pid`.                |
+| `processes[].parent_pid`    | int32  | Parent process ID.                           | `process.parent_process.pid`. |
+| `processes[].name`          | string | Executable name (no path / args).            | `process.name`.               |
+| `processes[].owner`         | string | Owner username.                              | `process.user.name`.          |
+| `processes[].cmd_line`      | string | Full command line (space-joined argv).       | `process.cmd_line`.           |
+| `processes[].state`         | string | POSIX state letter: `R`/`S`/`D`/`Z`/`T`/`I`. | No direct schema mapping.     |
+| `processes[].creation_time` | int64  | Process start time (unix seconds).           | `process.created_time`.       |
 
 Field name `cmd_line` follows OCSF (`process.cmd_line`) rather than Ohai's
 `command` — OCSF precedes Ohai when both name a field.
@@ -52,21 +52,21 @@ Field name `cmd_line` follows OCSF (`process.cmd_line`) rather than Ohai's
     "processes": [
       {
         "pid": 1,
-        "ppid": 0,
+        "parent_pid": 0,
         "name": "systemd",
-        "username": "root",
+        "owner": "root",
         "cmd_line": "/sbin/init",
         "state": "S",
-        "start_time": 1712064000
+        "creation_time": 1712064000
       },
       {
         "pid": 1234,
-        "ppid": 1,
+        "parent_pid": 1,
         "name": "sshd",
-        "username": "root",
+        "owner": "root",
         "cmd_line": "/usr/sbin/sshd -D",
         "state": "S",
-        "start_time": 1712064010
+        "creation_time": 1712064010
       }
     ]
   }
@@ -81,7 +81,7 @@ facts, _ := g.Collect(context.Background())
 
 for _, p := range facts.Process.Processes {
     if p.Name == "nginx" {
-        fmt.Printf("nginx pid=%d owner=%s\n", p.PID, p.Username)
+        fmt.Printf("nginx pid=%d owner=%s\n", p.PID, p.Owner)
     }
 }
 ```

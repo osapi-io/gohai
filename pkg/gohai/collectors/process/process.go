@@ -40,13 +40,13 @@ type Info struct {
 // read (permission-denied for another user's process, zombie parents,
 // etc.) are left empty rather than erroring.
 type Process struct {
-	PID       int32  `json:"pid"`
-	PPID      int32  `json:"ppid,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Username  string `json:"username,omitempty"`
-	CmdLine   string `json:"cmd_line,omitempty"`   // OCSF-style: process.cmd_line
-	State     string `json:"state,omitempty"`      // R/S/D/Z/T/I (Linux proc/status)
-	StartTime uint64 `json:"start_time,omitempty"` // unix timestamp (seconds)
+	PID          int32  `json:"pid"`
+	ParentPID    int32  `json:"parent_pid,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Owner        string `json:"owner,omitempty"`
+	CmdLine      string `json:"cmd_line,omitempty"`      // OCSF-style: process.cmd_line
+	State        string `json:"state,omitempty"`         // R/S/D/Z/T/I (Linux proc/status)
+	CreationTime int64  `json:"creation_time,omitempty"` // unix timestamp (seconds)
 }
 
 // Collector is the public interface every process variant satisfies.
@@ -105,13 +105,13 @@ func snapshotFromGopsutil(
 ) Process {
 	out := Process{PID: p.Pid}
 	if ppid, err := p.Ppid(); err == nil {
-		out.PPID = ppid
+		out.ParentPID = ppid
 	}
 	if n, err := p.Name(); err == nil {
 		out.Name = n
 	}
 	if u, err := p.Username(); err == nil {
-		out.Username = u
+		out.Owner = u
 	}
 	if cl, err := p.Cmdline(); err == nil {
 		out.CmdLine = cl
@@ -121,7 +121,7 @@ func snapshotFromGopsutil(
 	}
 	if ct, err := p.CreateTime(); err == nil && ct > 0 {
 		// gopsutil returns ms since epoch; convert to seconds.
-		out.StartTime = uint64(ct / 1000)
+		out.CreationTime = ct / 1000
 	}
 	return out
 }

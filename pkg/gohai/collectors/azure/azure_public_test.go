@@ -228,8 +228,8 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			verify: func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string) {
 				s.Equal("2023-07-01", gotAPI)
 				s.Require().NotNil(info)
-				s.Equal("abcd-1234", info.VMID)
-				s.Equal("eastus", info.Location)
+				s.Equal("abcd-1234", info.ID)
+				s.Equal("eastus", info.Region)
 				s.Require().Len(info.Interfaces, 1)
 				iface, ok := info.Interfaces["000D3A1122AA"]
 				s.Require().True(ok)
@@ -260,7 +260,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			negotiationStatus: http.StatusBadRequest,
 			verify: func(s *AzurePublicTestSuite, info *azure.Info, _ string) {
 				s.Require().NotNil(info)
-				s.Equal("abcd-1234", info.VMID)
+				s.Equal("abcd-1234", info.ID)
 			},
 		},
 		{
@@ -361,7 +361,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			},
 			verify: func(s *AzurePublicTestSuite, info *azure.Info, _ string) {
 				s.Require().NotNil(info)
-				s.Empty(info.VMID)
+				s.Empty(info.ID)
 				s.Empty(info.Interfaces)
 			},
 		},

@@ -98,10 +98,10 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:  "ec2 populates Facts.Ec2",
 			key:   "ec2",
-			value: &ec2.Info{InstanceID: "i-abc"},
+			value: &ec2.Info{ID: "i-abc"},
 			verify: func(s *GohaiTestSuite, f *Facts) {
 				s.Require().NotNil(f.Ec2)
-				s.Equal("i-abc", f.Ec2.InstanceID)
+				s.Equal("i-abc", f.Ec2.ID)
 			},
 		},
 		{
@@ -113,10 +113,10 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:  "azure populates Facts.Azure",
 			key:   "azure",
-			value: &azure.Info{VMID: "vm"},
+			value: &azure.Info{ID: "vm"},
 			verify: func(s *GohaiTestSuite, f *Facts) {
 				s.Require().NotNil(f.Azure)
-				s.Equal("vm", f.Azure.VMID)
+				s.Equal("vm", f.Azure.ID)
 			},
 		},
 		{
@@ -128,10 +128,10 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:  "digital_ocean populates Facts.DigitalOcean",
 			key:   "digital_ocean",
-			value: &digitalocean.Info{DropletID: 1},
+			value: &digitalocean.Info{ID: 1},
 			verify: func(s *GohaiTestSuite, f *Facts) {
 				s.Require().NotNil(f.DigitalOcean)
-				s.Equal(int64(1), f.DigitalOcean.DropletID)
+				s.Equal(int64(1), f.DigitalOcean.ID)
 			},
 		},
 		{
@@ -158,10 +158,10 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:  "alibaba populates Facts.Alibaba",
 			key:   "alibaba",
-			value: &alibaba.Info{InstanceID: "i-ali"},
+			value: &alibaba.Info{ID: "i-ali"},
 			verify: func(s *GohaiTestSuite, f *Facts) {
 				s.Require().NotNil(f.Alibaba)
-				s.Equal("i-ali", f.Alibaba.InstanceID)
+				s.Equal("i-ali", f.Alibaba.ID)
 			},
 		},
 		{
@@ -188,10 +188,10 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:  "openstack populates Facts.OpenStack",
 			key:   "openstack",
-			value: &openstack.Info{InstanceID: "i-os"},
+			value: &openstack.Info{ID: "i-os"},
 			verify: func(s *GohaiTestSuite, f *Facts) {
 				s.Require().NotNil(f.OpenStack)
-				s.Equal("i-os", f.OpenStack.InstanceID)
+				s.Equal("i-os", f.OpenStack.ID)
 			},
 		},
 		{

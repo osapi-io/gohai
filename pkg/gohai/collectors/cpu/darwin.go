@@ -68,9 +68,9 @@ func (d *Darwin) Collect(
 		info.Sockets = n
 	}
 	if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency_max"); ok {
-		info.Mhz = float64(n) / 1_000_000
+		info.Speed = float64(n) / 1_000_000
 	} else if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency"); ok {
-		info.Mhz = float64(n) / 1_000_000
+		info.Speed = float64(n) / 1_000_000
 	}
 	return info, nil
 }

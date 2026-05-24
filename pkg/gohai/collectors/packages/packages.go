@@ -30,10 +30,10 @@ import (
 
 // Package holds metadata for a single installed package.
 type Package struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-	Arch    string `json:"arch,omitempty"`
-	Source  string `json:"source"`
+	Name           string `json:"name"`
+	Version        string `json:"version"`
+	Architecture   string `json:"architecture,omitempty"`
+	PackageManager string `json:"package_manager"`
 }
 
 // Info holds the list of installed packages.

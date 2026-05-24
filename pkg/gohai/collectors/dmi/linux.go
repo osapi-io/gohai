@@ -68,9 +68,9 @@ func (l *Linux) Collect(
 
 	if b, err := biosFn(); err == nil && b != nil {
 		info.BIOS = &BIOS{
-			Vendor:  b.Vendor,
-			Version: b.Version,
-			Date:    b.Date,
+			Manufacturer: b.Vendor,
+			Ver:          b.Version,
+			Date:         b.Date,
 		}
 	}
 	if bb, err := baseboardFn(); err == nil && bb != nil {
@@ -94,7 +94,7 @@ func (l *Linux) Collect(
 	}
 	if p, err := productFn(); err == nil && p != nil {
 		info.Product = &Product{
-			Vendor:       p.Vendor,
+			VendorName:   p.Vendor,
 			Name:         p.Name,
 			Family:       p.Family,
 			Version:      p.Version,

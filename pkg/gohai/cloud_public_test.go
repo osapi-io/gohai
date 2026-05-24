@@ -60,7 +60,7 @@ func (s *CloudPublicTestSuite) TestCloud() {
 		},
 		{
 			name:  "ec2 returns aws",
-			facts: &gohai.Facts{Ec2: &ec2.Info{InstanceID: "i-abc"}},
+			facts: &gohai.Facts{Ec2: &ec2.Info{ID: "i-abc"}},
 			want:  gohai.CloudAWS,
 		},
 		{

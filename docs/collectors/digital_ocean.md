@@ -9,16 +9,16 @@ Collects DigitalOcean droplet metadata by hitting the link-local server at
 endpoint isn't reachable or the DMI signature doesn't match —
 `facts.DigitalOcean != nil` is the detection signal.
 
-Detection is gated on `dmi.BIOS.Vendor == "DigitalOcean"` (exact match, matches
-Ohai's `has_do_dmi?`). `vendor_data` is dropped from the response because it
-commonly contains cloud-init user scripts with credentials — matches Ohai's
-explicit scrub.
+Detection is gated on `dmi.BIOS.Manufacturer == "DigitalOcean"` (exact match,
+matches Ohai's `has_do_dmi?`). `vendor_data` is dropped from the response
+because it commonly contains cloud-init user scripts with credentials — matches
+Ohai's explicit scrub.
 
 ## Collected Fields
 
 | Field              | Type          | Description                                     | Schema mapping            |
 | ------------------ | ------------- | ----------------------------------------------- | ------------------------- |
-| `droplet_id`       | `int64`       | DigitalOcean droplet numeric ID.                | OTel `cloud.resource_id`  |
+| `id`               | `int64`       | DigitalOcean droplet numeric ID.                | OTel `cloud.resource_id`  |
 | `hostname`         | `string`      | Droplet hostname.                               | OCSF `device.hostname`    |
 | `region`           | `string`      | DigitalOcean region (e.g. `nyc3`).              | OTel `cloud.region`       |
 | `public_keys`      | `[]string`    | SSH public keys attached to the droplet.        | No direct schema mapping. |
@@ -59,7 +59,7 @@ explicit scrub.
 ```json
 {
   "digital_ocean": {
-    "droplet_id": 123456,
+    "id": 123456,
     "hostname": "web-1",
     "region": "nyc3",
     "tags": ["prod"],
@@ -93,14 +93,15 @@ gohai --category=cloud               # pulls this + all cloud collectors
 
 ## Dependencies
 
-`dmi`. DO writes `"DigitalOcean"` as `bios_vendor`; the collector gates the HTTP
-call on an exact match. When `dmi` is absent from prior (user disabled it), the
+`dmi`. DO writes `"DigitalOcean"` as `bios_vendor` (surfaced as
+`BIOS.Manufacturer` by the dmi collector); the collector gates the HTTP call on
+an exact match. When `dmi` is absent from prior (user disabled it), the
 collector fails open and tries the endpoint anyway.
 
 ## Data Sources
 
-1. **DMI gate:** `dmi.BIOS.Vendor == "DigitalOcean"` (exact). Matches Ohai's
-   `has_do_dmi?`.
+1. **DMI gate:** `dmi.BIOS.Manufacturer == "DigitalOcean"` (exact). Matches
+   Ohai's `has_do_dmi?`.
 2. **Endpoint:** `http://169.254.169.254/metadata/v1.json` — single JSON.
 3. **User-Agent:** `gohai` (the cloudmetadata default).
 4. **Timeout:** 6 seconds — matches Ohai's `read_timeout` in

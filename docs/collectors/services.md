@@ -1,4 +1,6 @@
-# services
+# Services
+
+> **Status:** Implemented ✅
 
 ## Description
 
@@ -12,44 +14,46 @@ service-list plugin. This is a gohai-native addition.
 
 ## Collected Fields
 
-| Field                | Type    | Schema mapping              | Notes                                      |
-| -------------------- | ------- | --------------------------- | ------------------------------------------ |
-| `services`           | list    | —                           | List of service objects                    |
-| `services[].name`    | string  | OCSF `process.name`         | Unit name with `.service` suffix stripped  |
-| `services[].state`   | string  | gohai convention: `state`   | systemd SUB state: `running`, `dead`, etc. |
-| `services[].enabled` | boolean | gohai convention: `enabled` | `true` when ACTIVE state is `active`       |
-| `services[].type`    | string  | gohai convention: `type`    | Reserved for future use; currently empty   |
+| Field                | Type     | Description                                | Schema mapping              |
+| -------------------- | -------- | ------------------------------------------ | --------------------------- |
+| `services`           | `list`   | List of service objects                    | —                           |
+| `services[].name`    | `string` | Unit name with `.service` suffix stripped  | No direct OCSF/OTel mapping |
+| `services[].state`   | `string` | systemd SUB state: `running`, `dead`, etc. | No direct OCSF/OTel mapping |
+| `services[].enabled` | `bool`   | `true` when ACTIVE state is `active`       | No direct OCSF/OTel mapping |
+| `services[].type`    | `string` | Reserved for future use; currently empty   | No direct OCSF/OTel mapping |
 
 ## Platform Support
 
-| Platform | Supported | Backing source                                                 |
-| -------- | --------- | -------------------------------------------------------------- |
-| Linux    | Yes       | `systemctl list-units --type=service --all --no-pager --plain` |
-| macOS    | No        | Returns nil (launchd model differs substantially)              |
+| Platform | Supported |
+| -------- | --------- |
+| Linux    | ✅        |
+| macOS    | ❌        |
 
 ## Example Output
 
 ```json
 {
-  "services": [
-    {
-      "name": "ssh",
-      "state": "running",
-      "enabled": true
-    },
-    {
-      "name": "NetworkManager",
-      "state": "dead",
-      "enabled": false
-    }
-  ]
+  "services": {
+    "services": [
+      {
+        "name": "ssh",
+        "state": "running",
+        "enabled": true
+      },
+      {
+        "name": "NetworkManager",
+        "state": "dead",
+        "enabled": false
+      }
+    ]
+  }
 }
 ```
 
 ## SDK Usage
 
 ```go
-g := gohai.New(gohai.WithEnabled("services"))
+g, _ := gohai.New(gohai.WithCollectors("services"))
 facts, _ := g.Collect(ctx)
 ```
 
@@ -69,6 +73,9 @@ None.
 
 ## Data Sources
 
+There is no Ohai equivalent for this collector — Ohai does not ship a systemd
+service enumeration plugin. This is a gohai-native addition.
+
 On Linux:
 
 1. Runs `systemctl list-units --type=service --all --no-pager --plain`.
@@ -83,6 +90,6 @@ On Linux:
 
 On macOS: returns nil.
 
-## Backing Library
+## Backing library
 
 `internal/executor.Executor` for command execution.

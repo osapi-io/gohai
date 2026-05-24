@@ -72,9 +72,9 @@ func (d *Darwin) Collect(
 		name := parts[0]
 		version := parts[len(parts)-1]
 		info.Packages = append(info.Packages, Package{
-			Name:    name,
-			Version: version,
-			Source:  "brew",
+			Name:           name,
+			Version:        version,
+			PackageManager: "brew",
 		})
 	}
 	return info, nil

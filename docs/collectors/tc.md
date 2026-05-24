@@ -1,4 +1,6 @@
-# tc
+# TC
+
+> **Status:** Implemented ✅
 
 ## Description
 
@@ -11,21 +13,21 @@ the `tc` command output, recording each qdisc's kind, handle, and parent.
 
 ## Collected Fields
 
-| Field                          | Type   | Schema mapping             | Notes                                                 |
-| ------------------------------ | ------ | -------------------------- | ----------------------------------------------------- |
-| `interfaces`                   | list   | —                          | List of interfaces with qdisc configuration           |
-| `interfaces[].name`            | string | gohai convention: `name`   | Network interface name, e.g. `eth0`                   |
-| `interfaces[].qdiscs`          | list   | —                          | Qdiscs attached to this interface                     |
-| `interfaces[].qdiscs[].kind`   | string | gohai convention: `kind`   | Qdisc type: `fq_codel`, `pfifo_fast`, `noqueue`, etc. |
-| `interfaces[].qdiscs[].handle` | string | gohai convention: `handle` | Qdisc handle (e.g. `1:`, `0:`)                        |
-| `interfaces[].qdiscs[].parent` | string | gohai convention: `parent` | Parent handle; empty for root qdiscs                  |
+| Field                          | Type     | Description                                           | Schema mapping              |
+| ------------------------------ | -------- | ----------------------------------------------------- | --------------------------- |
+| `interfaces`                   | `list`   | List of interfaces with qdisc configuration           | —                           |
+| `interfaces[].name`            | `string` | Network interface name, e.g. `eth0`                   | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs`          | `list`   | Qdiscs attached to this interface                     | —                           |
+| `interfaces[].qdiscs[].kind`   | `string` | Qdisc type: `fq_codel`, `pfifo_fast`, `noqueue`, etc. | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].handle` | `string` | Qdisc handle (e.g. `1:`, `0:`)                        | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].parent` | `string` | Parent handle; empty for root qdiscs                  | No direct OCSF/OTel mapping |
 
 ## Platform Support
 
-| Platform | Supported | Backing source               |
-| -------- | --------- | ---------------------------- |
-| Linux    | Yes       | `tc -s qdisc show`           |
-| macOS    | No        | Returns nil (tc not present) |
+| Platform | Supported |
+| -------- | --------- |
+| Linux    | ✅        |
+| macOS    | ❌        |
 
 ## Example Output
 
@@ -53,7 +55,7 @@ the `tc` command output, recording each qdisc's kind, handle, and parent.
 ## SDK Usage
 
 ```go
-g := gohai.New(gohai.WithEnabled("tc"))
+g, _ := gohai.New(gohai.WithCollectors("tc"))
 facts, _ := g.Collect(ctx)
 ```
 
@@ -72,6 +74,11 @@ gohai --no-collector.tc           # disable
 None.
 
 ## Data Sources
+
+Ohai's `linux/tc.rb` runs `tc -s qdisc show` and parses per-interface qdisc
+entries, recording kind, handle, and parent. gohai follows the same parsing
+strategy — extracting fields from `qdisc` lines and grouping by the `dev`
+keyword. No methodology deviation from Ohai.
 
 On Linux:
 
@@ -92,6 +99,6 @@ is consistent with the kernel's internal ordering.
 
 On macOS: returns nil.
 
-## Backing Library
+## Backing library
 
 `internal/executor.Executor` for command execution.

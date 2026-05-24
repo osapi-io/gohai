@@ -12,10 +12,10 @@ callers). macOS has no SMBIOS equivalent; the collector returns an empty Info
 there and the `hardware` collector (planned) covers macOS hardware identity.
 
 Primary consumers are cloud-provider collectors (`gce`, `ec2`, `azure`, ...)
-which use `product.Name` / `product.Vendor` / `bios.Vendor` / `chassis.AssetTag`
-to detect which cloud a VM is running on before hitting that provider's metadata
-endpoint. Hardware inventory and compliance tooling use the full set for fleet
-audits.
+which use `product.name` / `product.vendor_name` / `bios.manufacturer` /
+`chassis.asset_tag` to detect which cloud a VM is running on before hitting that
+provider's metadata endpoint. Hardware inventory and compliance tooling use the
+full set for fleet audits.
 
 ## Collected Fields
 
@@ -32,11 +32,11 @@ safely check `facts.DMI.Product != nil` before dereferencing.
 
 ### BIOS
 
-| Field     | Type     | Description        | Schema mapping                          |
-| --------- | -------- | ------------------ | --------------------------------------- |
-| `vendor`  | `string` | BIOS vendor.       | OCSF `device.hw_info.bios_manufacturer` |
-| `version` | `string` | BIOS version.      | OCSF `device.hw_info.bios_ver`          |
-| `date`    | `string` | BIOS release date. | OCSF `device.hw_info.bios_date`         |
+| Field          | Type     | Description        | Schema mapping                          |
+| -------------- | -------- | ------------------ | --------------------------------------- |
+| `manufacturer` | `string` | BIOS vendor.       | OCSF `device.hw_info.bios_manufacturer` |
+| `ver`          | `string` | BIOS version.      | OCSF `device.hw_info.bios_ver`          |
+| `date`         | `string` | BIOS release date. | OCSF `device.hw_info.bios_date`         |
 
 ### Baseboard
 
@@ -63,7 +63,7 @@ safely check `facts.DMI.Product != nil` before dereferencing.
 
 | Field           | Type     | Description                                                      |
 | --------------- | -------- | ---------------------------------------------------------------- |
-| `vendor`        | `string` | System vendor (`"Google"`, `"Amazon EC2"`, `"Dell Inc."`, etc.). |
+| `vendor_name`   | `string` | System vendor (`"Google"`, `"Amazon EC2"`, `"Dell Inc."`, etc.). |
 | `name`          | `string` | Product name — primary cloud-detection signal.                   |
 | `family`        | `string` | Product family.                                                  |
 | `version`       | `string` | Product version.                                                 |
@@ -86,11 +86,11 @@ safely check `facts.DMI.Product != nil` before dereferencing.
 ```json
 {
   "dmi": {
-    "bios": { "vendor": "Google", "version": "Google", "date": "10/28/2024" },
+    "bios": { "manufacturer": "Google", "ver": "Google", "date": "10/28/2024" },
     "baseboard": { "vendor": "Google", "product": "Google Compute Engine" },
     "chassis": { "vendor": "Google", "type": "1", "type_description": "Other" },
     "product": {
-      "vendor": "Google",
+      "vendor_name": "Google",
       "name": "Google Compute Engine",
       "uuid": ""
     }
@@ -148,6 +148,14 @@ cloud collector, dmi gets pulled in automatically via `Dependencies()`.
 None.
 
 ## Data Sources
+
+Ohai's `dmi.rb` shells out to `dmidecode`, which reads `/dev/mem` and requires
+root. gohai uses `ghw` instead, which reads `/sys/class/dmi/id/*` — the sysfs
+entries are world-readable and don't require elevated privileges. This is an
+intentional deviation: sysfs is the modern, unprivileged way to access SMBIOS
+data on Linux. The fields exposed are identical (BIOS vendor/version/date,
+baseboard, chassis, product), but gohai doesn't parse `dmidecode`'s freeform
+text output.
 
 On Linux:
 

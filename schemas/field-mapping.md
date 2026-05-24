@@ -22,7 +22,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | platform | Version | `version` | T1 | `version` | no | OCSF `os.version` — OS version string | [OCSF os](https://schema.ocsf.io/1.8.0/objects/os) |
 | platform | VersionExtra | `version_extra` | T3 | `version_extra` | no | No OCSF/OTel equivalent — macOS RSR patch suffix | Convention — gopsutil supplement |
 | platform | Family | `family` | T3 | `family` | no | No OCSF/OTel equivalent — distro family ("debian", "rhel") | Convention — gopsutil `PlatformFamily` |
-| platform | Architecture | `architecture` | T2 | `architecture` | no | OTel `host.arch` — CPU architecture the host runs on | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
+| platform | Architecture | `architecture` | T1 | `cpu_architecture` | yes | OCSF `device_hw_info.cpu_architecture` — collector is `platform` not `cpu`, prefix not redundant | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
 | platform | Build | `build` | T1 | `build` | no | OCSF `os.build` — OS build identifier | [OCSF os](https://schema.ocsf.io/1.8.0/objects/os) |
 | hostname | Name | `name` | T1 | `name` | no | OCSF `device.hostname` — leaf stripped per redundant-prefix rule | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
 | hostname | MachineName | `machine_name` | T1 | `machine_name` | no | OCSF `device.name` — alternate device name assigned by admin/user | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
@@ -83,17 +83,17 @@ Three-tier naming ladder applied to every gohai JSON field.
 | cpu | ModelName | `model_name` | T2 | `model_name` | no | OTel `host.cpu.model.name` — processor model designation | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu | VendorID | `vendor_id` | T2 | `vendor_id` | no | OTel `host.cpu.vendor.id` — processor manufacturer identifier | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu | Family | `family` | T2 | `family` | no | OTel `host.cpu.family` — CPU family or generation | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
-| cpu | Model | `model` | T2 | `model` | no | OTel `host.cpu.model.id` — model identifier within family | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
+| cpu | Model | `model` | T2 | `model_id` | yes | OTel `host.cpu.model.id` — flat leaf is `model_id`; current `model` drops `.id` qualifier | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu | Stepping | `stepping` | T2 | `stepping` | no | OTel `host.cpu.stepping` — core revision/stepping | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
-| cpu | Mhz | `mhz` | T1 | `mhz` | no | OCSF `device_hw_info.cpu_speed` — current frequency in MHz | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
+| cpu | Mhz | `mhz` | T1 | `speed` | yes | OCSF `device_hw_info.cpu_speed` → strip `cpu_` (collector=cpu) → `speed` | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
 | cpu | CacheSize | `cache_size` | T2 | `cache_size` | no | OTel `host.cpu.cache.l2.size` — aggregate cache from /proc/cpuinfo (KB) | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu | Flags | `flags` | T3 | `flags` | no | No OCSF/OTel equivalent — CPU feature flags | Convention — gopsutil `InfoStat.Flags` |
 | cpu | Caches | `caches` | T3 | `caches` | no | No OCSF/OTel equivalent — per-level cache sizes container | Convention — lscpu output |
 | cpu | NumaNodes | `numa_nodes` | T3 | `numa_nodes` | no | No OCSF/OTel equivalent — NUMA node → CPU index mapping | Convention — lscpu `NUMA node<N> CPU(s)` |
 | cpu | NumaNodesCount | `numa_nodes_count` | T3 | `numa_nodes_count` | no | No OCSF/OTel equivalent — NUMA node count | Convention — lscpu `NUMA node(s)` |
 | cpu | Vulnerabilities | `vulnerabilities` | T3 | `vulnerabilities` | no | No OCSF/OTel equivalent — mitigation → status map | Convention — /sys/devices/system/cpu/vulnerabilities |
-| cpu | CPUsOnline | `cpus_online` | T3 | `cpus_online` | no | No OCSF/OTel equivalent — online logical CPU count | Convention — lscpu `On-line CPU(s) list` |
-| cpu | CPUsOffline | `cpus_offline` | T3 | `cpus_offline` | no | No OCSF/OTel equivalent — offline logical CPU count | Convention — lscpu `Off-line CPU(s) list` |
+| cpu | CPUsOnline | `cpus_online` | T3 | `online` | yes | Redundant `cpus_` prefix stripped (collector is `cpu`) | Convention — lscpu `On-line CPU(s) list` |
+| cpu | CPUsOffline | `cpus_offline` | T3 | `offline` | yes | Redundant `cpus_` prefix stripped (collector is `cpu`) | Convention — lscpu `Off-line CPU(s) list` |
 | cpu | BIOSVendorID | `bios_vendor_id` | T3 | `bios_vendor_id` | no | No OCSF/OTel equivalent — BIOS-reported CPU vendor from lscpu | Convention — lscpu `BIOS Vendor ID` |
 | cpu | BIOSModelName | `bios_model_name` | T3 | `bios_model_name` | no | No OCSF/OTel equivalent — BIOS-reported CPU model from lscpu | Convention — lscpu `BIOS Model name` |
 | cpu | MachineType | `machine_type` | T3 | `machine_type` | no | No OCSF/OTel equivalent — s390x mainframe machine type | Convention — lscpu `Machine type` |
@@ -101,7 +101,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | cpu | MhzMin | `mhz_min` | T3 | `mhz_min` | no | No OCSF/OTel equivalent — minimum CPU frequency string | Convention — lscpu `CPU min MHz` |
 | cpu | MhzDynamic | `mhz_dynamic` | T3 | `mhz_dynamic` | no | No OCSF/OTel equivalent — dynamic CPU frequency (s390x) | Convention — lscpu `CPU dynamic MHz` |
 | cpu | Bogomips | `bogomips` | T3 | `bogomips` | no | No OCSF/OTel equivalent — BogoMIPS calibration value | Convention — lscpu `BogoMIPS` |
-| cpu | CPUOpmodes | `cpu_opmodes` | T3 | `cpu_opmodes` | no | No OCSF/OTel equivalent — supported CPU operation modes | Convention — lscpu `CPU op-mode(s)` |
+| cpu | CPUOpmodes | `cpu_opmodes` | T3 | `opmodes` | yes | Redundant `cpu_` prefix stripped (collector is `cpu`) | Convention — lscpu `CPU op-mode(s)` |
 | cpu | ByteOrder | `byte_order` | T3 | `byte_order` | no | No OCSF/OTel equivalent — CPU byte order | Convention — lscpu `Byte Order` |
 | cpu | AddressSizes | `address_sizes` | T3 | `address_sizes` | no | No OCSF/OTel equivalent — physical/virtual address sizes | Convention — lscpu `Address sizes` |
 | cpu | Virtualization | `virtualization` | T3 | `virtualization` | no | No OCSF/OTel equivalent — CPU virtualization capability | Convention — lscpu `Virtualization` |
@@ -118,13 +118,13 @@ Three-tier naming ladder applied to every gohai JSON field.
 | cpu.caches | L4 | `l4` | T3 | `l4` | no | No OCSF/OTel equivalent — L4 cache size string (rare) | Convention — lscpu `L4 cache` |
 | cpu.cpus[] | VendorID | `vendor_id` | T2 | `vendor_id` | no | OTel `host.cpu.vendor.id` — per-CPU vendor identifier | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu.cpus[] | Family | `family` | T2 | `family` | no | OTel `host.cpu.family` — per-CPU family | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
-| cpu.cpus[] | Model | `model` | T2 | `model` | no | OTel `host.cpu.model.id` — per-CPU model identifier | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
+| cpu.cpus[] | Model | `model` | T2 | `model_id` | yes | OTel `host.cpu.model.id` — flat leaf `model_id` | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu.cpus[] | ModelName | `model_name` | T2 | `model_name` | no | OTel `host.cpu.model.name` — per-CPU model designation | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu.cpus[] | Stepping | `stepping` | T2 | `stepping` | no | OTel `host.cpu.stepping` — per-CPU stepping | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu.cpus[] | PhysicalID | `physical_id` | T3 | `physical_id` | no | No OCSF/OTel equivalent — socket index from /proc/cpuinfo | Convention — gopsutil `InfoStat.PhysicalID` |
 | cpu.cpus[] | CoreID | `core_id` | T3 | `core_id` | no | No OCSF/OTel equivalent — physical core index within socket | Convention — gopsutil `InfoStat.CoreID` |
 | cpu.cpus[] | Cores | `cores` | T3 | `cores` | no | No OCSF/OTel equivalent — cores on this socket | Convention — gopsutil `InfoStat.Cores` |
-| cpu.cpus[] | Mhz | `mhz` | T1 | `mhz` | no | OCSF `device_hw_info.cpu_speed` — per-CPU frequency | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
+| cpu.cpus[] | Mhz | `mhz` | T1 | `speed` | yes | OCSF `device_hw_info.cpu_speed` → strip `cpu_` → `speed` | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
 | cpu.cpus[] | CacheSize | `cache_size` | T2 | `cache_size` | no | OTel `host.cpu.cache.l2.size` — per-CPU cache size (KB) | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | cpu.cpus[] | Flags | `flags` | T3 | `flags` | no | No OCSF/OTel equivalent — per-CPU feature flags | Convention — gopsutil `InfoStat.Flags` |
 | memory | Total | `total` | T1 | `total` | no | OCSF `device_hw_info.ram_size` — prefix `memory_` stripped; total physical RAM | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
@@ -201,7 +201,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | filesystem | ZFSDatasets | `zfs_datasets` | T3 | `zfs_datasets` | no | No OCSF/OTel equivalent — ZFS dataset array | Convention — `zfs get all` output |
 | filesystem.mounts[] | Device | `device` | T2 | `device` | no | OTel `system.device` — device identifier for filesystem | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/registry.yaml) |
 | filesystem.mounts[] | Mountpoint | `mountpoint` | T2 | `mountpoint` | no | OTel `system.filesystem.mountpoint` — filesystem mount path | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/registry.yaml) |
-| filesystem.mounts[] | Fstype | `fstype` | T2 | `fstype` | no | OTel `system.filesystem.type` — filesystem type | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/registry.yaml) |
+| filesystem.mounts[] | Fstype | `fstype` | T2 | `type` | yes | OTel `system.filesystem.type` → leaf is `type` | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/registry.yaml) |
 | filesystem.mounts[] | Opts | `opts` | T2 | `opts` | no | OTel `system.filesystem.mode` — mount options (rw, ro, etc.) | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/registry.yaml) |
 | filesystem.mounts[] | Total | `total` | T2 | `total` | no | OTel `system.filesystem.limit` — total filesystem capacity | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
 | filesystem.mounts[] | Used | `used` | T2 | `used` | no | OTel `system.filesystem.usage` with `state=used` — used space | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/metrics.yaml) |
@@ -221,7 +221,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | filesystem.mounts[].btrfs.allocation[] | TotalBytes | `total_bytes` | T3 | `total_bytes` | no | No OCSF/OTel equivalent — btrfs block-group total bytes | Convention — /sys/fs/btrfs total_bytes |
 | filesystem.mounts[].btrfs.allocation[] | BytesUsed | `bytes_used` | T3 | `bytes_used` | no | No OCSF/OTel equivalent — btrfs block-group bytes used | Convention — /sys/fs/btrfs bytes_used |
 | filesystem.unmounted[] | Device | `device` | T2 | `device` | no | OTel `system.device` — device identifier | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/registry.yaml) |
-| filesystem.unmounted[] | Fstype | `fstype` | T2 | `fstype` | no | OTel `system.filesystem.type` — filesystem type | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/registry.yaml) |
+| filesystem.unmounted[] | Fstype | `fstype` | T2 | `type` | yes | OTel `system.filesystem.type` → leaf is `type` | [OTel system](https://github.com/open-telemetry/semantic-conventions/blob/main/model/system/registry.yaml) |
 | filesystem.unmounted[] | UUID | `uuid` | T3 | `uuid` | no | No OCSF/OTel equivalent — filesystem UUID from lsblk | Convention — lsblk `UUID` |
 | filesystem.unmounted[] | Label | `label` | T3 | `label` | no | No OCSF/OTel equivalent — filesystem label from lsblk | Convention — lsblk `LABEL` |
 | filesystem.unmounted[] | PartUUID | `part_uuid` | T3 | `part_uuid` | no | No OCSF/OTel equivalent — GPT partition UUID from lsblk | Convention — lsblk `PARTUUID` |
@@ -237,8 +237,8 @@ Three-tier naming ladder applied to every gohai JSON field.
 | dmi | Baseboard | `baseboard` | T3 | `baseboard` | no | No OCSF/OTel equivalent — motherboard identity container | Convention — ghw `BaseboardInfo` |
 | dmi | Chassis | `chassis` | T1 | `chassis` | no | OCSF `device_hw_info.chassis` — enclosure identity container | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
 | dmi | Product | `product` | T3 | `product` | no | No OCSF/OTel equivalent — system identity container (DMI type 1) | Convention — ghw `ProductInfo` |
-| dmi.bios | Vendor | `vendor` | T1 | `vendor` | no | OCSF `device_hw_info.bios_manufacturer` — firmware vendor | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
-| dmi.bios | Version | `version` | T1 | `version` | no | OCSF `device_hw_info.bios_ver` — firmware version | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
+| dmi.bios | Vendor | `vendor` | T1 | `manufacturer` | yes | OCSF `device_hw_info.bios_manufacturer` → strip `bios_` (inside bios sub-object) → `manufacturer` | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
+| dmi.bios | Version | `version` | T1 | `ver` | yes | OCSF `device_hw_info.bios_ver` → strip `bios_` → `ver` | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
 | dmi.bios | Date | `date` | T1 | `date` | no | OCSF `device_hw_info.bios_date` — firmware release date | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
 | dmi.baseboard | Vendor | `vendor` | T3 | `vendor` | no | No OCSF/OTel equivalent — baseboard manufacturer | Convention — ghw `BaseboardInfo.Vendor` |
 | dmi.baseboard | Product | `product` | T3 | `product` | no | No OCSF/OTel equivalent — baseboard product name | Convention — ghw `BaseboardInfo.Product` |
@@ -251,7 +251,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | dmi.chassis | Version | `version` | T3 | `version` | no | No OCSF/OTel equivalent — chassis version | Convention — ghw `ChassisInfo.Version` |
 | dmi.chassis | SerialNumber | `serial_number` | T1 | `serial_number` | no | OCSF `device_hw_info.serial_number` — chassis serial number | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
 | dmi.chassis | AssetTag | `asset_tag` | T3 | `asset_tag` | no | No OCSF/OTel equivalent — chassis asset tag | Convention — ghw `ChassisInfo.AssetTag` |
-| dmi.product | Vendor | `vendor` | T1 | `vendor` | no | OCSF `device_hw_info.vendor_name` — system manufacturer | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
+| dmi.product | Vendor | `vendor` | T1 | `vendor_name` | yes | OCSF `device_hw_info.vendor_name` — OCSF uses `vendor_name` not bare `vendor` | [OCSF device_hw_info](https://schema.ocsf.io/1.8.0/objects/device_hw_info) |
 | dmi.product | Name | `name` | T1 | `name` | no | OCSF `device.model` — system/product name | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
 | dmi.product | Family | `family` | T3 | `family` | no | No OCSF/OTel equivalent — product family | Convention — ghw `ProductInfo.Family` |
 | dmi.product | Version | `version` | T3 | `version` | no | No OCSF/OTel equivalent — product version | Convention — ghw `ProductInfo.Version` |
@@ -349,7 +349,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | network.interfaces[] | Number | `number` | T1 | `number` | no | OCSF `network_interface.uid` — unique interface index | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
 | network.interfaces[] | State | `state` | T2 | `state` | no | OTel `hw.network.up` — admin state ("up" / "down") | [OTel hardware](https://github.com/open-telemetry/semantic-conventions/blob/main/model/hardware/network-metrics.yaml) |
 | network.interfaces[] | MTU | `mtu` | T3 | `mtu` | no | No OCSF/OTel equivalent — maximum transmission unit | Convention — gopsutil `InterfaceStat.MTU` |
-| network.interfaces[] | HardwareAddr | `hardware_addr` | T1 | `hardware_addr` | no | OCSF `network_interface.mac` — MAC address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
+| network.interfaces[] | HardwareAddr | `hardware_addr` | T1 | `mac` | yes | OCSF `network_interface.mac` — MAC address | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
 | network.interfaces[] | Encapsulation | `encapsulation` | T1 | `encapsulation` | no | OCSF `network_interface.type` — link layer type (Ethernet, Loopback, etc.) | [OCSF network_interface](https://schema.ocsf.io/1.8.0/objects/network_interface) |
 | network.interfaces[] | Driver | `driver` | T3 | `driver` | no | No OCSF/OTel equivalent — sysfs driver name (e1000e, virtio_net) | Convention — /sys/class/net/*/device/driver |
 | network.interfaces[] | Speed | `speed` | T2 | `speed` | no | OTel `hw.network.bandwidth.limit` — link speed string | [OTel hardware](https://github.com/open-telemetry/semantic-conventions/blob/main/model/hardware/network-metrics.yaml) |
@@ -420,10 +420,10 @@ Three-tier naming ladder applied to every gohai JSON field.
 
 | Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source | Citation |
 | --------- | -------- | ------------ | ---- | ----------- | -------- | ------ | -------- |
-| ec2 | InstanceID | `instance_id` | T1 | `instance_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — EC2 instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| ec2 | InstanceType | `instance_type` | T3 | `instance_type` | no | No OCSF/OTel equivalent — EC2 instance size/shape | Convention — EC2 IMDS `instance-type` |
+| ec2 | InstanceID | `instance_id` | T2 | `id` | yes | OTel `host.id` — "For Cloud, this must be the instance_id" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
+| ec2 | InstanceType | `instance_type` | T2 | `type` | yes | OTel `host.type` — "For Cloud, this must be the machine type" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | ec2 | InstanceLifecycle | `instance_life_cycle` | T3 | `instance_life_cycle` | no | No OCSF/OTel equivalent — on-demand vs spot lifecycle | Convention — EC2 IMDS `instance-life-cycle` |
-| ec2 | AMIID | `ami_id` | T3 | `ami_id` | no | No OCSF/OTel equivalent — AMI image identifier | Convention — EC2 IMDS `ami-id` |
+| ec2 | AMIID | `ami_id` | T2 | `image_id` | yes | OTel `host.image.id` — VM image ID from provider | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | ec2 | AMILaunchIndex | `ami_launch_index` | T3 | `ami_launch_index` | no | No OCSF/OTel equivalent — launch index within batch | Convention — EC2 IMDS `ami-launch-index` |
 | ec2 | AMIManifestPath | `ami_manifest_path` | T3 | `ami_manifest_path` | no | No OCSF/OTel equivalent — S3 manifest path for instance-store AMIs | Convention — EC2 IMDS `ami-manifest-path` |
 | ec2 | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance IMDS hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
@@ -436,8 +436,8 @@ Three-tier naming ladder applied to every gohai JSON field.
 | ec2 | SecurityGroups | `security_groups` | T3 | `security_groups` | no | No OCSF/OTel equivalent — attached security group names | Convention — EC2 IMDS `security-groups` |
 | ec2 | NetworkInterfaces | `network_interfaces` | T3 | `network_interfaces` | no | No OCSF/OTel equivalent — per-ENI metadata map keyed by MAC | Convention — EC2 IMDS `network/interfaces/macs/` |
 | ec2 | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — AWS region | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| ec2 | AvailabilityZone | `availability_zone` | T1 | `availability_zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — AWS AZ | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| ec2 | AccountID | `account_id` | T1 | `account_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — AWS account | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| ec2 | AvailabilityZone | `availability_zone` | T1 | `zone` | yes | OCSF `cloud.zone` — leaf is `zone` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| ec2 | AccountID | `account_id` | T1 | `account_uid` | yes | OCSF `cloud.account.uid` — OCSF uses `uid` not `id` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | ec2 | AvailabilityZoneID | `availability_zone_id` | T3 | `availability_zone_id` | no | No OCSF/OTel equivalent — AZ ID (consistent across accounts) | Convention — EC2 IMDS `placement/availability-zone-id` |
 | ec2 | GroupName | `group_name` | T3 | `group_name` | no | No OCSF/OTel equivalent — placement group name | Convention — EC2 IMDS `placement/group-name` |
 | ec2 | HostID | `host_id` | T3 | `host_id` | no | No OCSF/OTel equivalent — dedicated host ID | Convention — EC2 IMDS `placement/host-id` |
@@ -448,7 +448,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | ec2 | SpotInstanceAction | `spot_instance_action` | T3 | `spot_instance_action` | no | No OCSF/OTel equivalent — spot interruption action signal | Convention — EC2 IMDS `spot/instance-action` |
 | ec2 | SpotTerminationTime | `spot_termination_time` | T3 | `spot_termination_time` | no | No OCSF/OTel equivalent — spot termination timestamp | Convention — EC2 IMDS `spot/termination-time` |
 | ec2 | ServicesDomain | `services_domain` | T3 | `services_domain` | no | No OCSF/OTel equivalent — AWS services DNS domain | Convention — EC2 IMDS `services/domain` |
-| ec2 | ServicesPartition | `services_partition` | T1 | `services_partition` | no | OCSF `cloud.cloud_partition` — AWS partition (aws, aws-cn, aws-us-gov) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| ec2 | ServicesPartition | `services_partition` | T1 | `cloud_partition` | yes | OCSF `cloud.cloud_partition` — leaf is `cloud_partition` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | ec2 | ProductCodes | `product_codes` | T3 | `product_codes` | no | No OCSF/OTel equivalent — marketplace product codes | Convention — EC2 IMDS `product-codes` |
 | ec2 | PublicKeys | `public_keys` | T3 | `public_keys` | no | No OCSF/OTel equivalent — SSH public keys attached at launch | Convention — EC2 IMDS `public-keys/` |
 | ec2 | BlockDeviceMapping | `block_device_mapping` | T3 | `block_device_mapping` | no | No OCSF/OTel equivalent — AMI virtual disk → device path map | Convention — EC2 IMDS `block-device-mapping/` |
@@ -480,12 +480,12 @@ Three-tier naming ladder applied to every gohai JSON field.
 | ec2.iam_info | LastUpdated | `last_updated` | T3 | `last_updated` | no | No OCSF/OTel equivalent — IAM info last-updated timestamp | Convention — EC2 IMDS `iam/info` JSON |
 | ec2.iam_info | InstanceProfileArn | `instance_profile_arn` | T3 | `instance_profile_arn` | no | No OCSF/OTel equivalent — instance profile ARN | Convention — EC2 IMDS `iam/info` JSON |
 | ec2.iam_info | InstanceProfileID | `instance_profile_id` | T3 | `instance_profile_id` | no | No OCSF/OTel equivalent — instance profile ID | Convention — EC2 IMDS `iam/info` JSON |
-| gce | InstanceID | `instance_id` | T1 | `instance_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — GCE instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| gce | InstanceID | `instance_id` | T2 | `id` | yes | OTel `host.id` — "For Cloud, this must be the instance_id" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | gce | Name | `name` | T1 | `name` | no | OCSF `device.hostname` — instance name (GCE names are unique per project+zone) | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
 | gce | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — custom hostname if set | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
 | gce | CPUPlatform | `cpu_platform` | T3 | `cpu_platform` | no | No OCSF/OTel equivalent — underlying CPU platform (Intel Haswell, etc.) | Convention — GCE metadata `cpuPlatform` |
-| gce | MachineType | `machine_type` | T3 | `machine_type` | no | No OCSF/OTel equivalent — GCE machine type (short form) | Convention — GCE metadata `machineType` |
-| gce | Image | `image` | T3 | `image` | no | No OCSF/OTel equivalent — source image (short form) | Convention — GCE metadata `image` |
+| gce | MachineType | `machine_type` | T2 | `type` | yes | OTel `host.type` — "For Cloud, this must be the machine type" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
+| gce | Image | `image` | T2 | `image_id` | yes | OTel `host.image.id` — VM image ID from provider | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | gce | Description | `description` | T3 | `description` | no | No OCSF/OTel equivalent — instance description text | Convention — GCE metadata `description` |
 | gce | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — instance network tags | Convention — GCE metadata `tags` |
 | gce | Preemptible | `preemptible` | T3 | `preemptible` | no | No OCSF/OTel equivalent — preemptible/spot scheduling flag | Convention — GCE metadata `scheduling.preemptible` |
@@ -494,7 +494,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | gce | MaintenanceEvent | `maintenance_event` | T3 | `maintenance_event` | no | No OCSF/OTel equivalent — current maintenance event signal | Convention — GCE metadata `maintenanceEvent` |
 | gce | Zone | `zone` | T1 | `zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — GCE zone (short form) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
 | gce | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — GCE region (derived from zone) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| gce | ProjectID | `project_id` | T1 | `project_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — GCP project identifier | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| gce | ProjectID | `project_id` | T1 | `project_uid` | yes | OCSF `cloud.project_uid` — GCP project identifier | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | gce | NumericProjectID | `numeric_project_id` | T1 | `numeric_project_id` | no | OCSF `cloud.project_uid` — GCP numeric project ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | gce | ProjectAttributes | `project_attributes` | T3 | `project_attributes` | no | No OCSF/OTel equivalent — project-level metadata key/value pairs | Convention — GCE metadata `project.attributes` |
 | gce | Licenses | `licenses` | T3 | `licenses` | no | No OCSF/OTel equivalent — GCP license IDs attached to the VM | Convention — GCE metadata `licenses` |
@@ -530,21 +530,21 @@ Three-tier naming ladder applied to every gohai JSON field.
 | gce.service_accounts[] | Scopes | `scopes` | T3 | `scopes` | no | No OCSF/OTel equivalent — OAuth scopes granted | Convention — GCE metadata `serviceAccounts[].scopes` |
 | linode | PublicIP | `public_ip` | T3 | `public_ip` | no | No OCSF/OTel equivalent — eth0 public IPv4 address | Convention — Linode host interface detection |
 | linode | PrivateIP | `private_ip` | T3 | `private_ip` | no | No OCSF/OTel equivalent — eth0:1 private IPv4 address | Convention — Linode host interface detection |
-| azure | VMID | `vm_id` | T1 | `vm_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — Azure VM unique identifier (instance_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| azure | VMID | `vm_id` | T2 | `id` | yes | OTel `host.id` — "For Cloud, this must be the instance_id" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | azure | Name | `name` | T1 | `name` | no | OCSF `device.hostname` — VM display name (hostname canonical) | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
-| azure | VMSize | `vm_size` | T3 | `vm_size` | no | No OCSF/OTel equivalent — Azure VM size (instance_type canonical) | Convention — Azure IMDS `compute.vmSize` |
+| azure | VMSize | `vm_size` | T2 | `type` | yes | OTel `host.type` — "For Cloud, this must be the machine type" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | azure | ResourceID | `resource_id` | T2 | `resource_id` | no | OTel `cloud.resource_id` — fully qualified Azure resource ID | [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
 | azure | ResourceGroupName | `resource_group_name` | T3 | `resource_group_name` | no | No OCSF/OTel equivalent — Azure resource group name | Convention — Azure IMDS `compute.resourceGroupName` |
 | azure | VMScaleSetName | `vm_scale_set_name` | T3 | `vm_scale_set_name` | no | No OCSF/OTel equivalent — VM Scale Set name if member | Convention — Azure IMDS `compute.vmScaleSetName` |
 | azure | Priority | `priority` | T3 | `priority` | no | No OCSF/OTel equivalent — VM priority (Regular / Low / Spot) | Convention — Azure IMDS `compute.priority` |
 | azure | EvictionPolicy | `eviction_policy` | T3 | `eviction_policy` | no | No OCSF/OTel equivalent — Spot VM eviction policy | Convention — Azure IMDS `compute.evictionPolicy` |
-| azure | Location | `location` | T1 | `location` | no | OCSF `cloud.region` / OTel `cloud.region` — Azure region (region canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| azure | Location | `location` | T1 | `region` | yes | OCSF `cloud.region` — leaf is `region` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | azure | Zone | `zone` | T1 | `zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — Azure availability zone | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
 | azure | PlacementGroupID | `placement_group_id` | T3 | `placement_group_id` | no | No OCSF/OTel equivalent — proximity placement group ID | Convention — Azure IMDS `compute.placementGroupId` |
 | azure | PlatformFaultDomain | `platform_fault_domain` | T3 | `platform_fault_domain` | no | No OCSF/OTel equivalent — fault domain index | Convention — Azure IMDS `compute.platformFaultDomain` |
 | azure | PlatformUpdateDomain | `platform_update_domain` | T3 | `platform_update_domain` | no | No OCSF/OTel equivalent — update domain index | Convention — Azure IMDS `compute.platformUpdateDomain` |
-| azure | SubscriptionID | `subscription_id` | T1 | `subscription_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — Azure subscription (account_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| azure | AzEnvironment | `az_environment` | T1 | `az_environment` | no | OCSF `cloud.cloud_partition` — Azure cloud partition (AzureCloud, AzureUSGovernment, etc.) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| azure | SubscriptionID | `subscription_id` | T1 | `account_uid` | yes | OCSF `cloud.account.uid` — Azure subscription is the account | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| azure | AzEnvironment | `az_environment` | T1 | `cloud_partition` | yes | OCSF `cloud.cloud_partition` — leaf is `cloud_partition` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | azure | Offer | `offer` | T3 | `offer` | no | No OCSF/OTel equivalent — marketplace image offer name | Convention — Azure IMDS `compute.offer` |
 | azure | Publisher | `publisher` | T3 | `publisher` | no | No OCSF/OTel equivalent — marketplace image publisher | Convention — Azure IMDS `compute.publisher` |
 | azure | SKU | `sku` | T3 | `sku` | no | No OCSF/OTel equivalent — marketplace image SKU | Convention — Azure IMDS `compute.sku` |
@@ -600,16 +600,16 @@ Three-tier naming ladder applied to every gohai JSON field.
 | azure.interfaces[].subnets[] | Address | `address` | T3 | `address` | no | No OCSF/OTel equivalent — subnet address | Convention — Azure IMDS `network.interface[].subnet[].address` |
 | azure.interfaces[].subnets[] | Prefix | `prefix` | T3 | `prefix` | no | No OCSF/OTel equivalent — subnet prefix length | Convention — Azure IMDS `network.interface[].subnet[].prefix` |
 | oci | ID | `id` | T1 | `id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — OCI instance OCID (instance_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| oci | DisplayName | `display_name` | T3 | `display_name` | no | No OCSF/OTel equivalent — instance display name | Convention — OCI IMDS `instance.displayName` |
+| oci | DisplayName | `display_name` | T1 | `name` | yes | OCSF `device.name` — user-assigned instance name | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
 | oci | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance hostname (hostname canonical) | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
-| oci | Shape | `shape` | T3 | `shape` | no | No OCSF/OTel equivalent — OCI compute shape (instance_type canonical) | Convention — OCI IMDS `instance.shape` |
-| oci | Image | `image` | T3 | `image` | no | No OCSF/OTel equivalent — source image OCID (image_id canonical) | Convention — OCI IMDS `instance.image` |
+| oci | Shape | `shape` | T2 | `type` | yes | OTel `host.type` — "For Cloud, this must be the machine type" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
+| oci | Image | `image` | T2 | `image_id` | yes | OTel `host.image.id` — VM image ID from provider | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | oci | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — OCI region name (region canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
 | oci | CanonicalRegionName | `canonical_region_name` | T3 | `canonical_region_name` | no | No OCSF/OTel equivalent — OCI canonical region identifier | Convention — OCI IMDS `instance.canonicalRegionName` |
-| oci | AvailabilityDomain | `availability_domain` | T1 | `availability_domain` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — OCI availability domain (zone canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| oci | AvailabilityDomain | `availability_domain` | T1 | `zone` | yes | OCSF `cloud.zone` — leaf is `zone` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | oci | FaultDomain | `fault_domain` | T3 | `fault_domain` | no | No OCSF/OTel equivalent — OCI fault domain within availability domain | Convention — OCI IMDS `instance.faultDomain` |
 | oci | CompartmentID | `compartment_id` | T1 | `compartment_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — OCI compartment OCID (account_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| oci | TenantID | `tenant_id` | T3 | `tenant_id` | no | No OCSF/OTel equivalent — OCI tenancy OCID | Convention — OCI IMDS `instance.tenantId` |
+| oci | TenantID | `tenant_id` | T1 | `account_uid` | yes | OCSF `cloud.account.uid` — OCI tenancy is the account | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | oci | State | `state` | T3 | `state` | no | No OCSF/OTel equivalent — instance lifecycle state | Convention — OCI IMDS `instance.state` |
 | oci | TimeCreated | `time_created` | T3 | `time_created` | no | No OCSF/OTel equivalent — instance creation timestamp (epoch millis) | Convention — OCI IMDS `instance.timeCreated` |
 | oci | Metadata | `metadata` | T3 | `metadata` | no | No OCSF/OTel equivalent — user-defined metadata key/value pairs | Convention — OCI IMDS `instance.metadata` |
@@ -663,7 +663,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 | oci.volume_attachments[] | IPv4 | `ipv4` | T3 | `ipv4` | no | No OCSF/OTel equivalent — iSCSI target IPv4 address | Convention — OCI IMDS `allVolumeAttachments[].ipv4` |
 | oci.volume_attachments[] | Port | `port` | T3 | `port` | no | No OCSF/OTel equivalent — iSCSI target port | Convention — OCI IMDS `allVolumeAttachments[].port` |
 | oci.volume_attachments[] | EncryptionInTransit | `encryption_in_transit` | T3 | `encryption_in_transit` | no | No OCSF/OTel equivalent — in-transit encryption flag | Convention — OCI IMDS `allVolumeAttachments[].encryptionInTransit` |
-| digital_ocean | DropletID | `droplet_id` | T1 | `droplet_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — DO droplet identity (instance_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| digital_ocean | DropletID | `droplet_id` | T2 | `id` | yes | OTel `host.id` — "For Cloud, this must be the instance_id" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | digital_ocean | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — droplet hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
 | digital_ocean | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — DO datacenter region slug | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
 | digital_ocean | PublicKeys | `public_keys` | T3 | `public_keys` | no | No OCSF/OTel equivalent — SSH public keys attached at launch | Convention — DigitalOcean metadata `public_keys` |
@@ -685,21 +685,21 @@ Three-tier naming ladder applied to every gohai JSON field.
 | digital_ocean.interfaces[] | IPv6Mask | `ipv6_cidr` | T3 | `ipv6_cidr` | no | No OCSF/OTel equivalent — IPv6 CIDR prefix length | Convention — DigitalOcean metadata `interfaces[].ipv6.cidr` |
 | digital_ocean.interfaces[] | IPv6GW | `ipv6_gateway` | T3 | `ipv6_gateway` | no | No OCSF/OTel equivalent — IPv6 gateway address | Convention — DigitalOcean metadata `interfaces[].ipv6.gateway` |
 | digital_ocean.interfaces[] | Anchor | `anchor_ipv4` | T3 | `anchor_ipv4` | no | No OCSF/OTel equivalent — anchor IPv4 address (DO internal) | Convention — DigitalOcean metadata `interfaces[].anchor_ipv4` |
-| openstack | InstanceID | `instance_id` | T1 | `instance_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — OpenStack instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| openstack | InstanceType | `instance_type` | T3 | `instance_type` | no | No OCSF/OTel equivalent — Nova flavor / instance type | Convention — OpenStack EC2-compat metadata `instance-type` |
+| openstack | InstanceID | `instance_id` | T2 | `id` | yes | OTel `host.id` — "For Cloud, this must be the instance_id" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
+| openstack | InstanceType | `instance_type` | T2 | `type` | yes | OTel `host.type` — "For Cloud, this must be the machine type" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | openstack | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
 | openstack | LocalHostname | `local_hostname` | T3 | `local_hostname` | no | No OCSF/OTel equivalent — private DNS hostname | Convention — OpenStack EC2-compat metadata `local-hostname` |
 | openstack | PublicHostname | `public_hostname` | T3 | `public_hostname` | no | No OCSF/OTel equivalent — public DNS hostname | Convention — OpenStack EC2-compat metadata `public-hostname` |
-| openstack | AvailabilityZone | `availability_zone` | T1 | `availability_zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — OpenStack AZ | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| openstack | AvailabilityZone | `availability_zone` | T1 | `zone` | yes | OCSF `cloud.zone` — leaf is `zone` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | openstack | LocalIPv4 | `local_ipv4` | T3 | `local_ipv4` | no | No OCSF/OTel equivalent — primary private IPv4 address | Convention — OpenStack EC2-compat metadata `local-ipv4` |
 | openstack | PublicIPv4 | `public_ipv4` | T3 | `public_ipv4` | no | No OCSF/OTel equivalent — primary public IPv4 address | Convention — OpenStack EC2-compat metadata `public-ipv4` |
 | openstack | SecurityGroups | `security_groups` | T3 | `security_groups` | no | No OCSF/OTel equivalent — attached security group names | Convention — OpenStack EC2-compat metadata `security-groups` |
-| openstack | AMIID | `ami_id` | T3 | `ami_id` | no | No OCSF/OTel equivalent — AMI image identifier (EC2-compat) | Convention — OpenStack EC2-compat metadata `ami-id` |
+| openstack | AMIID | `ami_id` | T2 | `image_id` | yes | OTel `host.image.id` — VM image ID from provider | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | openstack | KernelID | `kernel_id` | T3 | `kernel_id` | no | No OCSF/OTel equivalent — paravirt kernel ID (EC2-compat) | Convention — OpenStack EC2-compat metadata `kernel-id` |
 | openstack | RamdiskID | `ramdisk_id` | T3 | `ramdisk_id` | no | No OCSF/OTel equivalent — paravirt ramdisk ID (EC2-compat) | Convention — OpenStack EC2-compat metadata `ramdisk-id` |
 | openstack | ReservationID | `reservation_id` | T3 | `reservation_id` | no | No OCSF/OTel equivalent — instance reservation identifier | Convention — OpenStack EC2-compat metadata `reservation-id` |
 | openstack | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — Nova instance display name | Convention — OpenStack meta_data.json `name` |
-| openstack | ProjectID | `project_id` | T1 | `project_id` | no | OCSF `cloud.project_uid` / OTel `cloud.account.id` — OpenStack project/tenant identifier | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| openstack | ProjectID | `project_id` | T1 | `project_uid` | yes | OCSF `cloud.project_uid` — leaf is `project_uid` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | openstack | UUID | `uuid` | T3 | `uuid` | no | No OCSF/OTel equivalent — Nova instance UUID (alternate identity) | Convention — OpenStack meta_data.json `uuid` |
 | openstack | LaunchIndex | `launch_index` | T3 | `launch_index` | no | No OCSF/OTel equivalent — launch order index within a batch | Convention — OpenStack meta_data.json `launch_index` |
 | openstack | MetaData | `meta_data` | T3 | `meta_data` | no | No OCSF/OTel equivalent — user-defined instance metadata key/value pairs | Convention — OpenStack meta_data.json `meta` |
@@ -712,14 +712,14 @@ Three-tier naming ladder applied to every gohai JSON field.
 | openstack.devices[] | Path | `path` | T3 | `path` | no | No OCSF/OTel equivalent — device node path | Convention — OpenStack meta_data.json `devices[].path` |
 | openstack.devices[] | Address | `address` | T3 | `address` | no | No OCSF/OTel equivalent — PCI address | Convention — OpenStack meta_data.json `devices[].address` |
 | openstack.devices[] | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — device tags | Convention — OpenStack meta_data.json `devices[].tags` |
-| alibaba | InstanceID | `instance_id` | T1 | `instance_id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — Alibaba ECS instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| alibaba | InstanceName | `instance_name` | T3 | `instance_name` | no | No OCSF/OTel equivalent — ECS instance display name | Convention — Alibaba IMDS `instance.instance_name` |
-| alibaba | InstanceType | `instance_type` | T3 | `instance_type` | no | No OCSF/OTel equivalent — ECS instance type (ecs.g7.xlarge, etc.) | Convention — Alibaba IMDS `instance.instance_type` |
+| alibaba | InstanceID | `instance_id` | T2 | `id` | yes | OTel `host.id` — "For Cloud, this must be the instance_id" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
+| alibaba | InstanceName | `instance_name` | T1 | `name` | yes | OCSF `device.name` — user-assigned instance name | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
+| alibaba | InstanceType | `instance_type` | T2 | `type` | yes | OTel `host.type` — "For Cloud, this must be the machine type" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | alibaba | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
 | alibaba | ImageID | `image_id` | T3 | `image_id` | no | No OCSF/OTel equivalent — source image identifier | Convention — Alibaba IMDS `image_id` |
 | alibaba | SerialNumber | `serial_number` | T3 | `serial_number` | no | No OCSF/OTel equivalent — instance serial number | Convention — Alibaba IMDS `serial_number` |
 | alibaba | NetworkType | `network_type` | T3 | `network_type` | no | No OCSF/OTel equivalent — network type (vpc / classic) | Convention — Alibaba IMDS `network_type` |
-| alibaba | OwnerAccountID | `owner_account_id` | T1 | `owner_account_id` | no | OCSF `cloud.account.uid` / OTel `cloud.account.id` — Alibaba Cloud account ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
+| alibaba | OwnerAccountID | `owner_account_id` | T1 | `account_uid` | yes | OCSF `cloud.account.uid` — cloud account identifier | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
 | alibaba | SourceAddress | `source_address` | T3 | `source_address` | no | No OCSF/OTel equivalent — metadata source address | Convention — Alibaba IMDS `source_address` |
 | alibaba | Region | `region` | T1 | `region` | no | OCSF `cloud.region` / OTel `cloud.region` — Alibaba region ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
 | alibaba | Zone | `zone` | T1 | `zone` | no | OCSF `cloud.zone` / OTel `cloud.availability_zone` — Alibaba zone ID | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
@@ -764,9 +764,9 @@ Three-tier naming ladder applied to every gohai JSON field.
 | scaleway | ID | `id` | T1 | `id` | no | OCSF `cloud_resource.uid` / OTel `cloud.resource_id` — Scaleway instance identity | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
 | scaleway | Name | `name` | T3 | `name` | no | No OCSF/OTel equivalent — instance display name | Convention — Scaleway metadata `name` |
 | scaleway | Hostname | `hostname` | T1 | `hostname` | no | OCSF `device.hostname` — instance hostname | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device) |
-| scaleway | Organization | `organization` | T3 | `organization` | no | No OCSF/OTel equivalent — Scaleway organization ID | Convention — Scaleway metadata `organization` |
-| scaleway | Project | `project` | T1 | `project` | no | OCSF `cloud.project_uid` / OTel `cloud.account.id` — Scaleway project ID (account_id canonical) | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) / [OTel cloud](https://github.com/open-telemetry/semantic-conventions/blob/main/model/cloud/registry.yaml) |
-| scaleway | CommercialType | `commercial_type` | T3 | `commercial_type` | no | No OCSF/OTel equivalent — instance type (DEV1-S, GP1-M, etc.) | Convention — Scaleway metadata `commercial_type` |
+| scaleway | Organization | `organization` | T1 | `account_uid` | yes | OCSF `cloud.account.uid` — Scaleway org is the account | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| scaleway | Project | `project` | T1 | `project_uid` | yes | OCSF `cloud.project_uid` — leaf is `project_uid` | [OCSF cloud](https://schema.ocsf.io/1.8.0/objects/cloud) |
+| scaleway | CommercialType | `commercial_type` | T2 | `type` | yes | OTel `host.type` — "For Cloud, this must be the machine type" | [OTel host](https://github.com/open-telemetry/semantic-conventions/blob/main/model/host/registry.yaml) |
 | scaleway | Tags | `tags` | T3 | `tags` | no | No OCSF/OTel equivalent — user-defined instance tags | Convention — Scaleway metadata `tags` |
 | scaleway | StateDetail | `state_detail` | T3 | `state_detail` | no | No OCSF/OTel equivalent — instance lifecycle state detail | Convention — Scaleway metadata `state_detail` |
 | scaleway | PublicIP | `public_ip` | T3 | `public_ip` | no | No OCSF/OTel equivalent — public IPv4 address | Convention — Scaleway metadata `public_ip.address` |
@@ -825,12 +825,12 @@ Three-tier naming ladder applied to every gohai JSON field.
 | process | Count | `count` | T3 | `count` | no | No OCSF/OTel equivalent — total number of running processes | Convention — snapshot aggregate |
 | process | Processes | `processes` | T3 | `processes` | no | No OCSF/OTel equivalent — array of process snapshots | Convention — collection container |
 | process.process | PID | `pid` | T1 | `pid` | no | OCSF `process.pid` — process identifier | [OCSF process](https://schema.ocsf.io/1.8.0/objects/process) |
-| process.process | PPID | `ppid` | T2 | `ppid` | no | OTel `process.parent_pid` — parent process identifier | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
+| process.process | PPID | `ppid` | T2 | `parent_pid` | yes | OTel `process.parent_pid` — current `ppid` is abbreviation | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
 | process.process | Name | `name` | T1 | `name` | no | OCSF `process.name` — process name | [OCSF process](https://schema.ocsf.io/1.8.0/objects/process) |
-| process.process | Username | `username` | T2 | `username` | no | OTel `process.owner` — username of the process owner | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
+| process.process | Username | `username` | T2 | `owner` | yes | OTel `process.owner` — current `username` doesn't match | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
 | process.process | CmdLine | `cmd_line` | T1 | `cmd_line` | no | OCSF `process.cmd_line` — full command line string | [OCSF process](https://schema.ocsf.io/1.8.0/objects/process) |
 | process.process | State | `state` | T2 | `state` | no | OTel `process.state` — process state code (R/S/D/Z/T/I) | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
-| process.process | StartTime | `start_time` | T1 | `start_time` | no | OCSF `process.created_time` — unix timestamp of process creation | [OCSF process](https://schema.ocsf.io/1.8.0/objects/process) |
+| process.process | StartTime | `start_time` | T2 | `creation_time` | yes | OTel `process.creation.time` → `creation_time` | [OTel process](https://github.com/open-telemetry/semantic-conventions/blob/main/model/process/registry.yaml) |
 | load | One | `one` | T3 | `one` | no | No OCSF/OTel equivalent — 1-minute load average | Convention — getloadavg(3) field 1 |
 | load | Five | `five` | T3 | `five` | no | No OCSF/OTel equivalent — 5-minute load average | Convention — getloadavg(3) field 2 |
 | load | Fifteen | `fifteen` | T3 | `fifteen` | no | No OCSF/OTel equivalent — 15-minute load average | Convention — getloadavg(3) field 3 |
@@ -948,8 +948,8 @@ Three-tier naming ladder applied to every gohai JSON field.
 | packages | Packages | `packages` | T3 | `packages` | no | No OCSF/OTel equivalent — installed package list | Convention — dpkg/rpm/brew output |
 | packages.package | Name | `name` | T1 | `name` | no | OCSF `package.name` | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
 | packages.package | Version | `version` | T1 | `version` | no | OCSF `package.version` | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
-| packages.package | Arch | `arch` | T1 | `arch` | no | OCSF `package.architecture` | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
-| packages.package | Source | `source` | T3 | `source` | no | No OCSF/OTel equivalent — package manager provenance | Convention — gohai internal tag |
+| packages.package | Arch | `arch` | T1 | `architecture` | yes | OCSF `package.architecture` — current `arch` is abbreviation | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
+| packages.package | Source | `source` | T1 | `package_manager` | yes | OCSF `package.package_manager` — which package manager installed this | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package) |
 | languages | Go | `go` | T3 | `go` | no | No OCSF/OTel equivalent — Go runtime version | Convention — go version output |
 | languages | Python | `python` | T3 | `python` | no | No OCSF/OTel equivalent — Python runtime version | Convention — python3 --version |
 | languages | Ruby | `ruby` | T3 | `ruby` | no | No OCSF/OTel equivalent — Ruby runtime version | Convention — ruby --version |

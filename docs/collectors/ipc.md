@@ -104,6 +104,12 @@ None.
 
 ## Data Sources
 
+Ohai's `linux/ipc.rb` reads the same `/proc/sys/kernel/` files for semaphore,
+message queue, and shared memory limits. gohai follows Ohai's methodology
+exactly — reading the raw kernel tunables rather than parsing `ipcs -l` output.
+All values are returned as strings to preserve the kernel's representation
+(including large 64-bit values in `shmall`/`shmmax`).
+
 On Linux:
 
 1. Read `/proc/sys/kernel/sem` via the injected `avfs.VFS`. The file contains
@@ -121,7 +127,7 @@ On Linux:
 
 On macOS: returns `nil`.
 
-## Backing Library
+## Backing library
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
   `memfs` in tests) for all sysctl reads.

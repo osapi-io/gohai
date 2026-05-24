@@ -97,6 +97,11 @@ None.
 
 ## Data Sources
 
+Ohai's `linux/interrupts.rb` parses `/proc/interrupts` similarly — reading
+per-CPU counts and the device/type label for each IRQ line. gohai follows the
+same approach but stores results as a structured array rather than Ohai's nested
+hash keyed by IRQ number.
+
 On Linux:
 
 1. Read `/proc/interrupts` via the injected `avfs.VFS`. If the file is absent
@@ -116,7 +121,7 @@ On Linux:
 
 On macOS: returns `nil`.
 
-## Backing Library
+## Backing library
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
   `memfs` in tests) for the `/proc/interrupts` read.

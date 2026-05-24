@@ -45,9 +45,9 @@ type Info struct {
 
 // BIOS is the firmware identity (DMI type 0).
 type BIOS struct {
-	Vendor  string `json:"vendor,omitempty"`
-	Version string `json:"version,omitempty"`
-	Date    string `json:"date,omitempty"`
+	Manufacturer string `json:"manufacturer,omitempty"`
+	Ver          string `json:"ver,omitempty"`
+	Date         string `json:"date,omitempty"`
 }
 
 // Baseboard is the motherboard identity (DMI type 2).
@@ -73,7 +73,7 @@ type Chassis struct {
 // primary signal cloud collectors key off — "Google Compute Engine",
 // "Amazon EC2", "DigitalOcean Droplet", etc.
 type Product struct {
-	Vendor       string `json:"vendor,omitempty"`
+	VendorName   string `json:"vendor_name,omitempty"`
 	Name         string `json:"name,omitempty"`
 	Family       string `json:"family,omitempty"`
 	Version      string `json:"version,omitempty"`

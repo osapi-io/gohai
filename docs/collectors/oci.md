@@ -19,17 +19,17 @@ that's the hardcoded secret).
 | Field                   | Type                          | Description                                                                                           | Schema mapping                 |
 | ----------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------ |
 | `id`                    | `string`                      | Instance OCID.                                                                                        | OTel `cloud.resource_id`       |
-| `display_name`          | `string`                      | Instance display name.                                                                                | OTel `host.name`               |
+| `name`                  | `string`                      | Instance display name.                                                                                | OTel `host.name`               |
 | `hostname`              | `string`                      | Instance hostname.                                                                                    | OCSF `device.hostname`         |
-| `shape`                 | `string`                      | Compute shape (e.g. `VM.Standard.E4.Flex`).                                                           | OTel `host.type`               |
+| `type`                  | `string`                      | Compute shape (e.g. `VM.Standard.E4.Flex`).                                                           | OTel `host.type`               |
 | `shape_config`          | `*ShapeConfig`                | Shape resource profile.                                                                               | No direct schema mapping.      |
-| `image`                 | `string`                      | Image OCID.                                                                                           | OTel `host.image.id`           |
+| `image_id`              | `string`                      | Image OCID.                                                                                           | OTel `host.image.id`           |
 | `region`                | `string`                      | Region short code (e.g. `phx`).                                                                       | OTel `cloud.region`            |
 | `canonical_region_name` | `string`                      | Full region (e.g. `us-phoenix-1`).                                                                    | No direct schema mapping.      |
-| `availability_domain`   | `string`                      | OCI availability domain.                                                                              | OTel `cloud.availability_zone` |
+| `zone`                  | `string`                      | OCI availability domain.                                                                              | OTel `cloud.availability_zone` |
 | `fault_domain`          | `string`                      | OCI fault domain.                                                                                     | No direct schema mapping.      |
 | `compartment_id`        | `string`                      | Compartment OCID.                                                                                     | OTel `cloud.account.id`        |
-| `tenant_id`             | `string`                      | Tenancy OCID.                                                                                         | No direct schema mapping.      |
+| `account_uid`           | `string`                      | Tenancy OCID.                                                                                         | No direct schema mapping.      |
 | `state`                 | `string`                      | Lifecycle state (e.g. `RUNNING`).                                                                     | No direct schema mapping.      |
 | `time_created`          | `int64`                       | Creation time (Unix ms).                                                                              | No direct schema mapping.      |
 | `metadata`              | `map[string]string`           | Instance metadata key/values.                                                                         | No direct schema mapping.      |
@@ -107,9 +107,9 @@ that's the hardcoded secret).
 {
   "oci": {
     "id": "ocid1.instance.oc1.phx.xxx",
-    "shape": "VM.Standard.E4.Flex",
+    "type": "VM.Standard.E4.Flex",
     "region": "phx",
-    "availability_domain": "pPrU:PHX-AD-1",
+    "zone": "pPrU:PHX-AD-1",
     "compartment_id": "ocid1.compartment.oc1..zzz",
     "vnics": [{ "private_ip": "10.0.1.5", "mac_addr": "02:00:17:01:02:03" }]
   }

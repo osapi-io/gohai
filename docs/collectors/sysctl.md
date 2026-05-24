@@ -89,6 +89,11 @@ None.
 
 ## Data Sources
 
+Ohai's `linux/sysctl.rb` runs `sysctl -a` and parses key=value output. gohai
+follows the same approach on both Linux and macOS — running `sysctl -a` through
+the shared Executor. The only difference is separator handling: gohai tries `: `
+before `=` so macOS values containing `=` (e.g. `vm.swapusage`) parse correctly.
+
 On both Linux and macOS the collector runs `sysctl -a` through the shared
 `internal/executor` runner:
 

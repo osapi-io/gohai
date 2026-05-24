@@ -56,9 +56,9 @@ type Info struct {
 	ModelName       string            `json:"model_name,omitempty"` // human-readable CPU name
 	VendorID        string            `json:"vendor_id,omitempty"`
 	Family          string            `json:"family,omitempty"`
-	Model           string            `json:"model,omitempty"`
+	ModelID         string            `json:"model_id,omitempty"`
 	Stepping        int32             `json:"stepping,omitempty"`
-	Mhz             float64           `json:"mhz,omitempty"`
+	Speed           float64           `json:"speed,omitempty"`
 	CacheSize       int32             `json:"cache_size,omitempty"` // KB — aggregate from /proc/cpuinfo
 	Flags           []string          `json:"flags,omitempty"`
 	Caches          *Caches           `json:"caches,omitempty"`           // per-level sizes from lscpu (Linux)
@@ -67,8 +67,8 @@ type Info struct {
 	Vulnerabilities map[string]string `json:"vulnerabilities,omitempty"`  // mitigation → status (Linux)
 
 	// CPU availability (Linux, from lscpu).
-	CPUsOnline  int `json:"cpus_online,omitempty"`
-	CPUsOffline int `json:"cpus_offline,omitempty"`
+	Online  int `json:"online,omitempty"`
+	Offline int `json:"offline,omitempty"`
 
 	// BIOS / machine identity (Linux, from lscpu).
 	BIOSVendorID  string `json:"bios_vendor_id,omitempty"`
@@ -83,7 +83,7 @@ type Info struct {
 	Bogomips   string `json:"bogomips,omitempty"`
 
 	// Execution mode metadata (Linux, from lscpu).
-	CPUOpmodes   []string `json:"cpu_opmodes,omitempty"`
+	Opmodes      []string `json:"opmodes,omitempty"`
 	ByteOrder    string   `json:"byte_order,omitempty"`
 	AddressSizes []string `json:"address_sizes,omitempty"`
 
@@ -109,13 +109,13 @@ type Info struct {
 type CPU struct {
 	VendorID   string   `json:"vendor_id,omitempty"`
 	Family     string   `json:"family,omitempty"`
-	Model      string   `json:"model,omitempty"`
+	ModelID    string   `json:"model_id,omitempty"`
 	ModelName  string   `json:"model_name,omitempty"`
 	Stepping   int32    `json:"stepping,omitempty"`
 	PhysicalID string   `json:"physical_id,omitempty"` // socket index
 	CoreID     string   `json:"core_id,omitempty"`     // physical core within socket
 	Cores      int32    `json:"cores,omitempty"`       // cores on this socket
-	Mhz        float64  `json:"mhz,omitempty"`
+	Speed      float64  `json:"speed,omitempty"`
 	CacheSize  int32    `json:"cache_size,omitempty"`
 	Flags      []string `json:"flags,omitempty"`
 }
@@ -189,9 +189,9 @@ func readCPU(
 		info.ModelName = s.ModelName
 		info.VendorID = s.VendorID
 		info.Family = s.Family
-		info.Model = s.Model
+		info.ModelID = s.Model
 		info.Stepping = s.Stepping
-		info.Mhz = s.Mhz
+		info.Speed = s.Mhz
 		info.CacheSize = s.CacheSize
 		info.Flags = s.Flags
 	}
@@ -200,13 +200,13 @@ func readCPU(
 		info.CPUs = append(info.CPUs, CPU{
 			VendorID:   s.VendorID,
 			Family:     s.Family,
-			Model:      s.Model,
+			ModelID:    s.Model,
 			ModelName:  s.ModelName,
 			Stepping:   s.Stepping,
 			PhysicalID: s.PhysicalID,
 			CoreID:     s.CoreID,
 			Cores:      s.Cores,
-			Mhz:        s.Mhz,
+			Speed:      s.Mhz,
 			CacheSize:  s.CacheSize,
 			Flags:      s.Flags,
 		})
@@ -479,10 +479,10 @@ func applyLscpuToInfo(
 		info.NumaNodesCount = s.numaNodesCount
 	}
 	if s.cpusOnline > 0 {
-		info.CPUsOnline = s.cpusOnline
+		info.Online = s.cpusOnline
 	}
 	if s.cpusOffline > 0 {
-		info.CPUsOffline = s.cpusOffline
+		info.Offline = s.cpusOffline
 	}
 	info.BIOSVendorID = s.biosVendorID
 	info.BIOSModelName = s.biosModelName
@@ -491,7 +491,7 @@ func applyLscpuToInfo(
 	info.MhzMin = s.mhzMin
 	info.MhzDynamic = s.mhzDynamic
 	info.Bogomips = s.bogomips
-	info.CPUOpmodes = s.cpuOpmodes
+	info.Opmodes = s.cpuOpmodes
 	info.ByteOrder = s.byteOrder
 	info.AddressSizes = s.addressSizes
 	info.Virtualization = s.virtualization

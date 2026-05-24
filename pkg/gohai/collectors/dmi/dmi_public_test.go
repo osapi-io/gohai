@@ -108,8 +108,8 @@ func (s *DmiPublicTestSuite) TestCollect() {
 			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
 				s.Require().NotNil(info)
 				s.Require().NotNil(info.BIOS)
-				s.Equal("SeaBIOS", info.BIOS.Vendor)
-				s.Equal("1.16.2", info.BIOS.Version)
+				s.Equal("SeaBIOS", info.BIOS.Manufacturer)
+				s.Equal("1.16.2", info.BIOS.Ver)
 				s.Equal("04/01/2014", info.BIOS.Date)
 
 				s.Require().NotNil(info.Baseboard)
@@ -121,7 +121,7 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				s.Equal("Other", info.Chassis.TypeDescription)
 
 				s.Require().NotNil(info.Product)
-				s.Equal("Google", info.Product.Vendor)
+				s.Equal("Google", info.Product.VendorName)
 				s.Equal("Google Compute Engine", info.Product.Name)
 				s.Equal("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", info.Product.UUID)
 			},

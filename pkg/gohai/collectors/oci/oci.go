@@ -70,17 +70,17 @@ const (
 type Info struct {
 	// From /instance.
 	ID                  string            `json:"id"`
-	DisplayName         string            `json:"display_name,omitempty"`
+	Name                string            `json:"name,omitempty"`
 	Hostname            string            `json:"hostname,omitempty"`
-	Shape               string            `json:"shape,omitempty"`
+	Type                string            `json:"type,omitempty"`
 	ShapeConfig         *ShapeConfig      `json:"shape_config,omitempty"`
-	Image               string            `json:"image,omitempty"`
+	ImageID             string            `json:"image_id,omitempty"`
 	Region              string            `json:"region,omitempty"`
 	CanonicalRegionName string            `json:"canonical_region_name,omitempty"`
-	AvailabilityDomain  string            `json:"availability_domain,omitempty"`
+	Zone                string            `json:"zone,omitempty"`
 	FaultDomain         string            `json:"fault_domain,omitempty"`
 	CompartmentID       string            `json:"compartment_id,omitempty"`
-	TenantID            string            `json:"tenant_id,omitempty"`
+	AccountUID          string            `json:"account_uid,omitempty"`
 	State               string            `json:"state,omitempty"`
 	TimeCreated         int64             `json:"time_created,omitempty"`
 	Metadata            map[string]string `json:"metadata,omitempty"`
@@ -389,16 +389,16 @@ func transformInstance(
 ) *Info {
 	info := &Info{
 		ID:                  r.ID,
-		DisplayName:         r.DisplayName,
+		Name:                r.DisplayName,
 		Hostname:            r.Hostname,
-		Shape:               r.Shape,
-		Image:               r.Image,
+		Type:                r.Shape,
+		ImageID:             r.Image,
 		Region:              r.Region,
 		CanonicalRegionName: r.CanonicalRegionName,
-		AvailabilityDomain:  r.AvailabilityDomain,
+		Zone:                r.AvailabilityDomain,
 		FaultDomain:         r.FaultDomain,
 		CompartmentID:       r.CompartmentID,
-		TenantID:            r.TenantID,
+		AccountUID:          r.TenantID,
 		State:               r.State,
 		TimeCreated:         r.TimeCreated,
 		Metadata:            r.Metadata,

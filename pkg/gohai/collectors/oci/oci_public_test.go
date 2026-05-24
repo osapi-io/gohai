@@ -173,7 +173,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Equal("Bearer Oracle", gotAuth)
 				s.Require().NotNil(info)
 				s.Equal("ocid1.instance.oc1.phx.xxx", info.ID)
-				s.Equal("VM.Standard.E4.Flex", info.Shape)
+				s.Equal("VM.Standard.E4.Flex", info.Type)
 				s.Require().NotNil(info.ShapeConfig)
 				s.InDelta(2.0, info.ShapeConfig.OCPUs, 0.01)
 				s.Equal("us-phoenix-1", info.CanonicalRegionName)
@@ -227,7 +227,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			instance: instanceResponse,
 			verify: func(s *OCIPublicTestSuite, info *oci.Info, _ string) {
 				s.Require().NotNil(info)
-				s.Equal("VM.Standard.E4.Flex", info.Shape)
+				s.Equal("VM.Standard.E4.Flex", info.Type)
 			},
 		},
 		{

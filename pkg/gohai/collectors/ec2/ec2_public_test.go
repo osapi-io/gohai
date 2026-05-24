@@ -40,7 +40,7 @@ import (
 
 func ec2Prior() collector.PriorResults {
 	return collector.PriorResults{
-		"dmi": &dmi.Info{BIOS: &dmi.BIOS{Vendor: "Amazon EC2"}},
+		"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Amazon EC2"}},
 	}
 }
 
@@ -297,14 +297,14 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
 				s.Require().NotNil(info)
 				s.Equal("2021-07-15", info.APIVersion)
-				s.Equal("i-abc", info.InstanceID)
-				s.Equal("t3.micro", info.InstanceType)
+				s.Equal("i-abc", info.ID)
+				s.Equal("t3.micro", info.Type)
 				s.Equal("10.0.0.5", info.LocalIPv4)
 				s.Equal([]string{"10.0.0.5", "10.0.0.6"}, info.LocalIPv4s)
 				s.Equal([]string{"default", "ssh"}, info.SecurityGroups)
-				s.Equal("123456789012", info.AccountID)
+				s.Equal("123456789012", info.AccountUID)
 				s.Equal("us-east-1", info.Region)
-				s.Equal("us-east-1a", info.AvailabilityZone)
+				s.Equal("us-east-1a", info.Zone)
 				s.Equal("use1-az1", info.AvailabilityZoneID)
 				s.Equal("my-cluster", info.GroupName)
 				s.Equal("h-abc", info.HostID)
@@ -315,7 +315,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				s.Equal("terminate", info.SpotInstanceAction)
 				s.Equal("2026-05-01T00:00:00Z", info.SpotTerminationTime)
 				s.Equal("amazonaws.com", info.ServicesDomain)
-				s.Equal("aws", info.ServicesPartition)
+				s.Equal("aws", info.CloudPartition)
 				s.Equal([]string{"abcdef12345"}, info.ProductCodes)
 				s.Equal("/dev/xvda", info.BlockDeviceMapping["ami"])
 				s.Equal("/dev/xvda1", info.BlockDeviceMapping["root"])
@@ -346,7 +346,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			opts: (&serverOpts{token404: true}).withDefaults(),
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
 				s.Require().NotNil(info)
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
@@ -430,7 +430,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		{
 			name: "dmi says not EC2 and no xen UUID short-circuits",
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Vendor: "Dell Inc."}},
+				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Dell Inc."}},
 			},
 			opts:       (&serverOpts{}).withDefaults(),
 			wantNil:    true,
@@ -439,30 +439,30 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		{
 			name: "detection via bios_version substring",
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Vendor: "Xen", Version: "4.2.amazon"}},
+				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Xen", Ver: "4.2.amazon"}},
 			},
 			opts: (&serverOpts{}).withDefaults(),
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
 				s.Require().NotNil(info)
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
 			name: "detection via hypervisor UUID prefix",
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Vendor: "Xen"}},
+				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Xen"}},
 			},
 			hypervisor: "ec2-abc-def",
 			opts:       (&serverOpts{}).withDefaults(),
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
 				s.Require().NotNil(info)
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
 			name: "hypervisor UUID without ec2 prefix doesn't match",
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Vendor: "Xen"}},
+				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Xen"}},
 			},
 			hypervisor: "kvm-12345",
 			opts:       (&serverOpts{}).withDefaults(),
@@ -477,7 +477,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			hypervisor: "ec2-abc",
 			opts:       (&serverOpts{}).withDefaults(),
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
@@ -485,7 +485,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{},
 			opts:  (&serverOpts{}).withDefaults(),
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
@@ -533,7 +533,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
 				// meta-data/placement/region still populates it
 				s.Equal("us-east-1", info.Region)
-				s.Empty(info.AccountID)
+				s.Empty(info.AccountUID)
 			},
 		},
 		{
@@ -541,7 +541,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			opts: (&serverOpts{identityBad: true}).withDefaults(),
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
 				s.Equal("us-east-1", info.Region)
-				s.Empty(info.AccountID)
+				s.Empty(info.AccountUID)
 			},
 		},
 		{
@@ -567,10 +567,10 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				http.NotFound(w, r)
 			},
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 				s.Equal("us-east-1", info.Region)
-				s.Equal("us-east-1a", info.AvailabilityZone)
-				s.Equal("123456789012", info.AccountID)
+				s.Equal("us-east-1a", info.Zone)
+				s.Equal("123456789012", info.AccountUID)
 			},
 		},
 		{
@@ -689,7 +689,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
 				s.Require().NotNil(info)
 				s.Equal("latest", info.APIVersion)
-				s.Equal("ami-fallback", info.AMIID)
+				s.Equal("ami-fallback", info.ImageID)
 			},
 		},
 		{

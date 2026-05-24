@@ -19,9 +19,9 @@ environment always announces itself in the kernel command line.
 | `id`                | `string`      | Instance UUID.                                                                       | OTel `cloud.resource_id`       |
 | `name`              | `string`      | Instance display name.                                                               | OTel `host.name`               |
 | `hostname`          | `string`      | Instance hostname.                                                                   | OCSF `device.hostname`         |
-| `organization`      | `string`      | Scaleway organization UUID.                                                          | OTel `cloud.account.id`        |
-| `project`           | `string`      | Scaleway project UUID.                                                               | No direct schema mapping.      |
-| `commercial_type`   | `string`      | Instance type (e.g. `DEV1-S`).                                                       | OTel `host.type`               |
+| `account_uid`       | `string`      | Scaleway organization UUID.                                                          | OTel `cloud.account.id`        |
+| `project_uid`       | `string`      | Scaleway project UUID.                                                               | No direct schema mapping.      |
+| `type`              | `string`      | Instance type (e.g. `DEV1-S`).                                                       | OTel `host.type`               |
 | `tags`              | `[]string`    | Instance tags.                                                                       | No direct schema mapping.      |
 | `state_detail`      | `string`      | Instance lifecycle state.                                                            | No direct schema mapping.      |
 | `public_ip`         | `string`      | Public IPv4.                                                                         | No direct schema mapping.      |
@@ -77,7 +77,7 @@ environment always announces itself in the kernel command line.
     "id": "sc-abc",
     "name": "prod-1",
     "hostname": "prod-1",
-    "commercial_type": "DEV1-S",
+    "type": "DEV1-S",
     "public_ip": "51.0.0.1",
     "private_ip": "10.64.0.1",
     "zone": "fr-par-1"

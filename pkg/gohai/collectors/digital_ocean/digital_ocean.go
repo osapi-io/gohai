@@ -57,7 +57,7 @@ const dmiVendorSignature = "DigitalOcean"
 // it commonly contains cloud-init user scripts with credentials
 // (matches Ohai's explicit drop).
 type Info struct {
-	DropletID  int64    `json:"droplet_id"`
+	ID         int64    `json:"id"`
 	Hostname   string   `json:"hostname,omitempty"`
 	Region     string   `json:"region,omitempty"`
 	PublicKeys []string `json:"public_keys,omitempty"`
@@ -199,7 +199,7 @@ func onDigitalOcean(
 	if !ok || info == nil || info.BIOS == nil {
 		return true
 	}
-	return info.BIOS.Vendor == dmiVendorSignature
+	return info.BIOS.Manufacturer == dmiVendorSignature
 }
 
 // transform reshapes the raw response. Flattens the nested
@@ -210,7 +210,7 @@ func transform(
 	r raw,
 ) *Info {
 	info := &Info{
-		DropletID:  r.DropletID,
+		ID:         r.DropletID,
 		Hostname:   r.Hostname,
 		Region:     r.Region,
 		PublicKeys: r.PublicKeys,

@@ -87,7 +87,7 @@ type ZFSProperty struct {
 type Mount struct {
 	Device            string   `json:"device"`
 	Mountpoint        string   `json:"mountpoint"`
-	Fstype            string   `json:"fstype"`
+	Type              string   `json:"type"`
 	Opts              []string `json:"opts,omitempty"`
 	Total             uint64   `json:"total,omitempty"`
 	Used              uint64   `json:"used,omitempty"`
@@ -138,7 +138,7 @@ type BtrfsAllocation struct {
 // no mountpoint. Capacity/usage are omitted; statfs requires a mount.
 type Filesystem struct {
 	Device    string `json:"device"`
-	Fstype    string `json:"fstype"`
+	Type      string `json:"type"`
 	UUID      string `json:"uuid,omitempty"`
 	Label     string `json:"label,omitempty"`
 	PartUUID  string `json:"part_uuid,omitempty"`
@@ -190,7 +190,7 @@ func listMounts(
 		m := Mount{
 			Device:     p.Device,
 			Mountpoint: p.Mountpoint,
-			Fstype:     p.Fstype,
+			Type:       p.Fstype,
 			Opts:       p.Opts,
 		}
 		if u, err := usageFn(ctx, p.Mountpoint); err == nil {
@@ -468,7 +468,7 @@ func mergeLsblkIntoMounts(
 		}
 		unmounted = append(unmounted, Filesystem{
 			Device:    e.Device,
-			Fstype:    e.Fstype,
+			Type:      e.Fstype,
 			UUID:      e.UUID,
 			Label:     e.Label,
 			PartUUID:  e.PartUUID,

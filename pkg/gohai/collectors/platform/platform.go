@@ -50,7 +50,7 @@ var hostInfoFn = host.InfoWithContext
 func readPlatform(
 	ctx context.Context,
 ) (*Info, string, error) {
-	info := &Info{OS: runtime.GOOS, Architecture: runtime.GOARCH}
+	info := &Info{OS: runtime.GOOS, CPUArchitecture: runtime.GOARCH}
 	h, err := hostInfoFn(ctx)
 	if err != nil {
 		return nil, "", err
@@ -66,13 +66,13 @@ func readPlatform(
 
 // Info holds platform identification data.
 type Info struct {
-	OS           string `json:"os"`                      // runtime.GOOS: "linux", "darwin", "windows"
-	Name         string `json:"name"`                    // distro/product: "ubuntu", "redhat", "darwin"
-	Version      string `json:"version"`                 // "24.04", "14.4.1"
-	VersionExtra string `json:"version_extra,omitempty"` // extra version info (macOS RSR patches)
-	Family       string `json:"family"`                  // "debian", "rhel", "mac_os_x"
-	Architecture string `json:"architecture"`            // "amd64", "arm64"
-	Build        string `json:"build,omitempty"`         // OS build identifier (macOS BuildVersion)
+	OS              string `json:"os"`                      // runtime.GOOS: "linux", "darwin", "windows"
+	Name            string `json:"name"`                    // distro/product: "ubuntu", "redhat", "darwin"
+	Version         string `json:"version"`                 // "24.04", "14.4.1"
+	VersionExtra    string `json:"version_extra,omitempty"` // extra version info (macOS RSR patches)
+	Family          string `json:"family"`                  // "debian", "rhel", "mac_os_x"
+	CPUArchitecture string `json:"cpu_architecture"`        // "amd64", "arm64"
+	Build           string `json:"build,omitempty"`         // OS build identifier (macOS BuildVersion)
 }
 
 // Collector is the public interface every platform variant satisfies.

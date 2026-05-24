@@ -94,6 +94,12 @@ None.
 
 ## Data Sources
 
+Ohai's `sysconf.rb` shells out to `getconf -a` and parses the key=value output.
+gohai uses `github.com/tklauser/go-sysconf` instead — a pure Go wrapper around
+the POSIX `sysconf(3)` syscall. This avoids the subprocess overhead and gives
+type-safe `int64` values directly. The four constants collected (CLK_TCK,
+PAGESIZE, NPROCESSORS_CONF, NPROCESSORS_ONLN) match Ohai's output.
+
 On both Linux and macOS the collector calls `Sysconf(SC_*)` from
 `github.com/tklauser/go-sysconf` directly — no subprocess:
 
