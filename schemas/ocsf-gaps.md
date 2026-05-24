@@ -62,7 +62,7 @@ will also need updating to match the new object shape.
 2. New `kernel_module` object — loaded kernel modules (rootkit detection, CIS benchmarks)
 3. New `security_posture` object — FIPS mode, SELinux status/mode/policy
 4. `cpu_info.flags` — security-relevant CPU feature flags (aes, sev, sgx, nx) *(blocked on #1630)*
-5. `network_interface.flags` — interface flags including PROMISC detection
+5. `network_interface.interface_flags` — interface flags including PROMISC detection — **submitted:** [ocsf/ocsf-schema#1647](https://github.com/ocsf/ocsf-schema/pull/1647)
 6. `cloud.security_groups` — cloud firewall group membership
 7. `cloud.iam_role` / `cloud.service_accounts` — IAM bindings
 8. New `ssh_host_key` object — host key type, fingerprint, length
