@@ -21,11 +21,13 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
+	"github.com/osapi-io/gohai/pkg/gohai/ocsf"
 )
 
 // WriteOutput writes facts to out in the requested format.
@@ -88,6 +90,37 @@ func WriteJSON(
 
 	if _, err := out.Write(append(b, '\n')); err != nil {
 		return fmt.Errorf("write output: %w", err)
+	}
+
+	return nil
+}
+
+// WriteOCSF converts facts to an OCSF inventory_info event and writes
+// the JSON to out.
+func WriteOCSF(
+	out io.Writer,
+	facts *gohai.Facts,
+	pretty bool,
+) error {
+	event := ocsf.FromFacts(facts)
+
+	var (
+		b   []byte
+		err error
+	)
+
+	if pretty {
+		b, err = json.MarshalIndent(event, "", "  ")
+	} else {
+		b, err = json.Marshal(event)
+	}
+
+	if err != nil {
+		return fmt.Errorf("encode ocsf output: %w", err)
+	}
+
+	if _, err := out.Write(append(b, '\n')); err != nil {
+		return fmt.Errorf("write ocsf output: %w", err)
 	}
 
 	return nil

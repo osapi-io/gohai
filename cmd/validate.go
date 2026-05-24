@@ -21,19 +21,16 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/spf13/cobra"
 
 	"github.com/osapi-io/gohai/internal/cli"
-	"github.com/osapi-io/gohai/schemas"
+	"github.com/osapi-io/gohai/internal/validate"
 )
 
 func newValidateCommand() *cobra.Command {
@@ -47,9 +44,8 @@ func newValidateCommand() *cobra.Command {
 Reads from --file or stdin. Exits 0 if valid, 1 if invalid.
 
 Examples:
-  gohai --pretty | gohai validate
-  gohai validate --file facts.json
-  gohai --collector.cpu --collector.memory --pretty | gohai validate`,
+  gohai collect --pretty | gohai validate
+  gohai validate --file facts.json`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(
@@ -75,17 +71,7 @@ func runValidate(
 		return err
 	}
 
-	sch, err := compileSchema()
-	if err != nil {
-		return fmt.Errorf("compile schema: %w", err)
-	}
-
-	var instance any
-	if err := json.Unmarshal(input, &instance); err != nil {
-		return fmt.Errorf("parse input JSON: %w", err)
-	}
-
-	if err := sch.Validate(instance); err != nil {
+	if err := validate.JSON(input); err != nil {
 		cli.Print(errOut, cli.Failure(errOut, "schema validation failed"))
 		cli.Print(errOut, "")
 		cli.Print(errOut, cli.Mute(errOut, err.Error()))
@@ -126,18 +112,4 @@ func readInput(
 	}
 
 	return data, nil
-}
-
-func compileSchema() (*jsonschema.Schema, error) {
-	schemaDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemas.SchemaJSON))
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal embedded schema: %w", err)
-	}
-
-	c := jsonschema.NewCompiler()
-	if err := c.AddResource("gohai.schema.json", schemaDoc); err != nil {
-		return nil, fmt.Errorf("add schema resource: %w", err)
-	}
-
-	return c.Compile("gohai.schema.json")
 }

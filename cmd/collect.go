@@ -22,7 +22,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -31,7 +30,6 @@ import (
 
 	"github.com/osapi-io/gohai/internal/cli"
 	"github.com/osapi-io/gohai/pkg/gohai"
-	"github.com/osapi-io/gohai/pkg/gohai/ocsf"
 )
 
 func newCollectCommand() *cobra.Command {
@@ -219,37 +217,8 @@ func runCollect(
 	}
 
 	if format == "ocsf" {
-		return writeOCSF(out, facts, pretty)
+		return cli.WriteOCSF(out, facts, pretty)
 	}
 
 	return cli.WriteOutput(out, facts, pretty, flat)
-}
-
-func writeOCSF(
-	out io.Writer,
-	facts *gohai.Facts,
-	pretty bool,
-) error {
-	event := ocsf.FromFacts(facts)
-
-	var (
-		b   []byte
-		err error
-	)
-
-	if pretty {
-		b, err = json.MarshalIndent(event, "", "  ")
-	} else {
-		b, err = json.Marshal(event)
-	}
-
-	if err != nil {
-		return fmt.Errorf("encode ocsf output: %w", err)
-	}
-
-	if _, err := out.Write(append(b, '\n')); err != nil {
-		return fmt.Errorf("write ocsf output: %w", err)
-	}
-
-	return nil
 }
