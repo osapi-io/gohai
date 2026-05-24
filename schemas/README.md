@@ -56,7 +56,31 @@ command works without the source tree.
 
 ## OCSF gap analysis
 
-[`ocsf-gaps.md`](ocsf-gaps.md) lists 76 fields that gohai emits but OCSF
+### Why gohai cares about OCSF
+
+[OCSF](https://ocsf.io/) (Open Cybersecurity Schema Framework) is a
+vendor-neutral schema for security events and asset inventory, backed by AWS,
+Splunk, and 150+ organizations. It defines a shared taxonomy so SIEMs, data
+lakes, vulnerability scanners, and inventory tools speak the same language.
+
+gohai's output is **asset inventory** — it describes what a host IS. That data
+feeds directly into security workflows:
+
+- **Vulnerability management** — "which hosts have this CPU flag / kernel
+  version / SELinux mode?"
+- **Compliance** — "do all hosts meet CIS benchmarks for X?"
+- **Incident response** — "what was this host's hardware, software, and
+  network state when the alert fired?"
+- **Asset inventory** — "what's running where, what hardware, what containers,
+  what services?"
+
+The relevance test for each gohai field: **would a security analyst, compliance
+auditor, or incident responder benefit from having this field in a normalized
+schema?** If yes, it's an OCSF gap candidate.
+
+### Gap candidates
+
+[`ocsf-gaps.md`](ocsf-gaps.md) lists fields that gohai emits but OCSF
 doesn't yet cover. Each entry includes:
 
 - What the field is
