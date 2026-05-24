@@ -88,17 +88,24 @@ None.
 
 ## Data Sources
 
+Ohai's `docker.rb` plugin collects aggregate container counts via `docker info`
+and the Docker version. gohai extends this approach by enumerating individual
+containers and images via `docker ps` and `docker images`, giving consumers
+per-container state visibility rather than just totals.
+
 On both Linux and macOS:
 
 1. Runs `docker version --format '{{.Server.Version}}'` to probe presence and
    retrieve the version. If this command fails (daemon not running, docker not
-   installed), Collect returns nil immediately — no error.
+   installed), Collect returns nil immediately — no error. Ohai's plugin
+   similarly gates on `docker info` success.
 2. Runs `docker ps -a --format '{{json .}}'` to list all containers. Output is
    NDJSON (one JSON object per line). Invalid JSON lines and blank lines are
-   skipped.
+   skipped. This is a gohai extension — Ohai does not enumerate individual
+   containers.
 3. Runs `docker images --format '{{json .}}'` to list local images. Same NDJSON
    parsing. If either `docker ps` or `docker images` fails, the respective field
-   is returned as an empty list.
+   is returned as an empty list. Also a gohai extension beyond Ohai's scope.
 4. Container `Names` field from Docker has a leading `/` — stripped before
    storing.
 

@@ -73,6 +73,9 @@ None.
 
 ## Data Sources
 
+There is no Ohai equivalent for this collector — Ohai does not ship a
+systemd service enumeration plugin. This is a gohai-native addition.
+
 On Linux:
 
 1. Runs `systemctl list-units --type=service --all --no-pager --plain`.

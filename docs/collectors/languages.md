@@ -68,6 +68,13 @@ None.
 
 ## Data Sources
 
+Ohai's `languages.rb` delegates to per-language sub-plugins (`go.rb`,
+`python.rb`, `ruby.rb`, `nodejs.rb`, `java.rb`, `perl.rb`), each running the
+same `--version` commands. gohai consolidates all six probes into a single
+collector. The version extraction logic mirrors Ohai's per-language parsers —
+the same edge cases are handled (Java's stderr output, Perl's parenthesized
+version form, Node's leading `v`).
+
 Both Linux and Darwin use identical probe sequences — version flags are the same
 across platforms:
 
