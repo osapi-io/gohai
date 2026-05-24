@@ -125,7 +125,7 @@ Ohai's `name,size,alloc,free,cap,dedup,health,version`) because `cap`, `dedup`,
 and `version` are derivable from the core fields or rarely queried in fleet
 inventory.
 
-## Backing Library
+## Backing library
 
 - `internal/executor` (`executor.New()` in production, gomock mock in tests) for
   the `zpool list` invocation.

@@ -22,16 +22,16 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field                    | Type   | Description                                  | Schema mapping                |
-| ------------------------ | ------ | -------------------------------------------- | ----------------------------- |
-| `count`                  | int    | Total process count.                         | No direct schema mapping.     |
-| `processes[].pid`             | int32  | Process ID.                                  | `process.pid`.                |
-| `processes[].parent_pid`      | int32  | Parent process ID.                           | `process.parent_process.pid`. |
-| `processes[].name`            | string | Executable name (no path / args).            | `process.name`.               |
-| `processes[].owner`           | string | Owner username.                              | `process.user.name`.          |
-| `processes[].cmd_line`        | string | Full command line (space-joined argv).       | `process.cmd_line`.           |
-| `processes[].state`           | string | POSIX state letter: `R`/`S`/`D`/`Z`/`T`/`I`. | No direct schema mapping.     |
-| `processes[].creation_time`   | int64  | Process start time (unix seconds).           | `process.created_time`.       |
+| Field                       | Type   | Description                                  | Schema mapping                |
+| --------------------------- | ------ | -------------------------------------------- | ----------------------------- |
+| `count`                     | int    | Total process count.                         | No direct schema mapping.     |
+| `processes[].pid`           | int32  | Process ID.                                  | `process.pid`.                |
+| `processes[].parent_pid`    | int32  | Parent process ID.                           | `process.parent_process.pid`. |
+| `processes[].name`          | string | Executable name (no path / args).            | `process.name`.               |
+| `processes[].owner`         | string | Owner username.                              | `process.user.name`.          |
+| `processes[].cmd_line`      | string | Full command line (space-joined argv).       | `process.cmd_line`.           |
+| `processes[].state`         | string | POSIX state letter: `R`/`S`/`D`/`Z`/`T`/`I`. | No direct schema mapping.     |
+| `processes[].creation_time` | int64  | Process start time (unix seconds).           | `process.created_time`.       |
 
 Field name `cmd_line` follows OCSF (`process.cmd_line`) rather than Ohai's
 `command` — OCSF precedes Ohai when both name a field.

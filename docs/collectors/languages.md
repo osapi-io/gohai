@@ -1,4 +1,6 @@
-# languages
+# Languages
+
+> **Status:** Implemented ✅
 
 ## Description
 
@@ -10,23 +12,23 @@ consolidates them into a single collector).
 
 ## Collected Fields
 
-| Field    | Type          | Schema mapping                 | Notes                                 |
-| -------- | ------------- | ------------------------------ | ------------------------------------- |
-| `go`     | string / null | OTel `process.runtime.version` | Go toolchain version, e.g. `1.21.0`   |
-| `python` | string / null | OTel `process.runtime.version` | `python3 --version` output            |
-| `ruby`   | string / null | OTel `process.runtime.version` | `ruby --version` output               |
-| `node`   | string / null | OTel `process.runtime.version` | `node --version` output, `v` stripped |
-| `java`   | string / null | OTel `process.runtime.version` | Version extracted from quoted string  |
-| `perl`   | string / null | OTel `process.runtime.version` | `(vX.Y.Z)` form extracted             |
+| Field    | Type       | Description                                   | Schema mapping                                                    |
+| -------- | ---------- | --------------------------------------------- | ----------------------------------------------------------------- |
+| `go`     | `*string`  | Go toolchain version, e.g. `1.21.0`           | No direct OCSF/OTel mapping (host inventory, not process runtime) |
+| `python` | `*string`  | Python 3 version from `python3 --version`     | No direct OCSF/OTel mapping                                      |
+| `ruby`   | `*string`  | Ruby version from `ruby --version`            | No direct OCSF/OTel mapping                                      |
+| `node`   | `*string`  | Node.js version, leading `v` stripped         | No direct OCSF/OTel mapping                                      |
+| `java`   | `*string`  | Java version extracted from quoted string     | No direct OCSF/OTel mapping                                      |
+| `perl`   | `*string`  | Perl version, `(vX.Y.Z)` form extracted      | No direct OCSF/OTel mapping                                      |
 
 Fields are omitted from JSON output when nil (runtime absent).
 
 ## Platform Support
 
-| Platform | Supported | Backing source                                             |
-| -------- | --------- | ---------------------------------------------------------- |
-| Linux    | Yes       | `go version`, `python3 --version`, `ruby --version`, etc.  |
-| macOS    | Yes       | Same commands — version flags are cross-platform identical |
+| Platform | Supported |
+| -------- | --------- |
+| Linux    | ✅        |
+| macOS    | ✅        |
 
 ## Example Output
 
@@ -46,7 +48,7 @@ Fields are omitted from JSON output when nil (runtime absent).
 ## SDK Usage
 
 ```go
-g := gohai.New(gohai.WithEnabled("languages"))
+g, _ := gohai.New(gohai.WithCollectors("languages"))
 facts, _ := g.Collect(ctx)
 ```
 
@@ -87,6 +89,6 @@ Any probe that fails (command not found, non-zero exit) sets the corresponding
 field to nil. The collector never returns an error — missing runtimes are the
 normal case on minimal hosts.
 
-## Backing Library
+## Backing library
 
 `internal/executor.Executor` for command execution.

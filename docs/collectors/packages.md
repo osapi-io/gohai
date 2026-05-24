@@ -1,4 +1,6 @@
-# packages
+# Packages
+
+> **Status:** Implemented ✅
 
 ## Description
 
@@ -9,27 +11,27 @@ absent (containers, minimal base images).
 
 ## Collected Fields
 
-| Field                | Type   | Schema mapping              | Notes                                     |
-| -------------------- | ------ | --------------------------- | ----------------------------------------- |
-| `packages`           | list   | —                           | List of installed package objects         |
-| `packages[].name`    | string | OCSF `package.name`         | Package name                              |
-| `packages[].version` | string | OCSF `package.version`      | Installed version                         |
-| `packages[].architecture`    | string | OCSF `package.architecture`    | CPU architecture; empty for brew packages |
-| `packages[].package_manager` | string | gohai convention               | Package manager: `dpkg`, `rpm`, or `brew` |
+| Field                        | Type     | Description                               | Schema mapping              |
+| ---------------------------- | -------- | ----------------------------------------- | --------------------------- |
+| `packages`                   | `list`   | List of installed package objects          | —                           |
+| `packages[].name`            | `string` | Package name                               | OCSF `package.name`         |
+| `packages[].version`         | `string` | Installed version                          | OCSF `package.version`      |
+| `packages[].architecture`    | `string` | CPU architecture; empty for brew packages  | OCSF `package.architecture` |
+| `packages[].package_manager` | `string` | Package manager: `dpkg`, `rpm`, or `brew`  | OCSF `package.package_manager` |
 
 ## Platform Support
 
-| Platform     | Supported | Backing source           |
-| ------------ | --------- | ------------------------ |
-| Linux/Debian | Yes       | `dpkg-query -W -f='...'` |
-| Linux/RHEL   | Yes       | `rpm -qa --qf '...'`     |
-| macOS        | Yes       | `brew list --versions`   |
+| Platform | Supported |
+| -------- | --------- |
+| Linux    | ✅        |
+| macOS    | ✅        |
 
 ## Example Output
 
 ```json
 {
-  "packages": [
+  "packages": {
+    "packages": [
     {
       "name": "bash",
       "version": "5.1-6",
@@ -43,13 +45,14 @@ absent (containers, minimal base images).
       "package_manager": "dpkg"
     }
   ]
+  }
 }
 ```
 
 ## SDK Usage
 
 ```go
-g := gohai.New(gohai.WithEnabled("packages"))
+g, _ := gohai.New(gohai.WithCollectors("packages"))
 facts, _ := g.Collect(ctx)
 ```
 
@@ -100,6 +103,6 @@ The collector dispatches on the platform detected by `platform.Detect()`:
 empty package list rather than propagating an error. Matches Ohai's
 `packages.rb` resilient stance.
 
-## Backing Library
+## Backing library
 
 `internal/executor.Executor` for command execution.

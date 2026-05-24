@@ -50,8 +50,8 @@ Top level: `mounts: []Mount`, plus (Linux only) `unmounted: []Filesystem`.
 
 Top-level `unmounted[]` (Linux only): block devices that `lsblk` reports with a
 non-empty filesystem type and empty mountpoint. Each entry carries `device`,
-`type`, `uuid`, `label`, `part_uuid`, `part_label` — capacity/usage are
-omitted because `statfs` requires a mount.
+`type`, `uuid`, `label`, `part_uuid`, `part_label` — capacity/usage are omitted
+because `statfs` requires a mount.
 
 Top-level `zfs_datasets[]` (Linux only, when `zfs` is on PATH): every ZFS
 dataset the kernel's ZFS module knows about — filesystems, volumes, snapshots,
@@ -158,8 +158,8 @@ On Linux:
 4. When `lsblk` is missing (minimal containers, Alpine without util-linux) or
    its output is malformed, we skip the enrichment silently; capacity and inode
    data remain from gopsutil.
-5. **Btrfs allocation enrichment** — for each mount with `type == "btrfs"` and
-   a non-empty UUID we read `/sys/fs/btrfs/<uuid>/allocation/` through the
+5. **Btrfs allocation enrichment** — for each mount with `type == "btrfs"` and a
+   non-empty UUID we read `/sys/fs/btrfs/<uuid>/allocation/` through the
    injected `avfs.VFS` and populate the mount's `btrfs` sub-record:
    per-block-group (`data`, `metadata`, `system`) byte counters (`total`,
    `used`, `reserved`) plus the RAID profile flag set (`single`, `raid0`,

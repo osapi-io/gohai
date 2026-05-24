@@ -1,4 +1,6 @@
-# docker
+# Docker
+
+> **Status:** Implemented ✅
 
 ## Description
 
@@ -14,27 +16,27 @@ visibility.
 
 ## Collected Fields
 
-| Field                 | Type   | Schema mapping                | Notes                                             |
-| --------------------- | ------ | ----------------------------- | ------------------------------------------------- |
-| `version`             | string | OCSF `device_hw_info.version` | Docker server version, e.g. `24.0.5`              |
-| `containers`          | list   | —                             | All containers (running and stopped)              |
-| `containers[].id`     | string | OCSF `container.uid`          | Short container ID                                |
-| `containers[].name`   | string | OCSF `container.name`         | Container name, leading `/` stripped              |
-| `containers[].image`  | string | OCSF `container.image.name`   | Image reference used to start the container       |
-| `containers[].state`  | string | OCSF `container.status`       | Docker state: `running`, `exited`, `paused`, etc. |
-| `containers[].status` | string | gohai convention: `status`    | Human-readable status string from `docker ps`     |
-| `images`              | list   | —                             | Locally pulled images                             |
-| `images[].id`         | string | OCSF `container.image.uid`    | Image ID (full SHA256 digest)                     |
-| `images[].repository` | string | OCSF `container.image.name`   | Repository name                                   |
-| `images[].tag`        | string | gohai convention: `tag`       | Image tag                                         |
-| `images[].size`       | string | gohai convention: `size`      | Human-readable size from `docker images`          |
+| Field                 | Type     | Description                                       | Schema mapping                |
+| --------------------- | -------- | ------------------------------------------------- | ----------------------------- |
+| `version`             | `string` | Docker server version, e.g. `24.0.5`              | No direct OCSF/OTel mapping   |
+| `containers`          | `list`   | All containers (running and stopped)               | —                             |
+| `containers[].id`     | `string` | Short container ID                                 | OCSF `container.uid`          |
+| `containers[].name`   | `string` | Container name, leading `/` stripped               | OCSF `container.name`         |
+| `containers[].image`  | `string` | Image reference used to start the container        | OCSF `container.image.name`   |
+| `containers[].state`  | `string` | Docker state: `running`, `exited`, `paused`, etc.  | No direct OCSF/OTel mapping   |
+| `containers[].status` | `string` | Human-readable status string from `docker ps`      | No direct OCSF/OTel mapping   |
+| `images`              | `list`   | Locally pulled images                              | —                             |
+| `images[].id`         | `string` | Image ID (full SHA256 digest)                      | No direct OCSF/OTel mapping   |
+| `images[].repository` | `string` | Repository name                                    | No direct OCSF/OTel mapping   |
+| `images[].tag`        | `string` | Image tag                                          | No direct OCSF/OTel mapping   |
+| `images[].size`       | `string` | Human-readable size from `docker images`           | No direct OCSF/OTel mapping   |
 
 ## Platform Support
 
-| Platform | Supported | Backing source                              |
-| -------- | --------- | ------------------------------------------- |
-| Linux    | Yes       | Docker CLI via `executor.Executor`          |
-| macOS    | Yes       | Docker Desktop exposes the same CLI surface |
+| Platform | Supported |
+| -------- | --------- |
+| Linux    | ✅        |
+| macOS    | ✅        |
 
 ## Example Output
 
@@ -66,7 +68,7 @@ visibility.
 ## SDK Usage
 
 ```go
-g := gohai.New(gohai.WithEnabled("docker"))
+g, _ := gohai.New(gohai.WithCollectors("docker"))
 facts, _ := g.Collect(ctx)
 ```
 
@@ -100,6 +102,6 @@ On both Linux and macOS:
 4. Container `Names` field from Docker has a leading `/` — stripped before
    storing.
 
-## Backing Library
+## Backing library
 
 `internal/executor.Executor` for command execution.

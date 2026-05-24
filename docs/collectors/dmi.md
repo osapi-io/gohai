@@ -12,10 +12,10 @@ callers). macOS has no SMBIOS equivalent; the collector returns an empty Info
 there and the `hardware` collector (planned) covers macOS hardware identity.
 
 Primary consumers are cloud-provider collectors (`gce`, `ec2`, `azure`, ...)
-which use `product.name` / `product.vendor_name` / `bios.manufacturer` / `chassis.asset_tag`
-to detect which cloud a VM is running on before hitting that provider's metadata
-endpoint. Hardware inventory and compliance tooling use the full set for fleet
-audits.
+which use `product.name` / `product.vendor_name` / `bios.manufacturer` /
+`chassis.asset_tag` to detect which cloud a VM is running on before hitting that
+provider's metadata endpoint. Hardware inventory and compliance tooling use the
+full set for fleet audits.
 
 ## Collected Fields
 
@@ -32,11 +32,11 @@ safely check `facts.DMI.Product != nil` before dereferencing.
 
 ### BIOS
 
-| Field            | Type     | Description        | Schema mapping                          |
-| ---------------- | -------- | ------------------ | --------------------------------------- |
-| `manufacturer`   | `string` | BIOS vendor.       | OCSF `device.hw_info.bios_manufacturer` |
-| `ver`            | `string` | BIOS version.      | OCSF `device.hw_info.bios_ver`          |
-| `date`           | `string` | BIOS release date. | OCSF `device.hw_info.bios_date`         |
+| Field          | Type     | Description        | Schema mapping                          |
+| -------------- | -------- | ------------------ | --------------------------------------- |
+| `manufacturer` | `string` | BIOS vendor.       | OCSF `device.hw_info.bios_manufacturer` |
+| `ver`          | `string` | BIOS version.      | OCSF `device.hw_info.bios_ver`          |
+| `date`         | `string` | BIOS release date. | OCSF `device.hw_info.bios_date`         |
 
 ### Baseboard
 

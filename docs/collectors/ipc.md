@@ -121,7 +121,7 @@ On Linux:
 
 On macOS: returns `nil`.
 
-## Backing Library
+## Backing library
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
   `memfs` in tests) for all sysctl reads.

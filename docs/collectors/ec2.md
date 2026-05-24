@@ -163,8 +163,8 @@ run.
 
 1. **Detection gate:** any of the following triggers detection:
    - `dmi.BIOS.Manufacturer` contains `"Amazon"` (Ohai's `has_ec2_amazon_dmi?`)
-   - `dmi.BIOS.Ver` contains `"amazon"` lowercase (Ohai's `has_ec2_xen_dmi?`
-     — catches HVM instances on Xen-based hypervisors)
+   - `dmi.BIOS.Ver` contains `"amazon"` lowercase (Ohai's `has_ec2_xen_dmi?` —
+     catches HVM instances on Xen-based hypervisors)
    - `/sys/hypervisor/uuid` starts with `"ec2"` (Ohai's `has_ec2_xen_uuid?`)
 2. **IMDSv2 token:** `PUT /latest/api/token` with
    `X-aws-ec2-metadata-token-ttl-seconds: 60`. The response body is the token.

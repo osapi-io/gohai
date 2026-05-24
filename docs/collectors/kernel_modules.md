@@ -36,6 +36,7 @@ Consumers use this to:
 | `size`     | uint64 | Memory footprint in bytes (Linux: `/proc/modules`; macOS: `kextstat` size column as hex).       |
 | `refcount` | int    | Number of holders / dependent modules.                                                          |
 | `version`  | string | Linux: `/sys/module/<name>/version` when present. macOS: parenthesized version from `kextstat`. |
+| `index`    | int    | macOS only: kext load order index from `kextstat`. Omitted on Linux.                            |
 
 On macOS, `modules` enumerates **legacy kernel extensions only** — System
 Extensions introduced in macOS 11+ live under `/Library/SystemExtensions/` and
