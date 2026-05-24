@@ -158,10 +158,10 @@ const scrubKey = "identity_credentials_ec2_security_credentials_ec2_instance"
 // the richer dynamic identity document, IAM info, and per-ENI data.
 type Info struct {
 	// Identity.
-	InstanceID        string `json:"instance_id"`
-	InstanceType      string `json:"instance_type,omitempty"`
+	ID                string `json:"id"`
+	Type              string `json:"type,omitempty"`
 	InstanceLifecycle string `json:"instance_life_cycle,omitempty"`
-	AMIID             string `json:"ami_id,omitempty"`
+	ImageID           string `json:"image_id,omitempty"`
 	AMILaunchIndex    string `json:"ami_launch_index,omitempty"`
 	AMIManifestPath   string `json:"ami_manifest_path,omitempty"`
 
@@ -182,9 +182,9 @@ type Info struct {
 	NetworkInterfaces map[string]NetworkInterface `json:"network_interfaces,omitempty"`
 
 	// Placement (from meta-data/placement + identity doc).
-	Region           string `json:"region,omitempty"`
-	AvailabilityZone string `json:"availability_zone,omitempty"`
-	AccountID        string `json:"account_id,omitempty"`
+	Region     string `json:"region,omitempty"`
+	Zone       string `json:"zone,omitempty"`
+	AccountUID string `json:"account_uid,omitempty"`
 
 	// Placement extras (from meta-data/placement/*). Populated only
 	// when IMDS returns non-404 for the respective key — empty on
@@ -205,8 +205,8 @@ type Info struct {
 	SpotTerminationTime string `json:"spot_termination_time,omitempty"`
 
 	// Services endpoint — useful on GovCloud / China regions.
-	ServicesDomain    string `json:"services_domain,omitempty"`
-	ServicesPartition string `json:"services_partition,omitempty"`
+	ServicesDomain string `json:"services_domain,omitempty"`
+	CloudPartition string `json:"cloud_partition,omitempty"`
 
 	// Marketplace product codes (empty on non-marketplace AMIs).
 	ProductCodes []string `json:"product_codes,omitempty"`
@@ -399,17 +399,17 @@ func (c *Collector) Collect(
 	if body, err := versionedGet(identityDocPath); err == nil {
 		var doc identityDoc
 		if json.Unmarshal(body, &doc) == nil {
-			if info.AccountID == "" {
-				info.AccountID = doc.AccountID
+			if info.AccountUID == "" {
+				info.AccountUID = doc.AccountID
 			}
 			if info.Region == "" {
 				info.Region = doc.Region
 			}
-			if info.AvailabilityZone == "" {
-				info.AvailabilityZone = doc.AvailabilityZone
+			if info.Zone == "" {
+				info.Zone = doc.AvailabilityZone
 			}
-			if info.InstanceID == "" {
-				info.InstanceID = doc.InstanceID
+			if info.ID == "" {
+				info.ID = doc.InstanceID
 			}
 		}
 	}
@@ -476,8 +476,8 @@ func fetchPublicKeys(
 }
 
 // onEC2 runs Ohai's has_ec2_* chain (non-Windows):
-//   - dmi.BIOS.Vendor contains "Amazon"  (has_ec2_amazon_dmi?)
-//   - dmi.BIOS.Version contains "amazon" (has_ec2_xen_dmi?)
+//   - dmi.BIOS.Manufacturer contains "Amazon"  (has_ec2_amazon_dmi?)
+//   - dmi.BIOS.Ver contains "amazon" (has_ec2_xen_dmi?)
 //   - /sys/hypervisor/uuid starts with "ec2" (has_ec2_xen_uuid?)
 //
 // Any match → detected. Falls open when dmi isn't in prior — the
@@ -490,10 +490,10 @@ func onEC2(
 		return true
 	}
 	if info.BIOS != nil {
-		if strings.Contains(info.BIOS.Vendor, dmiBIOSVendorSignature) {
+		if strings.Contains(info.BIOS.Manufacturer, dmiBIOSVendorSignature) {
 			return true
 		}
-		if strings.Contains(strings.ToLower(info.BIOS.Version), dmiBIOSVersionSignature) {
+		if strings.Contains(strings.ToLower(info.BIOS.Ver), dmiBIOSVersionSignature) {
 			return true
 		}
 	}
@@ -567,10 +567,10 @@ func transformMetadata(
 	v map[string]string,
 ) *Info {
 	info := &Info{
-		InstanceID:          v["/meta-data/instance-id"],
-		InstanceType:        v["/meta-data/instance-type"],
+		ID:                  v["/meta-data/instance-id"],
+		Type:                v["/meta-data/instance-type"],
 		InstanceLifecycle:   v["/meta-data/instance-life-cycle"],
-		AMIID:               v["/meta-data/ami-id"],
+		ImageID:             v["/meta-data/ami-id"],
 		AMILaunchIndex:      v["/meta-data/ami-launch-index"],
 		AMIManifestPath:     v["/meta-data/ami-manifest-path"],
 		Hostname:            v["/meta-data/hostname"],
@@ -580,7 +580,7 @@ func transformMetadata(
 		PublicIPv4:          v["/meta-data/public-ipv4"],
 		MAC:                 v["/meta-data/mac"],
 		Region:              v["/meta-data/placement/region"],
-		AvailabilityZone:    v["/meta-data/placement/availability-zone"],
+		Zone:                v["/meta-data/placement/availability-zone"],
 		AvailabilityZoneID:  v["/meta-data/placement/availability-zone-id"],
 		GroupName:           v["/meta-data/placement/group-name"],
 		HostID:              v["/meta-data/placement/host-id"],
@@ -593,7 +593,7 @@ func transformMetadata(
 		SpotInstanceAction:  v["/meta-data/spot/instance-action"],
 		SpotTerminationTime: v["/meta-data/spot/termination-time"],
 		ServicesDomain:      v["/meta-data/services/domain"],
-		ServicesPartition:   v["/meta-data/services/partition"],
+		CloudPartition:      v["/meta-data/services/partition"],
 	}
 	return info
 }

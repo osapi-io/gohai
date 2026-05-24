@@ -30,7 +30,7 @@ Top level: `mounts: []Mount`, plus (Linux only) `unmounted: []Filesystem`.
 | ----------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `device`                            | string   | Block-device path (`/dev/sda1`).                                                                                                                                                                                           | OCSF `device.path`.                       |
 | `mountpoint`                        | string   | Mount path (`/`, `/boot`).                                                                                                                                                                                                 | Nearest: OCSF `file.path` (event-scoped). |
-| `fstype`                            | string   | Filesystem type (`ext4`, `xfs`, `apfs`).                                                                                                                                                                                   | No direct schema mapping.                 |
+| `type`                              | string   | Filesystem type (`ext4`, `xfs`, `apfs`).                                                                                                                                                                                   | No direct schema mapping.                 |
 | `opts`                              | []string | Mount options (`rw`, `relatime`, `nosuid`).                                                                                                                                                                                | No direct schema mapping.                 |
 | `total`                             | uint64   | Total bytes.                                                                                                                                                                                                               | No direct schema mapping.                 |
 | `used`                              | uint64   | Used bytes.                                                                                                                                                                                                                | No direct schema mapping.                 |
@@ -50,7 +50,7 @@ Top level: `mounts: []Mount`, plus (Linux only) `unmounted: []Filesystem`.
 
 Top-level `unmounted[]` (Linux only): block devices that `lsblk` reports with a
 non-empty filesystem type and empty mountpoint. Each entry carries `device`,
-`fstype`, `uuid`, `label`, `part_uuid`, `part_label` — capacity/usage are
+`type`, `uuid`, `label`, `part_uuid`, `part_label` — capacity/usage are
 omitted because `statfs` requires a mount.
 
 Top-level `zfs_datasets[]` (Linux only, when `zfs` is on PATH): every ZFS
@@ -69,7 +69,7 @@ bookmarks — reported by `zfs get -p -H all`. Mirrors Ohai's `zfs_properties` /
 | `properties.*.source` | string              | `"-"` (read-only), `"default"`, `"local"`, `"inherited from <ancestor>"`, `"received"`.                                      |
 
 Field-name choices follow node_exporter's `filesystem` collector (`mountpoint`
-over Ohai's `mount`, `fstype` over Ohai's `fs_type`).
+over Ohai's `mount`, `type` over Ohai's `fs_type`).
 
 ## Platform Support
 
@@ -87,7 +87,7 @@ over Ohai's `mount`, `fstype` over Ohai's `fs_type`).
       {
         "device": "/dev/sda1",
         "mountpoint": "/",
-        "fstype": "ext4",
+        "type": "ext4",
         "opts": ["rw", "relatime"],
         "total": 107374182400,
         "used": 53687091200,
@@ -105,7 +105,7 @@ over Ohai's `mount`, `fstype` over Ohai's `fs_type`).
     "unmounted": [
       {
         "device": "/dev/sdb1",
-        "fstype": "crypto_LUKS",
+        "type": "crypto_LUKS",
         "uuid": "deadbeef-0000-0000-0000-000000000002",
         "label": "data"
       }
@@ -123,7 +123,7 @@ for _, m := range facts.Filesystem.Mounts {
     fmt.Printf("%s on %s: %.1f%% used\n", m.Device, m.Mountpoint, m.UsedPercent)
 }
 for _, u := range facts.Filesystem.Unmounted {
-    fmt.Printf("unmounted %s (%s) uuid=%s\n", u.Device, u.Fstype, u.UUID)
+    fmt.Printf("unmounted %s (%s) uuid=%s\n", u.Device, u.Type, u.UUID)
 }
 ```
 
@@ -158,7 +158,7 @@ On Linux:
 4. When `lsblk` is missing (minimal containers, Alpine without util-linux) or
    its output is malformed, we skip the enrichment silently; capacity and inode
    data remain from gopsutil.
-5. **Btrfs allocation enrichment** — for each mount with `fstype == "btrfs"` and
+5. **Btrfs allocation enrichment** — for each mount with `type == "btrfs"` and
    a non-empty UUID we read `/sys/fs/btrfs/<uuid>/allocation/` through the
    injected `avfs.VFS` and populate the mount's `btrfs` sub-record:
    per-block-group (`data`, `metadata`, `system`) byte counters (`total`,

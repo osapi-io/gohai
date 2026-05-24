@@ -96,7 +96,7 @@ func (l *Linux) Collect(
 	if l.FS != nil {
 		for i := range info.Mounts {
 			m := &info.Mounts[i]
-			if m.Fstype == "btrfs" && m.UUID != "" {
+			if m.Type == "btrfs" && m.UUID != "" {
 				m.Btrfs = readBtrfsInfo(l.FS, m.UUID)
 			}
 		}

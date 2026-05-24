@@ -138,8 +138,8 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "bash", Version: "5.1-6", Arch: "amd64", Source: "dpkg"},
-				{Name: "libc6", Version: "2.35-0", Arch: "amd64", Source: "dpkg"},
+				{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
+				{Name: "libc6", Version: "2.35-0", Architecture: "amd64", PackageManager: "dpkg"},
 			},
 		},
 		{
@@ -159,7 +159,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "bash", Version: "5.1-6", Arch: "amd64", Source: "dpkg"},
+				{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
 			},
 		},
 		{
@@ -197,7 +197,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "bash", Version: "5.1", Arch: "amd64", Source: "dpkg"},
+				{Name: "bash", Version: "5.1", Architecture: "amd64", PackageManager: "dpkg"},
 			},
 		},
 		{
@@ -232,8 +232,18 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "bash", Version: "5.1-6.fc36", Arch: "x86_64", Source: "rpm"},
-				{Name: "libc", Version: "2.35-1.fc36", Arch: "x86_64", Source: "rpm"},
+				{
+					Name:           "bash",
+					Version:        "5.1-6.fc36",
+					Architecture:   "x86_64",
+					PackageManager: "rpm",
+				},
+				{
+					Name:           "libc",
+					Version:        "2.35-1.fc36",
+					Architecture:   "x86_64",
+					PackageManager: "rpm",
+				},
 			},
 		},
 		{
@@ -280,7 +290,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "bash", Version: "5.1-6.fc36", Arch: "x86_64", Source: "rpm"},
+				{
+					Name:           "bash",
+					Version:        "5.1-6.fc36",
+					Architecture:   "x86_64",
+					PackageManager: "rpm",
+				},
 			},
 		},
 		{
@@ -297,9 +312,9 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				return mockExec(t, "brew", []string{"list", "--versions"}, brewOut, nil)
 			},
 			want: []packages.Package{
-				{Name: "git", Version: "2.40.0", Source: "brew"},
-				{Name: "zsh", Version: "5.9", Source: "brew"},
-				{Name: "curl", Version: "8.1.1", Source: "brew"},
+				{Name: "git", Version: "2.40.0", PackageManager: "brew"},
+				{Name: "zsh", Version: "5.9", PackageManager: "brew"},
+				{Name: "curl", Version: "8.1.1", PackageManager: "brew"},
 			},
 		},
 		{
@@ -315,7 +330,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "git", Version: "2.40.0", Source: "brew"},
+				{Name: "git", Version: "2.40.0", PackageManager: "brew"},
 			},
 		},
 		{

@@ -65,12 +65,12 @@ const metadataFlavorHeader = "Metadata-Flavor"
 // forms; everything else is passed through verbatim.
 type Info struct {
 	// Identity.
-	InstanceID  int64    `json:"instance_id"`
+	ID          int64    `json:"id"`
 	Name        string   `json:"name"`
 	Hostname    string   `json:"hostname"`
 	CPUPlatform string   `json:"cpu_platform,omitempty"`
-	MachineType string   `json:"machine_type"`
-	Image       string   `json:"image,omitempty"`
+	Type        string   `json:"type"`
+	ImageID     string   `json:"image_id,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
 
@@ -85,7 +85,7 @@ type Info struct {
 	Region string `json:"region"`
 
 	// Project.
-	ProjectID         string            `json:"project_id"`
+	ProjectUID        string            `json:"project_uid"`
 	NumericProjectID  int64             `json:"numeric_project_id"`
 	ProjectAttributes map[string]string `json:"project_attributes,omitempty"`
 
@@ -340,12 +340,12 @@ func transform(
 	r rawResponse,
 ) *Info {
 	info := &Info{
-		InstanceID:        r.Instance.ID,
+		ID:                r.Instance.ID,
 		Name:              r.Instance.Name,
 		Hostname:          r.Instance.Hostname,
 		CPUPlatform:       r.Instance.CPUPlatform,
-		MachineType:       lastSegment(r.Instance.MachineType),
-		Image:             lastSegment(r.Instance.Image),
+		Type:              lastSegment(r.Instance.MachineType),
+		ImageID:           lastSegment(r.Instance.Image),
 		Description:       r.Instance.Description,
 		Tags:              r.Instance.Tags,
 		Preemptible:       strings.EqualFold(r.Instance.Scheduling.Preemptible, "TRUE"),
@@ -353,7 +353,7 @@ func transform(
 		OnHostMaintenance: r.Instance.Scheduling.OnHostMaintenance,
 		MaintenanceEvent:  r.Instance.MaintenanceEvent,
 		Zone:              lastSegment(r.Instance.Zone),
-		ProjectID:         r.Project.ProjectID,
+		ProjectUID:        r.Project.ProjectID,
 		NumericProjectID:  r.Project.NumericProjectID,
 		ProjectAttributes: r.Project.Attributes,
 		Attributes:        r.Instance.Attributes,

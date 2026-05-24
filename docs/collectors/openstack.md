@@ -18,21 +18,21 @@ DMI; we go directly to DMI for the same effect.
 
 | Field               | Type                | Description                                                                                                                             | Schema mapping                 |
 | ------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `instance_id`       | `string`            | EC2-mirror instance ID.                                                                                                                 | OTel `cloud.resource_id`       |
-| `instance_type`     | `string`            | Instance flavor (e.g. `m1.small`).                                                                                                      | OTel `host.type`               |
+| `id`                | `string`            | EC2-mirror instance ID.                                                                                                                 | OTel `cloud.resource_id`       |
+| `type`              | `string`            | Instance flavor (e.g. `m1.small`).                                                                                                      | OTel `host.type`               |
 | `hostname`          | `string`            | Hostname.                                                                                                                               | OCSF `device.hostname`         |
 | `local_hostname`    | `string`            | Internal DNS name.                                                                                                                      | No direct schema mapping.      |
 | `public_hostname`   | `string`            | Public DNS name.                                                                                                                        | No direct schema mapping.      |
-| `availability_zone` | `string`            | Nova availability zone.                                                                                                                 | OTel `cloud.availability_zone` |
+| `zone`              | `string`            | Nova availability zone.                                                                                                                 | OTel `cloud.availability_zone` |
 | `local_ipv4`        | `string`            | Primary private IPv4.                                                                                                                   | No direct schema mapping.      |
 | `public_ipv4`       | `string`            | Primary public IPv4.                                                                                                                    | No direct schema mapping.      |
 | `security_groups`   | `[]string`          | Attached security groups.                                                                                                               | No direct schema mapping.      |
-| `ami_id`            | `string`            | EC2-mirror AMI ID.                                                                                                                      | OTel `host.image.id`           |
+| `image_id`          | `string`            | EC2-mirror AMI ID.                                                                                                                      | OTel `host.image.id`           |
 | `kernel_id`         | `string`            | Boot kernel image.                                                                                                                      | No direct schema mapping.      |
 | `ramdisk_id`        | `string`            | Boot ramdisk image.                                                                                                                     | No direct schema mapping.      |
 | `reservation_id`    | `string`            | EC2-mirror reservation ID.                                                                                                              | No direct schema mapping.      |
 | `name`              | `string`            | Nova `name` field.                                                                                                                      | OTel `host.name`               |
-| `project_id`        | `string`            | Nova project ID.                                                                                                                        | OTel `cloud.account.id`        |
+| `project_uid`       | `string`            | Nova project ID.                                                                                                                        | OTel `cloud.account.id`        |
 | `uuid`              | `string`            | Nova UUID.                                                                                                                              | No direct schema mapping.      |
 | `meta_data`         | `map[string]string` | Nova `meta` key/values.                                                                                                                 | No direct schema mapping.      |
 | `public_keys`       | `map[string]string` | Name→key map of SSH keys.                                                                                                               | No direct schema mapping.      |
@@ -56,12 +56,12 @@ data) and `random_seed` (sensitive — no inventory value).
 ```json
 {
   "openstack": {
-    "instance_id": "i-abc",
-    "instance_type": "m1.small",
-    "availability_zone": "nova",
+    "id": "i-abc",
+    "type": "m1.small",
+    "zone": "nova",
     "local_ipv4": "10.0.0.5",
     "uuid": "uuid-xxx",
-    "project_id": "proj-1"
+    "project_uid": "proj-1"
   }
 }
 ```
@@ -73,7 +73,7 @@ g, _ := gohai.New(gohai.WithCollectors("openstack"))
 facts, _ := g.Collect(context.Background())
 
 if facts.OpenStack != nil {
-    fmt.Println(facts.OpenStack.ProjectID, facts.OpenStack.AvailabilityZone)
+    fmt.Println(facts.OpenStack.ProjectUID, facts.OpenStack.Zone)
 }
 ```
 
@@ -98,14 +98,14 @@ open when dmi wasn't run.
    directory listing — entries ending in `/` are subdirectories (recurse),
    others are leaves. Matches Ohai's `fetch_metadata` style for the
    EC2-compatible tree. Populates the identity / placement / network fields
-   (`instance_id`, `instance_type`, `ami_id`, `kernel_id`, `ramdisk_id`,
-   `reservation_id`, `local_ipv4`, `public_ipv4`, `availability_zone`,
+   (`id`, `type`, `image_id`, `kernel_id`, `ramdisk_id`,
+   `reservation_id`, `local_ipv4`, `public_ipv4`, `zone`,
    `security_groups`, etc.).
 3. **Nova endpoint:** `GET /openstack/latest/meta_data.json` — the richer
-   Nova-native document. Populates `uuid`, `name`, `project_id`, `hostname`,
+   Nova-native document. Populates `uuid`, `name`, `project_uid`, `hostname`,
    `launch_index`, `meta_data`, `public_keys`, and the `devices[]` attached
    block-device list (type / bus / serial / path / address / tags). Fills
-   `availability_zone` / `hostname` when the EC2-mirror tree didn't supply them.
+   `zone` / `hostname` when the EC2-mirror tree didn't supply them.
    `network_info` and `random_seed` are intentionally skipped — the former is
    deployment-specific Neutron data, the latter is sensitive and has no
    inventory value.

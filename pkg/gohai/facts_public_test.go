@@ -46,11 +46,11 @@ func TestFactsPublicTestSuite(
 func (s *FactsPublicTestSuite) SetupTest() {
 	s.facts = &gohai.Facts{
 		Platform: &platform.Info{
-			OS:           "linux",
-			Name:         "ubuntu",
-			Version:      "24.04",
-			Family:       "debian",
-			Architecture: "amd64",
+			OS:              "linux",
+			Name:            "ubuntu",
+			Version:         "24.04",
+			Family:          "debian",
+			CPUArchitecture: "amd64",
 		},
 		CPU: &cpu.Info{
 			Count: 8,
@@ -94,7 +94,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
     "name": "ubuntu",
     "version": "24.04",
     "family": "debian",
-    "architecture": "amd64"
+    "cpu_architecture": "amd64"
   },
   "hostname": {
     "name": "web01",
@@ -131,7 +131,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 				s.Equal("ubuntu", f.Platform.Name)
 				s.Equal("24.04", f.Platform.Version)
 				s.Equal("debian", f.Platform.Family)
-				s.Equal("amd64", f.Platform.Architecture)
+				s.Equal("amd64", f.Platform.CPUArchitecture)
 			},
 		},
 		{

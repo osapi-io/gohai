@@ -45,7 +45,7 @@ Per interface:
 | `number`                  | int               | Kernel interface index (`ip link show` column 1). Mirrors Ohai `iface[:number]`.                                                                                                                                                                                                                                          | No direct schema mapping. |
 | `state`                   | string            | Admin state (`"up"` / `"down"`) derived from the `up` flag. Mirrors Ohai `iface["state"]`.                                                                                                                                                                                                                                | No direct schema mapping. |
 | `mtu`                     | int               | Maximum transmission unit (bytes).                                                                                                                                                                                                                                                                                        | No direct schema mapping. |
-| `hardware_addr`           | string            | MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                                                                                                                                                                                                                                  | `network_interface.mac`.  |
+| `mac`                     | string            | MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                                                                                                                                                                                                                                  | `network_interface.mac`.  |
 | `encapsulation`           | string            | Canonical encapsulation: `Ethernet` / `Loopback` / `PPP` / `SLIP` / `IPIP` / `6to4` / `VJSLIP`. Linux only.                                                                                                                                                                                                               | No direct schema mapping. |
 | `driver`                  | string            | Kernel driver bound to the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only — sysfs-derived.                                                                                                                                                                                                                             | No direct schema mapping. |
 | `speed`                   | string            | Negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only — ghw-derived.                                                                                                                                                                                                                                               | No direct schema mapping. |
@@ -131,7 +131,7 @@ Per `Counters`:
       {
         "name": "eth0",
         "mtu": 1500,
-        "hardware_addr": "02:42:ac:11:00:02",
+        "mac": "02:42:ac:11:00:02",
         "encapsulation": "Ethernet",
         "flags": ["up", "broadcast", "multicast"],
         "addresses": [

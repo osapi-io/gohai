@@ -38,7 +38,7 @@ import (
 // DigitalOcean, so Collect will proceed past the gate.
 func doPrior() collector.PriorResults {
 	return collector.PriorResults{
-		"dmi": &dmi.Info{BIOS: &dmi.BIOS{Vendor: "DigitalOcean"}},
+		"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "DigitalOcean"}},
 	}
 }
 
@@ -118,7 +118,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			},
 			verify: func(s *DigitalOceanPublicTestSuite, info *digitalocean.Info) {
 				s.Require().NotNil(info)
-				s.Equal(int64(123456), info.DropletID)
+				s.Equal(int64(123456), info.ID)
 				s.Equal("web-1", info.Hostname)
 				s.Equal("nyc3", info.Region)
 				s.Equal([]string{"prod"}, info.Tags)
@@ -148,7 +148,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 		{
 			name: "dmi says not DO short-circuits",
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Vendor: "Dell Inc."}},
+				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Dell Inc."}},
 			},
 			handler:    func(http.ResponseWriter, *http.Request) {},
 			wantNil:    true,
@@ -162,7 +162,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			},
 			verify: func(s *DigitalOceanPublicTestSuite, info *digitalocean.Info) {
 				s.Require().NotNil(info)
-				s.Equal(int64(42), info.DropletID)
+				s.Equal(int64(42), info.ID)
 			},
 		},
 		{
@@ -173,7 +173,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			},
 			verify: func(s *DigitalOceanPublicTestSuite, info *digitalocean.Info) {
 				s.Require().NotNil(info)
-				s.Equal(int64(43), info.DropletID)
+				s.Equal(int64(43), info.ID)
 			},
 		},
 		{

@@ -59,7 +59,7 @@ type Interface struct {
 	Number        int          `json:"number,omitempty"` // kernel interface index (Ohai: iface[:number])
 	State         string       `json:"state,omitempty"`  // admin state: "up" | "down" (Ohai: iface["state"])
 	MTU           int          `json:"mtu"`
-	HardwareAddr  string       `json:"hardware_addr,omitempty"` // OCSF: network_interface.mac
+	MAC           string       `json:"mac,omitempty"`           // OCSF: network_interface.mac
 	Encapsulation string       `json:"encapsulation,omitempty"` // canonical: Ethernet / Loopback / PPP / SLIP / IPIP / 6to4
 	Driver        string       `json:"driver,omitempty"`        // sysfs driver name (e1000e, virtio_net, ixgbe, ...)
 	Speed         string       `json:"speed,omitempty"`         // ghw link speed string ("1000Mb/s")
@@ -264,12 +264,12 @@ func readInterfaces(
 	out := make([]Interface, 0, len(ifs))
 	for _, i := range ifs {
 		item := Interface{
-			Name:         i.Name,
-			Number:       i.Index,
-			State:        stateFromFlags(i.Flags),
-			MTU:          i.MTU,
-			HardwareAddr: i.HardwareAddr,
-			Flags:        i.Flags,
+			Name:   i.Name,
+			Number: i.Index,
+			State:  stateFromFlags(i.Flags),
+			MTU:    i.MTU,
+			MAC:    i.HardwareAddr,
+			Flags:  i.Flags,
 		}
 		for _, a := range i.Addrs {
 			if addr, ok := parseAddress(a.Addr); ok {

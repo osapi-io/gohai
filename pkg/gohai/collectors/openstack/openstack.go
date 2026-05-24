@@ -75,14 +75,14 @@ const dreamhostUser = "dhc-user"
 // few OpenStack-specific fields from the richer meta_data.json.
 type Info struct {
 	// Identity.
-	InstanceID     string `json:"instance_id"`
-	InstanceType   string `json:"instance_type,omitempty"`
+	ID             string `json:"id"`
+	Type           string `json:"type,omitempty"`
 	Hostname       string `json:"hostname,omitempty"`
 	LocalHostname  string `json:"local_hostname,omitempty"`
 	PublicHostname string `json:"public_hostname,omitempty"`
 
 	// Placement.
-	AvailabilityZone string `json:"availability_zone,omitempty"`
+	Zone string `json:"zone,omitempty"`
 
 	// Network.
 	LocalIPv4      string   `json:"local_ipv4,omitempty"`
@@ -90,7 +90,7 @@ type Info struct {
 	SecurityGroups []string `json:"security_groups,omitempty"`
 
 	// Image / boot.
-	AMIID     string `json:"ami_id,omitempty"`
+	ImageID   string `json:"image_id,omitempty"`
 	KernelID  string `json:"kernel_id,omitempty"`
 	RamdiskID string `json:"ramdisk_id,omitempty"`
 
@@ -99,7 +99,7 @@ type Info struct {
 
 	// From the OpenStack-specific meta_data.json (when present).
 	Name        string            `json:"name,omitempty"`
-	ProjectID   string            `json:"project_id,omitempty"`
+	ProjectUID  string            `json:"project_uid,omitempty"`
 	UUID        string            `json:"uuid,omitempty"`
 	LaunchIndex int               `json:"launch_index,omitempty"`
 	MetaData    map[string]string `json:"meta_data,omitempty"`
@@ -221,15 +221,15 @@ func (c *Collector) Collect(
 		if jerr := json.Unmarshal(body, &doc); jerr == nil {
 			info.UUID = doc.UUID
 			info.Name = doc.Name
-			info.ProjectID = doc.ProjectID
+			info.ProjectUID = doc.ProjectID
 			info.LaunchIndex = doc.LaunchIndex
 			info.MetaData = doc.Meta
 			info.PublicKeys = doc.PublicKeys
 			for _, d := range doc.Devices {
 				info.Devices = append(info.Devices, Device(d))
 			}
-			if info.AvailabilityZone == "" {
-				info.AvailabilityZone = doc.AvailabilityZone
+			if info.Zone == "" {
+				info.Zone = doc.AvailabilityZone
 			}
 			if info.Hostname == "" {
 				info.Hostname = doc.Hostname
@@ -319,9 +319,9 @@ func populateFromTree(
 	info *Info,
 	tree map[string]any,
 ) {
-	info.AMIID = strVal(tree, "ami_id")
-	info.InstanceID = strVal(tree, "instance_id")
-	info.InstanceType = strVal(tree, "instance_type")
+	info.ImageID = strVal(tree, "ami_id")
+	info.ID = strVal(tree, "instance_id")
+	info.Type = strVal(tree, "instance_type")
 	info.Hostname = strVal(tree, "hostname")
 	info.LocalHostname = strVal(tree, "local_hostname")
 	info.LocalIPv4 = strVal(tree, "local_ipv4")
@@ -331,7 +331,7 @@ func populateFromTree(
 	info.KernelID = strVal(tree, "kernel_id")
 	info.RamdiskID = strVal(tree, "ramdisk_id")
 	if placement, ok := tree["placement"].(map[string]any); ok {
-		info.AvailabilityZone = strVal(placement, "availability_zone")
+		info.Zone = strVal(placement, "availability_zone")
 	}
 	if sg := strVal(tree, "security_groups"); sg != "" {
 		info.SecurityGroups = strings.Split(sg, "\n")

@@ -12,8 +12,8 @@ falls back to IMDSv1 when the token endpoint isn't reachable. The collector
 
 Detection runs Ohai's full non-Windows signal chain:
 
-- `dmi.BIOS.Vendor` contains `"Amazon"` (matches `has_ec2_amazon_dmi?`)
-- `dmi.BIOS.Version` contains `"amazon"` lowercase (matches `has_ec2_xen_dmi?`)
+- `dmi.BIOS.Manufacturer` contains `"Amazon"` (matches `has_ec2_amazon_dmi?`)
+- `dmi.BIOS.Ver` contains `"amazon"` lowercase (matches `has_ec2_xen_dmi?`)
 - `/sys/hypervisor/uuid` starts with `"ec2"` (matches `has_ec2_xen_uuid?`)
 
 If none match, the HTTP probe is skipped. The collector then fetches:
@@ -31,10 +31,10 @@ If none match, the HTTP probe is skipped. The collector then fetches:
 
 | Field                   | Type                          | Description                                                                   | Schema mapping                 |
 | ----------------------- | ----------------------------- | ----------------------------------------------------------------------------- | ------------------------------ |
-| `instance_id`           | `string`                      | EC2 instance ID.                                                              | OTel `cloud.resource_id`       |
-| `instance_type`         | `string`                      | Instance type (e.g. `t3.micro`).                                              | OTel `host.type`               |
+| `id`                    | `string`                      | EC2 instance ID.                                                              | OTel `cloud.resource_id`       |
+| `type`                  | `string`                      | Instance type (e.g. `t3.micro`).                                              | OTel `host.type`               |
 | `instance_life_cycle`   | `string`                      | `on-demand` / `spot` / `scheduled`.                                           | No direct schema mapping.      |
-| `ami_id`                | `string`                      | Boot AMI ID.                                                                  | OTel `host.image.id`           |
+| `image_id`              | `string`                      | Boot AMI ID.                                                                  | OTel `host.image.id`           |
 | `ami_launch_index`      | `string`                      | Launch index within the reservation.                                          | No direct schema mapping.      |
 | `ami_manifest_path`     | `string`                      | Legacy manifest path.                                                         | No direct schema mapping.      |
 | `hostname`              | `string`                      | EC2-supplied hostname.                                                        | No direct schema mapping.      |
@@ -45,8 +45,8 @@ If none match, the HTTP probe is skipped. The collector then fetches:
 | `mac`                   | `string`                      | Primary interface MAC.                                                        | OCSF `network_interface.mac`   |
 | `security_groups`       | `[]string`                    | Security group names.                                                         | No direct schema mapping.      |
 | `region`                | `string`                      | AWS region (e.g. `us-east-1`).                                                | OTel `cloud.region`            |
-| `availability_zone`     | `string`                      | Availability zone (e.g. `us-east-1a`).                                        | OTel `cloud.availability_zone` |
-| `account_id`            | `string`                      | AWS account ID (from identity document).                                      | OTel `cloud.account.id`        |
+| `zone`                  | `string`                      | Availability zone (e.g. `us-east-1a`).                                        | OTel `cloud.availability_zone` |
+| `account_uid`           | `string`                      | AWS account ID (from identity document).                                      | OTel `cloud.account.id`        |
 | `reservation_id`        | `string`                      | Reservation ID.                                                               | No direct schema mapping.      |
 | `profile`               | `string`                      | Virtualization profile (`default-hvm`).                                       | No direct schema mapping.      |
 | `iam_info`              | `*IAMInstanceInfo`            | Attached IAM profile — see below.                                             | No direct schema mapping.      |
@@ -64,7 +64,7 @@ If none match, the HTTP probe is skipped. The collector then fetches:
 | `spot_instance_action`  | `string`                      | Spot lifecycle signal (`stop`, `terminate`, `hibernate`).                     | No direct schema mapping.      |
 | `spot_termination_time` | `string`                      | ISO-8601 spot termination warning time.                                       | No direct schema mapping.      |
 | `services_domain`       | `string`                      | AWS services endpoint domain (GovCloud / China diverge from `amazonaws.com`). | No direct schema mapping.      |
-| `services_partition`    | `string`                      | AWS partition (`aws`, `aws-us-gov`, `aws-cn`).                                | No direct schema mapping.      |
+| `cloud_partition`       | `string`                      | AWS partition (`aws`, `aws-us-gov`, `aws-cn`).                                | No direct schema mapping.      |
 | `product_codes`         | `[]string`                    | Marketplace product codes attached to the AMI.                                | No direct schema mapping.      |
 | `public_keys`           | `[]string`                    | OpenSSH-format public keys injected at launch.                                | No direct schema mapping.      |
 | `block_device_mapping`  | `map[string]string`           | Virtual disk name → device path (`ami`→`/dev/xvda`).                          | No direct schema mapping.      |
@@ -118,13 +118,13 @@ Ohai's explicit scrub of the secrets-bearing sub-tree.
 ```json
 {
   "ec2": {
-    "instance_id": "i-abc",
-    "instance_type": "t3.micro",
+    "id": "i-abc",
+    "type": "t3.micro",
     "region": "us-east-1",
-    "availability_zone": "us-east-1a",
+    "zone": "us-east-1a",
     "local_ipv4": "10.0.0.5",
     "public_ipv4": "1.2.3.4",
-    "account_id": "123456789012",
+    "account_uid": "123456789012",
     "iam_info": {
       "code": "Success",
       "instance_profile_arn": "arn:aws:iam::123456789012:instance-profile/web"
@@ -140,7 +140,7 @@ g, _ := gohai.New(gohai.WithCollectors("ec2"))
 facts, _ := g.Collect(context.Background())
 
 if facts.Ec2 != nil {
-    fmt.Println(facts.Ec2.Region, facts.Ec2.AccountID)
+    fmt.Println(facts.Ec2.Region, facts.Ec2.AccountUID)
 }
 ```
 
@@ -162,8 +162,8 @@ run.
 ## Data Sources
 
 1. **Detection gate:** any of the following triggers detection:
-   - `dmi.BIOS.Vendor` contains `"Amazon"` (Ohai's `has_ec2_amazon_dmi?`)
-   - `dmi.BIOS.Version` contains `"amazon"` lowercase (Ohai's `has_ec2_xen_dmi?`
+   - `dmi.BIOS.Manufacturer` contains `"Amazon"` (Ohai's `has_ec2_amazon_dmi?`)
+   - `dmi.BIOS.Ver` contains `"amazon"` lowercase (Ohai's `has_ec2_xen_dmi?`
      — catches HVM instances on Xen-based hypervisors)
    - `/sys/hypervisor/uuid` starts with `"ec2"` (Ohai's `has_ec2_xen_uuid?`)
 2. **IMDSv2 token:** `PUT /latest/api/token` with

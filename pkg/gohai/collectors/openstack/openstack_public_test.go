@@ -165,13 +165,13 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
 				s.Require().NotNil(info)
 				s.Equal("openstack", info.Provider)
-				s.Equal("i-abc", info.InstanceID)
-				s.Equal("m1.small", info.InstanceType)
+				s.Equal("i-abc", info.ID)
+				s.Equal("m1.small", info.Type)
 				s.Equal("10.0.0.5", info.LocalIPv4)
-				s.Equal("nova", info.AvailabilityZone)
+				s.Equal("nova", info.Zone)
 				s.Equal([]string{"default", "ssh"}, info.SecurityGroups)
 				s.Equal("uuid-xxx", info.UUID)
-				s.Equal("proj-1", info.ProjectID)
+				s.Equal("proj-1", info.ProjectUID)
 				s.Equal("sre", info.MetaData["owner"])
 				s.Require().Len(info.Devices, 1)
 				s.Equal("disk", info.Devices[0].Type)
@@ -214,7 +214,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			tree:     metadataTree,
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
@@ -224,7 +224,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
 				s.Require().NotNil(info)
 				s.Equal("uuid-xxx", info.UUID)
-				s.Empty(info.InstanceID) // no EC2-mirror data
+				s.Empty(info.ID) // no EC2-mirror data
 			},
 		},
 		{
@@ -245,7 +245,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
 				s.Empty(info.UUID)
-				s.Equal("i-abc", info.InstanceID)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
@@ -258,7 +258,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
 				s.Equal("uuid-solo", info.UUID)
 				s.Equal("h", info.Hostname)
-				s.Equal("ami-yyy", info.AMIID)
+				s.Equal("ami-yyy", info.ImageID)
 			},
 		},
 		{
@@ -270,7 +270,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
-				s.Equal("ami-zzz", info.AMIID)
+				s.Equal("ami-zzz", info.ImageID)
 			},
 		},
 		{
@@ -282,7 +282,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
-				s.Equal("ami-aaa", info.AMIID)
+				s.Equal("ami-aaa", info.ImageID)
 			},
 		},
 		{
@@ -299,7 +299,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
-				s.Equal("ami-skip", info.AMIID)
+				s.Equal("ami-skip", info.ImageID)
 			},
 		},
 		{
@@ -310,7 +310,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
-				s.Equal("nova", info.AvailabilityZone) // from Nova doc
+				s.Equal("nova", info.Zone) // from Nova doc
 			},
 		},
 	}

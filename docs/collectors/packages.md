@@ -14,8 +14,8 @@ absent (containers, minimal base images).
 | `packages`           | list   | —                           | List of installed package objects         |
 | `packages[].name`    | string | OCSF `package.name`         | Package name                              |
 | `packages[].version` | string | OCSF `package.version`      | Installed version                         |
-| `packages[].arch`    | string | OCSF `package.architecture` | CPU architecture; empty for brew packages |
-| `packages[].source`  | string | gohai convention: `source`  | Package manager: `dpkg`, `rpm`, or `brew` |
+| `packages[].architecture`    | string | OCSF `package.architecture`    | CPU architecture; empty for brew packages |
+| `packages[].package_manager` | string | gohai convention               | Package manager: `dpkg`, `rpm`, or `brew` |
 
 ## Platform Support
 
@@ -33,14 +33,14 @@ absent (containers, minimal base images).
     {
       "name": "bash",
       "version": "5.1-6",
-      "arch": "amd64",
-      "source": "dpkg"
+      "architecture": "amd64",
+      "package_manager": "dpkg"
     },
     {
       "name": "libc6",
       "version": "2.35-0ubuntu3.6",
-      "arch": "amd64",
-      "source": "dpkg"
+      "architecture": "amd64",
+      "package_manager": "dpkg"
     }
   ]
 }

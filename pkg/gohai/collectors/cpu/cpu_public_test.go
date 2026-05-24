@@ -256,9 +256,9 @@ func (s *CPUPublicTestSuite) TestCollect() {
 			validate: func(i *cpu.Info) {
 				s.Require().Len(i.CPUs, 2)
 				s.Equal("P-core", i.CPUs[0].ModelName)
-				s.Equal(float64(5200), i.CPUs[0].Mhz)
+				s.Equal(float64(5200), i.CPUs[0].Speed)
 				s.Equal("E-core", i.CPUs[1].ModelName)
-				s.Equal(float64(3800), i.CPUs[1].Mhz)
+				s.Equal(float64(3800), i.CPUs[1].Speed)
 			},
 		},
 		{
@@ -339,15 +339,15 @@ NUMA node0 CPU(s):   0-15
 				s.Require().NotNil(i.NumaNodes)
 				s.Equal([]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, i.NumaNodes[0])
 				s.Equal(2, i.NumaNodesCount)
-				s.Equal(16, i.CPUsOnline)
-				s.Equal(16, i.CPUsOffline)
+				s.Equal(16, i.Online)
+				s.Equal(16, i.Offline)
 				s.Equal("Dell Inc.", i.BIOSVendorID)
 				s.Equal("PowerEdge R750", i.BIOSModelName)
 				s.Equal("3200.0000", i.MhzMax)
 				s.Equal("800.0000", i.MhzMin)
 				s.Equal("2400", i.MhzDynamic)
 				s.Equal("4600.00", i.Bogomips)
-				s.Equal([]string{"32-bit", "64-bit"}, i.CPUOpmodes)
+				s.Equal([]string{"32-bit", "64-bit"}, i.Opmodes)
 				s.Equal("little endian", i.ByteOrder)
 				s.Equal([]string{"46 bits physical", "48 bits virtual"}, i.AddressSizes)
 				s.Equal("VT-x", i.Virtualization)
@@ -431,7 +431,7 @@ Socket(s):           2
 				return lscpuExec(t, "CPU op-mode(s):      ,   ,\n")
 			},
 			validate: func(i *cpu.Info) {
-				s.Nil(i.CPUOpmodes)
+				s.Nil(i.Opmodes)
 			},
 		},
 		{
@@ -672,7 +672,7 @@ Book(s) per drawer:  1
 				s.Equal(12, i.Count)
 				s.Equal(6, i.Cores)
 				s.Equal(1, i.Sockets)
-				s.Equal(2600.0, i.Mhz)
+				s.Equal(2600.0, i.Speed)
 			},
 		},
 		{
@@ -691,7 +691,7 @@ Book(s) per drawer:  1
 			validate: func(i *cpu.Info) {
 				s.Equal(10, i.Cores)
 				s.Equal(1, i.Sockets)
-				s.Equal(0.0, i.Mhz)
+				s.Equal(0.0, i.Speed)
 			},
 		},
 		{
@@ -708,7 +708,7 @@ Book(s) per drawer:  1
 				})
 			},
 			validate: func(i *cpu.Info) {
-				s.Equal(3200.0, i.Mhz)
+				s.Equal(3200.0, i.Speed)
 			},
 		},
 		{
@@ -776,7 +776,7 @@ Book(s) per drawer:  1
 				})
 			},
 			validate: func(i *cpu.Info) {
-				s.Equal(2800.0, i.Mhz)
+				s.Equal(2800.0, i.Speed)
 			},
 		},
 		{

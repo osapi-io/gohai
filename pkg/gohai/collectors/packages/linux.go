@@ -88,10 +88,10 @@ func collectDpkg(
 			continue
 		}
 		info.Packages = append(info.Packages, Package{
-			Name:    name,
-			Version: version,
-			Arch:    arch,
-			Source:  "dpkg",
+			Name:           name,
+			Version:        version,
+			Architecture:   arch,
+			PackageManager: "dpkg",
 		})
 	}
 	return info, nil
@@ -120,10 +120,10 @@ func collectRPM(
 			continue
 		}
 		info.Packages = append(info.Packages, Package{
-			Name:    name,
-			Version: version,
-			Arch:    arch,
-			Source:  "rpm",
+			Name:           name,
+			Version:        version,
+			Architecture:   arch,
+			PackageManager: "rpm",
 		})
 	}
 	return info, nil

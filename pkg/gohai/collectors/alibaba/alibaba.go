@@ -62,15 +62,15 @@ const dmiVendorSignature = "Alibaba"
 // skipped.
 type Info struct {
 	// Identity.
-	InstanceID     string `json:"instance_id"`
-	InstanceName   string `json:"instance_name,omitempty"`
-	InstanceType   string `json:"instance_type,omitempty"`
-	Hostname       string `json:"hostname,omitempty"`
-	ImageID        string `json:"image_id,omitempty"`
-	SerialNumber   string `json:"serial_number,omitempty"`
-	NetworkType    string `json:"network_type,omitempty"`
-	OwnerAccountID string `json:"owner_account_id,omitempty"`
-	SourceAddress  string `json:"source_address,omitempty"`
+	ID            string `json:"id"`
+	Name          string `json:"name,omitempty"`
+	Type          string `json:"type,omitempty"`
+	Hostname      string `json:"hostname,omitempty"`
+	ImageID       string `json:"image_id,omitempty"`
+	SerialNumber  string `json:"serial_number,omitempty"`
+	NetworkType   string `json:"network_type,omitempty"`
+	AccountUID    string `json:"account_uid,omitempty"`
+	SourceAddress string `json:"source_address,omitempty"`
 
 	// Location.
 	Region string `json:"region,omitempty"`
@@ -204,7 +204,7 @@ func (c *Collector) Collect(
 }
 
 // onAlibaba checks the dmi collector's sys_vendor (exposed as
-// Product.Vendor by ghw, which reads /sys/class/dmi/id/sys_vendor)
+// Product.VendorName by ghw, which reads /sys/class/dmi/id/sys_vendor)
 // for the "Alibaba" substring. Fails open when dmi wasn't run.
 func onAlibaba(
 	prior collector.PriorResults,
@@ -213,7 +213,7 @@ func onAlibaba(
 	if !ok || info == nil || info.Product == nil {
 		return true
 	}
-	return strings.Contains(info.Product.Vendor, dmiVendorSignature)
+	return strings.Contains(info.Product.VendorName, dmiVendorSignature)
 }
 
 // walk issues a GET against path (relative to the Client's baseURL).
@@ -287,14 +287,14 @@ func transform(
 	if md == nil {
 		return info
 	}
-	info.InstanceID = strVal(md, "instance_id")
+	info.ID = strVal(md, "instance_id")
 	info.Hostname = strVal(md, "hostname")
 	info.Region = strVal(md, "region_id")
 	info.Zone = strVal(md, "zone_id")
 	info.ImageID = strVal(md, "image_id")
 	info.SerialNumber = strVal(md, "serial_number")
 	info.NetworkType = strVal(md, "network_type")
-	info.OwnerAccountID = strVal(md, "owner_account_id")
+	info.AccountUID = strVal(md, "owner_account_id")
 	info.SourceAddress = strVal(md, "source_address")
 	info.MAC = strVal(md, "mac")
 	info.PrivateIPv4 = strVal(md, "private_ipv4")
@@ -305,8 +305,8 @@ func transform(
 	info.VSwitchCIDR = strVal(md, "vswitch_cidr_block")
 
 	if inst, ok := md["instance"].(map[string]any); ok {
-		info.InstanceType = strVal(inst, "instance_type")
-		info.InstanceName = strVal(inst, "instance_name")
+		info.Type = strVal(inst, "instance_type")
+		info.Name = strVal(inst, "instance_name")
 		info.MaxBandwidthIngress = intVal(inst, "max_netbw_ingress")
 		info.MaxBandwidthEgress = intVal(inst, "max_netbw_egress")
 		info.VirtualizationSolution = strVal(inst, "virtualization_solution")

@@ -22,21 +22,21 @@ If neither fires, the collector short-circuits with no HTTP call.
 
 | Field                            | Type                      | Description                                                                                             | Schema mapping                 |
 | -------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `vm_id`                          | `string`                  | VM UUID.                                                                                                | OTel `cloud.resource_id`       |
+| `id`                             | `string`                  | VM UUID.                                                                                                | OTel `cloud.resource_id`       |
 | `name`                           | `string`                  | VM name.                                                                                                | OTel `host.name`               |
-| `vm_size`                        | `string`                  | VM SKU (e.g. `Standard_D2s_v3`).                                                                        | OTel `host.type`               |
+| `type`                           | `string`                  | VM SKU (e.g. `Standard_D2s_v3`).                                                                        | OTel `host.type`               |
 | `resource_id`                    | `string`                  | Full ARM resource ID.                                                                                   | No direct schema mapping.      |
 | `resource_group_name`            | `string`                  | Resource group name.                                                                                    | No direct schema mapping.      |
 | `vm_scale_set_name`              | `string`                  | VMSS name (if part of one).                                                                             | No direct schema mapping.      |
 | `priority`                       | `string`                  | `Regular` / `Low` / `Spot`.                                                                             | No direct schema mapping.      |
 | `eviction_policy`                | `string`                  | Spot eviction policy.                                                                                   | No direct schema mapping.      |
-| `location`                       | `string`                  | Azure region (e.g. `eastus`).                                                                           | OTel `cloud.region`            |
+| `region`                         | `string`                  | Azure region (e.g. `eastus`).                                                                           | OTel `cloud.region`            |
 | `zone`                           | `string`                  | Availability zone (e.g. `1`).                                                                           | OTel `cloud.availability_zone` |
 | `placement_group_id`             | `string`                  | Placement group.                                                                                        | No direct schema mapping.      |
 | `platform_fault_domain`          | `string`                  | Fault domain index.                                                                                     | No direct schema mapping.      |
 | `platform_update_domain`         | `string`                  | Update domain index.                                                                                    | No direct schema mapping.      |
-| `subscription_id`                | `string`                  | Azure subscription UUID.                                                                                | OTel `cloud.account.id`        |
-| `az_environment`                 | `string`                  | `AzurePublicCloud` / `AzureUSGovernment` / etc.                                                         | No direct schema mapping.      |
+| `account_uid`                    | `string`                  | Azure subscription UUID.                                                                                | OTel `cloud.account.id`        |
+| `cloud_partition`                | `string`                  | `AzurePublicCloud` / `AzureUSGovernment` / etc.                                                         | No direct schema mapping.      |
 | `offer`                          | `string`                  | Marketplace offer.                                                                                      | No direct schema mapping.      |
 | `publisher`                      | `string`                  | Marketplace publisher.                                                                                  | No direct schema mapping.      |
 | `sku`                            | `string`                  | Marketplace SKU.                                                                                        | No direct schema mapping.      |
@@ -80,12 +80,12 @@ Sub-struct details (`Plan`, `StorageProfile`, `Disk`, `ManagedDisk`, `Tag`,
 ```json
 {
   "azure": {
-    "vm_id": "abcd-1234",
+    "id": "abcd-1234",
     "name": "web-1",
-    "vm_size": "Standard_D2s_v3",
-    "location": "eastus",
+    "type": "Standard_D2s_v3",
+    "region": "eastus",
     "zone": "1",
-    "subscription_id": "sub-uuid",
+    "account_uid": "sub-uuid",
     "interfaces": [
       {
         "mac_address": "000D3A...",
@@ -103,7 +103,7 @@ g, _ := gohai.New(gohai.WithCollectors("azure"))
 facts, _ := g.Collect(context.Background())
 
 if facts.Azure != nil {
-    fmt.Println(facts.Azure.SubscriptionID, facts.Azure.Location)
+    fmt.Println(facts.Azure.AccountUID, facts.Azure.Region)
 }
 ```
 

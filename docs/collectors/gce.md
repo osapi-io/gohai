@@ -22,12 +22,12 @@ their short forms; everything else is surfaced verbatim.
 
 | Field                       | Type                 | Description                                                                                             | Schema mapping                        |
 | --------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| `instance_id`               | `int64`              | GCE numeric instance ID.                                                                                | OTel `cloud.resource_id` / `host.id`  |
+| `id`                        | `int64`              | GCE numeric instance ID.                                                                                | OTel `cloud.resource_id` / `host.id`  |
 | `name`                      | `string`             | VM instance name.                                                                                       | OTel `host.name`                      |
 | `hostname`                  | `string`             | Fully-qualified internal DNS name.                                                                      | OCSF `device.hostname`                |
 | `cpu_platform`              | `string`             | Underlying CPU platform (e.g. `Intel Broadwell`).                                                       | OTel `host.cpu.model.name`            |
-| `machine_type`              | `string`             | Short machine type (e.g. `n1-standard-1`).                                                              | OTel `host.type`                      |
-| `image`                     | `string`             | Short image name (e.g. `debian-12`).                                                                    | OTel `host.image.name`                |
+| `type`                      | `string`             | Short machine type (e.g. `n1-standard-1`).                                                              | OTel `host.type`                      |
+| `image_id`                  | `string`             | Short image name (e.g. `debian-12`).                                                                    | OTel `host.image.name`                |
 | `description`               | `string`             | Free-form description set on the instance.                                                              | No direct schema mapping.             |
 | `tags`                      | `[]string`           | GCE instance tags (firewall-rule targets, not labels).                                                  | No direct schema mapping.             |
 | `preemptible`               | `bool`               | `true` when the VM is preemptible/spot.                                                                 | No direct schema mapping.             |
@@ -36,7 +36,7 @@ their short forms; everything else is surfaced verbatim.
 | `maintenance_event`         | `string`             | Current maintenance event (`NONE`, `MIGRATE_ON_HOST_MAINTENANCE`, etc.).                                | No direct schema mapping.             |
 | `zone`                      | `string`             | GCE zone (e.g. `us-central1-a`).                                                                        | OTel `cloud.availability_zone`        |
 | `region`                    | `string`             | GCE region, derived from zone (e.g. `us-central1`).                                                     | OTel `cloud.region`                   |
-| `project_id`                | `string`             | GCP project ID.                                                                                         | OTel `cloud.account.id`               |
+| `project_uid`               | `string`             | GCP project ID.                                                                                         | OTel `cloud.account.id`               |
 | `numeric_project_id`        | `int64`              | GCP project numeric ID.                                                                                 | No direct schema mapping.             |
 | `project_attributes`        | `map[string]string`  | Project-level metadata. Commonly contains `ssh-keys`, `enable-oslogin`, etc.                            | No direct schema mapping.             |
 | `licenses`                  | `[]string`           | GCP license IDs attached to the VM (for BYOL / compliance tracking).                                    | No direct schema mapping.             |
@@ -108,12 +108,12 @@ which in practice is GCE VMs.
 ```json
 {
   "gce": {
-    "instance_id": 1234567890123,
+    "id": 1234567890123,
     "name": "my-vm",
     "hostname": "my-vm.c.my-project.internal",
     "cpu_platform": "Intel Broadwell",
-    "machine_type": "n1-standard-1",
-    "image": "debian-12",
+    "type": "n1-standard-1",
+    "image_id": "debian-12",
     "description": "primary app server",
     "tags": ["http-server", "https-server"],
     "preemptible": false,
@@ -122,7 +122,7 @@ which in practice is GCE VMs.
     "maintenance_event": "NONE",
     "zone": "us-central1-a",
     "region": "us-central1",
-    "project_id": "my-project",
+    "project_uid": "my-project",
     "numeric_project_id": 987654321,
     "project_attributes": { "ssh-keys": "admin:ssh-rsa BBBB..." },
     "licenses": ["8045211539491955793"],

@@ -34,7 +34,7 @@ Consumers use this to:
 | `version`       | string | Distro version (`"24.04"`, `"7.9.2009"`, `"14.4.1"`).                   | `os.version`.                                        |
 | `version_extra` | string | macOS RSR patch suffix (`"(a)"`). Empty when no RSR is applied.         | No direct schema mapping.                            |
 | `family`        | string | Family grouping (`"debian"`, `"rhel"`, `"fedora"`, `"suse"`, `"arch"`). | No direct schema mapping — input to packaging logic. |
-| `architecture`  | string | Hardware arch (`"amd64"`, `"arm64"`).                                   | `device.hw_info.cpu_bits` is the nearest.            |
+| `cpu_architecture` | string | Hardware arch (`"amd64"`, `"arm64"`).                                | `device.hw_info.cpu_bits` is the nearest.            |
 | `build`         | string | macOS build identifier from `sw_vers` `BuildVersion` (`"23E224"`).      | `os.build`.                                          |
 
 `name` values pass through our `platformIDRemap` table (mirrors Ohai's
@@ -68,7 +68,7 @@ Fedora-based network OS (arista_eos), and WRLinux variants (nexus, ios_xr).
     "name": "ubuntu",
     "version": "24.04",
     "family": "debian",
-    "architecture": "amd64"
+    "cpu_architecture": "amd64"
   }
 }
 ```
@@ -82,7 +82,7 @@ Fedora-based network OS (arista_eos), and WRLinux variants (nexus, ios_xr).
     "name": "centos",
     "version": "7.9.2009",
     "family": "rhel",
-    "architecture": "x86_64"
+    "cpu_architecture": "x86_64"
   }
 }
 ```
@@ -97,7 +97,7 @@ Fedora-based network OS (arista_eos), and WRLinux variants (nexus, ios_xr).
     "version": "14.4.1",
     "version_extra": "(a)",
     "family": "Standalone Workstation",
-    "architecture": "arm64",
+    "cpu_architecture": "arm64",
     "build": "23E224"
   }
 }
@@ -162,7 +162,7 @@ On Linux the collector cascades through gopsutil + extensions:
 5. **Family fallback** from the maintained distro → family table when gopsutil's
    `PlatformFamily` is empty (long-tail distros gopsutil doesn't recognize:
    alma, rocky, kali, raspbian, cloudlinux, etc.).
-6. **Architecture** from `runtime.GOARCH`.
+6. **CPU Architecture** from `runtime.GOARCH`.
 
 On macOS:
 
