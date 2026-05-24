@@ -12,9 +12,8 @@ artifacts for gohai's ~950 JSON fields.
 | `gohai.schema.json` | Generated JSON Schema (draft 2020-12) for `gohai.Facts` — reflects current Go tags, regenerated after renames |
 | `schema.go`         | `//go:embed` of the schema for the `gohai validate` command           |
 | `gen/`              | Generator tool that reflects `gohai.Facts` into JSON Schema           |
+| `ocsf-extension/`  | gohai vendor extension (uid 1337) for the OCSF schema compiler        |
 | `references/`       | OCSF JSON + OTel YAML reference files used during audits              |
-| `references/`         | OCSF JSON + OTel YAML reference files used during mapping    |
-| `corpus/`             | External schema corpora (OSSEM) for cross-reference          |
 
 ## Three-tier naming ladder
 

@@ -1,0 +1,28 @@
+{
+  "caption": "gohai Device",
+  "description": "Extends the device object with gohai system fact attributes.",
+  "extends": "device",
+  "attributes": {
+    "fqdn": {
+      "requirement": "optional"
+    },
+    "machine_id": {
+      "requirement": "optional"
+    },
+    "init_system": {
+      "requirement": "optional"
+    },
+    "uptime_seconds": {
+      "requirement": "optional"
+    },
+    "timezone_name": {
+      "requirement": "optional"
+    },
+    "virtualization_role": {
+      "requirement": "optional"
+    },
+    "virtualization_systems": {
+      "requirement": "optional"
+    }
+  }
+}

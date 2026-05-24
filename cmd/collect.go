@@ -36,6 +36,7 @@ func newCollectCommand() *cobra.Command {
 	var (
 		pretty         bool
 		flat           bool
+		format         string
 		listCollectors bool
 		noDefaults     bool
 		withTimings    bool
@@ -50,13 +51,15 @@ func newCollectCommand() *cobra.Command {
 		Short: "Collect system facts",
 		Long: `Collect system facts and output as JSON.
 
+Output formats:
+  --format ohai    Collector-centric JSON (default)
+  --format ocsf    OCSF inventory_info event (class_uid 5001)
+
 Examples:
-  gohai collect
   gohai collect --pretty
-  gohai collect --flat
-  gohai collect --collector.cpu --collector.memory --no-defaults
-  gohai collect --category=cloud --category=hardware
-  gohai collect --with-timings --pretty`,
+  gohai collect --format ocsf --pretty
+  gohai collect --no-defaults --collector.cpu --collector.memory
+  gohai collect --pretty | gohai validate`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(
@@ -73,6 +76,7 @@ Examples:
 				enabled,
 				disabled,
 				categories,
+				format,
 				pretty,
 				flat,
 				noDefaults,
@@ -81,6 +85,12 @@ Examples:
 		},
 	}
 
+	cmd.Flags().StringVar(
+		&format,
+		"format",
+		"ohai",
+		"output format: ohai (default) or ocsf",
+	)
 	cmd.Flags().BoolVar(&pretty, "pretty", false, "pretty-print JSON output")
 	cmd.Flags().BoolVar(&flat, "flat", false, "output flat key=value pairs")
 	cmd.Flags().
@@ -166,8 +176,15 @@ func runCollect(
 	out io.Writer,
 	enabled, disabled *flagSet,
 	categories []string,
+	format string,
 	pretty, flat, noDefaults, withTimings bool,
 ) error {
+	switch format {
+	case "ohai", "ocsf":
+	default:
+		return fmt.Errorf("unknown format %q: must be ohai or ocsf", format)
+	}
+
 	var opts []gohai.Option
 	if !noDefaults {
 		opts = append(opts, gohai.WithDefaults())
@@ -197,6 +214,10 @@ func runCollect(
 	facts, err := g.Collect(ctx)
 	if err != nil {
 		return err
+	}
+
+	if format == "ocsf" {
+		return cli.WriteOCSF(out, facts, pretty)
 	}
 
 	return cli.WriteOutput(out, facts, pretty, flat)

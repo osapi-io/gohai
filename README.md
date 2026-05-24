@@ -26,30 +26,32 @@ collector model — not reimplementing `/proc` parsing from scratch.
 
 ### Schema: OCSF + OpenTelemetry
 
+gohai produces a validated [OCSF][] `inventory_info` event
+(class_uid 5001) via `--format ocsf`. Standard OCSF attributes map
+directly; a [gohai vendor extension](schemas/ocsf-extension/)
+(uid 1337) carries fields OCSF doesn't yet cover — validated against
+OCSF's own schema validator (12/12 tests passing).
+
 Field names follow a three-tier naming ladder:
 
 1. **[OCSF][]** (Open Cybersecurity Schema Framework) — primary
-   authority. Backed by AWS and Splunk for asset, observability, and
-   security data. Aligning means gohai output feeds SIEMs, data lakes,
-   and inventory tools without translation. ~108 fields are OCSF-named.
-   Browse [schema.ocsf.io][ocsf-schema] to see canonical names.
+   authority. ~108 fields map to standard OCSF objects (`device`,
+   `device_hw_info`, `os`, `network_interface`, `cloud`, `package`,
+   `process`). Browse [schema.ocsf.io][ocsf-schema].
 2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** —
-   when OCSF is silent. Covers areas OCSF hasn't: CPU microarchitecture,
-   memory states, filesystem attributes, hardware detail. ~74 fields.
+   when OCSF is silent. ~74 fields cover CPU microarchitecture,
+   memory states, filesystem attributes, hardware detail.
 3. **gohai convention** — for the ~768 remaining fields where no
    standard has an opinion. Starts from the backing library's field
-   name (gopsutil/ghw) in `snake_case`, with unit suffixes when
-   ambiguous.
+   name in `snake_case`.
 
-The complete per-field mapping with verifiable citations lives in
-[`schemas/field-mapping.md`](schemas/field-mapping.md). Fields where
-OCSF is silent are tracked in [`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md)
-as upstream OCSF contribution candidates.
+The complete per-field mapping lives in
+[`schemas/field-mapping.md`](schemas/field-mapping.md). Gap candidates
+for upstream OCSF PRs are tracked in
+[`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md).
 
-What we **collect** (which facts, which distro edge cases, which
-fallback sources) draws on [Chef Ohai][]'s years of accumulated plugin
-logic. What we **call** each field draws on OCSF + OpenTelemetry. We
-do not pursue Ohai JSON shape parity.
+What we **collect** draws on [Chef Ohai][]'s plugin methodology. What
+we **call** each field draws on OCSF + OpenTelemetry.
 
 ### Primary consumer
 
@@ -105,6 +107,7 @@ go build -o gohai .
 | ⚡ Concurrent Collection        | Collectors run concurrently; dependency graph resolves order when any collector declares deps.                                                                         |
 | ⏱️ Per-Collector Timings        | Opt-in `--with-timings` / `WithTimings()` embeds per-collector durations, status, and error messages under `_timings` in the JSON output                              |
 | 📊 OCSF + OpenTelemetry + Ohai  | Field names follow [OCSF](https://schema.ocsf.io/) then [OpenTelemetry](https://opentelemetry.io/docs/specs/semconv/resource/); data sources mirror Chef Ohai's plugins |
+| 🔄 Native OCSF Output          | `--format ocsf` produces a standards-compliant OCSF `inventory_info` event (class_uid 5001) — feed directly into SIEMs and data lakes                                   |
 | 🔌 SDK Integration              | Import as a Go package for OSAPI and others                                                                                                                           |
 
 ## 🔌 Collectors
@@ -130,36 +133,12 @@ explicit `--collector.X` flags.
 ### CLI
 
 ```bash
-# Collect the recommended default collector set
-gohai collect
-
-# Pretty-printed JSON
-gohai collect --pretty
-
-# Flat key=value pairs instead of nested JSON
-gohai collect --flat
-
-# Enable specific collectors on top of the defaults
-gohai collect --collector.process --collector.packages
-
-# Disable specific collectors
-gohai collect --no-collector.virtualization --no-collector.network
-
-# Skip defaults entirely; run only what --collector.X turns on
-gohai collect --no-defaults --collector.platform --collector.cpu
-
-# Embed per-collector timings + errors under `_timings` in the JSON
-gohai collect --with-timings --pretty
-
-# List every registered collector and exit
-gohai collect --list-collectors
-
-# Validate output against the embedded JSON Schema
-gohai collect --pretty | gohai validate
-gohai validate --file facts.json
-
-# Display version information
-gohai version
+gohai collect --pretty                          # default collectors, pretty JSON
+gohai collect --format ocsf --pretty            # OCSF inventory_info event
+gohai collect --flat                            # flat key=value pairs
+gohai collect --no-defaults --collector.cpu     # specific collectors only
+gohai collect --pretty | gohai validate          # validate against schema
+gohai version                                   # build info
 ```
 
 ### SDK

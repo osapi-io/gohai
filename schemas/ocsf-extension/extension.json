@@ -1,0 +1,7 @@
+{
+  "uid": 1337,
+  "name": "gohai",
+  "caption": "gohai System Facts",
+  "description": "Extension for gohai system fact collection fields not covered by core OCSF. Covers CPU security flags, kernel modules, security posture (FIPS/SELinux), SSH host keys, and detailed hardware/OS/network inventory.",
+  "version": "1.0.0"
+}

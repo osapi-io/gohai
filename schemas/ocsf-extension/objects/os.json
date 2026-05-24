@@ -1,0 +1,25 @@
+{
+  "caption": "gohai OS",
+  "description": "Extends the os object with distribution identity and kernel detail.",
+  "extends": "os",
+  "attributes": {
+    "distribution_id": {
+      "requirement": "optional"
+    },
+    "version_id": {
+      "requirement": "optional"
+    },
+    "version_codename": {
+      "requirement": "optional"
+    },
+    "variant_id": {
+      "requirement": "optional"
+    },
+    "kernel_name": {
+      "requirement": "optional"
+    },
+    "kernel_version": {
+      "requirement": "optional"
+    }
+  }
+}

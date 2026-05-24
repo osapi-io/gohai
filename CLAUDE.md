@@ -381,6 +381,7 @@ For setup, prerequisites, and contributing guidelines:
 - @docs/contributing.md - PR workflow and contribution guidelines
 - @docs/collectors/README.md - Per-collector reference
 - @schemas/README.md - JSON Schema, field-naming strategy, OCSF gap analysis
+- @docs/ocsf-validation.md - How to validate OCSF output and vendor extension
 
 ## Quick Reference
 

@@ -18,36 +18,19 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package cli
+package ocsf
 
-import "github.com/osapi-io/gohai/pkg/gohai"
-
-// SetIsTerminalFn swaps the terminal-detection function for testing.
-func SetIsTerminalFn(
-	fn func(int) bool,
-) func() {
-	old := isTerminalFn
-	isTerminalFn = fn
-
-	return func() { isTerminalFn = old }
+// Cloud is the OCSF cloud object — context for cloud-hosted instances.
+type Cloud struct {
+	Provider       string   `json:"provider,omitempty"`
+	Region         string   `json:"region,omitempty"`
+	Zone           string   `json:"zone,omitempty"`
+	Account        *Account `json:"account,omitempty"`
+	ProjectUID     string   `json:"project_uid,omitempty"`
+	CloudPartition string   `json:"cloud_partition,omitempty"`
 }
 
-// SetMarshalFactsFn swaps the facts marshaling function for testing.
-func SetMarshalFactsFn(
-	fn func(*gohai.Facts, bool) ([]byte, error),
-) func() {
-	old := marshalFactsFn
-	marshalFactsFn = fn
-
-	return func() { marshalFactsFn = old }
-}
-
-// SetMarshalOCSFFn swaps the OCSF marshaling function for testing.
-func SetMarshalOCSFFn(
-	fn func(*gohai.Facts, bool) ([]byte, error),
-) func() {
-	old := marshalOCSFFn
-	marshalOCSFFn = fn
-
-	return func() { marshalOCSFFn = old }
+// Account is the OCSF account object nested inside cloud.
+type Account struct {
+	UID string `json:"uid,omitempty"`
 }
