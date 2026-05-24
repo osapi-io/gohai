@@ -33,6 +33,8 @@ import (
 
 var schemaJSONFn = func() []byte { return schemas.SchemaJSON }
 
+var schemaResourceURL = "gohai.schema.json"
+
 // CompileSchema compiles the embedded gohai JSON Schema and returns
 // the compiled schema ready for validation.
 func CompileSchema() (*jsonschema.Schema, error) {
@@ -42,11 +44,11 @@ func CompileSchema() (*jsonschema.Schema, error) {
 	}
 
 	c := jsonschema.NewCompiler()
-	if err := c.AddResource("gohai.schema.json", schemaDoc); err != nil {
+	if err := c.AddResource(schemaResourceURL, schemaDoc); err != nil {
 		return nil, fmt.Errorf("add schema resource: %w", err)
 	}
 
-	return c.Compile("gohai.schema.json")
+	return c.Compile(schemaResourceURL)
 }
 
 // JSON validates raw JSON bytes against the embedded gohai schema.

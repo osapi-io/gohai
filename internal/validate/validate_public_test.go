@@ -53,18 +53,25 @@ func TestValidatePublicTestSuite(
 
 func (s *ValidatePublicTestSuite) TestCompileSchema() {
 	tests := []struct {
-		name     string
-		schemaFn func() []byte
-		wantErr  bool
+		name        string
+		schemaFn    func() []byte
+		resourceURL string
+		wantErr     bool
 	}{
 		{
 			name:    "valid embedded schema compiles",
 			wantErr: false,
 		},
 		{
-			name:     "invalid JSON schema fails",
+			name:     "invalid JSON schema fails unmarshal",
 			schemaFn: func() []byte { return []byte(`{not json}`) },
 			wantErr:  true,
+		},
+		{
+			name:        "invalid resource URL fails AddResource",
+			schemaFn:    func() []byte { return []byte(`{"type": "object"}`) },
+			resourceURL: "://bad\x00url",
+			wantErr:     true,
 		},
 	}
 
@@ -72,6 +79,10 @@ func (s *ValidatePublicTestSuite) TestCompileSchema() {
 		s.Run(tc.name, func() {
 			if tc.schemaFn != nil {
 				restore := validate.SetSchemaJSONFn(tc.schemaFn)
+				defer restore()
+			}
+			if tc.resourceURL != "" {
+				restore := validate.SetSchemaResourceURL(tc.resourceURL)
 				defer restore()
 			}
 

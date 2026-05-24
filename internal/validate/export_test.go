@@ -29,3 +29,13 @@ func SetSchemaJSONFn(
 
 	return func() { schemaJSONFn = old }
 }
+
+// SetSchemaResourceURL swaps the resource URL for testing.
+func SetSchemaResourceURL(
+	url string,
+) func() {
+	old := schemaResourceURL
+	schemaResourceURL = url
+
+	return func() { schemaResourceURL = old }
+}
