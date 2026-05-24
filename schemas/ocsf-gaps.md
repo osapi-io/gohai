@@ -47,13 +47,48 @@ collectors
 | New: `ipc_limits`                    | 9          |
 | Other (shells, root_group, block)    | 15         |
 
+### Upstream tracking
+
+| # | Candidate | Status | OCSF Issue | OCSF PR |
+|---|-----------|--------|------------|---------|
+| — | `cpu_info` object (prerequisite) | ✅ Submitted (not ours) | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 1 | `cpu_info.vulnerabilities` | ⏳ Blocked on #1630 | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 2 | New `kernel_module` object | 📋 Ready to submit | — | — |
+| 3 | New `security_posture` object | 📋 Ready to submit | — | — |
+| 4 | `cpu_info.flags` | ⏳ Blocked on #1630 | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 5 | `network_interface.interface_flags` | ✅ Submitted | [#1646](https://github.com/ocsf/ocsf-schema/issues/1646) | [#1647](https://github.com/ocsf/ocsf-schema/pull/1647) |
+| 6 | `cloud.security_groups` | 📋 Ready to submit | — | — |
+| 7 | `cloud.iam_role` / `service_accounts` | 📋 Ready to submit | — | — |
+| 8 | New `ssh_host_key` object | 📋 Ready to submit | — | — |
+| 9 | New `routing_entry` object | 📋 Ready to submit | — | — |
+| 10 | New `neighbor_entry` object | 📋 Ready to submit | — | — |
+| 11 | `cloud.vpc_id` / `subnet_id` | 📋 Ready to submit | — | — |
+| 12 | `cloud.encryption_at_host` | 📋 Ready to submit | — | — |
+| 13 | `cpu_info.vendor_id` | ⏳ Blocked on #1630 | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 14 | `cpu_info.family` | ⏳ Blocked on #1630 | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 15 | `cpu_info.model_id` | ⏳ Blocked on #1630 | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 16 | `cpu_info.stepping` | ⏳ Blocked on #1630 | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 17 | `os.distribution_id` | 📋 Ready to submit | — | — |
+| 18 | `os.distribution_family` | 📋 Ready to submit | — | — |
+| 19 | `session.terminal` | 📋 Ready to submit | — | — |
+| 20 | `session.remote_host` | 📋 Ready to submit | — | — |
+
+### Upstream activity to watch
+
+[ocsf/ocsf-schema#1630](https://github.com/ocsf/ocsf-schema/pull/1630) adds a
+new `cpu_info` object to OCSF, deprecating the flat `cpu_*` attributes on
+`device_hw_info`. Once it merges, our CPU gap candidates (#1, #4, #13–16 below)
+should target the new `cpu_info` object rather than the deprecated flat
+attributes. Our OCSF output (`pkg/gohai/ocsf/device.go` `DeviceHWInfo` struct)
+will also need updating to match the new object shape.
+
 ### Top 20 OCSF upstream PR candidates (ranked)
 
-1. `device_hw_info.cpu_vulnerabilities` — kernel-reported Spectre/Meltdown/MDS mitigations
+1. `cpu_info.vulnerabilities` — kernel-reported Spectre/Meltdown/MDS mitigations *(blocked on #1630)*
 2. New `kernel_module` object — loaded kernel modules (rootkit detection, CIS benchmarks)
 3. New `security_posture` object — FIPS mode, SELinux status/mode/policy
-4. `device_hw_info.cpu_flags` — security-relevant CPU feature flags (aes, sev, sgx, nx)
-5. `network_interface.flags` — interface flags including PROMISC detection
+4. `cpu_info.flags` — security-relevant CPU feature flags (aes, sev, sgx, nx) *(blocked on #1630)*
+5. `network_interface.interface_flags` — interface flags including PROMISC detection — **submitted:** [ocsf/ocsf-schema#1647](https://github.com/ocsf/ocsf-schema/pull/1647)
 6. `cloud.security_groups` — cloud firewall group membership
 7. `cloud.iam_role` / `cloud.service_accounts` — IAM bindings
 8. New `ssh_host_key` object — host key type, fingerprint, length
@@ -61,10 +96,10 @@ collectors
 10. New `neighbor_entry` object — ARP/NDP table entries
 11. `cloud.vpc_id` / `cloud.subnet_id` — network segmentation identifiers
 12. `cloud.encryption_at_host` — data-at-rest encryption status
-13. `device_hw_info.cpu_vendor_id` — OTel `host.cpu.vendor.id` promotion
-14. `device_hw_info.cpu_family` — OTel `host.cpu.family` promotion
-15. `device_hw_info.cpu_model_id` — OTel `host.cpu.model.id` promotion
-16. `device_hw_info.cpu_stepping` — OTel `host.cpu.stepping` promotion
+13. `cpu_info.vendor_id` — OTel `host.cpu.vendor.id` promotion *(blocked on #1630)*
+14. `cpu_info.family` — OTel `host.cpu.family` promotion *(blocked on #1630)*
+15. `cpu_info.model_id` — OTel `host.cpu.model.id` promotion *(blocked on #1630)*
+16. `cpu_info.stepping` — OTel `host.cpu.stepping` promotion *(blocked on #1630)*
 17. `os.distribution_id` — machine-parseable distro identifier
 18. `os.distribution_family` — parent distro lineage (id_like)
 19. `session.terminal` — terminal device for login sessions
