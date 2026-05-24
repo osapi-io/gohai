@@ -1,0 +1,108 @@
+{
+  "caption": "gohai Dictionary",
+  "description": "Attribute definitions for the gohai system facts extension (uid 1337).",
+  "name": "dictionary",
+  "attributes": {
+    "fqdn": {
+      "caption": "FQDN",
+      "description": "Fully qualified domain name of the host.",
+      "type": "string_t"
+    },
+    "machine_id": {
+      "caption": "Machine ID",
+      "description": "Persistent machine identifier from /etc/machine-id or IOPlatformUUID.",
+      "type": "string_t"
+    },
+    "init_system": {
+      "caption": "Init System",
+      "description": "The init system type: systemd, launchd, upstart, sysvinit.",
+      "type": "string_t"
+    },
+    "uptime_seconds": {
+      "caption": "Uptime Seconds",
+      "description": "Seconds since last boot.",
+      "type": "long_t"
+    },
+    "timezone_name": {
+      "caption": "Timezone Name",
+      "description": "IANA timezone database name (e.g. America/Los_Angeles).",
+      "type": "string_t"
+    },
+    "virtualization_role": {
+      "caption": "Virtualization Role",
+      "description": "Whether this host is a virtualization 'host' or 'guest'.",
+      "type": "string_t"
+    },
+    "virtualization_systems": {
+      "caption": "Virtualization Systems",
+      "description": "All detected virtualization layers (name to role map).",
+      "type": "json_t"
+    },
+    "cpu_sockets": {
+      "caption": "CPU Sockets",
+      "description": "Physical CPU socket/package count.",
+      "type": "integer_t"
+    },
+    "cpu_vendor_id": {
+      "caption": "CPU Vendor ID",
+      "description": "CPU vendor identifier (GenuineIntel, AuthenticAMD).",
+      "type": "string_t"
+    },
+    "cpu_family": {
+      "caption": "CPU Family",
+      "description": "CPU family number.",
+      "type": "string_t"
+    },
+    "cpu_model_id": {
+      "caption": "CPU Model ID",
+      "description": "CPU model number within family.",
+      "type": "string_t"
+    },
+    "cpu_stepping": {
+      "caption": "CPU Stepping",
+      "description": "CPU silicon revision.",
+      "type": "integer_t"
+    },
+    "cpu_flags": {
+      "caption": "CPU Flags",
+      "description": "CPU feature flags (aes, avx2, ssse3, etc.).",
+      "type": "string_t",
+      "is_array": true
+    },
+    "cpu_vulnerabilities": {
+      "caption": "CPU Vulnerabilities",
+      "description": "CPU hardware vulnerability mitigation status from /sys.",
+      "type": "json_t"
+    },
+    "distribution_id": {
+      "caption": "Distribution ID",
+      "description": "Machine-readable OS distribution identifier from os-release (e.g. ubuntu, fedora).",
+      "type": "string_t"
+    },
+    "version_id": {
+      "caption": "Version ID",
+      "description": "Machine-parseable OS version from os-release (e.g. 22.04).",
+      "type": "string_t"
+    },
+    "version_codename": {
+      "caption": "Version Codename",
+      "description": "OS release codename from os-release (e.g. jammy, bookworm).",
+      "type": "string_t"
+    },
+    "variant_id": {
+      "caption": "Variant ID",
+      "description": "OS variant from os-release (e.g. server, workstation, container).",
+      "type": "string_t"
+    },
+    "kernel_name": {
+      "caption": "Kernel Name",
+      "description": "Kernel name from uname -s (Linux, Darwin).",
+      "type": "string_t"
+    },
+    "kernel_version": {
+      "caption": "Kernel Version",
+      "description": "Full kernel version string from uname -v.",
+      "type": "string_t"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "caption": "gohai Device Hardware Info",
+  "description": "Extends device_hw_info with CPU microarchitecture and security detail.",
+  "extends": "device_hw_info",
+  "attributes": {
+    "cpu_sockets": {
+      "requirement": "optional"
+    },
+    "cpu_vendor_id": {
+      "requirement": "optional"
+    },
+    "cpu_family": {
+      "requirement": "optional"
+    },
+    "cpu_model_id": {
+      "requirement": "optional"
+    },
+    "cpu_stepping": {
+      "requirement": "optional"
+    },
+    "cpu_flags": {
+      "requirement": "optional"
+    },
+    "cpu_vulnerabilities": {
+      "requirement": "optional"
+    }
+  }
+}
