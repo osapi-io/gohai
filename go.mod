@@ -12,10 +12,12 @@ require (
 	github.com/shirou/gopsutil/v4 v4.26.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
+	github.com/tklauser/go-sysconf v0.3.16
 	github.com/vishvananda/netlink v1.3.1
 	go.uber.org/mock v0.6.0
+	golang.org/x/crypto v0.50.0
 	golang.org/x/sys v0.45.0
-	golang.org/x/term v0.42.0
+	golang.org/x/term v0.43.0
 )
 
 require (
@@ -209,7 +211,6 @@ require (
 	github.com/tetafro/godot v1.5.6 // indirect
 	github.com/timakin/bodyclose v0.0.0-20260129054331-73d1f95b84b4 // indirect
 	github.com/timonwong/loggercheck v0.11.0 // indirect
-	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/tomarrell/wrapcheck/v2 v2.12.0 // indirect
 	github.com/tommy-muehle/go-mnd/v2 v2.5.1 // indirect
@@ -235,7 +236,6 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
-	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/exp/typeparams v0.0.0-20260209203927-2842357ff358 // indirect
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
