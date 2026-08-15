@@ -370,7 +370,7 @@ Methodology gaps between gohai and Ohai live on GitHub as issues labeled
 3. Paste the issue's "Doc after this fix lands" block into the collector doc,
    replacing Description / Collected Fields / Data Sources as specified.
 4. PR description must include `Closes #N`.
-5. CI green, 100% coverage, `just go::vet` clean.
+5. CI green, 100% coverage, `just go-vet` clean.
 
 When every open methodology issue closes, every collector doc reads as a
 self-contained spec and the SDK has zero unresolved methodology divergences from

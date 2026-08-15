@@ -62,7 +62,7 @@ just deps
 ## Quick Reference
 
 ```bash
-just fetch / just deps / just test / just go::unit / just go::vet / just go::fmt
+just fetch / just deps / just test / just go-unit / just go-vet / just go-fmt
 gohai collect --pretty             # run default collectors
 gohai collect --no-defaults --collector.cpu  # specific collectors
 gohai collect --pretty | gohai validate      # validate against schema
@@ -145,9 +145,9 @@ Go code should be formatted by [`gofumpt`][gofumpt] and linted using
 [`golangci-lint`][golangci-lint]. This style is enforced by CI.
 
 ```bash
-just go::fmt-check   # Check formatting
-just go::fmt         # Auto-fix formatting
-just go::vet         # Run linter
+just go-fmt-check   # Check formatting
+just go-fmt         # Auto-fix formatting
+just go-vet         # Run linter
 ```
 
 ### Documentation
@@ -192,8 +192,8 @@ func (base) Name() string {
 
 ```bash
 just test           # Run all tests (lint + unit + coverage)
-just go::unit       # Run unit tests only
-just go::unit-cov   # Generate coverage report
+just go-unit       # Run unit tests only
+just go-unit-cov   # Generate coverage report
 go test -run TestName -v ./internal/collector/platform/...  # Run a single test
 ```
 
@@ -201,7 +201,7 @@ Coverage is gated at 100%. `just test` fails if total coverage drops below it,
 so a change that adds untested code fails locally and in CI:
 
 ```bash
-just go::unit-cov-check   # Report coverage and fail below the target
+just go-unit-cov-check   # Report coverage and fail below the target
 ```
 
 The target is declared in `.github/codecov.yml` and in the shared `go` justfile
@@ -403,7 +403,7 @@ Before marking a collector complete, every item below must be true:
    live as GitHub issues (labeled `methodology-gap` /
    `collector:<name>`).
 8. **README.md** row flipped to `✅ (<backing>)`.
-9. **Lint clean**, `just go::vet` returns 0 issues.
+9. **Lint clean**, `just go-vet` returns 0 issues.
 10. **Commit message** explains the "why" — what Ohai/OCSF
     cross-references drove the implementation, what extensions over the
     upstream library we added, any deliberate deviations.
@@ -450,7 +450,7 @@ Run `just ready` before committing to ensure generated code, package docs,
 formatting, and lint are all up to date:
 
 ```bash
-just ready   # generate, docs::fmt, go::fmt, go::vet
+just ready   # generate, docs::fmt, go-fmt, go-vet
 ```
 
 ## Branching

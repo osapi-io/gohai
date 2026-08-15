@@ -257,7 +257,7 @@ Also update `docs/collectors/README.md` if the collector status changes.
 ```bash
 go build ./...
 go test ./... -count=1
-just go::vet
+just go-vet
 go run . --collector.<name> --pretty
 ```
 
