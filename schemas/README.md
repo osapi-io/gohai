@@ -5,15 +5,15 @@ artifacts for gohai's ~950 JSON fields.
 
 ## What's here
 
-| File                | Purpose                                                               |
-| ------------------- | --------------------------------------------------------------------- |
+| File                | Purpose                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `field-mapping.md`  | **Source of truth.** Per-field tier mapping (~950 rows) with `Changed? yes/no` showing which fields need renaming to match OCSF/OTel |
-| `ocsf-gaps.md`      | Fields where OCSF *should* have coverage but doesn't — upstream PR candidates for the OCSF schema repo |
-| `gohai.schema.json` | Generated JSON Schema (draft 2020-12) for `gohai.Facts` — reflects current Go tags, regenerated after renames |
-| `schema.go`         | `//go:embed` of the schema for the `gohai validate` command           |
-| `gen/`              | Generator tool that reflects `gohai.Facts` into JSON Schema           |
-| `ocsf-extension/`  | gohai vendor extension (uid 1337) for the OCSF schema compiler        |
-| `references/`       | OCSF JSON + OTel YAML reference files used during audits              |
+| `ocsf-gaps.md`      | Fields where OCSF *should* have coverage but doesn't — upstream PR candidates for the OCSF schema repo                               |
+| `gohai.schema.json` | Generated JSON Schema (draft 2020-12) for `gohai.Facts` — reflects current Go tags, regenerated after renames                        |
+| `schema.go`         | `//go:embed` of the schema for the `gohai validate` command                                                                          |
+| `gen/`              | Generator tool that reflects `gohai.Facts` into JSON Schema                                                                          |
+| `ocsf-extension/`   | gohai vendor extension (uid 1337) for the OCSF schema compiler                                                                       |
+| `references/`       | OCSF JSON + OTel YAML reference files used during audits                                                                             |
 
 ## Three-tier naming ladder
 
@@ -68,8 +68,8 @@ feeds directly into security workflows:
 - **Vulnerability management** — "which hosts have this CPU flag / kernel
   version / SELinux mode?"
 - **Compliance** — "do all hosts meet CIS benchmarks for X?"
-- **Incident response** — "what was this host's hardware, software, and
-  network state when the alert fired?"
+- **Incident response** — "what was this host's hardware, software, and network
+  state when the alert fired?"
 - **Asset inventory** — "what's running where, what hardware, what containers,
   what services?"
 
@@ -79,8 +79,8 @@ schema?** If yes, it's an OCSF gap candidate.
 
 ### Gap candidates
 
-[`ocsf-gaps.md`](ocsf-gaps.md) lists fields that gohai emits but OCSF
-doesn't yet cover. Each entry includes:
+[`ocsf-gaps.md`](ocsf-gaps.md) lists fields that gohai emits but OCSF doesn't
+yet cover. Each entry includes:
 
 - What the field is
 - Why OCSF lacks it
@@ -107,31 +107,31 @@ For every JSON field in every collector, apply this sequence:
    - If our current JSON tag doesn't match, set `Changed? yes` in
      `field-mapping.md` and put the correct name in `Chosen JSON`.
 2. **Check OTel next** (only if OCSF is silent). Open the semconv YAMLs in
-   `references/otel-*.yaml`. Does OTel have an attribute for this concept?
-   If yes:
+   `references/otel-*.yaml`. Does OTel have an attribute for this concept? If
+   yes:
    - The field is **T2**.
    - The JSON tag **MUST** use the OTel attribute name (last segment of the
      dotted path, after redundant-prefix stripping).
    - Same rename rule as above.
 3. **Convention (T3).** Neither OCSF nor OTel covers it. Use the backing
-   library's field name in `snake_case` with unit suffixes when ambiguous.
-   No rename needed — document as T3.
-4. **OCSF gap candidate?** If the field represents a concept OCSF *should*
-   cover but doesn't, add it to `ocsf-gaps.md`.
+   library's field name in `snake_case` with unit suffixes when ambiguous. No
+   rename needed — document as T3.
+4. **OCSF gap candidate?** If the field represents a concept OCSF *should* cover
+   but doesn't, add it to `ocsf-gaps.md`.
 
 ### After the audit
 
 5. **Update `field-mapping.md`** with correct tiers, `Changed?` flags, and
    `Chosen JSON` values.
-6. **Rename Go code** — change struct field names and `json:"..."` tags to
-   match `Chosen JSON` for every `Changed? yes` row.
+6. **Rename Go code** — change struct field names and `json:"..."` tags to match
+   `Chosen JSON` for every `Changed? yes` row.
 7. **Run `just generate`** to regenerate `gohai.schema.json` with the new tags.
 8. **Run tests** — `go test ./...` to verify nothing broke.
 
 ### Key rule
 
 **The JSON tag must match the schema name.** If `field-mapping.md` says a field
-maps to OTel `cloud.resource_id` but the JSON tag is `instance_id`, that's a
-bug — the tag must be renamed to `resource_id`. The mapping document is not a
+maps to OTel `cloud.resource_id` but the JSON tag is `instance_id`, that's a bug
+— the tag must be renamed to `resource_id`. The mapping document is not a
 translation table; it's a declaration of what the field IS named, verified
 against the schema source.

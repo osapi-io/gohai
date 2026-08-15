@@ -103,7 +103,7 @@ func main() {
 
 ## When to use `Cloud()` vs. the typed field directly
 
-- **Provider-agnostic code** (logging "this host is on \<cloud\>", fleet
+- **Provider-agnostic code** (logging "this host is on \<cloud>", fleet
   inventory, feature-flag gating) — use `Cloud()`.
 - **Provider-specific code** that already knows it cares about AWS — skip
   `Cloud()` and check `facts.Ec2 != nil` directly. It's shorter, faster, and
