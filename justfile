@@ -2,8 +2,6 @@
 # Minimum total coverage. Declared again in .github/codecov.yml —
 # change both together.
 
-go_coverage_target := "100"
-
 import? '.just/remote/go.just'
 
 mod? docs '.just/remote/docs.mod.just'
