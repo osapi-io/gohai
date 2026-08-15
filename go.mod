@@ -6,7 +6,7 @@ require (
 	github.com/avfs/avfs v0.35.0
 	github.com/caarlos0/go-version v0.2.2
 	github.com/invopop/jsonschema v0.14.0
-	github.com/jaypipes/ghw v0.24.0
+	github.com/jaypipes/ghw v0.25.0
 	github.com/jaypipes/pcidb v1.1.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/shirou/gopsutil/v4 v4.26.4
