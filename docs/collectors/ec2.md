@@ -161,56 +161,56 @@ run.
 
 ## Data Sources
 
-1. **Detection gate:** any of the following triggers detection:
-   - `dmi.BIOS.Manufacturer` contains `"Amazon"` (Ohai's `has_ec2_amazon_dmi?`)
-   - `dmi.BIOS.Ver` contains `"amazon"` lowercase (Ohai's `has_ec2_xen_dmi?` —
-     catches HVM instances on Xen-based hypervisors)
-   - `/sys/hypervisor/uuid` starts with `"ec2"` (Ohai's `has_ec2_xen_uuid?`)
-2. **IMDSv2 token:** `PUT /latest/api/token` with
-   `X-aws-ec2-metadata-token-ttl-seconds: 60`. The response body is the token.
-   404 → IMDSv1 fallback (no token header on subsequent reads), matching Ohai's
-   behavior.
-3. **API version negotiation:** `GET /` lists EC2's known versions
-   (newline-separated). The collector intersects this with its
-   `supportedAPIVersions` allowlist (the same set Ohai's
-   `EC2_SUPPORTED_VERSIONS` carries) and picks the latest match. Any negotiation
-   failure (transport error, 404, no intersection, empty body) falls back to
-   `"latest"` — which EC2 aliases to its newest supported version. Matches
-   Ohai's `best_api_version` handshake.
-4. **Meta-data tree:** GETs against a curated list of `/<version>/meta-data/*`
-   paths. In addition to the core identity/network fields this includes
-   placement sub-paths (`placement/availability-zone-id`,
-   `placement/group-name`, `placement/host-id`, `placement/partition-number`),
-   legacy paravirt boot (`kernel-id`, `ramdisk-id`), lifecycle signals
-   (`instance-action`, `spot/instance-action`, `spot/termination-time`),
-   `product-codes`, and the `services/{domain,partition}` endpoints (needed to
-   distinguish GovCloud / China from the commercial partition).
-   `security-groups` and `local-ipv4s` are split on newlines into arrays
-   (matches Ohai's `EC2_ARRAY_VALUES`).
-5. **Per-ENI subtree:** the collector walks
-   `/<version>/meta-data/network/interfaces/macs/` to enumerate ENIs, then
-   recurses into each MAC's subdirectory to populate the typed
-   `NetworkInterface` (subnet, vpc, security groups, IP arrays). Matches Ohai's
-   `fetch_dir_metadata` for `EC2_ARRAY_DIR`.
-6. **Directory-walking subroutines:** two listings are walked into typed
-   collections rather than stored as raw text:
-   - `GET /<version>/meta-data/public-keys/` yields lines like `0=my-key`; for
-     each index the collector fetches `public-keys/<i>/openssh-key` and appends
-     the OpenSSH-format string to `public_keys[]`. Missing `=` delimiters and
-     per-key fetch errors are tolerated.
-   - `GET /<version>/meta-data/block-device-mapping/` lists virtual names
-     (`ami`, `root`, `ebs1`, ...); each leaf is fetched and stored in
-     `block_device_mapping[<name>] = <device-path>`. Matches the shape Ohai
-     produces under `block_device_mapping`.
-7. **Security scrub:**
-   `identity_credentials_ec2_security_credentials_ec2_instance` is dropped from
-   any newline-split list (mirror's Ohai's explicit skip).
-8. **IAM info:** `GET /<version>/meta-data/iam/info` — parsed as JSON. We
-   deliberately do NOT fetch `iam/security-credentials/<role>/` because it
-   contains short-lived AWS access keys — matches Ohai's scrub of secrets.
-9. **Identity document:** `GET /<version>/dynamic/instance-identity/document` —
-   JSON with `accountId`, `region`, `availabilityZone`, `instanceId`. Fills the
-   top-level fields when the meta-data tree doesn't supply them.
+01. **Detection gate:** any of the following triggers detection:
+    - `dmi.BIOS.Manufacturer` contains `"Amazon"` (Ohai's `has_ec2_amazon_dmi?`)
+    - `dmi.BIOS.Ver` contains `"amazon"` lowercase (Ohai's `has_ec2_xen_dmi?` —
+      catches HVM instances on Xen-based hypervisors)
+    - `/sys/hypervisor/uuid` starts with `"ec2"` (Ohai's `has_ec2_xen_uuid?`)
+02. **IMDSv2 token:** `PUT /latest/api/token` with
+    `X-aws-ec2-metadata-token-ttl-seconds: 60`. The response body is the token.
+    404 → IMDSv1 fallback (no token header on subsequent reads), matching Ohai's
+    behavior.
+03. **API version negotiation:** `GET /` lists EC2's known versions
+    (newline-separated). The collector intersects this with its
+    `supportedAPIVersions` allowlist (the same set Ohai's
+    `EC2_SUPPORTED_VERSIONS` carries) and picks the latest match. Any
+    negotiation failure (transport error, 404, no intersection, empty body)
+    falls back to `"latest"` — which EC2 aliases to its newest supported
+    version. Matches Ohai's `best_api_version` handshake.
+04. **Meta-data tree:** GETs against a curated list of `/<version>/meta-data/*`
+    paths. In addition to the core identity/network fields this includes
+    placement sub-paths (`placement/availability-zone-id`,
+    `placement/group-name`, `placement/host-id`, `placement/partition-number`),
+    legacy paravirt boot (`kernel-id`, `ramdisk-id`), lifecycle signals
+    (`instance-action`, `spot/instance-action`, `spot/termination-time`),
+    `product-codes`, and the `services/{domain,partition}` endpoints (needed to
+    distinguish GovCloud / China from the commercial partition).
+    `security-groups` and `local-ipv4s` are split on newlines into arrays
+    (matches Ohai's `EC2_ARRAY_VALUES`).
+05. **Per-ENI subtree:** the collector walks
+    `/<version>/meta-data/network/interfaces/macs/` to enumerate ENIs, then
+    recurses into each MAC's subdirectory to populate the typed
+    `NetworkInterface` (subnet, vpc, security groups, IP arrays). Matches Ohai's
+    `fetch_dir_metadata` for `EC2_ARRAY_DIR`.
+06. **Directory-walking subroutines:** two listings are walked into typed
+    collections rather than stored as raw text:
+    - `GET /<version>/meta-data/public-keys/` yields lines like `0=my-key`; for
+      each index the collector fetches `public-keys/<i>/openssh-key` and appends
+      the OpenSSH-format string to `public_keys[]`. Missing `=` delimiters and
+      per-key fetch errors are tolerated.
+    - `GET /<version>/meta-data/block-device-mapping/` lists virtual names
+      (`ami`, `root`, `ebs1`, ...); each leaf is fetched and stored in
+      `block_device_mapping[<name>] = <device-path>`. Matches the shape Ohai
+      produces under `block_device_mapping`.
+07. **Security scrub:**
+    `identity_credentials_ec2_security_credentials_ec2_instance` is dropped from
+    any newline-split list (mirror's Ohai's explicit skip).
+08. **IAM info:** `GET /<version>/meta-data/iam/info` — parsed as JSON. We
+    deliberately do NOT fetch `iam/security-credentials/<role>/` because it
+    contains short-lived AWS access keys — matches Ohai's scrub of secrets.
+09. **Identity document:** `GET /<version>/dynamic/instance-identity/document` —
+    JSON with `accountId`, `region`, `availabilityZone`, `instanceId`. Fills the
+    top-level fields when the meta-data tree doesn't supply them.
 10. **User-data:** `GET /<version>/user-data/` — stored plaintext when valid
     UTF-8, base64-encoded when binary. Matches Ohai's `Encoding::BINARY` check.
 11. **User-Agent:** `gohai` (the cloudmetadata default).

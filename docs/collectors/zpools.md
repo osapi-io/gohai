@@ -6,8 +6,8 @@
 
 Reports ZFS pool status by running
 `zpool list -H -o name,size,alloc,free,health,altroot`. Both Linux and macOS can
-host ZFS via [OpenZFS][], so both variants attempt to run `zpool`. When `zpool`
-is not found or returns a non-zero exit, an empty pool list is returned without
+host ZFS via [OpenZFS], so both variants attempt to run `zpool`. When `zpool` is
+not found or returns a non-zero exit, an empty pool list is returned without
 error.
 
 The `-` sentinel that `zpool` reports for unavailable fields (e.g. `altroot`
@@ -131,4 +131,4 @@ inventory.
   the `zpool list` invocation.
 - Go stdlib `bufio` and `strings` for output parsing.
 
-[OpenZFS]: https://openzfs.org/
+[openzfs]: https://openzfs.org/

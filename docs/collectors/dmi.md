@@ -5,11 +5,11 @@
 ## Description
 
 Reports SMBIOS / DMI data — BIOS, baseboard, chassis, and product identity. On
-Linux the data comes from `/sys/class/dmi/id/*` via [ghw][], which reads the
-sysfs entries exposed by the kernel (no root needed for most fields —
-`product_serial` and `product_uuid` are 0400 and return empty for non-root
-callers). macOS has no SMBIOS equivalent; the collector returns an empty Info
-there and the `hardware` collector (planned) covers macOS hardware identity.
+Linux the data comes from `/sys/class/dmi/id/*` via [ghw], which reads the sysfs
+entries exposed by the kernel (no root needed for most fields — `product_serial`
+and `product_uuid` are 0400 and return empty for non-root callers). macOS has no
+SMBIOS equivalent; the collector returns an empty Info there and the `hardware`
+collector (planned) covers macOS hardware identity.
 
 Primary consumers are cloud-provider collectors (`gce`, `ec2`, `azure`, ...)
 which use `product.name` / `product.vendor_name` / `bios.manufacturer` /

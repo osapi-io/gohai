@@ -88,7 +88,7 @@ the file fallback in [chef/ohai#1562](https://github.com/chef/ohai/pull/1562)
 
 - On modern Debian/Ubuntu the `lsb-release` package ships both the file and the
   CLI; when one is present the other is too, so the fallback is redundant.
-- The file fallback was originally added for legacy Debian <7 where only the
+- The file fallback was originally added for legacy Debian \<7 where only the
   file was installed. That class of host is out of scope.
 - Minimized container images that strip the CLI but keep the file are an edge
   case; the correct fix there is to install the `lsb-release` package (or

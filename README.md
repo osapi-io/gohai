@@ -11,53 +11,51 @@
 
 # gohai
 
-**gohai is an SDK-first Go library** for collecting comprehensive system
-facts, inspired by [Chef Ohai][]. Import it into your Go application for
-typed access to system facts — or use the standalone `gohai` CLI, a thin
-wrapper over the same SDK.
+**gohai is an SDK-first Go library** for collecting comprehensive system facts,
+inspired by [Chef Ohai]. Import it into your Go application for typed access to
+system facts — or use the standalone `gohai` CLI, a thin wrapper over the same
+SDK.
 
-> 🐧 **Linux-first.** macOS is supported with a narrower field surface
-> (see per-collector docs for platform coverage); Windows is not supported.
+> 🐧 **Linux-first.** macOS is supported with a narrower field surface (see
+> per-collector docs for platform coverage); Windows is not supported.
 
-Each collector wraps a well-maintained backing source ([gopsutil][],
-[ghw][], [procfs][], cloud SDKs) and reshapes its output into typed Go
-structs. gohai's value is the unified API, typed structs, and pluggable
-collector model — not reimplementing `/proc` parsing from scratch.
+Each collector wraps a well-maintained backing source ([gopsutil], [ghw],
+[procfs], cloud SDKs) and reshapes its output into typed Go structs. gohai's
+value is the unified API, typed structs, and pluggable collector model — not
+reimplementing `/proc` parsing from scratch.
 
 ### Schema: OCSF + OpenTelemetry
 
-gohai produces a validated [OCSF][] `inventory_info` event
-(class_uid 5001) via `--format ocsf`. Standard OCSF attributes map
-directly; a [gohai vendor extension](schemas/ocsf-extension/)
-(uid 1337) carries fields OCSF doesn't yet cover — validated against
-OCSF's own schema validator (12/12 tests passing).
+gohai produces a validated [OCSF] `inventory_info` event (class_uid 5001) via
+`--format ocsf`. Standard OCSF attributes map directly; a
+[gohai vendor extension](schemas/ocsf-extension/) (uid 1337) carries fields OCSF
+doesn't yet cover — validated against OCSF's own schema validator (12/12 tests
+passing).
 
 Field names follow a three-tier naming ladder:
 
-1. **[OCSF][]** (Open Cybersecurity Schema Framework) — primary
-   authority. ~108 fields map to standard OCSF objects (`device`,
-   `device_hw_info`, `os`, `network_interface`, `cloud`, `package`,
-   `process`). Browse [schema.ocsf.io][ocsf-schema].
-2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** —
-   when OCSF is silent. ~74 fields cover CPU microarchitecture,
-   memory states, filesystem attributes, hardware detail.
-3. **gohai convention** — for the ~768 remaining fields where no
-   standard has an opinion. Starts from the backing library's field
-   name in `snake_case`.
+1. **[OCSF]** (Open Cybersecurity Schema Framework) — primary authority. ~108
+   fields map to standard OCSF objects (`device`, `device_hw_info`, `os`,
+   `network_interface`, `cloud`, `package`, `process`). Browse
+   [schema.ocsf.io][ocsf-schema].
+2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** — when OCSF
+   is silent. ~74 fields cover CPU microarchitecture, memory states, filesystem
+   attributes, hardware detail.
+3. **gohai convention** — for the ~768 remaining fields where no standard has an
+   opinion. Starts from the backing library's field name in `snake_case`.
 
 The complete per-field mapping lives in
-[`schemas/field-mapping.md`](schemas/field-mapping.md). Gap candidates
-for upstream OCSF PRs are tracked in
-[`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md).
+[`schemas/field-mapping.md`](schemas/field-mapping.md). Gap candidates for
+upstream OCSF PRs are tracked in [`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md).
 
-What we **collect** draws on [Chef Ohai][]'s plugin methodology. What
-we **call** each field draws on OCSF + OpenTelemetry.
+What we **collect** draws on [Chef Ohai]'s plugin methodology. What we **call**
+each field draws on OCSF + OpenTelemetry.
 
 ### Primary consumer
 
-gohai is built to be embedded in [OSAPI][] and other Go services that need
-typed system facts for routing, guards, discovery, inventory, and
-compliance. The CLI is a convenience — the SDK is the product.
+gohai is built to be embedded in [OSAPI] and other Go services that need typed
+system facts for routing, guards, discovery, inventory, and compliance. The CLI
+is a convenience — the SDK is the product.
 
 ## 📦 Install
 
@@ -96,26 +94,26 @@ go build -o gohai .
 
 ## ✨ Features
 
-| Feature                         | Description                                                                                                                                                           |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔌 Pluggable Collectors         | Enable/disable individual fact collectors                                                                                                                             |
-| 🏗️ Typed Structs                | Strongly-typed Go structs for all facts                                                                                                                               |
-| 📄 JSON Output                  | Nested JSON output for CLI and programmatic use                                                                                                                       |
-| 🗺️ Flat Map Access              | Dot-separated key-value access                                                                                                                                        |
-| 🐧 Cross-Platform               | Linux primary, macOS best-effort                                                                                                                                      |
-| 🔗 Collector Dependencies       | Automatic dependency resolution between facts                                                                                                                         |
-| ⚡ Concurrent Collection        | Collectors run concurrently; dependency graph resolves order when any collector declares deps.                                                                         |
-| ⏱️ Per-Collector Timings        | Opt-in `--with-timings` / `WithTimings()` embeds per-collector durations, status, and error messages under `_timings` in the JSON output                              |
-| 📊 OCSF + OpenTelemetry + Ohai  | Field names follow [OCSF](https://schema.ocsf.io/) then [OpenTelemetry](https://opentelemetry.io/docs/specs/semconv/resource/); data sources mirror Chef Ohai's plugins |
+| Feature                        | Description                                                                                                                                                             |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔌 Pluggable Collectors        | Enable/disable individual fact collectors                                                                                                                               |
+| 🏗️ Typed Structs               | Strongly-typed Go structs for all facts                                                                                                                                 |
+| 📄 JSON Output                 | Nested JSON output for CLI and programmatic use                                                                                                                         |
+| 🗺️ Flat Map Access             | Dot-separated key-value access                                                                                                                                          |
+| 🐧 Cross-Platform              | Linux primary, macOS best-effort                                                                                                                                        |
+| 🔗 Collector Dependencies      | Automatic dependency resolution between facts                                                                                                                           |
+| ⚡ Concurrent Collection       | Collectors run concurrently; dependency graph resolves order when any collector declares deps.                                                                          |
+| ⏱️ Per-Collector Timings       | Opt-in `--with-timings` / `WithTimings()` embeds per-collector durations, status, and error messages under `_timings` in the JSON output                                |
+| 📊 OCSF + OpenTelemetry + Ohai | Field names follow [OCSF](https://schema.ocsf.io/) then [OpenTelemetry](https://opentelemetry.io/docs/specs/semconv/resource/); data sources mirror Chef Ohai's plugins |
 | 🔄 Native OCSF Output          | `--format ocsf` produces a standards-compliant OCSF `inventory_info` event (class_uid 5001) — feed directly into SIEMs and data lakes                                   |
-| 🔌 SDK Integration              | Import as a Go package for OSAPI and others                                                                                                                           |
+| 🔌 SDK Integration             | Import as a Go package for OSAPI and others                                                                                                                             |
 
 ## 🔌 Collectors
 
-65 collectors across 9 categories. See the **[Collectors
-reference](docs/collectors/README.md)** for the full catalog —
-implementation status, default membership, schema mappings, and
-per-collector docs.
+65 collectors across 9 categories. See the
+**[Collectors reference](docs/collectors/README.md)** for the full catalog —
+implementation status, default membership, schema mappings, and per-collector
+docs.
 
 Collectors are individually toggled using node_exporter-style flags —
 `--collector.<name>` to opt in, `--no-collector.<name>` to opt out. SDK
@@ -143,10 +141,10 @@ gohai version                                   # build info
 
 ### SDK
 
-Importers should read the [full API reference on pkg.go.dev][Package
-documentation] for every `Option`, `Facts` field, and `Info` struct —
-that's the authoritative API surface. The examples below show the two
-usage shapes.
+Importers should read the
+[full API reference on pkg.go.dev][package documentation] for every `Option`,
+`Facts` field, and `Info` struct — that's the authoritative API surface. The
+examples below show the two usage shapes.
 
 **Collecting facts** (producer side):
 
@@ -186,8 +184,8 @@ func main() {
 }
 ```
 
-**Consuming stored facts** (decoder side — e.g. a server that received
-a fact blob from an agent):
+**Consuming stored facts** (decoder side — e.g. a server that received a fact
+blob from an agent):
 
 ```go
 var facts gohai.Facts
@@ -201,15 +199,15 @@ fmt.Println(facts.Network.DefaultInterface)
 ```
 
 Per-collector timings + error messages can be embedded in Facts by adding
-`gohai.WithTimings()` to `gohai.New(...)` — useful for debugging slow
-collectors or seeing why a collector failed without blocking the run.
-See the `Timings` field on [pkg.go.dev][Package documentation].
+`gohai.WithTimings()` to `gohai.New(...)` — useful for debugging slow collectors
+or seeing why a collector failed without blocking the run. See the `Timings`
+field on [pkg.go.dev][package documentation].
 
 **Detecting which cloud you're on.** Enable the cloud collectors
-(`WithCategory("cloud")`) and switch on `Facts.Cloud()` — returns a
-`*Cloud` with `Name` set to a provider identifier, or nil when no
-cloud was detected. Use the exported `gohai.CloudAWS` / `CloudGCE` /
-`CloudAzure` / etc. constants instead of raw strings:
+(`WithCategory("cloud")`) and switch on `Facts.Cloud()` — returns a `*Cloud`
+with `Name` set to a provider identifier, or nil when no cloud was detected. Use
+the exported `gohai.CloudAWS` / `CloudGCE` / `CloudAzure` / etc. constants
+instead of raw strings:
 
 ```go
 g, _ := gohai.New(gohai.WithCategory("cloud"))
@@ -226,20 +224,19 @@ case gohai.CloudGCE:
 }
 ```
 
-Rich per-provider data lives on the typed `Facts.Ec2` / `Facts.Gce` /
-etc. field. See [docs/collectors/cloud.md](docs/collectors/cloud.md)
-for the full pattern.
+Rich per-provider data lives on the typed `Facts.Ec2` / `Facts.Gce` / etc.
+field. See [docs/collectors/cloud.md](docs/collectors/cloud.md) for the full
+pattern.
 
 ## 📖 Documentation
 
-- [Package documentation][] on pkg.go.dev — generated API reference. Every
-  `Option`, `Facts` field, and `Info` struct is documented there. This is
-  the authoritative SDK reference.
-- [Collectors reference](docs/collectors/README.md) — one doc per collector
-  with fields, schema mappings (OCSF + OpenTelemetry), and Ohai source
-  alignment.
-- [Schemas](schemas/README.md) — JSON Schema, field-naming strategy
-  (OCSF > OTel > convention), OCSF gap analysis, and cloud canonical overlay.
+- [Package documentation] on pkg.go.dev — generated API reference. Every
+  `Option`, `Facts` field, and `Info` struct is documented there. This is the
+  authoritative SDK reference.
+- [Collectors reference](docs/collectors/README.md) — one doc per collector with
+  fields, schema mappings (OCSF + OpenTelemetry), and Ohai source alignment.
+- [Schemas](schemas/README.md) — JSON Schema, field-naming strategy (OCSF > OTel
+  \> convention), OCSF gap analysis, and cloud canonical overlay.
 - [Contributing](CONTRIBUTING.md) — prerequisites, setup, testing, commit
   conventions.
 - [Collector methodology](docs/methodology.md) — library selection, field
@@ -253,69 +250,64 @@ conventions, and the PR workflow.
 ## 🔗 Related Works
 
 gohai stands on the shoulders of the following projects — as methodology
-references, as backing libraries we wrap, or as peers solving adjacent
-problems:
+references, as backing libraries we wrap, or as peers solving adjacent problems:
 
 **Fact collectors (direct peers):**
 
-- [Chef Ohai][] — the canonical reference. Ruby-based plugin-driven fact
-  collector; every gohai collector cross-references the corresponding
-  Ohai plugin for data sources and per-distro edge cases.
-- [Puppet Facter](https://github.com/puppetlabs/facter) — Puppet's
-  equivalent. Different JSON shape, overlapping fact surface.
-- [osquery](https://github.com/osquery/osquery) — Meta's SQL-based
-  endpoint visibility. Different abstraction (SQL), same data space;
-  common reference point when evaluating an inventory tool.
-- [Ansible setup](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/setup_module.html) —
-  Ansible's built-in fact gathering, exposed as `ansible_facts` in
-  playbooks.
+- [Chef Ohai] — the canonical reference. Ruby-based plugin-driven fact
+  collector; every gohai collector cross-references the corresponding Ohai
+  plugin for data sources and per-distro edge cases.
+- [Puppet Facter](https://github.com/puppetlabs/facter) — Puppet's equivalent.
+  Different JSON shape, overlapping fact surface.
+- [osquery](https://github.com/osquery/osquery) — Meta's SQL-based endpoint
+  visibility. Different abstraction (SQL), same data space; common reference
+  point when evaluating an inventory tool.
+- [Ansible setup](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/setup_module.html)
+  — Ansible's built-in fact gathering, exposed as `ansible_facts` in playbooks.
 - [Salt Grains](https://docs.saltproject.io/en/latest/topics/grains/) —
   SaltStack's static facts.
 
 **Backing libraries (we import these):**
 
-- [gopsutil][] — primary source for dynamic runtime state (memory,
-  network I/O, process enumeration, virtualization detection).
-- [ghw][] — canonical for physical hardware topology (CPU NUMA,
-  DIMMs, block devices, DMI, GPU, PCI).
-- [procfs][] — Linux `/proc` and `/sys` parsing when a library doesn't
-  cover a field.
-- [go-sysinfo](https://github.com/elastic/go-sysinfo) — Elastic's
-  alternative for host/platform/kernel facts.
-- [avfs](https://github.com/avfs/avfs) — virtual filesystem
-  abstraction used in every collector that reads files, so tests can
-  run against in-memory fixtures.
+- [gopsutil] — primary source for dynamic runtime state (memory, network I/O,
+  process enumeration, virtualization detection).
+- [ghw] — canonical for physical hardware topology (CPU NUMA, DIMMs, block
+  devices, DMI, GPU, PCI).
+- [procfs] — Linux `/proc` and `/sys` parsing when a library doesn't cover a
+  field.
+- [go-sysinfo](https://github.com/elastic/go-sysinfo) — Elastic's alternative
+  for host/platform/kernel facts.
+- [avfs](https://github.com/avfs/avfs) — virtual filesystem abstraction used in
+  every collector that reads files, so tests can run against in-memory fixtures.
 
 **Other Go libraries in the space:**
 
-- [gosigar](https://github.com/cloudfoundry/gosigar) — Cloud Foundry's
-  Go port of Hyperic Sigar. Historical reference for Go-based host
-  metrics.
-- [go-ps](https://github.com/mitchellh/go-ps) — narrow process-listing
-  library. gopsutil supersedes it for our use.
-- [goprocinfo](https://github.com/c9s/goprocinfo) — lightweight `/proc`
-  parser. gopsutil + procfs cover the same ground for us.
+- [gosigar](https://github.com/cloudfoundry/gosigar) — Cloud Foundry's Go port
+  of Hyperic Sigar. Historical reference for Go-based host metrics.
+- [go-ps](https://github.com/mitchellh/go-ps) — narrow process-listing library.
+  gopsutil supersedes it for our use.
+- [goprocinfo](https://github.com/c9s/goprocinfo) — lightweight `/proc` parser.
+  gopsutil + procfs cover the same ground for us.
 
 **Methodology references (we read, don't import):**
 
-- [node_exporter](https://github.com/prometheus/node_exporter) — gold
-  standard for tricky Linux `/proc` and `/sys` parsing. Apache-2, but
-  we rewrite in our style rather than import.
-- [psutil](https://github.com/giampaolo/psutil) — the Python library
-  gopsutil is a port of; the original design reference for the
-  dynamic-state facts.
+- [node_exporter](https://github.com/prometheus/node_exporter) — gold standard
+  for tricky Linux `/proc` and `/sys` parsing. Apache-2, but we rewrite in our
+  style rather than import.
+- [psutil](https://github.com/giampaolo/psutil) — the Python library gopsutil is
+  a port of; the original design reference for the dynamic-state facts.
 
 ## 📄 License
 
-The [MIT][] License.
+The [MIT] License.
 
-[Chef Ohai]: https://docs.chef.io/ohai/
-[OSAPI]: https://github.com/osapi-io/osapi
-[gopsutil]: https://github.com/shirou/gopsutil
+[chef ohai]: https://docs.chef.io/ohai/
 [ghw]: https://github.com/jaypipes/ghw
-[procfs]: https://github.com/prometheus/procfs
-[OCSF]: https://ocsf.io/
+[gopsutil]: https://github.com/shirou/gopsutil
+[mit]: LICENSE
+[ocsf]: https://ocsf.io/
 [ocsf-schema]: https://schema.ocsf.io/
+[osapi]: https://github.com/osapi-io/osapi
 [otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 [package documentation]: https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai
-[MIT]: LICENSE
+[procfs]: https://github.com/prometheus/procfs

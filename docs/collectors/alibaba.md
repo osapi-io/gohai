@@ -132,33 +132,33 @@ wasn't run.
 
 ## Data Sources
 
-1. **DMI gate:** `dmi.Product.VendorName` contains `"Alibaba"`. ghw reads
-   `/sys/class/dmi/id/sys_vendor` into `Product.VendorName`, so this check is
-   equivalent to Ohai's `has_ali_dmi?`.
-2. **Endpoint:** `http://100.100.100.200/2016-01-01/` — note the non-standard
-   `100.100.100.200` link-local address, not `169.254.169.254`.
-3. **Recursive walk:** starting at `/`, the collector fetches each directory
-   listing (newline-separated entries), recurses into entries ending in `/`, and
-   fetches leaves as values. Matches Ohai's `fetch_metadata` algorithm in
-   `mixin/alibaba_metadata.rb`.
-4. **`/user-data` excluded** (root-level only) — matches Ohai's explicit skip to
-   avoid surfacing cloud-init scripts that may contain credentials.
-5. **Leaf parsing:** each leaf is tried as JSON first; on parse failure the raw
-   text is kept. Matches Ohai's `parse_json` fallback pattern.
-6. **Key sanitization:** dashes and slashes in path segments become underscores
-   in map keys; trailing underscores are stripped. Matches Ohai's
-   `sanitize_key`.
-7. **Transformation:** the walked tree is projected onto the typed `Info` —
-   identity / location / network fields flattened from `meta-data/`, plus the
-   nested sub-objects `instance/` (including `spot/termination-time`),
-   `image/market-place/`, `tags/instance/`, `disks/<serial>/`, and
-   `network/interfaces/macs/<mac>/`. All surfaced fields are typed; no `Raw`
-   escape hatch.
-8. **Deliberately excluded:** `ram/security-credentials/<role>/` (short-lived
-   AccessKey/SecurityToken) and `public-keys/<keypair>/openssh-key` — both
-   security-sensitive and of no inventory value.
-9. **User-Agent:** `gohai` (the cloudmetadata default) — Alibaba's metadata
-   service filters some requests by UA.
+01. **DMI gate:** `dmi.Product.VendorName` contains `"Alibaba"`. ghw reads
+    `/sys/class/dmi/id/sys_vendor` into `Product.VendorName`, so this check is
+    equivalent to Ohai's `has_ali_dmi?`.
+02. **Endpoint:** `http://100.100.100.200/2016-01-01/` — note the non-standard
+    `100.100.100.200` link-local address, not `169.254.169.254`.
+03. **Recursive walk:** starting at `/`, the collector fetches each directory
+    listing (newline-separated entries), recurses into entries ending in `/`,
+    and fetches leaves as values. Matches Ohai's `fetch_metadata` algorithm in
+    `mixin/alibaba_metadata.rb`.
+04. **`/user-data` excluded** (root-level only) — matches Ohai's explicit skip
+    to avoid surfacing cloud-init scripts that may contain credentials.
+05. **Leaf parsing:** each leaf is tried as JSON first; on parse failure the raw
+    text is kept. Matches Ohai's `parse_json` fallback pattern.
+06. **Key sanitization:** dashes and slashes in path segments become underscores
+    in map keys; trailing underscores are stripped. Matches Ohai's
+    `sanitize_key`.
+07. **Transformation:** the walked tree is projected onto the typed `Info` —
+    identity / location / network fields flattened from `meta-data/`, plus the
+    nested sub-objects `instance/` (including `spot/termination-time`),
+    `image/market-place/`, `tags/instance/`, `disks/<serial>/`, and
+    `network/interfaces/macs/<mac>/`. All surfaced fields are typed; no `Raw`
+    escape hatch.
+08. **Deliberately excluded:** `ram/security-credentials/<role>/` (short-lived
+    AccessKey/SecurityToken) and `public-keys/<keypair>/openssh-key` — both
+    security-sensitive and of no inventory value.
+09. **User-Agent:** `gohai` (the cloudmetadata default) — Alibaba's metadata
+    service filters some requests by UA.
 10. **Timeout:** 6 seconds per request, matching Ohai's `read_timeout` +
     `keep_alive_timeout`.
 11. **Failure handling:** first call (the root listing) failing → `(nil, nil)`.

@@ -40,18 +40,18 @@ Sources doc.
 
 **Decision order for each collector:**
 
-1. **[ghw][]** — canonical for physical hardware topology: CPU NUMA
+1. **[ghw]** — canonical for physical hardware topology: CPU NUMA
    - arch-aware counts, memory DIMMs/page-sizes, block devices with
      UUID/label/unmounted, network drivers/speed, DMI (baseboard / BIOS /
      chassis / product), GPU, PCI. Use ghw first for anything about static
      hardware shape.
-2. **[gopsutil][]** — canonical for dynamic runtime state: memory
+2. **[gopsutil]** — canonical for dynamic runtime state: memory
    free/available/used, disk I/O counters, network I/O counters, process
    enumeration, sessions (utmp), virtualization detection, host info. Use
    gopsutil for anything that changes per collection.
-3. **[go-sysinfo][]** — alternative for host / platform / kernel where gopsutil
-   is weaker. Evaluate case-by-case; don't stack both for the same fact.
-4. **[procfs][]** — raw Linux `/proc` and `/sys` parsing when none of the above
+3. **[go-sysinfo]** — alternative for host / platform / kernel where gopsutil is
+   weaker. Evaluate case-by-case; don't stack both for the same fact.
+4. **[procfs]** — raw Linux `/proc` and `/sys` parsing when none of the above
    cover a field. Preferred over rolling our own scanner.
 5. **Official provider SDKs** (aws-sdk-go, google.golang.org/cloud,
    azure-sdk-for-go) for cloud collectors; plain `net/http` to IMDS endpoints
@@ -64,9 +64,9 @@ Sources doc.
    quirks, retries). We then check whether ghw/gopsutil/stdlib already cover
    them. Only the residual gap becomes our extension code.
 
-**We learn from, but don't directly import, [node_exporter][]** — their
-collectors are a gold reference for tricky Linux `/proc` and `/sys` parsing
-(Apache-2 licensed). Read, understand, rewrite in our style.
+**We learn from, but don't directly import, [node_exporter]** — their collectors
+are a gold reference for tricky Linux `/proc` and `/sys` parsing (Apache-2
+licensed). Read, understand, rewrite in our style.
 
 ### Library-first principle
 
@@ -249,16 +249,14 @@ collector doc's **Schema mapping** column so consumers bridging to OCSF can
 write a mechanical transform.
 
 The Go field is the PascalCase rendering of the final JSON key
-(``Count int `json:"count"` ``, ``Name string `json:"name"` ``). When Go idiom
-on initialisms conflicts (OCSF `cpu_id` → Go `CPUID`, not `CpuId`), Go
+(`` Count int `json:"count"`  ``, `` Name string `json:"name"`  ``). When Go
+idiom on initialisms conflicts (OCSF `cpu_id` → Go `CPUID`, not `CpuId`), Go
 convention wins the field name but the JSON tag still follows the rule above.
 Don't invent internal names that have no schema-mapping claim.
 
 **Do not mirror Ohai's JSON shape.** Ohai is for **data-source** reference (what
 file/command to read, which distro edge cases, which fallback) — not field names
 or struct layout.
-
-[otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 
 ### MANDATORY: Cross-reference Ohai's data sources before implementing
 
@@ -376,11 +374,10 @@ When every open methodology issue closes, every collector doc reads as a
 self-contained spec and the SDK has zero unresolved methodology divergences from
 Ohai.
 
-[Chef Ohai]: https://docs.chef.io/ohai/
-[OSAPI]: https://github.com/osapi-io/osapi
-[gopsutil]: https://github.com/shirou/gopsutil
 [ghw]: https://github.com/jaypipes/ghw
-[procfs]: https://github.com/prometheus/procfs
 [go-sysinfo]: https://github.com/elastic/go-sysinfo
+[gopsutil]: https://github.com/shirou/gopsutil
 [node_exporter]: https://github.com/prometheus/node_exporter
 [ohai-plugins]: https://github.com/chef/ohai/tree/main/lib/ohai/plugins
+[otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
+[procfs]: https://github.com/prometheus/procfs

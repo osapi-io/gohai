@@ -113,8 +113,8 @@ On Linux the collector runs four `virsh` commands in sequence:
 1. **`virsh version`** — probe and version extraction. If this fails (virsh
    absent or daemon down), `Collect` returns `nil` immediately. The version is
    extracted from the "Running against daemon:" line first (daemon version);
-   when absent, falls back to "Using library: libvirt \<ver\>" (library
-   version). Matches Ohai's `libvirt_version` reporting.
+   when absent, falls back to "Using library: libvirt \<ver>" (library version).
+   Matches Ohai's `libvirt_version` reporting.
 
 2. **`virsh uri`** — connection URI (e.g. `qemu:///system`). Errors are silently
    ignored; `uri` stays empty rather than failing the whole collection.
