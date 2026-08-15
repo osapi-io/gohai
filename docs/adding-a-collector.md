@@ -276,5 +276,5 @@ Closes #<N>  (if work closes a methodology issue)
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/) with the
 50/72 rule. See
-[docs/development.md#commit-messages](development.md#commit-messages) for the
+[CONTRIBUTING.md#commit-messages](../CONTRIBUTING.md#commit-messages) for the
 full conventions.

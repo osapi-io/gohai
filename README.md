@@ -240,15 +240,15 @@ for the full pattern.
   alignment.
 - [Schemas](schemas/README.md) — JSON Schema, field-naming strategy
   (OCSF > OTel > convention), OCSF gap analysis, and cloud canonical overlay.
-- [Development](docs/development.md) — prerequisites, setup, testing, commit
+- [Contributing](CONTRIBUTING.md) — prerequisites, setup, testing, commit
   conventions.
-- [Contributing](docs/contributing.md) — PR workflow.
+- [Collector methodology](docs/methodology.md) — library selection, field
+  naming, and data sources.
 
 ## 🤝 Contributing
 
-See the [Development](docs/development.md) guide for prerequisites, setup,
-and conventions. See the [Contributing](docs/contributing.md) guide before
-submitting a PR.
+See the [Contributing](CONTRIBUTING.md) guide for prerequisites, setup,
+conventions, and the PR workflow.
 
 ## 🔗 Related Works
 
