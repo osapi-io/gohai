@@ -25,21 +25,24 @@ called, and how data sources are chosen — is reference material in
 
 ## Prerequisites
 
-Install tools using [mise]\[\]:
+Install tools using [mise](https://mise.jdx.dev):
 
 ```bash
 mise install
 ```
 
-- **[Go][]** — gohai is written in Go. We always support the latest two major Go
+- **[Go]** — gohai is written in Go. We always support the latest two major Go
   versions, so make sure your version is recent enough.
-- **[just][]** — Task runner used for building, testing, formatting, and other
+- **[just]** — Task runner used for building, testing, formatting, and other
   development workflows. Install with `brew install just`.
+- **[uv](https://docs.astral.sh/uv/)** — Python package runner. `just md-fmt`
+  formats markdown with mdformat through `uvx`; nothing is installed into the
+  repository.
 
 ### Claude Code
 
-If you use [Claude Code][] for development, install these plugins from the
-default marketplace:
+If you use [Claude Code] for development, install these plugins from the default
+marketplace:
 
 ```
 /plugin install commit-commands@claude-plugins-official
@@ -151,12 +154,13 @@ just go-vet         # Run linter
 
 ### Documentation
 
-Markdown files are formatted with [Prettier][prettier] via Bun. This style is
+Markdown files are formatted with
+[mdformat](https://pypi.org/project/mdformat/), run through `uvx`. This style is
 enforced by CI.
 
 ```bash
-just docs::fmt-check   # Check formatting
-just docs::fmt         # Auto-fix formatting
+just md-fmt-check   # Check formatting
+just md-fmt         # Auto-fix formatting
 ```
 
 ## Code standards
@@ -445,14 +449,14 @@ Run `just ready` before committing to ensure generated code, package docs,
 formatting, and lint are all up to date:
 
 ```bash
-just ready   # generate, docs::fmt, go-fmt, go-vet
+just ready   # generate, md-fmt, go-fmt, go-vet
 ```
 
 ## Branching
 
 All changes should be developed on feature branches. Create a branch from `main`
 using the naming convention `type/short-description`, where `type` matches the
-[Conventional Commits][] type:
+[Conventional Commits] type:
 
 - `feat/add-cpu-collector`
 - `fix/memory-parsing-error`
@@ -465,7 +469,7 @@ automatically if you are on `main`.
 
 ## Commit messages
 
-Follow [Conventional Commits][] with the 50/72 rule:
+Follow [Conventional Commits] with the 50/72 rule:
 
 - **Subject line**: max 50 characters, imperative mood, capitalized, no period
 - **Body**: wrap at 72 characters, separated from subject by a blank line
@@ -508,4 +512,8 @@ to answer questions.
 
 If you have questions, feel free to open a [Discussion] on GitHub.
 
+[claude code]: https://claude.ai/code
+[conventional commits]: https://www.conventionalcommits.org
 [discussion]: https://github.com/osapi-io/gohai/discussions
+[go]: https://go.dev
+[just]: https://just.systems
