@@ -2,7 +2,6 @@
 .worktrees/
 dist/
 docs/node_modules/
-docs/bun.lock
 .just/
 
 # Compiled gohai binary at repo root (not the pkg/gohai directory)
