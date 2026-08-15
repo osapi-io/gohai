@@ -197,6 +197,16 @@ just go::unit-cov   # Generate coverage report
 go test -run TestName -v ./internal/collector/platform/...  # Run a single test
 ```
 
+Coverage is gated at 100%. `just test` fails if total coverage drops below it,
+so a change that adds untested code fails locally and in CI:
+
+```bash
+just go::unit-cov-check   # Report coverage and fail below the target
+```
+
+The target is declared in `.github/codecov.yml` and in the shared `go` justfile
+module — change both together.
+
 ### Test file conventions
 
 - Public tests: `*_public_test.go` in test package
