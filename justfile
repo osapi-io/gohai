@@ -36,3 +36,4 @@ ready:
     just docs::fmt
     just go::fmt
     just go::vet
+    just just::fmt
