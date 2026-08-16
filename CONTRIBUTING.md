@@ -204,6 +204,39 @@ counterpart, rather than splitting tests away from the file they cover.
 - Import order: standard library, third party, then local, separated by blank
   lines.
 
+### Test doubles
+
+A double for an interface this organization defines is generated with `mockgen`
+and committed. Do not write a struct by hand to satisfy one.
+
+Generated mocks live in a `mocks` package beside the code they mock, produced by
+a `generate.go` holding the directive:
+
+```go
+package mocks
+
+//go:generate go tool go.uber.org/mock/mockgen -source=../types.go -destination=types.gen.go -package=mocks
+```
+
+The generator is resolved through the module's tool dependencies, so every
+checkout runs the version `go.mod` records. Destination files end in `.gen.go`
+and are committed. Do not use `gen/` for mocks — that name is taken by API code
+generation.
+
+Where call sites would otherwise repeat the same expectations, write a
+constructor returning a configured mock rather than introducing a hand-written
+type. The generated mock is still what satisfies the interface.
+
+Three doubles are written by hand, because generating them buys nothing:
+
+- One standing in for a standard library interface — `net.Conn`, `fs.File`,
+  `io.Writer`, `slog.Handler`. Those do not move when our code does.
+- One carrying a real implementation of the behavior under test, such as signing
+  with a genuinely generated key pair.
+- A recorder for a dependency called from a goroutine the test cannot join,
+  where a generated mock would assert a call count at a moment the test cannot
+  establish. State that reason where the recorder is defined.
+
 ### File headers
 
 Every `.go` file MUST start with the MIT license header — see any existing Go
