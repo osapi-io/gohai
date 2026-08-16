@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/collector/mocks"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
 	digitalocean "github.com/osapi-io/gohai/pkg/gohai/collectors/digital_ocean"
@@ -39,6 +40,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
+	"go.uber.org/mock/gomock"
 )
 
 type GohaiTestSuite struct {
@@ -51,32 +53,24 @@ func TestGohaiTestSuite(
 	suite.Run(t, new(GohaiTestSuite))
 }
 
-type cycleCollector struct {
-	name string
-	deps []string
-}
+// newCycleCollector returns a generated Collector mock declaring deps, for
+// exercising dependency-cycle detection. Collect returns nothing.
+func newCycleCollector(
+	ctrl *gomock.Controller,
+	name string,
+	deps ...string,
+) *mocks.MockCollector {
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return("misc").AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
+	m.EXPECT().Dependencies().Return(deps).AnyTimes()
+	m.EXPECT().
+		Collect(gomock.Any(), gomock.Any()).
+		Return(nil, nil).
+		AnyTimes()
 
-func (c *cycleCollector) Name() string {
-	return c.name
-}
-
-func (c *cycleCollector) Category() string {
-	return "misc"
-}
-
-func (c *cycleCollector) DefaultEnabled() bool {
-	return true
-}
-
-func (c *cycleCollector) Dependencies() []string {
-	return c.deps
-}
-
-func (c *cycleCollector) Collect(
-	_ context.Context,
-	_ collector.PriorResults,
-) (any, error) {
-	return nil, nil
+	return m
 }
 
 func (s *GohaiTestSuite) TestFactsSet() {
@@ -319,8 +313,8 @@ func (s *GohaiTestSuite) TestFactsCountPopulated() {
 
 func (s *GohaiTestSuite) TestCollectPropagatesRunError() {
 	reg := collector.NewRegistry()
-	s.Require().NoError(reg.Register(&cycleCollector{name: "a", deps: []string{"b"}}))
-	s.Require().NoError(reg.Register(&cycleCollector{name: "b", deps: []string{"a"}}))
+	s.Require().NoError(reg.Register(newCycleCollector(gomock.NewController(s.T()), "a", "b")))
+	s.Require().NoError(reg.Register(newCycleCollector(gomock.NewController(s.T()), "b", "a")))
 
 	g := &Gohai{registry: reg}
 	sel, err := reg.Selected(nil, nil)

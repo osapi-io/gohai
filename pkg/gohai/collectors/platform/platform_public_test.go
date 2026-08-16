@@ -35,7 +35,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/gen"
+	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	plat "github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 )

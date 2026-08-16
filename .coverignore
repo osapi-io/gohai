@@ -2,3 +2,4 @@
 /examples/
 /gen/
 main.go
+/mocks/
