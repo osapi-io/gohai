@@ -44,7 +44,7 @@ func newFailingCollector(
 	m := mocks.NewMockCollector(ctrl)
 	m.EXPECT().Name().Return(name).AnyTimes()
 	m.EXPECT().Category().Return("misc").AnyTimes()
-	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(false).AnyTimes()
 	m.EXPECT().Dependencies().Return(nil).AnyTimes()
 	m.EXPECT().
 		Collect(gomock.Any(), gomock.Any()).
