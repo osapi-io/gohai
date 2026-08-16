@@ -63,17 +63,7 @@ just fetch
 just deps
 ```
 
-## Quick Reference
-
-```bash
-just fetch / just deps / just test / just go-unit / just go-vet / just go-fmt
-gohai collect --pretty             # run default collectors
-gohai collect --no-defaults --collector.cpu  # specific collectors
-gohai collect --pretty | gohai validate      # validate against schema
-gohai version                      # build info
-```
-
-## Package Structure
+## Project structure
 
 - **`main.go`** — repo-root entry point; just calls `cmd.Execute()`
 - **`cmd/`** — Cobra CLI subcommands
@@ -151,6 +141,10 @@ just go-fmt         # Auto-fix formatting
 just go-vet         # Run linter
 ```
 
+The linters that run are declared in `.golangci.yml`. Read them there rather
+than looking for a list here — a copied list goes stale the first time the
+configuration changes.
+
 ### Documentation
 
 Markdown files are formatted with
@@ -164,20 +158,63 @@ just md-fmt         # Auto-fix formatting
 
 ## Code standards
 
-The Go conventions this repository follows — multi-line function signatures,
-naming a file for what it holds, table-driven `testify/suite` tests, suite
-naming, generated mocks, and the error-wrapping and import-order baseline — are
-specified in the `go-code-standards` capability in
-[osapi-io/specs](https://github.com/osapi-io/specs). That capability is the
-source, and this guide does not restate it.
+### Function signatures
 
-What follows is specific to gohai.
+Functions with parameters use multi-line format — one parameter per line, with
+the closing parenthesis and the return types on a line of their own:
 
-### File Headers
+```go
+func FunctionName(
+    param1 type1,
+    param2 type2,
+) (returnType, error) {
+}
+```
+
+Functions taking no parameters stay on one line:
+
+```go
+func Name() string {
+}
+```
+
+Adding a parameter then shows as one added line rather than a rewritten
+signature.
+
+### File naming
+
+Name a file for what it holds. Avoid `helpers.go`, `utils.go`, and names of that
+kind: they describe where code was put rather than what it is, and they
+accumulate whatever has no other home.
+
+`types.go` holds only type declarations — structs, interfaces, constants, and
+aliases. A function belongs in a file named for what it does.
+
+A test file is named for the production file it tests. Where tests grow too
+large to read, split the production file first so each test file keeps a
+counterpart, rather than splitting tests away from the file they cover.
+
+### Go patterns
+
+- Error wrapping: `fmt.Errorf("context: %w", err)`, so the chain names each
+  layer it passed through and stays inspectable with `errors.Is` and
+  `errors.As`.
+- Early returns rather than nesting the successful path inside conditionals.
+- Unused parameters: rename to `_`.
+- Import order: standard library, third party, then local, separated by blank
+  lines.
+
+### File headers
 
 Every `.go` file MUST start with the MIT license header — see any existing Go
 file in the repo for the exact format. Build-tagged files put `//go:build` on
 line 1, blank line, then the header.
+
+### Error wrapping at the module boundary
+
+Never expose raw gopsutil, ghw, or procfs error types through the public API.
+Wrap them, so callers do not need those packages in their module graph to handle
+an error.
 
 ## Testing
 
@@ -200,9 +237,23 @@ module — change both together.
 
 ### Test file conventions
 
-Test package layout, suite naming, table-driven cases, the `export_test.go`
-pattern, and generated mocks are all specified in `go-code-standards`. In this
-repository external tests live in `package gohai_test` or
+- Public tests: `*_public_test.go` in the package's `_test` package, exercising
+  the exported surface. This is the default.
+- Internal tests: `*_test.go` in the same package, for what the exported surface
+  cannot reach.
+- Suite naming: `*_public_test.go` → `{Name}PublicTestSuite`, `*_test.go` →
+  `{Name}TestSuite`.
+- `testify/suite` with table-driven cases.
+- One suite method per function under test — success, errors, and edge cases are
+  rows in one table, not separate methods.
+- `export_test.go` exposes unexported symbols to external tests, by alias or by
+  setter. Do not use an alias to re-cover behavior the caller's own test already
+  reaches; a helper with its own contract is what the pattern is for.
+- Mocks are generated with `go.uber.org/mock` and committed, never hand-written.
+  A double that carries a real implementation — signing with a real key, serving
+  real HTTP — is not a mock and does not need generating.
+
+External tests in this repository live in `package gohai_test` or
 `package collector_test`, and the setter form is `SetXFn(fn) func()`, returning
 a restore func the caller defers.
 
@@ -221,18 +272,17 @@ Collector-specific rules on top of that:
   `s.Equal(want, got, "expected equal")`.
 - Target 100% test coverage on all packages.
 
-### Go Patterns
+## Quick reference
 
-golangci-lint runs errcheck, errname, goimports, govet, prealloc, predeclared,
-revive, and staticcheck.
+```bash
+just fetch / just deps / just test / just go-unit / just go-vet / just go-fmt
+gohai collect --pretty             # run default collectors
+gohai collect --no-defaults --collector.cpu  # specific collectors
+gohai collect --pretty | gohai validate      # validate against schema
+gohai version                      # build info
+```
 
-Specific to this repository:
-
-- **Never expose raw gopsutil, ghw, or procfs error types through our API.**
-  Wrap them, so callers do not need those packages in their module graph to
-  handle an error.
-
-## VFS + Executor Abstractions
+## VFS and executor abstractions
 
 Collectors that read files or shell out **MUST** use two shared abstractions,
 injected as struct fields on the per-OS variant (same pattern as osapi's Agent
@@ -387,7 +437,7 @@ See [docs/adding-a-collector.md](docs/adding-a-collector.md) for the full
 step-by-step walkthrough (code examples, test setup, doc template, commit
 template).
 
-## Color Palette (Max Headroom)
+## Color palette (Max Headroom)
 
 ```
 #b4a7d6  lavender  accent, banner
@@ -402,7 +452,7 @@ Never pass raw ANSI escape strings in command code — reference the theme roles
 `#b4a7d6` hex value as a truecolor escape so the install banner and the running
 CLI paint with the exact same hue.
 
-## CLI Architecture
+## CLI architecture
 
 All CLI output styling and formatting lives in `internal/cli/`:
 
