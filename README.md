@@ -51,11 +51,12 @@ upstream OCSF PRs are tracked in [`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md).
 What we **collect** draws on [Chef Ohai]'s plugin methodology. What we **call**
 each field draws on OCSF + OpenTelemetry.
 
-### Primary consumer
+### Intended consumer
 
-gohai is built to be embedded in [OSAPI] and other Go services that need typed
-system facts for routing, guards, discovery, inventory, and compliance. The CLI
-is a convenience — the SDK is the product.
+gohai is designed to be embedded in Go services that need typed system facts for
+routing, guards, discovery, inventory, and compliance. [OSAPI] is the intended
+first consumer; it does not depend on gohai yet. The CLI is a convenience — the
+SDK is the product.
 
 ## 📦 Install
 
@@ -106,7 +107,7 @@ go build -o gohai .
 | ⏱️ Per-Collector Timings       | Opt-in `--with-timings` / `WithTimings()` embeds per-collector durations, status, and error messages under `_timings` in the JSON output                                |
 | 📊 OCSF + OpenTelemetry + Ohai | Field names follow [OCSF](https://schema.ocsf.io/) then [OpenTelemetry](https://opentelemetry.io/docs/specs/semconv/resource/); data sources mirror Chef Ohai's plugins |
 | 🔄 Native OCSF Output          | `--format ocsf` produces a standards-compliant OCSF `inventory_info` event (class_uid 5001) — feed directly into SIEMs and data lakes                                   |
-| 🔌 SDK Integration             | Import as a Go package for OSAPI and others                                                                                                                             |
+| 🔌 SDK Integration             | Import as a Go package into any Go service                                                                                                                              |
 
 ## 🔌 Collectors
 
