@@ -18,9 +18,9 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package mocks holds gomock-generated mocks for the executor package.
+// Package mocks holds gomock-generated mocks for the collector package.
 // Generated files (*.gen.go) are checked in and regenerated via
-// `go generate ./internal/executor/...`.
+// `go generate ./internal/collector/...`.
 package mocks
 
-//go:generate go run go.uber.org/mock/mockgen -source=../executor.go -destination=executor.gen.go -package=mocks
+//go:generate go tool go.uber.org/mock/mockgen -source=../collector.go -destination=collector.gen.go -package=mocks

@@ -31,11 +31,14 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/collector/mocks"
+	"go.uber.org/mock/gomock"
 )
 
 type RegistryPublicTestSuite struct {
 	suite.Suite
-	reg *collector.Registry
+	reg  *collector.Registry
+	ctrl *gomock.Controller
 }
 
 func TestRegistryPublicTestSuite(
@@ -46,66 +49,61 @@ func TestRegistryPublicTestSuite(
 
 func (s *RegistryPublicTestSuite) SetupTest() {
 	s.reg = collector.NewRegistry()
+	s.ctrl = gomock.NewController(s.T())
 }
 
-type fakeCollector struct {
-	name           string
-	category       string
-	defaultEnabled bool
-	deps           []string
-}
-
-func (f *fakeCollector) Name() string {
-	return f.name
-}
-
-func (f *fakeCollector) Category() string {
-	if f.category == "" {
-		return "misc"
+// newCollector returns a generated Collector mock reporting the given identity.
+// Collect succeeds, returning "<name>-result".
+func newCollector(
+	ctrl *gomock.Controller,
+	name string,
+	category string,
+	defaultEnabled bool,
+	deps ...string,
+) *mocks.MockCollector {
+	if category == "" {
+		category = "misc"
 	}
-	return f.category
+
+	if len(deps) == 0 {
+		deps = nil
+	}
+
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return(category).AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(defaultEnabled).AnyTimes()
+	m.EXPECT().Dependencies().Return(deps).AnyTimes()
+	m.EXPECT().
+		Collect(gomock.Any(), gomock.Any()).
+		Return(name+"-result", nil).
+		AnyTimes()
+
+	return m
 }
 
-func (f *fakeCollector) DefaultEnabled() bool {
-	return f.defaultEnabled
-}
+// newFailingCollector is newCollector with Collect returning err.
+func newFailingCollector(
+	ctrl *gomock.Controller,
+	name string,
+	err error,
+	deps ...string,
+) *mocks.MockCollector {
+	if len(deps) == 0 {
+		deps = nil
+	}
 
-func (f *fakeCollector) Dependencies() []string {
-	return f.deps
-}
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return("misc").AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
+	m.EXPECT().Dependencies().Return(deps).AnyTimes()
+	m.EXPECT().
+		Collect(gomock.Any(), gomock.Any()).
+		Return(nil, err).
+		AnyTimes()
 
-func (f *fakeCollector) Collect(
-	_ context.Context,
-	_ collector.PriorResults,
-) (any, error) {
-	return f.name + "-result", nil
-}
-
-type errCollector struct {
-	name string
-}
-
-func (e *errCollector) Name() string {
-	return e.name
-}
-
-func (e *errCollector) Category() string {
-	return "misc"
-}
-
-func (e *errCollector) DefaultEnabled() bool {
-	return true
-}
-
-func (e *errCollector) Dependencies() []string {
-	return nil
-}
-
-func (e *errCollector) Collect(
-	_ context.Context,
-	_ collector.PriorResults,
-) (any, error) {
-	return nil, errors.New("boom")
+	return m
 }
 
 func (s *RegistryPublicTestSuite) TestRegister() {
@@ -116,17 +114,17 @@ func (s *RegistryPublicTestSuite) TestRegister() {
 	}{
 		{
 			name:      "registers a new collector",
-			collector: &fakeCollector{name: "alpha", defaultEnabled: true},
+			collector: newCollector(s.ctrl, "alpha", "", true),
 			wantErr:   false,
 		},
 		{
 			name:      "rejects empty name",
-			collector: &fakeCollector{name: "", defaultEnabled: true},
+			collector: newCollector(s.ctrl, "", "", true),
 			wantErr:   true,
 		},
 		{
 			name:      "rejects duplicate registration",
-			collector: &fakeCollector{name: "dup", defaultEnabled: true},
+			collector: newCollector(s.ctrl, "dup", "", true),
 			wantErr:   true,
 		},
 	}
@@ -166,7 +164,7 @@ func (s *RegistryPublicTestSuite) TestGet() {
 			reg := collector.NewRegistry()
 			if tt.register {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: tt.lookup, defaultEnabled: true}))
+					NoError(reg.Register(newCollector(s.ctrl, tt.lookup, "", true)))
 			}
 			_, ok := reg.Get(tt.lookup)
 			s.Equal(tt.wantOK, ok)
@@ -175,9 +173,9 @@ func (s *RegistryPublicTestSuite) TestGet() {
 }
 
 func (s *RegistryPublicTestSuite) TestNamesInCategory() {
-	s.Require().NoError(s.reg.Register(&fakeCollector{name: "a", category: "cloud"}))
-	s.Require().NoError(s.reg.Register(&fakeCollector{name: "b", category: "cloud"}))
-	s.Require().NoError(s.reg.Register(&fakeCollector{name: "c", category: "system"}))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "a", "cloud", false)))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "b", "cloud", false)))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "c", "system", false)))
 
 	tests := []struct {
 		name     string
@@ -241,8 +239,8 @@ func (s *RegistryPublicTestSuite) TestGetDep() {
 }
 
 func (s *RegistryPublicTestSuite) TestNames() {
-	s.Require().NoError(s.reg.Register(&fakeCollector{name: "b", defaultEnabled: true}))
-	s.Require().NoError(s.reg.Register(&fakeCollector{name: "a", defaultEnabled: true}))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "b", "", true)))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "a", "", true)))
 	names := s.reg.Names()
 	sort.Strings(names)
 	s.Equal([]string{"a", "b"}, names)
@@ -293,13 +291,13 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 		s.Run(tt.name, func() {
 			reg := collector.NewRegistry()
 			s.Require().
-				NoError(reg.Register(&fakeCollector{name: "core1", defaultEnabled: true}))
+				NoError(reg.Register(newCollector(s.ctrl, "core1", "", true)))
 			s.Require().
-				NoError(reg.Register(&fakeCollector{name: "core2", defaultEnabled: true}))
+				NoError(reg.Register(newCollector(s.ctrl, "core2", "", true)))
 			s.Require().
-				NoError(reg.Register(&fakeCollector{name: "ext", defaultEnabled: true}))
+				NoError(reg.Register(newCollector(s.ctrl, "ext", "", true)))
 			s.Require().
-				NoError(reg.Register(&fakeCollector{name: "opt", defaultEnabled: false}))
+				NoError(reg.Register(newCollector(s.ctrl, "opt", "", false)))
 
 			got, err := reg.Selected(tt.enable, tt.disable)
 			if tt.wantErr {
@@ -332,11 +330,11 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "orders by dependency",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "a", defaultEnabled: true}))
+					NoError(reg.Register(newCollector(s.ctrl, "a", "", true)))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "b", defaultEnabled: true, deps: []string{"a"}}))
+					NoError(reg.Register(newCollector(s.ctrl, "b", "", true, "a")))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "c", defaultEnabled: true, deps: []string{"b"}}))
+					NoError(reg.Register(newCollector(s.ctrl, "c", "", true, "b")))
 			},
 			names:       []string{"a", "b", "c"},
 			wantResults: []string{"a", "b", "c"},
@@ -345,9 +343,9 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "auto-includes dependencies",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "a", defaultEnabled: false}))
+					NoError(reg.Register(newCollector(s.ctrl, "a", "", false)))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "b", defaultEnabled: false, deps: []string{"a"}}))
+					NoError(reg.Register(newCollector(s.ctrl, "b", "", false, "a")))
 			},
 			names:       []string{"b"},
 			wantResults: []string{"a", "b"},
@@ -356,9 +354,9 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "detects cycle",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "a", defaultEnabled: true, deps: []string{"b"}}))
+					NoError(reg.Register(newCollector(s.ctrl, "a", "", true, "b")))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "b", defaultEnabled: true, deps: []string{"a"}}))
+					NoError(reg.Register(newCollector(s.ctrl, "b", "", true, "a")))
 			},
 			names:   []string{"a", "b"},
 			wantErr: true,
@@ -367,7 +365,7 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "missing dependency errors",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "a", defaultEnabled: true, deps: []string{"missing"}}))
+					NoError(reg.Register(newCollector(s.ctrl, "a", "", true, "missing")))
 			},
 			names:   []string{"a"},
 			wantErr: true,
@@ -375,9 +373,10 @@ func (s *RegistryPublicTestSuite) TestRun() {
 		{
 			name: "collector error omits from results",
 			setup: func(reg *collector.Registry) {
-				s.Require().NoError(reg.Register(&errCollector{name: "bad"}))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "good", defaultEnabled: true}))
+					NoError(reg.Register(newFailingCollector(s.ctrl, "bad", errors.New("boom"))))
+				s.Require().
+					NoError(reg.Register(newCollector(s.ctrl, "good", "", true)))
 			},
 			names:        []string{"bad", "good"},
 			wantResults:  []string{"good"},
@@ -393,7 +392,8 @@ func (s *RegistryPublicTestSuite) TestRun() {
 		{
 			name: "zero-value hooks tolerates error without handler",
 			setup: func(reg *collector.Registry) {
-				s.Require().NoError(reg.Register(&errCollector{name: "bad"}))
+				s.Require().
+					NoError(reg.Register(newFailingCollector(s.ctrl, "bad", errors.New("boom"))))
 			},
 			names: []string{"bad"},
 			hooks: func(*sync.Mutex, *[]string, *[]string) collector.Hooks {
@@ -404,9 +404,10 @@ func (s *RegistryPublicTestSuite) TestRun() {
 		{
 			name: "OnComplete fires for every collector (success and failure)",
 			setup: func(reg *collector.Registry) {
-				s.Require().NoError(reg.Register(&errCollector{name: "bad"}))
 				s.Require().
-					NoError(reg.Register(&fakeCollector{name: "good", defaultEnabled: true}))
+					NoError(reg.Register(newFailingCollector(s.ctrl, "bad", errors.New("boom"))))
+				s.Require().
+					NoError(reg.Register(newCollector(s.ctrl, "good", "", true)))
 			},
 			names: []string{"bad", "good"},
 			hooks: func(

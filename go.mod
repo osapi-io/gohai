@@ -255,5 +255,6 @@ tool (
 	github.com/boumenot/gocover-cobertura
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
 	github.com/segmentio/golines
+	go.uber.org/mock/mockgen
 	mvdan.cc/gofumpt
 )

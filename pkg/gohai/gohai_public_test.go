@@ -27,27 +27,32 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/collector/mocks"
 	"github.com/osapi-io/gohai/pkg/gohai"
+	"go.uber.org/mock/gomock"
 )
 
 // failingCollector is a test double that always returns a canned error
 // from Collect. Used to exercise the error-path branch of
 // Facts.Timings without depending on a real collector's upstream seam.
-type failingCollector struct {
-	name string
-	err  error
-}
+// newFailingCollector returns a generated Collector mock whose Collect fails.
+func newFailingCollector(
+	ctrl *gomock.Controller,
+	name string,
+	err error,
+) *mocks.MockCollector {
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return("misc").AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
+	m.EXPECT().Dependencies().Return(nil).AnyTimes()
+	m.EXPECT().
+		Collect(gomock.Any(), gomock.Any()).
+		Return(nil, err).
+		AnyTimes()
 
-func (f *failingCollector) Name() string           { return f.name }
-func (f *failingCollector) Category() string       { return "misc" }
-func (f *failingCollector) DefaultEnabled() bool   { return false }
-func (f *failingCollector) Dependencies() []string { return nil }
-func (f *failingCollector) Collect(context.Context, collector.PriorResults) (any, error) {
-	return nil, f.err
+	return m
 }
-
-var _ collector.Collector = (*failingCollector)(nil)
 
 type GohaiPublicTestSuite struct {
 	suite.Suite
@@ -130,10 +135,11 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			if tt.injectFailing {
 				s.Require().NoError(
-					g.Register(&failingCollector{
-						name: "failtest",
-						err:  errors.New("simulated collector failure"),
-					}),
+					g.Register(newFailingCollector(
+						gomock.NewController(s.T()),
+						"failtest",
+						errors.New("simulated collector failure"),
+					)),
 				)
 				s.Require().NoError(g.Select("failtest"))
 			}
