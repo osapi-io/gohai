@@ -229,6 +229,19 @@ Rich per-provider data lives on the typed `Facts.Ec2` / `Facts.Gce` / etc.
 field. See [docs/collectors/cloud.md](docs/collectors/cloud.md) for the full
 pattern.
 
+## 📋 Examples
+
+Each example is a standalone Go program you can read and run.
+
+| Example                                                   | What it shows                                                |
+| --------------------------------------------------------- | ------------------------------------------------------------ |
+| [default-collection](examples/default-collection/main.go) | Collect the default set and print it as JSON                 |
+| [select-collectors](examples/select-collectors/main.go)   | Restrict collection to named collectors                      |
+| [categories](examples/categories/main.go)                 | Select by category, then subtract one                        |
+| [typed-facts](examples/typed-facts/main.go)               | Read results as typed fields, by key path, and as a flat map |
+| [timings](examples/timings/main.go)                       | Surface per-collector duration and failure                   |
+| [list-collectors](examples/list-collectors/main.go)       | Enumerate collectors without collecting                      |
+
 ## 📖 Documentation
 
 - [Package documentation] on pkg.go.dev — generated API reference. Every
@@ -242,11 +255,6 @@ pattern.
   conventions.
 - [Collector methodology](docs/methodology.md) — library selection, field
   naming, and data sources.
-
-## 🤝 Contributing
-
-See the [Contributing](CONTRIBUTING.md) guide for prerequisites, setup,
-conventions, and the PR workflow.
 
 ## 🔗 Related Works
 
@@ -297,6 +305,11 @@ references, as backing libraries we wrap, or as peers solving adjacent problems:
   style rather than import.
 - [psutil](https://github.com/giampaolo/psutil) — the Python library gopsutil is
   a port of; the original design reference for the dynamic-state facts.
+
+## 🤝 Contributing
+
+See the [Contributing](CONTRIBUTING.md) guide for prerequisites, setup,
+conventions, and the PR workflow.
 
 ## 📄 License
 
