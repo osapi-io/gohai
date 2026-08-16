@@ -227,10 +227,10 @@ module — change both together.
 - `testify/suite` with table-driven cases.
 - One suite method per function under test — success, errors, and edge cases are
   rows in one table, not separate methods.
-- `export_test.go` exposes unexported symbols via setter functions only
-  (`SetXFn(fn) func()` returning a restore func the caller defers). Never add
-  `var ReadX = readX` aliases — those invite a test that duplicates coverage the
-  caller's own test already provides.
+- `export_test.go` exposes unexported symbols to external tests, by alias or by
+  setter (`SetXFn(fn) func()` returning a restore func the caller defers). Do
+  not use an alias to test an internal step the caller's own test already covers
+  — a pure helper with its own contract is what the pattern is for.
 - Mocks are generated with `go.uber.org/mock` and committed; never hand-written.
 
 Collector-specific rules on top of that:
@@ -391,10 +391,10 @@ Before marking a collector complete, every item below must be true:
     methods shadowing bridge code `TestCollect` already exercises. Pure-helper
     public-function tests (e.g. `TestHumanDuration`) are the only legitimate
     extra test methods.
-06. **No intermediate seams.** `export_test.go` exports only `Set<X>Fn` setters
-    that swap at the upstream library boundary (`hostInfoFn`, `partitionsFn`,
-    etc.). No `readXFn = readX` wrappers, no `var ReadX = readX` type aliases
-    for direct bridge tests.
+06. **Seams sit at the boundary.** `export_test.go` swaps the upstream library
+    call (`hostInfoFn`, `partitionsFn`, etc.), so the bridge mapping runs on
+    every row. No `readXFn = readX` wrappers partway through the collector, and
+    no alias used to test a bridge `TestCollect` already exercises.
 07. **`docs/collectors/<name>.md`** is a self-contained functional spec:
     Description (what + why in our voice), Collected Fields with **Schema
     mapping** column (OCSF path first, OpenTelemetry attribute when OCSF is
