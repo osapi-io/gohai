@@ -1,5 +1,5 @@
 ---
-name: Docs Lint
+name: Markdown Lint
 
 on:
   push:
@@ -18,5 +18,5 @@ jobs:
         uses: extractions/setup-just@v4
       - name: Fetch justfiles
         run: just fetch
-      - name: Lint docs
+      - name: Lint markdown
         run: just md-fmt-check
