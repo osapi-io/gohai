@@ -142,8 +142,10 @@ gohai version                      # build info
 
 ## Code style
 
-Go code should be formatted by \[`gofumpt`\][gofumpt] and linted using
-\[`golangci-lint`\][golangci-lint]. This style is enforced by CI.
+Go conventions — signatures, file naming, test structure, mocking, and the style
+baseline — are specified in the `go-code-standards` capability in
+[osapi-io/specs](https://github.com/osapi-io/specs). Where this page and the
+specification disagree, the specification wins.
 
 ```bash
 just go-fmt-check   # Check formatting
@@ -170,26 +172,6 @@ Every `.go` file MUST start with the MIT license header — see any existing Go
 file in the repo for the exact format. Build-tagged files put `//go:build` on
 line 1, blank line, then the header.
 
-### Function Signatures
-
-Functions with parameters MUST use multi-line format:
-
-```go
-func FunctionName(
-    param1 type1,
-    param2 type2,
-) (returnType, error) {
-}
-```
-
-Zero-parameter functions stay single-line:
-
-```go
-func (base) Name() string {
-    return "cpu"
-}
-```
-
 ## Testing
 
 ```bash
@@ -211,54 +193,33 @@ module — change both together.
 
 ### Test file conventions
 
-- Public tests: `*_public_test.go` in test package (`package gohai_test` or
-  `package collector_test`) for exported functions
-- Internal tests: `*_test.go` in same package (`package gohai`) for private
-  functions — avoid when the external package can reach what it needs via an
-  `export_test.go` alias
-- `export_test.go` in the same package exposes unexported symbols to external
-  `_test.go` files via setter functions only (`SetXFn(fn) func()` returning a
-  restore func the caller defers). **Do not** add `var ReadX = readX`
-  type-aliases exposing private bridges — those enabled a second `TestReadX`
-  method that duplicates what `TestCollect` already covers. Never put
-  production-only code in `export_test.go`; the `_test.go` suffix makes it
-  test-only
-- Suite naming: `*_public_test.go` → `{Name}PublicTestSuite`, `*_test.go` →
-  `{Name}TestSuite`
-- Use `testify/suite` with table-driven patterns
+Test structure, suite naming, mocking, and what `export_test.go` may expose are
+specified in `go-code-standards`. In this repository the external test package
+is `package gohai_test` or `package collector_test`.
+
+Collector-specific rules on top of that:
+
 - **One `TestCollect` per collector.** All scenarios — both Linux and Darwin,
   success and error paths — live as rows in one table keyed by a `variant`
-  column. No `TestCollectLinux` / `TestCollectDarwin` / `TestCollectX` splits.
-  No `TestReadX` methods that duplicate paths `TestCollect` already hits via the
-  upstream seam.
-- Separate test methods are reserved for genuinely pure, independent public
-  helpers with their own contract (`TestHumanDuration`, `TestBytesToString`,
-  `TestNeighFamily`, `TestNeighState`) — not for bridges Collect already
-  exercises.
-- **Swap at the boundary, not in the middle.** `TestCollect` rows swap the raw
-  upstream library call (`hostInfoFn`, `partitionsFn`, `usersFn`, ...) and let
-  the bridge mapping run on every row. Do NOT add intermediate seams
-  (`readXFn = readX`) — that's test-only scaffolding in production code, and
-  it's what this consistency rule is specifically eliminating.
+  column. No `TestCollectLinux` / `TestCollectDarwin` splits.
+- Separate test methods are reserved for genuinely pure public helpers with
+  their own contract (`TestHumanDuration`, `TestBytesToString`) — not for
+  bridges `Collect` already exercises.
+- **Swap at the boundary.** `TestCollect` rows swap the raw upstream library
+  call (`hostInfoFn`, `partitionsFn`, ...) so the bridge mapping runs on every
+  row.
 - **No custom assertion messages** — `s.Equal(want, got)`, not
-  `s.Equal(want, got, "expected equal")`. Matches osapi's test style
-- Target 100% test coverage on all packages
+  `s.Equal(want, got, "expected equal")`.
+- Target 100% test coverage on all packages.
 
 ### Go Patterns
 
-- Error wrapping: `fmt.Errorf("context: %w", err)`. Wrap upstream library errors
-  with context — **never expose raw gopsutil / ghw / procfs error types through
-  our API**. Callers must never need those packages in their module graph to
-  handle errors
-- Early returns over nested if-else
-- Unused parameters: rename to `_`
-- Import order: stdlib, third-party, local (blank-line separated)
+Error wrapping, early returns, unused parameters, import order, and linting are
+specified in `go-code-standards`. Specific to this repository:
 
-### Linting
-
-golangci-lint with: errcheck, errname, goimports, govet, prealloc, predeclared,
-revive, staticcheck. Generated files (`*.gen.go`, `*.pb.go`) are excluded from
-formatting.
+- **Never expose raw gopsutil, ghw, or procfs error types through our API.**
+  Wrap them, so callers do not need those packages in their module graph to
+  handle an error.
 
 ## VFS + Executor Abstractions
 
