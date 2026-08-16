@@ -1,30 +1,30 @@
 # Schemas
 
 This directory holds the field-naming strategy, JSON Schema, and gap analysis
-artifacts for gohai's ~950 JSON fields.
+artifacts for gohai's 950 JSON fields.
 
 ## What's here
 
-| File                | Purpose                                                                                                                              |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `field-mapping.md`  | **Source of truth.** Per-field tier mapping (~950 rows) with `Changed? yes/no` showing which fields need renaming to match OCSF/OTel |
-| `ocsf-gaps.md`      | Fields where OCSF *should* have coverage but doesn't — upstream PR candidates for the OCSF schema repo                               |
-| `gohai.schema.json` | Generated JSON Schema (draft 2020-12) for `gohai.Facts` — reflects current Go tags, regenerated after renames                        |
-| `schema.go`         | `//go:embed` of the schema for the `gohai validate` command                                                                          |
-| `gen/`              | Generator tool that reflects `gohai.Facts` into JSON Schema                                                                          |
-| `ocsf-extension/`   | gohai vendor extension (uid 1337) for the OCSF schema compiler                                                                       |
-| `references/`       | OCSF JSON + OTel YAML reference files used during audits                                                                             |
+| File                | Purpose                                                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `field-mapping.md`  | **Source of truth.** Per-field tier mapping (950 rows) with `Changed? yes/no` showing which fields need renaming to match OCSF/OTel |
+| `ocsf-gaps.md`      | Fields where OCSF *should* have coverage but doesn't — upstream PR candidates for the OCSF schema repo                              |
+| `gohai.schema.json` | Generated JSON Schema (draft 2020-12) for `gohai.Facts` — reflects current Go tags, regenerated after renames                       |
+| `schema.go`         | `//go:embed` of the schema for the `gohai validate` command                                                                         |
+| `gen/`              | Generator tool that reflects `gohai.Facts` into JSON Schema                                                                         |
+| `ocsf-extension/`   | gohai vendor extension (uid 1337) for the OCSF schema compiler                                                                      |
+| `references/`       | OCSF JSON + OTel YAML reference files used during audits                                                                            |
 
 ## Three-tier naming ladder
 
 Every JSON field name comes from one of three tiers, applied in strict order:
 
-1. **OCSF** (~108 fields) — primary authority. Browse
+1. **OCSF** (107 fields) — primary authority. Browse
    [schema.ocsf.io](https://schema.ocsf.io/).
-2. **OpenTelemetry Resource Semantic Conventions** (~74 fields) — when OCSF is
+2. **OpenTelemetry Resource Semantic Conventions** (91 fields) — when OCSF is
    silent. See
    [OTel semconv](https://opentelemetry.io/docs/specs/semconv/resource/).
-3. **gohai convention** (~768 fields) — backing library names in `snake_case`
+3. **gohai convention** (752 fields) — backing library names in `snake_case`
    with unit suffixes when ambiguous.
 
 The complete per-field mapping with verifiable citations lives in

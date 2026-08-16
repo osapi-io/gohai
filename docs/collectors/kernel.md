@@ -28,15 +28,15 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field                | Type   | Description                                                         | Schema mapping                                              |
-| -------------------- | ------ | ------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `name`               | string | `uname -s` (`"Linux"`, `"Darwin"`).                                 | `os.name`.                                                  |
-| `release`            | string | `uname -r` — kernel release (`"5.15.0-47-generic"`).                | OCSF `os.kernel_release` (leaf stripped per CLAUDE.md).     |
-| `version`            | string | `uname -v` — build string.                                          | No direct schema mapping.                                   |
-| `machine`            | string | `uname -m` — hardware arch (`"x86_64"`, `"arm64"`).                 | Nearest: `device.hw_info.cpu_bits` (OCSF only stores bits). |
-| `processor`          | string | `uname -p` synthesis: same as `machine` on Linux and Darwin.        | No direct schema mapping.                                   |
-| `os`                 | string | `uname -o` synthesis: `"GNU/Linux"` on Linux, `"Darwin"` on Darwin. | `os.type`.                                                  |
-| `rosetta_translated` | bool   | macOS only. True when the process is running under Rosetta 2.       | No direct schema mapping.                                   |
+| Field                | Type   | Description                                                         | Schema mapping                                                |
+| -------------------- | ------ | ------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `name`               | string | `uname -s` (`"Linux"`, `"Darwin"`).                                 | `os.name`.                                                    |
+| `release`            | string | `uname -r` — kernel release (`"5.15.0-47-generic"`).                | OCSF `os.kernel_release` (leaf stripped per CONTRIBUTING.md). |
+| `version`            | string | `uname -v` — build string.                                          | No direct schema mapping.                                     |
+| `machine`            | string | `uname -m` — hardware arch (`"x86_64"`, `"arm64"`).                 | Nearest: `device.hw_info.cpu_bits` (OCSF only stores bits).   |
+| `processor`          | string | `uname -p` synthesis: same as `machine` on Linux and Darwin.        | No direct schema mapping.                                     |
+| `os`                 | string | `uname -o` synthesis: `"GNU/Linux"` on Linux, `"Darwin"` on Darwin. | `os.type`.                                                    |
+| `rosetta_translated` | bool   | macOS only. True when the process is running under Rosetta 2.       | No direct schema mapping.                                     |
 
 Loaded modules are reported by the separate
 [`kernel_modules`](kernel_modules.md) collector.

@@ -209,8 +209,8 @@ On Linux:
    `Hugetlb`, and `DirectMap4k` / `DirectMap2M` / `DirectMap1G`. All values are
    kernel-reported kB; we multiply by 1024 to emit bytes. This closes the
    Ohai-methodology gap without rolling a separate parser for the 27 fields
-   gopsutil already handles — extension on top of the library, per CLAUDE.md's
-   library-first principle.
+   gopsutil already handles — extension on top of the library, per
+   CONTRIBUTING.md's library-first principle.
 
 On macOS:
 

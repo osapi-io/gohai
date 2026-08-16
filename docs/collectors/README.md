@@ -43,8 +43,8 @@ Cybersecurity Schema Framework) as the primary authority (~108 fields),
 [schema.ocsf.io][ocsf-schema] and the
 [OpenTelemetry resource attributes][otel-semconv] to see canonical names. The
 complete per-field mapping with citations lives in
-[`schemas/field-mapping.md`](../schemas/field-mapping.md). Fields where OCSF is
-silent are tracked in [`schemas/ocsf-gaps.md`](../schemas/ocsf-gaps.md) as
+[`schemas/field-mapping.md`](../../schemas/field-mapping.md). Fields where OCSF
+is silent are tracked in [`schemas/ocsf-gaps.md`](../../schemas/ocsf-gaps.md) as
 upstream contribution candidates. Collection logic (what to read, which distro
 edge cases to handle) follows [Chef Ohai]'s plugins.
 
@@ -99,9 +99,9 @@ edge cases to handle) follows [Chef Ohai]'s plugins.
 | [linode](linode.md)               | `linode`        | Linode instance metadata       | ❌      | ✅          | `hostname` |
 | [oci](oci.md)                     | `oci`           | Oracle Cloud metadata          | ❌      | ✅          | `dmi`      |
 | [scaleway](scaleway.md)           | `scaleway`      | Scaleway instance metadata     | ❌      | ✅          | —          |
-| [rackspace](rackspace.md)         | `rackspace`     | Rackspace server metadata      | ❌      | 🪦          | —          |
-| [softlayer](softlayer.md)         | `softlayer`     | IBM SoftLayer metadata         | ❌      | 🪦          | —          |
-| [eucalyptus](eucalyptus.md)       | `eucalyptus`    | Eucalyptus instance metadata   | ❌      | 🪦          | —          |
+| rackspace                         | `rackspace`     | Rackspace server metadata      | ❌      | 🪦          | —          |
+| softlayer                         | `softlayer`     | IBM SoftLayer metadata         | ❌      | 🪦          | —          |
+| eucalyptus                        | `eucalyptus`    | Eucalyptus instance metadata   | ❌      | 🪦          | —          |
 
 There is no `cloud` collector — gohai doesn't ship a cross-provider aggregator.
 See [cloud.md](cloud.md) for the SDK pattern for detecting which provider a host

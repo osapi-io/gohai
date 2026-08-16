@@ -2,7 +2,7 @@
 
 Step-by-step walkthrough for building a new collector. For the rules and
 principles (library-first, OCSF + OpenTelemetry naming, no build tags, etc.) see
-[CLAUDE.md](../CLAUDE.md).
+[CONTRIBUTING.md](../CONTRIBUTING.md).
 
 **Reference implementation:** `pkg/gohai/collectors/shells/`. Copy its file
 layout and patterns exactly.
@@ -10,7 +10,7 @@ layout and patterns exactly.
 ## Done-definition
 
 See
-[CLAUDE.md — Done-definition](../CLAUDE.md#done-definition-every-collector-every-time).
+[CONTRIBUTING.md — Done-definition](../CONTRIBUTING.md#done-definition-every-collector-every-time).
 Every item there must be true before marking the collector complete.
 
 ## Step 1 — Create the sub-package
