@@ -142,7 +142,13 @@ gohai version                      # build info
 
 ## Code style
 
-Go code should be formatted by \[`gofumpt`\][gofumpt] and linted using
+These conventions are shared across every Go repository in the organization and
+are specified in the `go-code-standards` capability in
+[osapi-io/specs](https://github.com/osapi-io/specs). They are restated here
+because a contributor should not have to read another repository to learn how to
+write code in this one. Where the two disagree, the specification wins.
+
+Go code is formatted by \[`gofumpt`\][gofumpt] and linted using
 \[`golangci-lint`\][golangci-lint]. This style is enforced by CI.
 
 ```bash
@@ -172,7 +178,7 @@ line 1, blank line, then the header.
 
 ### Function Signatures
 
-Functions with parameters MUST use multi-line format:
+Functions with parameters use multi-line format, one parameter per line:
 
 ```go
 func FunctionName(
@@ -182,7 +188,7 @@ func FunctionName(
 }
 ```
 
-Zero-parameter functions stay single-line:
+Zero-parameter functions stay on one line:
 
 ```go
 func (base) Name() string {
@@ -211,54 +217,51 @@ module — change both together.
 
 ### Test file conventions
 
-- Public tests: `*_public_test.go` in test package (`package gohai_test` or
-  `package collector_test`) for exported functions
-- Internal tests: `*_test.go` in same package (`package gohai`) for private
-  functions — avoid when the external package can reach what it needs via an
-  `export_test.go` alias
-- `export_test.go` in the same package exposes unexported symbols to external
-  `_test.go` files via setter functions only (`SetXFn(fn) func()` returning a
-  restore func the caller defers). **Do not** add `var ReadX = readX`
-  type-aliases exposing private bridges — those enabled a second `TestReadX`
-  method that duplicates what `TestCollect` already covers. Never put
-  production-only code in `export_test.go`; the `_test.go` suffix makes it
-  test-only
+- Public tests: `*_public_test.go` in `package gohai_test` or
+  `package collector_test`, exercising the exported surface. This is the
+  default.
+- Internal tests: `*_test.go` in the same package, for what the exported surface
+  cannot reach.
 - Suite naming: `*_public_test.go` → `{Name}PublicTestSuite`, `*_test.go` →
-  `{Name}TestSuite`
-- Use `testify/suite` with table-driven patterns
+  `{Name}TestSuite`.
+- `testify/suite` with table-driven cases.
+- One suite method per function under test — success, errors, and edge cases are
+  rows in one table, not separate methods.
+- `export_test.go` exposes unexported symbols via setter functions only
+  (`SetXFn(fn) func()` returning a restore func the caller defers). Never add
+  `var ReadX = readX` aliases — those invite a test that duplicates coverage the
+  caller's own test already provides.
+- Mocks are generated with `go.uber.org/mock` and committed; never hand-written.
+
+Collector-specific rules on top of that:
+
 - **One `TestCollect` per collector.** All scenarios — both Linux and Darwin,
   success and error paths — live as rows in one table keyed by a `variant`
-  column. No `TestCollectLinux` / `TestCollectDarwin` / `TestCollectX` splits.
-  No `TestReadX` methods that duplicate paths `TestCollect` already hits via the
-  upstream seam.
-- Separate test methods are reserved for genuinely pure, independent public
-  helpers with their own contract (`TestHumanDuration`, `TestBytesToString`,
-  `TestNeighFamily`, `TestNeighState`) — not for bridges Collect already
-  exercises.
-- **Swap at the boundary, not in the middle.** `TestCollect` rows swap the raw
-  upstream library call (`hostInfoFn`, `partitionsFn`, `usersFn`, ...) and let
-  the bridge mapping run on every row. Do NOT add intermediate seams
-  (`readXFn = readX`) — that's test-only scaffolding in production code, and
-  it's what this consistency rule is specifically eliminating.
+  column. No `TestCollectLinux` / `TestCollectDarwin` splits.
+- Separate test methods are reserved for genuinely pure public helpers with
+  their own contract (`TestHumanDuration`, `TestBytesToString`) — not for
+  bridges `Collect` already exercises.
+- **Swap at the boundary.** `TestCollect` rows swap the raw upstream library
+  call (`hostInfoFn`, `partitionsFn`, ...) so the bridge mapping runs on every
+  row.
 - **No custom assertion messages** — `s.Equal(want, got)`, not
-  `s.Equal(want, got, "expected equal")`. Matches osapi's test style
-- Target 100% test coverage on all packages
+  `s.Equal(want, got, "expected equal")`.
+- Target 100% test coverage on all packages.
 
 ### Go Patterns
 
-- Error wrapping: `fmt.Errorf("context: %w", err)`. Wrap upstream library errors
-  with context — **never expose raw gopsutil / ghw / procfs error types through
-  our API**. Callers must never need those packages in their module graph to
-  handle errors
+- Error wrapping: `fmt.Errorf("context: %w", err)`
 - Early returns over nested if-else
 - Unused parameters: rename to `_`
 - Import order: stdlib, third-party, local (blank-line separated)
+- golangci-lint with errcheck, errname, goimports, govet, prealloc, predeclared,
+  revive, staticcheck
 
-### Linting
+Specific to this repository:
 
-golangci-lint with: errcheck, errname, goimports, govet, prealloc, predeclared,
-revive, staticcheck. Generated files (`*.gen.go`, `*.pb.go`) are excluded from
-formatting.
+- **Never expose raw gopsutil, ghw, or procfs error types through our API.**
+  Wrap them, so callers do not need those packages in their module graph to
+  handle an error.
 
 ## VFS + Executor Abstractions
 
