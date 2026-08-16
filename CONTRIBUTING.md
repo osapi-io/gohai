@@ -126,9 +126,9 @@ gohai version                      # build info
   - `gohai.schema.json` — generated schema (draft 2020-12), committed
   - `schema.go` — `//go:embed` of `gohai.schema.json` for the validate
     subcommand
-  - `field-mapping.md` — 803-row per-field tier mapping (OCSF/OTel/ convention)
+  - `field-mapping.md` — 950-row per-field tier mapping (OCSF/OTel/ convention)
     with citations
-  - `ocsf-gaps.md` — 73 OCSF upstream PR candidates
+  - `ocsf-gaps.md` — 82 OCSF upstream PR candidates
 - **`internal/platform/`** — OS/distro detection wrapping gopsutil. `Detect()`
   is a swappable `var` so collector tests can force any branch without importing
   gopsutil. `hostInfoFn` is private, exposed only to platform's own tests via
@@ -138,8 +138,7 @@ gohai version                      # build info
   - `registry.go` — `Registry` (register, resolve deps, run concurrently)
 - **`internal/executor/`** — command execution abstraction
   - `executor.go` — `Executor` interface (`Execute(ctx, name, args...)`)
-  - `gen/` — gomock mock generation (`go generate`)
-  - `mocks/` — generated mocks (committed)
+  - `gen/` — gomock mock generation (`go generate`) and the committed mock
 
 ## Code style
 
@@ -310,7 +309,7 @@ Reference implementation: `pkg/gohai/collectors/shells/`.
 
 `internal/executor` provides a minimal interface (single method:
 `Execute(ctx, name, args...) ([]byte, error)`) with a gomock mock at
-`internal/executor/mocks/`. Production impl wraps `exec.CommandContext` and
+`internal/executor/gen/`. Production impl wraps `exec.CommandContext` and
 returns combined stdout+stderr. Collectors that shell out (sysctl, sw_vers,
 lsb_release, loginctl, lscpu, kextstat, etc.) hold the Executor as a struct
 field.
@@ -345,8 +344,8 @@ c := &platform.Darwin{FS: memfs.New(), Exec: mockExec}
 ```
 
 Mocks are regenerated via `go generate ./internal/executor/...` and committed.
-Pinned tool: `go.uber.org/mock` (maintained fork — osapi uses the deprecated
-`golang/mock`; we picked the fork).
+Pinned tool: `go.uber.org/mock`, the maintained fork of the archived
+`golang/mock`.
 
 ### Migration status
 

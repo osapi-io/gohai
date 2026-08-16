@@ -133,8 +133,8 @@ with: current coverage, candidate coverage, migration plan.
 coverage is visible cross-platform, and CI on linux runners still validates
 actual linux runtime behavior.
 
-Shape (see [docs/adding-a-collector.md](docs/adding-a-collector.md) for full
-code examples):
+Shape (see [adding-a-collector.md](adding-a-collector.md) for full code
+examples):
 
 ```
 pkg/gohai/collectors/<name>/
@@ -217,9 +217,9 @@ tiers, applied in strict order of precedence:
      `mtu`, `fqdn`, `uuid`, `cidr`, `arn`, `id`.
 
 The complete per-field mapping with verifiable citations lives in
-[`schemas/field-mapping.md`](schemas/field-mapping.md). Fields where OCSF is
-silent are tracked in [`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md) as upstream
-contribution candidates.
+[`schemas/field-mapping.md`](../schemas/field-mapping.md). Fields where OCSF is
+silent are tracked in [`schemas/ocsf-gaps.md`](../schemas/ocsf-gaps.md) as
+upstream contribution candidates.
 
 **Not a naming reference:** Ohai (methodology only, not naming), node_exporter
 (methodology only), OCP (hardware design spec), CIS/SCAP/XCCDF (compliance

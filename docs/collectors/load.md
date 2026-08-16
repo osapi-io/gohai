@@ -80,8 +80,7 @@ gohai --no-collector.load   # disable
 
 None. (Consumers that want per-core saturation correlate with `cpu.total`
 themselves — we don't declare a runtime dependency because `Dependencies()`
-would auto-include `cpu` even when the user disabled it. See
-[dependencies.md](../features/dependencies.md#why-built-ins-dont-declare-dependencies-today).)
+would auto-include `cpu` even when the user disabled it.)
 
 ## Data Sources
 
