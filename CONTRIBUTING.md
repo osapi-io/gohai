@@ -142,10 +142,14 @@ gohai version                      # build info
 
 ## Code style
 
-Go conventions — signatures, file naming, test structure, mocking, and the style
-baseline — are specified in the `go-code-standards` capability in
-[osapi-io/specs](https://github.com/osapi-io/specs). Where this page and the
-specification disagree, the specification wins.
+These conventions are shared across every Go repository in the organization and
+are specified in the `go-code-standards` capability in
+[osapi-io/specs](https://github.com/osapi-io/specs). They are restated here
+because a contributor should not have to read another repository to learn how to
+write code in this one. Where the two disagree, the specification wins.
+
+Go code is formatted by \[`gofumpt`\][gofumpt] and linted using
+\[`golangci-lint`\][golangci-lint]. This style is enforced by CI.
 
 ```bash
 just go-fmt-check   # Check formatting
@@ -172,6 +176,26 @@ Every `.go` file MUST start with the MIT license header — see any existing Go
 file in the repo for the exact format. Build-tagged files put `//go:build` on
 line 1, blank line, then the header.
 
+### Function Signatures
+
+Functions with parameters use multi-line format, one parameter per line:
+
+```go
+func FunctionName(
+    param1 type1,
+    param2 type2,
+) (returnType, error) {
+}
+```
+
+Zero-parameter functions stay on one line:
+
+```go
+func (base) Name() string {
+    return "cpu"
+}
+```
+
 ## Testing
 
 ```bash
@@ -193,9 +217,21 @@ module — change both together.
 
 ### Test file conventions
 
-Test structure, suite naming, mocking, and what `export_test.go` may expose are
-specified in `go-code-standards`. In this repository the external test package
-is `package gohai_test` or `package collector_test`.
+- Public tests: `*_public_test.go` in `package gohai_test` or
+  `package collector_test`, exercising the exported surface. This is the
+  default.
+- Internal tests: `*_test.go` in the same package, for what the exported surface
+  cannot reach.
+- Suite naming: `*_public_test.go` → `{Name}PublicTestSuite`, `*_test.go` →
+  `{Name}TestSuite`.
+- `testify/suite` with table-driven cases.
+- One suite method per function under test — success, errors, and edge cases are
+  rows in one table, not separate methods.
+- `export_test.go` exposes unexported symbols via setter functions only
+  (`SetXFn(fn) func()` returning a restore func the caller defers). Never add
+  `var ReadX = readX` aliases — those invite a test that duplicates coverage the
+  caller's own test already provides.
+- Mocks are generated with `go.uber.org/mock` and committed; never hand-written.
 
 Collector-specific rules on top of that:
 
@@ -214,8 +250,14 @@ Collector-specific rules on top of that:
 
 ### Go Patterns
 
-Error wrapping, early returns, unused parameters, import order, and linting are
-specified in `go-code-standards`. Specific to this repository:
+- Error wrapping: `fmt.Errorf("context: %w", err)`
+- Early returns over nested if-else
+- Unused parameters: rename to `_`
+- Import order: stdlib, third-party, local (blank-line separated)
+- golangci-lint with errcheck, errname, goimports, govet, prealloc, predeclared,
+  revive, staticcheck
+
+Specific to this repository:
 
 - **Never expose raw gopsutil, ghw, or procfs error types through our API.**
   Wrap them, so callers do not need those packages in their module graph to
