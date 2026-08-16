@@ -1,4 +1,4 @@
 [tools]
-go = "1.25"
+go = "latest"
 just = "latest"
 uv = "latest"
