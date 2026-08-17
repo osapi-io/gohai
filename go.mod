@@ -12,7 +12,7 @@ require (
 	github.com/shirou/gopsutil/v4 v4.26.7
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
-	github.com/tklauser/go-sysconf v0.3.16
+	github.com/tklauser/go-sysconf v0.4.0
 	github.com/vishvananda/netlink v1.3.1
 	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.52.0
@@ -211,7 +211,7 @@ require (
 	github.com/tetafro/godot v1.5.6 // indirect
 	github.com/timakin/bodyclose v0.0.0-20260129054331-73d1f95b84b4 // indirect
 	github.com/timonwong/loggercheck v0.11.0 // indirect
-	github.com/tklauser/numcpus v0.11.0 // indirect
+	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/tomarrell/wrapcheck/v2 v2.12.0 // indirect
 	github.com/tommy-muehle/go-mnd/v2 v2.5.1 // indirect
 	github.com/ultraware/funlen v0.2.0 // indirect
