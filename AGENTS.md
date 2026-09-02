@@ -49,6 +49,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 ## Task tracking
 
-Implementation planning and execution uses the superpowers plugin workflows
-(`writing-plans` and `executing-plans`). Plans live in `docs/superpowers/`,
-created when the first plan is written.
+**Do not use superpowers.** Spec Kit governs specification, planning, and
+implementation, and the design record for a change lives in
+[osapi-io/specs](https://github.com/osapi-io/specs). A second workflow over that
+ground gives two answers to which artifact is authoritative, and the answer that
+loses is the one nobody reads. Nothing superpowers produces is committed.
