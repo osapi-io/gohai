@@ -26,10 +26,9 @@ treating the failure as real.
 
 ## Where the rules come from
 
-Repository layout and shared tooling are specified in
-[osapi-io/specs](https://github.com/osapi-io/specs). When a convention here and
-the specification disagree, the specification wins — say so rather than
-following the code.
+@CONTRIBUTING.md names the specification under "Before you start". When a
+convention here and the specification disagree, the specification wins — say so
+rather than following the code.
 
 ## Before writing a collector
 
