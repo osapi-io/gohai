@@ -13,6 +13,12 @@ called, and how data sources are chosen — is reference material in
 - Read the [Code of Conduct](CODE_OF_CONDUCT.md). It applies to every
   interaction in this repo.
 
+- **Design records** — The conventions binding this repository are specified in
+  [osapi-io/specs](https://github.com/osapi-io/specs) under `gohai/`, whose
+  `.specify/memory/` is the standing record. Design reasoning for a change lives
+  there too, not here — a design document kept in this repository goes stale the
+  moment the code moves past it, with nothing to catch the drift.
+
 - **Check existing work** — Is there an existing PR? Are there issues discussing
   the feature/change you want to make? Please make sure you consider/address
   these discussions in your work.
