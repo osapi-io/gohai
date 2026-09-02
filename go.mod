@@ -15,7 +15,7 @@ require (
 	github.com/tklauser/go-sysconf v0.4.0
 	github.com/vishvananda/netlink v1.3.1
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.52.0
+	golang.org/x/crypto v0.55.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
 )
@@ -239,7 +239,7 @@ require (
 	golang.org/x/exp/typeparams v0.0.0-20260209203927-2842357ff358 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
