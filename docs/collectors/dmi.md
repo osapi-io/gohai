@@ -4,9 +4,9 @@
 
 ## Description
 
-Reports SMBIOS / DMI data — BIOS, baseboard, chassis, and product identity. On
+Reports SMBIOS / DMI data. BIOS, baseboard, chassis, and product identity. On
 Linux the data comes from `/sys/class/dmi/id/*` via [ghw], which reads the sysfs
-entries exposed by the kernel (no root needed for most fields — `product_serial`
+entries exposed by the kernel (no root needed for most fields, `product_serial`
 and `product_uuid` are 0400 and return empty for non-root callers). macOS has no
 SMBIOS equivalent; the collector returns an empty Info there and the `hardware`
 collector (planned) covers macOS hardware identity.
@@ -19,7 +19,7 @@ full set for fleet audits.
 
 ## Collected Fields
 
-Each section is nil when that part of SMBIOS isn't available — virtual machines
+Each section is nil when that part of SMBIOS isn't available, virtual machines
 often omit chassis data, minimal containers may have no DMI at all. Consumers
 safely check `facts.DMI.Product != nil` before dereferencing.
 
@@ -64,11 +64,11 @@ safely check `facts.DMI.Product != nil` before dereferencing.
 | Field           | Type     | Description                                                      |
 | --------------- | -------- | ---------------------------------------------------------------- |
 | `vendor_name`   | `string` | System vendor (`"Google"`, `"Amazon EC2"`, `"Dell Inc."`, etc.). |
-| `name`          | `string` | Product name — primary cloud-detection signal.                   |
+| `name`          | `string` | Product name, primary cloud-detection signal.                    |
 | `family`        | `string` | Product family.                                                  |
 | `version`       | `string` | Product version.                                                 |
-| `serial_number` | `string` | Product serial (0400 on Linux — root-only, empty for non-root).  |
-| `uuid`          | `string` | System UUID (0400 on Linux — root-only, empty for non-root).     |
+| `serial_number` | `string` | Product serial (0400 on Linux, root-only, empty for non-root).   |
+| `uuid`          | `string` | System UUID (0400 on Linux, root-only, empty for non-root).      |
 | `sku`           | `string` | Product SKU.                                                     |
 
 ## Platform Support
@@ -140,8 +140,8 @@ gohai --no-collector.dmi   # disable (default)
 gohai --category=hardware  # pulls dmi + other hardware collectors
 ```
 
-Opt-in because most consumers only need DMI indirectly — when they enable a
-cloud collector, dmi gets pulled in automatically via `Dependencies()`.
+Opt-in because most consumers only need DMI indirectly, when they enable a cloud
+collector, dmi gets pulled in automatically via `Dependencies()`.
 
 ## Dependencies
 
@@ -150,7 +150,7 @@ None.
 ## Data Sources
 
 Ohai's `dmi.rb` shells out to `dmidecode`, which reads `/dev/mem` and requires
-root. gohai uses `ghw` instead, which reads `/sys/class/dmi/id/*` — the sysfs
+root. gohai uses `ghw` instead, which reads `/sys/class/dmi/id/*`, the sysfs
 entries are world-readable and don't require elevated privileges. This is an
 intentional deviation: sysfs is the modern, unprivileged way to access SMBIOS
 data on Linux. The fields exposed are identical (BIOS vendor/version/date,
@@ -170,7 +170,7 @@ On Linux:
    without `/sys/class/dmi/id/` at all (unprivileged containers) yields an Info
    with all four sub-structs nil.
 
-On macOS SMBIOS/DMI isn't exposed — the Linux DMI driver has no Darwin
+On macOS SMBIOS/DMI isn't exposed, the Linux DMI driver has no Darwin
 counterpart. We return an empty Info so consumers can check `facts.DMI.Product`
 without a per-OS branch. macOS hardware identity will be covered by the planned
 `hardware` collector via IOKit / `ioreg` / `system_profiler`.
@@ -178,7 +178,7 @@ without a per-OS branch. macOS hardware identity will be covered by the planned
 Ohai's `dmi` plugin shells out to `dmidecode`, which reads `/dev/mem` and
 exposes the full SMBIOS record set across all 128+ DMI types, but requires root.
 Our sysfs approach covers only the four types sysfs exports (BIOS, baseboard,
-chassis, product) — intentional tradeoff for rootless, container-friendly
+chassis, product), intentional tradeoff for rootless, container-friendly
 operation. Consumer-relevant types we don't cover are either redundant with
 other collectors (processor details → `cpu`, PCI slots → planned `pci`, DIMMs →
 partially in `memory`) or niche enough that no consumer has asked (cooling
@@ -187,7 +187,7 @@ devices, PSU, OEM strings). A dmidecode-based opt-in path can be added via
 
 ## Backing library
 
-- [github.com/jaypipes/ghw][ghw] — `pkg/bios`, `pkg/baseboard`, `pkg/chassis`,
+- [github.com/jaypipes/ghw][ghw]. `pkg/bios`, `pkg/baseboard`, `pkg/chassis`,
   `pkg/product`. ghw reads `/sys/class/dmi/id/*` directly without shelling out.
 
 [ghw]: https://github.com/jaypipes/ghw

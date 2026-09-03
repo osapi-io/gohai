@@ -9,7 +9,7 @@ Reports systemd service states on Linux hosts. Runs
 output. macOS uses launchd, which has a substantially different service model;
 Darwin returns nil gracefully.
 
-There is no direct Ohai equivalent for this collector — Ohai does not ship a
+There is no direct Ohai equivalent for this collector. Ohai does not ship a
 service-list plugin. This is a gohai-native addition.
 
 ## Collected Fields
@@ -73,7 +73,7 @@ None.
 
 ## Data Sources
 
-There is no Ohai equivalent for this collector — Ohai does not ship a systemd
+There is no Ohai equivalent for this collector. Ohai does not ship a systemd
 service enumeration plugin. This is a gohai-native addition.
 
 On Linux:
@@ -85,7 +85,7 @@ On Linux:
 4. Skips lines with fewer than 4 fields.
 5. ACTIVE state `active` → `enabled: true`; any other ACTIVE value → `false`.
 6. SUB state (e.g. `running`, `dead`, `failed`, `exited`) is stored in `state`.
-7. Returns an empty list (not an error) when systemctl is absent — containers
+7. Returns an empty list (not an error) when systemctl is absent, containers
    without systemd are common.
 
 On macOS: returns nil.

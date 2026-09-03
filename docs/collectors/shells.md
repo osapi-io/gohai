@@ -8,27 +8,27 @@ Reports the list of valid login shells installed on the host, as listed in
 `/etc/shells`. This file is maintained by the system package manager (and
 sometimes edited by operators) and is the authoritative source consulted by
 `login(1)`, `chsh(1)`, FTP daemons, and other tools that need to decide whether
-a given shell is "legitimate" — a user whose `passwd` entry points to a shell
-not in `/etc/shells` is typically treated as non-interactive.
+a given shell is "legitimate", a user whose `passwd` entry points to a shell not
+in `/etc/shells` is typically treated as non-interactive.
 
 Consumers use this to:
 
 - Enumerate which shells can be assigned as a login shell (fleet inventory,
-  policy compliance — e.g. "is `/bin/zsh` available on this host?").
+  policy compliance, e.g. "is `/bin/zsh` available on this host?").
 - Drive remediation tooling that installs a missing shell before `chsh`.
 - Spot drift across a fleet (hosts where `/etc/shells` has been hand-edited or
   pruned).
 
 Comments (lines beginning with `#`) and blank lines are stripped; leading and
 trailing whitespace on each entry is trimmed. Non-absolute entries (anything
-that doesn't start with `/`) are ignored — matches Ohai's strict `/`-prefix
+that doesn't start with `/`) are ignored, matches Ohai's strict `/`-prefix
 filter.
 
 ## Collected Fields
 
-| Field   | Type       | Description                                          | Schema mapping                                                                                                                    |
-| ------- | ---------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `paths` | `[]string` | Absolute paths to valid login shells, in file order. | No direct schema mapping — OCSF has `user.shell` per-user but no host-level shell inventory object. Treated as a gohai extension. |
+| Field   | Type       | Description                                          | Schema mapping                                                                                                                   |
+| ------- | ---------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `paths` | `[]string` | Absolute paths to valid login shells, in file order. | No direct schema mapping, OCSF has `user.shell` per-user but no host-level shell inventory object. Treated as a gohai extension. |
 
 ## Platform Support
 
@@ -39,7 +39,7 @@ filter.
 | Other    | Empty list |
 
 Missing `/etc/shells` (distroless/scratch containers) soft-misses to an empty
-list rather than erroring — matches Ohai's `file_exist?` gate.
+list rather than erroring, matches Ohai's `file_exist?` gate.
 
 ## Example Output
 
@@ -119,12 +119,12 @@ None.
 
 ## Data Sources
 
-On Linux and macOS (identical — `/etc/shells` follows POSIX convention and
-Ohai's plugin has no `:darwin`-specific path):
+On Linux and macOS (identical, `/etc/shells` follows POSIX convention and Ohai's
+plugin has no `:darwin`-specific path):
 
 1. Read `/etc/shells` through the injected `avfs.VFS`. Missing file (distroless
    containers, scratch images) soft-misses to `{paths: []}` rather than
-   erroring. Ohai omits the `shells` attribute entirely in the same situation —
+   erroring. Ohai omits the `shells` attribute entirely in the same situation,
    our typed struct is always present; the empty slice is a Go-idiom divergence,
    not a collection divergence.
 2. Scan the file line by line. Strip leading/trailing whitespace, skip blank
@@ -134,8 +134,8 @@ Ohai's plugin has no `:darwin`-specific path):
    valid entry); intentional safer behavior.
 3. Append surviving absolute paths to `paths[]` in file order.
 
-Permission-denied or other non-not-exist read errors propagate as a real failure
-— matches Ohai's behavior of letting `file_open` raise.
+Permission-denied or other non-not-exist read errors propagate as a real
+failure, which matches Ohai's behavior of letting `file_open` raise.
 
 ## Backing library
 

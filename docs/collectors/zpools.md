@@ -42,7 +42,7 @@ Consumers use this to:
 | Linux    | ✅ (when OpenZFS is installed) |
 | macOS    | ✅ (when OpenZFS is installed) |
 
-Both variants return an empty list — not an error — when `zpool` is absent.
+Both variants return an empty list, not an error, when `zpool` is absent.
 
 ## Example Output
 
@@ -113,7 +113,7 @@ On Linux and macOS (identical procedure):
    `executor.Executor`. `-H` suppresses the header line; `-o` selects exactly
    the six fields we want, tab-separated.
 2. If the command fails (exit code non-zero, `zpool` not found in `PATH`, or the
-   executor is `nil`), return an empty pool list without error — ZFS is not
+   executor is `nil`), return an empty pool list without error. ZFS is not
    installed on this host.
 3. Parse each output line, splitting on tabs. Lines that do not produce exactly
    six fields are skipped (defensive against unexpected output formats).

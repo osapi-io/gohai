@@ -10,17 +10,17 @@ a VMware guest, or when VMware Tools is absent, `Collect` returns `nil` with no
 error.
 
 The collector distinguishes VMware Workstation/Fusion (desktop) from vSphere
-using the raw session JSON query — a technique taken directly from Ohai's
+using the raw session JSON query, a technique taken directly from Ohai's
 `vmware.rb` plugin.
 
 ## Signals
 
 The collector reports two related signals about host type:
 
-- `host_type` — `"vmware_vsphere"` when the raw session JSON returns data
+- `host_type`. `"vmware_vsphere"` when the raw session JSON returns data
   (indicates the host hypervisor is vSphere/ESXi), or `"vmware_desktop"` for
   Workstation/Fusion. Use this to gate vSphere-specific automation.
-- `host_version` — populated only when `host_type` is `"vmware_vsphere"`;
+- `host_version`. Populated only when `host_type` is `"vmware_vsphere"`;
   contains the ESXi host version string. Empty on desktop hypervisors.
 
 ## Collected Fields
@@ -110,8 +110,8 @@ gohai --collector.vmware    # enable (opt-in)
 gohai --no-collector.vmware # disable
 ```
 
-DefaultEnabled: `false` — VMware Tools is not universally installed; callers
-must opt in explicitly.
+DefaultEnabled: `false`. VMware Tools is not universally installed; callers must
+opt in explicitly.
 
 ## Dependencies
 
@@ -123,7 +123,7 @@ On Linux the collector cascades through two detection signals before collecting:
 
 1. **SCSI controller check:** read `/proc/scsi/scsi` and look for "VMware" in
    the output. A VMware SCSI controller is present on all VMware guests that
-   have a virtual disk — this is a zero-exec fast path.
+   have a virtual disk. This is a zero-exec fast path.
 2. **Tool probe:** if `/proc/scsi/scsi` is absent or contains no VMware string,
    run `vmware-toolbox-cmd -v`. A successful non-empty response confirms the
    guest is VMware. This handles edge cases such as NVMe-only guests where no
@@ -135,7 +135,7 @@ When VMware is confirmed, the collector runs `vmware-toolbox-cmd stat <param>`
 for each of: `hosttime`, `speed`, `sessionid`, `balloon`, `swap`, `memlimit`,
 `memres`, `cpures`, `cpulimit`. It then runs `vmware-toolbox-cmd upgrade status`
 and `vmware-toolbox-cmd timesync status`. "UpdateInfo failed" responses are
-filtered to empty strings — Ohai's `vmware.rb` applies the same filter.
+filtered to empty strings. Ohai's `vmware.rb` applies the same filter.
 
 To distinguish desktop vs vSphere, the collector runs
 `vmware-toolbox-cmd stat raw json session`. An empty response indicates VMware
@@ -147,13 +147,13 @@ On macOS (VMware Fusion guest) the collector probes `vmware-toolbox-cmd -v`
 directly; if absent, returns `nil`. Collection proceeds identically when
 present.
 
-Windows is not implemented — Ohai's `vmware.rb` uses a different path
+Windows is not implemented. Ohai's `vmware.rb` uses a different path
 (`C:/Program Files/VMWare/VMware Tools/VMwareToolboxCmd.exe`) and gohai does not
 target Windows.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction for all `vmware-toolbox-cmd` invocations.
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) — virtual filesystem
-  for reading `/proc/scsi/scsi` on Linux. Tests inject a `memfs` instance.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs). Virtual filesystem for
+  reading `/proc/scsi/scsi` on Linux. Tests inject a `memfs` instance.

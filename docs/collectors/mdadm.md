@@ -98,8 +98,8 @@ None.
 Ohai's `linux/mdadm.rb` reads `/proc/mdstat` for array detection and parses
 member/spare disk lists. gohai follows the same approach for `/proc/mdstat` and
 extends it by optionally running `mdadm --detail` for UUID, state, and disk
-counts — which Ohai does not do. When `mdadm` is not installed, gohai still
-emits arrays with the information available from `/proc/mdstat` alone.
+counts, which Ohai does not do. When `mdadm` is not installed, gohai still emits
+arrays with the information available from `/proc/mdstat` alone.
 
 On Linux:
 
@@ -110,15 +110,15 @@ On Linux:
    `<name> : active|inactive ...` with a device name starting with `md` are
    recognized as array lines. For each such line, member tokens of the form
    `<dev>[N]` (active) and `<dev>[N](S)` (spare) are extracted via regex.
-   Journal devices (`(J)`) are recognized and silently skipped — they are an
+   Journal devices (`(J)`) are recognized and silently skipped. They are an
    implementation detail of the MD layer, not a data or parity member.
 3. For each discovered array (sorted by device name for deterministic output),
    run `mdadm --detail /dev/<device>` via the injected `executor.Executor`.
    Parse the output for:
-   - `Raid Level : <level>` — RAID level string.
-   - `State : <state>` — array state.
-   - `UUID : <uuid>` — array UUID.
-   - `Active Devices : <n>`, `Total Devices : <n>`, `Spare Devices : <n>` —
+   - `Raid Level : <level>`. RAID level string.
+   - `State : <state>`. Array state.
+   - `UUID : <uuid>`. Array UUID.
+   - `Active Devices : <n>`, `Total Devices : <n>`, `Spare Devices : <n>`,
      device counts.
 4. If `mdadm` is not installed or returns a non-zero exit, the enrichment step
    is silently skipped for that array. The array is still returned with members

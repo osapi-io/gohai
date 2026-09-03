@@ -5,11 +5,11 @@
 ## Description
 
 Reports RPM macro definitions from `rpm --showrc`. Macros are the RPM build
-system's configuration primitives — they control build paths (`%_topdir`,
+system's configuration primitives, they control build paths (`%_topdir`,
 `%_builddir`), compiler flags (`%optflags`), platform identifiers (`%_arch`),
 and many other aspects of how RPM packages are built and installed.
 
-On macOS the collector returns nil — RPM is not natively present on macOS.
+On macOS the collector returns nil. RPM is not natively present on macOS.
 
 Consumers use this to:
 
@@ -28,10 +28,10 @@ Consumers use this to:
 
 ## Platform Support
 
-| Platform | Supported                                   |
-| -------- | ------------------------------------------- |
-| Linux    | ✅ (requires `rpm` to be installed)         |
-| macOS    | Returns nil — RPM is not available on macOS |
+| Platform | Supported                                  |
+| -------- | ------------------------------------------ |
+| Linux    | ✅ (requires `rpm` to be installed)        |
+| macOS    | Returns nil, RPM is not available on macOS |
 
 ## Example Output
 
@@ -101,7 +101,7 @@ None.
 On Linux:
 
 1. Run `rpm --showrc` via the injected `executor.Executor`. If the command fails
-   (rpm not installed, permission denied), return `{macros: {}}` with no error —
+   (rpm not installed, permission denied), return `{macros: {}}` with no error,
    this matches Ohai's "skip if rpm not found" behaviour and avoids erroring on
    non-RPM systems (Debian, Alpine, etc.).
 2. Locate the two `===...===` marker lines (5 or more `=` signs) in the output.
@@ -116,7 +116,7 @@ On Linux:
 
 Note: Ohai's `rpm.rb` also parses `ARCHITECTURE AND OS`, `RPMRC VALUES`,
 `Features supported`, and `Macro path` sections from `rpm --showrc`. gohai
-collects only the macros section — the other sections are lower-demand fields.
+collects only the macros section, the other sections are lower-demand fields.
 Add them via a methodology issue if needed.
 
 ## Backing library

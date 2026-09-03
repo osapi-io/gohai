@@ -13,11 +13,11 @@ collection time.
 Consumers use this to:
 
 - Correlate logs and metrics across a fleet spanning regions.
-- Detect misconfigured hosts — e.g. a production box still on the builder's home
+- Detect misconfigured hosts, e.g. a production box still on the builder's home
   timezone.
 - Drive cron/schedule computations that need host-local time.
 
-The offset is a snapshot at collect time — a host on `America/Los_Angeles`
+The offset is a snapshot at collect time, a host on `America/Los_Angeles`
 reports `-25200` in July (PDT) and `-28800` in January (PST).
 
 ## Collected Fields
@@ -25,7 +25,7 @@ reports `-25200` in July (PDT) and `-28800` in January (PST).
 | Field    | Type   | Description                                             | Schema mapping                                                                                                                                           |
 | -------- | ------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`   | string | IANA timezone name.                                     | No direct schema mapping. OCSF's `device.location.tz_name` (within Location object) is the nearest analog but scoped to event location, not host config. |
-| `abbrev` | string | Current short abbreviation (`PDT`, `PST`, `UTC`).       | No direct schema mapping — ambiguous (e.g. `IST` means India / Israel / Ireland) so OCSF deliberately prefers offsets and IANA names.                    |
+| `abbrev` | string | Current short abbreviation (`PDT`, `PST`, `UTC`).       | No direct schema mapping, ambiguous (e.g. `IST` means India / Israel / Ireland) so OCSF deliberately prefers offsets and IANA names.                     |
 | `offset` | int    | Current offset from UTC in seconds (positive for east). | Closest: OCSF's timestamps use ISO-8601 with offset, but there's no host-config field.                                                                   |
 
 ## Platform Support
@@ -92,7 +92,7 @@ None.
 ## Data Sources
 
 Ohai's `timezone.rb` reports only `Time.now.getlocal.zone` (the short
-abbreviation like "EST"). gohai is a superset — it adds the IANA name (e.g.
+abbreviation like "EST"). gohai is a superset, it adds the IANA name (e.g.
 "America/New_York") via `/etc/localtime` symlink resolution and the numeric UTC
 offset in seconds, giving consumers both human-readable and machine-parseable
 timezone identification.
@@ -105,9 +105,9 @@ On Linux:
 2. When `/etc/localtime` isn't a symlink (Debian-style hosts where the timezone
    data is copied rather than symlinked, some container images), fall back to
    reading `/etc/timezone` through the VFS and trimming whitespace.
-3. If both sources fail, `name` stays empty — `abbrev` and `offset` still
+3. If both sources fail, `name` stays empty, `abbrev` and `offset` still
    populate from the Go runtime.
-4. `abbrev` and `offset` come from `time.Now().Zone()` — the runtime's cached
+4. `abbrev` and `offset` come from `time.Now().Zone()`, the runtime's cached
    local-time rules. The offset is a snapshot at collect time, so a host on
    `America/Los_Angeles` reports `-25200` in July (PDT) and `-28800` in January
    (PST).
@@ -116,10 +116,10 @@ On macOS:
 
 1. Resolve the IANA `name` by calling `Readlink("/etc/localtime")` and stripping
    macOS's `/var/db/timezone/zoneinfo/` prefix instead of Linux's
-   `/usr/share/zoneinfo/`. No `/etc/timezone` fallback — Apple doesn't ship that
+   `/usr/share/zoneinfo/`. No `/etc/timezone` fallback. Apple doesn't ship that
    file, so if the symlink is missing (rare, some CI sandboxes) `name` stays
    empty while `abbrev`/`offset` still populate.
-2. `abbrev` and `offset` come from `time.Now().Zone()` — same as Linux.
+2. `abbrev` and `offset` come from `time.Now().Zone()`, same as Linux.
 
 Superset of Ohai's `time.rb`, which only reports `Time.now.getlocal.zone` (the
 abbreviation). We additionally surface the IANA name (`America/Los_Angeles` vs.
@@ -127,4 +127,4 @@ just `PDT`) and the numeric offset.
 
 ## Backing library
 
-- Go stdlib (`os.Readlink`, `os.ReadFile`, `time`) — no third-party dependency.
+- Go stdlib (`os.Readlink`, `os.ReadFile`, `time`), no third-party dependency.

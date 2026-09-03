@@ -4,7 +4,7 @@
 
 ## Description
 
-Enumerates graphics / compute devices attached to the host — both integrated
+Enumerates graphics / compute devices attached to the host, both integrated
 (Apple Silicon M-series, Intel iGPUs) and discrete (NVIDIA, AMD). Consumers use
 this to:
 
@@ -12,12 +12,12 @@ this to:
 - Verify a driver/vendor pair in fleet inventory.
 - Feed CVE databases keyed off GPU firmware/driver versions.
 
-**No Ohai precedent.** Ohai has no GPU plugin — verified against the full
+**No Ohai precedent.** Ohai has no GPU plugin, verified against the full
 `chef/ohai` tree (no `gpu.rb`, no graphics/video/display plugins anywhere under
 `lib/ohai/plugins/`). This collector is therefore native to gohai: there's no
 years-of-distro-quirks methodology to mirror, and no consumers migrating from
 Ohai have an existing `node['gpu']` shape we'd be breaking. Collection follows
-the same shape as every other gohai hardware collector — ghw wraps
+the same shape as every other gohai hardware collector, ghw wraps
 `/sys/class/drm` on Linux, and macOS parses `system_profiler SPDisplaysDataType`
 via the shared Executor.
 
@@ -45,7 +45,7 @@ both Linux PCI data and darwin's system_profiler shape.
 | Linux    | ✅ (ghw/gpu walks `/sys/class/drm` + ghw's bundled pci.ids database)    |
 | macOS    | ✅ (`system_profiler SPDisplaysDataType -json` via the shared Executor) |
 
-On Linux, containers and minimal VMs typically lack `/sys/class/drm` — the
+On Linux, containers and minimal VMs typically lack `/sys/class/drm`, the
 collector returns an empty `cards` slice with no error.
 
 ## Example Output
@@ -113,14 +113,14 @@ None.
 
 ## Data Sources
 
-There is no Ohai equivalent for GPU enumeration — Ohai does not ship a GPU
+There is no Ohai equivalent for GPU enumeration. Ohai does not ship a GPU
 plugin. This is a gohai-native collector backed by ghw.
 
 On Linux:
 
 1. ghw/gpu reads `/sys/class/drm` for each `cardN` symlink, follows it to the
    PCI device's sysfs directory, and resolves vendor/product IDs against ghw's
-   bundled `pci.ids` database. All library-level — no shell-outs.
+   bundled `pci.ids` database. All library-level, no shell-outs.
 2. When `/sys/class/drm` is missing (headless server, stripped container, VM
    without a virtual display), ghw's `load` logs a warning and returns; we
    propagate that as an empty `cards` slice with no error.
@@ -141,7 +141,7 @@ On macOS:
 ## Backing library
 
 - [`github.com/jaypipes/ghw/pkg/gpu`](https://pkg.go.dev/github.com/jaypipes/ghw/pkg/gpu)
-  — Linux-only backend; resolves PCI IDs via `ghw/pkg/pci`.
-- [`internal/executor`](../../internal/executor) — shared command-runner
+  . Linux-only backend; resolves PCI IDs via `ghw/pkg/pci`.
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `system_profiler` on macOS. Tests mock it with
   `go.uber.org/mock`.

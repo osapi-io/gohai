@@ -77,13 +77,13 @@ None.
 
 Ohai's `linux/tc.rb` runs `tc -s qdisc show` and parses per-interface qdisc
 entries, recording kind, handle, and parent. gohai follows the same parsing
-strategy — extracting fields from `qdisc` lines and grouping by the `dev`
+strategy, extracting fields from `qdisc` lines and grouping by the `dev`
 keyword. No methodology deviation from Ohai.
 
 On Linux:
 
 1. Runs `tc -s qdisc show`.
-2. Parses lines that begin with `qdisc` — each such line describes one qdisc
+2. Parses lines that begin with `qdisc`, each such line describes one qdisc
    attached to a network interface. Other lines (statistics, blank lines,
    legend) are skipped.
 3. Line format:
@@ -91,7 +91,7 @@ On Linux:
 4. Extracts `kind`, `handle` (trailing `:` stripped), `iface`, and optional
    `parent`. Mirrors Ohai's `tc.rb` parsing strategy.
 5. Skips lines with fewer than 5 fields or missing the `dev` keyword.
-6. Returns an empty list (not an error) when `tc` is absent — common on minimal
+6. Returns an empty list (not an error) when `tc` is absent, common on minimal
    container images and non-Linux kernels without iproute2.
 
 Interface ordering follows the order of first appearance in `tc` output, which

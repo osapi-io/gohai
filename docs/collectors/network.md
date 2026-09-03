@@ -21,7 +21,7 @@ Consumers use this to:
 - Detect MTU mismatches or flapping interfaces (high `errin`/`errout`).
 
 DNS resolver configuration (`/etc/resolv.conf` nameservers + search domains)
-will live in its own `dns` collector — out of scope here.
+will live in its own `dns` collector, out of scope here.
 
 ## Collected Fields
 
@@ -35,7 +35,7 @@ Top level:
 | `default_gateway`         | string      | Next-hop IPv4 address for the default route.          | No direct schema mapping. |
 | `default_inet6_interface` | string      | Interface the default IPv6 route exits through.       | No direct schema mapping. |
 | `default_inet6_gateway`   | string      | Next-hop IPv6 address for the default route.          | No direct schema mapping. |
-| `neighbours`              | []Neighbour | Kernel ARP + NDP cache (Linux only — netlink).        | No direct schema mapping. |
+| `neighbours`              | []Neighbour | Kernel ARP + NDP cache (Linux only, netlink).         | No direct schema mapping. |
 
 Per interface:
 
@@ -47,24 +47,24 @@ Per interface:
 | `mtu`                     | int               | Maximum transmission unit (bytes).                                                                                                                                                                                                                                                                                        | No direct schema mapping. |
 | `mac`                     | string            | MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                                                                                                                                                                                                                                  | `network_interface.mac`.  |
 | `encapsulation`           | string            | Canonical encapsulation: `Ethernet` / `Loopback` / `PPP` / `SLIP` / `IPIP` / `6to4` / `VJSLIP`. Linux only.                                                                                                                                                                                                               | No direct schema mapping. |
-| `driver`                  | string            | Kernel driver bound to the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only — sysfs-derived.                                                                                                                                                                                                                             | No direct schema mapping. |
-| `speed`                   | string            | Negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only — ghw-derived.                                                                                                                                                                                                                                               | No direct schema mapping. |
-| `duplex`                  | string            | Link duplex (`Full`, `Half`). Linux only — ghw-derived.                                                                                                                                                                                                                                                                   | No direct schema mapping. |
+| `driver`                  | string            | Kernel driver bound to the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only, sysfs-derived.                                                                                                                                                                                                                              | No direct schema mapping. |
+| `speed`                   | string            | Negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only, ghw-derived.                                                                                                                                                                                                                                                | No direct schema mapping. |
+| `duplex`                  | string            | Link duplex (`Full`, `Half`). Linux only, ghw-derived.                                                                                                                                                                                                                                                                    | No direct schema mapping. |
 | `flags`                   | []string          | Interface flags (`up`, `broadcast`, `multicast`).                                                                                                                                                                                                                                                                         | No direct schema mapping. |
 | `addresses[]`             | []Address         | See below.                                                                                                                                                                                                                                                                                                                | —                         |
 | `routes[]`                | []Route           | Routes whose `dev` matches this interface.                                                                                                                                                                                                                                                                                | No direct schema mapping. |
-| `counters.*`              | Counters          | I/O counters — see below.                                                                                                                                                                                                                                                                                                 | No direct schema mapping. |
+| `counters.*`              | Counters          | I/O counters, see below.                                                                                                                                                                                                                                                                                                  | No direct schema mapping. |
 | `ethtool.driver_info`     | map[string]string | `ethtool -i <iface>` output as a map. Common keys: `driver`, `version`, `firmware_version`, `bus_info`, `supports_statistics`, `supports_test`, `supports_eeprom_access`, `supports_register_dump`, `supports_priv_flags`. Linux only; populated only when the `ethtool` binary is on PATH and the interface is Ethernet. | No direct schema mapping. |
-| `ethtool.ring_params`     | map[string]int    | `ethtool -g <iface>` — keys are prefixed `max_` (from "Pre-set maximums") or `current_` (from "Current hardware settings") then the field name snake_cased: `max_rx`, `current_rx`, `current_rx_jumbo`, etc. Values are buffer descriptor counts.                                                                         | No direct schema mapping. |
-| `ethtool.channel_params`  | map[string]int    | `ethtool -l <iface>` — same `max_` / `current_` prefix convention as `ring_params`. Keys: `rx`, `tx`, `other`, `combined`. Values are queue counts.                                                                                                                                                                       | No direct schema mapping. |
-| `ethtool.coalesce_params` | map[string]any    | `ethtool -c <iface>` — most values are integers (microseconds, frame counts). The exception is the `Adaptive RX: on  TX: off` line which becomes two string entries `adaptive_rx` / `adaptive_tx` carrying `"on"`/`"off"`.                                                                                                | No direct schema mapping. |
-| `ethtool.offload_params`  | map[string]string | `ethtool -k <iface>` — keys are feature names snake_cased (`rx_checksumming`, `generic_receive_offload`, ...). Values are `"on"` / `"off"`; trailing `[fixed]` / `[requested ...]` annotations are stripped.                                                                                                              | No direct schema mapping. |
-| `ethtool.pause_params`    | map[string]bool   | `ethtool -a <iface>` — keys: `autonegotiate`, `rx`, `tx`. Values are booleans (`"on"` → true).                                                                                                                                                                                                                            | No direct schema mapping. |
-| `vlan.id`                 | string            | 802.1Q VLAN tag (decimal). Linux only — parsed from `ip -d link`.                                                                                                                                                                                                                                                         | No direct schema mapping. |
-| `vlan.protocol`           | string            | `802.1Q` / `802.1ad` — present only on the protocol-qualified `ip` form.                                                                                                                                                                                                                                                  | No direct schema mapping. |
+| `ethtool.ring_params`     | map[string]int    | `ethtool -g <iface>`, keys are prefixed `max_` (from "Pre-set maximums") or `current_` (from "Current hardware settings") then the field name snake_cased: `max_rx`, `current_rx`, `current_rx_jumbo`, etc. Values are buffer descriptor counts.                                                                          | No direct schema mapping. |
+| `ethtool.channel_params`  | map[string]int    | `ethtool -l <iface>`, same `max_` / `current_` prefix convention as `ring_params`. Keys: `rx`, `tx`, `other`, `combined`. Values are queue counts.                                                                                                                                                                        | No direct schema mapping. |
+| `ethtool.coalesce_params` | map[string]any    | `ethtool -c <iface>`, most values are integers (microseconds, frame counts). The exception is the `Adaptive RX: on  TX: off` line which becomes two string entries `adaptive_rx` / `adaptive_tx` carrying `"on"`/`"off"`.                                                                                                 | No direct schema mapping. |
+| `ethtool.offload_params`  | map[string]string | `ethtool -k <iface>`, keys are feature names snake_cased (`rx_checksumming`, `generic_receive_offload`, ...). Values are `"on"` / `"off"`; trailing `[fixed]` / `[requested ...]` annotations are stripped.                                                                                                               | No direct schema mapping. |
+| `ethtool.pause_params`    | map[string]bool   | `ethtool -a <iface>`, keys: `autonegotiate`, `rx`, `tx`. Values are booleans (`"on"` → true).                                                                                                                                                                                                                             | No direct schema mapping. |
+| `vlan.id`                 | string            | 802.1Q VLAN tag (decimal). Linux only, parsed from `ip -d link`.                                                                                                                                                                                                                                                          | No direct schema mapping. |
+| `vlan.protocol`           | string            | `802.1Q` / `802.1ad`, present only on the protocol-qualified `ip` form.                                                                                                                                                                                                                                                   | No direct schema mapping. |
 | `vlan.flags`              | []string          | `REORDER_HDR` / `GVRP` / `LOOSE_BINDING` when set.                                                                                                                                                                                                                                                                        | No direct schema mapping. |
-| `tunnel_info.*`           | TunnelInfo        | ip6tnl / ipip tunnel metadata: `proto`, `external`, `remote`, `local`, `encaplimit`, `hoplimit`, `tclass`, `flowlabel`, `addrgenmode`, `numtxqueues`, `numrxqueues`, `gso_max_size`, `gso_max_segs`. Linux only — parsed from `ip -d link`.                                                                               | No direct schema mapping. |
-| `xdp.attached[]`          | []XDPProgram      | Attached XDP (eBPF) programs — each entry carries `mode` (`xdpdrv` / `xdpgeneric` / `xdpoffload` / `xdpmulti`), `id`, and `tag`. Linux only — parsed from `ip -d link`.                                                                                                                                                   | No direct schema mapping. |
+| `tunnel_info.*`           | TunnelInfo        | ip6tnl / ipip tunnel metadata: `proto`, `external`, `remote`, `local`, `encaplimit`, `hoplimit`, `tclass`, `flowlabel`, `addrgenmode`, `numtxqueues`, `numrxqueues`, `gso_max_size`, `gso_max_segs`. Linux only, parsed from `ip -d link`.                                                                                | No direct schema mapping. |
+| `xdp.attached[]`          | []XDPProgram      | Attached XDP (eBPF) programs, each entry carries `mode` (`xdpdrv` / `xdpgeneric` / `xdpoffload` / `xdpmulti`), `id`, and `tag`. Linux only, parsed from `ip -d link`.                                                                                                                                                     | No direct schema mapping. |
 
 Per address:
 
@@ -75,7 +75,7 @@ Per address:
 | `prefixlen` | int    | Prefix length (24, 64, …).                                        | No direct schema mapping. |
 | `netmask`   | string | IPv4 netmask derived from prefix (`"255.255.255.0"`); IPv6 omits. | No direct schema mapping. |
 | `broadcast` | string | IPv4 broadcast address derived from address + prefix; IPv6 omits. | No direct schema mapping. |
-| `scope`     | string | `Global`, `Link`, or `Host` — derived from stdlib classification. | No direct schema mapping. |
+| `scope`     | string | `Global`, `Link`, or `Host`, derived from stdlib classification.  | No direct schema mapping. |
 
 Per route:
 
@@ -115,10 +115,10 @@ Per `Counters`:
 
 ## Platform Support
 
-| Platform | Supported                                                                                  |
-| -------- | ------------------------------------------------------------------------------------------ |
-| Linux    | ✅ (gopsutil interfaces + counters, sysfs ARPHRD, `ip route` v4/v6, OpenVZ alias merge)    |
-| macOS    | ✅ (gopsutil interfaces + counters; routes/encap/OpenVZ are Linux-only — see Data Sources) |
+| Platform | Supported                                                                                 |
+| -------- | ----------------------------------------------------------------------------------------- |
+| Linux    | ✅ (gopsutil interfaces + counters, sysfs ARPHRD, `ip route` v4/v6, OpenVZ alias merge)   |
+| macOS    | ✅ (gopsutil interfaces + counters; routes/encap/OpenVZ are Linux-only, see Data Sources) |
 
 ## Example Output
 
@@ -209,7 +209,7 @@ None.
 
 On Linux:
 
-01. **gopsutil `net.Interfaces`** enumerates interfaces — name, MTU, hardware
+01. **gopsutil `net.Interfaces`** enumerates interfaces, name, MTU, hardware
     address, flags, raw address CIDRs, and `Index` (forwarded as the
     per-interface `number` field to match Ohai's `iface[:number]`). Admin
     `state` (`"up"` / `"down"`) is derived from gopsutil's `up` flag to match
@@ -271,23 +271,23 @@ On Linux:
     and the alias is removed from the output. Mirrors Ohai's behaviour so
     `interfaces[venet0]` is queryable for the container's actual IPs.
 
-On macOS we use gopsutil's `getifaddrs` + `netstat -i` only — encapsulation,
+On macOS we use gopsutil's `getifaddrs` + `netstat -i` only, encapsulation,
 routing, and OpenVZ handling are Linux-specific. A future enhancement may add
 `route -n get default` + `netstat -nr` parsing for macOS routes.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/net`](https://github.com/shirou/gopsutil) —
+- [`github.com/shirou/gopsutil/v4/net`](https://github.com/shirou/gopsutil),
   BSD-3. Primary source for interfaces + counters on both platforms.
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) — virtual filesystem
-  for `/sys/class/net/<iface>/type` and the OpenVZ detection probes (`/proc/vz`,
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs). Virtual filesystem for
+  `/sys/class/net/<iface>/type` and the OpenVZ detection probes (`/proc/vz`,
   `/proc/bc/0`).
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `ip route show` on Linux. Tests mock with
   `go.uber.org/mock`.
-- [`github.com/jaypipes/ghw`](https://github.com/jaypipes/ghw) — Apache-2.
-  Source for per-interface link `Speed` + `Duplex` on Linux.
-- [`github.com/vishvananda/netlink`](https://github.com/vishvananda/netlink) —
+- [`github.com/jaypipes/ghw`](https://github.com/jaypipes/ghw). Apache-2. Source
+  for per-interface link `Speed` + `Duplex` on Linux.
+- [`github.com/vishvananda/netlink`](https://github.com/vishvananda/netlink),
   Apache-2. Source for the kernel ARP + NDP cache on Linux. Both libraries
   compile cross-platform; their darwin paths return errors at runtime, leaving
   the relevant fields blank.

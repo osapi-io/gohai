@@ -9,7 +9,7 @@ Module entries carry size, reference count, and version so downstream tooling
 can correlate loaded modules against CVE feeds or policy baselines.
 
 Split from the [`kernel`](kernel.md) collector in 2026-04. Rationale: module
-enumeration is expensive — `kextstat -k -l` takes ~280ms on macOS, and reading
+enumeration is expensive, `kextstat -k -l` takes ~280ms on macOS, and reading
 `/sys/module/<name>/version` for every loaded module walks a fair chunk of the
 `/sys` hierarchy on Linux. Most consumers only want kernel identity (name,
 release, machine) and shouldn't pay that cost by default. This collector is
@@ -17,7 +17,7 @@ therefore opt-in; enable it when you actually need the module list.
 
 Consumers use this to:
 
-- Audit loaded modules/kexts for security compliance — is `cramfs` loaded? is an
+- Audit loaded modules/kexts for security compliance, is `cramfs` loaded? is an
   unsigned third-party module inserted? which EDR kext is active?
 - Correlate loaded modules against CVE feeds (module version ↔ known CVE).
 - Verify EDR / anti-malware agents are loaded (their kexts or modules should
@@ -38,7 +38,7 @@ Consumers use this to:
 | `version`  | string | Linux: `/sys/module/<name>/version` when present. macOS: parenthesized version from `kextstat`. |
 | `index`    | int    | macOS only: kext load order index from `kextstat`. Omitted on Linux.                            |
 
-On macOS, `modules` enumerates **legacy kernel extensions only** — System
+On macOS, `modules` enumerates **legacy kernel extensions only**. System
 Extensions introduced in macOS 11+ live under `/Library/SystemExtensions/` and
 require `systemextensionsctl`, which is not yet queried.
 
@@ -109,7 +109,7 @@ None.
 
 ## Data Sources
 
-Ohai's `kernel.rb` includes module enumeration as part of the kernel plugin —
+Ohai's `kernel.rb` includes module enumeration as part of the kernel plugin,
 parsing `/proc/modules` on Linux and `kextstat` on macOS. gohai separates
 modules into their own collector for independent enable/disable control but
 follows Ohai's same parsing approach for both platforms.
@@ -120,8 +120,8 @@ On Linux:
    line-by-line for per-module `name`, `size`, `refcount`. A missing file yields
    an empty Info with no error (systems without `procfs` mounted).
 2. For each module, `/sys/module/<name>/version` is read (when present) and
-   trimmed into `modules[].version`. A missing file leaves the field empty —
-   many built-in modules do not expose a version (matches Ohai's silent-on-miss
+   trimmed into `modules[].version`. A missing file leaves the field empty, many
+   built-in modules do not expose a version (matches Ohai's silent-on-miss
    behaviour).
 
 On macOS:
@@ -130,15 +130,15 @@ On macOS:
    row's fixed columns (`Index Refs Address Size Wired Name (Version)`) are
    parsed into a `Module` with `name`, `version` (parens stripped), `size`
    (hex), and `refcount`. When `kextstat` is absent or returns non-zero the
-   modules map is left empty — there is no `/proc/modules` equivalent on macOS.
+   modules map is left empty. There is no `/proc/modules` equivalent on macOS.
 2. System Extensions (macOS 11+) are out of scope; a future enhancement may
    consult `systemextensionsctl list`.
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) — virtual filesystem
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs). Virtual filesystem
   used to read `/proc/modules` and `/sys/module/<name>/version` on Linux. Tests
   inject `memfs` with canned content.
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `kextstat` on macOS. Tests mock it with
   `go.uber.org/mock`.

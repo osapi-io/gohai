@@ -21,12 +21,12 @@ gohai --category=cloud --category=hardware
 gohai.New(gohai.WithCategory("cloud"))
 ```
 
-Categories are the section headers below — `system`, `hardware`, `network`,
+Categories are the section headers below, `system`, `hardware`, `network`,
 `cloud`, `virtualization`, `security`, `software`, `users`, `linux`, `misc`.
 Dependencies pull in automatically, so e.g. enabling `cloud` picks up `dmi`
 since every cloud collector depends on it.
 
-**Defaults are opt-in.** `gohai.New()` (SDK) returns an empty registry — nothing
+**Defaults are opt-in.** `gohai.New()` (SDK) returns an empty registry, nothing
 runs unless you ask for it. Pass `gohai.WithDefaults()` for the recommended set,
 or `gohai.WithCollectors(...)` / `gohai.WithEnabled(...)` to enumerate. The CLI
 wires `WithDefaults()` automatically; pass `--no-defaults` to turn it off and
@@ -48,7 +48,7 @@ is silent are tracked in [`schemas/ocsf-gaps.md`](../../schemas/ocsf-gaps.md) as
 upstream contribution candidates. Collection logic (what to read, which distro
 edge cases to handle) follows [Chef Ohai]'s plugins.
 
-## 🖥️ System
+## System
 
 | Collector                           | Key              | Description                            | Default | Implemented | Depends On        |
 | ----------------------------------- | ---------------- | -------------------------------------- | ------- | ----------- | ----------------- |
@@ -66,7 +66,7 @@ edge cases to handle) follows [Chef Ohai]'s plugins.
 | [shells](shells.md)                 | `shells`         | Available shells                       | ✅      | ✅          | —                 |
 | [shard](shard.md)                   | `shard`          | Deterministic shard seed               | ✅      | ✅          | `hostname`, `dmi` |
 
-## ⚙️ Hardware
+## Hardware
 
 | Collector                   | Key          | Description                              | Default | Implemented | Depends On |
 | --------------------------- | ------------ | ---------------------------------------- | ------- | ----------- | ---------- |
@@ -80,13 +80,13 @@ edge cases to handle) follows [Chef Ohai]'s plugins.
 | [scsi](scsi.md)             | `scsi`       | SCSI devices                             | ❌      | ✅          | —          |
 | [hardware](hardware.md)     | `hardware`   | macOS hardware profile, battery, storage | ❌      | ✅          | —          |
 
-## 🌐 Network
+## Network
 
 | Collector             | Key       | Description                                  | Default | Implemented | Depends On |
 | --------------------- | --------- | -------------------------------------------- | ------- | ----------- | ---------- |
 | [network](network.md) | `network` | Interfaces, IPs, MACs, routes, DNS, counters | ✅      | ✅          | —          |
 
-## ☁️ Cloud
+## Cloud
 
 | Collector                         | Key             | Description                    | Default | Implemented | Depends On |
 | --------------------------------- | --------------- | ------------------------------ | ------- | ----------- | ---------- |
@@ -103,11 +103,11 @@ edge cases to handle) follows [Chef Ohai]'s plugins.
 | softlayer                         | `softlayer`     | IBM SoftLayer metadata         | ❌      | 🪦          | —          |
 | eucalyptus                        | `eucalyptus`    | Eucalyptus instance metadata   | ❌      | 🪦          | —          |
 
-There is no `cloud` collector — gohai doesn't ship a cross-provider aggregator.
+There is no `cloud` collector. gohai doesn't ship a cross-provider aggregator.
 See [cloud.md](cloud.md) for the SDK pattern for detecting which provider a host
 is on.
 
-## 🔮 Virtualization
+## Virtualization
 
 | Collector                           | Key              | Description                        | Default | Implemented | Depends On |
 | ----------------------------------- | ---------------- | ---------------------------------- | ------- | ----------- | ---------- |
@@ -116,14 +116,14 @@ is on.
 | [virtualbox](virtualbox.md)         | `virtualbox`     | VirtualBox guest additions data    | ❌      | ✅          | —          |
 | [libvirt](libvirt.md)               | `libvirt`        | Libvirt domain information         | ❌      | ✅          | —          |
 
-## 🔒 Security
+## Security
 
 | Collector             | Key       | Description                      | Default | Implemented | Depends On |
 | --------------------- | --------- | -------------------------------- | ------- | ----------- | ---------- |
 | [selinux](selinux.md) | `selinux` | SELinux status, policy, contexts | ❌      | ✅          | —          |
 | [ssh](ssh.md)         | `ssh`     | Host keys (RSA, ECDSA, ED25519)  | ❌      | ✅          | —          |
 
-## 📦 Software
+## Software
 
 | Collector                     | Key           | Description                                   | Default | Implemented | Depends On |
 | ----------------------------- | ------------- | --------------------------------------------- | ------- | ----------- | ---------- |
@@ -133,14 +133,14 @@ is on.
 | [docker](docker.md)           | `docker`      | Containers, images, Docker info               | ❌      | ✅          | —          |
 | [services](services.md)       | `services`    | Systemd service states                        | ❌      | ✅          | —          |
 
-## 👥 Users & Sessions
+## Users & Sessions
 
 | Collector               | Key        | Description                     | Default | Implemented | Depends On |
 | ----------------------- | ---------- | ------------------------------- | ------- | ----------- | ---------- |
 | [users](users.md)       | `users`    | passwd/group data, current user | ❌      | ✅          | —          |
 | [sessions](sessions.md) | `sessions` | Logged-in sessions              | ❌      | ✅          | —          |
 
-## 🐧 Linux-Specific
+## Linux-Specific
 
 | Collector                         | Key             | Description                   | Default | Implemented | Depends On |
 | --------------------------------- | --------------- | ----------------------------- | ------- | ----------- | ---------- |
@@ -158,7 +158,7 @@ is on.
 | [rpm](rpm.md)                     | `rpm`           | RPM macros and config         | ❌      | ✅          | —          |
 | [block_device](block_device.md)   | `block_device`  | Block device sysfs attributes | ❌      | ✅          | —          |
 
-## 🔧 Miscellaneous
+## Miscellaneous
 
 | Collector             | Key       | Description                               | Default | Implemented | Depends On |
 | --------------------- | --------- | ----------------------------------------- | ------- | ----------- | ---------- |
@@ -170,7 +170,7 @@ is on.
 ## Collector Dependencies
 
 The `Depends On` column in each category table above lists the collectors each
-entry depends on. Dependencies are resolved automatically — enabling a collector
+entry depends on. Dependencies are resolved automatically, enabling a collector
 also enables its dependencies.
 
 [chef ohai]: https://github.com/chef/ohai

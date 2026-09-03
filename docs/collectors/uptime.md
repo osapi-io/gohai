@@ -5,9 +5,9 @@
 ## Description
 
 Reports how long the system has been running (wall-clock seconds since boot),
-the boot timestamp, and — on Linux only — aggregate CPU idle seconds since boot.
+the boot timestamp, and, on Linux only, aggregate CPU idle seconds since boot.
 The idle counter is a sum across all logical CPUs, so on an 8-core host with a
-day of uptime you can see ~8 days of idle — that's the expected Linux semantic,
+day of uptime you can see ~8 days of idle, that's the expected Linux semantic,
 matching `cat /proc/uptime`.
 
 Consumers use this to:
@@ -29,11 +29,11 @@ Consumers use this to:
 
 ## Platform Support
 
-| Platform | Supported                                         |
-| -------- | ------------------------------------------------- |
-| Linux    | ✅                                                |
-| macOS    | ✅ (uptime/boot only — no idle counter available) |
-| Other    | —                                                 |
+| Platform | Supported                                        |
+| -------- | ------------------------------------------------ |
+| Linux    | ✅                                               |
+| macOS    | ✅ (uptime/boot only, no idle counter available) |
+| Other    | —                                                |
 
 ## Example Output
 
@@ -98,8 +98,8 @@ On Linux:
    `seconds` and synthesizes `boot_time` as `now - uptime`. We forward both
    verbatim and render `human` via `HumanDuration(seconds)`.
 2. We additionally read `/proc/uptime` through the injected `avfs.VFS` and parse
-   field 2 (aggregate idle time across all CPUs — can exceed wall-clock uptime
-   on multi-core systems) into `idle_seconds`; `idle_human` renders via the same
+   field 2 (aggregate idle time across all CPUs, can exceed wall-clock uptime on
+   multi-core systems) into `idle_seconds`; `idle_human` renders via the same
    helper. Missing file, malformed content, or a negative value leaves the idle
    fields zero-valued.
 
@@ -110,10 +110,10 @@ On macOS:
    `boot_time` / `human` as Linux. macOS has no aggregate idle counter, so
    `idle_seconds` / `idle_human` are omitted from the output.
 
-Mirrors Ohai's `uptime.rb` — same `/proc/uptime` parse on Linux, same
+Mirrors Ohai's `uptime.rb`, same `/proc/uptime` parse on Linux, same
 `kern.boottime`-derived uptime on Darwin. Our `boot_time` field is an additional
 surface not in Ohai. Human-rendering format is compact (`1d 2h 3m 4s`) rather
-than Ohai's verbose pluralized form (`1 day 02 hours 03 minutes 04 seconds`) —
+than Ohai's verbose pluralized form (`1 day 02 hours 03 minutes 04 seconds`),
 presentation choice.
 
 ## Backing library

@@ -106,7 +106,7 @@ On Linux:
    transport, revision, device) are skipped. Rows with an empty bracketed
    address are also skipped.
 4. Missing binary, exec error, or empty output yield an empty `devices` map with
-   no error — hosts without util-linux's `lsscsi` return cleanly rather than
+   no error, hosts without util-linux's `lsscsi` return cleanly rather than
    surfacing a missing-binary error.
 
 On macOS the collector returns an empty `Info{Devices: {}}`. macOS has no
@@ -114,12 +114,12 @@ On macOS the collector returns an empty `Info{Devices: {}}`. macOS has no
 SCSI-abstraction layer. Ohai's scsi plugin is Linux-only and we match that
 scope.
 
-Mirrors Ohai's `linux/scsi.rb` exactly — same command, same parsing algorithm,
+Mirrors Ohai's `linux/scsi.rb` exactly, same command, same parsing algorithm,
 same field names, same per-address keying. Ohai tolerates a missing `lsscsi` by
 simply skipping (`optional true` plugin); our collector matches that by
 returning empty rather than erroring.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `lsscsi`. Tests mock it with `go.uber.org/mock`.

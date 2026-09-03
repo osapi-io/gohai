@@ -11,7 +11,7 @@ the full picture to size workloads, debug OOM/overcommit events, detect kernel
 leaks (Slab growth), and audit hugepages configuration for databases or DPDK
 workloads.
 
-All byte-valued fields are **native bytes** — Ohai emits kB-suffixed strings
+All byte-valued fields are **native bytes**. Ohai emits kB-suffixed strings
 (`"total": "16384000kB"`); we chose bytes for Go ergonomics. Deliberate shape
 deviation, not a collection difference.
 
@@ -72,13 +72,13 @@ Consumers use this to:
 | `vmalloc_total`            | uint64  | vmalloc arena size.                                       | No direct schema mapping.        |
 | `vmalloc_used`             | uint64  | vmalloc in use.                                           | No direct schema mapping.        |
 | `vmalloc_chunk`            | uint64  | Largest free vmalloc chunk.                               | No direct schema mapping.        |
-| `hugepages.total`          | uint64  | `HugePages_Total` — configured pages.                     | No direct schema mapping.        |
+| `hugepages.total`          | uint64  | `HugePages_Total`, configured pages.                      | No direct schema mapping.        |
 | `hugepages.free`           | uint64  | `HugePages_Free`.                                         | No direct schema mapping.        |
 | `hugepages.reserved`       | uint64  | `HugePages_Rsvd`.                                         | No direct schema mapping.        |
 | `hugepages.surplus`        | uint64  | `HugePages_Surp`.                                         | No direct schema mapping.        |
 | `hugepages.size`           | uint64  | `Hugepagesize` in bytes.                                  | No direct schema mapping.        |
 | `hugepages.anon_hugepages` | uint64  | `AnonHugePages`.                                          | No direct schema mapping.        |
-| `hugepages.hugetlb`        | uint64  | `Hugetlb` — total memory in hugepages (Linux).            | No direct schema mapping.        |
+| `hugepages.hugetlb`        | uint64  | `Hugetlb`, total memory in hugepages (Linux).             | No direct schema mapping.        |
 | `direct_map.map_4k`        | uint64  | Physical memory mapped with 4k pages (Linux).             | No direct schema mapping.        |
 | `direct_map.map_2m`        | uint64  | Physical memory mapped with 2M pages (Linux).             | No direct schema mapping.        |
 | `direct_map.map_1g`        | uint64  | Physical memory mapped with 1G pages (Linux).             | No direct schema mapping.        |
@@ -90,10 +90,10 @@ Consumers use this to:
 
 ## Platform Support
 
-| Platform | Supported                                                |
-| -------- | -------------------------------------------------------- |
-| Linux    | ✅ (`/proc/meminfo` via gopsutil — 27+ forwarded fields) |
-| macOS    | ✅ (`host_statistics64` + `vm_stat` via executor)        |
+| Platform | Supported                                               |
+| -------- | ------------------------------------------------------- |
+| Linux    | ✅ (`/proc/meminfo` via gopsutil, 27+ forwarded fields) |
+| macOS    | ✅ (`host_statistics64` + `vm_stat` via executor)       |
 
 ## Example Output
 
@@ -184,7 +184,7 @@ None.
 
 Ohai's `linux/memory.rb` reads `/proc/meminfo` line by line and exposes each
 field. gohai uses gopsutil, which reads the same `/proc/meminfo` file and
-exposes the same fields as typed Go values. The field coverage is identical —
+exposes the same fields as typed Go values. The field coverage is identical,
 both surface total, free, available, buffers, cached, active, inactive, swap,
 hugepages, directmap, and all /proc/meminfo detail fields.
 
@@ -196,7 +196,7 @@ On Linux:
    Slab, Sreclaimable, Sunreclaim, PageTables, SwapCached, CommitLimit,
    CommittedAS, VmallocTotal, VmallocUsed, VmallocChunk, HugePagesTotal,
    HugePagesFree, HugePagesRsvd, HugePagesSurp, HugePageSize, AnonHugePages). We
-   forward every relevant field — library-first, no separate `/proc/meminfo`
+   forward every relevant field, library-first, no separate `/proc/meminfo`
    parse.
 2. gopsutil `mem.SwapMemory` provides the `swap.*` totals. `swap.cached` comes
    from the `SwapCached` field on the virtual memory stat.
@@ -209,7 +209,7 @@ On Linux:
    `Hugetlb`, and `DirectMap4k` / `DirectMap2M` / `DirectMap1G`. All values are
    kernel-reported kB; we multiply by 1024 to emit bytes. This closes the
    Ohai-methodology gap without rolling a separate parser for the 27 fields
-   gopsutil already handles — extension on top of the library, per
+   gopsutil already handles, extension on top of the library, per
    CONTRIBUTING.md's library-first principle.
 
 On macOS:
@@ -229,8 +229,8 @@ On macOS:
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/mem`](https://github.com/shirou/gopsutil) —
+- [`github.com/shirou/gopsutil/v4/mem`](https://github.com/shirou/gopsutil),
   BSD-3. Primary source on both platforms.
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `vm_stat` on macOS. Tests mock it with
   `go.uber.org/mock`.

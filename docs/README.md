@@ -6,7 +6,7 @@ Reference documentation for gohai. Runnable programs live in
 
 | Document                                       | Covers                                                                                      |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [collectors/README.md](collectors/README.md)   | Every collector, its category, default state, and backing library — one page per collector  |
+| [collectors/README.md](collectors/README.md)   | Every collector, its category, default state, and backing library, one page per collector   |
 | [methodology.md](methodology.md)               | How a collector decides what to read, which library to wrap, and what its fields are called |
 | [adding-a-collector.md](adding-a-collector.md) | Step-by-step walkthrough for writing a new collector                                        |
 | [ocsf-validation.md](ocsf-validation.md)       | Validating gohai's output and vendor extension against the upstream OCSF schema             |

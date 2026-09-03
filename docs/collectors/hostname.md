@@ -13,7 +13,7 @@ correlation.
 On macOS we additionally capture the friendly machine name
 (ComputerName-derived, e.g. "John's MacBook Pro") and prefer `hostname -s` over
 gopsutil so the short name always matches what `$(hostname -s)` reports
-elsewhere on the host — important on MDM-managed Macs where
+elsewhere on the host, important on MDM-managed Macs where
 `scutil --get HostName` can differ.
 
 ## Collected Fields
@@ -22,7 +22,7 @@ elsewhere on the host — important on MDM-managed Macs where
 | -------------- | ------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `name`         | string | Short hostname (e.g., `web01`).                                                          | OCSF `device.hostname` (leaf stripped: leaf matches collector name). |
 | `fqdn`         | string | Canonical FQDN; falls back to short hostname when DNS canonicalization ultimately fails. | `device.domain` + `.hostname`.                                       |
-| `domain`       | string | DNS domain — everything after the first `.` of the FQDN. Empty when FQDN equals `name`.  | `device.domain`.                                                     |
+| `domain`       | string | DNS domain, everything after the first `.` of the FQDN. Empty when FQDN equals `name`.   | `device.domain`.                                                     |
 | `machine_name` | string | Human-friendly name (macOS `ComputerName`-derived). Linux: same as `name`.               | No direct schema mapping.                                            |
 
 ## Platform Support
@@ -68,19 +68,19 @@ None.
 
 ## Data Sources
 
-On Linux and macOS (identical — mirrors Ohai's `hostname.rb` linux and darwin
+On Linux and macOS (identical, mirrors Ohai's `hostname.rb` linux and darwin
 branches):
 
 1. `hostname -s` → `name`. Run through the shared `internal/executor` runner. We
    prefer this over gopsutil so our short name matches what `$(hostname -s)`
-   reports in any other tool on the host — important on MDM-managed Macs where
+   reports in any other tool on the host, important on MDM-managed Macs where
    `scutil --get HostName` can differ, and on Linux hosts where `/etc/hostname`
    has been manually edited to an FQDN.
 2. `hostname` (no args) → `machine_name`. On stock macOS this is the
    `ComputerName`-derived friendly name; on Linux it normally matches the short
    name.
 3. FQDN is canonicalized via `net.LookupHost` followed by `net.LookupAddr`,
-   retried up to 3 times with a 100ms backoff on transient errors — matches
+   retried up to 3 times with a 100ms backoff on transient errors, matches
    Ohai's `canonicalize_hostname_with_retries`. On final failure we use the
    short hostname as FQDN.
 4. Derive `domain` by splitting FQDN on the first `.`. Empty when FQDN equals
@@ -95,10 +95,10 @@ mock present / absent / empty-output cases via `go.uber.org/mock`.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `hostname -s` and `hostname` on both Linux and
   macOS. Tests mock it with `go.uber.org/mock`.
 - Go stdlib `net` package for forward/reverse DNS canonicalization.
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
+- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil),
   BSD-3. Fallback source for the short hostname when the exec runner is
   unavailable.

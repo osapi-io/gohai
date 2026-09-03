@@ -79,7 +79,7 @@ The collector dispatches on the platform detected by `platform.Detect()`:
 1. Runs
    `dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\t${db:Status-Status}\n'`.
 2. Parses tab-delimited output, one package per line.
-3. Skips lines where `db:Status-Status` is not `installed` — mirrors Ohai's
+3. Skips lines where `db:Status-Status` is not `installed`, mirrors Ohai's
    debian branch in `packages.rb` which also filters on install status.
 4. Skips malformed lines (fewer than 4 fields) and empty-name entries.
 
@@ -94,10 +94,10 @@ The collector dispatches on the platform detected by `platform.Detect()`:
 **On macOS:**
 
 1. Runs `brew list --versions`.
-2. Output format: `<name> <ver1> [<ver2> ...]` — multiple versions can be
+2. Output format: `<name> <ver1> [<ver2> ...]`, multiple versions can be
    installed simultaneously. The collector records the last version token (most
    recently installed).
-3. Returns an empty list when Homebrew is not on PATH — not an error.
+3. Returns an empty list when Homebrew is not on PATH, not an error.
 
 **Error handling:** Any exec failure (command not found, exit error) returns an
 empty package list rather than propagating an error. Matches Ohai's

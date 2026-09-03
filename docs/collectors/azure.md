@@ -7,7 +7,7 @@
 Collects Azure VM metadata by hitting the link-local Instance Metadata Service
 at `http://169.254.169.254/metadata/instance`. Requires the `Metadata: true`
 header (Azure rejects requests without it) and **negotiates an api-version**
-with the service at collect time — matches Ohai's `best_api_version` handshake.
+with the service at collect time, matches Ohai's `best_api_version` handshake.
 `facts.Azure != nil` is the detection signal.
 
 Detection uses two Linux signals (matches Ohai's non-Windows chain):
@@ -45,7 +45,7 @@ If neither fires, the collector short-circuits with no HTTP call.
 | `os_type`                        | `string`                  | `Linux` / `Windows`.                                                                                    | OTel `os.type`                 |
 | `provider`                       | `string`                  | Azure RP (usually `Microsoft.Compute`).                                                                 | No direct schema mapping.      |
 | `plan`                           | `*Plan`                   | Marketplace plan.                                                                                       | No direct schema mapping.      |
-| `storage_profile`                | `*StorageProfile`         | OS disk + data disks — see below.                                                                       | No direct schema mapping.      |
+| `storage_profile`                | `*StorageProfile`         | OS disk + data disks, see below.                                                                        | No direct schema mapping.      |
 | `tags`                           | `string`                  | Semicolon-delimited `key:value` tag list.                                                               | No direct schema mapping.      |
 | `tags_list`                      | `[]Tag`                   | Parsed tags.                                                                                            | No direct schema mapping.      |
 | `user_data`                      | `string`                  | Base64-encoded custom data.                                                                             | No direct schema mapping.      |
@@ -127,32 +127,32 @@ None. Detection uses Azure-specific file signals (waagent binary + DHCP option
      `has_waagent?`.
    - `/var/lib/dhcp/dhclient.eth0.leases` contains `"unknown-245"`. Matches
      Ohai's `has_dhcp_option_245?`.
-2. **API version negotiation:** `GET /metadata/instance` without `api-version` —
+2. **API version negotiation:** `GET /metadata/instance` without `api-version`,
    Azure returns HTTP 400 with `{"newest-versions": [...]}`. We intersect with
    our supported-versions list and pick the latest. Falls back to the latest
    hardcoded version on any negotiation failure. Matches Ohai's
    `best_api_version` in `mixin/azure_metadata.rb`.
 3. **Metadata fetch:** `GET /metadata/instance?api-version=<negotiated>`.
-4. **Required header:** `Metadata: true` — Azure rejects requests without it.
+4. **Required header:** `Metadata: true`. Azure rejects requests without it.
    Protects against lateral SSRF.
 5. **User-Agent:** `gohai` (the cloudmetadata default).
-6. **Timeout:** 6 seconds — matches Ohai's `read_timeout`.
+6. **Timeout:** 6 seconds, matches Ohai's `read_timeout`.
 7. **Failure handling:** transport / 404 / etc. → `(nil, nil)`.
 8. **Transformation:** the `compute` sub-object is flattened onto the top-level
    `Info` (identity, placement, marketplace, tags, user-data). Optional nested
-   records — `host`, `host_group`, `os_profile`, `additional_capabilities`,
+   records, `host`, `host_group`, `os_profile`, `additional_capabilities`,
    `extended_location`, `plan`, `storage_profile`, `security_profile`,
-   `public_keys` — are retained as typed sub-structs when Azure populates them.
+   `public_keys`, are retained as typed sub-structs when Azure populates them.
    Per-interface IP addresses from `network.interface[].ipv4/ipv6` are also
    aggregated into flat top-level `public_ipv4` / `local_ipv4` / `public_ipv6` /
    `local_ipv6` lists in addition to the per-interface map keyed by MAC address.
 
-Mirrors Ohai's `Ohai::Mixin::AzureMetadata` methodology — same detection chain
+Mirrors Ohai's `Ohai::Mixin::AzureMetadata` methodology, same detection chain
 (non-Windows signals), same version-negotiation handshake, same 6s timeout, same
 MAC-keyed network-interfaces structure. Windows-specific detection signals
 (`C:\WindowsAzure`, `DhcpDomain` registry key) are not implemented.
 
 ## Backing library
 
-- [`internal/cloudmetadata`](../../internal/cloudmetadata/) — the shared HTTP
+- [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
   client used by every cloud-provider collector.

@@ -12,7 +12,7 @@ absent, `Collect` returns `nil` with no error.
 Only the guest role is implemented. Host-side inventory (`VBoxManage list vms`,
 `VBoxManage showvminfo`, etc.) from Ohai's `virtualbox.rb` host branch requires
 `VBoxManage` to be installed alongside the VirtualBox application. That surface
-is not yet implemented — consumers who need host inventory should use the
+is not yet implemented, consumers who need host inventory should use the
 VBoxManage API directly.
 
 ## Collected Fields
@@ -73,7 +73,7 @@ gohai --collector.virtualbox    # enable (opt-in)
 gohai --no-collector.virtualbox # disable
 ```
 
-DefaultEnabled: `false` — VirtualBox Guest Additions are not present on most
+DefaultEnabled: `false`. VirtualBox Guest Additions are not present on most
 hosts; callers must opt in explicitly.
 
 ## Dependencies
@@ -106,11 +106,11 @@ branch:
 - `GuestAdd/Revision, value: <val>,` → `guest_additions_revision`
 
 If `VBoxControl` is absent (not a VirtualBox guest, or Guest Additions not
-installed) the command fails and `Collect` returns `nil` — not an error. All
+installed) the command fails and `Collect` returns `nil`, not an error. All
 other lines in the output are silently ignored.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction for `VBoxControl` invocations. Tests mock it with
   `go.uber.org/mock`.

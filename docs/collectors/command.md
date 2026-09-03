@@ -12,7 +12,7 @@ listing without needing to shell out themselves.
 
 Both Linux and macOS support `ps -ef` with identical POSIX output format.
 
-DefaultEnabled is `false` — the full process table can be large and most
+DefaultEnabled is `false`, the full process table can be large and most
 consumers either use the `process` collector (which provides structured data) or
 don't need it at all.
 
@@ -86,13 +86,13 @@ On both Linux and macOS the collector runs `ps -ef` through the shared
 2. Blank lines are skipped.
 3. The header row and all process rows are stored as raw strings in `PS`.
 4. When `ps` is absent or returns an error, an empty `PS` slice is returned
-   without error — matches Ohai's no-panic posture.
+   without error, matches Ohai's no-panic posture.
 
 Ohai's `ps.rb` uses `"ps -ef"` on Linux, macOS, AIX, and Solaris, and
-`"ps -axww"` on BSDs. We use `ps -ef` on both Linux and Darwin — macOS `ps`
-fully supports the POSIX `-ef` flag set.
+`"ps -axww"` on BSDs. We use `ps -ef` on both Linux and Darwin, macOS `ps` fully
+supports the POSIX `-ef` flag set.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `ps -ef`. Tests mock it with `go.uber.org/mock`.

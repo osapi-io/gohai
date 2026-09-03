@@ -10,12 +10,12 @@ state, and start time. A point-in-time snapshot of `/proc/<pid>/*` (Linux) or
 
 Per-field read errors (access denied for a process owned by another user,
 zombies, short-lived processes that vanish mid-scan) leave the affected field
-zero-valued but keep the entry — the snapshot is best-effort, not strictly
+zero-valued but keep the entry. The snapshot is best-effort, not strictly
 uniform.
 
 Consumers use this to:
 
-- Detect unexpected processes (security — is `cryptominer` running?).
+- Detect unexpected processes (security, is `cryptominer` running?).
 - Map process → owner for accountability.
 - Reconstruct the parent/child tree via `pid`/`parent_pid`.
 - Enumerate things listening on services by name.
@@ -34,7 +34,7 @@ Consumers use this to:
 | `processes[].creation_time` | int64  | Process start time (unix seconds).           | `process.created_time`.       |
 
 Field name `cmd_line` follows OCSF (`process.cmd_line`) rather than Ohai's
-`command` — OCSF precedes Ohai when both name a field.
+`command`. OCSF precedes Ohai when both name a field.
 
 ## Platform Support
 
@@ -99,10 +99,10 @@ None.
 
 ## Data Sources
 
-| Platform | What we read                                                                    | Ohai plugin                                                                                                                                                          | Alignment                                                                                                                                                                                                                                                                                                  |
-| -------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `process.Processes` (reads `/proc/<pid>/stat`, `/proc/<pid>/cmdline`). | [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb) — sets `command[:ps] = "ps -ef"`; the `command` plugin runs it and emits the raw `ps` text. | **Different shape, same source data.** Ohai emits the raw `ps -ef` output as a text blob via its companion `command` collector (see `docs/collectors/command.md`); we parse `/proc` into typed per-process records. Ohai's `ps -ef` columns include `%cpu`, `%mem`, `tty`, `stime` which we don't surface. |
-| macOS    | gopsutil `process.Processes` (kinfo_proc syscall).                              | Same top-level [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb) — `ps -ef` under the `:darwin` branch.                                       | **Same source data, different shape** (same as Linux row).                                                                                                                                                                                                                                                 |
+| Platform | What we read                                                                    | Ohai plugin                                                                                                                                                         | Alignment                                                                                                                                                                                                                                                                                                  |
+| -------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | gopsutil `process.Processes` (reads `/proc/<pid>/stat`, `/proc/<pid>/cmdline`). | [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb), sets `command[:ps] = "ps -ef"`; the `command` plugin runs it and emits the raw `ps` text. | **Different shape, same source data.** Ohai emits the raw `ps -ef` output as a text blob via its companion `command` collector (see `docs/collectors/command.md`); we parse `/proc` into typed per-process records. Ohai's `ps -ef` columns include `%cpu`, `%mem`, `tty`, `stime` which we don't surface. |
+| macOS    | gopsutil `process.Processes` (kinfo_proc syscall).                              | Same top-level [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb), `ps -ef` under the `:darwin` branch.                                       | **Same source data, different shape** (same as Linux row).                                                                                                                                                                                                                                                 |
 
 **Known gaps vs. Ohai:** `%cpu`, `%mem`, `tty`, `stime` columns from `ps`. Also
 no threads, no file-descriptor count, no per-process env. Planned as extensions
@@ -112,4 +112,4 @@ if consumers need them. The raw `ps -ef` text blob is surfaced separately by our
 ## Backing library
 
 - [`github.com/shirou/gopsutil/v4/process`](https://github.com/shirou/gopsutil)
-  — BSD-3.
+  . BSD-3.

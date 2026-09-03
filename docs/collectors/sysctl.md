@@ -6,11 +6,11 @@
 
 Collects the complete kernel parameter table by running `sysctl -a`. Returns a
 flat `map[string]string` of all sysctl key/value pairs. Matches Ohai's
-`linux/sysctl` plugin. Both Linux and Darwin are supported — both platforms ship
+`linux/sysctl` plugin. Both Linux and Darwin are supported, both platforms ship
 `sysctl` with compatible output formats.
 
-DefaultEnabled is `false` — the full sysctl table is large (hundreds to
-thousands of entries) and most consumers only need specific keys.
+DefaultEnabled is `false`, the full sysctl table is large (hundreds to thousands
+of entries) and most consumers only need specific keys.
 
 ## Collected Fields
 
@@ -90,21 +90,21 @@ None.
 ## Data Sources
 
 Ohai's `linux/sysctl.rb` runs `sysctl -a` and parses key=value output. gohai
-follows the same approach on both Linux and macOS — running `sysctl -a` through
+follows the same approach on both Linux and macOS, running `sysctl -a` through
 the shared Executor. The only difference is separator handling: gohai tries `: `
 before `=` so macOS values containing `=` (e.g. `vm.swapusage`) parse correctly.
 
 On both Linux and macOS the collector runs `sysctl -a` through the shared
 `internal/executor` runner:
 
-1. Each output line is parsed for a separator — `": "` is tried first (macOS
+1. Each output line is parsed for a separator, `": "` is tried first (macOS
    native format; also used when values contain `" = "`), then `" = "` (Linux
    standard format). Lines with neither separator are skipped.
 2. The key portion is trimmed of whitespace. Lines with an empty key are
    skipped.
 3. Key and value are stored as-is in the `Params` map.
 4. When `sysctl` is absent or returns an error, an empty `Params` map is
-   returned without error — matches Ohai's no-panic stance. Ohai's
+   returned without error, matches Ohai's no-panic stance. Ohai's
    `linux/sysctl.rb` only populates the mash when `exitstatus == 0`.
 
 **Separator order rationale:** macOS values like `vm.swapusage` embed `" = "`
@@ -115,5 +115,5 @@ the `": "` check returns no match and `" = "` is used correctly.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `sysctl -a`. Tests mock it with `go.uber.org/mock`.

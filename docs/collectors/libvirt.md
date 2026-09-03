@@ -10,7 +10,7 @@ Reports libvirt domain information from a KVM/QEMU hypervisor host. Uses the
 with equivalent coverage. When `virsh` is absent or cannot connect to the
 daemon, `Collect` returns `nil` with no error.
 
-Only Linux is implemented — KVM requires Linux and the libvirt daemon
+Only Linux is implemented. KVM requires Linux and the libvirt daemon
 (`libvirtd`) is a Linux service. macOS always returns `nil`.
 
 ## Collected Fields
@@ -99,7 +99,7 @@ gohai --collector.libvirt    # enable (opt-in)
 gohai --no-collector.libvirt # disable
 ```
 
-DefaultEnabled: `false` — libvirt is only present on KVM hypervisor hosts;
+DefaultEnabled: `false`, libvirt is only present on KVM hypervisor hosts;
 callers must opt in explicitly.
 
 ## Dependencies
@@ -110,35 +110,35 @@ None.
 
 On Linux the collector runs four `virsh` commands in sequence:
 
-1. **`virsh version`** — probe and version extraction. If this fails (virsh
+1. **`virsh version`**. Probe and version extraction. If this fails (virsh
    absent or daemon down), `Collect` returns `nil` immediately. The version is
    extracted from the "Running against daemon:" line first (daemon version);
    when absent, falls back to "Using library: libvirt \<ver>" (library version).
    Matches Ohai's `libvirt_version` reporting.
 
-2. **`virsh uri`** — connection URI (e.g. `qemu:///system`). Errors are silently
+2. **`virsh uri`**. Connection URI (e.g. `qemu:///system`). Errors are silently
    ignored; `uri` stays empty rather than failing the whole collection.
 
-3. **`virsh list --all`** — enumerates all domains regardless of state. Errors
+3. **`virsh list --all`**. Enumerates all domains regardless of state. Errors
    yield an empty domain list, not a failure. The output table is parsed by
    skipping the header line and separator, then extracting name (column 2) and
    state (columns 3+, joined with spaces to handle "shut off").
 
-4. **`virsh dominfo <name>`** — enriches each domain with UUID, vCPU count,
+4. **`virsh dominfo <name>`**. Enriches each domain with UUID, vCPU count,
    maximum memory, and autostart status. Per-domain errors are silently ignored;
    the domain is kept in the list with only name and state populated. Lines
    without a colon separator are skipped.
 
 Ohai's libvirt plugin uses the `ruby-libvirt` gem for direct API access. We use
-the `virsh` CLI instead — it is always available when libvirt is installed and
+the `virsh` CLI instead. It is always available when libvirt is installed and
 does not require native bindings. The information surfaced is a subset of Ohai's
 full output (we do not enumerate networks, storage pools, or node hardware
 topology).
 
-macOS is not covered — `Collect` always returns `nil` on Darwin.
+macOS is not covered, `Collect` always returns `nil` on Darwin.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction for all `virsh` invocations. Tests mock it with
   `go.uber.org/mock`.
