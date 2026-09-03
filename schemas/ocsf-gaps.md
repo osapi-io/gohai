@@ -82,50 +82,48 @@ will also need updating to match the new object shape.
 
 ### Top 20 OCSF upstream PR candidates (ranked)
 
-01. `cpu_info.vulnerabilities` — kernel-reported Spectre/Meltdown/MDS
-    mitigations *(blocked on #1630)*
-02. New `kernel_module` object — loaded kernel modules (rootkit detection, CIS
-    benchmarks)
-03. New `security_posture` object — FIPS mode, SELinux status/mode/policy
-04. `cpu_info.flags` — security-relevant CPU feature flags (aes, sev, sgx, nx)
+01. `cpu_info.vulnerabilities`. Kernel-reported Spectre/Meltdown/MDS mitigations
     *(blocked on #1630)*
-05. `network_interface.interface_flags` — interface flags including PROMISC
-    detection — **submitted:**
+02. New `kernel_module` object, loaded kernel modules (rootkit detection, CIS
+    benchmarks)
+03. New `security_posture` object, FIPS mode, SELinux status/mode/policy
+04. `cpu_info.flags`. Security-relevant CPU feature flags (aes, sev, sgx, nx)
+    *(blocked on #1630)*
+05. `network_interface.interface_flags`. Interface flags including PROMISC
+    detection, **submitted:**
     [ocsf/ocsf-schema#1647](https://github.com/ocsf/ocsf-schema/pull/1647)
-06. `cloud.security_groups` — cloud firewall group membership
-07. `cloud.iam_role` / `cloud.service_accounts` — IAM bindings
-08. New `ssh_host_key` object — host key type, fingerprint, length
-09. New `routing_entry` object — destination, gateway, interface, metric
-10. New `neighbor_entry` object — ARP/NDP table entries
-11. `cloud.vpc_id` / `cloud.subnet_id` — network segmentation identifiers
-12. `cloud.encryption_at_host` — data-at-rest encryption status
-13. `cpu_info.vendor_id` — OTel `host.cpu.vendor.id` promotion *(blocked on
+06. `cloud.security_groups`. Cloud firewall group membership
+07. `cloud.iam_role` / `cloud.service_accounts`. IAM bindings
+08. New `ssh_host_key` object, host key type, fingerprint, length
+09. New `routing_entry` object, destination, gateway, interface, metric
+10. New `neighbor_entry` object, ARP/NDP table entries
+11. `cloud.vpc_id` / `cloud.subnet_id`. Network segmentation identifiers
+12. `cloud.encryption_at_host`. Data-at-rest encryption status
+13. `cpu_info.vendor_id`. OTel `host.cpu.vendor.id` promotion *(blocked on
     #1630)*
-14. `cpu_info.family` — OTel `host.cpu.family` promotion *(blocked on #1630)*
-15. `cpu_info.model_id` — OTel `host.cpu.model.id` promotion *(blocked on
-    #1630)*
-16. `cpu_info.stepping` — OTel `host.cpu.stepping` promotion *(blocked on
-    #1630)*
-17. `os.distribution_id` — machine-parseable distro identifier
-18. `os.distribution_family` — parent distro lineage (id_like)
-19. `session.terminal` — terminal device for login sessions
-20. `session.remote_host` — remote origin of login sessions
+14. `cpu_info.family`. OTel `host.cpu.family` promotion *(blocked on #1630)*
+15. `cpu_info.model_id`. OTel `host.cpu.model.id` promotion *(blocked on #1630)*
+16. `cpu_info.stepping`. OTel `host.cpu.stepping` promotion *(blocked on #1630)*
+17. `os.distribution_id`. Machine-parseable distro identifier
+18. `os.distribution_family`. Parent distro lineage (id_like)
+19. `session.terminal`. Terminal device for login sessions
+20. `session.remote_host`. Remote origin of login sessions
 
 ### OTel precedent candidates
 
 These have the highest chance of OCSF acceptance because OTel has already
 established the concept:
 
-- `instance_type` — OTel `host.type`
-- `cpu_vendor_id` / `cpu_family` / `cpu_model_id` / `cpu_stepping` — OTel
+- `instance_type`. OTel `host.type`
+- `cpu_vendor_id` / `cpu_family` / `cpu_model_id` / `cpu_stepping`. OTel
   `host.cpu.*`
-- `cpu_caches` L1/L3 — OTel has L2 via `host.cpu.cache.l2.size`
-- `uptime_seconds` — OTel `system.uptime`
-- `process_count` — OTel `system.process.count`
-- `interface_speed` — OTel `hw.network.bandwidth.limit`
-- `boot_rom_version` — OTel `hw.firmware_version`
-- `chassis_type` — OTel `hw.enclosure.type`
-- `pci.driver` — OTel `hw.driver_version`
+- `cpu_caches` L1/L3. OTel has L2 via `host.cpu.cache.l2.size`
+- `uptime_seconds`. OTel `system.uptime`
+- `process_count`. OTel `system.process.count`
+- `interface_speed`. OTel `hw.network.bandwidth.limit`
+- `boot_rom_version`. OTel `hw.firmware_version`
+- `chassis_type`. OTel `hw.enclosure.type`
+- `pci.driver`. OTel `hw.driver_version`
 
 ### Excluded from candidates (~1006 fields)
 
@@ -145,7 +143,7 @@ established the concept:
 
 ______________________________________________________________________
 
-## `device` — Host Identity & State
+## `device`: host Identity & State
 
 ### fqdn (`hostname.fqdn`)
 
@@ -246,7 +244,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `device_hw_info` — Hardware Detail
+## `device_hw_info`: hardware Detail
 
 ### cpu_sockets (`cpu.sockets`)
 
@@ -313,7 +311,7 @@ ______________________________________________________________________
 - **Security relevance:** Cache hierarchy determines microarchitecture
   generation; L1 sizes relevant to cache side-channel attacks
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** `host.cpu.cache.l2.size` — natural extension to L1/L3
+- **OTel precedent:** `host.cpu.cache.l2.size`, a natural extension to L1/L3
 - **gohai type:** `string` / `"l1d"`, `"l1i"`, `"l3"`
 
 ### cpu_mhz_max / cpu_mhz_min (`cpu.mhz_max`, `cpu.mhz_min`)
@@ -405,7 +403,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `os` — Operating System
+## `os`: operating System
 
 ### os_family (`platform.family`)
 
@@ -469,7 +467,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `network_interface` — Network Configuration
+## `network_interface`: network Configuration
 
 ### mtu (`network.interfaces[].mtu`)
 
@@ -612,7 +610,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `cloud` — Cross-Provider
+## `cloud`: cross-Provider
 
 ### instance_type (cross-provider)
 
@@ -626,7 +624,8 @@ ______________________________________________________________________
 ### instance_lifecycle (cross-provider)
 
 - **What:** On-demand, spot/preemptible, or reserved
-- **Security relevance:** Spot instances can disappear — IR evidence may be lost
+- **Security relevance:** Spot instances can disappear, so IR evidence may be
+  lost
 - **OCSF object:** `cloud`
 - **OTel precedent:** None
 - **gohai type:** `string`
@@ -708,7 +707,8 @@ ______________________________________________________________________
 ### session fields (`sessions.session.terminal`, `host`, `seat`)
 
 - **What:** Terminal name, remote host, systemd seat
-- **Security relevance:** "Who is logged in from where?" — first IR question
+- **Security relevance:** "Who is logged in from where?" is the first IR
+  question
 - **OCSF object:** Extend `session`
 - **OTel precedent:** None
 - **gohai type:** 3 string fields
@@ -727,7 +727,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `package` — Extend
+## `package`: extend
 
 ### package_manager_path (`package_mgr.path`)
 
