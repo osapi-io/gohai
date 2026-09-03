@@ -28,13 +28,13 @@ Caveats:
   collector also consults `/var/lib/dbus/machine-id` (which gopsutil doesn't)
   before giving up and returning empty.
 
-## Collected Fields
+## Collected fields
 
 | Field | Type   | Description                                 | Schema mapping                                                                                                                                                              |
 | ----- | ------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id`  | string | Stable machine identifier (typically UUID). | OCSF `device.uid`, the canonical OCSF host-identifier field (dictionary: "unique device identifier. Typically BIOS hardware identifier, machine id, or agent identifier."). |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
@@ -42,7 +42,7 @@ Caveats:
 | macOS    | ✅        |
 | Other    | —         |
 
-## Example Output
+## Example output
 
 ### Linux (systemd host)
 
@@ -64,7 +64,7 @@ Caveats:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -79,7 +79,7 @@ facts, _ := g.Collect(context.Background())
 fmt.Println(facts.MachineID.ID)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.machine_id      # enable (default)
@@ -90,7 +90,7 @@ gohai --no-collector.machine_id   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

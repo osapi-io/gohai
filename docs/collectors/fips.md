@@ -39,7 +39,7 @@ kernel's crypto module was validated against, that's a property of the module
 build (RHEL 8 targets 140-2; RHEL 9 targets 140-3). Consumers needing the
 validated revision should correlate with `platform`/`kernel`.
 
-## Collected Fields
+## Collected fields
 
 | Field                   | Type   | Description                                                                    | Schema mapping            |
 | ----------------------- | ------ | ------------------------------------------------------------------------------ | ------------------------- |
@@ -47,7 +47,7 @@ validated revision should correlate with `platform`/`kernel`.
 | `policy.name`           | string | Active crypto policy (e.g. `FIPS`, `FIPS:OSPP`, `DEFAULT`). Omitted if absent. | No direct schema mapping. |
 | `policy.fips_effective` | `bool` | `true` if the policy name starts with `FIPS`.                                  | No direct schema mapping. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
@@ -59,7 +59,7 @@ macOS is not covered because Apple's CoreCrypto module has no runtime toggle
 equivalent to Linux's kernel flag; FIPS 140 validation there is a property of
 the module and must be looked up via Apple's certificate list separately.
 
-## Example Output
+## Example output
 
 ### FIPS-enabled RHEL 9 host (kernel + policy both on)
 
@@ -97,7 +97,7 @@ the module and must be looked up via Apple's certificate list separately.
 
 `facts.Fips` is `nil`.
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -115,7 +115,7 @@ if f.Kernel.Enabled && (f.Policy == nil || f.Policy.FIPSEffective) {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.fips      # enable (default)
@@ -126,7 +126,7 @@ gohai --no-collector.fips   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

@@ -1,4 +1,4 @@
-# OS Release
+# OS release
 
 > **Status:** Implemented ✅
 
@@ -21,7 +21,7 @@ Consumers use this to:
 
 macOS has no equivalent file; the collector returns `nil` there.
 
-## Collected Fields
+## Collected fields
 
 | Field              | Type              | Description                                              | Schema mapping                                                          |
 | ------------------ | ----------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -40,14 +40,14 @@ macOS has no equivalent file; the collector returns `nil` there.
 | `bug_report_url`   | string            | Where to file bugs upstream.                             | No OCSF.                                                                |
 | `extra`            | map[string]string | Any keys not explicitly parsed (e.g. `UBUNTU_CODENAME`). | No OCSF.                                                                |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                  |
 | -------- | -------------------------- |
 | Linux    | ✅                         |
 | macOS    | `nil` (no equivalent file) |
 
-## Example Output
+## Example output
 
 ### Ubuntu 24.04
 
@@ -69,7 +69,7 @@ macOS has no equivalent file; the collector returns `nil` there.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("os_release"))
@@ -79,7 +79,7 @@ if r := facts.OSRelease; r != nil && r.ID == "ubuntu" {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.os_release      # enable (default)
@@ -90,7 +90,7 @@ gohai --no-collector.os_release   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 | Platform | What we read      | Ohai plugin                                                                                                                                   | Alignment                                                                                                                      |
 | -------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |

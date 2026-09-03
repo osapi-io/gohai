@@ -25,7 +25,7 @@ Consumers use this to:
 - Detect macOS hosts that have / haven't applied a Rapid Security Response
   patch.
 
-## Collected Fields
+## Collected fields
 
 | Field              | Type   | Description                                                             | Schema mapping                                      |
 | ------------------ | ------ | ----------------------------------------------------------------------- | --------------------------------------------------- |
@@ -50,14 +50,14 @@ cloudlinux, scientific, enterpriseenterprise, oracle, amazon), Debian family
 (cumulus, kali, pop, linuxmint, raspbian), Arch (manjaro, antergos),
 Fedora-based network OS (arista_eos), and WRLinux variants (nexus, ios_xr).
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                                                     |
 | -------- | --------------------------------------------------------------------------------------------- |
 | Linux    | ✅ (gopsutil `/etc/os-release` + redhat-release supplement + 10-file legacy fallback cascade) |
 | macOS    | ✅ (gopsutil + `sw_vers` for `BuildVersion` + `ProductVersionExtra`)                          |
 
-## Example Output
+## Example output
 
 ### Linux (Ubuntu 24.04 x86_64)
 
@@ -103,7 +103,7 @@ Fedora-based network OS (arista_eos), and WRLinux variants (nexus, ios_xr).
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("platform"))
@@ -121,7 +121,7 @@ if p.OS == "darwin" && p.VersionExtra != "" {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.platform      # enable (default)
@@ -133,7 +133,7 @@ gohai --no-collector.platform   # disable
 None. `platform` is the foundation other collectors consult via
 `internal/platform.Detect()`.
 
-## Data Sources
+## Data sources
 
 On Linux the collector cascades through gopsutil + extensions:
 

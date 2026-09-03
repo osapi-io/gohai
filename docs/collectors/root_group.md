@@ -1,4 +1,4 @@
-# Root Group
+# Root group
 
 > **Status:** Implemented ✅
 
@@ -21,13 +21,13 @@ Consumers use this to:
   expected `root`/`wheel` for the platform is worth flagging).
 - Mirror the Ohai contract for consumers migrating recipes to gohai.
 
-## Collected Fields
+## Collected fields
 
 | Field  | Type   | Description                                       | Schema mapping                                                                                                                         |
 | ------ | ------ | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `name` | string | Primary group name for root (`root`, `wheel`, …). | No direct schema mapping. OCSF's `group` object targets access-control events, not host-level facts. Treated as a gohai-native scalar. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
@@ -35,7 +35,7 @@ Consumers use this to:
 | macOS    | ✅        |
 | Other    | —         |
 
-## Example Output
+## Example output
 
 ### Linux
 
@@ -57,7 +57,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -72,7 +72,7 @@ facts, _ := g.Collect(context.Background())
 fmt.Println(facts.RootGroup.Name)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.root_group      # enable (default)
@@ -83,7 +83,7 @@ gohai --no-collector.root_group   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 | Platform | What we read                                         | Ohai plugin ([`root_group.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/root_group.rb)) | Alignment                                                                             |
 | -------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |

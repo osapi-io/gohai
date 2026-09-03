@@ -14,7 +14,7 @@ gohai extends that by enumerating individual containers and images via
 `docker ps -a` and `docker images`, which gives consumers per-container state
 visibility.
 
-## Collected Fields
+## Collected fields
 
 | Field                 | Type     | Description                                       | Schema mapping              |
 | --------------------- | -------- | ------------------------------------------------- | --------------------------- |
@@ -31,14 +31,14 @@ visibility.
 | `images[].tag`        | `string` | Image tag                                         | No direct OCSF/OTel mapping |
 | `images[].size`       | `string` | Human-readable size from `docker images`          | No direct OCSF/OTel mapping |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
 | Linux    | ✅        |
 | macOS    | ✅        |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -65,14 +65,14 @@ visibility.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("docker"))
 facts, _ := g.Collect(ctx)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 Default: **disabled** (opt-in). Docker may not be present on the host; the
 container-listing commands can be slow on hosts with many containers.
@@ -86,7 +86,7 @@ gohai --no-collector.docker       # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `docker.rb` plugin collects aggregate container counts via `docker info`
 and the Docker version. gohai extends this approach by enumerating individual

@@ -36,7 +36,7 @@ The collector reports per-key-type signals:
   modulus bit-length; for ECDSA it is the curve size (256/384/521); for Ed25519
   it is always 256. Use this to flag keys below a minimum strength policy.
 
-## Collected Fields
+## Collected fields
 
 | Field                       | Type     | Description                                                       | Schema mapping                                                                                                                                          |
 | --------------------------- | -------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -45,7 +45,7 @@ The collector reports per-key-type signals:
 | `keys[].fingerprint_md5`    | `string` | MD5 fingerprint in `xx:xx:...` colon-hex format.                  | No direct OCSF or OTel mapping. gohai convention: `fingerprint_md5`, matches OpenSSH `-E md5` output format.                                            |
 | `keys[].key_length`         | `int`    | Effective key length in bits (RSA modulus; ECDSA curve; Ed25519). | No direct OCSF or OTel mapping. gohai convention: `key_length` with implicit unit bits, consistent with OpenSSH's `-b` flag and `ssh-keygen -l` output. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                           |
 | -------- | --------------------------------------------------- |
@@ -53,7 +53,7 @@ The collector reports per-key-type signals:
 | macOS    | ✅ (same `/etc/ssh/` path, macOS ships OpenSSH)     |
 | Other    | Empty key list (no files found = no keys in output) |
 
-## Example Output
+## Example output
 
 ### RHEL/Fedora host with all three key types
 
@@ -94,7 +94,7 @@ The collector reports per-key-type signals:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -112,7 +112,7 @@ for _, key := range facts.SSH.Keys {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.ssh       # enable (opt-in)
@@ -126,7 +126,7 @@ material is security-sensitive and not needed for general-purpose inventory.
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux and macOS (identical, `/etc/ssh/` is the canonical path on both
 platforms; Ohai's `ssh_host_key.rb` checks `/etc/sshd_config` then falls back to

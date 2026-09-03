@@ -1,4 +1,4 @@
-# OCSF Validation
+# OCSF validation
 
 How to validate gohai's OCSF output and vendor extension against the upstream
 OCSF schema.
@@ -8,13 +8,13 @@ OCSF schema.
 - [uv](https://docs.astral.sh/uv/). Python package runner
 - A local clone of the [OCSF schema](https://github.com/ocsf/ocsf-schema)
 
-## Step 1: Clone the OCSF schema
+## Step 1: clone the OCSF schema
 
 ```bash
 git clone --depth 1 https://github.com/ocsf/ocsf-schema.git /tmp/ocsf-schema
 ```
 
-## Step 2: Compile the schema with our extension
+## Step 2: compile the schema with our extension
 
 gohai registers a vendor extension (uid 1337) at `schemas/ocsf-extension/`. The
 OCSF schema compiler merges it with the base schema:
@@ -36,7 +36,7 @@ If compilation fails with a shadowing error, an attribute in our extension
 conflicts with a base schema attribute. Remove the conflicting attribute from
 `schemas/ocsf-extension/dictionary.json`, it's already defined upstream.
 
-## Step 3: Generate OCSF output
+## Step 3: generate OCSF output
 
 ```bash
 gohai collect --format ocsf --pretty > ocsf-output.json
@@ -49,7 +49,7 @@ This produces an OCSF `inventory_info` event (class_uid 5001) with:
 - gohai extension (uid 1337) attributes for fields OCSF doesn't yet cover (e.g.
   `fqdn`, `cpu_flags`, `cpu_vulnerabilities`, `init_system`)
 
-## Step 4: Validate the schema + extension
+## Step 4: validate the schema + extension
 
 Copy our extension into the OCSF schema tree and run the validator:
 

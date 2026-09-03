@@ -10,7 +10,7 @@ means the runtime was not found on PATH. The set of detected runtimes mirrors
 Ohai's languages plugin (which delegates to per-language sub-plugins; gohai
 consolidates them into a single collector).
 
-## Collected Fields
+## Collected fields
 
 | Field    | Type      | Description                               | Schema mapping                                                    |
 | -------- | --------- | ----------------------------------------- | ----------------------------------------------------------------- |
@@ -23,14 +23,14 @@ consolidates them into a single collector).
 
 Fields are omitted from JSON output when nil (runtime absent).
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
 | Linux    | ✅        |
 | macOS    | ✅        |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -45,14 +45,14 @@ Fields are omitted from JSON output when nil (runtime absent).
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("languages"))
 facts, _ := g.Collect(ctx)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 Default: **disabled** (opt-in). Runtime detection requires shelling out six
 times, which is significant overhead.
@@ -66,7 +66,7 @@ gohai --no-collector.languages    # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `languages.rb` delegates to per-language sub-plugins (`go.rb`,
 `python.rb`, `ruby.rb`, `nodejs.rb`, `java.rb`, `perl.rb`), each running the

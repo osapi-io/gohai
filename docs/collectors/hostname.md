@@ -16,7 +16,7 @@ gopsutil so the short name always matches what `$(hostname -s)` reports
 elsewhere on the host, important on MDM-managed Macs where
 `scutil --get HostName` can differ.
 
-## Collected Fields
+## Collected fields
 
 | Field          | Type   | Description                                                                              | Schema mapping                                                       |
 | -------------- | ------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -25,14 +25,14 @@ elsewhere on the host, important on MDM-managed Macs where
 | `domain`       | string | DNS domain, everything after the first `.` of the FQDN. Empty when FQDN equals `name`.   | `device.domain`.                                                     |
 | `machine_name` | string | Human-friendly name (macOS `ComputerName`-derived). Linux: same as `name`.               | No direct schema mapping.                                            |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                          |
 | -------- | ------------------------------------------------------------------ |
 | Linux    | ✅ (`hostname -s` + `hostname` via executor, DNS canonicalization) |
 | macOS    | ✅ (`hostname -s` + `hostname` via executor, DNS canonicalization) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -45,7 +45,7 @@ elsewhere on the host, important on MDM-managed Macs where
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("hostname"))
@@ -55,7 +55,7 @@ info := facts.Hostname
 fmt.Println(info.Name, info.FQDN, info.Domain, info.MachineName)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.hostname      # enable (default)
@@ -66,7 +66,7 @@ gohai --no-collector.hostname   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux and macOS (identical, mirrors Ohai's `hostname.rb` linux and darwin
 branches):

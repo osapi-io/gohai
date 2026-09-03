@@ -9,7 +9,7 @@ from the native package database (dpkg on Debian/Ubuntu, rpm on RHEL/Fedora). On
 macOS it queries Homebrew. Returns an empty list when the package manager is
 absent (containers, minimal base images).
 
-## Collected Fields
+## Collected fields
 
 | Field                        | Type     | Description                               | Schema mapping                 |
 | ---------------------------- | -------- | ----------------------------------------- | ------------------------------ |
@@ -19,14 +19,14 @@ absent (containers, minimal base images).
 | `packages[].architecture`    | `string` | CPU architecture; empty for brew packages | OCSF `package.architecture`    |
 | `packages[].package_manager` | `string` | Package manager: `dpkg`, `rpm`, or `brew` | OCSF `package.package_manager` |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
 | Linux    | ✅        |
 | macOS    | ✅        |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -49,14 +49,14 @@ absent (containers, minimal base images).
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("packages"))
 facts, _ := g.Collect(ctx)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 Default: **disabled** (opt-in). Full package inventory is expensive on hosts
 with thousands of packages.
@@ -70,7 +70,7 @@ gohai --no-collector.packages     # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 The collector dispatches on the platform detected by `platform.Detect()`:
 

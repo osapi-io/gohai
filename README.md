@@ -254,7 +254,7 @@ Each example is a standalone Go program you can read and run.
 - [Collector methodology](docs/methodology.md). Library selection, field naming,
   and data sources.
 
-## Related Works
+## Related works
 
 gohai builds on the following projects, as methodology references, as backing
 libraries we wrap, or as peers solving adjacent problems:

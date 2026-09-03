@@ -23,7 +23,7 @@ Consumers use this to:
 - Track storage allocation and free space.
 - Detect pools configured with alternate roots (e.g. during rescue operations).
 
-## Collected Fields
+## Collected fields
 
 | Field             | Type     | Description                                                                                                                  | Schema mapping   |
 | ----------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------- |
@@ -35,7 +35,7 @@ Consumers use this to:
 | `pools[].health`  | `string` | Pool health status: `"ONLINE"`, `"DEGRADED"`, `"FAULTED"`, `"OFFLINE"`, `"REMOVED"`, or `"UNAVAIL"`. Empty when unavailable. | gohai convention |
 | `pools[].altroot` | `string` | Alternate root directory for the pool. Empty when none is configured (`zpool` reports `-`).                                  | gohai convention |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                      |
 | -------- | ------------------------------ |
@@ -44,7 +44,7 @@ Consumers use this to:
 
 Both variants return an empty list, not an error, when `zpool` is absent.
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -80,7 +80,7 @@ Both variants return an empty list, not an error, when `zpool` is absent.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -94,7 +94,7 @@ facts, _ := g.Collect(context.Background())
 // facts.Zpools.Pools contains the list
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.zpools      # enable
@@ -105,7 +105,7 @@ gohai --no-collector.zpools   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux and macOS (identical procedure):
 

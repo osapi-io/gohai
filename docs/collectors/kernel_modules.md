@@ -1,4 +1,4 @@
-# Kernel Modules
+# Kernel modules
 
 > **Status:** Implemented ✅
 
@@ -23,7 +23,7 @@ Consumers use this to:
 - Verify EDR / anti-malware agents are loaded (their kexts or modules should
   always be present).
 
-## Collected Fields
+## Collected fields
 
 | Field     | Type            | Description                    | Schema mapping            |
 | --------- | --------------- | ------------------------------ | ------------------------- |
@@ -42,14 +42,14 @@ On macOS, `modules` enumerates **legacy kernel extensions only**. System
 Extensions introduced in macOS 11+ live under `/Library/SystemExtensions/` and
 require `systemextensionsctl`, which is not yet queried.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                        |
 | -------- | ------------------------------------------------ |
 | Linux    | ✅ (`/proc/modules` + `/sys/module/<n>/version`) |
 | macOS    | ✅ (`kextstat -k -l`)                            |
 
-## Example Output
+## Example output
 
 ### Linux
 
@@ -80,7 +80,7 @@ require `systemextensionsctl`, which is not yet queried.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("kernel", "kernel_modules"))
@@ -95,7 +95,7 @@ if _, ok := mods.Modules["suspicious_mod"]; ok {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.kernel_modules      # enable (opt-in)
@@ -107,7 +107,7 @@ gohai --category=system                # enabling the system category also pulls
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `kernel.rb` includes module enumeration as part of the kernel plugin,
 parsing `/proc/modules` on Linux and `kextstat` on macOS. gohai separates

@@ -23,7 +23,7 @@ Consumers use this to:
 DNS resolver configuration (`/etc/resolv.conf` nameservers + search domains)
 will live in its own `dns` collector, out of scope here.
 
-## Collected Fields
+## Collected fields
 
 Top level:
 
@@ -113,14 +113,14 @@ Per `Counters`:
 | `dropin`       | uint64 | Receive drops.       |
 | `dropout`      | uint64 | Transmit drops.      |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                                                 |
 | -------- | ----------------------------------------------------------------------------------------- |
 | Linux    | ✅ (gopsutil interfaces + counters, sysfs ARPHRD, `ip route` v4/v6, OpenVZ alias merge)   |
 | macOS    | ✅ (gopsutil interfaces + counters; routes/encap/OpenVZ are Linux-only, see Data Sources) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -176,7 +176,7 @@ Per `Counters`:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("network"))
@@ -194,7 +194,7 @@ for _, iface := range n.Interfaces {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.network      # enable (default)
@@ -205,7 +205,7 @@ gohai --no-collector.network   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

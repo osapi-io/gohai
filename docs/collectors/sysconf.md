@@ -27,7 +27,7 @@ The collector reports four related signals:
 - `nprocessors_onln`. CPUs currently online (SC_NPROCESSORS_ONLN). The value
   used for parallelism decisions.
 
-## Collected Fields
+## Collected fields
 
 | Field              | Type  | Description                                                         | Schema mapping                                 |
 | ------------------ | ----- | ------------------------------------------------------------------- | ---------------------------------------------- |
@@ -36,14 +36,14 @@ The collector reports four related signals:
 | `nprocessors_conf` | int64 | Total configured CPU count including offline (SC_NPROCESSORS_CONF). | `host.cpu.count` (OTel), total configured.     |
 | `nprocessors_onln` | int64 | Currently online CPU count (SC_NPROCESSORS_ONLN).                   | `host.cpu.count` (OTel), online subset.        |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                              |
 | -------- | -------------------------------------- |
 | Linux    | ✅ (via `go-sysconf` SC\_\* constants) |
 | macOS    | ✅ (same SC\_\* constants supported)   |
 
-## Example Output
+## Example output
 
 ### Linux (x86-64, 4-core)
 
@@ -71,7 +71,7 @@ The collector reports four related signals:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("sysconf"))
@@ -81,7 +81,7 @@ if s := facts.Sysconf; s != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.sysconf    # enable (opt-in)
@@ -92,7 +92,7 @@ gohai --no-collector.sysconf # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `sysconf.rb` shells out to `getconf -a` and parses the key=value output.
 gohai uses `github.com/tklauser/go-sysconf` instead, a pure Go wrapper around

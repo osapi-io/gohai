@@ -12,20 +12,20 @@ flat `map[string]string` of all sysctl key/value pairs. Matches Ohai's
 DefaultEnabled is `false`, the full sysctl table is large (hundreds to thousands
 of entries) and most consumers only need specific keys.
 
-## Collected Fields
+## Collected fields
 
 | Field    | Type              | Description                                         | Schema mapping    |
 | -------- | ----------------- | --------------------------------------------------- | ----------------- |
 | `params` | map[string]string | All sysctl key/value pairs returned by `sysctl -a`. | gohai convention. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                     |
 | -------- | ----------------------------- |
 | Linux    | ✅ (`sysctl -a` via executor) |
 | macOS    | ✅ (`sysctl -a` via executor) |
 
-## Example Output
+## Example output
 
 ### Linux
 
@@ -66,7 +66,7 @@ of entries) and most consumers only need specific keys.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("sysctl"))
@@ -76,7 +76,7 @@ if s := facts.Sysctl; s != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.sysctl    # enable (opt-in)
@@ -87,7 +87,7 @@ gohai --no-collector.sysctl # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `linux/sysctl.rb` runs `sysctl -a` and parses key=value output. gohai
 follows the same approach on both Linux and macOS, running `sysctl -a` through

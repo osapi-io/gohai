@@ -1,4 +1,4 @@
-# LSB Release
+# LSB release
 
 > **Status:** Implemented ✅
 
@@ -13,7 +13,7 @@ The `lsb_release` CLI is the sole source, matches current Ohai's linux/lsb
 plugin. When the CLI is absent, `Info` stays empty rather than parsing
 `/etc/lsb-release`. See Data Sources for why.
 
-## Collected Fields
+## Collected fields
 
 | Field         | Type   | Description                                              | Schema mapping                                 |
 | ------------- | ------ | -------------------------------------------------------- | ---------------------------------------------- |
@@ -22,14 +22,14 @@ plugin. When the CLI is absent, `Info` stays empty rather than parsing
 | `codename`    | string | Release codename (`jammy`, `Plow`).                      | No direct schema mapping.                      |
 | `description` | string | Human-readable description (`Ubuntu 22.04.3 LTS`).       | No direct schema mapping (presentation-level). |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                          |
 | -------- | ---------------------------------- |
 | Linux    | ✅ (`lsb_release -a` via executor) |
 | macOS    | `nil` (no LSB concept on Darwin)   |
 
-## Example Output
+## Example output
 
 ### Ubuntu with `lsb-release` package
 
@@ -52,7 +52,7 @@ plugin. When the CLI is absent, `Info` stays empty rather than parsing
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("lsb"))
@@ -62,7 +62,7 @@ if l := facts.LSB; l != nil && l.ID == "Ubuntu" {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.lsb      # enable (default)
@@ -73,7 +73,7 @@ gohai --no-collector.lsb   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux we run `lsb_release -a` through the shared `internal/executor` runner
 and parse the four labelled lines it emits (`Distributor ID`, `Release`,

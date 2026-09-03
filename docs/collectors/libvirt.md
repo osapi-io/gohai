@@ -13,7 +13,7 @@ daemon, `Collect` returns `nil` with no error.
 Only Linux is implemented. KVM requires Linux and the libvirt daemon
 (`libvirtd`) is a Linux service. macOS always returns `nil`.
 
-## Collected Fields
+## Collected fields
 
 ### Top-level `Info`
 
@@ -34,14 +34,14 @@ Only Linux is implemented. KVM requires Linux and the libvirt daemon
 | `max_memory` | string | Maximum memory allocation (e.g. `2097152 KiB`).        | No direct schema mapping.          |
 | `autostart`  | bool   | Whether the domain autostarts with the libvirt daemon. | No direct schema mapping.          |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                                           |
 | -------- | ----------------------------------------------------------------------------------- |
 | Linux    | ✅ (`virsh version`, `virsh uri`, `virsh list --all`, `virsh dominfo` via executor) |
 | macOS    | `nil` (KVM not supported on Darwin)                                                 |
 
-## Example Output
+## Example output
 
 ### KVM host with two domains
 
@@ -80,7 +80,7 @@ Only Linux is implemented. KVM requires Linux and the libvirt daemon
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("libvirt"))
@@ -92,7 +92,7 @@ if lv := facts.Libvirt; lv != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.libvirt    # enable (opt-in)
@@ -106,7 +106,7 @@ callers must opt in explicitly.
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux the collector runs four `virsh` commands in sequence:
 

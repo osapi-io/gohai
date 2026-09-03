@@ -14,7 +14,7 @@ matches Ohai's `oci_chassis_asset_tag?` regex. Every request carries the literal
 `Authorization: Bearer Oracle` header OCI's IMDSv2 requires (not a real JWT,
 that's the hardcoded secret).
 
-## Collected Fields
+## Collected fields
 
 | Field                   | Type                          | Description                                                                                          | Schema mapping                 |
 | ----------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -93,7 +93,7 @@ that's the hardcoded secret).
 | `port`                  | `int`    | iSCSI target port.             |
 | `encryption_in_transit` | `bool`   | Whether encryption in transit. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                               |
 | -------- | --------------------------------------- |
@@ -101,7 +101,7 @@ that's the hardcoded secret).
 | macOS    | ✅ (only meaningful on an OCI instance) |
 | Other    | ✅ (only meaningful on an OCI instance) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -116,7 +116,7 @@ that's the hardcoded secret).
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("oci"))
@@ -127,7 +127,7 @@ if facts.OCI != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.oci      # enable (opt-in)
@@ -140,7 +140,7 @@ gohai --category=cloud     # pulls this + all cloud collectors
 `dmi`. OCI writes `"OracleCloud.com"` into chassis asset tag. The collector
 gates on a substring match. Fails open when dmi wasn't run.
 
-## Data Sources
+## Data sources
 
 1. **DMI gate:** `dmi.Chassis.AssetTag` contains `"OracleCloud.com"`. Matches
    Ohai's `oci_chassis_asset_tag?`.

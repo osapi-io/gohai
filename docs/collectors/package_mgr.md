@@ -1,4 +1,4 @@
-# Package Manager
+# Package manager
 
 > **Status:** Implemented ✅
 
@@ -18,14 +18,14 @@ Consumers use this to:
 - Detect hosts in a managed fleet that don't have the expected manager installed
   (e.g. a "Debian-family" host missing apt).
 
-## Collected Fields
+## Collected fields
 
 | Field  | Type   | Description                                                                                                                                               | Schema mapping                                                                                            |
 | ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `name` | string | Canonical manager name: `apt`, `apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, `xbps-install`, `emerge`, `brew`, `port`. Empty when no manager found. | No direct schema mapping, managed-software inventory has no canonical OCSF "which tool manages it" field. |
 | `path` | string | Absolute path to the manager binary (e.g. `/usr/bin/apt`). Empty when no manager found.                                                                   | No direct schema mapping.                                                                                 |
 
-## Platform Support
+## Platform support
 
 | Platform                                 | Supported                                         |
 | ---------------------------------------- | ------------------------------------------------- |
@@ -38,7 +38,7 @@ Dispatch is driven by `internal/platform.Detect()`, which wraps gopsutil's host
 info and maps `ubuntu`/`debian`/`raspbian` → `debian`,
 `rhel`/`redhat`/`centos`/`fedora`/`rocky`/`alma`/`amazon`/ `oracle` → `rhel`.
 
-## Example Output
+## Example output
 
 ### Ubuntu
 
@@ -81,7 +81,7 @@ info and maps `ubuntu`/`debian`/`raspbian` → `debian`,
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("package_mgr"))
@@ -97,7 +97,7 @@ case "brew":
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.package_mgr      # enable (default)
@@ -110,7 +110,7 @@ None at the registry level. Conceptually driven by `platform.Detect()` but uses
 it directly (via `internal/platform`) rather than consuming the `platform`
 collector's output, so the two collectors can be enabled/disabled independently.
 
-## Data Sources
+## Data sources
 
 | Platform | What we read                                                                                                              | Ohai plugin                                                                                                                    | Alignment                                                                                                                                                                                              |
 | -------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

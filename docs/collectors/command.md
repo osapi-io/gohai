@@ -16,20 +16,20 @@ DefaultEnabled is `false`, the full process table can be large and most
 consumers either use the `process` collector (which provides structured data) or
 don't need it at all.
 
-## Collected Fields
+## Collected fields
 
 | Field | Type     | Description                                       | Schema mapping    |
 | ----- | -------- | ------------------------------------------------- | ----------------- |
 | `ps`  | []string | Raw lines from `ps -ef` including the header row. | gohai convention. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                  |
 | -------- | -------------------------- |
 | Linux    | ✅ (`ps -ef` via executor) |
 | macOS    | ✅ (`ps -ef` via executor) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -54,7 +54,7 @@ don't need it at all.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("command"))
@@ -66,7 +66,7 @@ if c := facts.Command; c != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.command    # enable (opt-in)
@@ -77,7 +77,7 @@ gohai --no-collector.command # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On both Linux and macOS the collector runs `ps -ef` through the shared
 `internal/executor` runner:

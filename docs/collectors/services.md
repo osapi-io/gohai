@@ -12,7 +12,7 @@ Darwin returns nil gracefully.
 There is no direct Ohai equivalent for this collector. Ohai does not ship a
 service-list plugin. This is a gohai-native addition.
 
-## Collected Fields
+## Collected fields
 
 | Field                | Type     | Description                                | Schema mapping              |
 | -------------------- | -------- | ------------------------------------------ | --------------------------- |
@@ -22,14 +22,14 @@ service-list plugin. This is a gohai-native addition.
 | `services[].enabled` | `bool`   | `true` when ACTIVE state is `active`       | No direct OCSF/OTel mapping |
 | `services[].type`    | `string` | Reserved for future use; currently empty   | No direct OCSF/OTel mapping |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
 | Linux    | ✅        |
 | macOS    | ❌        |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -50,14 +50,14 @@ service-list plugin. This is a gohai-native addition.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("services"))
 facts, _ := g.Collect(ctx)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 Default: **disabled** (opt-in). Full service inventory can be large and requires
 systemd to be present.
@@ -71,7 +71,7 @@ gohai --no-collector.services     # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 There is no Ohai equivalent for this collector. Ohai does not ship a systemd
 service enumeration plugin. This is a gohai-native addition.

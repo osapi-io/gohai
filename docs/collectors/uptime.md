@@ -17,7 +17,7 @@ Consumers use this to:
 - Detect hosts that have been up too long (patching compliance).
 - Correlate incidents with boot events via boot_time.
 
-## Collected Fields
+## Collected fields
 
 | Field          | Type   | Description                                               | Schema mapping                                                                                          |
 | -------------- | ------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
@@ -27,7 +27,7 @@ Consumers use this to:
 | `idle_seconds` | uint64 | Aggregate CPU idle seconds across all cores (Linux only). | No direct schema mapping.                                                                               |
 | `idle_human`   | string | Human-readable idle duration (Linux only).                | N/A (presentation).                                                                                     |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                        |
 | -------- | ------------------------------------------------ |
@@ -35,7 +35,7 @@ Consumers use this to:
 | macOS    | ✅ (uptime/boot only, no idle counter available) |
 | Other    | —                                                |
 
-## Example Output
+## Example output
 
 ### Linux with idle
 
@@ -63,7 +63,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -79,7 +79,7 @@ u := facts.Uptime
 fmt.Printf("up %s since %d\n", u.Human, u.BootTime)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.uptime      # enable (default)
@@ -90,7 +90,7 @@ gohai --no-collector.uptime   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 
