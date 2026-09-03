@@ -225,17 +225,17 @@ sections in order:
   Linux vs macOS. Our voice.
 - **Signals** (only for complex collectors, see `docs/collectors/fips.md` for
   reference).
-- **Collected Fields**. Markdown table with Field / Type / Description /
+- **Collected fields**. Markdown table with Field / Type / Description /
   **Schema mapping** columns. Every field cites its OCSF path first
   (`os.kernel_release`, `device.cpu_count`), OpenTelemetry attribute second
   (`host.cpu.vendor.id`, `system.load_average.1m`) when OCSF is silent, or
   explicit "No direct schema" with a one-line reason.
-- **Platform Support**. Table.
-- **Example Output**. Realistic JSON for Linux and macOS.
-- **SDK Usage**. Go snippet using `gohai.New(...).Collect(ctx)`.
-- **Enable/Disable**. CLI flags.
+- **Platform support**. Table.
+- **Example output**. Realistic JSON for Linux and macOS.
+- **SDK usage**. Go snippet using `gohai.New(...).Collect(ctx)`.
+- **Enable/disable**. CLI flags.
 - **Dependencies**. Other collectors.
-- **Data Sources**. Step-by-step methodology in OUR voice. Per-OS sections when
+- **Data sources**. Step-by-step methodology in OUR voice. Per-OS sections when
   behavior differs. No "vs. Ohai" parity comparison. Ohai mentioned inline only
   when a specific methodology choice needs attribution.
 - **Backing library**. The Go library(s) we wrap.
