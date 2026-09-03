@@ -27,7 +27,7 @@ If none match, the HTTP probe is skipped. The collector then fetches:
   `availabilityZone`, `instanceId`)
 - Raw user-data (base64-encoded when binary, plaintext when UTF-8)
 
-## Collected Fields
+## Collected fields
 
 | Field                   | Type                          | Description                                                                   | Schema mapping                 |
 | ----------------------- | ----------------------------- | ----------------------------------------------------------------------------- | ------------------------------ |
@@ -105,7 +105,7 @@ If none match, the HTTP probe is skipped. The collector then fetches:
 `security-credentials` (access keys) is **deliberately dropped**, matches Ohai's
 explicit scrub of the secrets-bearing sub-tree.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                               |
 | -------- | --------------------------------------- |
@@ -113,7 +113,7 @@ explicit scrub of the secrets-bearing sub-tree.
 | macOS    | ✅ (only meaningful on an EC2 instance) |
 | Other    | ✅ (only meaningful on an EC2 instance) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -133,7 +133,7 @@ explicit scrub of the secrets-bearing sub-tree.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("ec2"))
@@ -144,7 +144,7 @@ if facts.Ec2 != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.ec2      # enable (opt-in)
@@ -159,7 +159,7 @@ gohai --category=cloud     # pulls this + all cloud collectors
 addition for Xen PV / older HVM-on-Xen instances. Fails open when dmi wasn't
 run.
 
-## Data Sources
+## Data sources
 
 01. **Detection gate:** any of the following triggers detection:
     - `dmi.BIOS.Manufacturer` contains `"Amazon"` (Ohai's `has_ec2_amazon_dmi?`)

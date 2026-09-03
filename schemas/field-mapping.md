@@ -14,7 +14,7 @@ Three-tier naming ladder applied to every gohai JSON field.
 
 ______________________________________________________________________
 
-## System Collectors
+## System collectors
 
 | Collector             | Go Field          | Current JSON         | Tier | Chosen JSON          | Changed? | Source                                                                                          | Citation                                                                                           |
 | --------------------- | ----------------- | -------------------- | ---- | -------------------- | -------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ ______________________________________________________________________
 | shells                | Paths             | `paths`              | T3   | `paths`              | no       | No OCSF/OTel equivalent, valid login shell paths from /etc/shells                               | Convention, /etc/shells                                                                            |
 | shard                 | Seed              | `seed`               | T3   | `seed`               | no       | No OCSF/OTel equivalent, deterministic shard seed (MD5-based)                                   | Convention, Ohai shard algorithm                                                                   |
 
-## Hardware Collectors
+## Hardware collectors
 
 | Collector                              | Go Field              | Current JSON              | Tier | Chosen JSON               | Changed? | Source                                                                                            | Citation                                                                                                              |
 | -------------------------------------- | --------------------- | ------------------------- | ---- | ------------------------- | -------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -335,7 +335,7 @@ ______________________________________________________________________
 | hardware.charger                       | Watts                 | `watts`                   | T3   | `watts`                   | no       | No OCSF/OTel equivalent, charger wattage                                                          | Convention, system_profiler `sppower_ac_charger_watts`                                                                |
 | hardware.charger                       | Connected             | `connected`               | T3   | `connected`               | no       | No OCSF/OTel equivalent, charger connected flag                                                   | Convention, system_profiler `sppower_ac_charger_connected`                                                            |
 
-## Network Collectors
+## Network collectors
 
 | Collector                           | Go Field              | Current JSON              | Tier | Chosen JSON               | Changed? | Source                                                                            | Citation                                                                                                              |
 | ----------------------------------- | --------------------- | ------------------------- | ---- | ------------------------- | -------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -417,7 +417,7 @@ ______________________________________________________________________
 | network.neighbours[]                | Interface             | `interface`               | T3   | `interface`               | no       | No OCSF/OTel equivalent, neighbour egress interface                               | Convention, `ip neigh` dev field                                                                                      |
 | network.neighbours[]                | State                 | `state`                   | T3   | `state`                   | no       | No OCSF/OTel equivalent, NUD state (REACHABLE / STALE / etc.)                     | Convention, `ip neigh` state field                                                                                    |
 
-## Cloud Collectors
+## Cloud collectors
 
 | Collector                                 | Go Field                        | Current JSON                          | Tier | Chosen JSON                           | Changed? | Source                                                                                          | Citation                                                                                                                                                            |
 | ----------------------------------------- | ------------------------------- | ------------------------------------- | ---- | ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -797,7 +797,7 @@ ______________________________________________________________________
 | scaleway.bootscript                       | Organization                    | `organization`                        | T3   | `organization`                        | no       | No OCSF/OTel equivalent, bootscript organization owner                                          | Convention, Scaleway metadata `bootscript.organization`                                                                                                             |
 | scaleway.bootscript                       | Public                          | `public`                              | T3   | `public`                              | no       | No OCSF/OTel equivalent, bootscript public visibility flag                                      | Convention, Scaleway metadata `bootscript.public`                                                                                                                   |
 
-## Other Collectors
+## Other collectors
 
 | Collector        | Go Field       | Current JSON      | Tier | Chosen JSON       | Changed? | Source                                                            | Citation                                                                                                     |
 | ---------------- | -------------- | ----------------- | ---- | ----------------- | -------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |

@@ -14,7 +14,7 @@ Note: this collector reports **I/O counters only**. Physical device metadata
 `block_device` collector that wraps `ghw/block`, tracked separately. Ohai splits
 these the same way.
 
-## Collected Fields
+## Collected fields
 
 | Field per device | Type   | Description                                   | Schema mapping            |
 | ---------------- | ------ | --------------------------------------------- | ------------------------- |
@@ -29,14 +29,14 @@ these the same way.
 
 Top level: `devices: []Device`.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                     |
 | -------- | ----------------------------- |
 | Linux    | ✅ (parses `/proc/diskstats`) |
 | macOS    | ✅ (IOKit via gopsutil)       |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -57,7 +57,7 @@ Top level: `devices: []Device`.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("disk"))
@@ -67,7 +67,7 @@ for _, d := range facts.Disk.Devices {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.disk      # enable (default)
@@ -78,7 +78,7 @@ gohai --no-collector.disk   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

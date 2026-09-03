@@ -31,7 +31,7 @@ The complete per-field mapping with verifiable citations lives in
 [`field-mapping.md`](field-mapping.md). Fields where OCSF is silent are tracked
 in [`ocsf-gaps.md`](ocsf-gaps.md) as upstream contribution candidates.
 
-## JSON Schema
+## JSON schema
 
 `gohai.schema.json` is generated from `gohai.Facts` via
 [`invopop/jsonschema`](https://github.com/invopop/jsonschema). It contains 157

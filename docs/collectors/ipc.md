@@ -21,7 +21,7 @@ Consumers use this to:
   semaphore sets.
 - Compare configured limits against application recommendations.
 
-## Collected Fields
+## Collected fields
 
 | Field        | Type     | Description                                                                                      | Schema mapping   |
 | ------------ | -------- | ------------------------------------------------------------------------------------------------ | ---------------- |
@@ -43,7 +43,7 @@ All values are returned as strings preserving the raw kernel representation.
 Missing sysctl files yield empty strings for their fields, not all kernels or
 container configurations expose all parameters.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                   |
 | -------- | --------------------------- |
@@ -52,7 +52,7 @@ container configurations expose all parameters.
 
 macOS does not expose `/proc/sys/kernel`. The Darwin variant returns `nil`.
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -77,7 +77,7 @@ macOS does not expose `/proc/sys/kernel`. The Darwin variant returns `nil`.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -91,7 +91,7 @@ facts, _ := g.Collect(context.Background())
 // facts.IPC.Sem, facts.IPC.Msg, facts.IPC.Shm
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.ipc      # enable
@@ -102,7 +102,7 @@ gohai --no-collector.ipc   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `linux/ipc.rb` reads the same `/proc/sys/kernel/` files for semaphore,
 message queue, and shared memory limits. gohai follows Ohai's methodology

@@ -26,7 +26,7 @@ Consumers use this to:
 - Detect Rosetta-translated processes on Apple Silicon so architecture-sensitive
   consumers can compensate.
 
-## Collected Fields
+## Collected fields
 
 | Field                | Type   | Description                                                         | Schema mapping                                                |
 | -------------------- | ------ | ------------------------------------------------------------------- | ------------------------------------------------------------- |
@@ -41,14 +41,14 @@ Consumers use this to:
 Loaded modules are reported by the separate
 [`kernel_modules`](kernel_modules.md) collector.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                   |
 | -------- | ------------------------------------------- |
 | Linux    | ✅ (uname syscall)                          |
 | macOS    | ✅ (uname syscall + `sysctl` Rosetta probe) |
 
-## Example Output
+## Example output
 
 ### Linux
 
@@ -95,7 +95,7 @@ Loaded modules are reported by the separate
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("kernel"))
@@ -114,7 +114,7 @@ if k.RosettaTranslated {
 // if mods := facts.KernelModules; mods != nil { ... }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.kernel      # enable (default)
@@ -125,7 +125,7 @@ gohai --no-collector.kernel   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `kernel.rb` shells out to `uname -s`, `uname -r`, `uname -v`, `uname -m`,
 `uname -p` individually. gohai calls `unix.Uname()` (the Go syscall wrapper)

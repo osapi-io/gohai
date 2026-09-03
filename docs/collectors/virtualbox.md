@@ -15,7 +15,7 @@ Only the guest role is implemented. Host-side inventory (`VBoxManage list vms`,
 is not yet implemented, consumers who need host inventory should use the
 VBoxManage API directly.
 
-## Collected Fields
+## Collected fields
 
 | Field                      | Type   | Description                                          | Schema mapping            |
 | -------------------------- | ------ | ---------------------------------------------------- | ------------------------- |
@@ -25,16 +25,16 @@ VBoxManage API directly.
 | `guest_additions_revision` | string | Guest Additions revision from `GuestAdd/Revision`.   | No direct schema mapping. |
 | `language_id`              | string | Host locale/language ID (`en_US`) from `LanguageID`. | No direct schema mapping. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                               |
 | -------- | ------------------------------------------------------- |
 | Linux    | ✅ (`VBoxControl guestproperty enumerate` via executor) |
 | macOS    | ✅ (`VBoxControl guestproperty enumerate` via executor) |
 
-## Example Output
+## Example output
 
-### VirtualBox guest with Guest Additions installed
+### VirtualBox guest with guest additions installed
 
 ```json
 {
@@ -48,7 +48,7 @@ VBoxManage API directly.
 }
 ```
 
-### Non-VirtualBox host or Guest Additions absent
+### Non-VirtualBox host or guest additions absent
 
 ```json
 {
@@ -56,7 +56,7 @@ VBoxManage API directly.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("virtualbox"))
@@ -66,7 +66,7 @@ if vb := facts.VirtualBox; vb != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.virtualbox    # enable (opt-in)
@@ -80,7 +80,7 @@ hosts; callers must opt in explicitly.
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `virtualbox.rb` has two modes: host-side (via `VBoxManage`) and
 guest-side (via `VBoxControl`). gohai implements guest-side only, using

@@ -14,7 +14,7 @@ matches Ohai's `has_do_dmi?`). `vendor_data` is dropped from the response
 because it commonly contains cloud-init user scripts with credentials, matches
 Ohai's explicit scrub.
 
-## Collected Fields
+## Collected fields
 
 | Field              | Type          | Description                                     | Schema mapping            |
 | ------------------ | ------------- | ----------------------------------------------- | ------------------------- |
@@ -46,7 +46,7 @@ Ohai's explicit scrub.
 | `ipv6_gateway` | `string` | IPv6 gateway.                        |
 | `anchor_ipv4`  | `string` | DO anchor IP (inter-droplet fabric). |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                            |
 | -------- | ------------------------------------ |
@@ -54,7 +54,7 @@ Ohai's explicit scrub.
 | macOS    | ✅ (only meaningful on a DO droplet) |
 | Other    | ✅ (only meaningful on a DO droplet) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -72,7 +72,7 @@ Ohai's explicit scrub.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("digital_ocean"))
@@ -83,7 +83,7 @@ if facts.DigitalOcean != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.digital_ocean      # enable (opt-in)
@@ -98,7 +98,7 @@ gohai --category=cloud               # pulls this + all cloud collectors
 an exact match. When `dmi` is absent from prior (user disabled it), the
 collector fails open and tries the endpoint anyway.
 
-## Data Sources
+## Data sources
 
 1. **DMI gate:** `dmi.BIOS.Manufacturer == "DigitalOcean"` (exact). Matches
    Ohai's `has_do_dmi?`.

@@ -13,7 +13,7 @@ sources the data from `/sys/bus/pci/devices` via ghw rather than shelling out to
 `lspci`. ghw resolves vendor / product / class names against its bundled pci.ids
 database.
 
-## Collected Fields
+## Collected fields
 
 | Field     | Type                | Description                   | Schema mapping            |
 | --------- | ------------------- | ----------------------------- | ------------------------- |
@@ -38,14 +38,14 @@ database.
 | `iommu_group`    | `string` | IOMMU group identifier (when virtualization-ready hardware).      |
 | `parent_address` | `string` | PCI address of the upstream bridge (e.g. `0000:00:1c.0`).         |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                   |
 | -------- | ----------------------------------------------------------- |
 | Linux    | ✅                                                          |
 | macOS    | ❌ (sysfs PCI tree is Linux-specific; returns empty `Info`) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -66,7 +66,7 @@ database.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("pci"))
@@ -77,7 +77,7 @@ for addr, d := range facts.PCI.Devices {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.pci      # enable (opt-in)
@@ -89,7 +89,7 @@ gohai --category=hardware  # pulls this + all hardware collectors
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

@@ -16,7 +16,7 @@ logged-in sessions live here. Ohai does not have a direct equivalent; this is a
 gohai extension driven by the consumer need to detect active interactive
 sessions for audit and security tooling.
 
-## Collected Fields
+## Collected fields
 
 | Field       | Type        | Description                       | Schema mapping             |
 | ----------- | ----------- | --------------------------------- | -------------------------- |
@@ -38,14 +38,14 @@ Fields present only on one path stay empty on the other. Consumers can detect
 which source fed the data by checking for `session_id` (loginctl) vs.
 `terminal`/`started` (utmp).
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                              |
 | -------- | -------------------------------------- |
 | Linux    | ✅ (loginctl preferred, utmp fallback) |
 | macOS    | ✅ (utmpx only, no systemd)            |
 
-## Example Output
+## Example output
 
 ### systemd host (loginctl path)
 
@@ -82,7 +82,7 @@ which source fed the data by checking for `session_id` (loginctl) vs.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("sessions"))
@@ -93,7 +93,7 @@ for _, s := range facts.Sessions.LoggedIn {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.sessions      # enable (opt-in)
@@ -104,7 +104,7 @@ gohai --no-collector.sessions   # disable (default)
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

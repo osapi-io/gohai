@@ -21,7 +21,7 @@ the same shape as every other gohai hardware collector, ghw wraps
 `/sys/class/drm` on Linux, and macOS parses `system_profiler SPDisplaysDataType`
 via the shared Executor.
 
-## Collected Fields
+## Collected fields
 
 | Field       | Type   | Description                                                           | Schema mapping            |
 | ----------- | ------ | --------------------------------------------------------------------- | ------------------------- |
@@ -38,7 +38,7 @@ Neither OCSF nor OpenTelemetry semantic conventions define a GPU object, so
 field naming is gohai-native. Go-idiomatic snake_case; fields chosen to cover
 both Linux PCI data and darwin's system_profiler shape.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                               |
 | -------- | ----------------------------------------------------------------------- |
@@ -48,7 +48,7 @@ both Linux PCI data and darwin's system_profiler shape.
 On Linux, containers and minimal VMs typically lack `/sys/class/drm`, the
 collector returns an empty `cards` slice with no error.
 
-## Example Output
+## Example output
 
 ### Linux
 
@@ -86,7 +86,7 @@ collector returns an empty `cards` slice with no error.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("gpu"))
@@ -99,7 +99,7 @@ if gpu := facts.GPU; gpu != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.gpu        # enable (opt-in)
@@ -111,7 +111,7 @@ gohai --category=hardware    # pulls in gpu alongside dmi and friends
 
 None.
 
-## Data Sources
+## Data sources
 
 There is no Ohai equivalent for GPU enumeration. Ohai does not ship a GPU
 plugin. This is a gohai-native collector backed by ghw.

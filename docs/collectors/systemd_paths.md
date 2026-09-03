@@ -1,4 +1,4 @@
-# Systemd Paths
+# Systemd paths
 
 > **Status:** Implemented ✅
 
@@ -10,7 +10,7 @@ returns `nil`, systemd is Linux-only.
 
 DefaultEnabled is `false`, relevant only on systemd-managed Linux hosts.
 
-## Collected Fields
+## Collected fields
 
 | Field   | Type              | Description                                                                          | Schema mapping    |
 | ------- | ----------------- | ------------------------------------------------------------------------------------ | ----------------- |
@@ -28,14 +28,14 @@ Common keys in `paths` include (but are not limited to):
 
 The exact keys emitted depend on the systemd version installed.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                        |
 | -------- | -------------------------------- |
 | Linux    | ✅ (`systemd-path` via executor) |
 | macOS    | `nil` (systemd is Linux-only)    |
 
-## Example Output
+## Example output
 
 ### Linux with systemd
 
@@ -63,7 +63,7 @@ The exact keys emitted depend on the systemd version installed.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("systemd_paths"))
@@ -73,7 +73,7 @@ if sp := facts.SystemdPaths; sp != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.systemd_paths    # enable (opt-in)
@@ -84,7 +84,7 @@ gohai --no-collector.systemd_paths # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux the collector runs `systemd-path` (no arguments) through the shared
 `internal/executor` runner and parses its output:

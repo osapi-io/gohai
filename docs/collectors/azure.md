@@ -18,7 +18,7 @@ Detection uses two Linux signals (matches Ohai's non-Windows chain):
 
 If neither fires, the collector short-circuits with no HTTP call.
 
-## Collected Fields
+## Collected fields
 
 | Field                            | Type                      | Description                                                                                             | Schema mapping                 |
 | -------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -67,7 +67,7 @@ Sub-struct details (`Plan`, `StorageProfile`, `Disk`, `ManagedDisk`, `Tag`,
 `AdditionalCapabilities`, `ExtendedLocation`, `Interface`, `IPAddrs`,
 `IPAddress`, `Subnet`) live on pkg.go.dev.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                           |
 | -------- | ----------------------------------- |
@@ -75,7 +75,7 @@ Sub-struct details (`Plan`, `StorageProfile`, `Disk`, `ManagedDisk`, `Tag`,
 | macOS    | ✅ (only meaningful on an Azure VM) |
 | Other    | ✅ (only meaningful on an Azure VM) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -96,7 +96,7 @@ Sub-struct details (`Plan`, `StorageProfile`, `Disk`, `ManagedDisk`, `Tag`,
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("azure"))
@@ -107,7 +107,7 @@ if facts.Azure != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.azure      # enable (opt-in)
@@ -120,7 +120,7 @@ gohai --category=cloud       # pulls this + all cloud collectors
 None. Detection uses Azure-specific file signals (waagent binary + DHCP option
 245), not DMI.
 
-## Data Sources
+## Data sources
 
 1. **Detection gate:** returns `(nil, nil)` unless one of these is true:
    - `/usr/sbin/waagent` exists (Azure Linux Agent installed). Matches Ohai's

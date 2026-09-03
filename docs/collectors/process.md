@@ -20,7 +20,7 @@ Consumers use this to:
 - Reconstruct the parent/child tree via `pid`/`parent_pid`.
 - Enumerate things listening on services by name.
 
-## Collected Fields
+## Collected fields
 
 | Field                       | Type   | Description                                  | Schema mapping                |
 | --------------------------- | ------ | -------------------------------------------- | ----------------------------- |
@@ -36,14 +36,14 @@ Consumers use this to:
 Field name `cmd_line` follows OCSF (`process.cmd_line`) rather than Ohai's
 `command`. OCSF precedes Ohai when both name a field.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                             |
 | -------- | ----------------------------------------------------- |
 | Linux    | ✅ (`/proc/<pid>/{stat,status,cmdline}` via gopsutil) |
 | macOS    | ✅ (`kinfo_proc` via gopsutil)                        |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -73,7 +73,7 @@ Field name `cmd_line` follows OCSF (`process.cmd_line`) rather than Ohai's
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("process"))
@@ -86,7 +86,7 @@ for _, p := range facts.Process.Processes {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.process      # opt-in (off by default — process enumeration scales with process count)
@@ -97,7 +97,7 @@ gohai --no-collector.process   # explicitly disable (e.g. when stripping default
 
 None.
 
-## Data Sources
+## Data sources
 
 | Platform | What we read                                                                    | Ohai plugin                                                                                                                                                         | Alignment                                                                                                                                                                                                                                                                                                  |
 | -------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -22,7 +22,7 @@ Consumers use this to:
 - Track spare disk counts to detect arrays running without redundancy.
 - Verify RAID level and UUID for change management.
 
-## Collected Fields
+## Collected fields
 
 | Field                   | Type       | Description                                                                           | Schema mapping   |
 | ----------------------- | ---------- | ------------------------------------------------------------------------------------- | ---------------- |
@@ -37,7 +37,7 @@ Consumers use this to:
 | `arrays[].members`      | `[]string` | Active member device names from `/proc/mdstat` (e.g. `["sda1","sdb1"]`).              | gohai convention |
 | `arrays[].spares`       | `[]string` | Spare member device names from `/proc/mdstat` (devices tagged `(S)`).                 | gohai convention |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported      |
 | -------- | -------------- |
@@ -46,7 +46,7 @@ Consumers use this to:
 
 macOS has no MD RAID stack. The Darwin variant returns `nil`.
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -68,7 +68,7 @@ macOS has no MD RAID stack. The Darwin variant returns `nil`.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -82,7 +82,7 @@ facts, _ := g.Collect(context.Background())
 // facts.Mdadm.Arrays contains the list
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.mdadm      # enable
@@ -93,7 +93,7 @@ gohai --no-collector.mdadm   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `linux/mdadm.rb` reads `/proc/mdstat` for array detection and parses
 member/spare disk lists. gohai follows the same approach for `/proc/mdstat` and

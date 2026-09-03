@@ -16,7 +16,7 @@ Consumers use this to:
 - Resolve `root_group` or `current_user`-like facts without a second `os/user`
   lookup.
 
-## Collected Fields
+## Collected fields
 
 | Field          | Type                     | Description                                                      | Schema mapping            |
 | -------------- | ------------------------ | ---------------------------------------------------------------- | ------------------------- |
@@ -41,14 +41,14 @@ Consumers use this to:
 | `gid`     | `int`      | Numeric group ID.                              |
 | `members` | `[]string` | Supplementary members, in file-declared order. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                 |
 | -------- | --------------------------------------------------------- |
 | Linux    | ✅                                                        |
 | macOS    | ✅ (macOS ships POSIX flat files alongside OpenDirectory) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -78,7 +78,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("users"))
@@ -89,7 +89,7 @@ if entry, ok := facts.Users.Passwd["deploy"]; ok {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.users      # enable (opt-in)
@@ -100,7 +100,7 @@ gohai --no-collector.users   # disable (default)
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux and macOS (identical, both platforms ship POSIX flat files):
 

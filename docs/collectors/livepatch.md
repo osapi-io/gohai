@@ -32,7 +32,7 @@ Consumers use this to:
   it is still patching live tasks. The patch is not fully effective until
   `transition` becomes `false`.
 
-## Collected Fields
+## Collected fields
 
 | Field                      | Type               | Description                                                        | Schema mapping                                                  |
 | -------------------------- | ------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------- |
@@ -40,14 +40,14 @@ Consumers use this to:
 | `patches[name].enabled`    | `bool`             | `true` if the patch is active (sysfs `enabled == "1"`).            | No direct OCSF or OTel mapping. gohai convention: `enabled`.    |
 | `patches[name].transition` | `bool`             | `true` if the patch is mid-transition (sysfs `transition == "1"`). | No direct OCSF or OTel mapping. gohai convention: `transition`. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                  |
 | -------- | ---------------------------------------------------------- |
 | Linux    | ✅ (requires `CONFIG_LIVEPATCH=y`)                         |
 | macOS    | Returns nil, kernel livepatching is not available on macOS |
 
-## Example Output
+## Example output
 
 ### Host with one active patch
 
@@ -84,7 +84,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -104,7 +104,7 @@ if facts.Livepatch != nil && facts.Livepatch.Patches != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.livepatch       # enable (opt-in)
@@ -118,7 +118,7 @@ specialized Linux feature not present on most hosts.
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `linux/livepatch.rb` uses the same sysfs approach, `dir_glob` over
 `/sys/kernel/livepatch/*` and reading `enabled`/`transition` files for each

@@ -23,7 +23,7 @@ The collector reports two related signals about host type:
 - `host_version`. Populated only when `host_type` is `"vmware_vsphere"`;
   contains the ESXi host version string. Empty on desktop hypervisors.
 
-## Collected Fields
+## Collected fields
 
 | Field             | Type   | Description                                                | Schema mapping                  |
 | ----------------- | ------ | ---------------------------------------------------------- | ------------------------------- |
@@ -42,14 +42,14 @@ The collector reports two related signals about host type:
 | `host_type`       | string | Hypervisor type: `"vmware_vsphere"` or `"vmware_desktop"`. | No direct schema mapping.       |
 | `host_version`    | string | ESXi host version (vSphere only; empty on desktop).        | No direct schema mapping.       |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                       |
 | -------- | --------------------------------------------------------------- |
 | Linux    | ✅ (checks `/proc/scsi/scsi` then `vmware-toolbox-cmd` probe)   |
 | macOS    | ✅ (`vmware-toolbox-cmd` probe; VMware Fusion guests supported) |
 
-## Example Output
+## Example output
 
 ### VMware Workstation / Fusion guest
 
@@ -93,7 +93,7 @@ The collector reports two related signals about host type:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("vmware"))
@@ -103,7 +103,7 @@ if vm := facts.VMware; vm != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.vmware    # enable (opt-in)
@@ -117,7 +117,7 @@ opt in explicitly.
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux the collector cascades through two detection signals before collecting:
 

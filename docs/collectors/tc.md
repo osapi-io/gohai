@@ -11,7 +11,7 @@ not ship the `tc` tool; Darwin returns nil gracefully.
 Mirrors Ohai's `linux/tc.rb` methodology: parse per-interface qdisc entries from
 the `tc` command output, recording each qdisc's kind, handle, and parent.
 
-## Collected Fields
+## Collected fields
 
 | Field                          | Type     | Description                                           | Schema mapping              |
 | ------------------------------ | -------- | ----------------------------------------------------- | --------------------------- |
@@ -22,14 +22,14 @@ the `tc` command output, recording each qdisc's kind, handle, and parent.
 | `interfaces[].qdiscs[].handle` | `string` | Qdisc handle (e.g. `1:`, `0:`)                        | No direct OCSF/OTel mapping |
 | `interfaces[].qdiscs[].parent` | `string` | Parent handle; empty for root qdiscs                  | No direct OCSF/OTel mapping |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
 | Linux    | ✅        |
 | macOS    | ❌        |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -52,14 +52,14 @@ the `tc` command output, recording each qdisc's kind, handle, and parent.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("tc"))
 facts, _ := g.Collect(ctx)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 Default: **disabled** (opt-in). Requires iproute2 (`tc`) to be installed, which
 is not universal across container images and embedded distributions.
@@ -73,7 +73,7 @@ gohai --no-collector.tc           # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `linux/tc.rb` runs `tc -s qdisc show` and parses per-interface qdisc
 entries, recording kind, handle, and parent. gohai follows the same parsing

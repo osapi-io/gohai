@@ -16,14 +16,14 @@ signals (matches Ohai's `looks_like_linode?`):
 
 Data comes from the host's own network interfaces.
 
-## Collected Fields
+## Collected fields
 
 | Field        | Type     | Description                            | Schema mapping            |
 | ------------ | -------- | -------------------------------------- | ------------------------- |
 | `public_ip`  | `string` | First non-link-local IPv4 on `eth0`.   | No direct schema mapping. |
 | `private_ip` | `string` | First non-link-local IPv4 on `eth0:1`. | No direct schema mapping. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                             |
 | -------- | ------------------------------------- |
@@ -31,7 +31,7 @@ Data comes from the host's own network interfaces.
 | macOS    | ✅ (returns nil, no Linode signature) |
 | Other    | ✅ (returns nil, no Linode signature) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -42,7 +42,7 @@ Data comes from the host's own network interfaces.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -58,7 +58,7 @@ if facts.Linode != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.linode      # enable (opt-in)
@@ -71,7 +71,7 @@ gohai --category=cloud        # pulls this + all cloud collectors
 `hostname`, needed for the FQDN/Domain detection signal that mirrors Ohai's
 `has_linode_domain?`.
 
-## Data Sources
+## Data sources
 
 1. **Detection chain** (any signal triggers detection):
    - **apt:** `/etc/apt/sources.list` contains `"linode"` (case-insensitive).

@@ -26,7 +26,7 @@ Consumers use this to:
 - On Apple Silicon, track `compressed` memory pressure as the primary signal
   (the compressor is aggressively used on macOS).
 
-## Collected Fields
+## Collected fields
 
 | Field                      | Type    | Description                                               | Schema mapping                   |
 | -------------------------- | ------- | --------------------------------------------------------- | -------------------------------- |
@@ -88,14 +88,14 @@ Consumers use this to:
 | `swap.used_percent`        | float64 | Percent of swap used.                                     | No direct schema mapping.        |
 | `swap.cached`              | uint64  | `SwapCached` from `/proc/meminfo` (Linux).                | No direct schema mapping.        |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                               |
 | -------- | ------------------------------------------------------- |
 | Linux    | ✅ (`/proc/meminfo` via gopsutil, 27+ forwarded fields) |
 | macOS    | ✅ (`host_statistics64` + `vm_stat` via executor)       |
 
-## Example Output
+## Example output
 
 ### Linux
 
@@ -153,7 +153,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("memory"))
@@ -169,7 +169,7 @@ if m.Compressed > 0 {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.memory      # enable (default)
@@ -180,7 +180,7 @@ gohai --no-collector.memory   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `linux/memory.rb` reads `/proc/meminfo` line by line and exposes each
 field. gohai uses gopsutil, which reads the same `/proc/meminfo` file and

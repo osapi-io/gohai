@@ -12,7 +12,7 @@ systemd tool.
 
 DefaultEnabled is `false`. The data is Linux-only and requires systemd.
 
-## Collected Fields
+## Collected fields
 
 | Field                          | Type   | Description                                                | Schema mapping                                                                  |
 | ------------------------------ | ------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------- |
@@ -30,14 +30,14 @@ DefaultEnabled is `false`. The data is Linux-only and requires systemd.
 | `hardware_model`               | string | Hardware model string.                                     | `device_hw_info.model` (OCSF).                                                  |
 | `firmware_version`             | string | Firmware/BIOS version string.                              | `device_hw_info.bios_ver` (OCSF), closest match.                                |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                       |
 | -------- | ------------------------------- |
 | Linux    | ✅ (`hostnamectl` via executor) |
 | macOS    | `nil` (systemd is Linux-only)   |
 
-## Example Output
+## Example output
 
 ### Linux with systemd
 
@@ -69,7 +69,7 @@ DefaultEnabled is `false`. The data is Linux-only and requires systemd.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("hostnamectl"))
@@ -79,7 +79,7 @@ if h := facts.Hostnamectl; h != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.hostnamectl    # enable (opt-in)
@@ -90,7 +90,7 @@ gohai --no-collector.hostnamectl # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux the collector runs `hostnamectl` (no subcommand) through the shared
 `internal/executor` runner and parses its `Key: value` output line by line:

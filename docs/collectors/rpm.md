@@ -20,20 +20,20 @@ Consumers use this to:
 - Inventory RPM version and platform compatibility metadata for fleet-wide build
   system configuration management.
 
-## Collected Fields
+## Collected fields
 
 | Field    | Type                | Description                                                             | Schema mapping                                                                              |
 | -------- | ------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `macros` | `map[string]string` | RPM macro name → definition. Macro names as reported by `rpm --showrc`. | No direct OCSF or OTel mapping. gohai convention: `macros` (mirrors Ohai's `rpm[:macros]`). |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                  |
 | -------- | ------------------------------------------ |
 | Linux    | ✅ (requires `rpm` to be installed)        |
 | macOS    | Returns nil, RPM is not available on macOS |
 
-## Example Output
+## Example output
 
 ### Typical RHEL/Fedora host
 
@@ -64,7 +64,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -82,7 +82,7 @@ if facts.RPM != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.rpm       # enable (opt-in)
@@ -96,7 +96,7 @@ and is only relevant on RPM-based Linux distributions.
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 
