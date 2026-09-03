@@ -448,7 +448,7 @@ Before marking a collector complete, every item below must be true:
 02. **Checked OCSF schema** ([schema.ocsf.io](https://schema.ocsf.io/)) and,
     when OCSF is silent, \[OpenTelemetry Resource Semantic
     Conventions\][otel-semconv] for canonical field names. Schema mappings
-    recorded in the collector doc's Collected Fields table under the **Schema
+    recorded in the collector doc's Collected fields table under the **Schema
     mapping** column. When a schema has a field we could emit but don't, either
     add it or note why.
 03. **osapi per-OS struct pattern**. No build tags, factory dispatch on
@@ -467,10 +467,10 @@ Before marking a collector complete, every item below must be true:
     every row. No `readXFn = readX` wrappers partway through the collector, and
     no alias used to test a bridge `TestCollect` already exercises.
 07. **`docs/collectors/<name>.md`** is a self-contained functional spec:
-    Description (what + why in our voice), Collected Fields with **Schema
+    Description (what + why in our voice), Collected fields with **Schema
     mapping** column (OCSF path first, OpenTelemetry attribute when OCSF is
-    silent), Platform Support, Example Output, SDK Usage, Enable/Disable,
-    Dependencies, Data Sources (step-by-step methodology in OUR voice, not a
+    silent), Platform support, Example output, SDK usage, Enable/disable,
+    Dependencies, Data sources (step-by-step methodology in OUR voice, not a
     Ohai parity table), Backing library. **No "Known gaps vs. Ohai" section.**
     methodology gaps live as GitHub issues (labeled `methodology-gap` /
     `collector:<name>`).
@@ -482,7 +482,7 @@ Before marking a collector complete, every item below must be true:
 11. **Check GitHub issues** for tracked methodology gaps:
     `gh issue list --label methodology-gap --label collector:<name>`. If the
     work closes a tracked issue, the issue's "Doc after this fix lands" block IS
-    the doc content to paste into Data Sources. The PR description must include
+    the doc content to paste into Data sources. The PR description must include
     `Closes #N`.
 
 See [docs/adding-a-collector.md](docs/adding-a-collector.md) for the full
