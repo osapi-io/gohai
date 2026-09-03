@@ -1,4 +1,4 @@
-# OCSF Gap Report
+# OCSF gap report
 
 Fields where gohai collects data that OCSF does not currently model. Each entry
 is a candidate for an upstream OCSF PR to
@@ -143,7 +143,7 @@ established the concept:
 
 ______________________________________________________________________
 
-## `device`: host Identity & State
+## `device`: host identity and state
 
 ### fqdn (`hostname.fqdn`)
 
@@ -244,7 +244,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `device_hw_info`: hardware Detail
+## `device_hw_info`: hardware detail
 
 ### cpu_sockets (`cpu.sockets`)
 
@@ -403,7 +403,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `os`: operating System
+## `os`: operating system
 
 ### os_family (`platform.family`)
 
@@ -467,7 +467,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `network_interface`: network Configuration
+## `network_interface`: network configuration
 
 ### mtu (`network.interfaces[].mtu`)
 
@@ -610,7 +610,7 @@ ______________________________________________________________________
 
 ______________________________________________________________________
 
-## `cloud`: cross-Provider
+## `cloud`: cross-provider
 
 ### instance_type (cross-provider)
 

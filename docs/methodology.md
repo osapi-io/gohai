@@ -336,10 +336,9 @@ Signals are about **meaning**, not structure. Use them whenever a consumer can
 reasonably ask "which of these fields should I look at for X?", the Signals
 section answers that before they have to read the field table.
 
-This keeps docs consistent and makes it obvious at a glance whether we're
-leveraging Ohai's hard-won knowledge or flying solo. If Ohai has coverage we
-lack, either add it in the same PR or open a tracked issue, don't silently drop
-it.
+This keeps docs consistent and makes it obvious at a glance whether we're using
+Ohai's hard-won knowledge or flying solo. If Ohai has coverage we lack, either
+add it in the same PR or open a tracked issue, don't silently drop it.
 
 [Reference PR adding this rule: chef/ohai#1754]
 

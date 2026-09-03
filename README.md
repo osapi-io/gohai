@@ -52,12 +52,11 @@ each field draws on OCSF + OpenTelemetry.
 
 ### Intended consumer
 
-gohai is designed to be embedded in Go services that need typed system facts for
-routing, guards, discovery, inventory, and compliance. [OSAPI] is the intended
-first consumer; it does not depend on gohai yet. The CLI is a convenience. The
-SDK is the product.
+gohai embeds in Go services that need typed system facts for routing, guards,
+discovery, inventory, and compliance. [OSAPI] is the intended first consumer; it
+does not depend on gohai yet. The CLI is a convenience. The SDK is the product.
 
-## 📦 Install
+## Install
 
 ```bash
 curl -fsSL https://github.com/osapi-io/gohai/raw/main/install.sh | bash
@@ -92,7 +91,7 @@ go build -o gohai .
 
 </details>
 
-## ✨ Features
+## Features
 
 | Feature                        | Description                                                                                                                                                             |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -108,7 +107,7 @@ go build -o gohai .
 | 🔄 Native OCSF Output          | `--format ocsf` produces a standards-compliant OCSF `inventory_info` event (class_uid 5001), feed directly into SIEMs and data lakes                                    |
 | 🔌 SDK Integration             | Import as a Go package into any Go service                                                                                                                              |
 
-## 🔌 Collectors
+## Collectors
 
 65 collectors across 9 categories. See the
 **[Collectors reference](docs/collectors/README.md)** for the full catalog,
@@ -126,7 +125,7 @@ identity, base hardware, network, load, virt detect). The CLI wires
 `WithDefaults()` automatically; pass `--no-defaults` to skip it and use only
 explicit `--collector.X` flags.
 
-## 🎯 Usage
+## Usage
 
 ### CLI
 
@@ -228,7 +227,7 @@ Rich per-provider data lives on the typed `Facts.Ec2` / `Facts.Gce` / etc.
 field. See [docs/collectors/cloud.md](docs/collectors/cloud.md) for the full
 pattern.
 
-## 📋 Examples
+## Examples
 
 Each example is a standalone Go program you can read and run.
 
@@ -241,7 +240,7 @@ Each example is a standalone Go program you can read and run.
 | [timings](examples/timings/main.go)                       | Surface per-collector duration and failure                   |
 | [list-collectors](examples/list-collectors/main.go)       | Enumerate collectors without collecting                      |
 
-## 📖 Documentation
+## Documentation
 
 - [Package documentation] on pkg.go.dev. Generated API reference. Every
   `Option`, `Facts` field, and `Info` struct is documented there. This is the
@@ -255,7 +254,7 @@ Each example is a standalone Go program you can read and run.
 - [Collector methodology](docs/methodology.md). Library selection, field naming,
   and data sources.
 
-## 🔗 Related Works
+## Related Works
 
 gohai builds on the following projects, as methodology references, as backing
 libraries we wrap, or as peers solving adjacent problems:
@@ -305,12 +304,12 @@ libraries we wrap, or as peers solving adjacent problems:
 - [psutil](https://github.com/giampaolo/psutil). The Python library gopsutil is
   a port of; the original design reference for the dynamic-state facts.
 
-## 🤝 Contributing
+## Contributing
 
 See the [Contributing](CONTRIBUTING.md) guide for prerequisites, setup,
 conventions, and the PR workflow.
 
-## 📄 License
+## License
 
 The [MIT] License.
 

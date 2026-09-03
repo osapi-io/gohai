@@ -1,4 +1,4 @@
-# Adding a New Collector
+# Adding a new collector
 
 Step-by-step walkthrough for building a new collector. For the rules and
 principles (library-first, OCSF + OpenTelemetry naming, no build tags, etc.) see

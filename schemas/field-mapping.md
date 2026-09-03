@@ -1,4 +1,4 @@
-# Field Mapping Table
+# Field mapping table
 
 Three-tier naming ladder applied to every gohai JSON field.
 
@@ -842,7 +842,7 @@ ______________________________________________________________________
 | package_mgr      | Name           | `name`            | T1   | `name`            | no       | OCSF `package.name`, package manager name                         | [OCSF package](https://schema.ocsf.io/1.8.0/objects/package)                                                 |
 | package_mgr      | Path           | `path`            | T3   | `path`            | no       | No OCSF/OTel equivalent, absolute path to package manager binary  | Convention, exec.LookPath result                                                                             |
 
-## Linux-Specific Collectors (New)
+## Linux-specific collectors (new)
 
 | Collector           | Go Field                  | Current JSON                   | Tier | Chosen JSON                    | Changed? | Source                                                       | Citation                                                                                           |
 | ------------------- | ------------------------- | ------------------------------ | ---- | ------------------------------ | -------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
@@ -926,7 +926,7 @@ ______________________________________________________________________
 | zpools.pool         | Altroot                   | `altroot`                      | T3   | `altroot`                      | no       | No OCSF/OTel equivalent, alternate root directory            | Convention, zpool list ALTROOT                                                                     |
 | rpm                 | Macros                    | `macros`                       | T3   | `macros`                       | no       | No OCSF/OTel equivalent, RPM macro definitions               | Convention, rpm --showrc                                                                           |
 
-## Security Collectors (New)
+## Security collectors (new)
 
 | Collector | Go Field               | Current JSON                | Tier | Chosen JSON                 | Changed? | Source                                                | Citation                         |
 | --------- | ---------------------- | --------------------------- | ---- | --------------------------- | -------- | ----------------------------------------------------- | -------------------------------- |
@@ -942,7 +942,7 @@ ______________________________________________________________________
 | ssh.key   | FingerprintMD5         | `fingerprint_md5`           | T3   | `fingerprint_md5`           | no       | No OCSF/OTel equivalent, MD5 fingerprint              | Convention, ssh-keygen -E md5    |
 | ssh.key   | KeyLength              | `key_length`                | T3   | `key_length`                | no       | No OCSF/OTel equivalent, key length in bits           | Convention, SSH key spec         |
 
-## Software Collectors (New)
+## Software collectors (new)
 
 | Collector        | Go Field   | Current JSON | Tier | Chosen JSON       | Changed? | Source                                                               | Citation                                                     |
 | ---------------- | ---------- | ------------ | ---- | ----------------- | -------- | -------------------------------------------------------------------- | ------------------------------------------------------------ |
@@ -975,7 +975,7 @@ ______________________________________________________________________
 | docker.image     | Tag        | `tag`        | T3   | `tag`             | no       | No OCSF/OTel equivalent, image tag                                   | Convention, docker images Tag                                |
 | docker.image     | Size       | `size`       | T3   | `size`            | no       | No OCSF/OTel equivalent, image size                                  | Convention, docker images Size                               |
 
-## Virtualization Collectors (New)
+## Virtualization collectors (new)
 
 | Collector      | Go Field               | Current JSON               | Tier | Chosen JSON                | Changed? | Source                                             | Citation                              |
 | -------------- | ---------------------- | -------------------------- | ---- | -------------------------- | -------- | -------------------------------------------------- | ------------------------------------- |
@@ -1008,7 +1008,7 @@ ______________________________________________________________________
 | libvirt.domain | MaxMemory              | `max_memory`               | T3   | `max_memory`               | no       | No OCSF/OTel equivalent, max memory allocation     | Convention, virsh dominfo             |
 | libvirt.domain | Autostart              | `autostart`                | T3   | `autostart`                | no       | No OCSF/OTel equivalent, domain autostart flag     | Convention, virsh dominfo             |
 
-## Miscellaneous Collectors (New)
+## Miscellaneous collectors (new)
 
 | Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source                                           | Citation                        |
 | --------- | -------- | ------------ | ---- | ----------- | -------- | ------------------------------------------------ | ------------------------------- |
