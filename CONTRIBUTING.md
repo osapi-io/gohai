@@ -138,8 +138,8 @@ just deps
 
 ## Code style
 
-Go code is formatted by \[`gofumpt`\][gofumpt] and linted using
-\[`golangci-lint`\][golangci-lint]. This style is enforced by CI.
+Go code is formatted by [gofumpt] and linted using [golangci-lint], enforced by
+CI.
 
 ```bash
 just go-fmt-check   # Check formatting
@@ -149,12 +149,12 @@ just go-vet         # Run linter
 
 The linters that run are declared in `.golangci.yml`. Read them there rather
 than looking for a list here. A copied list goes stale the first time the
-configuration changes.
+configuration changes. Generated files (`*.gen.go`, `*.pb.go`) are excluded from
+formatting.
 
 ### Documentation
 
-Markdown files are formatted with
-[mdformat](https://pypi.org/project/mdformat/), run through `uvx`. This style is
+Markdown files are formatted with [mdformat] through `uvx`. This style is
 enforced by CI.
 
 ```bash
@@ -569,9 +569,9 @@ be reasonable to split it in a few). Git squash and rebase is your friend!
 
 ## AI usage
 
-All contributions are subject to the [AI Usage Policy](AI_POLICY.md). Disclose
-the tool you used, and make sure you can explain what your change does without
-the aid of AI tools.
+This repo is written with AI assistance. All contributions are subject to the
+[AI Usage Policy](AI_POLICY.md). Disclose the tool you used, and make sure you
+can explain what your change does without the aid of AI tools.
 
 ## FAQ
 
@@ -589,4 +589,7 @@ If you have questions, open a [Discussion] on GitHub.
 [conventional commits]: https://www.conventionalcommits.org
 [discussion]: https://github.com/osapi-io/gohai/discussions
 [go]: https://go.dev
+[gofumpt]: https://github.com/mvdan/gofumpt
+[golangci-lint]: https://golangci-lint.run
 [just]: https://just.systems
+[mdformat]: https://pypi.org/project/mdformat/
