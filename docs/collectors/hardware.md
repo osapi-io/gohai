@@ -4,14 +4,14 @@
 
 ## Description
 
-Collects the macOS hardware facts `system_profiler` surfaces — machine identity
+Collects the macOS hardware facts `system_profiler` surfaces, machine identity
 (model, serial, platform UUID), CPU labels (Intel `cpu_type` or Apple Silicon
 `chip_type`), memory, firmware versions, attached storage volumes, battery, and
 AC charger. Mirrors Ohai's `darwin/hardware.rb` methodology: three
-`system_profiler` invocations — `SPHardwareDataType`, `SPStorageDataType`,
-`SPPowerDataType` — run concurrently and merged into a typed Info.
+`system_profiler` invocations, `SPHardwareDataType`, `SPStorageDataType`,
+`SPPowerDataType`, run concurrently and merged into a typed Info.
 
-**This collector is macOS-only by design.** Linux doesn't need it — the
+**This collector is macOS-only by design.** Linux doesn't need it, the
 equivalent identity / CPU / memory / storage facts are already split across
 `dmi`, `cpu`, `memory`, `disk`, `filesystem`, and `pci`. On macOS those
 abstractions don't exist (no SMBIOS, no `/sys`), so every fact funnels through
@@ -44,18 +44,18 @@ battery / charger. Non-Darwin platforms return an empty Info.
 
 ### Storage
 
-| Field          | Type     | Description                                                   |
-| -------------- | -------- | ------------------------------------------------------------- |
-| `name`         | `string` | Volume name (`Macintosh HD`).                                 |
-| `bsd_name`     | `string` | Device node (`disk1s1`).                                      |
-| `capacity`     | `int64`  | Size in bytes.                                                |
-| `file_system`  | `string` | `APFS`, `HFS+`, etc.                                          |
-| `mount_point`  | `string` | Mount path.                                                   |
-| `free_space`   | `int64`  | Free bytes.                                                   |
-| `writable`     | `bool`   | Whether the volume is mounted read-write.                     |
-| `drive_type`   | `string` | `ssd` / `hdd` (CoreStorage only — empty on APFS).             |
-| `smart_status` | `string` | SMART verdict (`Verified`, CoreStorage only — empty on APFS). |
-| `partitions`   | `int`    | Partition count (CoreStorage only — empty on APFS).           |
+| Field          | Type     | Description                                                  |
+| -------------- | -------- | ------------------------------------------------------------ |
+| `name`         | `string` | Volume name (`Macintosh HD`).                                |
+| `bsd_name`     | `string` | Device node (`disk1s1`).                                     |
+| `capacity`     | `int64`  | Size in bytes.                                               |
+| `file_system`  | `string` | `APFS`, `HFS+`, etc.                                         |
+| `mount_point`  | `string` | Mount path.                                                  |
+| `free_space`   | `int64`  | Free bytes.                                                  |
+| `writable`     | `bool`   | Whether the volume is mounted read-write.                    |
+| `drive_type`   | `string` | `ssd` / `hdd` (CoreStorage only, empty on APFS).             |
+| `smart_status` | `string` | SMART verdict (`Verified`, CoreStorage only, empty on APFS). |
+| `partitions`   | `int`    | Partition count (CoreStorage only, empty on APFS).           |
 
 ### Battery
 
@@ -176,7 +176,7 @@ On macOS:
    as strings (e.g. `cycle_count: "201"`) are parsed via a helper that accepts
    both JSON numbers and numeric strings.
 3. `battery.remaining` is computed as `current_capacity * 100 / max_capacity`
-   when `max_capacity > 0` — matches Ohai's `(current / max * 100).to_i`.
+   when `max_capacity > 0`, matches Ohai's `(current / max * 100).to_i`.
 4. Each of the three calls is tolerated independently: missing binary, exec
    error, or malformed JSON in one invocation leaves only that section empty.
    This keeps the collector useful on hosts where one `SP*DataType` mode fails
@@ -189,18 +189,18 @@ Darwin-only and Linux gets equivalent coverage from the `dmi`, `cpu`, `memory`,
 ### Deviations from Ohai
 
 - **Skip `architecture`, `operating_system`, `operating_system_version`,
-  `build_version`** — Ohai merges these into `hardware{}` too, but they're
+  `build_version`**. Ohai merges these into `hardware{}` too, but they're
   already collected by gohai's `kernel`, `platform`, and `os_release`
   collectors. Duplicating them would violate the single-source principle.
-- **Surface AC charger info** — Ohai reads `SPPowerDataType` only for the
-  battery item. We additionally surface the `sppower_ac_charger_information`
-  item because fleet management cares about adapter wattage mismatches.
-- **Surface `amperage` / `voltage`** — Ohai ignores the raw
+- **Surface AC charger info**. Ohai reads `SPPowerDataType` only for the battery
+  item. We additionally surface the `sppower_ac_charger_information` item
+  because fleet management cares about adapter wattage mismatches.
+- **Surface `amperage` / `voltage`**. Ohai ignores the raw
   `sppower_current_amperage` and `sppower_current_voltage` fields in the battery
   item; we expose them for consumers that want charge-rate signals.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `system_profiler`. Tests mock it with
   `go.uber.org/mock`.

@@ -4,7 +4,7 @@
 
 ## Description
 
-Detects every hypervisor and container runtime the host participates in — as
+Detects every hypervisor and container runtime the host participates in, as
 **guest**, **host**, or both. A single host can legitimately report multiple
 systems (a Docker host that is itself a KVM guest on EC2, an LXD host on bare
 metal, etc.). Mirrors Ohai's linux/virtualization.rb and
@@ -30,7 +30,7 @@ Consumers use this to:
 
 Empty `system` + empty `systems` means "no virtualization detected" (bare
 metal). When more than one layer is detected, `system`/`role` report the last
-positive detection in the cascade order — consumers that care about every layer
+positive detection in the cascade order, consumers that care about every layer
 should iterate `systems`.
 
 ## Platform Support
@@ -117,7 +117,7 @@ None.
 
 On Linux the collector cascades through every signal Ohai's
 `linux/virtualization.rb` checks, populating `systems[<name>] = role` for each
-positive hit. Order matters — the last positive detection sets primary
+positive hit. Order matters, the last positive detection sets primary
 `system`/`role`, but every layer remains in `systems`:
 
 01. **`systemd-detect-virt` fast-path:** when on PATH, run
@@ -137,14 +137,14 @@ positive hit. Order matters — the last positive detection sets primary
     `/sys/devices/virtual/misc/kvm` exists → host (or guest when the
     `hypervisor` cpuinfo flag is set). Additionally, if the `cpu` prior result
     has `HypervisorVendor == "KVM"` and `VirtualizationType` in `{full, para}`
-    (from `lscpu`), register as kvm guest — covers nested VMs where the
+    (from `lscpu`), register as kvm guest, covers nested VMs where the
     `/sys/devices/virtual/misc/kvm` node isn't exposed.
 
 06. **DMI:** `/sys/class/dmi/id/sys_vendor` is matched first against Ohai's
-    `guest_from_dmi_data` manufacturer table — `OpenStack`, `Xen`, `VMware`,
+    `guest_from_dmi_data` manufacturer table, `OpenStack`, `Xen`, `VMware`,
     `Microsoft` (combined with `Virtual Machine` in product) → hyperv,
     `Amazon EC2`, `QEMU` → kvm, `Veertu`, `Parallels`. If no manufacturer match,
-    `/sys/class/dmi/id/product_name` is matched against the product table —
+    `/sys/class/dmi/id/product_name` is matched against the product table,
     `VirtualBox` → vbox, `OpenStack` (Red Hat variant), `KVM` / `RHEV` → kvm,
     `BHYVE`.
 
@@ -161,7 +161,7 @@ positive hit. Order matters — the last positive detection sets primary
     - Direct: `/(docker|lxc|containerd)/…` → matching runtime (containerd remaps
       to docker).
     - Nested (systemd-managed, docker-ce, cgroup v2): `/<parent>/docker-…` or
-      `/<parent>/lxc-…` — catches `/system.slice/docker-<hash>.scope`,
+      `/<parent>/lxc-…`, catches `/system.slice/docker-<hash>.scope`,
       `/docker-ce/docker/<hash>`, `/kubepods/.../docker-<hash>.scope`, GitHub
       Actions runner layouts.
 
@@ -201,9 +201,9 @@ through the shared `internal/executor` runner. Tests mock both with `memfs` and
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) — virtual filesystem
-  for the dozen `/proc`, `/sys`, `/var/lib/...`, and `/Applications/...` probes.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs). Virtual filesystem for
+  the dozen `/proc`, `/sys`, `/var/lib/...`, and `/Applications/...` probes.
   Tests inject `memfs` with canned fixtures.
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction for `systemd-detect-virt`, `command -v <bin>`, `sysctl`, `ioreg`,
   `system_profiler`. Tests mock with `go.uber.org/mock`.

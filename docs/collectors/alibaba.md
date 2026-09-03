@@ -5,11 +5,11 @@
 ## Description
 
 Collects Alibaba Cloud ECS instance metadata from the link-local server at
-`http://100.100.100.200/2016-01-01/` — Alibaba uses `100.100.100.200` rather
-than the more common `169.254.169.254` link-local range. `facts.Alibaba != nil`
-is the detection signal.
+`http://100.100.100.200/2016-01-01/`. Alibaba uses `100.100.100.200` rather than
+the more common `169.254.169.254` link-local range. `facts.Alibaba != nil` is
+the detection signal.
 
-Detection is gated on DMI `sys_vendor` containing `"Alibaba"` — matches Ohai's
+Detection is gated on DMI `sys_vendor` containing `"Alibaba"`, matches Ohai's
 `has_ali_dmi?`.
 
 ## Collected Fields
@@ -135,29 +135,29 @@ wasn't run.
 01. **DMI gate:** `dmi.Product.VendorName` contains `"Alibaba"`. ghw reads
     `/sys/class/dmi/id/sys_vendor` into `Product.VendorName`, so this check is
     equivalent to Ohai's `has_ali_dmi?`.
-02. **Endpoint:** `http://100.100.100.200/2016-01-01/` — note the non-standard
+02. **Endpoint:** `http://100.100.100.200/2016-01-01/`, note the non-standard
     `100.100.100.200` link-local address, not `169.254.169.254`.
 03. **Recursive walk:** starting at `/`, the collector fetches each directory
     listing (newline-separated entries), recurses into entries ending in `/`,
     and fetches leaves as values. Matches Ohai's `fetch_metadata` algorithm in
     `mixin/alibaba_metadata.rb`.
-04. **`/user-data` excluded** (root-level only) — matches Ohai's explicit skip
-    to avoid surfacing cloud-init scripts that may contain credentials.
+04. **`/user-data` excluded** (root-level only). Matches Ohai's explicit skip to
+    avoid surfacing cloud-init scripts that may contain credentials.
 05. **Leaf parsing:** each leaf is tried as JSON first; on parse failure the raw
     text is kept. Matches Ohai's `parse_json` fallback pattern.
 06. **Key sanitization:** dashes and slashes in path segments become underscores
     in map keys; trailing underscores are stripped. Matches Ohai's
     `sanitize_key`.
-07. **Transformation:** the walked tree is projected onto the typed `Info` —
+07. **Transformation:** the walked tree is projected onto the typed `Info`,
     identity / location / network fields flattened from `meta-data/`, plus the
     nested sub-objects `instance/` (including `spot/termination-time`),
     `image/market-place/`, `tags/instance/`, `disks/<serial>/`, and
     `network/interfaces/macs/<mac>/`. All surfaced fields are typed; no `Raw`
     escape hatch.
 08. **Deliberately excluded:** `ram/security-credentials/<role>/` (short-lived
-    AccessKey/SecurityToken) and `public-keys/<keypair>/openssh-key` — both
+    AccessKey/SecurityToken) and `public-keys/<keypair>/openssh-key`, both
     security-sensitive and of no inventory value.
-09. **User-Agent:** `gohai` (the cloudmetadata default) — Alibaba's metadata
+09. **User-Agent:** `gohai` (the cloudmetadata default). Alibaba's metadata
     service filters some requests by UA.
 10. **Timeout:** 6 seconds per request, matching Ohai's `read_timeout` +
     `keep_alive_timeout`.
@@ -171,5 +171,5 @@ pattern, same 6s timeout.
 
 ## Backing library
 
-- [`internal/cloudmetadata`](../../internal/cloudmetadata/) — the shared HTTP
+- [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
   client used by every cloud-provider collector.

@@ -8,18 +8,18 @@ Detects which init system (PID 1) the host is running under. Matters when
 consumers decide how to restart services, reload configuration, or declare
 dependency ordering:
 
-- `systemd` — `systemctl` family, unit files under `/etc/systemd/system/`
-- `upstart` — `initctl`, `/etc/init/*.conf`
-- `sysvinit` — classic `/etc/init.d/*` scripts + runlevels
-- `openrc` — Gentoo / Alpine; `rc-service`, `/etc/init.d/` + OpenRC conf
-- `runit` — Void Linux, Artix; `sv` command
-- `launchd` — macOS; `launchctl`, `*.plist` under `/Library/LaunchDaemons/`
+- `systemd`. `systemctl` family, unit files under `/etc/systemd/system/`
+- `upstart`. `initctl`, `/etc/init/*.conf`
+- `sysvinit`. Classic `/etc/init.d/*` scripts + runlevels
+- `openrc`. Gentoo / Alpine; `rc-service`, `/etc/init.d/` + OpenRC conf
+- `runit`. Void Linux, Artix; `sv` command
+- `launchd`. MacOS; `launchctl`, `*.plist` under `/Library/LaunchDaemons/`
 
 ## Collected Fields
 
-| Field  | Type   | Description                                                                               | Schema mapping                                                                                                         |
-| ------ | ------ | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `name` | string | Canonical init system name. Known values listed above; unknown values pass through as-is. | No direct schema mapping — `process.name` of PID 1 is the closest concept (`os.pid_1_name`-style field doesn't exist). |
+| Field  | Type   | Description                                                                               | Schema mapping                                                                                                        |
+| ------ | ------ | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `name` | string | Canonical init system name. Known values listed above; unknown values pass through as-is. | No direct schema mapping, `process.name` of PID 1 is the closest concept (`os.pid_1_name`-style field doesn't exist). |
 
 ## Platform Support
 
@@ -29,7 +29,7 @@ dependency ordering:
 | macOS    | ✅ (hard-coded `launchd`) |
 
 On Linux, if `/proc/1/comm` is unreadable (restricted containers), the `name` is
-empty — consumers should treat empty as unknown, not as an assertion of any
+empty. Consumers should treat empty as unknown, not as an assertion of any
 particular init system.
 
 ## Example Output
@@ -85,9 +85,9 @@ On Linux:
    Other values pass through unchanged. Mirrors Ohai's `init_package.rb`, which
    reads the same file; we add the canonicalization step that Ohai skips.
 
-On macOS we hard-code `launchd` — it's the only init system Darwin ships. Ohai's
+On macOS we hard-code `launchd`, it's the only init system Darwin ships. Ohai's
 `init_package.rb` is Linux-only and returns nothing here.
 
 ## Backing library
 
-- Go stdlib (`os`) — no third-party dependency.
+- Go stdlib (`os`), no third-party dependency.

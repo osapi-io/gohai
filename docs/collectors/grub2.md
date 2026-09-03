@@ -9,7 +9,7 @@ environment block is a fixed-size 1024-byte file that persists boot-time
 variables across reboots. It is commonly used by bootloaders and `grub2-editenv`
 to track boot state.
 
-On macOS the collector returns nil — GRUB2 is a Linux/BSD bootloader not present
+On macOS the collector returns nil. GRUB2 is a Linux/BSD bootloader not present
 on macOS.
 
 Consumers use this to:
@@ -28,10 +28,10 @@ Consumers use this to:
 
 ## Platform Support
 
-| Platform | Supported                                     |
-| -------- | --------------------------------------------- |
-| Linux    | ✅                                            |
-| macOS    | Returns nil — GRUB2 is not available on macOS |
+| Platform | Supported                                    |
+| -------- | -------------------------------------------- |
+| Linux    | ✅                                           |
+| macOS    | Returns nil, GRUB2 is not available on macOS |
 
 ## Example Output
 
@@ -99,7 +99,7 @@ On Linux:
 1. Try `/boot/grub2/grubenv` first (RHEL, Fedora, CentOS, Rocky, AlmaLinux) via
    the injected `avfs.VFS`.
 2. If that file does not exist, try `/boot/grub/grubenv` (Debian, Ubuntu).
-3. If neither file exists, return `{environment: nil}` — nil signals "GRUB2 not
+3. If neither file exists, return `{environment: nil}`, nil signals "GRUB2 not
    installed" to consumers.
 4. Parse the file line by line:
    - Skip lines beginning with `#` (the standard `# GRUB Environment Block`

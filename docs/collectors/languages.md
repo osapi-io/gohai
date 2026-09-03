@@ -71,29 +71,29 @@ None.
 Ohai's `languages.rb` delegates to per-language sub-plugins (`go.rb`,
 `python.rb`, `ruby.rb`, `nodejs.rb`, `java.rb`, `perl.rb`), each running the
 same `--version` commands. gohai consolidates all six probes into a single
-collector. The version extraction logic mirrors Ohai's per-language parsers —
-the same edge cases are handled (Java's stderr output, Perl's parenthesized
-version form, Node's leading `v`).
+collector. The version extraction logic mirrors Ohai's per-language parsers, the
+same edge cases are handled (Java's stderr output, Perl's parenthesized version
+form, Node's leading `v`).
 
-Both Linux and Darwin use identical probe sequences — version flags are the same
+Both Linux and Darwin use identical probe sequences, version flags are the same
 across platforms:
 
-1. **Go:** `go version` — extracts the `goX.Y.Z` token and strips the `go`
+1. **Go:** `go version`, extracts the `goX.Y.Z` token and strips the `go`
    prefix.
-2. **Python:** `python3 --version` — extracts the second whitespace-delimited
+2. **Python:** `python3 --version`, extracts the second whitespace-delimited
    field (`Python 3.11.4` → `3.11.4`).
-3. **Ruby:** `ruby --version` — extracts the second whitespace-delimited field
+3. **Ruby:** `ruby --version`, extracts the second whitespace-delimited field
    (`ruby 3.2.2 (...)` → `3.2.2`).
-4. **Node:** `node --version` — strips the leading `v` from the output
-   (`v20.1.0` → `20.1.0`).
-5. **Java:** `java -version` — Java writes to stderr; the executor returns
+4. **Node:** `node --version`, strips the leading `v` from the output (`v20.1.0`
+   → `20.1.0`).
+5. **Java:** `java -version`. Java writes to stderr; the executor returns
    combined output. Extracts the version from the first quoted string
    (`"21.0.1"`).
-6. **Perl:** `perl --version` — extracts the `(vX.Y.Z)` parenthesised form from
+6. **Perl:** `perl --version`, extracts the `(vX.Y.Z)` parenthesised form from
    the first line.
 
 Any probe that fails (command not found, non-zero exit) sets the corresponding
-field to nil. The collector never returns an error — missing runtimes are the
+field to nil. The collector never returns an error, missing runtimes are the
 normal case on minimal hosts.
 
 ## Backing library

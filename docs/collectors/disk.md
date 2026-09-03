@@ -5,14 +5,14 @@
 ## Description
 
 Reports per-device disk I/O counters (read/write counts, bytes, and latency).
-Equivalent to what `iostat` shows at the block-device layer — useful for
+Equivalent to what `iostat` shows at the block-device layer, useful for
 detecting saturated disks, unbalanced I/O across NVMe devices, and trending
 storage workload over time.
 
 Note: this collector reports **I/O counters only**. Physical device metadata
 (model, vendor, serial, rotational, block sizes) will come from a forthcoming
-`block_device` collector that wraps `ghw/block` — tracked separately. Ohai
-splits these the same way.
+`block_device` collector that wraps `ghw/block`, tracked separately. Ohai splits
+these the same way.
 
 ## Collected Fields
 
@@ -92,12 +92,12 @@ On macOS:
    shape. Device names match what `iostat` reports (e.g. `disk0`).
 
 Physical device metadata (model, vendor, serial, rotational, block sizes) is out
-of this collector's scope — tracked in the planned `block_device` collector
+of this collector's scope, tracked in the planned `block_device` collector
 backed by `ghw/block`. Ohai splits the two concerns the same way (its
 `diskstats`-style data doesn't exist; `linux/block_device.rb` covers sysfs
 device metadata only).
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil) —
+- [`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil),
   BSD-3.

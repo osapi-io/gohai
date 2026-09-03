@@ -102,13 +102,13 @@ None.
 
 ## Data Sources
 
-On Linux and macOS (identical — both platforms ship POSIX flat files):
+On Linux and macOS (identical, both platforms ship POSIX flat files):
 
 1. Read `/etc/passwd` through the injected `avfs.VFS` and parse line-by-line
    into `passwd[<username>]`. Format is seven colon-separated fields:
    `name:password:uid:gid:gecos:home:shell`. We keep `uid`, `gid`, `dir`,
    `shell`, and `gecos`; the password hash placeholder is dropped. Duplicate
-   usernames keep the first occurrence — matches `Etc.passwd`'s C-library
+   usernames keep the first occurrence, matches `Etc.passwd`'s C-library
    iteration. Comments (`#`) and malformed lines (< 7 fields) are skipped.
 2. Read `/etc/group` through the same VFS. Format is four colon-separated
    fields: `name:password:gid:members(comma-separated)`. We keep `gid` and the
@@ -118,13 +118,13 @@ On Linux and macOS (identical — both platforms ship POSIX flat files):
    `Etc.getpwuid(Process.euid).name`. Missing `/etc/passwd` or an euid with no
    matching entry leaves `current_user` empty.
 
-Mirrors Ohai's `passwd` plugin — same files, same duplicate-drops-second rule,
+Mirrors Ohai's `passwd` plugin, same files, same duplicate-drops-second rule,
 same effective-UID lookup for current user. We parse `/etc/passwd` directly
 rather than calling `getpwent(3)` so the collector has no cgo dependency.
 
 On macOS, local accounts live in Directory Services (`dscl .`). The flat files
 `/etc/passwd` and `/etc/group` carry the well-known system users (`root`,
-`daemon`, etc.) but omit user-created accounts — those live in OpenDirectory and
+`daemon`, etc.) but omit user-created accounts. Those live in OpenDirectory and
 require `dscl` to enumerate. Ohai's `passwd` plugin has the same limitation
 (Ruby's `Etc` wraps POSIX flat files on macOS); a future enhancement could shell
 out to `dscl . -list /Users` for a richer view.

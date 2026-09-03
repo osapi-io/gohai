@@ -87,13 +87,13 @@ None.
 
 | Platform | What we read                                         | Ohai plugin ([`root_group.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/root_group.rb)) | Alignment                                                                             |
 | -------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Linux    | `os/user.Lookup("root")` → `LookupGroupId(user.Gid)` | `Etc.getgrgid(Etc.getpwnam("root").gid).name` — same two-hop pattern.                                  | **Identical.** Two-hop lookup ensures correctness even if root's primary GID isn't 0. |
+| Linux    | `os/user.Lookup("root")` → `LookupGroupId(user.Gid)` | `Etc.getgrgid(Etc.getpwnam("root").gid).name`, same two-hop pattern.                                   | **Identical.** Two-hop lookup ensures correctness even if root's primary GID isn't 0. |
 | macOS    | Same Go stdlib calls                                 | Same Ruby `Etc` call                                                                                   | **Identical.** Typical result "wheel".                                                |
 
 **Known gaps:** None. Windows support (Ohai has a WMI SID-544 lookup for
-localized Administrators group name) is out of scope — gohai doesn't target
+localized Administrators group name) is out of scope. gohai doesn't target
 Windows yet.
 
 ## Backing library
 
-- Go stdlib (`os/user`) — no third-party dependency.
+- Go stdlib (`os/user`), no third-party dependency.

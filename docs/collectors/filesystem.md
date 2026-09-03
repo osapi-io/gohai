@@ -14,9 +14,9 @@ Consumers use this to:
 - Monitor disk-full conditions per mount (critical for `/var/log`,
   `/var/lib/docker`, etc.).
 - Detect unexpected mount points (e.g. NFS shares that shouldn't be present).
-- Correlate a mount to its disk UUID — the standard join key across storage,
+- Correlate a mount to its disk UUID, the standard join key across storage,
   asset-inventory, and cloud-snapshot tooling.
-- Surface block devices that carry a filesystem but aren't mounted — LUKS
+- Surface block devices that carry a filesystem but aren't mounted. LUKS
   containers, inactive LVs, btrfs device members.
 
 Per-mount usage failures (stale NFS, permission denied) skip the usage/inode
@@ -50,12 +50,12 @@ Top level: `mounts: []Mount`, plus (Linux only) `unmounted: []Filesystem`.
 
 Top-level `unmounted[]` (Linux only): block devices that `lsblk` reports with a
 non-empty filesystem type and empty mountpoint. Each entry carries `device`,
-`type`, `uuid`, `label`, `part_uuid`, `part_label` — capacity/usage are omitted
+`type`, `uuid`, `label`, `part_uuid`, `part_label`, capacity/usage are omitted
 because `statfs` requires a mount.
 
 Top-level `zfs_datasets[]` (Linux only, when `zfs` is on PATH): every ZFS
-dataset the kernel's ZFS module knows about — filesystems, volumes, snapshots,
-bookmarks — reported by `zfs get -p -H all`. Mirrors Ohai's `zfs_properties` /
+dataset the kernel's ZFS module knows about, filesystems, volumes, snapshots,
+bookmarks, reported by `zfs get -p -H all`. Mirrors Ohai's `zfs_properties` /
 `zfs_parents` / `zfs_zpool` keys.
 
 | Field per dataset     | Type                | Description                                                                                                                  |
@@ -142,7 +142,7 @@ None.
 
 Ohai's `filesystem.rb` combines `mount`, `df`, and `lsblk` output to build a
 per-device view with mount points, capacity, and filesystem types. gohai uses
-gopsutil instead, which reads `/proc/mounts` and `statfs` syscalls directly —
+gopsutil instead, which reads `/proc/mounts` and `statfs` syscalls directly,
 same underlying data, different parsing path. gohai extends Ohai's surface with
 btrfs subvolume detail and ZFS dataset properties via VFS reads.
 
@@ -164,18 +164,18 @@ On Linux:
 4. When `lsblk` is missing (minimal containers, Alpine without util-linux) or
    its output is malformed, we skip the enrichment silently; capacity and inode
    data remain from gopsutil.
-5. **Btrfs allocation enrichment** — for each mount with `type == "btrfs"` and a
+5. **Btrfs allocation enrichment**. For each mount with `type == "btrfs"` and a
    non-empty UUID we read `/sys/fs/btrfs/<uuid>/allocation/` through the
    injected `avfs.VFS` and populate the mount's `btrfs` sub-record:
    per-block-group (`data`, `metadata`, `system`) byte counters (`total`,
    `used`, `reserved`) plus the RAID profile flag set (`single`, `raid0`,
    `raid1`, `raid10`, `raid5`, `raid6`, `dup`). Missing sysfs paths (older
    kernels, containers without /sys mounted) skip the enrichment silently.
-6. **ZFS datasets** — when `zfs` is on PATH we run `zfs get -p -H all` through
+6. **ZFS datasets**. When `zfs` is on PATH we run `zfs get -p -H all` through
    the shared `internal/executor` runner and parse its tab-separated
    dataset/property/value/source rows into `ZFSDatasets` keyed by dataset name.
    `-p` forces machine-readable byte values, `-H` drops the header. Non-ZFS
-   hosts (binary missing or exec error) return zero datasets with no error —
+   hosts (binary missing or exec error) return zero datasets with no error,
    independent of `lsblk`.
 
 On macOS we use gopsutil's mount enumeration backed by `getfsstat(2)`. Btrfs and
@@ -183,8 +183,8 @@ ZFS enrichment are Linux-only.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil) —
+- [`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil),
   BSD-3. Primary source for mounts, capacity, inodes.
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `lsblk` on Linux. Tests mock it with
   `go.uber.org/mock`.

@@ -6,9 +6,9 @@
 
 Reports standard systemd directory paths by running `systemd-path` and parsing
 its `name: /path` output. Matches Ohai's `linux/systemd_paths` plugin. Darwin
-returns `nil` — systemd is Linux-only.
+returns `nil`, systemd is Linux-only.
 
-DefaultEnabled is `false` — relevant only on systemd-managed Linux hosts.
+DefaultEnabled is `false`, relevant only on systemd-managed Linux hosts.
 
 ## Collected Fields
 
@@ -94,13 +94,13 @@ On Linux the collector runs `systemd-path` (no arguments) through the shared
 2. Lines with an empty key are skipped.
 3. Key and path are stored as-is in the `Paths` map.
 4. When `systemd-path` is absent or returns an error, an empty `Paths` map is
-   returned without error — matches Ohai's no-panic behaviour.
+   returned without error, matches Ohai's no-panic behaviour.
 
-macOS is not covered — `systemd-path` is a Linux systemd utility. Ohai's plugin
+macOS is not covered, `systemd-path` is a Linux systemd utility. Ohai's plugin
 is `collect_data(:linux)` only.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `systemd-path` on Linux. Tests mock it with
   `go.uber.org/mock`.

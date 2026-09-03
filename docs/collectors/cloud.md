@@ -69,7 +69,7 @@ import (
 )
 
 func main() {
-    // Opt in to cloud collectors — none run by default.
+    // Opt in to cloud collectors, none run by default.
     g, err := gohai.New(gohai.WithCategory("cloud"))
     if err != nil {
         log.Fatal(err)
@@ -104,8 +104,8 @@ func main() {
 ## When to use `Cloud()` vs. the typed field directly
 
 - **Provider-agnostic code** (logging "this host is on \<cloud>", fleet
-  inventory, feature-flag gating) — use `Cloud()`.
-- **Provider-specific code** that already knows it cares about AWS — skip
+  inventory, feature-flag gating), use `Cloud()`.
+- **Provider-specific code** that already knows it cares about AWS, skip
   `Cloud()` and check `facts.Ec2 != nil` directly. It's shorter, faster, and
   compile-time checked.
 
@@ -126,7 +126,7 @@ gohai.New(gohai.WithEnabled("ec2"))
 ```
 
 `WithCategory("cloud")` pulls every cloud collector plus their `dmi` dependency
-automatically — `dmi` is read once even though multiple cloud collectors declare
+automatically, `dmi` is read once even though multiple cloud collectors declare
 it as a dependency.
 
 ## Per-provider docs
@@ -134,12 +134,12 @@ it as a dependency.
 Collection methodology, field coverage, and Ohai-parity details live in each
 provider's own doc:
 
-- [ec2.md](ec2.md) — AWS EC2
-- [gce.md](gce.md) — Google Compute Engine
-- [azure.md](azure.md) — Microsoft Azure
-- [digital_ocean.md](digital_ocean.md) — DigitalOcean
-- [oci.md](oci.md) — Oracle Cloud Infrastructure
-- [alibaba.md](alibaba.md) — Alibaba Cloud ECS
-- [linode.md](linode.md) — Linode
-- [openstack.md](openstack.md) — OpenStack
-- [scaleway.md](scaleway.md) — Scaleway
+- [ec2.md](ec2.md). AWS EC2
+- [gce.md](gce.md). Google Compute Engine
+- [azure.md](azure.md). Microsoft Azure
+- [digital_ocean.md](digital_ocean.md). DigitalOcean
+- [oci.md](oci.md). Oracle Cloud Infrastructure
+- [alibaba.md](alibaba.md). Alibaba Cloud ECS
+- [linode.md](linode.md). Linode
+- [openstack.md](openstack.md). OpenStack
+- [scaleway.md](scaleway.md). Scaleway

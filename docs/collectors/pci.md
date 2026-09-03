@@ -8,7 +8,7 @@ Enumerates PCI devices attached to the host. Reports vendor / product
 identifiers + human names, device class + subclass, subsystem IDs, kernel driver
 binding, revision, IOMMU group, and the parent (bridge) PCI address.
 
-Mirrors Ohai's `linux/lspci.rb` output shape — a map keyed by PCI address — but
+Mirrors Ohai's `linux/lspci.rb` output shape, a map keyed by PCI address, but
 sources the data from `/sys/bus/pci/devices` via ghw rather than shelling out to
 `lspci`. ghw resolves vendor / product / class names against its bundled pci.ids
 database.
@@ -27,7 +27,7 @@ database.
 | `vendor_name`    | `string` | Human vendor name from pci.ids (e.g. `Intel Corporation`).        |
 | `device_id`      | `string` | 4-hex PCI device ID (e.g. `24fd`).                                |
 | `device_name`    | `string` | Human device name (e.g. `Wireless 8265 / 8275`).                  |
-| `class_id`       | `string` | 2-hex PCI class code (e.g. `02` — Network controller).            |
+| `class_id`       | `string` | 2-hex PCI class code (e.g. `02`, Network controller).             |
 | `class_name`     | `string` | Human class name.                                                 |
 | `subclass_id`    | `string` | 2-hex subclass code.                                              |
 | `subclass_name`  | `string` | Human subclass name.                                              |
@@ -99,10 +99,10 @@ On Linux:
 2. Vendor / product / class / subclass names are resolved against ghw's bundled
    pci.ids database (no network lookup). When a pcidb entry is missing the ID is
    still populated but the corresponding name is empty.
-3. ghw's `Driver: "unknown"` — used when the device has no kernel driver bound —
+3. ghw's `Driver: "unknown"`, used when the device has no kernel driver bound,
    is normalized to an empty string for a cleaner consumer contract.
 4. A ghw load error (missing sysfs, container without `/sys/bus/pci`) yields an
-   empty `devices` map with no error — matches the "fails quietly" behavior of
+   empty `devices` map with no error, matches the "fails quietly" behavior of
    the other hardware collectors.
 
 On macOS the collector returns an empty `Info{Devices: {}}`. macOS exposes PCI
@@ -113,12 +113,12 @@ plugin is Linux-only and the output shape it emits is built around Linux's sysfs
 Mirrors Ohai's `linux/lspci.rb` field surface (`vendor_id` / `vendor_name`,
 `device_id` / `device_name`, `class_id` / `class_name`, `sdevice_id` /
 `sdevice_name`, `driver`, `revision`). Fields Ohai doesn't emit but ghw exposes
-— `subclass_id` / `subclass_name`, `iommu_group`, `parent_address` — are added
-on top. Ohai's `module` array (kernel modules that _can_ bind) is not surfaced;
-`driver` reports only the currently bound kernel module, which is what inventory
-consumers typically want.
+are added on top: `subclass_id` / `subclass_name`, `iommu_group`,
+`parent_address`. Ohai's `module` array (kernel modules that _can_ bind) is not
+surfaced; `driver` reports only the currently bound kernel module, which is what
+inventory consumers typically want.
 
 ## Backing library
 
-- [`github.com/jaypipes/ghw/pkg/pci`](https://github.com/jaypipes/ghw) —
+- [`github.com/jaypipes/ghw/pkg/pci`](https://github.com/jaypipes/ghw),
   canonical sysfs PCI reader with bundled pci.ids name resolution.

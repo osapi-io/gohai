@@ -4,8 +4,8 @@
 
 ## Description
 
-Reports Linux IPC subsystem kernel parameters — semaphore limits, message queue
-limits, and shared memory limits — by reading the `/proc/sys/kernel/` sysctl
+Reports Linux IPC subsystem kernel parameters, semaphore limits, message queue
+limits, and shared memory limits, by reading the `/proc/sys/kernel/` sysctl
 tree. These values are set at boot by `/etc/sysctl.conf` (or drop-ins) and
 influence how much IPC resource any process or container can allocate.
 
@@ -40,7 +40,7 @@ Consumers use this to:
 | `shm.shmmni` | `string` | Maximum number of shared memory segments, from `/proc/sys/kernel/shmmni`.                        | gohai convention |
 
 All values are returned as strings preserving the raw kernel representation.
-Missing sysctl files yield empty strings for their fields — not all kernels or
+Missing sysctl files yield empty strings for their fields, not all kernels or
 container configurations expose all parameters.
 
 ## Platform Support
@@ -106,7 +106,7 @@ None.
 
 Ohai's `linux/ipc.rb` reads the same `/proc/sys/kernel/` files for semaphore,
 message queue, and shared memory limits. gohai follows Ohai's methodology
-exactly — reading the raw kernel tunables rather than parsing `ipcs -l` output.
+exactly, reading the raw kernel tunables rather than parsing `ipcs -l` output.
 All values are returned as strings to preserve the kernel's representation
 (including large 64-bit values in `shmall`/`shmmax`).
 
@@ -121,7 +121,7 @@ On Linux:
    `/proc/sys/kernel/msgmax` individually; each contains a single decimal value.
 3. Read `/proc/sys/kernel/shmall`, `/proc/sys/kernel/shmmax`, and
    `/proc/sys/kernel/shmmni` individually; each contains a single decimal value.
-4. Missing files are soft-missed to empty string — this happens in minimal
+4. Missing files are soft-missed to empty string, this happens in minimal
    container environments where `/proc/sys` is not fully bind-mounted or the
    kernel does not expose a given parameter.
 

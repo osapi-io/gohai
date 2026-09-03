@@ -21,7 +21,7 @@ If none match, the HTTP probe is skipped. The collector then fetches:
 - The `/meta-data/` tree (curated paths + newline-split arrays for
   `security-groups` and `local-ipv4s`)
 - The full per-ENI subtree under `/meta-data/network/interfaces/macs/<mac>/`
-- IAM info (`iam/info` only — `security-credentials` deliberately dropped to
+- IAM info (`iam/info` only, `security-credentials` deliberately dropped to
   match Ohai's scrub of the secrets sub-tree)
 - The dynamic instance identity document (`accountId`, `region`,
   `availabilityZone`, `instanceId`)
@@ -49,9 +49,9 @@ If none match, the HTTP probe is skipped. The collector then fetches:
 | `account_uid`           | `string`                      | AWS account ID (from identity document).                                      | OTel `cloud.account.id`        |
 | `reservation_id`        | `string`                      | Reservation ID.                                                               | No direct schema mapping.      |
 | `profile`               | `string`                      | Virtualization profile (`default-hvm`).                                       | No direct schema mapping.      |
-| `iam_info`              | `*IAMInstanceInfo`            | Attached IAM profile — see below.                                             | No direct schema mapping.      |
+| `iam_info`              | `*IAMInstanceInfo`            | Attached IAM profile, see below.                                              | No direct schema mapping.      |
 | `local_ipv4s`           | `[]string`                    | All private IPv4s assigned to the primary interface.                          | No direct schema mapping.      |
-| `network_interfaces`    | `map[string]NetworkInterface` | Per-ENI subtree keyed by MAC — see below.                                     | OCSF `network_interface`       |
+| `network_interfaces`    | `map[string]NetworkInterface` | Per-ENI subtree keyed by MAC, see below.                                      | OCSF `network_interface`       |
 | `api_version`           | `string`                      | The IMDS API version negotiated at collection time.                           | No direct schema mapping.      |
 | `user_data`             | `string`                      | Raw user-data; base64-encoded when binary.                                    | No direct schema mapping.      |
 | `availability_zone_id`  | `string`                      | AZ identifier (e.g. `use1-az1`).                                              | No direct schema mapping.      |
@@ -102,8 +102,8 @@ If none match, the HTTP probe is skipped. The collector then fetches:
 | `instance_profile_arn` | `string` | Full ARN of the attached IAM profile. |
 | `instance_profile_id`  | `string` | IAM profile ID.                       |
 
-`security-credentials` (access keys) is **deliberately dropped** — matches
-Ohai's explicit scrub of the secrets-bearing sub-tree.
+`security-credentials` (access keys) is **deliberately dropped**, matches Ohai's
+explicit scrub of the secrets-bearing sub-tree.
 
 ## Platform Support
 
@@ -163,7 +163,7 @@ run.
 
 01. **Detection gate:** any of the following triggers detection:
     - `dmi.BIOS.Manufacturer` contains `"Amazon"` (Ohai's `has_ec2_amazon_dmi?`)
-    - `dmi.BIOS.Ver` contains `"amazon"` lowercase (Ohai's `has_ec2_xen_dmi?` —
+    - `dmi.BIOS.Ver` contains `"amazon"` lowercase (Ohai's `has_ec2_xen_dmi?`,
       catches HVM instances on Xen-based hypervisors)
     - `/sys/hypervisor/uuid` starts with `"ec2"` (Ohai's `has_ec2_xen_uuid?`)
 02. **IMDSv2 token:** `PUT /latest/api/token` with
@@ -175,8 +175,8 @@ run.
     `supportedAPIVersions` allowlist (the same set Ohai's
     `EC2_SUPPORTED_VERSIONS` carries) and picks the latest match. Any
     negotiation failure (transport error, 404, no intersection, empty body)
-    falls back to `"latest"` — which EC2 aliases to its newest supported
-    version. Matches Ohai's `best_api_version` handshake.
+    falls back to `"latest"`, which EC2 aliases to its newest supported version.
+    Matches Ohai's `best_api_version` handshake.
 04. **Meta-data tree:** GETs against a curated list of `/<version>/meta-data/*`
     paths. In addition to the core identity/network fields this includes
     placement sub-paths (`placement/availability-zone-id`,
@@ -205,13 +205,13 @@ run.
 07. **Security scrub:**
     `identity_credentials_ec2_security_credentials_ec2_instance` is dropped from
     any newline-split list (mirror's Ohai's explicit skip).
-08. **IAM info:** `GET /<version>/meta-data/iam/info` — parsed as JSON. We
+08. **IAM info:** `GET /<version>/meta-data/iam/info`, parsed as JSON. We
     deliberately do NOT fetch `iam/security-credentials/<role>/` because it
-    contains short-lived AWS access keys — matches Ohai's scrub of secrets.
-09. **Identity document:** `GET /<version>/dynamic/instance-identity/document` —
+    contains short-lived AWS access keys, matches Ohai's scrub of secrets.
+09. **Identity document:** `GET /<version>/dynamic/instance-identity/document`,
     JSON with `accountId`, `region`, `availabilityZone`, `instanceId`. Fills the
     top-level fields when the meta-data tree doesn't supply them.
-10. **User-data:** `GET /<version>/user-data/` — stored plaintext when valid
+10. **User-data:** `GET /<version>/user-data/`, stored plaintext when valid
     UTF-8, base64-encoded when binary. Matches Ohai's `Encoding::BINARY` check.
 11. **User-Agent:** `gohai` (the cloudmetadata default).
 12. **Timeout:** 10 seconds per request, matching Ohai's `read_timeout` and
@@ -220,12 +220,12 @@ run.
     Per-path failures on subsequent paths are tolerated and leave their field
     zero-valued.
 
-Mirrors Ohai's `Ohai::Mixin::Ec2Metadata` methodology — same IMDSv2→IMDSv1
+Mirrors Ohai's `Ohai::Mixin::Ec2Metadata` methodology, same IMDSv2→IMDSv1
 fallback, same version negotiation, same recursive ENI walk, same security
 scrubs, same 10s timeout. Windows-specific signal
 (`Win32_ComputerSystemProduct.identifyingnumber`) is not implemented.
 
 ## Backing library
 
-- [`internal/cloudmetadata`](../../internal/cloudmetadata/) — the shared HTTP
+- [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
   client used by every cloud-provider collector.

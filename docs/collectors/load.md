@@ -4,7 +4,7 @@
 
 ## Description
 
-Reports the 1/5/15-minute system load averages — the same numbers `uptime(1)`,
+Reports the 1/5/15-minute system load averages, the same numbers `uptime(1)`,
 `w(1)`, and `top(1)` show. Load average is the exponentially-weighted moving
 average of the run queue length (runnable + uninterruptible tasks) over each
 window.
@@ -79,8 +79,8 @@ gohai --no-collector.load   # disable
 ## Dependencies
 
 None. (Consumers that want per-core saturation correlate with `cpu.total`
-themselves — we don't declare a runtime dependency because `Dependencies()`
-would auto-include `cpu` even when the user disabled it.)
+themselves. We don't declare a runtime dependency because `Dependencies()` would
+auto-include `cpu` even when the user disabled it.)
 
 ## Data Sources
 
@@ -95,12 +95,12 @@ On macOS:
    same three floats. Same field mapping as Linux.
 
 Ohai does not ship a loadavg plugin in current `main`, so this collector has no
-Ohai counterpart — the field names are a Go-idiomatic rendering of
+Ohai counterpart, the field names are a Go-idiomatic rendering of
 `getloadavg(3)`'s conceptual triple. The trailing `/proc/loadavg` fields
 (`runnable_tasks`, `last_pid`) are out of scope because `getloadavg(3)` doesn't
 expose them; deferred until a concrete consumer asks.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/load`](https://github.com/shirou/gopsutil) —
+- [`github.com/shirou/gopsutil/v4/load`](https://github.com/shirou/gopsutil),
   BSD-3.

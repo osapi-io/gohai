@@ -4,10 +4,10 @@
 
 ## Description
 
-Reports OS identification — canonical name, version, family, architecture, and
+Reports OS identification, canonical name, version, family, architecture, and
 (macOS) build / RSR patch suffix. The `platform` collector is the foundation
 other code reads through `internal/platform.Detect()` to choose per-OS /
-per-family code paths — `package_mgr`, `shard`, and the per-OS struct factories
+per-family code paths, `package_mgr`, `shard`, and the per-OS struct factories
 in every collector all rely on this data.
 
 The collector prefers `/etc/os-release` (systemd standard) and falls back
@@ -27,15 +27,15 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field              | Type   | Description                                                             | Schema mapping                                       |
-| ------------------ | ------ | ----------------------------------------------------------------------- | ---------------------------------------------------- |
-| `os`               | string | `runtime.GOOS` — `"linux"`, `"darwin"`, `"windows"`.                    | `os.type`.                                           |
-| `name`             | string | Canonical distro / product ID (`"ubuntu"`, `"redhat"`, `"darwin"`).     | `os.name`.                                           |
-| `version`          | string | Distro version (`"24.04"`, `"7.9.2009"`, `"14.4.1"`).                   | `os.version`.                                        |
-| `version_extra`    | string | macOS RSR patch suffix (`"(a)"`). Empty when no RSR is applied.         | No direct schema mapping.                            |
-| `family`           | string | Family grouping (`"debian"`, `"rhel"`, `"fedora"`, `"suse"`, `"arch"`). | No direct schema mapping — input to packaging logic. |
-| `cpu_architecture` | string | Hardware arch (`"amd64"`, `"arm64"`).                                   | `device.hw_info.cpu_bits` is the nearest.            |
-| `build`            | string | macOS build identifier from `sw_vers` `BuildVersion` (`"23E224"`).      | `os.build`.                                          |
+| Field              | Type   | Description                                                             | Schema mapping                                      |
+| ------------------ | ------ | ----------------------------------------------------------------------- | --------------------------------------------------- |
+| `os`               | string | `runtime.GOOS`, `"linux"`, `"darwin"`, `"windows"`.                     | `os.type`.                                          |
+| `name`             | string | Canonical distro / product ID (`"ubuntu"`, `"redhat"`, `"darwin"`).     | `os.name`.                                          |
+| `version`          | string | Distro version (`"24.04"`, `"7.9.2009"`, `"14.4.1"`).                   | `os.version`.                                       |
+| `version_extra`    | string | macOS RSR patch suffix (`"(a)"`). Empty when no RSR is applied.         | No direct schema mapping.                           |
+| `family`           | string | Family grouping (`"debian"`, `"rhel"`, `"fedora"`, `"suse"`, `"arch"`). | No direct schema mapping, input to packaging logic. |
+| `cpu_architecture` | string | Hardware arch (`"amd64"`, `"arm64"`).                                   | `device.hw_info.cpu_bits` is the nearest.           |
+| `build`            | string | macOS build identifier from `sw_vers` `BuildVersion` (`"23E224"`).      | `os.build`.                                         |
 
 `name` values pass through our `platformIDRemap` table (mirrors Ohai's
 `OS_RELEASE_PLATFORM_REMAP`) so common variants canonicalize to their parent
@@ -73,7 +73,7 @@ Fedora-based network OS (arista_eos), and WRLinux variants (nexus, ios_xr).
 }
 ```
 
-### Linux (CentOS 7.9 — minor version supplemented from /etc/redhat-release)
+### Linux (CentOS 7.9: minor version supplemented from /etc/redhat-release)
 
 ```json
 {
@@ -137,7 +137,7 @@ None. `platform` is the foundation other collectors consult via
 
 On Linux the collector cascades through gopsutil + extensions:
 
-1. **gopsutil `host.Info`** reads `/etc/os-release` — the modern systemd path.
+1. **gopsutil `host.Info`** reads `/etc/os-release`, the modern systemd path.
    Produces `Platform` (raw distro ID), `PlatformVersion`, `PlatformFamily`.
 2. **`platformIDRemap`** normalizes the raw ID to its canonical form (Ohai's
    `OS_RELEASE_PLATFORM_REMAP` table). Adds `archarm` → `arch`, `cumulus-linux`
@@ -158,7 +158,7 @@ On Linux the collector cascades through gopsutil + extensions:
    - `/etc/debian_version` → family `debian`; file contents are the version.
    - `/etc/arch-release` → name `arch`, version empty (rolling).
    - `/etc/gentoo-release`, `/etc/slackware-version`, `/etc/enterprise-release`,
-     `/etc/exherbo-release` — family inferred from filename.
+     `/etc/exherbo-release`, family inferred from filename.
 5. **Family fallback** from the maintained distro → family table when gopsutil's
    `PlatformFamily` is empty (long-tail distros gopsutil doesn't recognize:
    alma, rocky, kali, raspbian, cloudlinux, etc.).
@@ -179,11 +179,11 @@ On macOS:
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) —
+- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil),
   BSD-3. Primary source for `/etc/os-release` parse + macOS `host.Info`.
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) — virtual filesystem
-  for the redhat-release / debian_version supplements and the 10-file legacy
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs). Virtual filesystem for
+  the redhat-release / debian_version supplements and the 10-file legacy
   `/etc/*-release` fallback cascade.
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `sw_vers` on macOS. Tests mock with
   `go.uber.org/mock`.

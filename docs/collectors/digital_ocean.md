@@ -6,12 +6,12 @@
 
 Collects DigitalOcean droplet metadata by hitting the link-local server at
 `http://169.254.169.254/metadata/v1.json`. Returns nil with no error when the
-endpoint isn't reachable or the DMI signature doesn't match —
+endpoint isn't reachable or the DMI signature doesn't match,
 `facts.DigitalOcean != nil` is the detection signal.
 
 Detection is gated on `dmi.BIOS.Manufacturer == "DigitalOcean"` (exact match,
 matches Ohai's `has_do_dmi?`). `vendor_data` is dropped from the response
-because it commonly contains cloud-init user scripts with credentials — matches
+because it commonly contains cloud-init user scripts with credentials, matches
 Ohai's explicit scrub.
 
 ## Collected Fields
@@ -29,7 +29,7 @@ Ohai's explicit scrub.
 | `auth_key`         | `string`      | DO internal auth token; often empty.            | No direct schema mapping. |
 | `user_data`        | `string`      | User-supplied cloud-init data.                  | No direct schema mapping. |
 | `ipv4_nameservers` | `[]string`    | DNS resolvers.                                  | No direct schema mapping. |
-| `interfaces`       | `[]Interface` | Attached VNICs — see below.                     | OCSF `network_interface`  |
+| `interfaces`       | `[]Interface` | Attached VNICs, see below.                      | OCSF `network_interface`  |
 
 ### Interface
 
@@ -102,24 +102,24 @@ collector fails open and tries the endpoint anyway.
 
 1. **DMI gate:** `dmi.BIOS.Manufacturer == "DigitalOcean"` (exact). Matches
    Ohai's `has_do_dmi?`.
-2. **Endpoint:** `http://169.254.169.254/metadata/v1.json` — single JSON.
+2. **Endpoint:** `http://169.254.169.254/metadata/v1.json`, single JSON.
 3. **User-Agent:** `gohai` (the cloudmetadata default).
-4. **Timeout:** 6 seconds — matches Ohai's `read_timeout` in
+4. **Timeout:** 6 seconds, matches Ohai's `read_timeout` in
    `mixin/do_metadata.rb`.
 5. **Failure handling:** transport / 404 / other errors → `(nil, nil)`.
 6. **Security scrub:** `vendor_data` dropped from the output (matches Ohai). May
    contain cloud-init scripts + credentials. `user_data` and `auth_key` are
-   retained — the former is the droplet owner's own cloud-init payload, the
+   retained. The former is the droplet owner's own cloud-init payload, the
    latter is DO's internal token that Ohai also surfaces.
 7. **Transformation:** `reserved_ip` is lifted from the nested
    `reserved_ip.ipv4.ip_address` path onto the flat top-level field (DO's newer
    replacement for the legacy `floating_ip`; both fields coexist while older
    droplets still use `floating_ip`).
 
-Mirrors Ohai's `Ohai::Mixin::DoMetadata` methodology — same endpoint, same DMI
+Mirrors Ohai's `Ohai::Mixin::DoMetadata` methodology, same endpoint, same DMI
 gate, same `vendor_data` scrub, same 6s timeout.
 
 ## Backing library
 
-- [`internal/cloudmetadata`](../../internal/cloudmetadata/) — the shared HTTP
+- [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
   client used by every cloud-provider collector.

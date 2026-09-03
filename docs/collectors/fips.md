@@ -12,10 +12,10 @@ non-compliant algorithms.
 
 The collector reports two related signals:
 
-- `kernel.enabled` — the kernel-level flag from `/proc/sys/crypto/fips_enabled`,
+- `kernel.enabled`. The kernel-level flag from `/proc/sys/crypto/fips_enabled`,
   set by the `fips=1` kernel command-line parameter at boot. This is the classic
   140-2-era signal.
-- `policy` — the user-space crypto policy on hosts that ship the
+- `policy`. The user-space crypto policy on hosts that ship the
   `crypto-policies` framework (RHEL 8+, Fedora 30+, CentOS Stream, Amazon Linux
   2023). On FIPS 140-3 systems, an operator can flip the policy post-boot with
   `update-crypto-policies --set DEFAULT` **without** changing the kernel flag,
@@ -27,7 +27,7 @@ Consumers use this to:
 
 - Confirm FIPS posture across a fleet that is supposed to be compliant (FedRAMP,
   DoD SRG, HIPAA).
-- Gate features that behave differently under FIPS — for example, TLS libraries
+- Gate features that behave differently under FIPS, for example, TLS libraries
   and SSH clients that disable non-approved ciphers when the kernel flag is set.
 - Detect drift: a FIPS-provisioned host whose crypto policy got toggled off is a
   real incident (kernel says "FIPS", user-space says "not really"), and
@@ -35,7 +35,7 @@ Consumers use this to:
   it.
 
 The runtime flag does **not** distinguish which revision of FIPS 140 the
-kernel's crypto module was validated against — that's a property of the module
+kernel's crypto module was validated against, that's a property of the module
 build (RHEL 8 targets 140-2; RHEL 9 targets 140-3). Consumers needing the
 validated revision should correlate with `platform`/`kernel`.
 
@@ -135,11 +135,11 @@ On Linux:
    file (kernel without the flag) leaves `kernel` nil.
 2. Read `/etc/crypto-policies/config` via the same VFS. The trimmed first line
    is the policy name. `policy.fips_effective` is set when the name starts with
-   `FIPS` (case-sensitive — matches the file's convention). Missing file leaves
+   `FIPS` (case-sensitive, matches the file's convention). Missing file leaves
    `policy` nil.
 
 Mirrors Ohai's `fips.rb` kernel-flag signal and extends it with the
-`crypto-policies` probe — which catches FIPS 140-3 post-boot drift that Ohai's
+`crypto-policies` probe, which catches FIPS 140-3 post-boot drift that Ohai's
 OpenSSL-binding approach would miss.
 
 On macOS the collector returns no data. Apple's CoreCrypto module has no runtime
@@ -149,4 +149,4 @@ separately. Matches Ohai's decision to skip macOS.
 
 ## Backing library
 
-- Go stdlib (`os`, `io`) — no third-party dependency.
+- Go stdlib (`os`, `io`), no third-party dependency.

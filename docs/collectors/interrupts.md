@@ -21,13 +21,13 @@ The collector mirrors Ohai's `interrupts` plugin methodology: it reads
 
 ## Collected Fields
 
-| Field                   | Type      | Description                                                                                                             | Schema mapping   |
-| ----------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `irqs`                  | `array`   | List of interrupt lines from `/proc/interrupts`.                                                                        | gohai convention |
-| `irqs[].number`         | `string`  | IRQ identifier — a decimal number for hardware IRQs (`"0"`, `"9"`) or a label for architecture IRQs (`"NMI"`, `"ERR"`). | gohai convention |
-| `irqs[].type`           | `string`  | Interrupt controller type (e.g. `"IO-APIC"`, `"PCI-MSI"`). Empty for non-numeric IRQs that lack this field.             | gohai convention |
-| `irqs[].device`         | `string`  | Driver or device name (e.g. `"timer"`, `"eth0"`). Empty for non-numeric IRQs or when no device is listed.               | gohai convention |
-| `irqs[].counts_per_cpu` | `[]int64` | Per-CPU event count in CPU-index order. Slice length equals the CPU count in the header line.                           | gohai convention |
+| Field                   | Type      | Description                                                                                                            | Schema mapping   |
+| ----------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `irqs`                  | `array`   | List of interrupt lines from `/proc/interrupts`.                                                                       | gohai convention |
+| `irqs[].number`         | `string`  | IRQ identifier, a decimal number for hardware IRQs (`"0"`, `"9"`) or a label for architecture IRQs (`"NMI"`, `"ERR"`). | gohai convention |
+| `irqs[].type`           | `string`  | Interrupt controller type (e.g. `"IO-APIC"`, `"PCI-MSI"`). Empty for non-numeric IRQs that lack this field.            | gohai convention |
+| `irqs[].device`         | `string`  | Driver or device name (e.g. `"timer"`, `"eth0"`). Empty for non-numeric IRQs or when no device is listed.              | gohai convention |
+| `irqs[].counts_per_cpu` | `[]int64` | Per-CPU event count in CPU-index order. Slice length equals the CPU count in the header line.                          | gohai convention |
 
 ## Platform Support
 
@@ -97,7 +97,7 @@ None.
 
 ## Data Sources
 
-Ohai's `linux/interrupts.rb` parses `/proc/interrupts` similarly — reading
+Ohai's `linux/interrupts.rb` parses `/proc/interrupts` similarly, reading
 per-CPU counts and the device/type label for each IRQ line. gohai follows the
 same approach but stores results as a structured array rather than Ohai's nested
 hash keyed by IRQ number.

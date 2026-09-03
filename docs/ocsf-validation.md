@@ -5,7 +5,7 @@ OCSF schema.
 
 ## Prerequisites
 
-- [uv](https://docs.astral.sh/uv/) — Python package runner
+- [uv](https://docs.astral.sh/uv/). Python package runner
 - A local clone of the [OCSF schema](https://github.com/ocsf/ocsf-schema)
 
 ## Step 1: Clone the OCSF schema
@@ -34,7 +34,7 @@ INFO: Extension "gohai" is patching "device_hw_info" from base schema
 
 If compilation fails with a shadowing error, an attribute in our extension
 conflicts with a base schema attribute. Remove the conflicting attribute from
-`schemas/ocsf-extension/dictionary.json` — it's already defined upstream.
+`schemas/ocsf-extension/dictionary.json`, it's already defined upstream.
 
 ## Step 3: Generate OCSF output
 
@@ -75,7 +75,7 @@ PASSED: Event class categories are defined
 PASSED: JSON files match their metaschema definitions
 ```
 
-This confirms our gohai extension (uid 1337) is a valid OCSF extension —
+This confirms our gohai extension (uid 1337) is a valid OCSF extension,
 dictionary attributes are correctly typed, object extensions reference valid
 attributes, and the metaschema definitions are well-formed.
 
@@ -83,12 +83,12 @@ attributes, and the metaschema definitions are well-formed.
 
 ```
 schemas/ocsf-extension/
-  extension.json              — uid 1337, name "gohai"
-  dictionary.json             — attribute type definitions
+  extension.json             , uid 1337, name "gohai"
+  dictionary.json            , attribute type definitions
   objects/
-    device.json               — extends device with fqdn, machine_id, etc.
-    device_hw_info.json        — extends hw_info with cpu_flags, etc.
-    os.json                   — extends os with distribution_id, etc.
+    device.json              , extends device with fqdn, machine_id, etc.
+    device_hw_info.json       , extends hw_info with cpu_flags, etc.
+    os.json                  , extends os with distribution_id, etc.
 ```
 
 ## Output formats

@@ -143,8 +143,8 @@ gohai version                                   # build info
 
 Importers should read the
 [full API reference on pkg.go.dev][package documentation] for every `Option`,
-`Facts` field, and `Info` struct. That is the authoritative API surface. The
-examples below show the two usage shapes.
+`Facts` field, and `Info` struct. That is the authoritative list. The examples
+below show the two usage shapes.
 
 **Collecting facts** (producer side):
 
@@ -257,8 +257,8 @@ Each example is a standalone Go program you can read and run.
 
 ## 🔗 Related Works
 
-gohai stands on the shoulders of the following projects, as methodology
-references, as backing libraries we wrap, or as peers solving adjacent problems:
+gohai builds on the following projects, as methodology references, as backing
+libraries we wrap, or as peers solving adjacent problems:
 
 **Fact collectors (direct peers):**
 
@@ -299,9 +299,9 @@ references, as backing libraries we wrap, or as peers solving adjacent problems:
 
 **Methodology references (we read, don't import):**
 
-- [node_exporter](https://github.com/prometheus/node_exporter). Gold standard
-  for tricky Linux `/proc` and `/sys` parsing. Apache-2, but we rewrite in our
-  style rather than import.
+- [node_exporter](https://github.com/prometheus/node_exporter). The reference we
+  check against for tricky Linux `/proc` and `/sys` parsing. Apache-2, but we
+  rewrite in our style rather than import.
 - [psutil](https://github.com/giampaolo/psutil). The Python library gopsutil is
   a port of; the original design reference for the dynamic-state facts.
 

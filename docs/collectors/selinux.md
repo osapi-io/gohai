@@ -9,7 +9,7 @@ collector reads `/etc/selinux/config` for the configured mode and policy type,
 and runs `sestatus` for the runtime enforcement mode, loaded policy name, policy
 version, and maximum kernel policy version.
 
-On macOS the collector returns nil — SELinux is a Linux kernel security module
+On macOS the collector returns nil. SELinux is a Linux kernel security module
 and is not present on macOS.
 
 Consumers use this to:
@@ -17,7 +17,7 @@ Consumers use this to:
 - Verify that SELinux is enforcing on production hosts (compliance checks, CIS
   benchmark alignment).
 - Detect drift between the configured mode (`config_mode`) and the runtime mode
-  (`current_mode`) — a mismatch indicates the system was rebooted with a
+  (`current_mode`), a mismatch indicates the system was rebooted with a
   different kernel argument or an admin ran `setenforce 0`.
 - Audit which policy module is loaded (`loaded_policy_name`: `targeted`, `mls`,
   `minimum`).
@@ -26,13 +26,13 @@ Consumers use this to:
 
 ## Signals
 
-- `status` — overall SELinux availability: `"enabled"` when SELinux is compiled
+- `status`. Overall SELinux availability: `"enabled"` when SELinux is compiled
   in and the config mode is not `disabled`; `"disabled"` otherwise. This is the
-  first field to check — if `"disabled"`, all other fields are irrelevant.
-- `current_mode` — runtime mode from `sestatus`: `"enforcing"`, `"permissive"`,
+  first field to check, if `"disabled"`, all other fields are irrelevant.
+- `current_mode`. Runtime mode from `sestatus`: `"enforcing"`, `"permissive"`,
   or `"disabled"`. This can differ from `config_mode` when an admin has called
   `setenforce` without rebooting.
-- `config_mode` — the SELINUX= value from `/etc/selinux/config`, the mode the
+- `config_mode`. The SELINUX= value from `/etc/selinux/config`, the mode the
   system will boot into. Compare with `current_mode` to detect runtime
   overrides.
 
@@ -49,10 +49,10 @@ Consumers use this to:
 
 ## Platform Support
 
-| Platform | Supported                                       |
-| -------- | ----------------------------------------------- |
-| Linux    | ✅                                              |
-| macOS    | Returns nil — SELinux is not available on macOS |
+| Platform | Supported                                      |
+| -------- | ---------------------------------------------- |
+| Linux    | ✅                                             |
+| macOS    | Returns nil, SELinux is not available on macOS |
 
 ## Example Output
 
@@ -130,12 +130,11 @@ On Linux:
 1. Read `/etc/selinux/config` through the injected `avfs.VFS`. Parse `SELINUX=`
    for the configured mode and `SELINUXTYPE=` for the policy type. Lines
    beginning with `#` and blank lines are skipped. If the file does not exist,
-   SELinux is not installed — return `{status: "disabled"}` immediately without
+   SELinux is not installed, return `{status: "disabled"}` immediately without
    calling `sestatus`.
 2. If the configured mode is `disabled`, return
    `{status: "disabled", config_mode: "disabled", loaded_policy_name: <SELINUXTYPE>}`
-   without calling `sestatus` — sestatus exits non-zero when SELinux is
-   disabled.
+   without calling `sestatus`, sestatus exits non-zero when SELinux is disabled.
 3. If the configured mode is `enforcing` or `permissive`, run `sestatus` via the
    injected `executor.Executor`. Parse the output for:
    - `SELinux status:` → overrides `status` field.
@@ -151,7 +150,7 @@ On Linux:
 
 Note: Ohai uses `sestatus -v -b` which also collects policy booleans and process
 contexts. gohai uses plain `sestatus` and collects only the status/mode/version
-fields — policy booleans and process contexts are outside our current scope.
+fields, policy booleans and process contexts are outside our current scope.
 
 ## Backing library
 

@@ -16,7 +16,7 @@ file/command parser) and reshape its output into our typed `Info` struct.
 of what a collector needs, use it for that part. If the library doesn't cover
 everything we want, add the extension logic **in our collector** on top of the
 library's output. Do not replace the library wholesale just because it's missing
-one piece — you lose years of accumulated bug fixes and cross-platform handling
+one piece, you lose years of accumulated bug fixes and cross-platform handling
 that way.
 
 Extension pattern:
@@ -40,38 +40,38 @@ Sources doc.
 
 **Decision order for each collector:**
 
-1. **[ghw]** — canonical for physical hardware topology: CPU NUMA
+1. **[ghw]**. Canonical for physical hardware topology: CPU NUMA
    - arch-aware counts, memory DIMMs/page-sizes, block devices with
      UUID/label/unmounted, network drivers/speed, DMI (baseboard / BIOS /
      chassis / product), GPU, PCI. Use ghw first for anything about static
      hardware shape.
-2. **[gopsutil]** — canonical for dynamic runtime state: memory
+2. **[gopsutil]**. Canonical for dynamic runtime state: memory
    free/available/used, disk I/O counters, network I/O counters, process
    enumeration, sessions (utmp), virtualization detection, host info. Use
    gopsutil for anything that changes per collection.
-3. **[go-sysinfo]** — alternative for host / platform / kernel where gopsutil is
+3. **[go-sysinfo]**. Alternative for host / platform / kernel where gopsutil is
    weaker. Evaluate case-by-case; don't stack both for the same fact.
-4. **[procfs]** — raw Linux `/proc` and `/sys` parsing when none of the above
+4. **[procfs]**. Raw Linux `/proc` and `/sys` parsing when none of the above
    cover a field. Preferred over rolling our own scanner.
 5. **Official provider SDKs** (aws-sdk-go, google.golang.org/cloud,
    azure-sdk-for-go) for cloud collectors; plain `net/http` to IMDS endpoints
    when the SDK is too heavy.
-6. **Our own extension** — last resort. ONLY the fields the libraries above
-   don't expose. Extensions read files via `avfs.VFS` and shell out via
+6. **Our own extension**. Last resort. ONLY the fields the libraries above don't
+   expose. Extensions read files via `avfs.VFS` and shell out via
    `executor.Executor` so tests never touch the real host.
-7. **[Ohai's Ruby plugin][ohai-plugins] as methodology reference only** — NOT an
+7. **[Ohai's Ruby plugin][ohai-plugins] as methodology reference only**. NOT an
    import. We read Ohai to learn WHICH edge cases exist (fallback chains, distro
    quirks, retries). We then check whether ghw/gopsutil/stdlib already cover
    them. Only the residual gap becomes our extension code.
 
-**We learn from, but don't directly import, [node_exporter]** — their collectors
+**We learn from, but don't directly import, [node_exporter]**, their collectors
 are a gold reference for tricky Linux `/proc` and `/sys` parsing (Apache-2
 licensed). Read, understand, rewrite in our style.
 
 ### Library-first principle
 
 **Never roll your own parsing when a library covers it.** If gopsutil reads
-`/proc/meminfo` already, we don't write a second `/proc/meminfo` parser — we
+`/proc/meminfo` already. We don't write a second `/proc/meminfo` parser, and we
 surface the fields gopsutil already exposes on our typed `Info`. If ghw
 enumerates block devices with UUID/label, we don't shell out to `lsblk`.
 
@@ -82,7 +82,7 @@ Before implementing or extending a collector, verify in this order:
 2. If no: does a secondary library (the next one down in the Decision order)
    expose it?
 3. If still no: we need an extension. The extension uses `avfs.VFS` for file
-   reads and `executor.Executor` for exec calls — never plain `os.ReadFile` /
+   reads and `executor.Executor` for exec calls, never plain `os.ReadFile` /
    `exec.Command` in collector Collect methods.
 
 ### Per-collector library stack
@@ -102,7 +102,7 @@ with rationale.
 | uptime                 | gopsutil              | —                                          |
 | kernel                 | `x/sys/unix` + stdlib | —                                          |
 | load                   | gopsutil              | —                                          |
-| process                | gopsutil              | — (ghw doesn't do processes)               |
+| process                | gopsutil              | , (ghw doesn't do processes)               |
 | users (sessions)       | gopsutil (utmp)       | supplement with loginctl via executor      |
 | virtualization         | gopsutil              | go-sysinfo has some                        |
 | fips                   | stdlib                | No library covers                          |
@@ -124,11 +124,11 @@ New collectors must justify library choice in their PR. Migrations (gopsutil →
 ghw, etc.) need their own issue labeled `library-migration` + `collector:<name>`
 with: current coverage, candidate coverage, migration plan.
 
-### Cross-platform compilation — no build tags (osapi pattern)
+### Cross-platform compilation: no build tags (osapi pattern)
 
 **MANDATORY:** Collector code must compile on every target platform, with **no
 `//go:build` tags anywhere**. This is the pattern OSAPI uses in
-`internal/provider/` — study that code before writing a new collector. Result:
+`internal/provider/`, study that code before writing a new collector. Result:
 `go test ./...` on any dev machine compiles and runs every collector's tests,
 coverage is visible cross-platform, and CI on linux runners still validates
 actual linux runtime behavior.
@@ -163,31 +163,31 @@ returns `"darwin"` / `"debian"` / `"rhel"` / `""` for generic linux).
   stdlib, gopsutil, `golang.org/x/sys/unix` (per-OS layouts but compiles
   everywhere), ghw, cloud SDKs. No raw `syscall.Utsname` etc.
 - Missing OS-specific paths (e.g. `/proc/modules` on darwin) return empty
-  gracefully — never error.
+  gracefully, never error.
 - Add a `Debian` variant (or `RHEL`, `SUSE`, etc.) **only** when that distro
   family genuinely diverges. Otherwise generic `Linux` covers all non-darwin.
 - Dependency-inject file readers, command runners, and gopsutil calls via struct
-  fields — lets tests exercise every branch without touching the real host.
+  fields, lets tests exercise every branch without touching the real host.
 - **NEVER leak third-party types through public `Fn` fields.** Per-OS struct
-  `Fn` fields are forbidden — no public field on a `Linux` / `Darwin` / etc.
+  `Fn` fields are forbidden, no public field on a `Linux` / `Darwin` / etc.
   variant may have a function type whose signature mentions gopsutil / ghw /
   procfs types.
 - **Test seams swap at the upstream library boundary, not in the middle.** The
   upstream call lives in a private package var
   (`var hostInfoFn = host.InfoWithContext`); tests swap it via a `Set<X>Fn`
   setter declared in `export_test.go`. **Do not** add intermediate wrappers like
-  `readBaseFn = readBase` that let tests bypass a bridge function — that forces
-  a second test method (`TestReadBase`) to cover the bridge, which is exactly
-  what we're consolidating away from. One seam, one `TestCollect`. Collect calls
+  `readBaseFn = readBase` that let tests bypass a bridge function, that forces a
+  second test method (`TestReadBase`) to cover the bridge, which is exactly what
+  we're consolidating away from. One seam, one `TestCollect`. Collect calls
   `readBase(ctx)` directly; tests swap `hostInfoFn` and the bridge mapping runs
   on every row. See `pkg/gohai/collectors/uptime/` and
   `pkg/gohai/collectors/load/` for canonical examples.
 - File reads and command execution go through `FS avfs.VFS` and
-  `Exec executor.Executor` struct fields on the per-OS variant — these are _our_
+  `Exec executor.Executor` struct fields on the per-OS variant. These are _our_
   abstractions (not third-party types), so they're fine to expose publicly. See
   the "VFS + Executor Abstractions" section for the pattern.
 
-The Collector interface and `Info` struct shape are the contract — whatever
+The Collector interface and `Info` struct shape are the contract, whatever
 backing strategy a collector uses, its output must match the typed struct and
 consumer expectations.
 
@@ -196,17 +196,17 @@ consumer expectations.
 **Three-tier naming ladder.** Every JSON field name comes from one of three
 tiers, applied in strict order of precedence:
 
-1. **[OCSF][]** (Open Cybersecurity Schema Framework) — primary authority. When
+1. **[OCSF][]** (Open Cybersecurity Schema Framework). Primary authority. When
    OCSF has a field for the concept, use its name. Browse
    [schema.ocsf.io][ocsf-schema] objects: `device`, `device_hw_info`, `os`,
    `network_interface`, `package`, `process`, `cloud`. (~108 gohai fields are
    tier 1.)
-2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]** — when OCSF
-   is silent. Covers CPU microarchitecture (`host.cpu.*`), memory states
+2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]**. When OCSF is
+   silent. Covers CPU microarchitecture (`host.cpu.*`), memory states
    (`system.memory.*`), filesystem attributes (`system.filesystem.*`), hardware
    detail (`hardware.*`), and process attributes (`process.*`). (~74 gohai
    fields are tier 2.)
-3. **gohai convention** — for the long tail where no standard has an opinion
+3. **gohai convention**. For the long tail where no standard has an opinion
    (~768 fields):
    - Start from the backing library's field name (gopsutil/ghw), converted to
      `snake_case`.
@@ -234,15 +234,15 @@ parent-object prefix stripped when that prefix duplicates our collector name.
 Our output nests by collector (`{"cpu": {...}, "memory": {...}}`), so restating
 the prefix inside the nested object is noise. Examples:
 
-| OCSF path            | Our collector | Redundant prefix?                                             | Our JSON key |
-| -------------------- | ------------- | ------------------------------------------------------------- | ------------ |
-| `device.cpu_count`   | `cpu`         | `cpu_` → strip                                                | `count`      |
-| `device.cpu_cores`   | `cpu`         | `cpu_` → strip                                                | `cores`      |
-| `device.memory_size` | `memory`      | `memory_` → strip                                             | `size`       |
-| `os.kernel_release`  | `kernel`      | `kernel_` → strip                                             | `release`    |
-| `device.hostname`    | `hostname`    | `hostname` == collector → `name`                              | `name`       |
-| `process.cmd_line`   | `process`     | no match → keep                                               | `cmd_line`   |
-| `host.cpu.vendor.id` | `cpu`         | OTel leaf is `id`, parent `vendor` isn't our collector — keep | `vendor_id`  |
+| OCSF path            | Our collector | Redundant prefix?                                            | Our JSON key |
+| -------------------- | ------------- | ------------------------------------------------------------ | ------------ |
+| `device.cpu_count`   | `cpu`         | `cpu_` → strip                                               | `count`      |
+| `device.cpu_cores`   | `cpu`         | `cpu_` → strip                                               | `cores`      |
+| `device.memory_size` | `memory`      | `memory_` → strip                                            | `size`       |
+| `os.kernel_release`  | `kernel`      | `kernel_` → strip                                            | `release`    |
+| `device.hostname`    | `hostname`    | `hostname` == collector → `name`                             | `name`       |
+| `process.cmd_line`   | `process`     | no match → keep                                              | `cmd_line`   |
+| `host.cpu.vendor.id` | `cpu`         | OTel leaf is `id`, parent `vendor` isn't our collector, keep | `vendor_id`  |
 
 The full schema path (OCSF first, OTel if OCSF silent) is cited in every
 collector doc's **Schema mapping** column so consumers bridging to OCSF can
@@ -255,22 +255,22 @@ convention wins the field name but the JSON tag still follows the rule above.
 Don't invent internal names that have no schema-mapping claim.
 
 **Do not mirror Ohai's JSON shape.** Ohai is for **data-source** reference (what
-file/command to read, which distro edge cases, which fallback) — not field names
+file/command to read, which distro edge cases, which fallback), not field names
 or struct layout.
 
 ### MANDATORY: Cross-reference Ohai's data sources before implementing
 
 Before writing code for a new collector (or modifying an existing one), **read
-Ohai's corresponding plugin and spec** — but the goal is to match their
+Ohai's corresponding plugin and spec**, but the goal is to match their
 **collection approach** (what file/command/library they read, what edge cases
 they handle, how they detect per-distro differences), **not** their JSON output
 shape. Ruby Mash ↔ Go struct translation isn't worthwhile to pin byte-for-byte;
 Go-native JSON shape is fine.
 
 What matters: Ohai has years of accumulated bug fixes and distro-specific
-quirks. Leverage that. If they read `/proc/X` plus fall back to `cmd Y` on SUSE,
-we should too. If they have special handling for Amazon Linux vs RHEL, we need
-to think about it too.
+quirks. Use them. If they read `/proc/X` plus fall back to `cmd Y` on SUSE, we
+should too. If they have special handling for Amazon Linux vs RHEL, we need to
+think about it too.
 
 Fetch both files with `gh api`:
 
@@ -279,7 +279,7 @@ gh api repos/chef/ohai/contents/lib/ohai/plugins/<name>.rb --jq .content | base6
 gh api repos/chef/ohai/contents/spec/unit/plugins/<name>_spec.rb --jq .content | base64 -d
 ```
 
-Filenames occasionally differ — many plugins live under OS subdirs (`linux/`,
+Filenames occasionally differ, many plugins live under OS subdirs (`linux/`,
 `darwin/`, `windows/`). Browse `repos/chef/ohai/contents/lib/ohai/plugins` if
 the direct path 404s.
 
@@ -326,19 +326,19 @@ Use a prose list immediately after the Description section:
 ```md
 The collector reports N related signals:
 
-- `<field>` — what it means, what source it comes from, what question it answers
+- `<field>`. What it means, what source it comes from, what question it answers
   for the consumer.
-- `<field>` — same, including when this signal and the one above can disagree
+- `<field>`. Same, including when this signal and the one above can disagree
   and what that disagreement tells you.
 ```
 
 Signals are about **meaning**, not structure. Use them whenever a consumer can
-reasonably ask "which of these fields should I look at for X?" — the Signals
+reasonably ask "which of these fields should I look at for X?", the Signals
 section answers that before they have to read the field table.
 
 This keeps docs consistent and makes it obvious at a glance whether we're
 leveraging Ohai's hard-won knowledge or flying solo. If Ohai has coverage we
-lack, either add it in the same PR or open a tracked issue — don't silently drop
+lack, either add it in the same PR or open a tracked issue, don't silently drop
 it.
 
 [Reference PR adding this rule: chef/ohai#1754]
@@ -352,17 +352,17 @@ Methodology gaps between gohai and Ohai live on GitHub as issues labeled
 - Full Ohai methodology breakdown, source-cited with file + line ranges.
 - Our current implementation and what it misses.
 - Risk / severity / which hosts fail.
-- Proposed fix — concrete code plan.
+- Proposed fix, concrete code plan.
 - Acceptance criteria.
-- **"Doc after this fix lands"** — the exact prose (Description + Collected
+- **"Doc after this fix lands"**. The exact prose (Description + Collected
   Fields table + Data Sources) the fix PR pastes into the collector's
   `docs/collectors/<name>.md`.
 
 **Workflow when working a methodology issue:**
 
-1. `gh issue view <N>` — read end to end, especially the "Doc after this fix
+1. `gh issue view <N>`. Read end to end, especially the "Doc after this fix
    lands" block.
-2. Implement the code change per "Proposed fix" — use the VFS / Executor
+2. Implement the code change per "Proposed fix", use the VFS / Executor
    abstractions if Phase 1 has landed, otherwise the `export_test.go` + private
    var + `Set<X>Fn` pattern.
 3. Paste the issue's "Doc after this fix lands" block into the collector doc,

@@ -20,10 +20,10 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field  | Type   | Description                                                                                                                                               | Schema mapping                                                                                             |
-| ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `name` | string | Canonical manager name: `apt`, `apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, `xbps-install`, `emerge`, `brew`, `port`. Empty when no manager found. | No direct schema mapping — managed-software inventory has no canonical OCSF "which tool manages it" field. |
-| `path` | string | Absolute path to the manager binary (e.g. `/usr/bin/apt`). Empty when no manager found.                                                                   | No direct schema mapping.                                                                                  |
+| Field  | Type   | Description                                                                                                                                               | Schema mapping                                                                                            |
+| ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `name` | string | Canonical manager name: `apt`, `apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, `xbps-install`, `emerge`, `brew`, `port`. Empty when no manager found. | No direct schema mapping, managed-software inventory has no canonical OCSF "which tool manages it" field. |
+| `path` | string | Absolute path to the manager binary (e.g. `/usr/bin/apt`). Empty when no manager found.                                                                   | No direct schema mapping.                                                                                 |
 
 ## Platform Support
 
@@ -108,8 +108,7 @@ gohai --no-collector.package_mgr   # disable
 
 None at the registry level. Conceptually driven by `platform.Detect()` but uses
 it directly (via `internal/platform`) rather than consuming the `platform`
-collector's output — so the two collectors can be enabled/disabled
-independently.
+collector's output, so the two collectors can be enabled/disabled independently.
 
 ## Data Sources
 
@@ -118,9 +117,9 @@ independently.
 | Linux    | `exec.LookPath` for the family-specific manager (`apt` on debian, `dnf`/`yum` on rhel, `zypper`/`pacman`/etc. on others). | [`packages.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/packages.rb) uses the same family dispatch internally. | **Equivalent dispatch; different output**: Ohai hides the dispatch and emits installed-package inventory. We surface the dispatch as a typed fact so consumers can make their own install/query calls. |
 | macOS    | `exec.LookPath brew`, fallback `port`.                                                                                    | Ohai has no macOS package-manager detection.                                                                                   | **Extension**: Ohai doesn't target macOS package managers; we cover brew and MacPorts.                                                                                                                 |
 
-**Known gaps:** Windows (Chocolatey / winget / Scoop) is out of scope — gohai
+**Known gaps:** Windows (Chocolatey / winget / Scoop) is out of scope, gohai
 doesn't target Windows yet.
 
 ## Backing library
 
-- Go stdlib (`os/exec` — `exec.LookPath`) — no third-party dependency.
+- Go stdlib (`os/exec`, `exec.LookPath`), no third-party dependency.

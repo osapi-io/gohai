@@ -18,9 +18,9 @@ Consumers use this to:
 
 ## Collected Fields
 
-| Field  | Type  | Description                                                                                                                                     | Schema mapping                                               |
-| ------ | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `seed` | `int` | First 7 hex chars of MD5(`machinename + serial + uuid`) interpreted as base-16 integer. Stable across reboots when DMI identity doesn't change. | No direct schema mapping — shard is a gohai/Ohai convention. |
+| Field  | Type  | Description                                                                                                                                     | Schema mapping                                              |
+| ------ | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `seed` | `int` | First 7 hex chars of MD5(`machinename + serial + uuid`) interpreted as base-16 integer. Stable across reboots when DMI identity doesn't change. | No direct schema mapping, shard is a gohai/Ohai convention. |
 
 ## Platform Support
 
@@ -82,7 +82,7 @@ On macOS:
 
 1. `machinename` is read from the `hostname` prior result (same as Linux).
 2. `serial` comes from `system_profiler SPHardwareDataType -json` via the shared
-   `internal/executor` runner — matching Ohai's `hardware["serial_number"]`
+   `internal/executor` runner, matching Ohai's `hardware["serial_number"]`
    source. Error or missing data leaves serial empty.
 3. `uuid` comes from gopsutil's `host.InfoWithContext` → `HostID`
    (IOPlatformUUID). Matches Ohai's `hardware["platform_UUID"]`. Error leaves
@@ -92,7 +92,7 @@ On macOS:
 Mirrors Ohai's `shard.rb` algorithm with the same default sources
 (`machinename`, `serial`, `uuid`) and the same MD5 → integer output. We do not
 implement Ohai's per-plugin `[:sources]` configurability or FIPS-aware digest
-selection (SHA-256 under FIPS) — those can be added if a consumer needs them.
+selection (SHA-256 under FIPS). Those can be added if a consumer needs them.
 
 ## Backing library
 

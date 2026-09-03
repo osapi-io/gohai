@@ -4,12 +4,12 @@
 
 ## Description
 
-Reports Linux Standard Base identification fields — `id`, `release`, `codename`,
-`description` — used as a stable cross-distro identity tuple. Legacy compliance
+Reports Linux Standard Base identification fields, `id`, `release`, `codename`,
+`description`, used as a stable cross-distro identity tuple. Legacy compliance
 tooling and older packaging still consume LSB, so we surface it even though
 `os_release` has largely supplanted it on modern distros.
 
-The `lsb_release` CLI is the sole source — matches current Ohai's linux/lsb
+The `lsb_release` CLI is the sole source, matches current Ohai's linux/lsb
 plugin. When the CLI is absent, `Info` stays empty rather than parsing
 `/etc/lsb-release`. See Data Sources for why.
 
@@ -78,7 +78,7 @@ None.
 On Linux we run `lsb_release -a` through the shared `internal/executor` runner
 and parse the four labelled lines it emits (`Distributor ID`, `Release`,
 `Codename`, `Description`) into the matching `Info` fields. When the CLI is
-absent or errors, `Info` stays empty — not an error. Matches Ohai's no-panic
+absent or errors, `Info` stays empty, not an error. Matches Ohai's no-panic
 behaviour.
 
 **Why no `/etc/lsb-release` file fallback?** Our prior implementation parsed the
@@ -94,10 +94,10 @@ the file fallback in [chef/ohai#1562](https://github.com/chef/ohai/pull/1562)
   case; the correct fix there is to install the `lsb-release` package (or
   consume `os_release` instead, which we already surface in its own collector).
 
-macOS is not covered — no LSB concept on Darwin.
+macOS is not covered, no LSB concept on Darwin.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) — shared command-runner
+- [`internal/executor`](../../internal/executor). Shared command-runner
   abstraction used to invoke `lsb_release -a` on Linux. Tests mock it with
   `go.uber.org/mock`.

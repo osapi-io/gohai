@@ -21,12 +21,12 @@ gohai --category=cloud --category=hardware
 gohai.New(gohai.WithCategory("cloud"))
 ```
 
-Categories are the section headers below — `system`, `hardware`, `network`,
+Categories are the section headers below, `system`, `hardware`, `network`,
 `cloud`, `virtualization`, `security`, `software`, `users`, `linux`, `misc`.
 Dependencies pull in automatically, so e.g. enabling `cloud` picks up `dmi`
 since every cloud collector depends on it.
 
-**Defaults are opt-in.** `gohai.New()` (SDK) returns an empty registry — nothing
+**Defaults are opt-in.** `gohai.New()` (SDK) returns an empty registry, nothing
 runs unless you ask for it. Pass `gohai.WithDefaults()` for the recommended set,
 or `gohai.WithCollectors(...)` / `gohai.WithEnabled(...)` to enumerate. The CLI
 wires `WithDefaults()` automatically; pass `--no-defaults` to turn it off and
@@ -103,7 +103,7 @@ edge cases to handle) follows [Chef Ohai]'s plugins.
 | softlayer                         | `softlayer`     | IBM SoftLayer metadata         | ❌      | 🪦          | —          |
 | eucalyptus                        | `eucalyptus`    | Eucalyptus instance metadata   | ❌      | 🪦          | —          |
 
-There is no `cloud` collector — gohai doesn't ship a cross-provider aggregator.
+There is no `cloud` collector. gohai doesn't ship a cross-provider aggregator.
 See [cloud.md](cloud.md) for the SDK pattern for detecting which provider a host
 is on.
 
@@ -170,7 +170,7 @@ is on.
 ## Collector Dependencies
 
 The `Depends On` column in each category table above lists the collectors each
-entry depends on. Dependencies are resolved automatically — enabling a collector
+entry depends on. Dependencies are resolved automatically, enabling a collector
 also enables its dependencies.
 
 [chef ohai]: https://github.com/chef/ohai

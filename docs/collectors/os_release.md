@@ -4,8 +4,8 @@
 
 ## Description
 
-Parses `/etc/os-release` — the standardized freedesktop.org manifest every
-modern Linux distribution ships to describe itself. This is the authoritative,
+Parses `/etc/os-release`, the standardized freedesktop.org manifest every modern
+Linux distribution ships to describe itself. This is the authoritative,
 machine-readable source for distro identity, version, codename, and
 upstream-compatibility hints.
 
@@ -27,9 +27,9 @@ macOS has no equivalent file; the collector returns `nil` there.
 | ------------------ | ----------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `id`               | string            | Short identifier (`ubuntu`, `rhel`, `debian`, `alpine`). | `os.name` (OCSF uses `name` for the distro identifier).                 |
 | `id_like`          | []string          | Parent/upstream distros this host is compatible with.    | No direct schema mapping; downstream-compatible with `os.name` aliases. |
-| `name`             | string            | Display name (`"Ubuntu"`).                               | No direct schema mapping — `os.name` is already `id`.                   |
+| `name`             | string            | Display name (`"Ubuntu"`).                               | No direct schema mapping, `os.name` is already `id`.                    |
 | `pretty_name`      | string            | Human-readable (`"Ubuntu 24.04 LTS"`).                   | No direct schema mapping (presentation-level).                          |
-| `version`          | string            | Full version string including codename.                  | No OCSF — `os.version` is used for the version number.                  |
+| `version`          | string            | Full version string including codename.                  | No OCSF, `os.version` is used for the version number.                   |
 | `version_id`       | string            | Version number only (`"24.04"`).                         | OCSF `os.version`.                                                      |
 | `version_codename` | string            | Codename only (`"noble"`).                               | No direct schema mapping.                                               |
 | `build_id`         | string            | Build identifier (rolling distros).                      | OCSF `os.build` (closest match).                                        |
@@ -92,14 +92,14 @@ None.
 
 ## Data Sources
 
-| Platform | What we read      | Ohai plugin                                                                                                                                    | Alignment                                                                                                                      |
-| -------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Linux    | `/etc/os-release` | [`linux/os_release.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/os_release.rb) — parses the same file into `os_release`. | **Equivalent**: same file, same every-key extraction. We keep known keys as typed fields and bucket unknown keys into `extra`. |
-| macOS    | —                 | No Ohai handler.                                                                                                                               | Parity — we return nil.                                                                                                        |
+| Platform | What we read      | Ohai plugin                                                                                                                                   | Alignment                                                                                                                      |
+| -------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Linux    | `/etc/os-release` | [`linux/os_release.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/os_release.rb), parses the same file into `os_release`. | **Equivalent**: same file, same every-key extraction. We keep known keys as typed fields and bucket unknown keys into `extra`. |
+| macOS    | —                 | No Ohai handler.                                                                                                                              | Parity, we return nil.                                                                                                         |
 
 **Known gaps:** None. Ohai additionally emits some legacy aliases (e.g. `lsb.id`
 for backward compat); those belong to our `lsb` collector, not this one.
 
 ## Backing library
 
-- Go stdlib (`os`, `bufio`) — no third-party dependency.
+- Go stdlib (`os`, `bufio`), no third-party dependency.
