@@ -1,4 +1,4 @@
-# Block Device
+# Block device
 
 > **Status:** Implemented ✅
 
@@ -26,7 +26,7 @@ Consumers use this to:
 Ohai's `block_device` plugin reads the same sysfs paths on the same
 device-relative layout; we mirror its attribute set exactly.
 
-## Collected Fields
+## Collected fields
 
 | Field                           | Type     | Description                                                                         | Schema mapping                                                                                             |
 | ------------------------------- | -------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
@@ -45,7 +45,7 @@ device-relative layout; we mirror its attribute set exactly.
 | `devices[].queue_depth`         | `string` | SCSI queue depth from `/sys/block/<dev>/device/queue_depth`.                        | gohai convention                                                                                           |
 | `devices[].firmware_rev`        | `string` | Alternate firmware revision from `/sys/block/<dev>/device/firmware_rev`.            | gohai convention                                                                                           |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported             |
 | -------- | --------------------- |
@@ -55,7 +55,7 @@ device-relative layout; we mirror its attribute set exactly.
 macOS does not expose a `/sys/block` hierarchy. The Darwin variant returns
 `nil`, indicating the data is not available on this platform.
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -90,7 +90,7 @@ macOS does not expose a `/sys/block` hierarchy. The Darwin variant returns
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -104,7 +104,7 @@ facts, _ := g.Collect(context.Background())
 // facts.BlockDevice.Devices contains the list
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.block_device      # enable
@@ -115,7 +115,7 @@ gohai --no-collector.block_device   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `linux/block_device.rb` reads the same `/sys/block/` tree, top-level
 `size` and `removable`, `queue/` for `rotational`, `physical_block_size`,

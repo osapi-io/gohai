@@ -36,7 +36,7 @@ Consumers use this to:
   system will boot into. Compare with `current_mode` to detect runtime
   overrides.
 
-## Collected Fields
+## Collected fields
 
 | Field                       | Type     | Description                                                                      | Schema mapping                                                                  |
 | --------------------------- | -------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
@@ -47,14 +47,14 @@ Consumers use this to:
 | `max_kernel_policy_version` | `string` | Maximum policy version the kernel supports (e.g. `"33"`).                        | No direct OCSF or OTel mapping. gohai convention: `max_kernel_policy_version`.  |
 | `loaded_policy_name`        | `string` | Name of the loaded SELinux policy module (`targeted`, `mls`, `minimum`).         | No direct OCSF or OTel mapping. gohai convention: `loaded_policy_name`.         |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                      |
 | -------- | ---------------------------------------------- |
 | Linux    | ✅                                             |
 | macOS    | Returns nil, SELinux is not available on macOS |
 
-## Example Output
+## Example output
 
 ### Enforcing host with targeted policy
 
@@ -91,7 +91,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -109,7 +109,7 @@ if facts.SELinux != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.selinux       # enable (opt-in)
@@ -123,7 +123,7 @@ root on some kernel configurations.
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

@@ -22,7 +22,7 @@ Consumers use this to:
 Per-mount usage failures (stale NFS, permission denied) skip the usage/inode
 fields but keep the mount in the output.
 
-## Collected Fields
+## Collected fields
 
 Top level: `mounts: []Mount`, plus (Linux only) `unmounted: []Filesystem`.
 
@@ -71,14 +71,14 @@ bookmarks, reported by `zfs get -p -H all`. Mirrors Ohai's `zfs_properties` /
 Field-name choices follow node_exporter's `filesystem` collector (`mountpoint`
 over Ohai's `mount`, `type` over Ohai's `fs_type`).
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                       |
 | -------- | ----------------------------------------------- |
 | Linux    | ✅ (gopsutil + `lsblk` enrichment when on PATH) |
 | macOS    | ✅ (`getfsstat` syscall via gopsutil)           |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -114,7 +114,7 @@ over Ohai's `mount`, `type` over Ohai's `fs_type`).
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("filesystem"))
@@ -127,7 +127,7 @@ for _, u := range facts.Filesystem.Unmounted {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.filesystem      # enable (default)
@@ -138,7 +138,7 @@ gohai --no-collector.filesystem   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `filesystem.rb` combines `mount`, `df`, and `lsblk` output to build a
 per-device view with mount points, capacity, and filesystem types. gohai uses

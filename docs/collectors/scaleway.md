@@ -12,7 +12,7 @@ Non-Scaleway hosts drop silently.
 Detection uses `/proc/cmdline` for the substring `"scaleway"`. Scaleway's boot
 environment always announces itself in the kernel command line.
 
-## Collected Fields
+## Collected fields
 
 | Field               | Type          | Description                                                                         | Schema mapping                 |
 | ------------------- | ------------- | ----------------------------------------------------------------------------------- | ------------------------------ |
@@ -61,7 +61,7 @@ environment always announces itself in the kernel command line.
 | `organization` | `string` | Organization that owns the bootscript. |
 | `public`       | `bool`   | Whether the bootscript is public.      |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                             |
 | -------- | ------------------------------------- |
@@ -69,7 +69,7 @@ environment always announces itself in the kernel command line.
 | macOS    | ✅ (only meaningful on a Scaleway VM) |
 | Other    | ✅ (only meaningful on a Scaleway VM) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -85,7 +85,7 @@ environment always announces itself in the kernel command line.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -101,7 +101,7 @@ if facts.Scaleway != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.scaleway      # enable (opt-in)
@@ -114,7 +114,7 @@ gohai --category=cloud          # pulls this + all cloud collectors
 None. Detection uses `/proc/cmdline` rather than DMI. Scaleway exposes no stable
 DMI signature, but their kernel cmdline always contains `"scaleway"`.
 
-## Data Sources
+## Data sources
 
 1. **cmdline gate:** read `/proc/cmdline` and check for the substring
    `"scaleway"` (case-insensitive). Missing file or absent substring

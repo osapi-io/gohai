@@ -14,7 +14,7 @@ Detection is gated on DMI `product.name` containing `"OpenStack"`. Ohai's plugin
 gates on the virtualization plugin's openstack signal, which itself reads DMI;
 we go directly to DMI for the same effect.
 
-## Collected Fields
+## Collected fields
 
 | Field             | Type                | Description                                                                                                                             | Schema mapping                 |
 | ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
@@ -43,7 +43,7 @@ we go directly to DMI for the same effect.
 Still skipped from meta_data.json: `network_info` (deployment-specific Neutron
 data) and `random_seed` (sensitive, no inventory value).
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                               |
 | -------- | --------------------------------------- |
@@ -51,7 +51,7 @@ data) and `random_seed` (sensitive, no inventory value).
 | macOS    | ✅ (only meaningful on an OpenStack VM) |
 | Other    | ✅ (only meaningful on an OpenStack VM) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -66,7 +66,7 @@ data) and `random_seed` (sensitive, no inventory value).
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("openstack"))
@@ -77,7 +77,7 @@ if facts.OpenStack != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.openstack      # enable (opt-in)
@@ -90,7 +90,7 @@ gohai --category=cloud           # pulls this + all cloud collectors
 `dmi`. OpenStack writes `"OpenStack Nova"` or similar as `product_name`. Fails
 open when dmi wasn't run.
 
-## Data Sources
+## Data sources
 
 1. **DMI gate:** `dmi.Product.Name` contains `"OpenStack"`. Mirrors Ohai's
    virtualization-plugin gate (which itself reads DMI).

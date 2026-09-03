@@ -1,10 +1,10 @@
-# Collector Methodology
+# Collector methodology
 
 How gohai decides what a collector reads, which library it wraps, and what its
 fields are called. This is reference material for writing or modifying a
 collector; see [CONTRIBUTING](../CONTRIBUTING.md) for setup and workflow.
 
-## Implementation Methodology
+## Implementation methodology
 
 **We are a wrapper and aggregator, not a re-implementor.** Each collector's job
 is to wrap a well-maintained backing source (Go library, provider SDK, or a thin
@@ -258,7 +258,7 @@ Don't invent internal names that have no schema-mapping claim.
 file/command to read, which distro edge cases, which fallback), not field names
 or struct layout.
 
-### MANDATORY: Cross-reference Ohai's data sources before implementing
+### MANDATORY: cross-reference Ohai's data sources before implementing
 
 Before writing code for a new collector (or modifying an existing one), **read
 Ohai's corresponding plugin and spec**, but the goal is to match their
@@ -342,7 +342,7 @@ add it in the same PR or open a tracked issue, don't silently drop it.
 
 [Reference PR adding this rule: chef/ohai#1754]
 
-## Methodology Work
+## Methodology work
 
 Methodology gaps between gohai and Ohai live on GitHub as issues labeled
 `methodology-gap` and `collector:<name>`. See

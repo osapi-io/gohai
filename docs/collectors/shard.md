@@ -16,20 +16,20 @@ Consumers use this to:
 - Distribute work across parallel pipelines without central coordination.
 - Pick a canary host deterministically (`seed == 0 mod N`).
 
-## Collected Fields
+## Collected fields
 
 | Field  | Type  | Description                                                                                                                                     | Schema mapping                                              |
 | ------ | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `seed` | `int` | First 7 hex chars of MD5(`machinename + serial + uuid`) interpreted as base-16 integer. Stable across reboots when DMI identity doesn't change. | No direct schema mapping, shard is a gohai/Ohai convention. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                                             |
 | -------- | ------------------------------------------------------------------------------------- |
 | Linux    | ✅ (inputs: machinename from hostname + serial/uuid from DMI)                         |
 | macOS    | ✅ (inputs: machinename from hostname + serial from system_profiler + IOPlatformUUID) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -39,7 +39,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("shard"))
@@ -49,7 +49,7 @@ bucket := facts.Shard.Seed % 60
 fmt.Printf("this host runs at minute %d of every hour\n", bucket)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.shard      # enable (default)
@@ -63,7 +63,7 @@ plus DMI serial number and UUID from `dmi.Info`. On macOS where DMI is empty,
 serial comes from `system_profiler SPHardwareDataType` and UUID from
 IOPlatformUUID via gopsutil.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

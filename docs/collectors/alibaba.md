@@ -12,7 +12,7 @@ the detection signal.
 Detection is gated on DMI `sys_vendor` containing `"Alibaba"`, matches Ohai's
 `has_ali_dmi?`.
 
-## Collected Fields
+## Collected fields
 
 | Field                             | Type                          | Description                                                          | Schema mapping                 |
 | --------------------------------- | ----------------------------- | -------------------------------------------------------------------- | ------------------------------ |
@@ -81,7 +81,7 @@ Detection is gated on DMI `sys_vendor` containing `"Alibaba"`, matches Ohai's
 | `product_code` | `string` | Marketplace product code.        |
 | `charge_type`  | `string` | Billing method (`PrePaid` etc.). |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                              |
 | -------- | -------------------------------------- |
@@ -89,7 +89,7 @@ Detection is gated on DMI `sys_vendor` containing `"Alibaba"`, matches Ohai's
 | macOS    | ✅ (only meaningful on an Alibaba ECS) |
 | Other    | ✅ (only meaningful on an Alibaba ECS) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -106,7 +106,7 @@ Detection is gated on DMI `sys_vendor` containing `"Alibaba"`, matches Ohai's
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("alibaba"))
@@ -117,7 +117,7 @@ if facts.Alibaba != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.alibaba      # enable (opt-in)
@@ -130,7 +130,7 @@ gohai --category=cloud         # pulls this + all cloud collectors
 `dmi`. Alibaba writes `"Alibaba Cloud"` as `sys_vendor`. Fails open when dmi
 wasn't run.
 
-## Data Sources
+## Data sources
 
 01. **DMI gate:** `dmi.Product.VendorName` contains `"Alibaba"`. ghw reads
     `/sys/class/dmi/id/sys_vendor` into `Product.VendorName`, so this check is

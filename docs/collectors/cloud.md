@@ -1,4 +1,4 @@
-# Cloud Detection
+# Cloud detection
 
 > **Status:** Not a collector
 

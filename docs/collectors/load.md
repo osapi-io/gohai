@@ -25,7 +25,7 @@ Consumers use this to:
 Consumers that need per-core saturation should divide by `cpu.total` from the
 `cpu` collector.
 
-## Collected Fields
+## Collected fields
 
 | Field     | Type    | Description             | Schema mapping            |
 | --------- | ------- | ----------------------- | ------------------------- |
@@ -37,14 +37,14 @@ Field names are a gohai choice: OCSF has no load-average field and Ohai ships no
 loadavg plugin, so `one`/`five`/`fifteen` are picked to match the conceptual
 triple returned by `getloadavg(3)`.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                             |
 | -------- | ------------------------------------- |
 | Linux    | ✅ (`/proc/loadavg` via gopsutil)     |
 | macOS    | ✅ (`sysctl vm.loadavg` via gopsutil) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -56,7 +56,7 @@ triple returned by `getloadavg(3)`.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("load", "cpu"))
@@ -69,7 +69,7 @@ if perCore > 1.0 {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.load      # enable (default)
@@ -82,7 +82,7 @@ None. (Consumers that want per-core saturation correlate with `cpu.total`
 themselves. We don't declare a runtime dependency because `Dependencies()` would
 auto-include `cpu` even when the user disabled it.)
 
-## Data Sources
+## Data sources
 
 On Linux:
 

@@ -20,7 +20,7 @@ Consumers use this to:
 The offset is a snapshot at collect time, a host on `America/Los_Angeles`
 reports `-25200` in July (PDT) and `-28800` in January (PST).
 
-## Collected Fields
+## Collected fields
 
 | Field    | Type   | Description                                             | Schema mapping                                                                                                                                           |
 | -------- | ------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -28,7 +28,7 @@ reports `-25200` in July (PDT) and `-28800` in January (PST).
 | `abbrev` | string | Current short abbreviation (`PDT`, `PST`, `UTC`).       | No direct schema mapping, ambiguous (e.g. `IST` means India / Israel / Ireland) so OCSF deliberately prefers offsets and IANA names.                     |
 | `offset` | int    | Current offset from UTC in seconds (positive for east). | Closest: OCSF's timestamps use ISO-8601 with offset, but there's no host-config field.                                                                   |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported |
 | -------- | --------- |
@@ -36,7 +36,7 @@ reports `-25200` in July (PDT) and `-28800` in January (PST).
 | macOS    | ✅        |
 | Other    | —         |
 
-## Example Output
+## Example output
 
 ### Los Angeles host in summer
 
@@ -62,7 +62,7 @@ reports `-25200` in July (PDT) and `-28800` in January (PST).
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -78,7 +78,7 @@ tz := facts.Timezone
 fmt.Println(tz.Name, tz.Abbrev, tz.Offset)
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.timezone      # enable (default)
@@ -89,7 +89,7 @@ gohai --no-collector.timezone   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `timezone.rb` reports only `Time.now.getlocal.zone` (the short
 abbreviation like "EST"). gohai is a superset, it adds the IANA name (e.g.

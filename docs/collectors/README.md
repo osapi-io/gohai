@@ -133,14 +133,14 @@ is on.
 | [docker](docker.md)           | `docker`      | Containers, images, Docker info               | ❌      | ✅          | —          |
 | [services](services.md)       | `services`    | Systemd service states                        | ❌      | ✅          | —          |
 
-## Users & Sessions
+## Users & sessions
 
 | Collector               | Key        | Description                     | Default | Implemented | Depends On |
 | ----------------------- | ---------- | ------------------------------- | ------- | ----------- | ---------- |
 | [users](users.md)       | `users`    | passwd/group data, current user | ❌      | ✅          | —          |
 | [sessions](sessions.md) | `sessions` | Logged-in sessions              | ❌      | ✅          | —          |
 
-## Linux-Specific
+## Linux-specific
 
 | Collector                         | Key             | Description                   | Default | Implemented | Depends On |
 | --------------------------------- | --------------- | ----------------------------- | ------- | ----------- | ---------- |
@@ -167,7 +167,7 @@ is on.
 | [command](command.md) | `command` | Full `ps` output (Ohai command/ps parity) | ❌      | ✅          | —          |
 | [sysconf](sysconf.md) | `sysconf` | POSIX sysconf values                      | ❌      | ✅          | —          |
 
-## Collector Dependencies
+## Collector dependencies
 
 The `Depends On` column in each category table above lists the collectors each
 entry depends on. Dependencies are resolved automatically, enabling a collector

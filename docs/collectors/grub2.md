@@ -20,20 +20,20 @@ Consumers use this to:
   rpm-ostree upgrade state machines.
 - Read `kernelopts` or custom environment variables set by provisioning tooling.
 
-## Collected Fields
+## Collected fields
 
 | Field         | Type                | Description                                                                      | Schema mapping                                                                                   |
 | ------------- | ------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `environment` | `map[string]string` | Key=value pairs from the grubenv file. Nil if no grubenv file found on any path. | No direct OCSF or OTel mapping. gohai convention: `environment` (Ohai uses `grub2.environment`). |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                    |
 | -------- | -------------------------------------------- |
 | Linux    | ✅                                           |
 | macOS    | Returns nil, GRUB2 is not available on macOS |
 
-## Example Output
+## Example output
 
 ### Typical Fedora/RHEL host
 
@@ -60,7 +60,7 @@ Consumers use this to:
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -78,7 +78,7 @@ if facts.GRUB2 != nil && facts.GRUB2.Environment != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.grub2       # enable (opt-in)
@@ -92,7 +92,7 @@ on all Linux hosts (e.g. containers, UEFI-only systems using systemd-boot).
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

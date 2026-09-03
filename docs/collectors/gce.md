@@ -16,7 +16,7 @@ match the rest of the gohai codebase's single-top-level-struct convention.
 Resource paths (`machineType`, `zone`, `image`, `network`) are normalized to
 their short forms; everything else is surfaced verbatim.
 
-## Collected Fields
+## Collected fields
 
 ### Top-level
 
@@ -91,7 +91,7 @@ their short forms; everything else is surfaced verbatim.
 | `aliases` | `[]string` | Alias names (rarely populated).                                         |
 | `scopes`  | `[]string` | OAuth scopes granted to the SA (for IAM auditing).                      |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                        |
 | -------- | -------------------------------- |
@@ -103,7 +103,7 @@ The collector works on any OS, it's an HTTP call, not a file read. It only
 returns data on hosts where `metadata.google.internal` resolves and responds,
 which in practice is GCE VMs.
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -170,7 +170,7 @@ which in practice is GCE VMs.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -193,7 +193,7 @@ if facts.Gce != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.gce      # enable (opt-in)
@@ -214,7 +214,7 @@ don't have to enable it yourself. When `dmi` is absent from the prior results
 (explicitly disabled by the user) the collector fails open and attempts the HTTP
 probe anyway, slower on non-GCE hosts but still correct.
 
-## Data Sources
+## Data sources
 
 1. **DMI gate** (see [dmi.md](dmi.md)): reads the prior `dmi` collector result
    and short-circuits with `(nil, nil)` when `product.name` doesn't contain

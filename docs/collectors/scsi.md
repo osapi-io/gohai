@@ -13,7 +13,7 @@ Consumers use this to inventory attached disks / CD-ROMs / tape drives by SCSI
 address when `lsscsi`'s particular view is the needed abstraction (e.g. matching
 hardware in a server's drive bays to logical device nodes).
 
-## Collected Fields
+## Collected fields
 
 | Field     | Type                | Description                    | Schema mapping            |
 | --------- | ------------------- | ------------------------------ | ------------------------- |
@@ -30,14 +30,14 @@ hardware in a server's drive bays to logical device nodes).
 | `revision`  | `string` | Firmware revision (second-to-last token).                  |
 | `device`    | `string` | Backing device node (`/dev/sda`, `/dev/sr0`, etc.).        |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                        |
 | -------- | ------------------------------------------------ |
 | Linux    | ✅ (requires `lsscsi` on PATH)                   |
 | macOS    | ❌ (no `lsscsi` on Darwin; returns empty `Info`) |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -64,7 +64,7 @@ hardware in a server's drive bays to logical device nodes).
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("scsi"))
@@ -75,7 +75,7 @@ for addr, d := range facts.SCSI.Devices {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.scsi      # enable (opt-in)
@@ -87,7 +87,7 @@ gohai --category=hardware   # pulls this + all hardware collectors
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

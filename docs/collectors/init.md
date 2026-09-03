@@ -15,13 +15,13 @@ dependency ordering:
 - `runit`. Void Linux, Artix; `sv` command
 - `launchd`. MacOS; `launchctl`, `*.plist` under `/Library/LaunchDaemons/`
 
-## Collected Fields
+## Collected fields
 
 | Field  | Type   | Description                                                                               | Schema mapping                                                                                                        |
 | ------ | ------ | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `name` | string | Canonical init system name. Known values listed above; unknown values pass through as-is. | No direct schema mapping, `process.name` of PID 1 is the closest concept (`os.pid_1_name`-style field doesn't exist). |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                 |
 | -------- | ------------------------- |
@@ -32,7 +32,7 @@ On Linux, if `/proc/1/comm` is unreadable (restricted containers), the `name` is
 empty. Consumers should treat empty as unknown, not as an assertion of any
 particular init system.
 
-## Example Output
+## Example output
 
 ### systemd host
 
@@ -52,7 +52,7 @@ particular init system.
 { "init": { "name": "openrc" } }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("init"))
@@ -65,7 +65,7 @@ case "launchd":
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.init      # enable (default)
@@ -76,7 +76,7 @@ gohai --no-collector.init   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux:
 

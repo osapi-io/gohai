@@ -27,7 +27,7 @@ Assumes homogeneous CPUs across sockets, `model_name`, `vendor_id`, `family`,
 gopsutil returns. True on ~99% of hosts; asymmetric-core SKUs (Apple Silicon's
 P+E cores, Intel Alder Lake's hybrid) report the first core's data.
 
-## Collected Fields
+## Collected fields
 
 | Field                 | Type              | Description                                                                                                                                                                                                                                                                                             | Schema mapping                                                                                     |
 | --------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -70,14 +70,14 @@ P+E cores, Intel Alder Lake's hybrid) report the first core's data.
 | `vulnerabilities`     | map[string]string | Mitigation name → status string from `/sys/devices/system/cpu/vulnerabilities/*` (Linux).                                                                                                                                                                                                               | No direct schema mapping.                                                                          |
 | `cpus[]`              | []CPU             | Per-logical-CPU breakdown, `vendor_id`, `family`, `model_id`, `model_name`, `stepping`, `physical_id`, `core_id`, `cores`, `speed`, `cache_size`, `flags`. Matters on hybrid-core CPUs (Alder Lake P+E, Apple Silicon P+E) where per-core values differ. Mirrors Ohai's `cpu["0"]`, `cpu["1"]` entries. | No direct schema mapping.                                                                          |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                                                 |
 | -------- | ----------------------------------------------------------------------------------------- |
 | Linux    | ✅ (gopsutil `/proc/cpuinfo` + sysfs vulnerabilities + optional `lscpu`)                  |
 | macOS    | ✅ (gopsutil sysctl + `hw.physicalcpu` / `hw.packages` / `hw.cpufrequency_max` overrides) |
 
-## Example Output
+## Example output
 
 ### Linux dual-socket Xeon
 
@@ -126,7 +126,7 @@ P+E cores, Intel Alder Lake's hybrid) report the first core's data.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("cpu"))
@@ -143,7 +143,7 @@ for mitigation, status := range c.Vulnerabilities {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.cpu      # enable (default)
@@ -154,7 +154,7 @@ gohai --no-collector.cpu   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `cpu.rb` uses two sources on Linux: direct `/proc/cpuinfo` parsing for
 per-core identity (model, flags, MHz, vendor, family, stepping) and `lscpu` for

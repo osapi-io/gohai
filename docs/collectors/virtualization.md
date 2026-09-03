@@ -19,7 +19,7 @@ Consumers use this to:
 - Distinguish host vs guest roles for the same runtime (a vbox host running on
   bare metal vs a vbox guest under VirtualBox).
 
-## Collected Fields
+## Collected fields
 
 | Field             | Type              | Description                                                                                                          | Schema mapping            |
 | ----------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------- |
@@ -33,14 +33,14 @@ metal). When more than one layer is detected, `system`/`role` report the last
 positive detection in the cascade order, consumers that care about every layer
 should iterate `systems`.
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                                        |
 | -------- | -------------------------------------------------------------------------------- |
 | Linux    | ✅ (full Ohai cascade: systemd-detect-virt + DMI + cgroup + 12 file/exec probes) |
 | macOS    | ✅ (Ohai cascade: PATH probes + sysctl + ioreg + system_profiler)                |
 
-## Example Output
+## Example output
 
 ### Bare metal
 
@@ -75,7 +75,7 @@ should iterate `systems`.
 }
 ```
 
-### Apple Virtualization.framework guest
+### Apple virtualization.framework guest
 
 ```json
 {
@@ -87,7 +87,7 @@ should iterate `systems`.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("virtualization"))
@@ -102,7 +102,7 @@ for name, role := range v.Systems {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.virtualization      # enable (default)
@@ -113,7 +113,7 @@ gohai --no-collector.virtualization   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux the collector cascades through every signal Ohai's
 `linux/virtualization.rb` checks, populating `systems[<name>] = role` for each

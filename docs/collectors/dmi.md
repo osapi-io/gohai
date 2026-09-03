@@ -17,7 +17,7 @@ which use `product.name` / `product.vendor_name` / `bios.manufacturer` /
 provider's metadata endpoint. Hardware inventory and compliance tooling use the
 full set for fleet audits.
 
-## Collected Fields
+## Collected fields
 
 Each section is nil when that part of SMBIOS isn't available, virtual machines
 often omit chassis data, minimal containers may have no DMI at all. Consumers
@@ -71,7 +71,7 @@ safely check `facts.DMI.Product != nil` before dereferencing.
 | `uuid`          | `string` | System UUID (0400 on Linux, root-only, empty for non-root).      |
 | `sku`           | `string` | Product SKU.                                                     |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                   |
 | -------- | ------------------------------------------- |
@@ -79,7 +79,7 @@ safely check `facts.DMI.Product != nil` before dereferencing.
 | macOS    | ✅ returns empty Info (macOS has no SMBIOS) |
 | Other    | ✅ returns empty Info                       |
 
-## Example Output
+## Example output
 
 ### GCE VM
 
@@ -106,7 +106,7 @@ safely check `facts.DMI.Product != nil` before dereferencing.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -132,7 +132,7 @@ Or enable by category:
 gohai.New(gohai.WithCategory("hardware"))  // pulls dmi + cpu + memory + disk + filesystem
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.dmi      # enable (opt-in)
@@ -147,7 +147,7 @@ collector, dmi gets pulled in automatically via `Dependencies()`.
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `dmi.rb` shells out to `dmidecode`, which reads `/dev/mem` and requires
 root. gohai uses `ghw` instead, which reads `/sys/class/dmi/id/*`, the sysfs

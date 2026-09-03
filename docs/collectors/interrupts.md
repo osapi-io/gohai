@@ -19,7 +19,7 @@ The collector mirrors Ohai's `interrupts` plugin methodology: it reads
 `/proc/interrupts` and parses the kernel-documented format described in
 [Documentation/filesystems/proc.txt][kernel-proc-txt].
 
-## Collected Fields
+## Collected fields
 
 | Field                   | Type      | Description                                                                                                            | Schema mapping   |
 | ----------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------- |
@@ -29,7 +29,7 @@ The collector mirrors Ohai's `interrupts` plugin methodology: it reads
 | `irqs[].device`         | `string`  | Driver or device name (e.g. `"timer"`, `"eth0"`). Empty for non-numeric IRQs or when no device is listed.              | gohai convention |
 | `irqs[].counts_per_cpu` | `[]int64` | Per-CPU event count in CPU-index order. Slice length equals the CPU count in the header line.                          | gohai convention |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                   |
 | -------- | --------------------------- |
@@ -38,7 +38,7 @@ The collector mirrors Ohai's `interrupts` plugin methodology: it reads
 
 macOS does not expose `/proc/interrupts`. The Darwin variant returns `nil`.
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -70,7 +70,7 @@ macOS does not expose `/proc/interrupts`. The Darwin variant returns `nil`.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -84,7 +84,7 @@ facts, _ := g.Collect(context.Background())
 // facts.Interrupts.IRQs contains the list
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.interrupts      # enable
@@ -95,7 +95,7 @@ gohai --no-collector.interrupts   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 Ohai's `linux/interrupts.rb` parses `/proc/interrupts` similarly, reading
 per-CPU counts and the device/type label for each IRQ line. gohai follows the

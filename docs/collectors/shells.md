@@ -24,13 +24,13 @@ trailing whitespace on each entry is trimmed. Non-absolute entries (anything
 that doesn't start with `/`) are ignored, matches Ohai's strict `/`-prefix
 filter.
 
-## Collected Fields
+## Collected fields
 
 | Field   | Type       | Description                                          | Schema mapping                                                                                                                   |
 | ------- | ---------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `paths` | `[]string` | Absolute paths to valid login shells, in file order. | No direct schema mapping, OCSF has `user.shell` per-user but no host-level shell inventory object. Treated as a gohai extension. |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported  |
 | -------- | ---------- |
@@ -41,7 +41,7 @@ filter.
 Missing `/etc/shells` (distroless/scratch containers) soft-misses to an empty
 list rather than erroring, matches Ohai's `file_exist?` gate.
 
-## Example Output
+## Example output
 
 ### Typical Linux
 
@@ -89,7 +89,7 @@ list rather than erroring, matches Ohai's `file_exist?` gate.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 import (
@@ -106,7 +106,7 @@ for _, p := range facts.Shells.Paths {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.shells      # enable (default)
@@ -117,7 +117,7 @@ gohai --no-collector.shells   # disable
 
 None.
 
-## Data Sources
+## Data sources
 
 On Linux and macOS (identical, `/etc/shells` follows POSIX convention and Ohai's
 plugin has no `:darwin`-specific path):

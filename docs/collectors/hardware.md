@@ -18,7 +18,7 @@ abstractions don't exist (no SMBIOS, no `/sys`), so every fact funnels through
 `system_profiler`. `hardware` is the Darwin equivalent of Linux's `dmi` plus
 battery / charger. Non-Darwin platforms return an empty Info.
 
-## Collected Fields
+## Collected fields
 
 | Field                     | Type        | Description                                                                                                      | Schema mapping                      |
 | ------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
@@ -83,14 +83,14 @@ battery / charger. Non-Darwin platforms return an empty Info.
 | `watts`         | `string` | Rated wattage (verbatim string from `system_profiler`). |
 | `connected`     | `bool`   | Whether the charger is currently plugged in.            |
 
-## Platform Support
+## Platform support
 
 | Platform | Supported                                                                |
 | -------- | ------------------------------------------------------------------------ |
 | Linux    | ❌ (use `dmi`, `cpu`, `memory`, `disk`, `filesystem` collectors instead) |
 | macOS    | ✅                                                                       |
 
-## Example Output
+## Example output
 
 ```json
 {
@@ -129,7 +129,7 @@ battery / charger. Non-Darwin platforms return an empty Info.
 }
 ```
 
-## SDK Usage
+## SDK usage
 
 ```go
 g, _ := gohai.New(gohai.WithCollectors("hardware"))
@@ -143,7 +143,7 @@ if h := facts.Hardware; h != nil {
 }
 ```
 
-## Enable/Disable
+## Enable/disable
 
 ```bash
 gohai --collector.hardware      # enable (opt-in)
@@ -155,7 +155,7 @@ gohai --category=hardware       # pulls this + all hardware collectors
 
 None.
 
-## Data Sources
+## Data sources
 
 On macOS:
 
