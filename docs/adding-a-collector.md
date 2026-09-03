@@ -80,7 +80,7 @@ Each file declares a struct for that OS, embeds `base`, and implements
 **`linux.go`:**
 
 ```go
-// (MIT header). NO //go:build tag
+// (MIT header) — NO //go:build tag
 package cpu
 
 import (
@@ -94,7 +94,7 @@ type Linux struct {
 
     // Fn fields are typed in OUR *Info / []OurType, never gopsutil types.
     // The gopsutil call lives in a private package var swapped via
-    // export_test.go, see pkg/gohai/collectors/uptime/ for the pattern.
+    // export_test.go — see pkg/gohai/collectors/uptime/ for the pattern.
     ReadFn func(context.Context) (*Info, error)
 }
 
@@ -117,7 +117,7 @@ covers all non-darwin.
 The private gopsutil wrapper lives in `<name>.go`:
 
 ```go
-// Private injection seam, not exposed on any public Fn field.
+// Private injection seam — not exposed on any public Fn field.
 var infoFn = cpu.InfoWithContext
 
 func readCPU(ctx context.Context) (*Info, error) {

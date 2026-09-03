@@ -83,12 +83,12 @@ attributes, and the metaschema definitions are well-formed.
 
 ```
 schemas/ocsf-extension/
-  extension.json             , uid 1337, name "gohai"
-  dictionary.json            , attribute type definitions
+  extension.json              — uid 1337, name "gohai"
+  dictionary.json             — attribute type definitions
   objects/
-    device.json              , extends device with fqdn, machine_id, etc.
-    device_hw_info.json       , extends hw_info with cpu_flags, etc.
-    os.json                  , extends os with distribution_id, etc.
+    device.json               — extends device with fqdn, machine_id, etc.
+    device_hw_info.json        — extends hw_info with cpu_flags, etc.
+    os.json                   — extends os with distribution_id, etc.
 ```
 
 ## Output formats

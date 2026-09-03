@@ -326,9 +326,9 @@ Use a prose list immediately after the Description section:
 ```md
 The collector reports N related signals:
 
-- `<field>`. What it means, what source it comes from, what question it answers
+- `<field>` — what it means, what source it comes from, what question it answers
   for the consumer.
-- `<field>`. Same, including when this signal and the one above can disagree
+- `<field>` — same, including when this signal and the one above can disagree
   and what that disagreement tells you.
 ```
 

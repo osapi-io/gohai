@@ -69,7 +69,7 @@ import (
 )
 
 func main() {
-    // Opt in to cloud collectors, none run by default.
+    // Opt in to cloud collectors — none run by default.
     g, err := gohai.New(gohai.WithCategory("cloud"))
     if err != nil {
         log.Fatal(err)

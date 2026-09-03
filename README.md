@@ -173,7 +173,7 @@ func main() {
         log.Fatal(err)
     }
 
-    // Typed access. pkg.go.dev documents every Info struct's fields.
+    // Typed access — pkg.go.dev documents every Info struct's fields.
     fmt.Printf("OS:     %s %s\n", facts.Platform.Name, facts.Platform.Version)
     fmt.Printf("Cores:  %d\n", facts.CPU.Cores)
     fmt.Printf("Memory: %d bytes\n", facts.Memory.Total)
@@ -193,7 +193,7 @@ if err := json.Unmarshal(payload, &facts); err != nil {
     log.Fatal(err)
 }
 
-// Typed access on the decoded value, with no map[string]any guessing.
+// Typed access on the decoded value — no map[string]any guessing.
 fmt.Println(facts.Platform.Name, facts.CPU.Cores)
 fmt.Println(facts.Network.DefaultInterface)
 ```
