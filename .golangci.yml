@@ -42,12 +42,6 @@ linters:
         # nothing, and naming them makes the code worse. Left at its defaults
         # this rule reported 225 findings on nats-client, 116 of them the
         # literal 1.
-        # The validate tag's options are registered at runtime with
-        # go-playground/validator, which revive cannot see. These are the
-        # ones this organization registers.
-        - name: struct-tag
-          arguments:
-            - "validate,go_duration,cron_schedule,valid_target,alphanum_or_fact,ip_or_fact"
         - name: add-constant
           arguments:
             # In strconv.ParseInt(s, 10, 64) the base and the bit size are
@@ -94,6 +88,15 @@ linters:
       # production still names every number it uses.
       - path: _test\.go$
         text: "add-constant: avoid magic numbers"
+
+      # go-playground/validator's options are registered at runtime, by a
+      # RegisterValidation call revive cannot follow. It reads the tag as
+      # text and calls anything outside its built-in list unknown. A real
+      # typo still fails loudly: validator panics on an unregistered
+      # option the first time that struct is checked.
+      - linters:
+          - revive
+        text: 'struct-tag: unknown option .* in validate tag'
 
 formatters:
   enable:
