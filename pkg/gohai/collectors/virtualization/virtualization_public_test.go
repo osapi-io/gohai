@@ -251,6 +251,19 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			validate: func(i *virtualization.Info) { s.Equal(roleGuest, i.Systems["vbox"]) },
 		},
 		{
+			// /proc/modules exists on every Linux host; neither
+			// VirtualBox module being loaded is the ordinary case.
+			name:    "linux: /proc/modules without either vbox module",
+			variant: osLinux,
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/modules": "ext4 950272 1 - Live 0x0\n",
+				})
+			},
+			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) { s.Empty(i.Systems["vbox"]) },
+		},
+		{
 			name:    "linux: kvm guest via /proc/cpuinfo QEMU string",
 			variant: osLinux,
 			fs: func() avfs.VFS {
@@ -614,6 +627,38 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			},
 			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
 			validate: func(i *virtualization.Info) { s.Equal(roleGuest, i.Systems["linux-vserver"]) },
+		},
+		{
+			// /proc/self/status is always present; a host that is not
+			// a vserver simply carries no context line.
+			name:    "linux: /proc/self/status without a vserver context",
+			variant: osLinux,
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/status": "Name:\tbash\nTgid:\t1\n",
+				})
+			},
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) {
+				s.Empty(i.Systems["linux-vserver"])
+			},
+		},
+		{
+			// PID 1's environment names a runtime only inside a
+			// container.
+			name:    "linux: /proc/1/environ names no container runtime",
+			variant: osLinux,
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/1/environ": "PATH=/usr/bin\x00HOME=/root\x00",
+				})
+			},
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validate: func(i *virtualization.Info) {
+				s.Empty(i.Systems["lxc"])
+				s.Empty(i.Systems["nspawn"])
+				s.Empty(i.Systems["podman"])
+			},
 		},
 		{
 			name:    "linux: cgroup docker container",

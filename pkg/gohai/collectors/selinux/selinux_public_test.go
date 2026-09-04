@@ -174,6 +174,24 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			wantLoaded: selinuxTargeted,
 		},
 		{
+			// The config file carries settings beyond the two this
+			// reports, and they are passed over.
+			name:    "linux: config keys this collector does not report",
+			variant: osLinux,
+			setupFS: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/etc/selinux/config": "SELINUX=disabled\n" +
+						"SELINUXTYPE=targeted\n" +
+						"SETLOCALDEFS=0\n",
+				})
+			},
+			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
+				return execmocks.NewMockExecutor(ctrl)
+			},
+			wantStatus: "disabled",
+			wantLoaded: selinuxTargeted,
+		},
+		{
 			name:    "linux: enforcing with sestatus",
 			variant: osLinux,
 			setupFS: func() avfs.VFS {
