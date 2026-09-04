@@ -157,7 +157,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				return execmocks.NewMockExecutor(ctrl)
 			},
-			wantStatus: "disabled",
+			wantStatus: statusDisabled,
 		},
 		{
 			name:    "linux: config SELINUX=disabled — disabled, no sestatus",
@@ -170,7 +170,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				return execmocks.NewMockExecutor(ctrl)
 			},
-			wantStatus: "disabled",
+			wantStatus: statusDisabled,
 			wantLoaded: selinuxTargeted,
 		},
 		{
@@ -188,7 +188,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				return execmocks.NewMockExecutor(ctrl)
 			},
-			wantStatus: "disabled",
+			wantStatus: statusDisabled,
 			wantLoaded: selinuxTargeted,
 		},
 		{
@@ -265,7 +265,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusDisabled), nil)
 				return m
 			},
-			wantStatus: "disabled",
+			wantStatus: statusDisabled,
 			wantLoaded: selinuxTargeted,
 		},
 		{
