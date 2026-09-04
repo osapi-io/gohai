@@ -2,10 +2,11 @@
 
 Test: `just test` | Before committing: `just ready`
 
-Read @CONTRIBUTING.md first. It covers prerequisites, setup, package structure,
-code standards, testing, and how to add a collector. All of it applies to agents
-exactly as they apply to people. The collector methodology is reference material
-in @docs/methodology.md. This file carries only what is specific to agents.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) first. It covers prerequisites, setup,
+package structure, code standards, testing, and how to add a collector. All of
+it applies to agents exactly as they apply to people. The collector methodology
+is reference material in [docs/methodology.md](docs/methodology.md). This file
+carries only what is specific to agents.
 
 ## Running tools
 
@@ -25,16 +26,16 @@ treating the failure as real.
 
 ## Where the rules come from
 
-@CONTRIBUTING.md names the specification under "Before you start". When a
-convention here and the specification disagree, the specification wins. Say so
-rather than following the code.
+[CONTRIBUTING.md](CONTRIBUTING.md#before-you-start) names the specification.
+When a convention here and the specification disagree, the specification wins.
+Say so rather than following the code.
 
 ## Before writing a collector
 
-Read `docs/methodology.md` before implementing or modifying one. The decision
-order for backing libraries, the three-tier field naming ladder, and the
-requirement to cross-reference Ohai's data sources are not optional, and a
-collector written without them will be sent back.
+Read [docs/methodology.md](docs/methodology.md) before implementing or modifying
+one. The decision order for backing libraries, the three-tier field naming
+ladder, and the requirement to cross-reference Ohai's data sources are not
+optional, and a collector written without them will be sent back.
 
 ## Commit trailer
 
