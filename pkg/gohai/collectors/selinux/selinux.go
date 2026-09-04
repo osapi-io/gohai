@@ -104,24 +104,43 @@ func parseConfigFile(
 	if err != nil {
 		return "", ""
 	}
+
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		key, val, ok := strings.Cut(line, "=")
+		key, val, ok := configAssignment(sc.Text())
 		if !ok {
 			continue
 		}
-		switch strings.TrimSpace(key) {
+
+		switch key {
 		case "SELINUX":
-			selinuxMode = strings.ToLower(strings.TrimSpace(val))
+			selinuxMode = val
 		case "SELINUXTYPE":
-			selinuxType = strings.ToLower(strings.TrimSpace(val))
+			selinuxType = val
+		default:
+			// A key this collector does not report.
 		}
 	}
+
 	return selinuxMode, selinuxType
+}
+
+// configAssignment splits one KEY=value line, skipping blanks and
+// comments and lowering the value as Ohai does.
+func configAssignment(
+	raw string,
+) (key string, val string, ok bool) {
+	line := strings.TrimSpace(raw)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return "", "", false
+	}
+
+	k, v, found := strings.Cut(line, "=")
+	if !found {
+		return "", "", false
+	}
+
+	return strings.TrimSpace(k), strings.ToLower(strings.TrimSpace(v)), true
 }
 
 // parseSestatus parses the output of `sestatus` and populates the
@@ -145,28 +164,45 @@ func parseSestatus(
 ) {
 	sc := bufio.NewScanner(bytes.NewReader(output))
 	for sc.Scan() {
-		line := sc.Text()
-		key, val, ok := strings.Cut(line, ":")
+		key, val, ok := strings.Cut(sc.Text(), ":")
 		if !ok {
 			continue
 		}
-		key = strings.TrimSpace(strings.ToLower(key))
-		val = strings.TrimSpace(val)
-		switch key {
-		case "selinux status":
-			if val == "enabled" {
-				info.Status = "enabled"
-			} else {
-				info.Status = "disabled"
-			}
-		case "current mode":
-			info.CurrentMode = strings.ToLower(val)
-		case "loaded policy name":
-			info.LoadedPolicyName = val
-		case "max kernel policy version":
-			info.MaxKernelPolicyVersion = val
-		case "policy version":
-			info.PolicyVersion = val
+
+		setSestatusField(
+			info,
+			strings.TrimSpace(strings.ToLower(key)),
+			strings.TrimSpace(val),
+		)
+	}
+}
+
+// setSestatusField files one line of sestatus output.
+func setSestatusField(
+	info *Info,
+	key string,
+	val string,
+) {
+	if key == "selinux status" {
+		// Anything that is not "enabled" is off.
+		info.Status = "disabled"
+		if val == "enabled" {
+			info.Status = "enabled"
 		}
+
+		return
+	}
+
+	switch key {
+	case "current mode":
+		info.CurrentMode = strings.ToLower(val)
+	case "loaded policy name":
+		info.LoadedPolicyName = val
+	case "max kernel policy version":
+		info.MaxKernelPolicyVersion = val
+	case "policy version":
+		info.PolicyVersion = val
+	default:
+		// A key this collector does not report.
 	}
 }

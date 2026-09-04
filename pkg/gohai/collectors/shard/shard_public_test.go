@@ -50,8 +50,8 @@ const (
 
 func priorWithDMI() collector.PriorResults {
 	return collector.PriorResults{
-		"hostname": &hostname.Info{MachineName: machinename},
-		"dmi": &dmi.Info{
+		fieldHostname: &hostname.Info{MachineName: machinename},
+		sourceDMI: &dmi.Info{
 			Product: &dmi.Product{SerialNumber: serial, UUID: uuid},
 		},
 	}
@@ -82,9 +82,9 @@ func (s *ShardPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -93,14 +93,16 @@ func (s *ShardPublicTestSuite) TestNew() {
 			s.Equal("shard", c.Name())
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
-			s.Equal([]string{"hostname", "dmi"}, c.Dependencies())
+			s.Equal([]string{fieldHostname, sourceDMI}, c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*shard.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*shard.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -118,16 +120,16 @@ func (s *ShardPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:     "linux: matches Ohai test vector (machinename + serial + uuid)",
-			variant:  "linux",
+			variant:  osLinux,
 			prior:    priorWithDMI(),
 			wantSeed: ohaiDefaultSeed,
 		},
 		{
 			name:    "linux: baseboard serial fallback when product serial empty",
-			variant: "linux",
+			variant: osLinux,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
-				"dmi": &dmi.Info{
+				fieldHostname: &hostname.Info{MachineName: machinename},
+				sourceDMI: &dmi.Info{
 					Product:   &dmi.Product{UUID: uuid},
 					Baseboard: &dmi.Baseboard{SerialNumber: serial},
 				},
@@ -136,10 +138,10 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: chassis serial fallback",
-			variant: "linux",
+			variant: osLinux,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
-				"dmi": &dmi.Info{
+				fieldHostname: &hostname.Info{MachineName: machinename},
+				sourceDMI: &dmi.Info{
 					Product: &dmi.Product{UUID: uuid},
 					Chassis: &dmi.Chassis{SerialNumber: serial},
 				},
@@ -148,17 +150,17 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: no dmi → seed from machinename only",
-			variant: "linux",
+			variant: osLinux,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
+				fieldHostname: &hostname.Info{MachineName: machinename},
 			},
 			wantSeed: -1,
 		},
 		{
 			name:    "linux: no hostname prior → seed from serial+uuid only",
-			variant: "linux",
+			variant: osLinux,
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{
+				sourceDMI: &dmi.Info{
 					Product: &dmi.Product{SerialNumber: serial, UUID: uuid},
 				},
 			},
@@ -166,24 +168,24 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "linux: empty prior → deterministic zero-input seed",
-			variant:  "linux",
+			variant:  osLinux,
 			prior:    collector.PriorResults{},
 			wantSeed: -1,
 		},
 		{
 			name:    "linux: nil dmi sub-structs → empty serial+uuid",
-			variant: "linux",
+			variant: osLinux,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
-				"dmi":      &dmi.Info{},
+				fieldHostname: &hostname.Info{MachineName: machinename},
+				sourceDMI:     &dmi.Info{},
 			},
 			wantSeed: -1,
 		},
 		{
 			name:    "darwin: matches Ohai test vector",
-			variant: "darwin",
+			variant: osDarwin,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
+				fieldHostname: &hostname.Info{MachineName: machinename},
 			},
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: uuid}, nil
@@ -193,9 +195,9 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: gopsutil error → empty uuid, seed still computes",
-			variant: "darwin",
+			variant: osDarwin,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
+				fieldHostname: &hostname.Info{MachineName: machinename},
 			},
 			hostFn:   func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
 			spOut:    []byte(sysProfJSON),
@@ -203,9 +205,9 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: malformed system_profiler JSON → empty serial",
-			variant: "darwin",
+			variant: osDarwin,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
+				fieldHostname: &hostname.Info{MachineName: machinename},
 			},
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: uuid}, nil
@@ -215,9 +217,9 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: empty items array → empty serial",
-			variant: "darwin",
+			variant: osDarwin,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
+				fieldHostname: &hostname.Info{MachineName: machinename},
 			},
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: uuid}, nil
@@ -227,9 +229,9 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: system_profiler error → empty serial",
-			variant: "darwin",
+			variant: osDarwin,
 			prior: collector.PriorResults{
-				"hostname": &hostname.Info{MachineName: machinename},
+				fieldHostname: &hostname.Info{MachineName: machinename},
 			},
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: uuid}, nil
@@ -242,9 +244,9 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c shard.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &shard.Linux{}
-			case "darwin":
+			case osDarwin:
 				defer shard.SetHostInfoFn(tt.hostFn)()
 				ctrl := gomock.NewController(s.T())
 				mockExec := execmocks.NewMockExecutor(ctrl)
@@ -258,6 +260,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 						Return(tt.spOut, nil)
 				}
 				c = &shard.Darwin{Exec: mockExec}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 
 			got, err := c.Collect(context.Background(), tt.prior)

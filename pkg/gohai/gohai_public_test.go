@@ -88,26 +88,26 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "WithDefaults + WithDisabled subtracts platform",
-			opts:         []gohai.Option{gohai.WithDefaults(), gohai.WithDisabled("platform")},
+			opts:         []gohai.Option{gohai.WithDefaults(), gohai.WithDisabled(fieldPlatform)},
 			wantPlatform: false,
 			wantHostname: true,
 		},
 		{
 			name:         "WithEnabled platform without defaults still collects platform",
-			opts:         []gohai.Option{gohai.WithEnabled("platform")},
+			opts:         []gohai.Option{gohai.WithEnabled(fieldPlatform)},
 			wantPlatform: true,
 			wantHostname: false,
 		},
 		{
 			name:         "only platform",
-			opts:         []gohai.Option{gohai.WithCollectors("platform")},
+			opts:         []gohai.Option{gohai.WithCollectors(fieldPlatform)},
 			wantPlatform: true,
 			wantHostname: false,
 		},
 		{
 			name: "WithTimings populates Facts.Timings per collector",
 			opts: []gohai.Option{
-				gohai.WithCollectors("platform"),
+				gohai.WithCollectors(fieldPlatform),
 				gohai.WithTimings(),
 			},
 			wantPlatform: true,
@@ -115,7 +115,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "without WithTimings Facts.Timings is nil",
-			opts:         []gohai.Option{gohai.WithCollectors("platform")},
+			opts:         []gohai.Option{gohai.WithCollectors(fieldPlatform)},
 			wantPlatform: true,
 			wantTimings:  false,
 		},
@@ -158,7 +158,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 					s.Contains(entry.Error, "simulated collector failure")
 					s.Greater(entry.DurationNs, int64(0))
 				} else {
-					entry, ok := facts.Timings.Collectors["platform"]
+					entry, ok := facts.Timings.Collectors[fieldPlatform]
 					s.Require().True(ok)
 					s.Equal("ok", entry.Status)
 					s.Empty(entry.Error)

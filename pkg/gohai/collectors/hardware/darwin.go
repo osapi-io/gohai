@@ -42,6 +42,9 @@ type Darwin struct {
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
+// percent scales a fraction into whole percentage points.
+const percent = 100
+
 func NewDarwin() *Darwin {
 	return &Darwin{Exec: executor.New()}
 }
@@ -62,19 +65,15 @@ func (d *Darwin) Collect(
 	var wg sync.WaitGroup
 	var hwOut, storageOut, powerOut []byte
 
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		hwOut, _ = d.Exec.Execute(ctx, "system_profiler", "SPHardwareDataType", "-json")
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		storageOut, _ = d.Exec.Execute(ctx, "system_profiler", "SPStorageDataType", "-json")
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		powerOut, _ = d.Exec.Execute(ctx, "system_profiler", "SPPowerDataType", "-json")
-	}()
+	})
 	wg.Wait()
 
 	applyHardware(info, hwOut)
@@ -89,26 +88,7 @@ func applyHardware(
 	info *Info,
 	out []byte,
 ) {
-	var payload struct {
-		Items []struct {
-			MachineModel          string `json:"machine_model"`
-			MachineName           string `json:"machine_name"`
-			SerialNumber          string `json:"serial_number"`
-			PlatformUUID          string `json:"platform_UUID"`
-			ProvisioningUDID      string `json:"provisioning_UDID"`
-			CPUType               string `json:"cpu_type"`
-			ChipType              string `json:"chip_type"`
-			CurrentProcessorSpeed string `json:"current_processor_speed"`
-			NumberProcessors      any    `json:"number_processors"` // int on Intel, string on Apple Silicon
-			Packages              any    `json:"packages"`
-			L2CacheCore           string `json:"l2_cache_core"`
-			L3Cache               string `json:"l3_cache"`
-			PhysicalMemory        string `json:"physical_memory"`
-			BootROMVersion        string `json:"boot_rom_version"`
-			OSLoaderVersion       string `json:"os_loader_version"`
-			SMCVersionSystem      string `json:"SMC_version_system"`
-		} `json:"SPHardwareDataType"`
-	}
+	var payload hardwarePayload
 	if err := json.Unmarshal(out, &payload); err != nil || len(payload.Items) == 0 {
 		return
 	}
@@ -136,21 +116,7 @@ func applyStorage(
 	info *Info,
 	out []byte,
 ) {
-	var payload struct {
-		Items []struct {
-			Name        string `json:"_name"`
-			BSDName     string `json:"bsd_name"`
-			SizeInBytes int64  `json:"size_in_bytes"`
-			FreeInBytes int64  `json:"free_space_in_bytes"`
-			FileSystem  string `json:"file_system"`
-			MountPoint  string `json:"mount_point"`
-			Writable    string `json:"writable"` // "yes"/"no"
-			CoreStorage []struct {
-				MediumType  string `json:"medium_type"`
-				SmartStatus string `json:"smart_status"`
-			} `json:"com.apple.corestorage.pv"`
-		} `json:"SPStorageDataType"`
-	}
+	var payload storagePayload
 	if err := json.Unmarshal(out, &payload); err != nil {
 		return
 	}
@@ -185,12 +151,18 @@ func applyPower(
 		return
 	}
 	for _, item := range payload.Items {
-		name, _ := item["_name"].(string)
+		name, ok := item["_name"].(string)
+		if !ok {
+			continue
+		}
+
 		switch name {
 		case "spbattery_information":
 			info.Battery = parseBattery(item)
 		case "sppower_ac_charger_information":
 			info.Charger = parseCharger(item)
+		default:
+			// A key this collector does not report.
 		}
 	}
 }
@@ -221,7 +193,7 @@ func parseBattery(
 		Voltage:          firstInt(item, nil, "sppower_current_voltage"),
 	}
 	if maxc > 0 {
-		b.Remaining = cur * 100 / maxc
+		b.Remaining = cur * percent / maxc
 	}
 	return b
 }
@@ -259,16 +231,12 @@ func firstString(
 	primary, secondary map[string]any,
 	key string,
 ) string {
-	if primary != nil {
-		if s, ok := primary[key].(string); ok && s != "" {
+	for _, m := range []map[string]any{primary, secondary} {
+		if s, ok := m[key].(string); ok && s != "" {
 			return s
 		}
 	}
-	if secondary != nil {
-		if s, ok := secondary[key].(string); ok && s != "" {
-			return s
-		}
-	}
+
 	return ""
 }
 
@@ -280,19 +248,29 @@ func firstInt(
 	key string,
 ) int {
 	for _, m := range []map[string]any{primary, secondary} {
-		if m == nil {
-			continue
-		}
-		switch v := m[key].(type) {
-		case float64:
-			return int(v)
-		case string:
-			if n, err := strconv.Atoi(v); err == nil {
-				return n
-			}
+		if n, ok := asInt(m[key]); ok {
+			return n
 		}
 	}
+
 	return 0
+}
+
+// asInt reads a number that system_profiler reports either as JSON
+// number or as a quoted string, depending on the machine.
+func asInt(
+	v any,
+) (int, bool) {
+	switch n := v.(type) {
+	case float64:
+		return int(n), true
+	case string:
+		i, err := strconv.Atoi(n)
+
+		return i, err == nil
+	default:
+		return 0, false
+	}
 }
 
 // firstBool normalizes system_profiler's string-boolean convention
@@ -341,6 +319,53 @@ func anyToInt(
 		if n, err := strconv.Atoi(x); err == nil {
 			return n
 		}
+	default:
+		// A key this collector does not report.
 	}
 	return 0
+}
+
+// The shapes system_profiler reports, named rather than nested so the
+// decode target is readable on its own.
+type hardwareItem struct {
+	MachineModel          string `json:"machine_model"`
+	MachineName           string `json:"machine_name"`
+	SerialNumber          string `json:"serial_number"`
+	PlatformUUID          string `json:"platform_UUID"`
+	ProvisioningUDID      string `json:"provisioning_UDID"`
+	CPUType               string `json:"cpu_type"`
+	ChipType              string `json:"chip_type"`
+	CurrentProcessorSpeed string `json:"current_processor_speed"`
+	NumberProcessors      any    `json:"number_processors"` // int on Intel, string on Apple Silicon
+	Packages              any    `json:"packages"`
+	L2CacheCore           string `json:"l2_cache_core"`
+	L3Cache               string `json:"l3_cache"`
+	PhysicalMemory        string `json:"physical_memory"`
+	BootROMVersion        string `json:"boot_rom_version"`
+	OSLoaderVersion       string `json:"os_loader_version"`
+	SMCVersionSystem      string `json:"SMC_version_system"`
+}
+
+type hardwarePayload struct {
+	Items []hardwareItem `json:"SPHardwareDataType"`
+}
+
+type coreStorageVolume struct {
+	MediumType  string `json:"medium_type"`
+	SmartStatus string `json:"smart_status"`
+}
+
+type storageItem struct {
+	Name        string              `json:"_name"`
+	BSDName     string              `json:"bsd_name"`
+	SizeInBytes int64               `json:"size_in_bytes"`
+	FreeInBytes int64               `json:"free_space_in_bytes"`
+	FileSystem  string              `json:"file_system"`
+	MountPoint  string              `json:"mount_point"`
+	Writable    string              `json:"writable"` // "yes"/"no"
+	CoreStorage []coreStorageVolume `json:"com.apple.corestorage.pv"`
+}
+
+type storagePayload struct {
+	Items []storageItem `json:"SPStorageDataType"`
 }

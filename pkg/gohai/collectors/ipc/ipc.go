@@ -86,6 +86,12 @@ type Collector interface {
 type base struct{}
 
 // Name returns "ipc".
+// /proc/sys/kernel/sem holds SEMMSL SEMMNS SEMOPM SEMMNI in order.
+const (
+	semOPM = 2
+	semMNI = 3
+)
+
 func (base) Name() string { return "ipc" }
 
 // Category returns "linux".
@@ -135,11 +141,11 @@ func parseSem(
 	if len(fields) >= 2 {
 		lim.SEMMNS = fields[1]
 	}
-	if len(fields) >= 3 {
-		lim.SEMOPM = fields[2]
+	if len(fields) > semOPM {
+		lim.SEMOPM = fields[semOPM]
 	}
-	if len(fields) >= 4 {
-		lim.SEMMNI = fields[3]
+	if len(fields) > semMNI {
+		lim.SEMMNI = fields[semMNI]
 	}
 	return lim
 }

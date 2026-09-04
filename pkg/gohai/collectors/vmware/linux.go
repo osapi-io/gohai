@@ -50,6 +50,9 @@ type Linux struct {
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem and executor.
+// statCommand is the vmware-toolbox-cmd subcommand this reads.
+const statCommand = "stat"
+
 func NewLinux() *Linux {
 	return &Linux{
 		FS:   osfs.NewWithNoIdm(),
@@ -107,15 +110,15 @@ func collectVMwareTools(
 
 	// stat subcommand parameters — mirrors Ohai's iteration.
 	info.Version = run("-v")
-	info.Hosttime = run("stat", "hosttime")
-	info.Speed = run("stat", "speed")
-	info.SessionID = run("stat", "sessionid")
-	info.Balloon = run("stat", "balloon")
-	info.Swap = run("stat", "swap")
-	info.MemLimit = run("stat", "memlimit")
-	info.MemRes = run("stat", "memres")
-	info.CPURes = run("stat", "cpures")
-	info.CPULimit = run("stat", "cpulimit")
+	info.Hosttime = run(statCommand, "hosttime")
+	info.Speed = run(statCommand, "speed")
+	info.SessionID = run(statCommand, "sessionid")
+	info.Balloon = run(statCommand, "balloon")
+	info.Swap = run(statCommand, "swap")
+	info.MemLimit = run(statCommand, "memlimit")
+	info.MemRes = run(statCommand, "memres")
+	info.CPURes = run(statCommand, "cpures")
+	info.CPULimit = run(statCommand, "cpulimit")
 
 	// status subcommand parameters.
 	info.UpgradeStatus = run("upgrade", "status")
@@ -124,7 +127,7 @@ func collectVMwareTools(
 	// Distinguish desktop vs vSphere by querying the raw session JSON.
 	// An empty response means VMware Workstation/Fusion (desktop).
 	// A JSON response with a "version" key means vSphere.
-	rawSession := run("stat", "raw", "json", "session")
+	rawSession := run(statCommand, "raw", "json", "session")
 	if rawSession == "" {
 		info.HostType = "vmware_desktop"
 	} else {

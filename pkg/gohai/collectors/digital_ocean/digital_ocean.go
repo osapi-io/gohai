@@ -22,6 +22,8 @@
 // the link-local metadata server at http://169.254.169.254/metadata/v1.json.
 // The collector returns nil with no error when the endpoint is not
 // reachable — that's the signal that the host isn't a DO droplet.
+//
+//nolint:revive // package-naming: renaming changes a published import path
 package digital_ocean
 
 import (
@@ -40,6 +42,10 @@ import (
 const ProviderName = "digital_ocean"
 
 // metadataBaseURL is DigitalOcean's link-local metadata endpoint.
+// The instance metadata service is link-local and serves plain
+// HTTP only; there is no HTTPS endpoint to point this at.
+//
+//nolint:revive // unsecure-url-scheme
 const metadataBaseURL = "http://169.254.169.254"
 
 // metadataPath returns the entire droplet metadata as one JSON blob.

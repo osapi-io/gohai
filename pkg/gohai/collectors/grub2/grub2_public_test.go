@@ -83,26 +83,28 @@ func (s *Grub2PublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := grub2.New()
 			s.Equal("grub2", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*grub2.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*grub2.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -124,13 +126,13 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: no grubenv on any path — nil environment",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return memfs.New() },
 			wantEnv: nil,
 		},
 		{
 			name:    "linux: grubenv at /boot/grub2/grubenv",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/boot/grub2/grubenv": grubenv,
@@ -145,7 +147,7 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: grubenv at /boot/grub/grubenv (Debian path)",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/boot/grub/grubenv": "# GRUB Environment Block\nsaved_entry=ubuntu\n",
@@ -157,7 +159,7 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: grub2 path takes priority over grub path",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/boot/grub2/grubenv": "from=grub2\n",
@@ -168,7 +170,7 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: empty grubenv file",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/boot/grub2/grubenv": "",
@@ -178,7 +180,7 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: lines without equals sign are skipped",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/boot/grub2/grubenv": "# comment\nno_equals_here\nkey=value\n",
@@ -191,10 +193,12 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c grub2.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &grub2.Linux{FS: tt.setupFS()}
 			case "darwin":
 				c = &grub2.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

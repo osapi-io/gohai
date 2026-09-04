@@ -47,16 +47,16 @@ func (s *OptionsPublicTestSuite) TestNew() {
 		{"defaults", nil, false},
 		{"with disabled", []gohai.Option{gohai.WithDisabled("platform")}, false},
 		{"with collectors only", []gohai.Option{gohai.WithCollectors("platform")}, false},
-		{"unknown enabled errors", []gohai.Option{gohai.WithEnabled("nope")}, true},
-		{"unknown disabled errors", []gohai.Option{gohai.WithDisabled("nope")}, true},
-		{"unknown only errors", []gohai.Option{gohai.WithCollectors("nope")}, true},
+		{"unknown enabled errors", []gohai.Option{gohai.WithEnabled(valueNope)}, true},
+		{"unknown disabled errors", []gohai.Option{gohai.WithDisabled(valueNope)}, true},
+		{"unknown only errors", []gohai.Option{gohai.WithCollectors(valueNope)}, true},
 		{"with category cloud", []gohai.Option{gohai.WithCategory("cloud")}, false},
 		{
 			"with category hardware stacks",
 			[]gohai.Option{gohai.WithCategory("hardware", "cloud")},
 			false,
 		},
-		{"unknown category errors", []gohai.Option{gohai.WithCategory("nope")}, true},
+		{"unknown category errors", []gohai.Option{gohai.WithCategory(valueNope)}, true},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {

@@ -33,8 +33,9 @@ import (
 	"github.com/osapi-io/gohai/internal/cli"
 )
 
-// Execute runs the gohai CLI. Called from main.go.
-func Execute() {
+// Execute runs the gohai CLI. Called from main.go, which owns the exit
+// code so that this stays testable.
+func Execute() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -47,10 +48,8 @@ func Execute() {
 	}()
 
 	cmd := newRootCommand()
-	if err := cmd.ExecuteContext(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
+
+	return cmd.ExecuteContext(ctx)
 }
 
 func newRootCommand() *cobra.Command {

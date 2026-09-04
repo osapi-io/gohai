@@ -24,19 +24,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/ocsf"
+)
+
+// OutputFormat selects how facts are rendered.
+type OutputFormat int
+
+const (
+	// FormatJSON writes the fact tree as JSON.
+	FormatJSON OutputFormat = iota
+	// FormatFlat writes sorted dot-separated key=value pairs.
+	FormatFlat
 )
 
 // WriteOutput writes facts to out in the requested format.
 func WriteOutput(
 	out io.Writer,
 	facts *gohai.Facts,
-	pretty, flat bool,
+	format OutputFormat,
+	pretty bool,
 ) error {
-	if flat {
+	if format == FormatFlat {
 		return WriteFlat(out, facts)
 	}
 
@@ -55,7 +66,7 @@ func WriteFlat(
 		keys = append(keys, k)
 	}
 
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	for _, k := range keys {
 		if _, err := fmt.Fprintf(out, "%s=%v\n", k, flatMap[k]); err != nil {
@@ -128,6 +139,27 @@ func WriteOCSF(
 }
 
 // WriteCollectorList writes the collector registry grouped by category.
+// writeCategory writes one category heading and the collectors under it.
+func writeCategory(
+	out io.Writer,
+	cat string,
+	names []string,
+) error {
+	slices.Sort(names)
+
+	if _, err := fmt.Fprintf(out, "[%s]\n", cat); err != nil {
+		return fmt.Errorf("write collector list: %w", err)
+	}
+
+	for _, n := range names {
+		if _, err := fmt.Fprintf(out, "  %s\n", n); err != nil {
+			return fmt.Errorf("write collector list: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func WriteCollectorList(
 	out io.Writer,
 ) error {
@@ -144,20 +176,11 @@ func WriteCollectorList(
 		cats = append(cats, c)
 	}
 
-	sort.Strings(cats)
+	slices.Sort(cats)
 
 	for _, cat := range cats {
-		names := byCat[cat]
-		sort.Strings(names)
-
-		if _, err := fmt.Fprintf(out, "[%s]\n", cat); err != nil {
-			return fmt.Errorf("write collector list: %w", err)
-		}
-
-		for _, n := range names {
-			if _, err := fmt.Fprintf(out, "  %s\n", n); err != nil {
-				return fmt.Errorf("write collector list: %w", err)
-			}
+		if err := writeCategory(out, cat, byCat[cat]); err != nil {
+			return err
 		}
 	}
 

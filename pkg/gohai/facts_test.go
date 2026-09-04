@@ -561,6 +561,18 @@ func (s *FactsTestSuite) TestCountPopulated() {
 			},
 			want: 46,
 		},
+		{
+			// These four were set but never counted: countPopulated
+			// listed its fields by hand and had fallen behind set.
+			name: "counts sessions, hardware, scsi and pci",
+			facts: &Facts{
+				Sessions: &sessions.Info{},
+				Hardware: &hardware.Info{},
+				SCSI:     &scsi.Info{},
+				PCI:      &pci.Info{},
+			},
+			want: 4,
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {

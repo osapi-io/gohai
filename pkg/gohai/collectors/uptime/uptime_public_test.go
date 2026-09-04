@@ -60,11 +60,11 @@ func (s *UptimePublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -75,12 +75,14 @@ func (s *UptimePublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*uptime.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*uptime.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -109,60 +111,60 @@ func (s *UptimePublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: 3h up + idle parsed",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("12345.67 9876.54\n", true) },
 			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: value3h12m5s,
 				IdleSeconds: 9876, IdleHuman: "2h 44m 36s",
 			},
 		},
 		{
 			name:    "linux: missing /proc/uptime omits idle",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("", false) },
 			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: value3h12m5s,
 			},
 		},
 		{
 			name:    "linux: malformed /proc/uptime omits idle",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("12345.67\n", true) },
 			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: value3h12m5s,
 			},
 		},
 		{
 			name:    "linux: unparseable idle field omits",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("12345.67 xyz\n", true) },
 			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: value3h12m5s,
 			},
 		},
 		{
 			name:    "linux: negative idle omits",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("12345.67 -1.0\n", true) },
 			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: value3h12m5s,
 			},
 		},
 		{
 			name:    "linux: gopsutil error wrapped and returned",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
 			setupFS: func() avfs.VFS { return buildFS("1 1\n", true) },
 			wantErr: true,
 		},
 		{
 			name:    "darwin: uptime returned",
-			variant: "darwin",
+			variant: osDarwin,
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{Uptime: 7200, BootTime: 1_700_000_000}, nil
 			},
@@ -170,7 +172,7 @@ func (s *UptimePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: gopsutil error propagated",
-			variant: "darwin",
+			variant: osDarwin,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
@@ -180,10 +182,12 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			defer uptime.SetHostInfoFn(tt.hostFn)()
 			var c uptime.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &uptime.Linux{FS: tt.setupFS()}
-			case "darwin":
+			case osDarwin:
 				c = &uptime.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {
@@ -207,7 +211,7 @@ func (s *UptimePublicTestSuite) TestHumanDuration() {
 		{"zero seconds", 0, "0s"},
 		{"seconds only", 45, "45s"},
 		{"minutes and seconds", 75, "1m 15s"},
-		{"hours/minutes/seconds", 3*3600 + 12*60 + 5, "3h 12m 5s"},
+		{"hours/minutes/seconds", 3*3600 + 12*60 + 5, value3h12m5s},
 		{"days+hours+minutes+seconds", 2*86400 + 5*3600 + 12*60 + 5, "2d 5h 12m 5s"},
 	}
 	for _, tt := range tests {

@@ -86,7 +86,7 @@ func probe(
 // none found.
 func firstFound(
 	names ...string,
-) (string, string) {
+) (name string, path string) {
 	for _, n := range names {
 		if p := probe(n); p != "" {
 			return n, p

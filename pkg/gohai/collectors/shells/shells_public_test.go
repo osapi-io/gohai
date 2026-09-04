@@ -75,19 +75,19 @@ func (s *ShellsPublicTestSuite) TestNew() {
 	}{
 		{
 			"darwin dispatches to Darwin + wires FS",
-			"darwin",
-			"darwin",
+			osDarwin,
+			osDarwin,
 			func() avfs.VFS { return shells.NewDarwin().FS },
 		},
 		{
 			"debian dispatches to Linux + wires FS",
 			"debian",
-			"linux",
+			osLinux,
 			func() avfs.VFS { return shells.NewLinux().FS },
 		},
-		{"rhel dispatches to Linux", "rhel", "linux", nil},
-		{"arch dispatches to Linux", "arch", "linux", nil},
-		{"unknown dispatches to Linux", "", "linux", nil},
+		{"rhel dispatches to Linux", "rhel", osLinux, nil},
+		{"arch dispatches to Linux", "arch", osLinux, nil},
+		{"unknown dispatches to Linux", "", osLinux, nil},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -98,12 +98,14 @@ func (s *ShellsPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*shells.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*shells.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 			if tt.wantFSFrom != nil {
 				s.NotNil(tt.wantFSFrom())
@@ -122,74 +124,74 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: canonical /etc/shells",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.WriteFile("/etc/shells",
+				_ = f.MkdirAll(pathEtc, 0o755)
+				_ = f.WriteFile(pathEtcShells,
 					[]byte("# comment\n/bin/sh\n/bin/bash\n\n/usr/bin/zsh\n"),
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"},
+			want: []string{pathBinSh, "/bin/bash", "/usr/bin/zsh"},
 		},
 		{
 			name:    "linux: non-absolute entries skipped",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.WriteFile("/etc/shells",
+				_ = f.MkdirAll(pathEtc, 0o755)
+				_ = f.WriteFile(pathEtcShells,
 					[]byte("/bin/sh\nnologin\nbash\n/bin/zsh\n"),
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/sh", "/bin/zsh"},
+			want: []string{pathBinSh, "/bin/zsh"},
 		},
 		{
 			name:    "linux: whitespace trimmed",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.WriteFile("/etc/shells",
+				_ = f.MkdirAll(pathEtc, 0o755)
+				_ = f.WriteFile(pathEtcShells,
 					[]byte("  /bin/bash  \n\t/bin/sh\t\n"),
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/bash", "/bin/sh"},
+			want: []string{"/bin/bash", pathBinSh},
 		},
 		{
 			name:    "linux: empty file",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.WriteFile("/etc/shells", []byte{}, fs.FileMode(0o644))
+				_ = f.MkdirAll(pathEtc, 0o755)
+				_ = f.WriteFile(pathEtcShells, []byte{}, fs.FileMode(0o644))
 				return f
 			},
 			want: []string{},
 		},
 		{
 			name:    "linux: missing file soft-misses",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return memfs.New() },
 			want:    []string{},
 		},
 		{
 			name:    "linux: other read error propagated",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
 			wantErr: true,
 		},
 		{
 			name:    "darwin: canonical macOS /etc/shells",
-			variant: "darwin",
+			variant: osDarwin,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.MkdirAll(pathEtc, 0o755)
 				_ = f.WriteFile(
-					"/etc/shells",
+					pathEtcShells,
 					[]byte(
 						"/bin/bash\n/bin/csh\n/bin/dash\n/bin/ksh\n/bin/sh\n/bin/tcsh\n/bin/zsh\n",
 					),
@@ -202,14 +204,14 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 				"/bin/csh",
 				"/bin/dash",
 				"/bin/ksh",
-				"/bin/sh",
+				pathBinSh,
 				"/bin/tcsh",
 				"/bin/zsh",
 			},
 		},
 		{
 			name:    "darwin: missing file soft-misses",
-			variant: "darwin",
+			variant: osDarwin,
 			setupFS: func() avfs.VFS { return memfs.New() },
 			want:    []string{},
 		},
@@ -218,10 +220,12 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c shells.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &shells.Linux{FS: tt.setupFS()}
-			case "darwin":
+			case osDarwin:
 				c = &shells.Darwin{FS: tt.setupFS()}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

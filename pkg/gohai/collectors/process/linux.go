@@ -39,7 +39,7 @@ func NewLinux() *Linux {
 }
 
 // Collect returns a process snapshot.
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

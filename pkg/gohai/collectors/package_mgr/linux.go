@@ -46,7 +46,7 @@ func NewLinux() *Linux {
 //
 // apt/dnf/yum are intentionally NOT probed here — those hosts dispatch
 // to the Debian or RHEL variant before ever reaching this one.
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

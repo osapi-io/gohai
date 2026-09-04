@@ -87,7 +87,7 @@ func (s *ScalewayPublicTestSuite) TestInterface() {
 		got  any
 		want any
 	}{
-		{"Name", c.Name(), "scaleway"},
+		{"Name", c.Name(), cloudScaleway},
 		{"Category", c.Category(), "cloud"},
 		{"DefaultEnabled", c.DefaultEnabled(), false},
 		{"Dependencies", c.Dependencies(), []string(nil)},
@@ -158,7 +158,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "404 drops silently when cmdline says scaleway",
-			cmdline: "scaleway",
+			cmdline: cloudScaleway,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				http.NotFound(w, nil)
 			},
@@ -166,14 +166,14 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "connection refused drops silently",
-			cmdline: "scaleway",
+			cmdline: cloudScaleway,
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
 			wantNil: true,
 		},
 		{
 			name:    "malformed JSON surfaces as error",
-			cmdline: "scaleway",
+			cmdline: cloudScaleway,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte("not json"))
 			},
@@ -181,7 +181,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "empty optional nested objects produce empty fields",
-			cmdline: "scaleway",
+			cmdline: cloudScaleway,
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(`{"id":"sc-x","tags":[]}`))
 			},

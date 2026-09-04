@@ -75,8 +75,8 @@ func (s *ThemePublicTestSuite) TestAccent() {
 		tty      bool
 		wantAnsi bool
 	}{
-		{name: "non-TTY returns plain text", tty: false, wantAnsi: false},
-		{name: "TTY wraps with ANSI", tty: true, wantAnsi: true},
+		{name: nonTTYReturnsPlainText, tty: false, wantAnsi: false},
+		{name: tTYWrapsWithANSI, tty: true, wantAnsi: true},
 	}
 
 	for _, tc := range tests {
@@ -101,8 +101,8 @@ func (s *ThemePublicTestSuite) TestOK() {
 		tty      bool
 		wantAnsi bool
 	}{
-		{name: "non-TTY returns plain text", tty: false, wantAnsi: false},
-		{name: "TTY wraps with ANSI", tty: true, wantAnsi: true},
+		{name: nonTTYReturnsPlainText, tty: false, wantAnsi: false},
+		{name: tTYWrapsWithANSI, tty: true, wantAnsi: true},
 	}
 
 	for _, tc := range tests {
@@ -127,8 +127,8 @@ func (s *ThemePublicTestSuite) TestErr() {
 		tty      bool
 		wantAnsi bool
 	}{
-		{name: "non-TTY returns plain text", tty: false, wantAnsi: false},
-		{name: "TTY wraps with ANSI", tty: true, wantAnsi: true},
+		{name: nonTTYReturnsPlainText, tty: false, wantAnsi: false},
+		{name: tTYWrapsWithANSI, tty: true, wantAnsi: true},
 	}
 
 	for _, tc := range tests {
@@ -153,8 +153,8 @@ func (s *ThemePublicTestSuite) TestInfo() {
 		tty      bool
 		wantAnsi bool
 	}{
-		{name: "non-TTY returns plain text", tty: false, wantAnsi: false},
-		{name: "TTY wraps with ANSI", tty: true, wantAnsi: true},
+		{name: nonTTYReturnsPlainText, tty: false, wantAnsi: false},
+		{name: tTYWrapsWithANSI, tty: true, wantAnsi: true},
 	}
 
 	for _, tc := range tests {

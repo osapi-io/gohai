@@ -56,6 +56,9 @@ type Collector interface {
 
 type base struct{}
 
+// gopsutil reports creation time in milliseconds.
+const millisPerSecond = 1000
+
 func (base) Name() string     { return "process" }
 func (base) Category() string { return collector.CategoryMisc }
 
@@ -104,24 +107,48 @@ func snapshotFromGopsutil(
 	p *process.Process,
 ) Process {
 	out := Process{PID: p.Pid}
+
 	if ppid, err := p.Ppid(); err == nil {
 		out.ParentPID = ppid
 	}
-	if n, err := p.Name(); err == nil {
-		out.Name = n
+
+	applyProcessStrings(p, &out)
+	applyProcessState(p, &out)
+
+	return out
+}
+
+// applyProcessStrings copies the descriptive fields. Each is read
+// separately because a process can deny one and answer the rest.
+func applyProcessStrings(
+	p *process.Process,
+	out *Process,
+) {
+	for _, f := range []struct {
+		read func() (string, error)
+		dst  *string
+	}{
+		{p.Name, &out.Name},
+		{p.Username, &out.Owner},
+		{p.Cmdline, &out.CmdLine},
+	} {
+		if v, err := f.read(); err == nil {
+			*f.dst = v
+		}
 	}
-	if u, err := p.Username(); err == nil {
-		out.Owner = u
-	}
-	if cl, err := p.Cmdline(); err == nil {
-		out.CmdLine = cl
-	}
+}
+
+// applyProcessState copies the run state and start time.
+func applyProcessState(
+	p *process.Process,
+	out *Process,
+) {
 	if st, err := p.Status(); err == nil && len(st) > 0 {
 		out.State = st[0]
 	}
+
+	// gopsutil reports creation time in milliseconds since the epoch.
 	if ct, err := p.CreateTime(); err == nil && ct > 0 {
-		// gopsutil returns ms since epoch; convert to seconds.
-		out.CreationTime = ct / 1000
+		out.CreationTime = ct / millisPerSecond
 	}
-	return out
 }

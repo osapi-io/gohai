@@ -46,6 +46,12 @@ type Linux struct {
 
 // NewLinux returns a Linux variant wired to the real OS filesystem and
 // the production Executor.
+// The printable range of ASCII, which is all this keeps.
+const (
+	asciiSpace = 0x20
+	asciiDEL   = 0x7f
+)
+
 func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
@@ -71,121 +77,230 @@ func cascadeLinux(
 	prior collector.PriorResults,
 	info *Info,
 ) {
-	// 0. systemd-detect-virt fast-path (not from Ohai but cheap and
-	//    authoritative on systemd hosts).
-	detectViaSystemd(ctx, exec, info)
+	// Ohai's order, and its numbering. Each step contributes what it
+	// finds; the last authoritative signal wins.
+	detectViaSystemd(ctx, exec, info) // 0.
+	detectHostBinaries(ctx, exec, info)
+	detectXen(fs, info)        // 3.
+	detectVirtualBox(fs, info) // 4.
+	detectKVM(fs, prior, info) // 6, 7.
+	detectViaDMI(fs, info)     // 8.
+	detectOpenVZ(fs, info)     // 9.
+	detectHyperV(fs, info)     // 10.
+	detectVServer(fs, info)    // 11.
+	detectViaCgroup(fs, info)  // 12.
+	detectLXCHost(ctx, fs, exec, info)
+	detectDockerEnv(fs, info) // 13.
+	detectLXD(fs, info)       // 14.
+}
 
-	// 1. docker / 2. podman / 5. nova as host binaries.
-	if execBinaryOnPath(ctx, exec, "docker") {
-		addSystem(info, "docker", "host", false)
-	}
-	if execBinaryOnPath(ctx, exec, "podman") {
-		addSystem(info, "podman", "host", false)
-	}
-	if execBinaryOnPath(ctx, exec, "nova") {
-		addSystem(info, "openstack", "host", false)
-	}
-
-	// 3. Xen.
-	if fileExists(fs, "/proc/xen") {
-		addSystem(info, "xen", "guest", false)
-		if fileContains(fs, "/proc/xen/capabilities", "control_d") {
-			addSystem(info, "xen", "host", true)
+// detectHostBinaries treats a management binary on PATH as evidence the
+// host runs that platform. Steps 1, 2 and 5.
+func detectHostBinaries(
+	ctx context.Context,
+	exec executor.Executor,
+	info *Info,
+) {
+	for _, b := range []struct{ bin, system string }{
+		{systemDocker, systemDocker},
+		{"podman", "podman"},
+		{"nova", systemOpenStack},
+	} {
+		if execBinaryOnPath(ctx, exec, b.bin) {
+			addSystem(info, b.system, roleHost)
 		}
 	}
+}
 
-	// 4. VirtualBox via /proc/modules.
-	if b, err := fs.ReadFile("/proc/modules"); err == nil {
-		text := string(b)
-		if containsLineWithPrefix(text, "vboxdrv") {
-			addSystem(info, "vbox", "host", false)
-		} else if containsLineWithPrefix(text, "vboxguest") {
-			addSystem(info, "vbox", "guest", false)
-		}
+// detectXen reads /proc/xen. control_d in its capabilities means this is
+// dom0 — the host — rather than a guest.
+func detectXen(
+	fs avfs.VFS,
+	info *Info,
+) {
+	if !fileExists(fs, "/proc/xen") {
+		return
 	}
 
-	// 6/7. KVM.
+	addSystem(info, systemXen, roleGuest)
+
+	if fileContains(fs, "/proc/xen/capabilities", "control_d") {
+		overrideSystem(info, systemXen, roleHost)
+	}
+}
+
+// detectVirtualBox tells the host driver from the guest additions by
+// which module is loaded.
+func detectVirtualBox(
+	fs avfs.VFS,
+	info *Info,
+) {
+	b, err := fs.ReadFile("/proc/modules")
+	if err != nil {
+		return
+	}
+
+	text := string(b)
+
+	switch {
+	case containsLineWithPrefix(text, "vboxdrv"):
+		addSystem(info, "vbox", roleHost)
+	case containsLineWithPrefix(text, "vboxguest"):
+		addSystem(info, "vbox", roleGuest)
+	default:
+		// Neither module is loaded.
+	}
+}
+
+// detectKVM looks at the CPU model, the kvm device, and what lscpu
+// reported. Steps 6, 7 and 7b.
+func detectKVM(
+	fs avfs.VFS,
+	prior collector.PriorResults,
+	info *Info,
+) {
 	if b, err := fs.ReadFile("/proc/cpuinfo"); err == nil {
-		text := string(b)
-		if strings.Contains(text, "QEMU Virtual CPU") ||
-			strings.Contains(text, "Common KVM processor") ||
-			strings.Contains(text, "Common 32-bit KVM processor") {
-			addSystem(info, "kvm", "guest", false)
-		}
-		if fileExists(fs, "/sys/devices/virtual/misc/kvm") {
-			role := "host"
-			if strings.Contains(text, " hypervisor") || strings.Contains(text, "\thypervisor") {
-				role = "guest"
-			}
-			addSystem(info, "kvm", role, false)
-		}
+		detectKVMFromCPUInfo(fs, string(b), info)
 	}
-	// 7b. KVM via cpu prior (lscpu's hypervisor_vendor / virtualization_type).
-	// Covers nested VMs where /sys/devices/virtual/misc/kvm isn't present
+
+	// Covers a nested VM, where /sys/devices/virtual/misc/kvm is absent
 	// but lscpu still reports a hypervisor. Matches Ohai's
-	// cpu[:hypervisor_vendor] == "KVM" + cpu[:virtualization_type] check.
-	if cpuInfo, ok := collector.GetDep[*cpu.Info](prior, "cpu"); ok && cpuInfo != nil {
-		if strings.EqualFold(cpuInfo.HypervisorVendor, "KVM") &&
-			(cpuInfo.VirtualizationType == "full" || cpuInfo.VirtualizationType == "para") {
-			addSystem(info, "kvm", "guest", false)
-		}
+	// cpu[:hypervisor_vendor] == "KVM" check.
+	cpuInfo, ok := collector.GetDep[*cpu.Info](prior, "cpu")
+	if !ok || cpuInfo == nil {
+		return
 	}
 
-	// 8. DMI match.
-	detectViaDMI(fs, info)
+	if strings.EqualFold(cpuInfo.HypervisorVendor, "KVM") &&
+		(cpuInfo.VirtualizationType == "full" ||
+			cpuInfo.VirtualizationType == "para") {
+		addSystem(info, systemKVM, roleGuest)
+	}
+}
 
-	// 9. OpenVZ.
-	if fileExists(fs, "/proc/bc/0") {
-		addSystem(info, "openvz", "host", false)
-	} else if fileExists(fs, "/proc/vz") {
-		addSystem(info, "openvz", "guest", false)
+// detectKVMFromCPUInfo reads the guest signature out of the CPU model,
+// then decides host or guest from the hypervisor flag.
+func detectKVMFromCPUInfo(
+	fs avfs.VFS,
+	text string,
+	info *Info,
+) {
+	if strings.Contains(text, "QEMU Virtual CPU") ||
+		strings.Contains(text, "Common KVM processor") ||
+		strings.Contains(text, "Common 32-bit KVM processor") {
+		addSystem(info, systemKVM, roleGuest)
 	}
 
-	// 10. Hyper-V KVP. When we see the pool file, extract the host
-	// name between "HostName" and "HostingSystemEditionId" — matches
-	// Ohai's linux/virtualization.rb extraction. Keeps Raw printable
-	// bytes only and lowercases, same as Ohai's behaviour.
-	if b, err := fs.ReadFile("/var/lib/hyperv/.kvp_pool_3"); err == nil {
-		addSystem(info, "hyperv", "guest", false)
-		info.HypervisorHost = parseHypervKVPHostName(b)
+	if !fileExists(fs, "/sys/devices/virtual/misc/kvm") {
+		return
 	}
 
-	// 11. linux-vserver.
-	if b, err := fs.ReadFile("/proc/self/status"); err == nil {
-		text := string(b)
-		switch {
-		case strings.Contains(text, "s_context: 0") || strings.Contains(text, "VxID: 0"):
-			addSystem(info, "linux-vserver", "host", false)
-		case strings.Contains(text, "s_context:") || strings.Contains(text, "VxID:"):
-			addSystem(info, "linux-vserver", "guest", false)
-		}
+	role := roleHost
+	if strings.Contains(text, " hypervisor") ||
+		strings.Contains(text, "\thypervisor") {
+		role = roleGuest
 	}
 
-	// 12. cgroup / environ container detection.
-	detectViaCgroup(fs, info)
+	addSystem(info, systemKVM, role)
+}
 
-	// 12a. LXC host: lxc-version or lxc-start on PATH AND cgroup root
-	// paths are all "/" (host-side cgroup namespace, not a container).
-	// Only fires when nothing else set System — matches Ohai OHAI-573
-	// guard to prevent false positives on lxc hosts that also look
-	// container-like via other signals.
-	if info.System == "" && cgroupRootsAllSlash(fs) {
-		if execBinaryOnPath(ctx, exec, "lxc-version") || execBinaryOnPath(ctx, exec, "lxc-start") {
-			addSystem(info, "lxc", "host", false)
-		}
+// detectOpenVZ distinguishes the host's /proc/bc/0 from a guest's
+// /proc/vz.
+func detectOpenVZ(
+	fs avfs.VFS,
+	info *Info,
+) {
+	switch {
+	case fileExists(fs, "/proc/bc/0"):
+		addSystem(info, "openvz", roleHost)
+	case fileExists(fs, "/proc/vz"):
+		addSystem(info, "openvz", roleGuest)
+	default:
+		// Neither path is present.
+	}
+}
+
+// detectHyperV reads the KVP pool file, which names the hosting system.
+func detectHyperV(
+	fs avfs.VFS,
+	info *Info,
+) {
+	b, err := fs.ReadFile("/var/lib/hyperv/.kvp_pool_3")
+	if err != nil {
+		return
 	}
 
-	// 13. .dockerenv / .dockerinit override.
+	addSystem(info, "hyperv", roleGuest)
+	info.HypervisorHost = parseHypervKVPHostName(b)
+}
+
+// detectVServer reads the vserver context out of /proc/self/status.
+// Context zero is the host.
+func detectVServer(
+	fs avfs.VFS,
+	info *Info,
+) {
+	b, err := fs.ReadFile("/proc/self/status")
+	if err != nil {
+		return
+	}
+
+	text := string(b)
+
+	switch {
+	case strings.Contains(text, "s_context: 0") ||
+		strings.Contains(text, "VxID: 0"):
+		addSystem(info, "linux-vserver", roleHost)
+	case strings.Contains(text, "s_context:") ||
+		strings.Contains(text, "VxID:"):
+		addSystem(info, "linux-vserver", roleGuest)
+	default:
+		// Not a vserver at all.
+	}
+}
+
+// detectLXCHost fires only when nothing else claimed the host, which is
+// Ohai's OHAI-573 guard against an LXC host that also looks
+// container-like through another signal.
+func detectLXCHost(
+	ctx context.Context,
+	fs avfs.VFS,
+	exec executor.Executor,
+	info *Info,
+) {
+	if info.System != "" || !cgroupRootsAllSlash(fs) {
+		return
+	}
+
+	if execBinaryOnPath(ctx, exec, "lxc-version") ||
+		execBinaryOnPath(ctx, exec, "lxc-start") {
+		addSystem(info, "lxc", roleHost)
+	}
+}
+
+// detectDockerEnv is authoritative: these files exist only inside a
+// container, so they override whatever an earlier step decided.
+func detectDockerEnv(
+	fs avfs.VFS,
+	info *Info,
+) {
 	if fileExists(fs, "/.dockerenv") || fileExists(fs, "/.dockerinit") {
-		addSystem(info, "docker", "guest", true)
+		overrideSystem(info, systemDocker, roleGuest)
+	}
+}
+
+// detectLXD tells the guest socket from the host's devlxd endpoint.
+func detectLXD(
+	fs avfs.VFS,
+	info *Info,
+) {
+	if fileExists(fs, "/dev/lxd/sock") {
+		addSystem(info, "lxd", roleGuest)
 	}
 
-	// 14. LXD.
-	if fileExists(fs, "/dev/lxd/sock") {
-		addSystem(info, "lxd", "guest", false)
-	}
-	if fileExists(fs, "/var/lib/lxd/devlxd") || fileExists(fs, "/var/snap/lxd/common/lxd/devlxd") {
-		addSystem(info, "lxd", "host", false)
+	if fileExists(fs, "/var/lib/lxd/devlxd") ||
+		fileExists(fs, "/var/snap/lxd/common/lxd/devlxd") {
+		addSystem(info, "lxd", roleHost)
 	}
 }
 
@@ -210,13 +325,45 @@ func detectViaSystemd(
 		if v == "" || v == "none" {
 			continue
 		}
-		addSystem(info, v, "guest", false)
+		addSystem(info, v, roleGuest)
 	}
 }
 
 // detectViaDMI reads sysfs DMI fields and matches against Ohai's
 // full guest_from_dmi_data table. Manufacturer (sys_vendor) is
 // checked first, then product_name — matches mixin/dmi_decode.rb.
+// dmiSignal is one row of the DMI match table: a substring to look for,
+// the platform it identifies, and — for Hyper-V, which needs both DMI
+// fields — a product string that must also match.
+type dmiSignal struct {
+	match       string
+	system      string
+	alsoProduct string
+}
+
+// The DMI tables, in Ohai's order. Manufacturer is consulted first, and
+// the product name only when no manufacturer matched.
+var (
+	dmiVendorSignals = []dmiSignal{
+		{match: systemOpenStack, system: systemOpenStack},
+		{match: systemXen, system: systemXen},
+		{match: "vmware", system: "vmware"},
+		{match: "microsoft", system: "hyperv", alsoProduct: "virtual machine"},
+		{match: "amazon ec2", system: "amazonec2"},
+		{match: "qemu", system: systemKVM},
+		{match: "veertu", system: "veertu"},
+		{match: "parallels", system: "parallels"},
+	}
+
+	dmiProductSignals = []dmiSignal{
+		{match: "virtualbox", system: "vbox"},
+		{match: systemOpenStack, system: systemOpenStack},
+		{match: systemKVM, system: systemKVM},
+		{match: "rhev", system: systemKVM},
+		{match: "bhyve", system: "bhyve"},
+	}
+)
+
 func detectViaDMI(
 	fs avfs.VFS,
 	info *Info,
@@ -226,49 +373,43 @@ func detectViaDMI(
 		if err != nil {
 			return ""
 		}
+
 		return strings.TrimSpace(string(b))
 	}
+
 	product := strings.ToLower(dmi("/sys/class/dmi/id/product_name"))
 	vendor := strings.ToLower(dmi("/sys/class/dmi/id/sys_vendor"))
 
-	// Manufacturer-keyed signals (Ohai checks these first).
-	switch {
-	case strings.Contains(vendor, "openstack"):
-		addSystem(info, "openstack", "guest", false)
-		return
-	case strings.Contains(vendor, "xen"):
-		addSystem(info, "xen", "guest", false)
-		return
-	case strings.Contains(vendor, "vmware"):
-		addSystem(info, "vmware", "guest", false)
-		return
-	case strings.Contains(vendor, "microsoft") && strings.Contains(product, "virtual machine"):
-		addSystem(info, "hyperv", "guest", false)
-		return
-	case strings.Contains(vendor, "amazon ec2"):
-		addSystem(info, "amazonec2", "guest", false)
-		return
-	case strings.Contains(vendor, "qemu"):
-		addSystem(info, "kvm", "guest", false)
-		return
-	case strings.Contains(vendor, "veertu"):
-		addSystem(info, "veertu", "guest", false)
-		return
-	case strings.Contains(vendor, "parallels"):
-		addSystem(info, "parallels", "guest", false)
+	if matchDMI(info, vendor, product, dmiVendorSignals) {
 		return
 	}
-	// Product-keyed signals (fallback when vendor didn't match).
-	switch {
-	case strings.Contains(product, "virtualbox"):
-		addSystem(info, "vbox", "guest", false)
-	case strings.Contains(product, "openstack"):
-		addSystem(info, "openstack", "guest", false)
-	case strings.Contains(product, "kvm") || strings.Contains(product, "rhev"):
-		addSystem(info, "kvm", "guest", false)
-	case strings.Contains(product, "bhyve"):
-		addSystem(info, "bhyve", "guest", false)
+
+	matchDMI(info, product, product, dmiProductSignals)
+}
+
+// matchDMI records the first signal that matches, and reports whether
+// one did.
+func matchDMI(
+	info *Info,
+	value string,
+	product string,
+	signals []dmiSignal,
+) bool {
+	for _, s := range signals {
+		if !strings.Contains(value, s.match) {
+			continue
+		}
+
+		if s.alsoProduct != "" && !strings.Contains(product, s.alsoProduct) {
+			continue
+		}
+
+		addSystem(info, s.system, roleGuest)
+
+		return true
 	}
+
+	return false
 }
 
 // cgroupContainerRE matches Docker / LXC / containerd cgroup paths
@@ -289,32 +430,53 @@ func detectViaCgroup(
 	info *Info,
 ) {
 	if b, err := fs.ReadFile("/proc/self/cgroup"); err == nil {
-		text := string(b)
-		matched := false
-		if m := cgroupContainerRE.FindStringSubmatch(text); m != nil {
-			name := m[1]
-			if name == "containerd" {
-				name = "docker"
-			}
-			addSystem(info, name, "guest", false)
-			matched = true
-		}
-		if !matched {
-			if m := cgroupNestedContainerRE.FindStringSubmatch(text); m != nil {
-				addSystem(info, m[1], "guest", false)
-			}
-		}
+		detectFromCgroupPaths(string(b), info)
 	}
+
 	if b, err := fs.ReadFile("/proc/1/environ"); err == nil {
-		text := string(b)
-		switch {
-		case strings.Contains(text, "container=lxc"):
-			addSystem(info, "lxc", "guest", false)
-		case strings.Contains(text, "container=systemd-nspawn"):
-			addSystem(info, "nspawn", "guest", false)
-		case strings.Contains(text, "container=podman"):
-			addSystem(info, "podman", "guest", false)
+		detectFromPID1Environ(string(b), info)
+	}
+}
+
+// detectFromCgroupPaths matches the classic layout first, then the
+// systemd and docker-ce layouts where the runtime is a named cgroup
+// under a parent slice.
+func detectFromCgroupPaths(
+	text string,
+	info *Info,
+) {
+	if m := cgroupContainerRE.FindStringSubmatch(text); m != nil {
+		name := m[1]
+		// containerd is how Docker appears on a modern host.
+		if name == "containerd" {
+			name = systemDocker
 		}
+
+		addSystem(info, name, roleGuest)
+
+		return
+	}
+
+	if m := cgroupNestedContainerRE.FindStringSubmatch(text); m != nil {
+		addSystem(info, m[1], roleGuest)
+	}
+}
+
+// detectFromPID1Environ reads the container= variable the runtime sets
+// on the init process.
+func detectFromPID1Environ(
+	text string,
+	info *Info,
+) {
+	switch {
+	case strings.Contains(text, "container=lxc"):
+		addSystem(info, "lxc", roleGuest)
+	case strings.Contains(text, "container=systemd-nspawn"):
+		addSystem(info, "nspawn", roleGuest)
+	case strings.Contains(text, "container=podman"):
+		addSystem(info, "podman", roleGuest)
+	default:
+		// PID 1 names no container runtime.
 	}
 }
 
@@ -331,8 +493,8 @@ func cgroupRootsAllSlash(
 	}
 	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
 	for _, line := range lines {
-		fields := strings.SplitN(line, ":", 3)
-		if len(fields) < 3 {
+		fields := strings.SplitN(line, ":", cgroupFields)
+		if len(fields) < cgroupFields {
 			return false
 		}
 		if strings.TrimSpace(fields[2]) != "/" {
@@ -411,7 +573,7 @@ func parseHypervKVPHostName(
 	}
 	var out []byte
 	for _, c := range m[1] {
-		if c >= 0x20 && c < 0x7f {
+		if c >= asciiSpace && c < asciiDEL {
 			out = append(out, c)
 		}
 	}

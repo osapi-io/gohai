@@ -30,7 +30,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -46,6 +46,10 @@ import (
 const ProviderName = "aws"
 
 // metadataBaseURL is EC2's link-local metadata endpoint.
+// The instance metadata service is link-local and serves plain
+// HTTP only; there is no HTTPS endpoint to point this at.
+//
+//nolint:revive // unsecure-url-scheme
 const metadataBaseURL = "http://169.254.169.254"
 
 // metadataTimeout matches Ohai's 10s read + keep-alive timeout in
@@ -342,86 +346,137 @@ func (c *Collector) Collect(
 	token := c.fetchIMDSv2Token(ctx)
 	headers := imdsHeaders(token)
 	version := c.negotiateAPIVersion(ctx, headers)
-	versionedGet := func(path string) ([]byte, error) {
+
+	get := func(path string) ([]byte, error) {
 		return c.client.GetWithHeaders(ctx, "/"+version+path, headers)
 	}
 
-	values := make(map[string]string, len(metadataPaths))
-	for i, p := range metadataPaths {
-		body, err := versionedGet(p)
-		if err != nil {
-			if i == 0 {
-				return nil, nil
-			}
-			continue
-		}
-		values[p] = strings.TrimSpace(string(body))
+	values, ok := fetchMetadata(get)
+	if !ok {
+		return nil, nil
 	}
 
 	info := transformMetadata(values)
 	info.APIVersion = version
 
-	// Newline-split array leaves (Ohai's EC2_ARRAY_VALUES).
-	if body, err := versionedGet(securityGroupsPath); err == nil {
-		info.SecurityGroups = splitLines(string(body))
-	}
-	if body, err := versionedGet(localIPv4sPath); err == nil {
-		info.LocalIPv4s = splitLines(string(body))
-	}
-	if body, err := versionedGet(productCodesPath); err == nil {
-		info.ProductCodes = splitLines(string(body))
-	}
+	applyArrayLeaves(info, get)
 
-	// Variable-keyed subtrees — fetch the listing, then each entry.
-	info.BlockDeviceMapping = fetchBlockDeviceMapping(versionedGet)
-	info.PublicKeys = fetchPublicKeys(versionedGet)
+	// Variable-keyed subtrees: fetch the listing, then each entry.
+	info.BlockDeviceMapping = fetchBlockDeviceMapping(get)
+	info.PublicKeys = fetchPublicKeys(get)
 
-	// Per-ENI subtree. Tolerate missing on single-interface instances
-	// (older shapes sometimes 404 this tree).
-	if enis := fetchENIs(versionedGet); len(enis) > 0 {
+	// A single-interface instance sometimes 404s this tree.
+	if enis := fetchENIs(get); len(enis) > 0 {
 		info.NetworkInterfaces = enis
 	}
 
-	// IAM info — keep profile ARN, drop security-credentials.
-	if body, err := versionedGet(iamInfoPath); err == nil {
-		var iam rawIAMInfo
-		if json.Unmarshal(body, &iam) == nil {
-			info.IAMInfo = &IAMInstanceInfo{
-				Code:               iam.Code,
-				LastUpdated:        iam.LastUpdated,
-				InstanceProfileArn: iam.InstanceProfileArn,
-				InstanceProfileID:  iam.InstanceProfileID,
-			}
-		}
-	}
+	applyIAMInfo(info, get)
+	applyIdentityDoc(info, get)
 
-	// Identity document: canonical region / AZ / account.
-	if body, err := versionedGet(identityDocPath); err == nil {
-		var doc identityDoc
-		if json.Unmarshal(body, &doc) == nil {
-			if info.AccountUID == "" {
-				info.AccountUID = doc.AccountID
-			}
-			if info.Region == "" {
-				info.Region = doc.Region
-			}
-			if info.Zone == "" {
-				info.Zone = doc.AvailabilityZone
-			}
-			if info.ID == "" {
-				info.ID = doc.InstanceID
-			}
-		}
-	}
-
-	// User-data: plaintext when UTF-8, base64 when binary (matches
-	// Ohai's Encoding::BINARY check). 404 (no user-data set) is
-	// expected and tolerated.
-	if body, err := versionedGet(userDataPath); err == nil {
+	// 404 here just means no user-data was set.
+	if body, err := get(userDataPath); err == nil {
 		info.UserData = encodeUserData(body)
 	}
 
 	return info, nil
+}
+
+// fetchMetadata reads the flat metadata leaves. A failure on the first
+// path means this is not EC2 after all; later ones are simply absent.
+func fetchMetadata(
+	get func(string) ([]byte, error),
+) (map[string]string, bool) {
+	values := make(map[string]string, len(metadataPaths))
+
+	for i, p := range metadataPaths {
+		body, err := get(p)
+		if err != nil {
+			if i == 0 {
+				return nil, false
+			}
+
+			continue
+		}
+
+		values[p] = strings.TrimSpace(string(body))
+	}
+
+	return values, true
+}
+
+// applyArrayLeaves reads the newline-separated lists, Ohai's
+// EC2_ARRAY_VALUES.
+func applyArrayLeaves(
+	info *Info,
+	get func(string) ([]byte, error),
+) {
+	for _, leaf := range []struct {
+		path string
+		dst  *[]string
+	}{
+		{securityGroupsPath, &info.SecurityGroups},
+		{localIPv4sPath, &info.LocalIPv4s},
+		{productCodesPath, &info.ProductCodes},
+	} {
+		if body, err := get(leaf.path); err == nil {
+			*leaf.dst = splitLines(string(body))
+		}
+	}
+}
+
+// applyIAMInfo keeps the instance profile and drops the credentials that
+// sit beside it.
+func applyIAMInfo(
+	info *Info,
+	get func(string) ([]byte, error),
+) {
+	body, err := get(iamInfoPath)
+	if err != nil {
+		return
+	}
+
+	var iam rawIAMInfo
+	if json.Unmarshal(body, &iam) != nil {
+		return
+	}
+
+	info.IAMInfo = &IAMInstanceInfo{
+		Code:               iam.Code,
+		LastUpdated:        iam.LastUpdated,
+		InstanceProfileArn: iam.InstanceProfileArn,
+		InstanceProfileID:  iam.InstanceProfileID,
+	}
+}
+
+// applyIdentityDoc fills in region, zone, account and instance id from
+// the signed identity document, where the flat leaves left them empty.
+func applyIdentityDoc(
+	info *Info,
+	get func(string) ([]byte, error),
+) {
+	body, err := get(identityDocPath)
+	if err != nil {
+		return
+	}
+
+	var doc identityDoc
+	if json.Unmarshal(body, &doc) != nil {
+		return
+	}
+
+	for _, f := range []struct {
+		dst *string
+		src string
+	}{
+		{&info.AccountUID, doc.AccountID},
+		{&info.Region, doc.Region},
+		{&info.Zone, doc.AvailabilityZone},
+		{&info.ID, doc.InstanceID},
+	} {
+		if *f.dst == "" {
+			*f.dst = f.src
+		}
+	}
 }
 
 // fetchBlockDeviceMapping walks /meta-data/block-device-mapping/.
@@ -457,22 +512,35 @@ func fetchPublicKeys(
 	if err != nil {
 		return nil
 	}
+
 	var keys []string
+
 	for _, line := range splitLines(string(listing)) {
-		idx, _, ok := strings.Cut(line, "=")
-		if !ok {
-			idx = line
-		}
-		body, err := get(publicKeysPath + "/" + idx + "/openssh-key")
-		if err != nil {
-			continue
-		}
-		key := strings.TrimSpace(string(body))
-		if key != "" {
+		if key := fetchPublicKey(get, line); key != "" {
 			keys = append(keys, key)
 		}
 	}
+
 	return keys
+}
+
+// fetchPublicKey reads one key from the listing. A listing line reads
+// "0=my-key", and the index before the equals names the subtree.
+func fetchPublicKey(
+	get func(string) ([]byte, error),
+	line string,
+) string {
+	idx, _, ok := strings.Cut(line, "=")
+	if !ok {
+		idx = line
+	}
+
+	body, err := get(publicKeysPath + "/" + idx + "/openssh-key")
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(body))
 }
 
 // onEC2 runs Ohai's has_ec2_* chain (non-Windows):
@@ -489,20 +557,35 @@ func onEC2(
 	if !ok || info == nil {
 		return true
 	}
-	if info.BIOS != nil {
-		if strings.Contains(info.BIOS.Manufacturer, dmiBIOSVendorSignature) {
-			return true
-		}
-		if strings.Contains(strings.ToLower(info.BIOS.Ver), dmiBIOSVersionSignature) {
-			return true
-		}
+
+	return biosSaysEC2(info) || hypervisorUUIDSaysEC2()
+}
+
+// biosSaysEC2 checks the two DMI BIOS fields Ohai reads.
+func biosSaysEC2(
+	info *dmi.Info,
+) bool {
+	if info.BIOS == nil {
+		return false
 	}
-	if b, err := os.ReadFile(hypervisorUUIDPath); err == nil {
-		if strings.HasPrefix(strings.TrimSpace(string(b)), hypervisorUUIDPrefix) {
-			return true
-		}
+
+	return strings.Contains(info.BIOS.Manufacturer, dmiBIOSVendorSignature) ||
+		strings.Contains(
+			strings.ToLower(info.BIOS.Ver), dmiBIOSVersionSignature,
+		)
+}
+
+// hypervisorUUIDSaysEC2 checks the Xen hypervisor UUID, which on EC2
+// begins with "ec2".
+func hypervisorUUIDSaysEC2() bool {
+	b, err := os.ReadFile(hypervisorUUIDPath)
+	if err != nil {
+		return false
 	}
-	return false
+
+	return strings.HasPrefix(
+		strings.TrimSpace(string(b)), hypervisorUUIDPrefix,
+	)
 }
 
 // fetchIMDSv2Token requests an IMDSv2 token with a 60s TTL. Empty
@@ -558,8 +641,7 @@ func (c *Collector) negotiateAPIVersion(
 	if len(matches) == 0 {
 		return "latest"
 	}
-	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
-	return matches[0]
+	return slices.Max(matches)
 }
 
 // transformMetadata populates Info from the per-path value map.

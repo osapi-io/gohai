@@ -76,26 +76,28 @@ func (s *HostnamectlPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := hostnamectl.New()
 			s.Equal("hostnamectl", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*hostnamectl.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*hostnamectl.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -127,7 +129,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: full output parsed correctly",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t, fullOutput, nil)
 			},
@@ -149,7 +151,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: minimal output, only static_hostname",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t, []byte(" Static hostname: node1\n"), nil)
 			},
@@ -157,7 +159,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: line without colon-space separator skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t,
 					[]byte("no separator here\n Static hostname: host2\n"),
@@ -167,7 +169,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: operating_system key (no pretty_name) sets PrettyName",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t,
 					[]byte(" Operating System: Debian GNU/Linux 12 (bookworm)\n"),
@@ -177,7 +179,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: cpe_os_name key maps to OperatingSystemCPEName",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t,
 					[]byte(" CPE OS Name: cpe:/o:debian:debian_linux:12\n"),
@@ -187,7 +189,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: non-ASCII value collapses double spaces",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				// Emoji between two words — after stripping, two adjacent spaces remain.
 				return hostnamectlExec(t,
@@ -198,7 +200,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: exec error yields empty Info, no error",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t, nil, errors.New("command not found"))
 			},
@@ -206,7 +208,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: nil Exec yields empty Info, no error",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			want:    hostnamectl.Info{},
 		},
@@ -220,10 +222,12 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c hostnamectl.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &hostnamectl.Linux{Exec: tt.exec(s.T())}
 			case "darwin":
 				c = hostnamectl.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

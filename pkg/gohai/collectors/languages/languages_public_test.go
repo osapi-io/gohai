@@ -69,15 +69,15 @@ func buildFullMock(
 		Return([]byte("go version go1.21.0 linux/amd64\n"), nil).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "python3", "--version").
+		Execute(gomock.Any(), "python3", version).
 		Return([]byte("Python 3.11.4\n"), nil).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "ruby", "--version").
+		Execute(gomock.Any(), "ruby", version).
 		Return([]byte("ruby 3.2.2 (2023-03-30)\n"), nil).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "node", "--version").
+		Execute(gomock.Any(), "node", version).
 		Return([]byte("v20.1.0\n"), nil).
 		AnyTimes()
 	m.EXPECT().
@@ -85,7 +85,7 @@ func buildFullMock(
 		Return([]byte("openjdk version \"21.0.1\" 2023-10-17\n"), nil).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "perl", "--version").
+		Execute(gomock.Any(), "perl", version).
 		Return([]byte("This is perl 5, version 36, subversion 0 (v5.36.0)\n"), nil).
 		AnyTimes()
 	return m
@@ -100,11 +100,11 @@ func buildAbsentMock(
 	m := execmocks.NewMockExecutor(ctrl)
 	absent := errors.New("not found")
 	m.EXPECT().Execute(gomock.Any(), "go", "version").Return(nil, absent).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "python3", "--version").Return(nil, absent).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "ruby", "--version").Return(nil, absent).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "node", "--version").Return(nil, absent).AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "python3", version).Return(nil, absent).AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "ruby", version).Return(nil, absent).AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "node", version).Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "java", "-version").Return(nil, absent).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "perl", "--version").Return(nil, absent).AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "perl", version).Return(nil, absent).AnyTimes()
 	return m
 }
 
@@ -127,11 +127,11 @@ func buildSingleMock(
 
 	probes := []struct{ cmd, arg string }{
 		{"go", "version"},
-		{"python3", "--version"},
-		{"ruby", "--version"},
-		{"node", "--version"},
+		{"python3", version},
+		{"ruby", version},
+		{"node", version},
 		{"java", "-version"},
-		{"perl", "--version"},
+		{"perl", version},
 	}
 	for _, p := range probes {
 		if p.cmd == override.cmd && p.arg == override.arg {
@@ -159,11 +159,11 @@ func (s *LanguagesPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -174,12 +174,14 @@ func (s *LanguagesPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*languages.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*languages.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -194,7 +196,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: all runtimes present",
-			variant: "linux",
+			variant: osLinux,
 			exec:    buildFullMock(s.T()),
 			want: languages.Info{
 				Go:     strPtr("1.21.0"),
@@ -207,19 +209,19 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: no runtimes present, all nil",
-			variant: "linux",
+			variant: osLinux,
 			exec:    buildAbsentMock(s.T()),
 			want:    languages.Info{},
 		},
 		{
 			name:    "linux: nil Exec returns empty Info",
-			variant: "linux",
+			variant: osLinux,
 			exec:    nil,
 			want:    languages.Info{},
 		},
 		{
 			name:    "darwin: all runtimes present",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    buildFullMock(s.T()),
 			want: languages.Info{
 				Go:     strPtr("1.21.0"),
@@ -232,37 +234,37 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: no runtimes present, all nil",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    buildAbsentMock(s.T()),
 			want:    languages.Info{},
 		},
 		{
 			name:    "darwin: nil Exec returns empty Info",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    nil,
 			want:    languages.Info{},
 		},
 		{
 			name:    "linux: go version without go prefix falls back to trimmed output",
-			variant: "linux",
+			variant: osLinux,
 			exec:    buildSingleMock(s.T(), langOverride{"go", "version", "something 1.2.3"}),
 			want:    languages.Info{Go: strPtr("something 1.2.3")},
 		},
 		{
 			name:    "linux: python single token fallback",
-			variant: "linux",
-			exec:    buildSingleMock(s.T(), langOverride{"python3", "--version", "3.11.4"}),
+			variant: osLinux,
+			exec:    buildSingleMock(s.T(), langOverride{"python3", version, "3.11.4"}),
 			want:    languages.Info{Python: strPtr("3.11.4")},
 		},
 		{
 			name:    "linux: ruby single token fallback",
-			variant: "linux",
-			exec:    buildSingleMock(s.T(), langOverride{"ruby", "--version", "3.2.2"}),
+			variant: osLinux,
+			exec:    buildSingleMock(s.T(), langOverride{"ruby", version, "3.2.2"}),
 			want:    languages.Info{Ruby: strPtr("3.2.2")},
 		},
 		{
 			name:    "linux: java version without quotes uses first line",
-			variant: "linux",
+			variant: osLinux,
 			exec: buildSingleMock(
 				s.T(),
 				langOverride{"java", "-version", "java version abc\nother line"},
@@ -271,8 +273,8 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: perl version without parens falls back to first line",
-			variant: "linux",
-			exec:    buildSingleMock(s.T(), langOverride{"perl", "--version", "perl 5.36"}),
+			variant: osLinux,
+			exec:    buildSingleMock(s.T(), langOverride{"perl", version, "perl 5.36"}),
 			want:    languages.Info{Perl: strPtr("perl 5.36")},
 		},
 	}
@@ -280,10 +282,12 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c languages.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &languages.Linux{Exec: tt.exec}
-			case "darwin":
+			case osDarwin:
 				c = &languages.Darwin{Exec: tt.exec}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

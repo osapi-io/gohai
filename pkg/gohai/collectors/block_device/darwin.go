@@ -39,7 +39,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns nil on macOS — /sys/block is Linux-only.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

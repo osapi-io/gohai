@@ -53,7 +53,7 @@ type malformFS struct {
 	avfs.VFS
 }
 
-func (m malformFS) ReadFile(
+func (malformFS) ReadFile(
 	_ string,
 ) ([]byte, error) {
 	return []byte("ssh-rsa !!!notbase64!!! comment\n"), nil
@@ -64,7 +64,7 @@ type badFieldsFS struct {
 	avfs.VFS
 }
 
-func (b badFieldsFS) ReadFile(
+func (badFieldsFS) ReadFile(
 	_ string,
 ) ([]byte, error) {
 	return []byte("ssh-rsa\n"), nil
@@ -88,7 +88,7 @@ func fsWith(
 // authorized_keys line.
 func encodeSSHPublicKey(
 	t require.TestingT,
-	pub interface{},
+	pub any,
 ) []byte {
 	sshPub, err := ssh.NewPublicKey(pub)
 	require.NoError(t, err)
@@ -158,11 +158,11 @@ func (s *SSHPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -173,12 +173,14 @@ func (s *SSHPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*gohaisssh.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*gohaisssh.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -194,7 +196,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 	// ends after exponent field). skipWireString returns nil on the
 	// second call; readWireString therefore gets nil → returns 0.
 	truncatedRSABlob := func() []byte {
-		algoField := marshalWireString([]byte("ssh-rsa"))
+		algoField := marshalWireString([]byte(keyTypeRSA))
 		expField := marshalWireString([]byte{1, 0, 1}) // exponent 65537 only
 		return append(algoField, expField...)
 	}()
@@ -210,7 +212,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: no key files",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/etc/ssh", 0o755)
@@ -220,43 +222,43 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: rsa-2048 key",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_rsa_key.pub": generateRSAKey(s.T(), 2048),
 				})
 			},
 			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
+			wantFirstType: keyTypeRSA,
 			wantKeyLength: 2048,
 		},
 		{
 			name:    "linux: rsa-4096 key",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_rsa_key.pub": generateRSAKey(s.T(), 4096),
 				})
 			},
 			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
+			wantFirstType: keyTypeRSA,
 			wantKeyLength: 4096,
 		},
 		{
 			name:    "linux: truncated rsa wire blob — key length 0",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(truncatedRSABlob),
 				})
 			},
 			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
+			wantFirstType: keyTypeRSA,
 			wantKeyLength: 0,
 		},
 		{
 			name:    "linux: ecdsa-p256 key",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P256()),
@@ -268,7 +270,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: ecdsa-p384 key",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P384()),
@@ -280,7 +282,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: ecdsa-p521 key",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P521()),
@@ -292,7 +294,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: ed25519 key",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_ed25519_key.pub": generateEd25519Key(s.T()),
@@ -304,7 +306,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: all three key types",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_rsa_key.pub":     generateRSAKey(s.T(), 2048),
@@ -316,19 +318,19 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: malformed base64 returns error",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return malformFS{memfs.New()} },
 			wantErr: true,
 		},
 		{
 			name:    "linux: too few fields returns error",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return badFieldsFS{memfs.New()} },
 			wantErr: true,
 		},
 		{
 			name:    "darwin: ed25519 key",
-			variant: "darwin",
+			variant: osDarwin,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
 					"/etc/ssh/ssh_host_ed25519_key.pub": generateEd25519Key(s.T()),
@@ -340,7 +342,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: no key files",
-			variant: "darwin",
+			variant: osDarwin,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/etc/ssh", 0o755)
@@ -350,13 +352,13 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: malformed base64 returns error",
-			variant: "darwin",
+			variant: osDarwin,
 			setupFS: func() avfs.VFS { return malformFS{memfs.New()} },
 			wantErr: true,
 		},
 		{
 			name:    "linux: unknown key type — key length 0",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				// Build a blob whose type field is not rsa/ecdsa/ed25519 to
 				// exercise the default branch in deriveKeyLength.
@@ -366,12 +368,12 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				})
 			},
 			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
+			wantFirstType: keyTypeRSA,
 			wantKeyLength: 0,
 		},
 		{
 			name:    "linux: wire blob too short for length header — key length 0",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				// 3-byte blob: too short for even the first 4-byte length
 				// header. skipWireString returns nil (len < 4 branch).
@@ -381,12 +383,12 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				})
 			},
 			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
+			wantFirstType: keyTypeRSA,
 			wantKeyLength: 0,
 		},
 		{
 			name:    "linux: wire blob length field exceeds bytes — key length 0",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				// Length header claims 100 bytes but only 2 follow — the
 				// len(b) < 4+n branch in skipWireString.
@@ -396,7 +398,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				})
 			},
 			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
+			wantFirstType: keyTypeRSA,
 			wantKeyLength: 0,
 		},
 		{
@@ -404,9 +406,9 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			// valid fields (algo + exponent) so skipWireString succeeds twice,
 			// then the modulus field header claims 100 bytes but only 2 remain.
 			name:    "linux: modulus length exceeds remaining bytes — key length 0",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
-				algoField := marshalWireString([]byte("ssh-rsa"))
+				algoField := marshalWireString([]byte(keyTypeRSA))
 				expField := marshalWireString([]byte{1, 0, 1})
 				// Modulus header claims 100 bytes but only 2 bytes follow.
 				modHeader := []byte{0, 0, 0, 100, 0x00, 0x00}
@@ -416,7 +418,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				})
 			},
 			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
+			wantFirstType: keyTypeRSA,
 			wantKeyLength: 0,
 		},
 		{
@@ -424,7 +426,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			// not rsa, ecdsa, or ed25519. The file field[0] is "ssh-dss"
 			// (deprecated) so keyType hits the default return 0.
 			name:    "linux: dsa key type — key length 0",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				blob := marshalWireString([]byte("ssh-dss"))
 				line := append(
@@ -444,7 +446,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			// has "ecdsa" prefix but not a recognized nistp* curve label.
 			// This hits the `return 0` after the inner ecdsa switch.
 			name:    "linux: ecdsa unknown curve — key length 0",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				blob := marshalWireString([]byte("ecdsa-sha2-unknown"))
 				line := append(
@@ -464,10 +466,12 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c gohaisssh.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &gohaisssh.Linux{FS: tt.setupFS()}
-			case "darwin":
+			case osDarwin:
 				c = &gohaisssh.Darwin{FS: tt.setupFS()}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

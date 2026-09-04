@@ -74,27 +74,29 @@ func (s *ZpoolsPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := zpools.New()
 			s.Equal("zpools", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*zpools.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*zpools.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -119,18 +121,18 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: single pool all fields populated",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, onePool, nil) },
 			want: []zpools.Pool{
-				{Name: "tank", Size: "1.82T", Alloc: "672G", Free: "1.17T", Health: "ONLINE"},
+				{Name: "tank", Size: "1.82T", Alloc: "672G", Free: "1.17T", Health: stateOnline},
 			},
 		},
 		{
 			name:    "linux: two pools returned in order",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, twoPools, nil) },
 			want: []zpools.Pool{
-				{Name: "data", Size: "3.62T", Alloc: "1.20T", Free: "2.42T", Health: "ONLINE"},
+				{Name: "data", Size: "3.62T", Alloc: "1.20T", Free: "2.42T", Health: stateOnline},
 				{
 					Name:    "backup",
 					Size:    "931G",
@@ -143,7 +145,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: dash fields sanitized to empty strings",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, dashFields, nil) },
 			want: []zpools.Pool{
 				{Name: "pool1", Health: "OFFLINE"},
@@ -151,7 +153,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: altroot present",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, altRootPool, nil) },
 			want: []zpools.Pool{
 				{
@@ -159,26 +161,26 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 					Size:    "1.82T",
 					Alloc:   "672G",
 					Free:    "1.17T",
-					Health:  "ONLINE",
+					Health:  stateOnline,
 					Altroot: "/alternate",
 				},
 			},
 		},
 		{
 			name:    "linux: malformed line skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, malformedLine, nil) },
 			want:    []zpools.Pool{},
 		},
 		{
 			name:    "linux: empty output returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, []byte{}, nil) },
 			want:    []zpools.Pool{},
 		},
 		{
 			name:    "linux: zpool not installed returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return zpoolExec(t, nil, errors.New("exec: zpool not found"))
 			},
@@ -186,21 +188,21 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: nil executor returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			want:    []zpools.Pool{},
 		},
 		{
 			name:    "darwin: single pool",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, onePool, nil) },
 			want: []zpools.Pool{
-				{Name: "tank", Size: "1.82T", Alloc: "672G", Free: "1.17T", Health: "ONLINE"},
+				{Name: "tank", Size: "1.82T", Alloc: "672G", Free: "1.17T", Health: stateOnline},
 			},
 		},
 		{
 			name:    "darwin: zpool not installed returns empty list",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return zpoolExec(t, nil, errors.New("exec: zpool not found"))
 			},
@@ -211,10 +213,12 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c zpools.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &zpools.Linux{Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &zpools.Darwin{Exec: tt.exec(s.T())}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

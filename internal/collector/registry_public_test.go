@@ -23,7 +23,7 @@ package collector_test
 import (
 	"context"
 	"errors"
-	"sort"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -156,7 +156,7 @@ func (s *RegistryPublicTestSuite) TestGet() {
 		wantOK   bool
 	}{
 		{"registered collector found", true, "known", true},
-		{"missing collector not found", false, "missing", false},
+		{"missing collector not found", false, valueMissing, false},
 	}
 
 	for _, tt := range tests {
@@ -173,23 +173,23 @@ func (s *RegistryPublicTestSuite) TestGet() {
 }
 
 func (s *RegistryPublicTestSuite) TestNamesInCategory() {
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "a", "cloud", false)))
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "b", "cloud", false)))
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "c", "system", false)))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, keyA, "cloud", false)))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, keyB, "cloud", false)))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, keyC, "system", false)))
 
 	tests := []struct {
 		name     string
 		category string
 		want     []string
 	}{
-		{"multiple collectors in category", "cloud", []string{"a", "b"}},
-		{"single collector in category", "system", []string{"c"}},
-		{"unknown category returns empty", "missing", []string{}},
+		{"multiple collectors in category", "cloud", []string{keyA, keyB}},
+		{"single collector in category", "system", []string{keyC}},
+		{"unknown category returns empty", valueMissing, []string{}},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			got := s.reg.NamesInCategory(tt.category)
-			sort.Strings(got)
+			slices.Sort(got)
 			s.Equal(tt.want, got)
 		})
 	}
@@ -216,7 +216,7 @@ func (s *RegistryPublicTestSuite) TestGetDep() {
 		},
 		{
 			name:   "missing key returns ok=false",
-			lookup: "missing",
+			lookup: valueMissing,
 		},
 		{
 			name:   "type mismatch returns ok=false",
@@ -239,11 +239,11 @@ func (s *RegistryPublicTestSuite) TestGetDep() {
 }
 
 func (s *RegistryPublicTestSuite) TestNames() {
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "b", "", true)))
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "a", "", true)))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, keyB, "", true)))
+	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, keyA, "", true)))
 	names := s.reg.Names()
-	sort.Strings(names)
-	s.Equal([]string{"a", "b"}, names)
+	slices.Sort(names)
+	s.Equal([]string{keyA, keyB}, names)
 }
 
 func (s *RegistryPublicTestSuite) TestSelected() {
@@ -257,32 +257,32 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 	}{
 		{
 			name: "defaults: core+extended on, opt-in off",
-			want: []string{"core1", "core2", "ext"},
+			want: []string{coreOne, coreTwo, ext},
 		},
 		{
 			name:    "disable a default-on collector",
-			disable: []string{"core1"},
-			want:    []string{"core2", "ext"},
+			disable: []string{coreOne},
+			want:    []string{coreTwo, ext},
 		},
 		{
 			name:   "enable an opt-in collector",
-			enable: []string{"opt"},
-			want:   []string{"core1", "core2", "ext", "opt"},
+			enable: []string{opt},
+			want:   []string{coreOne, coreTwo, ext, opt},
 		},
 		{
 			name:    "disable wins over enable for same name",
-			enable:  []string{"opt"},
-			disable: []string{"opt"},
-			want:    []string{"core1", "core2", "ext"},
+			enable:  []string{opt},
+			disable: []string{opt},
+			want:    []string{coreOne, coreTwo, ext},
 		},
 		{
 			name:    "unknown in enable list errors",
-			enable:  []string{"missing"},
+			enable:  []string{valueMissing},
 			wantErr: true,
 		},
 		{
 			name:    "unknown in disable list errors",
-			disable: []string{"missing"},
+			disable: []string{valueMissing},
 			wantErr: true,
 		},
 	}
@@ -291,13 +291,13 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 		s.Run(tt.name, func() {
 			reg := collector.NewRegistry()
 			s.Require().
-				NoError(reg.Register(newCollector(s.ctrl, "core1", "", true)))
+				NoError(reg.Register(newCollector(s.ctrl, coreOne, "", true)))
 			s.Require().
-				NoError(reg.Register(newCollector(s.ctrl, "core2", "", true)))
+				NoError(reg.Register(newCollector(s.ctrl, coreTwo, "", true)))
 			s.Require().
-				NoError(reg.Register(newCollector(s.ctrl, "ext", "", true)))
+				NoError(reg.Register(newCollector(s.ctrl, ext, "", true)))
 			s.Require().
-				NoError(reg.Register(newCollector(s.ctrl, "opt", "", false)))
+				NoError(reg.Register(newCollector(s.ctrl, opt, "", false)))
 
 			got, err := reg.Selected(tt.enable, tt.disable)
 			if tt.wantErr {
@@ -309,7 +309,7 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 			for _, c := range got {
 				names = append(names, c.Name())
 			}
-			sort.Strings(names)
+			slices.Sort(names)
 			s.Equal(tt.want, names)
 		})
 	}
@@ -330,86 +330,86 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			name: "orders by dependency",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "a", "", true)))
+					NoError(reg.Register(newCollector(s.ctrl, keyA, "", true)))
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "b", "", true, "a")))
+					NoError(reg.Register(newCollector(s.ctrl, keyB, "", true, keyA)))
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "c", "", true, "b")))
+					NoError(reg.Register(newCollector(s.ctrl, keyC, "", true, keyB)))
 			},
-			names:       []string{"a", "b", "c"},
-			wantResults: []string{"a", "b", "c"},
+			names:       []string{keyA, keyB, keyC},
+			wantResults: []string{keyA, keyB, keyC},
 		},
 		{
 			name: "auto-includes dependencies",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "a", "", false)))
+					NoError(reg.Register(newCollector(s.ctrl, keyA, "", false)))
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "b", "", false, "a")))
+					NoError(reg.Register(newCollector(s.ctrl, keyB, "", false, keyA)))
 			},
-			names:       []string{"b"},
-			wantResults: []string{"a", "b"},
+			names:       []string{keyB},
+			wantResults: []string{keyA, keyB},
 		},
 		{
 			name: "detects cycle",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "a", "", true, "b")))
+					NoError(reg.Register(newCollector(s.ctrl, keyA, "", true, keyB)))
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "b", "", true, "a")))
+					NoError(reg.Register(newCollector(s.ctrl, keyB, "", true, keyA)))
 			},
-			names:   []string{"a", "b"},
+			names:   []string{keyA, keyB},
 			wantErr: true,
 		},
 		{
 			name: "missing dependency errors",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "a", "", true, "missing")))
+					NoError(reg.Register(newCollector(s.ctrl, keyA, "", true, valueMissing)))
 			},
-			names:   []string{"a"},
+			names:   []string{keyA},
 			wantErr: true,
 		},
 		{
 			name: "collector error omits from results",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(newFailingCollector(s.ctrl, "bad", errors.New("boom"))))
+					NoError(reg.Register(newFailingCollector(s.ctrl, valueBad, errors.New("boom"))))
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "good", "", true)))
+					NoError(reg.Register(newCollector(s.ctrl, valueGood, "", true)))
 			},
-			names:        []string{"bad", "good"},
-			wantResults:  []string{"good"},
-			wantErrNames: []string{"bad"},
+			names:        []string{valueBad, valueGood},
+			wantResults:  []string{valueGood},
+			wantErrNames: []string{valueBad},
 		},
 		{
 			name: "unknown collector errors",
 			setup: func(_ *collector.Registry) {
 			},
-			names:   []string{"missing"},
+			names:   []string{valueMissing},
 			wantErr: true,
 		},
 		{
 			name: "zero-value hooks tolerates error without handler",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(newFailingCollector(s.ctrl, "bad", errors.New("boom"))))
+					NoError(reg.Register(newFailingCollector(s.ctrl, valueBad, errors.New("boom"))))
 			},
-			names: []string{"bad"},
+			names: []string{valueBad},
 			hooks: func(*sync.Mutex, *[]string, *[]string) collector.Hooks {
 				return collector.Hooks{}
 			},
-			wantResults: nil, // "bad" drops silently
+			wantResults: nil, // valueBad drops silently
 		},
 		{
 			name: "OnComplete fires for every collector (success and failure)",
 			setup: func(reg *collector.Registry) {
 				s.Require().
-					NoError(reg.Register(newFailingCollector(s.ctrl, "bad", errors.New("boom"))))
+					NoError(reg.Register(newFailingCollector(s.ctrl, valueBad, errors.New("boom"))))
 				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "good", "", true)))
+					NoError(reg.Register(newCollector(s.ctrl, valueGood, "", true)))
 			},
-			names: []string{"bad", "good"},
+			names: []string{valueBad, valueGood},
 			hooks: func(
 				mu *sync.Mutex,
 				onErr *[]string,
@@ -428,9 +428,9 @@ func (s *RegistryPublicTestSuite) TestRun() {
 					},
 				}
 			},
-			wantResults:     []string{"good"},
-			wantErrNames:    []string{"bad"},
-			wantCompleteAll: []string{"bad", "good"},
+			wantResults:     []string{valueGood},
+			wantErrNames:    []string{valueBad},
+			wantCompleteAll: []string{valueBad, valueGood},
 		},
 	}
 

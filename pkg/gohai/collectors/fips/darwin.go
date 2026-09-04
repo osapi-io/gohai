@@ -41,7 +41,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns nil — no FIPS facts on darwin.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

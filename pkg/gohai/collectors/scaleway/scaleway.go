@@ -43,6 +43,10 @@ const ProviderName = "scaleway"
 
 // metadataBaseURL is Scaleway's unusual link-local metadata address
 // (not the standard 169.254.169.254 — matches Ohai's SCALEWAY_METADATA_ADDR).
+// The instance metadata service is link-local and serves plain
+// HTTP only; there is no HTTPS endpoint to point this at.
+//
+//nolint:revive // unsecure-url-scheme
 const metadataBaseURL = "http://169.254.42.42"
 
 // metadataPath returns the entire instance config as JSON in one GET.
@@ -265,32 +269,54 @@ func transform(
 		PrivateIP:   r.PrivateIP,
 		Timezone:    r.Timezone,
 	}
-	if r.PublicIP != nil {
-		info.PublicIP = r.PublicIP.Address
-		info.PublicIPID = r.PublicIP.ID
-		info.PublicIPDynamic = r.PublicIP.Dynamic
+
+	applyAddressing(info, r)
+	applyAttachments(info, r)
+
+	return info
+}
+
+// applyAddressing copies the optional address blocks, each of which is
+// absent on an instance that does not have one.
+func applyAddressing(
+	info *Info,
+	r raw,
+) {
+	if ip := r.PublicIP; ip != nil {
+		info.PublicIP = ip.Address
+		info.PublicIPID = ip.ID
+		info.PublicIPDynamic = ip.Dynamic
 	}
-	if r.IPv6 != nil {
-		info.IPv6Address = r.IPv6.Address
-		info.IPv6Netmask = r.IPv6.Netmask
-		info.IPv6Gateway = r.IPv6.Gateway
+
+	if v6 := r.IPv6; v6 != nil {
+		info.IPv6Address = v6.Address
+		info.IPv6Netmask = v6.Netmask
+		info.IPv6Gateway = v6.Gateway
 	}
-	if r.Location != nil {
-		info.Zone = r.Location.ZoneID
-		info.PlatformID = r.Location.PlatformID
+
+	if loc := r.Location; loc != nil {
+		info.Zone = loc.ZoneID
+		info.PlatformID = loc.PlatformID
 	}
+}
+
+// applyAttachments copies what is attached to the instance.
+func applyAttachments(
+	info *Info,
+	r raw,
+) {
 	for _, k := range r.SSHPublicKeys {
-		k.Key = strings.TrimSpace(k.Key)
-		if k.Key != "" {
-			info.SSHPublicKeys = append(info.SSHPublicKeys, k.Key)
+		if key := strings.TrimSpace(k.Key); key != "" {
+			info.SSHPublicKeys = append(info.SSHPublicKeys, key)
 		}
 	}
+
 	for _, v := range r.Volumes {
 		info.Volumes = append(info.Volumes, Volume(v))
 	}
+
 	if r.Bootscript != nil {
 		bs := Bootscript(*r.Bootscript)
 		info.Bootscript = &bs
 	}
-	return info
 }

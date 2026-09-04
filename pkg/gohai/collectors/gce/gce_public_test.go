@@ -24,7 +24,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -40,7 +40,7 @@ import (
 // hitting the metadata endpoint.
 func gcePrior() collector.PriorResults {
 	return collector.PriorResults{
-		"dmi": &dmi.Info{Product: &dmi.Product{Name: "Google Compute Engine"}},
+		sourceDMI: &dmi.Info{Product: &dmi.Product{Name: "Google Compute Engine"}},
 	}
 }
 
@@ -232,7 +232,7 @@ func (s *GcePublicTestSuite) TestMetadata() {
 				for _, sa := range info.ServiceAccounts {
 					emails = append(emails, sa.Email)
 				}
-				sort.Strings(emails)
+				slices.Sort(emails)
 				s.Equal([]string{
 					"a@x.iam.gserviceaccount.com",
 					"b@x.iam.gserviceaccount.com",
@@ -270,7 +270,7 @@ func (s *GcePublicTestSuite) TestMetadata() {
 			name:    "dmi says not GCE short-circuits without HTTP call",
 			handler: func(http.ResponseWriter, *http.Request) {},
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{Product: &dmi.Product{Name: "OptiPlex 3070"}},
+				sourceDMI: &dmi.Info{Product: &dmi.Product{Name: "OptiPlex 3070"}},
 			},
 			wantNil:    true,
 			wantNoHTTP: true,
@@ -278,7 +278,7 @@ func (s *GcePublicTestSuite) TestMetadata() {
 		{
 			name:    "empty dmi product fails open and tries HTTP",
 			handler: func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(cannedResponse)) },
-			prior:   collector.PriorResults{"dmi": &dmi.Info{}},
+			prior:   collector.PriorResults{sourceDMI: &dmi.Info{}},
 			verify: func(s *GcePublicTestSuite, info *gce.Info, _ string) {
 				s.Require().NotNil(info)
 				s.Equal("my-vm", info.Name)
@@ -355,7 +355,7 @@ func (s *GcePublicTestSuite) TestMetadataInterface() {
 		{"Name", c.Name(), "gce"},
 		{"Category", c.Category(), "cloud"},
 		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+		{"Dependencies", c.Dependencies(), []string{sourceDMI}},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {

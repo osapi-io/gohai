@@ -37,7 +37,7 @@ func NewDebian() *Debian {
 }
 
 // Collect returns apt if present.
-func (d *Debian) Collect(
+func (*Debian) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

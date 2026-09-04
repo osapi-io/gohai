@@ -41,6 +41,12 @@ type Darwin struct {
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
+// The capture groups of kextstatLine: index, refs, size, name, version.
+const (
+	kextName    = 4
+	kextVersion = 5
+)
+
 func NewDarwin() *Darwin {
 	return &Darwin{Exec: executor.New()}
 }
@@ -79,23 +85,39 @@ func parseKextstat(
 	b []byte,
 ) map[string]Module {
 	out := map[string]Module{}
+
 	sc := bufio.NewScanner(strings.NewReader(string(b)))
 	for sc.Scan() {
 		m := kextstatLine.FindStringSubmatch(sc.Text())
 		if m == nil {
 			continue
 		}
-		mod := Module{Version: m[5]}
-		if idx, err := strconv.Atoi(m[1]); err == nil {
-			mod.Index = idx
-		}
-		if rc, err := strconv.Atoi(m[2]); err == nil {
-			mod.RefCount = rc
-		}
-		if sz, err := strconv.ParseUint(m[3], 16, 64); err == nil {
-			mod.Size = sz
-		}
-		out[m[4]] = mod
+
+		out[m[kextName]] = kextModule(m)
 	}
+
 	return out
+}
+
+// kextModule reads one kextstat row. A field that will not parse is left
+// at its zero value rather than dropping the whole module.
+func kextModule(
+	m []string,
+) Module {
+	mod := Module{Version: m[kextVersion]}
+
+	if idx, err := strconv.Atoi(m[1]); err == nil {
+		mod.Index = idx
+	}
+
+	if rc, err := strconv.Atoi(m[2]); err == nil {
+		mod.RefCount = rc
+	}
+
+	// kextstat reports the load address and size in hex.
+	if sz, err := strconv.ParseUint(m[3], 16, 64); err == nil {
+		mod.Size = sz
+	}
+
+	return mod
 }

@@ -53,6 +53,12 @@ type Collector interface {
 type base struct{}
 
 // Name returns "services".
+// systemctl list-units reports UNIT LOAD ACTIVE SUB.
+const (
+	serviceFields = 4
+	serviceSub    = 3
+)
+
 func (base) Name() string { return "services" }
 
 // Category returns "software".
@@ -86,32 +92,43 @@ func parseSystemctlOutput(
 	output string,
 ) *Info {
 	info := &Info{Services: []Service{}}
+
 	sc := bufio.NewScanner(strings.NewReader(output))
 	for sc.Scan() {
-		line := sc.Text()
-		// Skip header, blank lines, and legend lines that start with spaces
-		// or contain "UNIT".
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "UNIT") {
+		fields, ok := serviceFieldsOf(sc.Text())
+		if !ok {
 			continue
 		}
-		// Skip legend/summary lines (e.g. "LOAD   = Reflects whether the unit...").
-		if !strings.Contains(line, ".service") {
-			continue
-		}
-		fields := strings.Fields(trimmed)
-		if len(fields) < 4 {
-			continue
-		}
-		name := strings.TrimSuffix(fields[0], ".service")
-		// fields[1] = LOAD, fields[2] = ACTIVE, fields[3] = SUB
-		active := fields[2]
-		sub := fields[3]
+
 		info.Services = append(info.Services, Service{
-			Name:    name,
-			State:   sub,
-			Enabled: active == "active",
+			Name:  strings.TrimSuffix(fields[0], ".service"),
+			State: fields[serviceSub],
+			// fields[1] is LOAD, fields[2] ACTIVE, fields[3] SUB.
+			Enabled: fields[2] == "active",
 		})
 	}
+
 	return info
+}
+
+// serviceFieldsOf splits one systemctl row, rejecting the header, the
+// blank lines and the legend that follows the table.
+func serviceFieldsOf(
+	line string,
+) ([]string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || strings.HasPrefix(trimmed, "UNIT") {
+		return nil, false
+	}
+
+	if !strings.Contains(line, ".service") {
+		return nil, false
+	}
+
+	fields := strings.Fields(trimmed)
+	if len(fields) < serviceFields {
+		return nil, false
+	}
+
+	return fields, true
 }

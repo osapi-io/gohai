@@ -89,10 +89,10 @@ func (s *FipsPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -106,9 +106,11 @@ func (s *FipsPublicTestSuite) TestNew() {
 			case "darwin":
 				_, ok := c.(*fips.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*fips.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -128,7 +130,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: kernel enabled, no crypto-policies",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return newFipsFS(map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"})
 			},
@@ -137,7 +139,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: kernel enabled + FIPS policy effective",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return newFipsFS(map[string]string{
 					"/proc/sys/crypto/fips_enabled": "1\n",
@@ -150,7 +152,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: kernel enabled + FIPS subpolicy",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return newFipsFS(map[string]string{
 					"/proc/sys/crypto/fips_enabled": "1\n",
@@ -163,7 +165,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: kernel enabled, policy toggled to DEFAULT (drift)",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return newFipsFS(map[string]string{
 					"/proc/sys/crypto/fips_enabled": "1\n",
@@ -176,7 +178,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: policy with comments and blanks",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return newFipsFS(map[string]string{
 					"/proc/sys/crypto/fips_enabled": "1\n",
@@ -189,7 +191,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: policy file comments only → no policy",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return newFipsFS(map[string]string{
 					"/proc/sys/crypto/fips_enabled": "1\n",
@@ -201,7 +203,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: kernel disabled",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return newFipsFS(map[string]string{"/proc/sys/crypto/fips_enabled": "0\n"})
 			},
@@ -210,14 +212,14 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:          "linux: kernel file missing → disabled",
-			variant:       "linux",
+			variant:       osLinux,
 			setupFS:       func() avfs.VFS { return memfs.New() },
 			wantEnabled:   false,
 			wantPolicyNil: true,
 		},
 		{
 			name:    "linux: kernel read error propagated",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return pathErrorFS{VFS: memfs.New(), failPath: "/proc/sys/crypto/fips_enabled"}
 			},
@@ -226,7 +228,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: policy read error ignored (Policy omitted)",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				base := newFipsFS(map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"})
 				return pathErrorFS{VFS: base, failPath: "/etc/crypto-policies/config"}
@@ -244,10 +246,12 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c fips.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &fips.Linux{FS: tt.setupFS()}
 			case "darwin":
 				c = fips.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

@@ -75,27 +75,29 @@ func (s *SysctlPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := sysctl.New()
 			s.Equal("sysctl", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*sysctl.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*sysctl.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -121,7 +123,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 	}{
 		{
 			name:    "linux: canonical key=value output parsed",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, linuxOutput, nil) },
 			wantParams: map[string]string{
 				"kernel.hostname":     "myhost",
@@ -132,13 +134,13 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		},
 		{
 			name:       "linux: empty output yields empty params map",
-			variant:    "linux",
+			variant:    osLinux,
 			exec:       func(t *testing.T) executor.Executor { return sysctlExec(t, []byte{}, nil) },
 			wantParams: map[string]string{},
 		},
 		{
 			name:    "linux: lines without separator skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return sysctlExec(t, []byte("no_separator\nkernel.panic = 1\n"), nil)
 			},
@@ -146,7 +148,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		},
 		{
 			name:    "linux: empty key skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				// Line with separator but no key portion — key becomes empty, skipped.
 				return sysctlExec(t, []byte(": value\nkernel.panic = 2\n"), nil)
@@ -155,19 +157,19 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		},
 		{
 			name:       "linux: exec error yields empty params, no error",
-			variant:    "linux",
+			variant:    osLinux,
 			exec:       func(t *testing.T) executor.Executor { return sysctlExec(t, nil, errors.New("not found")) },
 			wantParams: map[string]string{},
 		},
 		{
 			name:       "linux: nil Exec yields empty params, no error",
-			variant:    "linux",
+			variant:    osLinux,
 			exec:       func(*testing.T) executor.Executor { return nil },
 			wantParams: map[string]string{},
 		},
 		{
 			name:    "darwin: colon-separated output parsed",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, darwinOutput, nil) },
 			wantParams: map[string]string{
 				"kern.ostype":    "Darwin",
@@ -178,13 +180,13 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		},
 		{
 			name:       "darwin: exec error yields empty params, no error",
-			variant:    "darwin",
+			variant:    osDarwin,
 			exec:       func(t *testing.T) executor.Executor { return sysctlExec(t, nil, errors.New("not found")) },
 			wantParams: map[string]string{},
 		},
 		{
 			name:       "darwin: nil Exec yields empty params, no error",
-			variant:    "darwin",
+			variant:    osDarwin,
 			exec:       func(*testing.T) executor.Executor { return nil },
 			wantParams: map[string]string{},
 		},
@@ -193,10 +195,12 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		s.Run(tt.name, func() {
 			var c sysctl.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &sysctl.Linux{Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &sysctl.Darwin{Exec: tt.exec(s.T())}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

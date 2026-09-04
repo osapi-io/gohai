@@ -221,6 +221,34 @@ type Collector interface {
 
 type base struct{}
 
+// An IPv4 address is four bytes, thirty-two bits.
+const (
+	ipv4Bits = 32
+	ipv4Len  = 4
+)
+
+// afInet6 is AF_INET6 as the kernel reports it in a netlink message.
+const afInet6 = 10
+
+// Neighbour cache states, NUD_* in linux/neighbour.h.
+const (
+	nudIncomplete = 0x01
+	nudReachable  = 0x02
+	nudStale      = 0x04
+	nudDelay      = 0x08
+	nudProbe      = 0x10
+	nudFailed     = 0x20
+	nudNoARP      = 0x40
+	nudPermanent  = 0x80
+)
+
+// Separators this parsing works in.
+const (
+	colon      = ":"
+	newline    = "\n"
+	underscore = "_"
+)
+
 func (base) Name() string           { return "network" }
 func (base) Category() string       { return collector.CategoryNetwork }
 func (base) DefaultEnabled() bool   { return true }
@@ -251,37 +279,65 @@ func readInterfaces(
 	if err != nil {
 		return nil, err
 	}
+
+	countersByName := readCounters(ctx)
+
+	out := make([]Interface, 0, len(ifs))
+
+	for _, i := range ifs {
+		item := Interface{
+			Name:      i.Name,
+			Number:    i.Index,
+			State:     stateFromFlags(i.Flags),
+			MTU:       i.MTU,
+			MAC:       i.HardwareAddr,
+			Flags:     i.Flags,
+			Addresses: parseAddresses(i.Addrs),
+		}
+
+		if c, ok := countersByName[i.Name]; ok {
+			item.Counters = c
+		}
+
+		out = append(out, item)
+	}
+
+	return out, nil
+}
+
+// readCounters reads per-interface traffic counters. They are a bonus:
+// an error here leaves the interfaces themselves intact.
+func readCounters(
+	ctx context.Context,
+) map[string]*Counters {
 	counts, _ := ioCountersFn(ctx, true)
-	countersByName := map[string]*Counters{}
+
+	out := make(map[string]*Counters, len(counts))
 	for _, c := range counts {
-		countersByName[c.Name] = &Counters{
+		out[c.Name] = &Counters{
 			BytesSent: c.BytesSent, BytesRecv: c.BytesRecv,
 			PacketsSent: c.PacketsSent, PacketsRecv: c.PacketsRecv,
 			Errin: c.Errin, Errout: c.Errout,
 			Dropin: c.Dropin, Dropout: c.Dropout,
 		}
 	}
-	out := make([]Interface, 0, len(ifs))
-	for _, i := range ifs {
-		item := Interface{
-			Name:   i.Name,
-			Number: i.Index,
-			State:  stateFromFlags(i.Flags),
-			MTU:    i.MTU,
-			MAC:    i.HardwareAddr,
-			Flags:  i.Flags,
+
+	return out
+}
+
+// parseAddresses keeps the addresses that parse, dropping any that do not.
+func parseAddresses(
+	addrs gpnet.InterfaceAddrList,
+) []Address {
+	var out []Address
+
+	for _, a := range addrs {
+		if addr, ok := parseAddress(a.Addr); ok {
+			out = append(out, addr)
 		}
-		for _, a := range i.Addrs {
-			if addr, ok := parseAddress(a.Addr); ok {
-				item.Addresses = append(item.Addresses, addr)
-			}
-		}
-		if c, ok := countersByName[i.Name]; ok {
-			item.Counters = c
-		}
-		out = append(out, item)
 	}
-	return out, nil
+
+	return out
 }
 
 // parseAddress turns a CIDR string into a structured Address.
@@ -313,9 +369,9 @@ func ipv4Broadcast(
 	ip net.IP,
 	prefixlen int,
 ) string {
-	mask := net.CIDRMask(prefixlen, 32)
-	bcast := make(net.IP, 4)
-	for i := 0; i < 4; i++ {
+	mask := net.CIDRMask(prefixlen, ipv4Bits)
+	bcast := make(net.IP, ipv4Len)
+	for i := range ipv4Len {
 		bcast[i] = ip[i] | ^mask[i]
 	}
 	return bcast.String()
@@ -351,8 +407,8 @@ func parseEthtoolDriverInfo(
 	raw []byte,
 ) map[string]string {
 	out := map[string]string{}
-	for _, line := range strings.Split(string(raw), "\n") {
-		key, val, ok := strings.Cut(line, ":")
+	for _, line := range strings.Split(string(raw), newline) {
+		key, val, ok := strings.Cut(line, colon)
 		if !ok {
 			continue
 		}
@@ -361,8 +417,8 @@ func parseEthtoolDriverInfo(
 			continue
 		}
 		key = strings.ToLower(key)
-		key = strings.ReplaceAll(key, " ", "_")
-		key = strings.ReplaceAll(key, "-", "_")
+		key = strings.ReplaceAll(key, " ", underscore)
+		key = strings.ReplaceAll(key, "-", underscore)
 		out[key] = strings.TrimSpace(val)
 	}
 	if len(out) == 0 {
@@ -380,49 +436,85 @@ func parseEthtoolDriverInfo(
 //
 // headerPrefix is the per-iface header line ethtool prints first
 // ("Ring parameters for" / "Channel parameters for") which we skip.
+// eachEthtoolLine walks ethtool's output, skipping the header it starts
+// with and any blank line.
+func eachEthtoolLine(
+	raw []byte,
+	headerPrefix string,
+	fn func(line string),
+) {
+	for _, line := range strings.Split(string(raw), newline) {
+		if strings.HasPrefix(line, headerPrefix) {
+			continue
+		}
+
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			fn(trimmed)
+		}
+	}
+}
+
 func parseEthtoolSectionedInts(
 	raw []byte,
 	headerPrefix string,
 ) map[string]int {
 	out := map[string]int{}
 	section := ""
-	for _, line := range strings.Split(string(raw), "\n") {
-		if strings.HasPrefix(line, headerPrefix) {
-			continue
+
+	eachEthtoolLine(raw, headerPrefix, func(line string) {
+		if s, ok := ethtoolSection(line); ok {
+			section = s
+
+			return
 		}
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(trimmed, "Pre-set maximums"):
-			section = "max"
-			continue
-		case strings.HasPrefix(trimmed, "Current hardware settings"):
-			section = "current"
-			continue
-		}
+
 		if section == "" {
-			continue
+			return
 		}
-		key, val, ok := strings.Cut(trimmed, ":")
-		if !ok {
-			continue
+
+		if key, n, ok := ethtoolIntField(line); ok {
+			out[section+underscore+key] = n
 		}
-		val = strings.TrimSpace(val)
-		if val == "" {
-			continue
-		}
-		n, err := strconv.Atoi(val)
-		if err != nil {
-			continue
-		}
-		out[section+"_"+ethtoolKey(key)] = n
-	}
+	})
+
 	if len(out) == 0 {
 		return nil
 	}
+
 	return out
+}
+
+// ethtoolSection recognises the two headings ethtool prints, which say
+// which set of values the lines below belong to.
+func ethtoolSection(
+	line string,
+) (string, bool) {
+	switch {
+	case strings.HasPrefix(line, "Pre-set maximums"):
+		return "max", true
+	case strings.HasPrefix(line, "Current hardware settings"):
+		return "current", true
+	default:
+		return "", false
+	}
+}
+
+// ethtoolIntField reads a "key: <int>" line, reporting false for
+// anything that is not one.
+func ethtoolIntField(
+	line string,
+) (key string, value int, ok bool) {
+	k, v, found := strings.Cut(line, colon)
+	if !found {
+		return "", 0, false
+	}
+
+	n, err := strconv.Atoi(strings.TrimSpace(v))
+	if err != nil {
+		return "", 0, false
+	}
+
+	return ethtoolKey(k), n, true
 }
 
 // parseEthtoolCoalesceParams parses `ethtool -c <iface>` output. The
@@ -431,43 +523,42 @@ func parseEthtoolSectionedInts(
 // pair where value is parsed as an integer. Mirrors Ohai's
 // ethernet_coalesce_parameters exactly, including the special
 // Adaptive handling.
+// addAdaptive records the two values the Adaptive line carries.
+func addAdaptive(
+	out map[string]any,
+	line string,
+) {
+	rx, tx, ok := parseAdaptiveLine(line)
+	if !ok {
+		return
+	}
+
+	out["adaptive_rx"] = rx
+	out["adaptive_tx"] = tx
+}
+
 func parseEthtoolCoalesceParams(
 	raw []byte,
 ) map[string]any {
 	out := map[string]any{}
-	for _, line := range strings.Split(string(raw), "\n") {
-		if strings.HasPrefix(line, "Coalesce parameters for") {
-			continue
+
+	eachEthtoolLine(raw, "Coalesce parameters for", func(line string) {
+		// "Adaptive RX: on  TX: off" is one line holding two values.
+		if strings.HasPrefix(line, "Adaptive") {
+			addAdaptive(out, line)
+
+			return
 		}
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
+
+		if key, n, ok := ethtoolIntField(line); ok {
+			out[key] = n
 		}
-		if strings.HasPrefix(trimmed, "Adaptive") {
-			rx, tx, ok := parseAdaptiveLine(trimmed)
-			if ok {
-				out["adaptive_rx"] = rx
-				out["adaptive_tx"] = tx
-			}
-			continue
-		}
-		key, val, ok := strings.Cut(trimmed, ":")
-		if !ok {
-			continue
-		}
-		val = strings.TrimSpace(val)
-		if val == "" {
-			continue
-		}
-		n, err := strconv.Atoi(val)
-		if err != nil {
-			continue
-		}
-		out[ethtoolKey(key)] = n
-	}
+	})
+
 	if len(out) == 0 {
 		return nil
 	}
+
 	return out
 }
 
@@ -482,7 +573,7 @@ func parseAdaptiveLine(
 	if !ok {
 		return "", "", false
 	}
-	_, rxVal, ok := strings.Cut(rxRaw, ":")
+	_, rxVal, ok := strings.Cut(rxRaw, colon)
 	if !ok {
 		return "", "", false
 	}
@@ -498,31 +589,47 @@ func parseEthtoolOffloadParams(
 	raw []byte,
 ) map[string]string {
 	out := map[string]string{}
-	for _, line := range strings.Split(string(raw), "\n") {
-		if strings.HasPrefix(line, "Features for") {
-			continue
-		}
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		key, val, ok := strings.Cut(trimmed, ":")
+
+	eachEthtoolLine(raw, "Features for", func(line string) {
+		key, val, ok := ethtoolStringField(line)
 		if !ok {
-			continue
+			return
 		}
-		val = strings.ToLower(strings.TrimSpace(val))
+
+		// A feature can read "on [fixed]"; the bracket is not the value.
+		val = strings.ToLower(val)
 		if i := strings.Index(val, "["); i >= 0 {
 			val = strings.TrimSpace(val[:i])
 		}
-		if val == "" {
-			continue
+
+		if val != "" {
+			out[key] = val
 		}
-		out[ethtoolKey(key)] = val
-	}
+	})
+
 	if len(out) == 0 {
 		return nil
 	}
+
 	return out
+}
+
+// ethtoolStringField reads a "key: value" line, reporting false when the
+// line is not one or carries no value.
+func ethtoolStringField(
+	line string,
+) (key string, val string, ok bool) {
+	k, v, found := strings.Cut(line, colon)
+	if !found {
+		return "", "", false
+	}
+
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return "", "", false
+	}
+
+	return ethtoolKey(k), v, true
 }
 
 // parseEthtoolPauseParams parses `ethtool -a <iface>` output. Values
@@ -531,27 +638,17 @@ func parseEthtoolPauseParams(
 	raw []byte,
 ) map[string]bool {
 	out := map[string]bool{}
-	for _, line := range strings.Split(string(raw), "\n") {
-		if strings.HasPrefix(line, "Pause parameters for") {
-			continue
+
+	eachEthtoolLine(raw, "Pause parameters for", func(line string) {
+		if key, val, ok := ethtoolStringField(line); ok {
+			out[key] = strings.EqualFold(val, "on")
 		}
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			continue
-		}
-		key, val, ok := strings.Cut(trimmed, ":")
-		if !ok {
-			continue
-		}
-		val = strings.TrimSpace(val)
-		if val == "" {
-			continue
-		}
-		out[ethtoolKey(key)] = strings.EqualFold(val, "on")
-	}
+	})
+
 	if len(out) == 0 {
 		return nil
 	}
+
 	return out
 }
 
@@ -562,8 +659,8 @@ func ethtoolKey(
 	k string,
 ) string {
 	k = strings.TrimSpace(strings.ToLower(k))
-	k = strings.ReplaceAll(k, " ", "_")
-	k = strings.ReplaceAll(k, "-", "_")
+	k = strings.ReplaceAll(k, " ", underscore)
+	k = strings.ReplaceAll(k, "-", underscore)
 	return k
 }
 
@@ -593,23 +690,6 @@ var (
 // the iface block (after the header line). Captures the tunnel kind
 // (ip6tnl / ipip).
 var tunnelHeaderRE = regexp.MustCompile(`^\s+(ip6tnl|ipip)\b`)
-
-// tunnelKVKeys is the set of `<word> <value>` keys Ohai pulls out of
-// the tunnel info line. Stored as a set for fast membership checks
-// inside parseIPLinkOutput.
-var tunnelKVKeys = map[string]struct{}{
-	"remote":       {},
-	"local":        {},
-	"encaplimit":   {},
-	"hoplimit":     {},
-	"tclass":       {},
-	"flowlabel":    {},
-	"addrgenmode":  {},
-	"numtxqueues":  {},
-	"numrxqueues":  {},
-	"gso_max_size": {},
-	"gso_max_segs": {},
-}
 
 // tunnelProtoValues are the bare-word `proto` values ip emits.
 var tunnelProtoValues = map[string]struct{}{
@@ -648,41 +728,67 @@ func parseIPLinkOutput(
 	raw []byte,
 ) map[string]*ipLinkAnnotations {
 	out := map[string]*ipLinkAnnotations{}
-	var currentName string
-	var xdpMode string
-	for _, line := range strings.Split(string(raw), "\n") {
+
+	var (
+		currentName string
+		xdpMode     string
+	)
+
+	for _, line := range strings.Split(string(raw), newline) {
 		if m := ipLinkHeaderRE.FindStringSubmatch(line); m != nil {
-			currentName = m[2]
-			xdpMode = ""
+			currentName, xdpMode = m[2], ""
+
 			continue
 		}
+
 		if currentName == "" {
 			continue
 		}
-		ann := out[currentName]
-		if ann == nil {
+
+		ann, ok := out[currentName]
+		if !ok {
 			ann = &ipLinkAnnotations{}
 			out[currentName] = ann
 		}
 
-		switch {
-		case tunnelHeaderRE.MatchString(line):
-			ann.TunnelInfo = parseTunnelLine(line)
-		case strings.Contains(line, "vlan id ") ||
-			strings.Contains(line, "vlan protocol "):
-			ann.VLAN = parseVLANLine(line)
-		case strings.Contains(line, "xdp"):
-			parseXDPLine(line, ann, &xdpMode)
-		}
+		annotateFromLine(line, ann, &xdpMode)
 	}
-	// Drop interfaces with no annotations so callers can range over a
-	// dense map instead of probing nil sub-fields.
+
+	dropEmptyAnnotations(out)
+
+	return out
+}
+
+// annotateFromLine files one continuation line under the interface whose
+// header it followed.
+func annotateFromLine(
+	line string,
+	ann *ipLinkAnnotations,
+	xdpMode *string,
+) {
+	switch {
+	case tunnelHeaderRE.MatchString(line):
+		ann.TunnelInfo = parseTunnelLine(line)
+	case strings.Contains(line, "vlan id ") ||
+		strings.Contains(line, "vlan protocol "):
+		ann.VLAN = parseVLANLine(line)
+	case strings.Contains(line, "xdp"):
+		parseXDPLine(line, ann, xdpMode)
+	default:
+		// A line carrying none of the three.
+	}
+}
+
+// dropEmptyAnnotations removes interfaces nothing was recorded for, so a
+// caller can range over the map instead of probing nil sub-fields.
+func dropEmptyAnnotations(
+	out map[string]*ipLinkAnnotations,
+) {
 	for name, ann := range out {
 		if ann.VLAN == nil && ann.TunnelInfo == nil && ann.XDP == nil {
 			delete(out, name)
 		}
 	}
-	return out
 }
 
 // parseVLANLine extracts the VLAN id, protocol qualifier (when
@@ -692,83 +798,111 @@ func parseVLANLine(
 	line string,
 ) *VLANInfo {
 	v := &VLANInfo{}
-	if m := vlanProtocolIDRE.FindStringSubmatch(line); m != nil {
-		v.Protocol = m[1]
-		v.ID = m[2]
-	} else if m := vlanIDOnlyRE.FindStringSubmatch(line); m != nil {
-		v.ID = m[1]
+
+	switch m := vlanProtocolIDRE.FindStringSubmatch(line); {
+	case m != nil:
+		v.Protocol, v.ID = m[1], m[2]
+	default:
+		if m := vlanIDOnlyRE.FindStringSubmatch(line); m != nil {
+			v.ID = m[1]
+		}
 	}
+
 	if v.ID == "" {
 		return nil
 	}
-	flags := vlanFlagsRE.FindAllString(line, -1)
-	if len(flags) > 0 {
-		seen := map[string]bool{}
-		for _, f := range flags {
-			if !seen[f] {
-				seen[f] = true
-				v.Flags = append(v.Flags, f)
-			}
+
+	v.Flags = uniqueStrings(vlanFlagsRE.FindAllString(line, -1))
+
+	return v
+}
+
+// uniqueStrings keeps the first occurrence of each value, in order.
+func uniqueStrings(
+	in []string,
+) []string {
+	if len(in) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]bool, len(in))
+
+	var out []string
+
+	for _, s := range in {
+		if !seen[s] {
+			seen[s] = true
+			out = append(out, s)
 		}
 	}
-	return v
+
+	return out
 }
 
 // parseTunnelLine walks the whitespace-tokenized words of an ip6tnl /
 // ipip continuation line, picking out the keys Ohai recognises.
 // Bareword tokens that match tunnelProtoValues become Proto;
-// `external` becomes External=true; anything in tunnelKVKeys takes
+// `external` becomes External=true; a key setTunnelField knows takes
 // the next token as its value.
 func parseTunnelLine(
 	line string,
 ) *TunnelInfo {
 	t := &TunnelInfo{}
 	words := strings.Fields(line)
+
 	for i, w := range words {
-		if w == "external" {
+		switch {
+		case w == "external":
 			t.External = true
-			continue
-		}
-		if _, ok := tunnelProtoValues[w]; ok {
+		case isTunnelProto(w):
 			t.Proto = w
-			continue
-		}
-		if _, ok := tunnelKVKeys[w]; !ok {
-			continue
-		}
-		if i+1 >= len(words) {
-			continue
-		}
-		val := words[i+1]
-		switch w {
-		case "remote":
-			t.Remote = val
-		case "local":
-			t.Local = val
-		case "encaplimit":
-			t.EncapLimit = val
-		case "hoplimit":
-			t.HopLimit = val
-		case "tclass":
-			t.TClass = val
-		case "flowlabel":
-			t.Flowlabel = val
-		case "addrgenmode":
-			t.AddrGenMode = val
-		case "numtxqueues":
-			t.NumTxQueues = val
-		case "numrxqueues":
-			t.NumRxQueues = val
-		case "gso_max_size":
-			t.GsoMaxSize = val
-		case "gso_max_segs":
-			t.GsoMaxSegs = val
+		case i+1 < len(words):
+			setTunnelField(t, w, words[i+1])
+		default:
+			// A trailing key with no value after it.
 		}
 	}
+
 	if *t == (TunnelInfo{}) {
 		return nil
 	}
+
 	return t
+}
+
+// isTunnelProto reports whether a word names the tunnel's protocol
+// rather than being a key.
+func isTunnelProto(
+	w string,
+) bool {
+	_, ok := tunnelProtoValues[w]
+
+	return ok
+}
+
+// setTunnelField files one "key value" pair from an ip link tunnel line.
+func setTunnelField(
+	t *TunnelInfo,
+	key string,
+	val string,
+) {
+	dst := map[string]*string{
+		"remote":       &t.Remote,
+		"local":        &t.Local,
+		"encaplimit":   &t.EncapLimit,
+		"hoplimit":     &t.HopLimit,
+		"tclass":       &t.TClass,
+		"flowlabel":    &t.Flowlabel,
+		"addrgenmode":  &t.AddrGenMode,
+		"numtxqueues":  &t.NumTxQueues,
+		"numrxqueues":  &t.NumRxQueues,
+		"gso_max_size": &t.GsoMaxSize,
+		"gso_max_segs": &t.GsoMaxSegs,
+	}[key]
+
+	if dst != nil {
+		*dst = val
+	}
 }
 
 // parseXDPLine handles the two XDP line shapes: a mode-announcing
@@ -783,28 +917,41 @@ func parseXDPLine(
 	xdpMode *string,
 ) {
 	if m := xdpHeaderRE.FindStringSubmatch(line); m != nil {
-		mode := m[1]
-		if mode == "xdp" {
-			mode = "xdpdrv"
+		// A bare "xdp" header means the driver-level hook.
+		*xdpMode = m[1]
+		if *xdpMode == "xdp" {
+			*xdpMode = "xdpdrv"
 		}
-		*xdpMode = mode
-		if ann.XDP == nil {
-			ann.XDP = &XDPInfo{}
-		}
+
+		ensureXDP(ann)
 	}
-	if m := xdpAttachedRE.FindStringSubmatch(line); m != nil {
-		mode := m[1]
-		if mode == "xdp" {
-			mode = *xdpMode
-		}
-		if ann.XDP == nil {
-			ann.XDP = &XDPInfo{}
-		}
-		ann.XDP.Attached = append(ann.XDP.Attached, XDPProgram{
-			Mode: mode,
-			ID:   m[2],
-			Tag:  m[3],
-		})
+
+	m := xdpAttachedRE.FindStringSubmatch(line)
+	if m == nil {
+		return
+	}
+
+	ensureXDP(ann)
+
+	// The attachment line repeats "xdp" for whatever the header said.
+	mode := m[1]
+	if mode == "xdp" {
+		mode = *xdpMode
+	}
+
+	ann.XDP.Attached = append(ann.XDP.Attached, XDPProgram{
+		Mode: mode,
+		ID:   m[2],
+		Tag:  m[3],
+	})
+}
+
+// ensureXDP creates the XDP record the first time a line mentions one.
+func ensureXDP(
+	ann *ipLinkAnnotations,
+) {
+	if ann.XDP == nil {
+		ann.XDP = &XDPInfo{}
 	}
 }
 
@@ -844,7 +991,7 @@ var arphrdEncapsulation = map[int]string{
 func isOpenVZAlias(
 	name string,
 ) (string, bool) {
-	if i := strings.Index(name, ":"); i > 0 {
+	if i := strings.Index(name, colon); i > 0 {
 		if _, err := strconv.Atoi(name[i+1:]); err == nil {
 			return name[:i], true
 		}
@@ -961,7 +1108,7 @@ func neighFamily(
 	switch fam {
 	case 2: // AF_INET
 		return "inet"
-	case 10: // AF_INET6
+	case afInet6:
 		return "inet6"
 	}
 	return ""
@@ -974,21 +1121,21 @@ func neighState(
 	state int,
 ) string {
 	switch state {
-	case 0x01:
+	case nudIncomplete:
 		return "INCOMPLETE"
-	case 0x02:
+	case nudReachable:
 		return "REACHABLE"
-	case 0x04:
+	case nudStale:
 		return "STALE"
-	case 0x08:
+	case nudDelay:
 		return "DELAY"
-	case 0x10:
+	case nudProbe:
 		return "PROBE"
-	case 0x20:
+	case nudFailed:
 		return "FAILED"
-	case 0x40:
+	case nudNoARP:
 		return "NOARP"
-	case 0x80:
+	case nudPermanent:
 		return "PERMANENT"
 	}
 	return ""

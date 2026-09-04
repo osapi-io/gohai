@@ -58,26 +58,28 @@ func (s *BlockDevicePublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := blockdevice.New()
 			s.Equal("block_device", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*blockdevice.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*blockdevice.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -93,7 +95,7 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: single disk with full sysfs tree",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/sys/block/sda/device", 0o755)
@@ -158,7 +160,7 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: multiple devices sorted by readdir order",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/sys/block/nvme0n1/queue", 0o755)
@@ -192,13 +194,13 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: /sys/block absent returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() *memfs.MemFS { return memfs.New() },
 			want:    []blockdevice.BlockDevice{},
 		},
 		{
 			name:    "linux: device with no optional sysfs files",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/sys/block/vda", 0o755)
@@ -210,7 +212,7 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: firmware_rev populated",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/sys/block/sdb/device", 0o755)
@@ -227,7 +229,7 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: non-directory entries in /sys/block are skipped",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/sys/block", 0o755)
@@ -251,10 +253,12 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c blockdevice.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &blockdevice.Linux{FS: tt.setupFS()}
 			case "darwin":
 				c = blockdevice.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

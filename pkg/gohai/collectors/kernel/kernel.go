@@ -76,16 +76,26 @@ var unameSyscall = unix.Uname
 // defaultUname invokes unix.Uname (works on any unix-like OS) and
 // converts the fixed-length byte arrays to Go strings. Shared by both
 // Linux and Darwin factories.
-func defaultUname() (name, release, version, machine string, err error) {
+// unameResult is what uname(2) reports, as Go strings.
+type unameResult struct {
+	Name    string
+	Release string
+	Version string
+	Machine string
+}
+
+func defaultUname() (unameResult, error) {
 	var u unix.Utsname
-	if err = unameSyscall(&u); err != nil {
-		return "", "", "", "", fmt.Errorf("uname: %w", err)
+	if err := unameSyscall(&u); err != nil {
+		return unameResult{}, fmt.Errorf("uname: %w", err)
 	}
-	return bytesToString(u.Sysname[:]),
-		bytesToString(u.Release[:]),
-		bytesToString(u.Version[:]),
-		bytesToString(u.Machine[:]),
-		nil
+
+	return unameResult{
+		Name:    bytesToString(u.Sysname[:]),
+		Release: bytesToString(u.Release[:]),
+		Version: bytesToString(u.Version[:]),
+		Machine: bytesToString(u.Machine[:]),
+	}, nil
 }
 
 // bytesToString trims trailing NUL bytes from a C-style fixed-length

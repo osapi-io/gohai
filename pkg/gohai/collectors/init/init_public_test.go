@@ -18,6 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+//nolint:revive // package-directory-mismatch: init is not a legal package name
 package initd_test
 
 import (

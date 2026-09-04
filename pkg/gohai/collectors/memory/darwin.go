@@ -44,6 +44,9 @@ type Darwin struct {
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
+// defaultPageSize is what Darwin uses when vm_stat does not say.
+const defaultPageSize = 4096
+
 func NewDarwin() *Darwin {
 	return &Darwin{Exec: executor.New()}
 }
@@ -82,32 +85,77 @@ func applyVMStat(
 	info *Info,
 	out []byte,
 ) {
-	pageSize := uint64(4096)
+	pageSize := uint64(defaultPageSize)
+
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
 	for sc.Scan() {
 		line := sc.Text()
-		if m := vmStatPageSize.FindStringSubmatch(line); m != nil {
-			if ps, err := strconv.ParseUint(m[1], 10, 64); err == nil && ps > 0 {
-				pageSize = ps
-			}
+
+		// The header names the page size everything else is counted in.
+		if ps, ok := vmStatPageSizeOf(line); ok {
+			pageSize = ps
+
 			continue
 		}
-		idx := strings.Index(line, ":")
-		if idx < 0 {
+
+		key, pages, ok := vmStatField(line)
+		if !ok {
 			continue
 		}
-		key := strings.TrimSpace(line[:idx])
-		val := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(line[idx+1:]), "."))
-		pages, err := strconv.ParseUint(val, 10, 64)
-		if err != nil {
-			continue
-		}
-		bytes := pages * pageSize
-		switch key {
-		case "Pages speculative":
-			info.Speculative = bytes
-		case "Pages stored in compressor":
-			info.Compressed = bytes
-		}
+
+		setVMStatField(info, key, pages*pageSize)
+	}
+}
+
+// vmStatPageSizeOf reads the page size out of vm_stat's header line.
+func vmStatPageSizeOf(
+	line string,
+) (uint64, bool) {
+	m := vmStatPageSize.FindStringSubmatch(line)
+	if m == nil {
+		return 0, false
+	}
+
+	ps, err := strconv.ParseUint(m[1], 10, 64)
+	if err != nil || ps == 0 {
+		return 0, false
+	}
+
+	return ps, true
+}
+
+// vmStatField reads a "key: <pages>." line. vm_stat ends each count
+// with a full stop.
+func vmStatField(
+	line string,
+) (key string, pages uint64, ok bool) {
+	k, v, found := strings.Cut(line, ":")
+	if !found {
+		return "", 0, false
+	}
+
+	n, err := strconv.ParseUint(
+		strings.TrimSuffix(strings.TrimSpace(v), "."), 10, 64,
+	)
+	if err != nil {
+		return "", 0, false
+	}
+
+	return strings.TrimSpace(k), n, true
+}
+
+// setVMStatField files the counts this collector reports.
+func setVMStatField(
+	info *Info,
+	key string,
+	bytes uint64,
+) {
+	switch key {
+	case "Pages speculative":
+		info.Speculative = bytes
+	case "Pages stored in compressor":
+		info.Compressed = bytes
+	default:
+		// A key this collector does not report.
 	}
 }

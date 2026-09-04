@@ -59,11 +59,11 @@ func (s *TimezonePublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -74,12 +74,14 @@ func (s *TimezonePublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*timezone.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*timezone.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -87,10 +89,10 @@ func (s *TimezonePublicTestSuite) TestNew() {
 
 func (s *TimezonePublicTestSuite) TestCollect() {
 	pdt := func() time.Time {
-		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PDT", -7*3600))
+		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone(zonePDT, -7*3600))
 	}
 	pst := func() time.Time {
-		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PST", -8*3600))
+		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone(zonePST, -8*3600))
 	}
 
 	tests := []struct {
@@ -104,7 +106,7 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: symlink points to IANA zone",
-			variant: "linux",
+			variant: osLinux,
 			now:     pdt,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
@@ -114,86 +116,86 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 					[]byte{},
 					fs.FileMode(0o644),
 				)
-				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.Symlink("/usr/share/zoneinfo/America/Los_Angeles", "/etc/localtime")
+				_ = f.MkdirAll(pathEtc, 0o755)
+				_ = f.Symlink("/usr/share/zoneinfo/America/Los_Angeles", pathEtcLocaltime)
 				return f
 			},
 			wantName:   "America/Los_Angeles",
-			wantAbbrev: "PDT",
+			wantAbbrev: zonePDT,
 			wantOffset: -7 * 3600,
 		},
 		{
 			name:    "linux: target without zoneinfo prefix passed through",
-			variant: "linux",
+			variant: osLinux,
 			now:     pdt,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.Symlink("UTC", "/etc/localtime")
+				_ = f.MkdirAll(pathEtc, 0o755)
+				_ = f.Symlink(zoneUTC, pathEtcLocaltime)
 				return f
 			},
-			wantName:   "UTC",
-			wantAbbrev: "PDT",
+			wantName:   zoneUTC,
+			wantAbbrev: zonePDT,
 			wantOffset: -7 * 3600,
 		},
 		{
 			name:    "linux: readlink fails, falls back to /etc/timezone",
-			variant: "linux",
+			variant: osLinux,
 			now:     pdt,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.MkdirAll(pathEtc, 0o755)
 				_ = f.WriteFile("/etc/timezone", []byte("Europe/Berlin\n"), fs.FileMode(0o644))
 				return f
 			},
 			wantName:   "Europe/Berlin",
-			wantAbbrev: "PDT",
+			wantAbbrev: zonePDT,
 			wantOffset: -7 * 3600,
 		},
 		{
 			name:       "linux: both sources missing leaves name empty",
-			variant:    "linux",
+			variant:    osLinux,
 			now:        pdt,
 			setupFS:    func() avfs.VFS { return memfs.New() },
 			wantName:   "",
-			wantAbbrev: "PDT",
+			wantAbbrev: zonePDT,
 			wantOffset: -7 * 3600,
 		},
 		{
 			name:    "darwin: macOS zoneinfo symlink",
-			variant: "darwin",
+			variant: osDarwin,
 			now:     pst,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.Symlink("/var/db/timezone/zoneinfo/America/Los_Angeles", "/etc/localtime")
+				_ = f.MkdirAll(pathEtc, 0o755)
+				_ = f.Symlink("/var/db/timezone/zoneinfo/America/Los_Angeles", pathEtcLocaltime)
 				return f
 			},
 			wantName:   "America/Los_Angeles",
-			wantAbbrev: "PST",
+			wantAbbrev: zonePST,
 			wantOffset: -8 * 3600,
 		},
 		{
 			name:    "darwin: target without prefix passed through",
-			variant: "darwin",
+			variant: osDarwin,
 			now:     pst,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/etc", 0o755)
-				_ = f.Symlink("UTC", "/etc/localtime")
+				_ = f.MkdirAll(pathEtc, 0o755)
+				_ = f.Symlink(zoneUTC, pathEtcLocaltime)
 				return f
 			},
-			wantName:   "UTC",
-			wantAbbrev: "PST",
+			wantName:   zoneUTC,
+			wantAbbrev: zonePST,
 			wantOffset: -8 * 3600,
 		},
 		{
 			name:       "darwin: readlink error leaves name empty",
-			variant:    "darwin",
+			variant:    osDarwin,
 			now:        pst,
 			setupFS:    func() avfs.VFS { return memfs.New() },
 			wantName:   "",
-			wantAbbrev: "PST",
+			wantAbbrev: zonePST,
 			wantOffset: -8 * 3600,
 		},
 	}
@@ -203,10 +205,12 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 			defer timezone.SetNowFn(tt.now)()
 			var c timezone.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &timezone.Linux{FS: tt.setupFS()}
-			case "darwin":
+			case osDarwin:
 				c = &timezone.Darwin{FS: tt.setupFS()}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

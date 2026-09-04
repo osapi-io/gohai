@@ -41,6 +41,9 @@ type Darwin struct {
 }
 
 // NewDarwin returns a Darwin variant wired to production dependencies.
+// sysctl reports clock speed in hertz; Info carries megahertz.
+const hzPerMHz = 1_000_000
+
 func NewDarwin() *Darwin {
 	return &Darwin{Exec: executor.New()}
 }
@@ -68,9 +71,9 @@ func (d *Darwin) Collect(
 		info.Sockets = n
 	}
 	if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency_max"); ok {
-		info.Speed = float64(n) / 1_000_000
+		info.Speed = float64(n) / hzPerMHz
 	} else if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency"); ok {
-		info.Speed = float64(n) / 1_000_000
+		info.Speed = float64(n) / hzPerMHz
 	}
 	return info, nil
 }

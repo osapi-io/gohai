@@ -60,11 +60,11 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -75,12 +75,14 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*machineid.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*machineid.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -98,7 +100,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: gopsutil returns /etc/machine-id → use it",
-			variant: "linux",
+			variant: osLinux,
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: "gopsutil-id"}, nil
 			},
@@ -106,39 +108,39 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: gopsutil empty, dbus fallback wins",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
 			dbus:    "dbus-id\n",
 			wantID:  "dbus-id",
 		},
 		{
 			name:    "linux: gopsutil empty, dbus missing → empty ID (no error)",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
 			wantID:  "",
 		},
 		{
 			name:    "linux: gopsutil empty, dbus whitespace-only → empty ID",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
 			dbus:    "   \n",
 			wantID:  "",
 		},
 		{
 			name:    "linux: gopsutil nil info returns empty",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, nil },
 			wantID:  "",
 		},
 		{
 			name:    "linux: gopsutil error wrapped and returned",
-			variant: "linux",
+			variant: osLinux,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 		{
 			name:    "darwin: gopsutil returns IOPlatformUUID",
-			variant: "darwin",
+			variant: osDarwin,
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: "iokit-uuid-1234"}, nil
 			},
@@ -146,13 +148,13 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: nil info returns empty",
-			variant: "darwin",
+			variant: osDarwin,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, nil },
 			wantID:  "",
 		},
 		{
 			name:    "darwin: gopsutil error wrapped and returned",
-			variant: "darwin",
+			variant: osDarwin,
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
@@ -162,7 +164,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			defer machineid.SetHostInfoFn(tt.hostFn)()
 			var c machineid.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				var vfs avfs.VFS = memfs.New()
 				if tt.dbus != "" {
 					f := memfs.New()
@@ -171,8 +173,10 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 					vfs = f
 				}
 				c = &machineid.Linux{FS: vfs}
-			case "darwin":
+			case osDarwin:
 				c = &machineid.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

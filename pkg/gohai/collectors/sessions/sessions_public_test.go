@@ -82,11 +82,11 @@ func (s *SessionsPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -97,12 +97,14 @@ func (s *SessionsPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*sessions.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*sessions.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -129,7 +131,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: loginctl present, parses sessions ignores utmp",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, loginctlOutput, nil) },
 			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
 			validate: func(i *sessions.Info) {
@@ -145,7 +147,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: loginctl missing, falls back to utmp via gopsutil",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return loginctlExec(t, nil, errors.New("not found"))
 			},
@@ -159,7 +161,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: nil Exec, utmp path direct",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
 			validate: func(i *sessions.Info) {
@@ -169,7 +171,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: loginctl returns empty output, empty session list not fallback",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, []byte(""), nil) },
 			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
 			validate: func(i *sessions.Info) {
@@ -178,7 +180,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: loginctl missing AND gopsutil errors propagate",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return loginctlExec(t, nil, errors.New("not found"))
 			},
@@ -189,7 +191,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: console session",
-			variant: "darwin",
+			variant: osDarwin,
 			usersFn: func(context.Context) ([]host.UserStat, error) {
 				return []host.UserStat{
 					{User: "john", Terminal: "console", Started: 1712908800},
@@ -204,7 +206,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: gopsutil error wrapped and returned",
-			variant: "darwin",
+			variant: osDarwin,
 			usersFn: func(context.Context) ([]host.UserStat, error) {
 				return nil, errors.New("utmpx error")
 			},
@@ -216,10 +218,12 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			defer sessions.SetUsersFn(tt.usersFn)()
 			var c sessions.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &sessions.Linux{Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &sessions.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

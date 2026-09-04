@@ -38,7 +38,7 @@ import (
 // DigitalOcean, so Collect will proceed past the gate.
 func doPrior() collector.PriorResults {
 	return collector.PriorResults{
-		"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "DigitalOcean"}},
+		sourceDMI: &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "DigitalOcean"}},
 	}
 }
 
@@ -91,7 +91,7 @@ func (s *DigitalOceanPublicTestSuite) TestInterface() {
 		{"Name", c.Name(), "digital_ocean"},
 		{"Category", c.Category(), "cloud"},
 		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+		{"Dependencies", c.Dependencies(), []string{sourceDMI}},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -148,7 +148,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 		{
 			name: "dmi says not DO short-circuits",
 			prior: collector.PriorResults{
-				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Dell Inc."}},
+				sourceDMI: &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Dell Inc."}},
 			},
 			handler:    func(http.ResponseWriter, *http.Request) {},
 			wantNil:    true,
@@ -156,7 +156,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 		},
 		{
 			name:  "dmi without BIOS fails open and tries HTTP",
-			prior: collector.PriorResults{"dmi": &dmi.Info{}},
+			prior: collector.PriorResults{sourceDMI: &dmi.Info{}},
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(`{"droplet_id": 42}`))
 			},

@@ -31,7 +31,7 @@ import (
 	"errors"
 	"net/http"
 	"os"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
@@ -44,6 +44,10 @@ import (
 const ProviderName = "azure"
 
 // metadataBaseURL is Azure's link-local metadata endpoint.
+// The instance metadata service is link-local and serves plain
+// HTTP only; there is no HTTPS endpoint to point this at.
+//
+//nolint:revive // unsecure-url-scheme
 const metadataBaseURL = "http://169.254.169.254"
 
 // metadataPath is the Azure instance metadata path.
@@ -479,32 +483,52 @@ func (c *Collector) negotiateAPIVersion(
 	ctx context.Context,
 ) string {
 	fallback := supportedAPIVersions[len(supportedAPIVersions)-1]
-	body, status, err := c.client.RawGet(ctx, metadataPath)
-	if err != nil || status != http.StatusBadRequest {
+
+	offered, ok := c.probeAPIVersions(ctx)
+	if !ok {
 		return fallback
 	}
-	var probe struct {
-		NewestVersions []string `json:"newest-versions"`
-	}
-	if json.Unmarshal(body, &probe) != nil || len(probe.NewestVersions) == 0 {
-		return fallback
-	}
+
+	// The newest version both sides know about.
 	supported := make(map[string]struct{}, len(supportedAPIVersions))
 	for _, v := range supportedAPIVersions {
 		supported[v] = struct{}{}
 	}
-	// Intersection, sorted descending, pick first.
-	matches := make([]string, 0, len(probe.NewestVersions))
-	for _, v := range probe.NewestVersions {
+
+	matches := make([]string, 0, len(offered))
+
+	for _, v := range offered {
 		if _, ok := supported[v]; ok {
 			matches = append(matches, v)
 		}
 	}
+
 	if len(matches) == 0 {
 		return fallback
 	}
-	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
-	return matches[0]
+
+	return slices.Max(matches)
+}
+
+// probeAPIVersions asks for a bad version on purpose: IMDS answers 400
+// with the versions it does support.
+func (c *Collector) probeAPIVersions(
+	ctx context.Context,
+) ([]string, bool) {
+	body, status, err := c.client.RawGet(ctx, metadataPath)
+	if err != nil || status != http.StatusBadRequest {
+		return nil, false
+	}
+
+	var probe struct {
+		NewestVersions []string `json:"newest-versions"`
+	}
+
+	if json.Unmarshal(body, &probe) != nil || len(probe.NewestVersions) == 0 {
+		return nil, false
+	}
+
+	return probe.NewestVersions, true
 }
 
 // transform reshapes Azure's two-section response into the flat Info,
@@ -513,120 +537,180 @@ func transform(
 	r raw,
 ) *Info {
 	info := &Info{}
-	if r.Compute != nil {
-		info.ID = r.Compute.VMID
-		info.Name = r.Compute.Name
-		info.Type = r.Compute.VMSize
-		info.ResourceID = r.Compute.ResourceID
-		info.ResourceGroupName = r.Compute.ResourceGroupName
-		info.VMScaleSetName = r.Compute.VMScaleSetName
-		info.Priority = r.Compute.Priority
-		info.EvictionPolicy = r.Compute.EvictionPolicy
-		info.Region = r.Compute.Location
-		info.Zone = r.Compute.Zone
-		info.PlacementGroupID = r.Compute.PlacementGroupID
-		info.PlatformFaultDomain = r.Compute.PlatformFaultDomain
-		info.PlatformUpdateDomain = r.Compute.PlatformUpdateDomain
-		info.AccountUID = r.Compute.SubscriptionID
-		info.CloudPartition = r.Compute.AzEnvironment
-		info.Offer = r.Compute.Offer
-		info.Publisher = r.Compute.Publisher
-		info.SKU = r.Compute.SKU
-		info.Version = r.Compute.Version
-		info.LicenseType = r.Compute.LicenseType
-		info.OSType = r.Compute.OSType
-		info.Provider = r.Compute.Provider
-		info.Plan = r.Compute.Plan
-		info.Tags = r.Compute.Tags
-		info.TagsList = r.Compute.TagsList
-		info.UserData = r.Compute.UserData
-		info.CustomData = r.Compute.CustomData
-		info.IsHostCompatibilityLayer = r.Compute.IsHostCompatibilityLayer
 
-		if r.Compute.SecurityProfile != nil {
-			sp := SecurityProfile(*r.Compute.SecurityProfile)
-			info.SecurityProfile = &sp
-		}
-		if r.Compute.Host != nil {
-			h := Host(*r.Compute.Host)
-			info.Host = &h
-		}
-		if r.Compute.HostGroup != nil {
-			hg := HostGroup(*r.Compute.HostGroup)
-			info.HostGroup = &hg
-		}
-		if r.Compute.OSProfile != nil {
-			op := OSProfile(*r.Compute.OSProfile)
-			info.OSProfile = &op
-		}
-		if r.Compute.AdditionalCapabilities != nil {
-			ac := AdditionalCapabilities(*r.Compute.AdditionalCapabilities)
-			info.AdditionalCapabilities = &ac
-		}
-		if r.Compute.ExtendedLocation != nil {
-			el := ExtendedLocation(*r.Compute.ExtendedLocation)
-			info.ExtendedLocation = &el
-		}
-		for _, pk := range r.Compute.PublicKeys {
-			info.PublicKeys = append(info.PublicKeys, PublicKey(pk))
-		}
-		if r.Compute.StorageProfile != nil {
-			info.StorageProfile = &StorageProfile{}
-			if r.Compute.StorageProfile.OSDisk != nil {
-				d := convertDisk(*r.Compute.StorageProfile.OSDisk)
-				info.StorageProfile.OSDisk = &d
-			}
-			for _, d := range r.Compute.StorageProfile.DataDisks {
-				info.StorageProfile.DataDisks = append(
-					info.StorageProfile.DataDisks, convertDisk(d),
-				)
-			}
-		}
-	}
-	if r.Network != nil {
-		info.Interfaces = make(map[string]Interface, len(r.Network.Interface))
-		for _, ri := range r.Network.Interface {
-			iface := Interface{MACAddress: ri.MACAddress}
-			if len(ri.IPv4.IPAddress) > 0 || len(ri.IPv4.Subnet) > 0 {
-				iface.IPv4 = &IPAddrs{}
-				for _, a := range ri.IPv4.IPAddress {
-					iface.IPv4.IPAddresses = append(iface.IPv4.IPAddresses, IPAddress{
-						PrivateIP: a.PrivateIPAddress,
-						PublicIP:  a.PublicIPAddress,
-					})
-					if a.PrivateIPAddress != "" {
-						info.LocalIPv4 = append(info.LocalIPv4, a.PrivateIPAddress)
-					}
-					if a.PublicIPAddress != "" {
-						info.PublicIPv4 = append(info.PublicIPv4, a.PublicIPAddress)
-					}
-				}
-				for _, sn := range ri.IPv4.Subnet {
-					iface.IPv4.Subnets = append(iface.IPv4.Subnets, Subnet(sn))
-				}
-			}
-			if len(ri.IPv6.IPAddress) > 0 || len(ri.IPv6.Subnet) > 0 {
-				iface.IPv6 = &IPAddrs{}
-				for _, a := range ri.IPv6.IPAddress {
-					iface.IPv6.IPAddresses = append(iface.IPv6.IPAddresses, IPAddress{
-						PrivateIP: a.PrivateIPAddress,
-						PublicIP:  a.PublicIPAddress,
-					})
-					if a.PrivateIPAddress != "" {
-						info.LocalIPv6 = append(info.LocalIPv6, a.PrivateIPAddress)
-					}
-					if a.PublicIPAddress != "" {
-						info.PublicIPv6 = append(info.PublicIPv6, a.PublicIPAddress)
-					}
-				}
-				for _, sn := range ri.IPv6.Subnet {
-					iface.IPv6.Subnets = append(iface.IPv6.Subnets, Subnet(sn))
-				}
-			}
-			info.Interfaces[ri.MACAddress] = iface
-		}
-	}
+	applyCompute(info, r.Compute)
+	applyNetwork(info, r.Network)
+
 	return info
+}
+
+// applyCompute copies the instance's own description across.
+func applyCompute(
+	info *Info,
+	c *rawCompute,
+) {
+	if c == nil {
+		return
+	}
+
+	info.ID = c.VMID
+	info.Name = c.Name
+	info.Type = c.VMSize
+	info.ResourceID = c.ResourceID
+	info.ResourceGroupName = c.ResourceGroupName
+	info.VMScaleSetName = c.VMScaleSetName
+	info.Priority = c.Priority
+	info.EvictionPolicy = c.EvictionPolicy
+	info.Region = c.Location
+	info.Zone = c.Zone
+	info.PlacementGroupID = c.PlacementGroupID
+	info.PlatformFaultDomain = c.PlatformFaultDomain
+	info.PlatformUpdateDomain = c.PlatformUpdateDomain
+	info.AccountUID = c.SubscriptionID
+	info.CloudPartition = c.AzEnvironment
+	info.Offer = c.Offer
+	info.Publisher = c.Publisher
+	info.SKU = c.SKU
+	info.Version = c.Version
+	info.LicenseType = c.LicenseType
+	info.OSType = c.OSType
+	info.Provider = c.Provider
+	info.Plan = c.Plan
+	info.Tags = c.Tags
+	info.TagsList = c.TagsList
+	info.UserData = c.UserData
+	info.CustomData = c.CustomData
+	info.IsHostCompatibilityLayer = c.IsHostCompatibilityLayer
+
+	applyComputeObjects(info, c)
+	applyStorageProfile(info, c.StorageProfile)
+}
+
+// applyComputeObjects copies the nested objects Azure reports only when
+// the instance has them.
+func applyComputeObjects(
+	info *Info,
+	c *rawCompute,
+) {
+	if c.SecurityProfile != nil {
+		sp := SecurityProfile(*c.SecurityProfile)
+		info.SecurityProfile = &sp
+	}
+
+	if c.Host != nil {
+		h := Host(*c.Host)
+		info.Host = &h
+	}
+
+	if c.HostGroup != nil {
+		hg := HostGroup(*c.HostGroup)
+		info.HostGroup = &hg
+	}
+
+	if c.OSProfile != nil {
+		op := OSProfile(*c.OSProfile)
+		info.OSProfile = &op
+	}
+
+	if c.AdditionalCapabilities != nil {
+		ac := AdditionalCapabilities(*c.AdditionalCapabilities)
+		info.AdditionalCapabilities = &ac
+	}
+
+	if c.ExtendedLocation != nil {
+		el := ExtendedLocation(*c.ExtendedLocation)
+		info.ExtendedLocation = &el
+	}
+
+	for _, pk := range c.PublicKeys {
+		info.PublicKeys = append(info.PublicKeys, PublicKey(pk))
+	}
+}
+
+// applyStorageProfile copies the OS disk and any data disks.
+func applyStorageProfile(
+	info *Info,
+	sp *rawStorageProfile,
+) {
+	if sp == nil {
+		return
+	}
+
+	info.StorageProfile = &StorageProfile{}
+
+	if sp.OSDisk != nil {
+		d := convertDisk(*sp.OSDisk)
+		info.StorageProfile.OSDisk = &d
+	}
+
+	for _, d := range sp.DataDisks {
+		info.StorageProfile.DataDisks = append(
+			info.StorageProfile.DataDisks, convertDisk(d),
+		)
+	}
+}
+
+// applyNetwork copies each interface, and gathers the instance-level
+// address lists as it goes.
+func applyNetwork(
+	info *Info,
+	n *rawNetwork,
+) {
+	if n == nil {
+		return
+	}
+
+	info.Interfaces = make(map[string]Interface, len(n.Interface))
+
+	for _, ri := range n.Interface {
+		info.Interfaces[ri.MACAddress] = Interface{
+			MACAddress: ri.MACAddress,
+			IPv4:       collectAddrs(ri.IPv4, &info.LocalIPv4, &info.PublicIPv4),
+			IPv6:       collectAddrs(ri.IPv6, &info.LocalIPv6, &info.PublicIPv6),
+		}
+	}
+}
+
+// collectAddrs converts one address family of one interface, appending
+// what it finds to the instance-level lists. It returns nil for a family
+// the interface does not carry, which is how the two are told apart.
+func collectAddrs(
+	src rawIPInfo,
+	local *[]string,
+	public *[]string,
+) *IPAddrs {
+	if len(src.IPAddress) == 0 && len(src.Subnet) == 0 {
+		return nil
+	}
+
+	out := &IPAddrs{}
+
+	for _, a := range src.IPAddress {
+		out.IPAddresses = append(out.IPAddresses, IPAddress{
+			PrivateIP: a.PrivateIPAddress,
+			PublicIP:  a.PublicIPAddress,
+		})
+
+		appendIfSet(local, a.PrivateIPAddress)
+		appendIfSet(public, a.PublicIPAddress)
+	}
+
+	for _, sn := range src.Subnet {
+		out.Subnets = append(out.Subnets, Subnet(sn))
+	}
+
+	return out
+}
+
+// appendIfSet adds an address to a list, ignoring the empty string that
+// IMDS uses for an address the instance does not have.
+func appendIfSet(
+	dst *[]string,
+	addr string,
+) {
+	if addr != "" {
+		*dst = append(*dst, addr)
+	}
 }
 
 func convertDisk(

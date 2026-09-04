@@ -48,6 +48,9 @@ type Linux struct {
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem.
+// meminfo reports in kibibytes.
+const bytesPerKiB = 1024
+
 func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
@@ -84,51 +87,72 @@ func applyMeminfoExtension(
 		if !ok {
 			continue
 		}
-		switch key {
-		case "Active(anon)":
-			info.ActiveAnon = val
-		case "Inactive(anon)":
-			info.InactiveAnon = val
-		case "Active(file)":
-			info.ActiveFile = val
-		case "Inactive(file)":
-			info.InactiveFile = val
-		case "Unevictable":
-			info.Unevictable = val
-		case "KernelStack":
-			info.KernelStack = val
-		case "Percpu":
-			info.PerCPU = val
-		case "KReclaimable":
-			info.KReclaimable = val
-		case "AnonPages":
-			info.AnonPages = val
-		case "Shmem":
-			info.Shmem = val
-		case "HighTotal":
-			info.HighTotal = val
-		case "HighFree":
-			info.HighFree = val
-		case "LowTotal":
-			info.LowTotal = val
-		case "LowFree":
-			info.LowFree = val
-		case "NFS_Unstable":
-			info.NFSUnstable = val
-		case "Bounce":
-			info.Bounce = val
-		case "Hugetlb":
-			if info.HugePages == nil {
-				info.HugePages = &Hugepages{}
-			}
-			info.HugePages.Hugetlb = val
-		case "DirectMap4k":
-			ensureDirectMap(info).Map4k = val
-		case "DirectMap2M":
-			ensureDirectMap(info).Map2M = val
-		case "DirectMap1G":
-			ensureDirectMap(info).Map1G = val
+
+		if setMeminfoField(info, key, val) {
+			continue
 		}
+
+		setMeminfoPageField(info, key, val)
+	}
+}
+
+// setMeminfoField files a key that maps straight onto an Info field,
+// reporting whether it did.
+func setMeminfoField(
+	info *Info,
+	key string,
+	val uint64,
+) bool {
+	dst := map[string]*uint64{
+		"Active(anon)":   &info.ActiveAnon,
+		"Inactive(anon)": &info.InactiveAnon,
+		"Active(file)":   &info.ActiveFile,
+		"Inactive(file)": &info.InactiveFile,
+		"Unevictable":    &info.Unevictable,
+		"KernelStack":    &info.KernelStack,
+		"Percpu":         &info.PerCPU,
+		"KReclaimable":   &info.KReclaimable,
+		"AnonPages":      &info.AnonPages,
+		"Shmem":          &info.Shmem,
+		"HighTotal":      &info.HighTotal,
+		"HighFree":       &info.HighFree,
+		"LowTotal":       &info.LowTotal,
+		"LowFree":        &info.LowFree,
+		"NFS_Unstable":   &info.NFSUnstable,
+		"Bounce":         &info.Bounce,
+	}[key]
+
+	if dst == nil {
+		return false
+	}
+
+	*dst = val
+
+	return true
+}
+
+// setMeminfoPageField files the huge-page and direct-map keys, which
+// live in sub-structs created on first use.
+func setMeminfoPageField(
+	info *Info,
+	key string,
+	val uint64,
+) {
+	switch key {
+	case "Hugetlb":
+		if info.HugePages == nil {
+			info.HugePages = &Hugepages{}
+		}
+
+		info.HugePages.Hugetlb = val
+	case "DirectMap4k":
+		ensureDirectMap(info).Map4k = val
+	case "DirectMap2M":
+		ensureDirectMap(info).Map2M = val
+	case "DirectMap1G":
+		ensureDirectMap(info).Map1G = val
+	default:
+		// A key this collector does not report.
 	}
 }
 
@@ -163,7 +187,7 @@ func parseMeminfoLine(
 		return "", 0, false
 	}
 	if len(fields) >= 2 && strings.EqualFold(fields[1], "kB") {
-		n *= 1024
+		n *= bytesPerKiB
 	}
 	return key, n, true
 }

@@ -51,6 +51,20 @@ var geteuidFn = os.Geteuid
 // New returns the users variant for the host OS. Both Linux and
 // Darwin read the same /etc/passwd and /etc/group files — separate
 // structs preserve the per-OS dispatch pattern for consistency.
+// The colon-separated layouts this reads:
+//
+//	passwd: name:passwd:uid:gid:gecos:dir:shell
+//	group:  name:passwd:gid:members
+const (
+	passwdFields = 7
+	passwdGECOS  = 4
+	passwdDir    = 5
+	passwdShell  = 6
+
+	groupFields  = 4
+	groupMembers = 3
+)
+
 func New() Collector {
 	if platform.Detect() == "darwin" {
 		return NewDarwin()
@@ -130,31 +144,50 @@ func parsePasswd(
 	content []byte,
 ) map[string]PasswdEntry {
 	out := make(map[string]PasswdEntry)
+
 	sc := bufio.NewScanner(bytes.NewReader(content))
 	for sc.Scan() {
-		line := sc.Text()
-		if line == "" || strings.HasPrefix(line, "#") {
+		fields := passwdFieldsOf(sc.Text())
+		if fields == nil {
 			continue
 		}
-		fields := strings.Split(line, ":")
-		if len(fields) < 7 {
-			continue
-		}
+
+		// The first entry for a name wins, as getpwnam does.
 		name := fields[0]
 		if _, exists := out[name]; exists {
 			continue
 		}
+
 		uid, _ := strconv.Atoi(fields[2])
 		gid, _ := strconv.Atoi(fields[3])
+
 		out[name] = PasswdEntry{
 			UID:   uid,
 			GID:   gid,
-			GECOS: fields[4],
-			Dir:   fields[5],
-			Shell: fields[6],
+			GECOS: fields[passwdGECOS],
+			Dir:   fields[passwdDir],
+			Shell: fields[passwdShell],
 		}
 	}
+
 	return out
+}
+
+// passwdFieldsOf splits one /etc/passwd line, returning nil for a blank,
+// a comment, or a line with too few fields to read.
+func passwdFieldsOf(
+	line string,
+) []string {
+	if line == "" || strings.HasPrefix(line, "#") {
+		return nil
+	}
+
+	fields := strings.Split(line, ":")
+	if len(fields) < passwdFields {
+		return nil
+	}
+
+	return fields
 }
 
 // parseGroup turns the contents of /etc/group into a name→entry map.
@@ -164,26 +197,40 @@ func parseGroup(
 	content []byte,
 ) map[string]GroupEntry {
 	out := make(map[string]GroupEntry)
+
 	sc := bufio.NewScanner(bytes.NewReader(content))
 	for sc.Scan() {
 		line := sc.Text()
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
+
 		fields := strings.Split(line, ":")
-		if len(fields) < 4 {
+		if len(fields) < groupFields {
 			continue
 		}
+
 		gid, _ := strconv.Atoi(fields[2])
-		var members []string
-		if m := strings.TrimSpace(fields[3]); m != "" {
-			for _, part := range strings.Split(m, ",") {
-				if p := strings.TrimSpace(part); p != "" {
-					members = append(members, p)
-				}
-			}
+		out[fields[0]] = GroupEntry{
+			GID:     gid,
+			Members: splitMembers(fields[groupMembers]),
 		}
-		out[fields[0]] = GroupEntry{GID: gid, Members: members}
 	}
+
 	return out
+}
+
+// splitMembers reads the comma-separated member list of a group line.
+func splitMembers(
+	field string,
+) []string {
+	var members []string
+
+	for _, part := range strings.Split(strings.TrimSpace(field), ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			members = append(members, p)
+		}
+	}
+
+	return members
 }

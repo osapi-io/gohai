@@ -50,19 +50,19 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, release, version, machine, err := defaultUname()
+	u, err := defaultUname()
 	if err != nil {
 		return nil, err
 	}
 	info := &Info{
-		Name:      name,
-		Release:   release,
-		Version:   version,
-		Machine:   machine,
-		Processor: machine,
+		Name:      u.Name,
+		Release:   u.Release,
+		Version:   u.Version,
+		Machine:   u.Machine,
+		Processor: u.Machine,
 		OS:        "Darwin",
 	}
-	if d.Exec != nil && detectRosetta(ctx, d.Exec, machine) {
+	if d.Exec != nil && detectRosetta(ctx, d.Exec, u.Machine) {
 		info.Machine = "arm64"
 		info.Processor = "arm64"
 		info.RosettaTranslated = true

@@ -70,11 +70,7 @@ func readDarwinSerial(
 	if err != nil {
 		return ""
 	}
-	var sp struct {
-		Items []struct {
-			SerialNumber string `json:"serial_number"`
-		} `json:"SPHardwareDataType"`
-	}
+	var sp hardwareSerialPayload
 	if err := json.Unmarshal(out, &sp); err != nil || len(sp.Items) == 0 {
 		return ""
 	}
@@ -91,4 +87,14 @@ func readDarwinUUID(
 		return ""
 	}
 	return h.HostID
+}
+
+// hardwareSerialPayload is the sliver of system_profiler's hardware
+// report this collector reads.
+type hardwareSerialItem struct {
+	SerialNumber string `json:"serial_number"`
+}
+
+type hardwareSerialPayload struct {
+	Items []hardwareSerialItem `json:"SPHardwareDataType"`
 }

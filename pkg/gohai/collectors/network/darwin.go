@@ -41,7 +41,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns network Info.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

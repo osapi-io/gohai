@@ -59,6 +59,9 @@ type Collector interface {
 type base struct{}
 
 // Name returns "rpm".
+// A macro line is "- <name> <value...>", split on the first two spaces.
+const macroFields = 3
+
 func (base) Name() string { return "rpm" }
 
 // Category returns "linux".
@@ -93,58 +96,88 @@ func New() Collector {
 func parseShowrc(
 	output []byte,
 ) map[string]string {
-	lines := splitLines(output)
-
-	// Find the two marker lines that bracket the macros section.
-	markerIdx := []int{}
-	for i, line := range lines {
-		if macrosMarkerRE.MatchString(line) {
-			markerIdx = append(markerIdx, i)
-			if len(markerIdx) == 2 {
-				break
-			}
-		}
-	}
-	if len(markerIdx) < 2 {
+	body, ok := macrosSection(splitLines(output))
+	if !ok {
 		return map[string]string{}
 	}
 
-	macros := map[string]string{}
-	var name, value string
+	acc := &macroAccumulator{macros: map[string]string{}}
+	for _, line := range body {
+		acc.add(line)
+	}
 
-	for _, line := range lines[markerIdx[0]+1 : markerIdx[1]] {
-		if strings.HasPrefix(line, "-") {
-			// Store the previous macro if any.
-			if name != "" {
-				macros[name] = value
-			}
-			// Parse new macro: "- <name> <value...>" (split on first two
-			// spaces — same as Ohai's `line.split(" ", 3)` picking [1] and [2]).
-			parts := strings.SplitN(line, " ", 3)
-			if len(parts) < 2 {
-				name = ""
-				value = ""
-				continue
-			}
-			name = parts[1]
-			if len(parts) == 3 {
-				value = parts[2]
-			} else {
-				value = ""
-			}
-		} else {
-			// Continuation line — append to current macro.
-			if name != "" {
-				value += "\n" + line
+	acc.flush()
+
+	return acc.macros
+}
+
+// macroAccumulator assembles macros as the lines arrive. A value can run
+// over several lines, so a macro is only complete when the next one
+// begins or the section ends.
+type macroAccumulator struct {
+	macros map[string]string
+	name   string
+	value  string
+}
+
+// add takes one line: either the start of a macro or a continuation of
+// the one before it.
+func (a *macroAccumulator) add(
+	line string,
+) {
+	if !strings.HasPrefix(line, "-") {
+		if a.name != "" {
+			a.value += "\n" + line
+		}
+
+		return
+	}
+
+	a.flush()
+	a.name, a.value = parseMacroLine(line)
+}
+
+// flush stores whatever macro is in hand.
+func (a *macroAccumulator) flush() {
+	if a.name != "" {
+		a.macros[a.name] = a.value
+	}
+}
+
+// macrosSection returns the lines between the two markers that bracket
+// rpm --showrc's macro list.
+func macrosSection(
+	lines []string,
+) ([]string, bool) {
+	var markers []int
+
+	for i, line := range lines {
+		if macrosMarkerRE.MatchString(line) {
+			markers = append(markers, i)
+			if len(markers) == 2 {
+				return lines[markers[0]+1 : markers[1]], true
 			}
 		}
 	}
-	// Store the last parsed macro.
-	if name != "" {
-		macros[name] = value
+
+	return nil, false
+}
+
+// parseMacroLine reads "- <name> <value...>", splitting on the first two
+// spaces as Ohai's line.split(" ", 3) does.
+func parseMacroLine(
+	line string,
+) (name string, value string) {
+	parts := strings.SplitN(line, " ", macroFields)
+	if len(parts) < 2 {
+		return "", ""
 	}
 
-	return macros
+	if len(parts) == macroFields {
+		return parts[1], parts[2]
+	}
+
+	return parts[1], ""
 }
 
 // splitLines splits b on newlines and returns the slice of lines

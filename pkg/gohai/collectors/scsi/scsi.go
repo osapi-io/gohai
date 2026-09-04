@@ -58,6 +58,10 @@ type Collector interface {
 
 type base struct{}
 
+// lsscsi reports at least addr, type, transport, revision and device;
+// anything beyond that is the vendor/model name.
+const scsiFields = 5
+
 func (base) Name() string           { return "scsi" }
 func (base) Category() string       { return collector.CategoryHardware }
 func (base) DefaultEnabled() bool   { return false }
@@ -88,7 +92,7 @@ func parseLsscsi(
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	for sc.Scan() {
 		fields := strings.Fields(sc.Text())
-		if len(fields) < 5 {
+		if len(fields) < scsiFields {
 			continue
 		}
 		addr := strings.Trim(fields[0], "[]")
@@ -102,7 +106,7 @@ func parseLsscsi(
 			Device:    fields[len(fields)-1],
 			Revision:  fields[len(fields)-2],
 		}
-		if len(fields) > 5 {
+		if len(fields) > scsiFields {
 			d.Name = strings.Join(fields[3:len(fields)-2], " ")
 		}
 		result[addr] = d

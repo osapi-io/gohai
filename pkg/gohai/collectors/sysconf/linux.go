@@ -49,7 +49,7 @@ func NewLinux() *Linux {
 
 // Collect calls sysconf for four constants and returns an Info.
 // Individual lookup failures are reported as errors.
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

@@ -121,26 +121,28 @@ func (s *MdadmPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := mdadm.New()
 			s.Equal("mdadm", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*mdadm.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*mdadm.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -160,11 +162,11 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: raid1 array enriched by mdadm --detail",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/mdstat", mdstatRaid1, fs.FileMode(0o444))
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcMdstat, mdstatRaid1, fs.FileMode(0o444))
 				return f
 			},
 			setupEx: func(t *testing.T) *execmocks.MockExecutor {
@@ -184,18 +186,18 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 					ActiveDisks: 2,
 					TotalDisks:  2,
 					SpareDisks:  0,
-					Members:     []string{"sda1", "sdb1"},
+					Members:     []string{sda1, sdb1},
 					Spares:      []string{},
 				},
 			},
 		},
 		{
 			name:    "linux: array with spare member",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/mdstat", mdstatWithSpare, fs.FileMode(0o444))
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcMdstat, mdstatWithSpare, fs.FileMode(0o444))
 				return f
 			},
 			setupEx: func(t *testing.T) *execmocks.MockExecutor {
@@ -209,18 +211,18 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			want: []mdadm.Array{
 				{
 					Device:  "md1",
-					Members: []string{"sda1", "sdb1"},
+					Members: []string{sda1, sdb1},
 					Spares:  []string{"sdc1"},
 				},
 			},
 		},
 		{
 			name:    "linux: two arrays returned in sorted order",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/mdstat", mdstatTwo, fs.FileMode(0o444))
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcMdstat, mdstatTwo, fs.FileMode(0o444))
 				return f
 			},
 			setupEx: func(t *testing.T) *execmocks.MockExecutor {
@@ -231,17 +233,17 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				return m
 			},
 			want: []mdadm.Array{
-				{Device: "md0", Members: []string{"sda1", "sdd1"}, Spares: []string{}},
-				{Device: "md1", Members: []string{"sdb1", "sdc1"}, Spares: []string{}},
+				{Device: "md0", Members: []string{sda1, "sdd1"}, Spares: []string{}},
+				{Device: "md1", Members: []string{sdb1, "sdc1"}, Spares: []string{}},
 			},
 		},
 		{
 			name:    "linux: no arrays in /proc/mdstat returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/mdstat",
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcMdstat,
 					[]byte("Personalities : []\nunused devices: <none>\n"),
 					fs.FileMode(0o444))
 				return f
@@ -251,28 +253,28 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: /proc/mdstat absent returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return memfs.New() },
 			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
 			want:    []mdadm.Array{},
 		},
 		{
 			name:    "linux: nil Exec skips mdadm --detail enrichment",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/mdstat", mdstatRaid1, fs.FileMode(0o444))
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcMdstat, mdstatRaid1, fs.FileMode(0o444))
 				return f
 			},
 			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
 			want: []mdadm.Array{
-				{Device: "md0", Members: []string{"sda1", "sdb1"}, Spares: []string{}},
+				{Device: "md0", Members: []string{sda1, sdb1}, Spares: []string{}},
 			},
 		},
 		{
 			name:    "linux: read error on /proc/mdstat propagates",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
 			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
 			wantErr: true,
@@ -288,7 +290,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c mdadm.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				lc := &mdadm.Linux{FS: tt.setupFS()}
 				if tt.setupEx != nil {
 					if m := tt.setupEx(s.T()); m != nil {
@@ -298,6 +300,8 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				c = lc
 			case "darwin":
 				c = mdadm.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

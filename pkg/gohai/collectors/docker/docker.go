@@ -67,8 +67,11 @@ type Collector interface {
 // base holds fields shared by every OS variant.
 type base struct{}
 
-// Name returns "docker".
-func (base) Name() string { return "docker" }
+// Name returns dockerBinary.
+// dockerBinary is the command this collector shells out to.
+const dockerBinary = "docker"
+
+func (base) Name() string { return dockerBinary }
 
 // Category returns "software".
 func (base) Category() string { return collector.CategorySoftware }
@@ -117,7 +120,7 @@ func collectDocker(
 	if exec == nil {
 		return nil, nil
 	}
-	versionOut, err := exec.Execute(ctx, "docker", "version", "--format", "{{.Server.Version}}")
+	versionOut, err := exec.Execute(ctx, dockerBinary, "version", "--format", "{{.Server.Version}}")
 	if err != nil {
 		// Docker not on PATH or daemon unreachable — soft-miss.
 		return nil, nil
@@ -145,7 +148,7 @@ func collectContainers(
 	ctx context.Context,
 	exec executor.Executor,
 ) ([]Container, error) {
-	out, err := exec.Execute(ctx, "docker", "ps", "-a", "--format", "{{json .}}")
+	out, err := exec.Execute(ctx, dockerBinary, "ps", "-a", "--format", "{{json .}}")
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +180,7 @@ func collectImages(
 	ctx context.Context,
 	exec executor.Executor,
 ) ([]Image, error) {
-	out, err := exec.Execute(ctx, "docker", "images", "--format", "{{json .}}")
+	out, err := exec.Execute(ctx, dockerBinary, "images", "--format", "{{json .}}")
 	if err != nil {
 		return nil, err
 	}

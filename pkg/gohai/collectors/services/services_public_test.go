@@ -90,10 +90,10 @@ func (s *ServicesPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -107,9 +107,11 @@ func (s *ServicesPublicTestSuite) TestNew() {
 			case "darwin":
 				_, ok := c.(*services.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*services.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -125,7 +127,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: systemctl returns services",
-			variant: "linux",
+			variant: osLinux,
 			exec:    systemctlExec(s.T(), []byte(systemctlOut), nil),
 			want: []services.Service{
 				{Name: "ssh", State: "running", Enabled: true},
@@ -135,25 +137,25 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: systemctl fails, empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec:    systemctlExec(s.T(), nil, errors.New("not found")),
 			want:    []services.Service{},
 		},
 		{
 			name:    "linux: nil Exec returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec:    nil,
 			want:    []services.Service{},
 		},
 		{
 			name:    "linux: empty output returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec:    systemctlExec(s.T(), []byte(""), nil),
 			want:    []services.Service{},
 		},
 		{
 			name:    "linux: lines without .service are skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: systemctlExec(
 				s.T(),
 				[]byte("not-a-service-line\nssh.service loaded active running OpenSSH\n"),
@@ -165,7 +167,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: short field lines skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec:    systemctlExec(s.T(), []byte("ssh.service loaded\n"), nil),
 			want:    []services.Service{},
 		},
@@ -179,10 +181,12 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c services.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &services.Linux{Exec: tt.exec}
 			case "darwin":
 				c = services.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

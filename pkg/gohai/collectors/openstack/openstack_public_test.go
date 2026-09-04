@@ -45,8 +45,8 @@ func osPrior() collector.PriorResults {
 // metadataTree mirrors OpenStack's EC2-compatible meta-data tree.
 // Paths ending with "/" are directory listings; others are leaves.
 var metadataTree = map[string]string{
-	"/latest/meta-data/":                            "ami-id\ninstance-id\ninstance-type\nhostname\nlocal-hostname\nlocal-ipv4\npublic-hostname\npublic-ipv4\nplacement/\nreservation-id\nkernel-id\nramdisk-id\nsecurity-groups",
-	"/latest/meta-data/ami-id":                      "ami-xxx",
+	pathLatestMetaData:                              "ami-id\ninstance-id\ninstance-type\nhostname\nlocal-hostname\nlocal-ipv4\npublic-hostname\npublic-ipv4\nplacement/\nreservation-id\nkernel-id\nramdisk-id\nsecurity-groups",
+	pathLatestMetaDataAmiID:                         "ami-xxx",
 	"/latest/meta-data/instance-id":                 "i-abc",
 	"/latest/meta-data/instance-type":               "m1.small",
 	"/latest/meta-data/hostname":                    "prod-1",
@@ -251,8 +251,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 		{
 			name: "EC2-mirror partial: only ami-id present",
 			tree: map[string]string{
-				"/latest/meta-data/":       "ami-id",
-				"/latest/meta-data/ami-id": "ami-yyy",
+				pathLatestMetaData:      "ami-id",
+				pathLatestMetaDataAmiID: "ami-yyy",
 			},
 			novaBody: `{"uuid": "uuid-solo", "hostname": "h"}`,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
@@ -264,8 +264,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 		{
 			name: "broken subdir during walk is tolerated",
 			tree: map[string]string{
-				"/latest/meta-data/":       "ami-id\nbroken/",
-				"/latest/meta-data/ami-id": "ami-zzz",
+				pathLatestMetaData:      "ami-id\nbroken/",
+				pathLatestMetaDataAmiID: "ami-zzz",
 				// /latest/meta-data/broken/ intentionally missing → 404
 			},
 			novaBody: novaDoc,
@@ -276,8 +276,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 		{
 			name: "leaf fetch error during walk is tolerated",
 			tree: map[string]string{
-				"/latest/meta-data/":       "ami-id\nmissing-leaf",
-				"/latest/meta-data/ami-id": "ami-aaa",
+				pathLatestMetaData:      "ami-id\nmissing-leaf",
+				pathLatestMetaDataAmiID: "ami-aaa",
 				// /latest/meta-data/missing-leaf intentionally absent → 404
 			},
 			novaBody: novaDoc,
@@ -294,8 +294,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 		{
 			name: "empty listing lines are skipped",
 			tree: map[string]string{
-				"/latest/meta-data/":       "\n\nami-id\n\n",
-				"/latest/meta-data/ami-id": "ami-skip",
+				pathLatestMetaData:      "\n\nami-id\n\n",
+				pathLatestMetaDataAmiID: "ami-skip",
 			},
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
@@ -305,8 +305,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 		{
 			name: "tree without placement subdirectory leaves AZ empty (until Nova fills it)",
 			tree: map[string]string{
-				"/latest/meta-data/":       "ami-id",
-				"/latest/meta-data/ami-id": "ami-no-placement",
+				pathLatestMetaData:      "ami-id",
+				pathLatestMetaDataAmiID: "ami-no-placement",
 			},
 			novaBody: novaDoc,
 			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {

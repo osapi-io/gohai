@@ -58,11 +58,11 @@ func (s *ProcessPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -73,12 +73,14 @@ func (s *ProcessPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*process.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*process.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -95,7 +97,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: snapshot wraps gopsutil processes",
-			variant: "linux",
+			variant: osLinux,
 			fn: func(context.Context) ([]*gpprocess.Process, error) {
 				p, _ := gpprocess.NewProcess(ownPID)
 				return []*gpprocess.Process{p}, nil
@@ -104,7 +106,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: empty process list",
-			variant: "linux",
+			variant: osLinux,
 			fn: func(context.Context) ([]*gpprocess.Process, error) {
 				return []*gpprocess.Process{}, nil
 			},
@@ -112,13 +114,13 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: gopsutil error propagated",
-			variant: "linux",
+			variant: osLinux,
 			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 		{
 			name:    "darwin: macOS snapshot",
-			variant: "darwin",
+			variant: osDarwin,
 			fn: func(context.Context) ([]*gpprocess.Process, error) {
 				return []*gpprocess.Process{}, nil
 			},
@@ -126,7 +128,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: processes error propagated",
-			variant: "darwin",
+			variant: osDarwin,
 			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("kauth denied") },
 			wantErr: true,
 		},
@@ -136,10 +138,12 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			defer process.SetProcessesFn(tt.fn)()
 			var c process.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &process.Linux{}
-			case "darwin":
+			case osDarwin:
 				c = &process.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

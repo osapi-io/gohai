@@ -99,11 +99,11 @@ func (s *DockerPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -114,12 +114,14 @@ func (s *DockerPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*docker.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*docker.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -135,7 +137,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: docker present, full result",
-			variant: "linux",
+			variant: osLinux,
 			exec: buildMock(
 				s.T(),
 				[]byte(versionOut), nil,
@@ -143,13 +145,13 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(imagesOut), nil,
 			),
 			want: &docker.Info{
-				Version: "24.0.5",
+				Version: value2405,
 				Containers: []docker.Container{
 					{
-						ID:     "abc123",
-						Name:   "web",
+						ID:     sampleID,
+						Name:   nameWeb,
 						Image:  "nginx:latest",
-						State:  "running",
+						State:  stateRunning,
 						Status: "Up 2 hours",
 					},
 					{
@@ -161,26 +163,31 @@ func (s *DockerPublicTestSuite) TestCollect() {
 					},
 				},
 				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+					{
+						ID:         sampleDigest,
+						Repository: serviceNginx,
+						Tag:        versionLatest,
+						Size:       value187MB,
+					},
 					{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
 				},
 			},
 		},
 		{
 			name:    "linux: docker version fails, returns nil",
-			variant: "linux",
+			variant: osLinux,
 			exec:    buildMock(s.T(), nil, errors.New("no docker"), nil, nil, nil, nil),
 			wantNil: true,
 		},
 		{
 			name:    "linux: nil Exec returns nil",
-			variant: "linux",
+			variant: osLinux,
 			exec:    nil,
 			wantNil: true,
 		},
 		{
 			name:    "linux: ps fails, containers empty",
-			variant: "linux",
+			variant: osLinux,
 			exec: buildMock(
 				s.T(),
 				[]byte(versionOut), nil,
@@ -188,17 +195,22 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(imagesOut), nil,
 			),
 			want: &docker.Info{
-				Version:    "24.0.5",
+				Version:    value2405,
 				Containers: []docker.Container{},
 				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+					{
+						ID:         sampleDigest,
+						Repository: serviceNginx,
+						Tag:        versionLatest,
+						Size:       value187MB,
+					},
 					{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
 				},
 			},
 		},
 		{
 			name:    "linux: images fails, images empty",
-			variant: "linux",
+			variant: osLinux,
 			exec: buildMock(
 				s.T(),
 				[]byte(versionOut), nil,
@@ -206,13 +218,13 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				nil, errors.New("images failed"),
 			),
 			want: &docker.Info{
-				Version: "24.0.5",
+				Version: value2405,
 				Containers: []docker.Container{
 					{
-						ID:     "abc123",
-						Name:   "web",
+						ID:     sampleID,
+						Name:   nameWeb,
 						Image:  "nginx:latest",
-						State:  "running",
+						State:  stateRunning,
 						Status: "Up 2 hours",
 					},
 					{
@@ -228,7 +240,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: blank lines in containers output skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: buildMock(
 				s.T(),
 				[]byte(versionOut),
@@ -241,16 +253,22 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				nil,
 			),
 			want: &docker.Info{
-				Version: "24.0.5",
+				Version: value2405,
 				Containers: []docker.Container{
-					{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
+					{
+						ID:     sampleID,
+						Name:   nameWeb,
+						Image:  serviceNginx,
+						State:  stateRunning,
+						Status: "Up",
+					},
 				},
 				Images: nil,
 			},
 		},
 		{
 			name:    "linux: invalid JSON lines in containers skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: buildMock(
 				s.T(),
 				[]byte(versionOut),
@@ -263,16 +281,22 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				nil,
 			),
 			want: &docker.Info{
-				Version: "24.0.5",
+				Version: value2405,
 				Containers: []docker.Container{
-					{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
+					{
+						ID:     sampleID,
+						Name:   nameWeb,
+						Image:  serviceNginx,
+						State:  stateRunning,
+						Status: "Up",
+					},
 				},
 				Images: nil,
 			},
 		},
 		{
 			name:    "linux: blank lines in images output skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: buildMock(
 				s.T(),
 				[]byte(versionOut),
@@ -285,16 +309,21 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				nil,
 			),
 			want: &docker.Info{
-				Version:    "24.0.5",
+				Version:    value2405,
 				Containers: nil,
 				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+					{
+						ID:         sampleDigest,
+						Repository: serviceNginx,
+						Tag:        versionLatest,
+						Size:       value187MB,
+					},
 				},
 			},
 		},
 		{
 			name:    "linux: invalid JSON lines in images skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: buildMock(
 				s.T(),
 				[]byte(versionOut),
@@ -307,16 +336,21 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				nil,
 			),
 			want: &docker.Info{
-				Version:    "24.0.5",
+				Version:    value2405,
 				Containers: nil,
 				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+					{
+						ID:         sampleDigest,
+						Repository: serviceNginx,
+						Tag:        versionLatest,
+						Size:       value187MB,
+					},
 				},
 			},
 		},
 		{
 			name:    "darwin: docker present, full result",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: buildMock(
 				s.T(),
 				[]byte(versionOut), nil,
@@ -324,13 +358,13 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(imagesOut), nil,
 			),
 			want: &docker.Info{
-				Version: "24.0.5",
+				Version: value2405,
 				Containers: []docker.Container{
 					{
-						ID:     "abc123",
-						Name:   "web",
+						ID:     sampleID,
+						Name:   nameWeb,
 						Image:  "nginx:latest",
-						State:  "running",
+						State:  stateRunning,
 						Status: "Up 2 hours",
 					},
 					{
@@ -342,20 +376,25 @@ func (s *DockerPublicTestSuite) TestCollect() {
 					},
 				},
 				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+					{
+						ID:         sampleDigest,
+						Repository: serviceNginx,
+						Tag:        versionLatest,
+						Size:       value187MB,
+					},
 					{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
 				},
 			},
 		},
 		{
 			name:    "darwin: docker absent, returns nil",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    buildMock(s.T(), nil, errors.New("not found"), nil, nil, nil, nil),
 			wantNil: true,
 		},
 		{
 			name:    "darwin: nil Exec returns nil",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    nil,
 			wantNil: true,
 		},
@@ -364,10 +403,12 @@ func (s *DockerPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c docker.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &docker.Linux{Exec: tt.exec}
-			case "darwin":
+			case osDarwin:
 				c = &docker.Darwin{Exec: tt.exec}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

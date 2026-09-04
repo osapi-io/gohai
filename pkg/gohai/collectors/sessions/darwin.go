@@ -39,7 +39,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns logged-in session Info.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

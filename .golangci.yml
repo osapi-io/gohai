@@ -1,7 +1,19 @@
-# Refer to golangci-lint's example config file for more options and information:
-# https://github.com/golangci/golangci-lint/blob/master/.golangci.example.yml
+# golangci-lint v2 configuration.
+# https://golangci-lint.run/docs/configuration/file/
+#
+# One config, byte for byte identical in every Go repository in osapi-io and in
+# @retr0h/golang-starter, which new projects are generated from. A repository
+# that needs a change to it changes it in the template too, and the change goes
+# back out to the others in the same pass — a rule that fires in six places and
+# is tuned in one is not the same rule any more. `md5 .golangci.yml` in each
+# repository is how you check.
+#
+# `version` is the string "2" and settings nest under `linters`. Written the v1
+# way — a numeric version, a top-level `linters-settings`, an
+# `issues.exclude-use-default` — `run` drops the keys without complaint and
+# nothing takes effect. `golangci-lint config verify` is the check.
 
-version: 2
+version: "2"
 
 run:
   timeout: 5m
@@ -17,16 +29,74 @@ linters:
     - revive
     - staticcheck
     - unused
+  settings:
+    revive:
+      enable-all-rules: true
+      rules:
+        # golines --max-len=80 in `just go-fmt` wraps code at 80. It cannot
+        # wrap a doc comment or a log string, which is all this rule ever
+        # fires on. Measured on nats-client: 163 findings, none of them code.
+        - name: line-length-limit
+          disabled: true
+        # 0, 1 and 2 are not magic. `i+1`, `parts[0]` and `Times(1)` hide
+        # nothing, and naming them makes the code worse. Left at its defaults
+        # this rule reported 225 findings on nats-client, 116 of them the
+        # literal 1.
+        - name: add-constant
+          arguments:
+            # In strconv.ParseInt(s, 10, 64) the base and the bit size are
+            # part of the call's grammar, not values hidden behind a
+            # literal. Naming them base10 and bitSize64 reads worse.
+            - ignoreFuncs: 'strconv\.Parse.*,strconv\.Format.*,strconv\.Append.*'
+              allowInts: "0,1,2"
+              allowStrs: '""'
+              maxLitCount: "3"
+        # A file that models an external API's JSON has as many structs as
+        # that API has objects — azure's metadata document is 18 of them.
+        # Splitting such a file to satisfy a count organises it by number
+        # rather than by meaning.
+        - name: max-public-structs
+          disabled: true
+  exclusions:
+    presets:
+      - comments
+      - std-error-handling
+    rules:
+      # These three rules ask whether a function does too much. A table-driven
+      # test does not: it holds a list of cases and one small loop. revive
+      # counts the whole literal, closures included, so a ten-case table reads
+      # as complexity twenty while the loop body under it branches twice.
+      #
+      # They stay on for production, where they found four functions on
+      # nats-client genuinely worth splitting — ConsumeMessages at 23, WatchKV
+      # at 20, Connect at 14.
+      - path: _test\.go$
+        text: "function-length|cognitive-complexity|cyclomatic"
+
+      # A table-driven test compares numbers, and the numbers are the
+      # assertion. `initial: 100ms, attempt: 2, want: 200ms` says the interval
+      # doubles; behind names it says nothing and you go and look up two
+      # constants to find out. Same for a predicate table comparing 4096
+      # against 8192, or four CPUs against eight.
+      #
+      # This exempts numbers only. A string repeated four times is duplication
+      # wherever it appears, so add-constant still reports those here, and
+      # production still names every number it uses.
+      - path: _test\.go$
+        text: "add-constant: avoid magic numbers"
 
 formatters:
   enable:
+    - gofmt
     - goimports
 
-linters-settings:
-  revive:
-    enable-all-rules: true
-
 issues:
-  exclude-use-default: false
+  # Without these every run stops at 50 findings per linter and the repository
+  # looks like it has exactly 50 problems, forever.
   max-issues-per-linter: 0
   max-same-issues: 0
+  # Default true, which reports one finding per line. Every complexity rule
+  # anchors to the function declaration, so a single line carries all of them
+  # and you are shown whichever came first — runTask read as "82 statements"
+  # until this was set, and was also cyclomatic 24 and cognitive 43.
+  uniq-by-line: false

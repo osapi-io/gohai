@@ -48,50 +48,65 @@ func NewLinux() *Linux {
 // Collect enumerates PCI devices. A ghw load error yields an empty
 // Info with no error — containers and minimal VMs routinely lack
 // /sys/bus/pci/devices and we shouldn't noisily fail for that.
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{Devices: map[string]Device{}}
+
 	pi, err := ghwPCIFn()
 	if err != nil || pi == nil {
 		return info, nil
 	}
+
 	for _, d := range pi.Devices {
 		if d == nil || d.Address == "" {
 			continue
 		}
-		entry := Device{
-			Revision:      d.Revision,
-			Driver:        d.Driver,
-			IOMMUGroup:    d.IOMMUGroup,
-			ParentAddress: d.ParentAddress,
-		}
-		if d.Vendor != nil {
-			entry.VendorID = d.Vendor.ID
-			entry.VendorName = d.Vendor.Name
-		}
-		if d.Product != nil {
-			entry.DeviceID = d.Product.ID
-			entry.DeviceName = d.Product.Name
-		}
-		if d.Class != nil {
-			entry.ClassID = d.Class.ID
-			entry.ClassName = d.Class.Name
-		}
-		if d.Subclass != nil {
-			entry.SubclassID = d.Subclass.ID
-			entry.SubclassName = d.Subclass.Name
-		}
-		if d.Subsystem != nil {
-			entry.SubsystemID = d.Subsystem.ID
-			entry.SubsystemName = d.Subsystem.Name
-		}
-		// ghw returns "unknown" for unresolved driver; normalize to empty.
-		if strings.EqualFold(entry.Driver, "unknown") {
-			entry.Driver = ""
-		}
-		info.Devices[d.Address] = entry
+
+		info.Devices[d.Address] = pciDevice(d)
 	}
+
 	return info, nil
+}
+
+// pciDevice reads one device. Each of the five lookups is independent —
+// a device the PCI database does not fully describe still reports what
+// it does know.
+func pciDevice(
+	d *ghwpci.Device,
+) Device {
+	entry := Device{
+		Revision:      d.Revision,
+		Driver:        d.Driver,
+		IOMMUGroup:    d.IOMMUGroup,
+		ParentAddress: d.ParentAddress,
+	}
+
+	// ghw says "unknown" where it could not resolve the driver.
+	if strings.EqualFold(entry.Driver, "unknown") {
+		entry.Driver = ""
+	}
+
+	if v := d.Vendor; v != nil {
+		entry.VendorID, entry.VendorName = v.ID, v.Name
+	}
+
+	if p := d.Product; p != nil {
+		entry.DeviceID, entry.DeviceName = p.ID, p.Name
+	}
+
+	if c := d.Class; c != nil {
+		entry.ClassID, entry.ClassName = c.ID, c.Name
+	}
+
+	if s := d.Subclass; s != nil {
+		entry.SubclassID, entry.SubclassName = s.ID, s.Name
+	}
+
+	if s := d.Subsystem; s != nil {
+		entry.SubsystemID, entry.SubsystemName = s.ID, s.Name
+	}
+
+	return entry
 }

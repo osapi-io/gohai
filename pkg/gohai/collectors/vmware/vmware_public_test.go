@@ -144,10 +144,10 @@ func (s *VMwarePublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -158,12 +158,14 @@ func (s *VMwarePublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*vmware.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*vmware.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -181,12 +183,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		// ----- Linux -----
 		{
 			name:    "linux: vmware SCSI in /proc/scsi/scsi + tools cmd",
-			variant: "linux",
+			variant: osLinux,
 			setupLinux: func() *vmware.Linux {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc/scsi", 0o755)
+				_ = f.MkdirAll(pathProcScsi, 0o755)
 				_ = f.WriteFile(
-					"/proc/scsi/scsi",
+					pathProcScsiScsi,
 					[]byte(
 						"Host: scsi0 Channel: 00 Id: 00 Lun: 00\n  Vendor: VMware   Model: Virtual disk\n",
 					),
@@ -196,17 +198,17 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validate: func(i *vmware.Info) {
 				s.Equal("12.3.0 build-21581411", i.Version)
-				s.Equal("vmware_desktop", i.HostType)
+				s.Equal(virtVMware, i.HostType)
 				s.Equal("01 Jan 2026 12:00:00", i.Hosttime)
 			},
 		},
 		{
 			name:    "linux: vSphere session JSON sets host_type and host_version",
-			variant: "linux",
+			variant: osLinux,
 			setupLinux: func() *vmware.Linux {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc/scsi", 0o755)
-				_ = f.WriteFile("/proc/scsi/scsi",
+				_ = f.MkdirAll(pathProcScsi, 0o755)
+				_ = f.WriteFile(pathProcScsiScsi,
 					[]byte("VMware SCSI\n"),
 					fs.FileMode(0o444))
 				return &vmware.Linux{FS: f, Exec: vsphereMock(s.T())}
@@ -218,7 +220,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: /proc/scsi/scsi missing but toolbox-cmd responds",
-			variant: "linux",
+			variant: osLinux,
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
 				m := execmocks.NewMockExecutor(ctrl)
@@ -277,12 +279,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validate: func(i *vmware.Info) {
 				s.Equal("12.3.0", i.Version)
-				s.Equal("vmware_desktop", i.HostType)
+				s.Equal(virtVMware, i.HostType)
 			},
 		},
 		{
 			name:    "linux: UpdateInfo failed filtered from stat output",
-			variant: "linux",
+			variant: osLinux,
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
 				m := execmocks.NewMockExecutor(ctrl)
@@ -335,8 +337,8 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					Return([]byte(""), nil).
 					AnyTimes()
 				f := memfs.New()
-				_ = f.MkdirAll("/proc/scsi", 0o755)
-				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware\n"), fs.FileMode(0o444))
+				_ = f.MkdirAll(pathProcScsi, 0o755)
+				_ = f.WriteFile(pathProcScsiScsi, []byte("VMware\n"), fs.FileMode(0o444))
 				return &vmware.Linux{FS: f, Exec: m}
 			},
 			validate: func(i *vmware.Info) {
@@ -345,7 +347,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: invalid vSphere session JSON still sets host_type",
-			variant: "linux",
+			variant: osLinux,
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
 				m := execmocks.NewMockExecutor(ctrl)
@@ -401,8 +403,8 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					Return([]byte("not-json"), nil).
 					AnyTimes()
 				f := memfs.New()
-				_ = f.MkdirAll("/proc/scsi", 0o755)
-				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware\n"), fs.FileMode(0o444))
+				_ = f.MkdirAll(pathProcScsi, 0o755)
+				_ = f.WriteFile(pathProcScsiScsi, []byte("VMware\n"), fs.FileMode(0o444))
 				return &vmware.Linux{FS: f, Exec: m}
 			},
 			validate: func(i *vmware.Info) {
@@ -412,7 +414,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: no VMware signals returns nil",
-			variant: "linux",
+			variant: osLinux,
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
 				m := execmocks.NewMockExecutor(ctrl)
@@ -424,7 +426,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: nil Exec and no /proc/scsi/scsi returns nil",
-			variant: "linux",
+			variant: osLinux,
 			setupLinux: func() *vmware.Linux {
 				return &vmware.Linux{FS: memfs.New(), Exec: nil}
 			},
@@ -433,18 +435,18 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		// ----- Darwin -----
 		{
 			name:    "darwin: toolbox-cmd present returns Info",
-			variant: "darwin",
+			variant: osDarwin,
 			setupDarwin: func() *vmware.Darwin {
 				return &vmware.Darwin{Exec: fullToolboxMock(s.T())}
 			},
 			validate: func(i *vmware.Info) {
 				s.Equal("12.3.0 build-21581411", i.Version)
-				s.Equal("vmware_desktop", i.HostType)
+				s.Equal(virtVMware, i.HostType)
 			},
 		},
 		{
 			name:    "darwin: stat command error leaves field empty",
-			variant: "darwin",
+			variant: osDarwin,
 			setupDarwin: func() *vmware.Darwin {
 				ctrl := gomock.NewController(s.T())
 				m := execmocks.NewMockExecutor(ctrl)
@@ -501,12 +503,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validate: func(i *vmware.Info) {
 				s.Empty(i.Speed)
-				s.Equal("vmware_desktop", i.HostType)
+				s.Equal(virtVMware, i.HostType)
 			},
 		},
 		{
 			name:    "darwin: toolbox-cmd absent returns nil",
-			variant: "darwin",
+			variant: osDarwin,
 			setupDarwin: func() *vmware.Darwin {
 				ctrl := gomock.NewController(s.T())
 				m := execmocks.NewMockExecutor(ctrl)
@@ -518,7 +520,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: toolbox-cmd returns empty output — nil",
-			variant: "darwin",
+			variant: osDarwin,
 			setupDarwin: func() *vmware.Darwin {
 				ctrl := gomock.NewController(s.T())
 				m := execmocks.NewMockExecutor(ctrl)
@@ -530,7 +532,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: nil Exec returns nil",
-			variant: "darwin",
+			variant: osDarwin,
 			setupDarwin: func() *vmware.Darwin {
 				return &vmware.Darwin{Exec: nil}
 			},
@@ -541,10 +543,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c vmware.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = tt.setupLinux()
-			case "darwin":
+			case osDarwin:
 				c = tt.setupDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

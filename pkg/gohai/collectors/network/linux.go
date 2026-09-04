@@ -53,6 +53,9 @@ type Linux struct {
 
 // NewLinux returns a Linux variant wired to the real OS filesystem
 // and the production Executor.
+// ethtoolBinary is the command this collector shells out to.
+const ethtoolBinary = "ethtool"
+
 func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
@@ -98,21 +101,17 @@ func applyEthtoolDriverInfo(
 	info *Info,
 ) {
 	for i := range info.Interfaces {
-		if info.Interfaces[i].Encapsulation != "Ethernet" {
+		iface := &info.Interfaces[i]
+		if iface.Encapsulation != "Ethernet" {
 			continue
 		}
-		out, err := exec.Execute(ctx, "ethtool", "-i", info.Interfaces[i].Name)
-		if err != nil {
-			continue
-		}
-		di := parseEthtoolDriverInfo(out)
+
+		di := parseEthtoolDriverInfo(ethtoolQuery(ctx, exec, iface.Name, "-i"))
 		if len(di) == 0 {
 			continue
 		}
-		if info.Interfaces[i].Ethtool == nil {
-			info.Interfaces[i].Ethtool = &EthtoolInfo{}
-		}
-		info.Interfaces[i].Ethtool.DriverInfo = di
+
+		ensureEthtool(iface).DriverInfo = di
 	}
 }
 
@@ -164,39 +163,77 @@ func applyEthtoolTuning(
 		if info.Interfaces[i].Encapsulation != "Ethernet" {
 			continue
 		}
-		name := info.Interfaces[i].Name
-		ensureEthtool := func() *EthtoolInfo {
-			if info.Interfaces[i].Ethtool == nil {
-				info.Interfaces[i].Ethtool = &EthtoolInfo{}
-			}
-			return info.Interfaces[i].Ethtool
-		}
-		if out, err := exec.Execute(ctx, "ethtool", "-g", name); err == nil {
-			if v := parseEthtoolSectionedInts(out, "Ring parameters for"); v != nil {
-				ensureEthtool().RingParams = v
-			}
-		}
-		if out, err := exec.Execute(ctx, "ethtool", "-l", name); err == nil {
-			if v := parseEthtoolSectionedInts(out, "Channel parameters for"); v != nil {
-				ensureEthtool().ChannelParams = v
-			}
-		}
-		if out, err := exec.Execute(ctx, "ethtool", "-c", name); err == nil {
-			if v := parseEthtoolCoalesceParams(out); v != nil {
-				ensureEthtool().CoalesceParams = v
-			}
-		}
-		if out, err := exec.Execute(ctx, "ethtool", "-k", name); err == nil {
-			if v := parseEthtoolOffloadParams(out); v != nil {
-				ensureEthtool().OffloadParams = v
-			}
-		}
-		if out, err := exec.Execute(ctx, "ethtool", "-a", name); err == nil {
-			if v := parseEthtoolPauseParams(out); v != nil {
-				ensureEthtool().PauseParams = v
-			}
-		}
+
+		applyEthtoolTuningTo(ctx, exec, &info.Interfaces[i])
 	}
+}
+
+// applyEthtoolTuningTo records whatever each ethtool query answers. An
+// interface that answers none of them keeps a nil Ethtool rather than an
+// empty one, which the parsers returning nil arranges.
+func applyEthtoolTuningTo(
+	ctx context.Context,
+	exec executor.Executor,
+	iface *Interface,
+) {
+	name := iface.Name
+
+	if v := parseEthtoolSectionedInts(
+		ethtoolQuery(ctx, exec, name, "-g"), "Ring parameters for",
+	); v != nil {
+		ensureEthtool(iface).RingParams = v
+	}
+
+	if v := parseEthtoolSectionedInts(
+		ethtoolQuery(ctx, exec, name, "-l"), "Channel parameters for",
+	); v != nil {
+		ensureEthtool(iface).ChannelParams = v
+	}
+
+	if v := parseEthtoolCoalesceParams(
+		ethtoolQuery(ctx, exec, name, "-c"),
+	); v != nil {
+		ensureEthtool(iface).CoalesceParams = v
+	}
+
+	if v := parseEthtoolOffloadParams(
+		ethtoolQuery(ctx, exec, name, "-k"),
+	); v != nil {
+		ensureEthtool(iface).OffloadParams = v
+	}
+
+	if v := parseEthtoolPauseParams(
+		ethtoolQuery(ctx, exec, name, "-a"),
+	); v != nil {
+		ensureEthtool(iface).PauseParams = v
+	}
+}
+
+// ethtoolQuery runs one ethtool query, returning nil when it fails. The
+// parsers read nil as empty output, so a caller need not check twice.
+func ethtoolQuery(
+	ctx context.Context,
+	exec executor.Executor,
+	name string,
+	flag string,
+) []byte {
+	out, err := exec.Execute(ctx, ethtoolBinary, flag, name)
+	if err != nil {
+		return nil
+	}
+
+	return out
+}
+
+// ensureEthtool creates the record the first time a query answers.
+func ensureEthtool(
+	iface *Interface,
+) *EthtoolInfo {
+	if iface.Ethtool == nil {
+		iface.Ethtool = &EthtoolInfo{}
+	}
+
+	return iface.Ethtool
 }
 
 // applyNICStats merges per-interface link-layer detail. Speed +
@@ -271,21 +308,43 @@ func applyOpenVZAliasMerge(
 	if !openVZGuest(fs) {
 		return ifs
 	}
+
 	byName := map[string]int{}
 	for i, iface := range ifs {
 		byName[iface.Name] = i
 	}
+
 	out := ifs[:0]
+
 	for _, iface := range ifs {
-		if base, alias := isOpenVZAlias(iface.Name); alias {
-			if idx, ok := byName[base]; ok {
-				ifs[idx].Addresses = append(ifs[idx].Addresses, iface.Addresses...)
-				continue
-			}
+		// venet0:0 and friends are aliases whose addresses belong to
+		// the interface they are named after.
+		if idx, merged := aliasTarget(byName, iface.Name); merged {
+			ifs[idx].Addresses = append(ifs[idx].Addresses, iface.Addresses...)
+
+			continue
 		}
+
 		out = append(out, iface)
 	}
+
 	return out
+}
+
+// aliasTarget reports the index of the interface an alias belongs to,
+// and whether the name was an alias with a base that is present.
+func aliasTarget(
+	byName map[string]int,
+	name string,
+) (int, bool) {
+	base, alias := isOpenVZAlias(name)
+	if !alias {
+		return 0, false
+	}
+
+	idx, ok := byName[base]
+
+	return idx, ok
 }
 
 // openVZGuest returns true when the host is an OpenVZ guest:
@@ -314,34 +373,58 @@ func applyRoutes(
 		{"-4", "inet"},
 		{"-6", "inet6"},
 	} {
-		out, err := exec.Execute(ctx, "ip", "-o", fam.flag, "route", "show", "table", "main")
+		out, err := exec.Execute(
+			ctx, "ip", "-o", fam.flag, "route", "show", "table", "main",
+		)
 		if err != nil {
 			continue
 		}
-		for _, logical := range joinContinuationLines(string(out)) {
-			for _, r := range expandRouteLine(logical, fam.family) {
-				info.Routes = append(info.Routes, r)
-				if !isDefaultDestination(r.Destination) {
-					continue
-				}
-				// First default-route hit wins (matches Ohai). On
-				// multipath defaults the first nexthop becomes the
-				// reported default; later nexthops still appear in
-				// Routes.
-				if fam.family == "inet" && info.DefaultInterface == "" {
-					info.DefaultInterface = r.Interface
-					info.DefaultGateway = r.Gateway
-				}
-				if fam.family == "inet6" && info.DefaultInet6Interface == "" {
-					info.DefaultInet6Interface = r.Interface
-					info.DefaultInet6Gateway = r.Gateway
-				}
-			}
-		}
+
+		addRoutes(info, string(out), fam.family)
 	}
+
 	resolveRouteInterfacesBySource(info)
+
 	for _, r := range info.Routes {
 		attachToInterface(info, r)
+	}
+}
+
+// addRoutes records one family's routes, and notes the first default
+// among them.
+func addRoutes(
+	info *Info,
+	out string,
+	family string,
+) {
+	for _, logical := range joinContinuationLines(out) {
+		for _, r := range expandRouteLine(logical, family) {
+			info.Routes = append(info.Routes, r)
+			noteDefaultRoute(info, r, family)
+		}
+	}
+}
+
+// noteDefaultRoute records the first default route of each family, which
+// is what Ohai reports. On a multipath default the first nexthop wins;
+// the rest are still listed under Routes.
+func noteDefaultRoute(
+	info *Info,
+	r Route,
+	family string,
+) {
+	if !isDefaultDestination(r.Destination) {
+		return
+	}
+
+	if family == "inet" && info.DefaultInterface == "" {
+		info.DefaultInterface = r.Interface
+		info.DefaultGateway = r.Gateway
+	}
+
+	if family == "inet6" && info.DefaultInet6Interface == "" {
+		info.DefaultInet6Interface = r.Interface
+		info.DefaultInet6Gateway = r.Gateway
 	}
 }
 
@@ -359,11 +442,14 @@ func joinContinuationLines(
 		trimmed := strings.TrimRight(line, " \t")
 		cont := strings.HasSuffix(trimmed, "\\")
 		if cont {
-			pending.WriteString(strings.TrimSuffix(trimmed, "\\"))
-			pending.WriteByte(' ')
+			// strings.Builder writes cannot fail.
+			_, _ = pending.WriteString(strings.TrimSuffix(trimmed, "\\"))
+			_ = pending.WriteByte(' ')
+
 			continue
 		}
-		pending.WriteString(trimmed)
+
+		_, _ = pending.WriteString(trimmed)
 		if s := strings.TrimSpace(pending.String()); s != "" {
 			logical = append(logical, s)
 		}
@@ -386,38 +472,52 @@ func joinContinuationLines(
 func expandRouteLine(
 	line, family string,
 ) []Route {
-	if !strings.Contains(line, "nexthop") {
+	idx := strings.Index(line, "nexthop")
+	if idx < 0 {
 		return []Route{parseIPRouteLine(strings.TrimSpace(line), family)}
 	}
-	idx := strings.Index(line, "nexthop")
-	prefix := strings.TrimSpace(line[:idx])
-	prefixRoute := parseIPRouteLine(prefix, family)
+
+	prefixRoute := parseIPRouteLine(strings.TrimSpace(line[:idx]), family)
+
 	var out []Route
+
 	for _, hop := range strings.Split(line[idx:], "nexthop") {
 		hop = strings.TrimSpace(hop)
 		if hop == "" {
 			continue
 		}
-		// Re-use parseIPRouteLine by synthesizing a route line —
-		// `<destination> nexthop tokens...`. Destination from the
-		// prefix; remaining attrs (gateway/dev/weight/...) come from
-		// the nexthop block.
-		synth := prefixRoute.Destination + " " + hop
-		hopRoute := parseIPRouteLine(synth, family)
-		// Carry forward proto / scope / metric from the prefix when
-		// the nexthop block doesn't restate them.
-		if hopRoute.Proto == "" {
-			hopRoute.Proto = prefixRoute.Proto
-		}
-		if hopRoute.Scope == "" {
-			hopRoute.Scope = prefixRoute.Scope
-		}
-		if hopRoute.Metric == 0 {
-			hopRoute.Metric = prefixRoute.Metric
-		}
-		out = append(out, hopRoute)
+
+		out = append(out, nexthopRoute(prefixRoute, hop, family))
 	}
+
 	return out
+}
+
+// nexthopRoute builds one route of a multipath default. The destination
+// comes from the prefix and the gateway and device from the nexthop
+// block; proto, scope and metric carry forward when the block does not
+// restate them.
+func nexthopRoute(
+	prefix Route,
+	hop string,
+	family string,
+) Route {
+	// parseIPRouteLine wants a whole line, so give it one.
+	r := parseIPRouteLine(prefix.Destination+" "+hop, family)
+
+	if r.Proto == "" {
+		r.Proto = prefix.Proto
+	}
+
+	if r.Scope == "" {
+		r.Scope = prefix.Scope
+	}
+
+	if r.Metric == 0 {
+		r.Metric = prefix.Metric
+	}
+
+	return r
 }
 
 // resolveRouteInterfacesBySource fills in Route.Interface for routes
@@ -430,21 +530,35 @@ func resolveRouteInterfacesBySource(
 	if len(info.Routes) == 0 {
 		return
 	}
-	addrToIface := map[string]string{}
-	for _, iface := range info.Interfaces {
-		for _, a := range iface.Addresses {
-			addrToIface[a.Addr] = iface.Name
-		}
-	}
+
+	addrToIface := interfaceByAddress(info)
+
 	for i := range info.Routes {
 		r := &info.Routes[i]
 		if r.Interface != "" || r.Source == "" {
 			continue
 		}
+
 		if name, ok := addrToIface[r.Source]; ok {
 			r.Interface = name
 		}
 	}
+}
+
+// interfaceByAddress indexes the interfaces by the addresses they carry,
+// so a route naming only its source can be attributed to one.
+func interfaceByAddress(
+	info *Info,
+) map[string]string {
+	out := map[string]string{}
+
+	for _, iface := range info.Interfaces {
+		for _, a := range iface.Addresses {
+			out[a.Addr] = iface.Name
+		}
+	}
+
+	return out
 }
 
 // parseIPRouteLine parses one `ip -o route` line into a Route. The
@@ -457,43 +571,50 @@ func parseIPRouteLine(
 ) Route {
 	fields := strings.Fields(line)
 	r := Route{Destination: fields[0], Family: family}
-	for i := 1; i < len(fields); i++ {
-		switch fields[i] {
-		case "via":
-			if i+1 < len(fields) {
-				r.Gateway = fields[i+1]
-				i++
-			}
-		case "dev":
-			if i+1 < len(fields) {
-				r.Interface = fields[i+1]
-				i++
-			}
-		case "src":
-			if i+1 < len(fields) {
-				r.Source = fields[i+1]
-				i++
-			}
-		case "scope":
-			if i+1 < len(fields) {
-				r.Scope = fields[i+1]
-				i++
-			}
-		case "proto":
-			if i+1 < len(fields) {
-				r.Proto = fields[i+1]
-				i++
-			}
-		case "metric":
-			if i+1 < len(fields) {
-				if m, err := strconv.Atoi(fields[i+1]); err == nil {
-					r.Metric = m
-				}
-				i++
-			}
+
+	// Most of what follows the destination is a "key value" pair, but a
+	// bare flag such as onlink or linkdown sits between them, so an
+	// unrecognised word advances by one rather than two.
+	for i := 1; i+1 < len(fields); i++ {
+		if setRouteField(&r, fields[i], fields[i+1]) {
+			i++
 		}
 	}
+
 	return r
+}
+
+// setRouteField files one key/value pair of an ip route line, reporting
+// whether the key was one it knows — and so whether the value after it
+// was consumed.
+func setRouteField(
+	r *Route,
+	key string,
+	val string,
+) bool {
+	if key == "metric" {
+		if m, err := strconv.Atoi(val); err == nil {
+			r.Metric = m
+		}
+
+		return true
+	}
+
+	dst := map[string]*string{
+		"via":   &r.Gateway,
+		"dev":   &r.Interface,
+		"src":   &r.Source,
+		"scope": &r.Scope,
+		"proto": &r.Proto,
+	}[key]
+
+	if dst == nil {
+		return false
+	}
+
+	*dst = val
+
+	return true
 }
 
 // attachToInterface appends the route to the matching interface's

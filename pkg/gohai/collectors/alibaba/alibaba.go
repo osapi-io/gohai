@@ -29,7 +29,6 @@ package alibaba
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
@@ -46,6 +45,10 @@ const ProviderName = "alibaba"
 // metadataBaseURL is Alibaba's unusual metadata address — not the
 // standard 169.254.169.254 link-local. Matches Ohai's
 // Ohai::Mixin::AlibabaMetadata::ALIBABA_METADATA_ADDR constant.
+// The instance metadata service is link-local and serves plain
+// HTTP only; there is no HTTPS endpoint to point this at.
+//
+//nolint:revive // unsecure-url-scheme
 const metadataBaseURL = "http://100.100.100.200/2016-01-01"
 
 // metadataTimeout matches Ohai's 6s read + keep-alive timeout in
@@ -224,6 +227,19 @@ func onAlibaba(
 //
 // The first call uses path "" (the `/2016-01-01/` listing). At that
 // level only, Ohai explicitly excludes `/user-data` from the walk.
+// walkable reports whether a listing line is worth following. Ohai skips
+// /user-data at the root, and so do we.
+func walkable(
+	path string,
+	line string,
+) bool {
+	if line == "" {
+		return false
+	}
+
+	return path != "" || strings.TrimRight(line, "/") != "user-data"
+}
+
 func walk(
 	ctx context.Context,
 	c *cloudmetadata.Client,
@@ -233,38 +249,55 @@ func walk(
 	if err != nil {
 		return nil, err
 	}
+
 	result := make(map[string]any)
+
 	for _, line := range strings.Split(string(listing), "\n") {
 		line = strings.TrimSpace(line)
-		if line == "" {
+		if !walkable(path, line) {
 			continue
 		}
-		// Replicate Ohai's root-level "/user-data" skip.
-		if path == "" && strings.TrimRight(line, "/") == "user-data" {
-			continue
-		}
-		key := sanitizeKey(line)
-		child := fmt.Sprintf("%s%s", path, line)
-		if strings.HasSuffix(line, "/") {
-			sub, err := walk(ctx, c, child)
-			if err != nil {
-				continue
-			}
-			result[key] = sub
-		} else {
-			leaf, err := c.Get(ctx, "/"+child)
-			if err != nil {
-				continue
-			}
-			var jv any
-			if json.Unmarshal(leaf, &jv) == nil {
-				result[key] = jv
-			} else {
-				result[key] = strings.TrimSpace(string(leaf))
-			}
+
+		if v, ok := walkEntry(ctx, c, path, line); ok {
+			result[sanitizeKey(line)] = v
 		}
 	}
+
 	return result, nil
+}
+
+// walkEntry reads one listing entry: a trailing slash means a subtree to
+// descend into, anything else is a leaf to fetch. An entry that cannot
+// be read is skipped rather than failing the whole walk.
+func walkEntry(
+	ctx context.Context,
+	c *cloudmetadata.Client,
+	path string,
+	line string,
+) (any, bool) {
+	child := path + line
+
+	if strings.HasSuffix(line, "/") {
+		sub, err := walk(ctx, c, child)
+		if err != nil {
+			return nil, false
+		}
+
+		return sub, true
+	}
+
+	leaf, err := c.Get(ctx, "/"+child)
+	if err != nil {
+		return nil, false
+	}
+
+	// A leaf is JSON where it parses as JSON, and text otherwise.
+	var jv any
+	if json.Unmarshal(leaf, &jv) == nil {
+		return jv, true
+	}
+
+	return strings.TrimSpace(string(leaf)), true
 }
 
 // sanitizeKey mirrors Ohai's sanitize_key + trailing-underscore strip.
@@ -283,10 +316,42 @@ func transform(
 	tree map[string]any,
 ) *Info {
 	info := &Info{}
-	md, _ := tree["meta_data"].(map[string]any)
+
+	md := subMap(tree, "meta_data")
 	if md == nil {
 		return info
 	}
+
+	applyInstanceFields(info, md)
+	applyInstance(info, subMap(md, "instance"))
+	applyResolverConf(info, md)
+	applyMarketplace(info, md)
+	applyTags(info, md)
+	applyDisks(info, md)
+	applyInterfaces(info, md)
+
+	return info
+}
+
+// subMap returns a nested object of a decoded JSON tree, or nil when the
+// key is absent or holds something other than an object.
+func subMap(
+	m map[string]any,
+	key string,
+) map[string]any {
+	sub, ok := m[key].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	return sub
+}
+
+// applyInstanceFields copies the values that sit directly on meta_data.
+func applyInstanceFields(
+	info *Info,
+	md map[string]any,
+) {
 	info.ID = strVal(md, "instance_id")
 	info.Hostname = strVal(md, "hostname")
 	info.Region = strVal(md, "region_id")
@@ -303,101 +368,188 @@ func transform(
 	info.VPCCIDRBlock = strVal(md, "vpc_cidr_block")
 	info.VSwitchID = strVal(md, "vswitch_id")
 	info.VSwitchCIDR = strVal(md, "vswitch_cidr_block")
+}
 
-	if inst, ok := md["instance"].(map[string]any); ok {
-		info.Type = strVal(inst, "instance_type")
-		info.Name = strVal(inst, "instance_name")
-		info.MaxBandwidthIngress = intVal(inst, "max_netbw_ingress")
-		info.MaxBandwidthEgress = intVal(inst, "max_netbw_egress")
-		info.VirtualizationSolution = strVal(inst, "virtualization_solution")
-		info.VirtualizationSolutionVersion = strVal(inst, "virtualization_solution_version")
-		if spot, ok := inst["spot"].(map[string]any); ok {
-			info.SpotTerminationTime = strVal(spot, "termination_time")
-		}
+// applyInstance copies the instance object, and the spot terms inside it.
+func applyInstance(
+	info *Info,
+	inst map[string]any,
+) {
+	if inst == nil {
+		return
 	}
-	if dns, ok := md["dns_conf"].(map[string]any); ok {
+
+	info.Type = strVal(inst, "instance_type")
+	info.Name = strVal(inst, "instance_name")
+	info.MaxBandwidthIngress = intVal(inst, "max_netbw_ingress")
+	info.MaxBandwidthEgress = intVal(inst, "max_netbw_egress")
+	info.VirtualizationSolution = strVal(inst, "virtualization_solution")
+	info.VirtualizationSolutionVersion = strVal(
+		inst, "virtualization_solution_version",
+	)
+
+	if spot := subMap(inst, "spot"); spot != nil {
+		info.SpotTerminationTime = strVal(spot, "termination_time")
+	}
+}
+
+// applyResolverConf copies the DNS, NTP and RAM role settings.
+func applyResolverConf(
+	info *Info,
+	md map[string]any,
+) {
+	if dns := subMap(md, "dns_conf"); dns != nil {
 		info.Nameservers = splitSpace(strVal(dns, "nameservers"))
 	}
-	if ntp, ok := md["ntp_conf"].(map[string]any); ok {
+
+	if ntp := subMap(md, "ntp_conf"); ntp != nil {
 		info.NTPServers = splitSpace(strVal(ntp, "ntp_servers"))
 	}
-	if ram, ok := md["ram"].(map[string]any); ok {
+
+	if ram := subMap(md, "ram"); ram != nil {
 		info.RAMRoleName = strVal(ram, "role_name")
 	}
-	if img, ok := md["image"].(map[string]any); ok {
-		if mp, ok := img["market_place"].(map[string]any); ok {
-			m := &Marketplace{
-				ProductCode: strVal(mp, "product_code"),
-				ChargeType:  strVal(mp, "charge_type"),
-			}
-			if m.ProductCode != "" || m.ChargeType != "" {
-				info.Marketplace = m
-			}
+}
+
+// applyMarketplace records the marketplace image an instance came from,
+// if it names one.
+func applyMarketplace(
+	info *Info,
+	md map[string]any,
+) {
+	img := subMap(md, "image")
+	if img == nil {
+		return
+	}
+
+	mp := subMap(img, "market_place")
+	if mp == nil {
+		return
+	}
+
+	m := &Marketplace{
+		ProductCode: strVal(mp, "product_code"),
+		ChargeType:  strVal(mp, "charge_type"),
+	}
+	if m.ProductCode != "" || m.ChargeType != "" {
+		info.Marketplace = m
+	}
+}
+
+// applyTags copies the instance's tags, keeping only string values.
+func applyTags(
+	info *Info,
+	md map[string]any,
+) {
+	tags := subMap(md, "tags")
+	if tags == nil {
+		return
+	}
+
+	inst := subMap(tags, "instance")
+	if inst == nil {
+		return
+	}
+
+	out := make(map[string]string, len(inst))
+
+	for k, v := range inst {
+		if s, ok := v.(string); ok {
+			out[k] = s
 		}
 	}
-	if tags, ok := md["tags"].(map[string]any); ok {
-		if inst, ok := tags["instance"].(map[string]any); ok {
-			out := make(map[string]string, len(inst))
-			for k, v := range inst {
-				if s, ok := v.(string); ok {
-					out[k] = s
-				}
-			}
-			if len(out) > 0 {
-				info.Tags = out
-			}
+
+	if len(out) > 0 {
+		info.Tags = out
+	}
+}
+
+// applyDisks copies the attached disks, keyed by serial number.
+func applyDisks(
+	info *Info,
+	md map[string]any,
+) {
+	disks := subMap(md, "disks")
+	if disks == nil {
+		return
+	}
+
+	out := make(map[string]Disk, len(disks))
+
+	for serial, v := range disks {
+		d, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		out[serial] = Disk{
+			ID:   strVal(d, "id"),
+			Name: strVal(d, "name"),
 		}
 	}
-	if disks, ok := md["disks"].(map[string]any); ok {
-		out := make(map[string]Disk, len(disks))
-		for serial, v := range disks {
-			d, ok := v.(map[string]any)
-			if !ok {
-				continue
-			}
-			out[serial] = Disk{
-				ID:   strVal(d, "id"),
-				Name: strVal(d, "name"),
-			}
-		}
-		if len(out) > 0 {
-			info.Disks = out
-		}
+
+	if len(out) > 0 {
+		info.Disks = out
 	}
-	if net, ok := md["network"].(map[string]any); ok {
-		if interfaces, ok := net["interfaces"].(map[string]any); ok {
-			if macs, ok := interfaces["macs"].(map[string]any); ok {
-				out := make(map[string]NetworkInterface, len(macs))
-				for mac, v := range macs {
-					e, ok := v.(map[string]any)
-					if !ok {
-						continue
-					}
-					out[mac] = NetworkInterface{
-						NetworkInterfaceID:   strVal(e, "network_interface_id"),
-						PrimaryIPAddress:     strVal(e, "primary_ip_address"),
-						PrivateIPv4s:         splitCommaOrSpace(strVal(e, "private_ipv4s")),
-						IPv4Prefixes:         splitCommaOrSpace(strVal(e, "ipv4_prefixes")),
-						Netmask:              strVal(e, "netmask"),
-						Gateway:              strVal(e, "gateway"),
-						VPCID:                strVal(e, "vpc_id"),
-						VPCCIDRBlock:         strVal(e, "vpc_cidr_block"),
-						VPCIPv6CIDRBlocks:    splitCommaOrSpace(strVal(e, "vpc_ipv6_cidr_blocks")),
-						VSwitchID:            strVal(e, "vswitch_id"),
-						VSwitchCIDRBlock:     strVal(e, "vswitch_cidr_block"),
-						VSwitchIPv6CIDRBlock: strVal(e, "vswitch_ipv6_cidr_block"),
-						IPv6s:                splitCommaOrSpace(strVal(e, "ipv6s")),
-						IPv6Prefixes:         splitCommaOrSpace(strVal(e, "ipv6_prefixes")),
-						IPv6Gateway:          strVal(e, "ipv6_gateway"),
-					}
-				}
-				if len(out) > 0 {
-					info.NetworkInterfaces = out
-				}
-			}
-		}
+}
+
+// applyInterfaces copies the network interfaces, keyed by MAC address.
+func applyInterfaces(
+	info *Info,
+	md map[string]any,
+) {
+	net := subMap(md, "network")
+	if net == nil {
+		return
 	}
-	return info
+
+	interfaces := subMap(net, "interfaces")
+	if interfaces == nil {
+		return
+	}
+
+	macs := subMap(interfaces, "macs")
+	if macs == nil {
+		return
+	}
+
+	out := make(map[string]NetworkInterface, len(macs))
+
+	for mac, v := range macs {
+		e, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		out[mac] = networkInterface(e)
+	}
+
+	if len(out) > 0 {
+		info.NetworkInterfaces = out
+	}
+}
+
+// networkInterface reads one interface entry.
+func networkInterface(
+	e map[string]any,
+) NetworkInterface {
+	return NetworkInterface{
+		NetworkInterfaceID:   strVal(e, "network_interface_id"),
+		PrimaryIPAddress:     strVal(e, "primary_ip_address"),
+		PrivateIPv4s:         splitCommaOrSpace(strVal(e, "private_ipv4s")),
+		IPv4Prefixes:         splitCommaOrSpace(strVal(e, "ipv4_prefixes")),
+		Netmask:              strVal(e, "netmask"),
+		Gateway:              strVal(e, "gateway"),
+		VPCID:                strVal(e, "vpc_id"),
+		VPCCIDRBlock:         strVal(e, "vpc_cidr_block"),
+		VPCIPv6CIDRBlocks:    splitCommaOrSpace(strVal(e, "vpc_ipv6_cidr_blocks")),
+		VSwitchID:            strVal(e, "vswitch_id"),
+		VSwitchCIDRBlock:     strVal(e, "vswitch_cidr_block"),
+		VSwitchIPv6CIDRBlock: strVal(e, "vswitch_ipv6_cidr_block"),
+		IPv6s:                splitCommaOrSpace(strVal(e, "ipv6s")),
+		IPv6Prefixes:         splitCommaOrSpace(strVal(e, "ipv6_prefixes")),
+		IPv6Gateway:          strVal(e, "ipv6_gateway"),
+	}
 }
 
 // splitCommaOrSpace handles Alibaba's mixed list encoding — some
@@ -410,20 +562,25 @@ func splitCommaOrSpace(
 	if s == "" {
 		return nil
 	}
-	// Commas first; if none, whitespace.
-	if strings.Contains(s, ",") {
-		out := make([]string, 0)
-		for _, part := range strings.Split(s, ",") {
-			if p := strings.TrimSpace(part); p != "" {
-				out = append(out, p)
-			}
-		}
-		if len(out) == 0 {
-			return nil
-		}
-		return out
+
+	// Commas first; whitespace only when there are none.
+	if !strings.Contains(s, ",") {
+		return strings.Fields(s)
 	}
-	return strings.Fields(s)
+
+	out := make([]string, 0)
+
+	for _, part := range strings.Split(s, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			out = append(out, p)
+		}
+	}
+
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
 }
 
 // strVal returns the string value at key, or empty when absent / wrong type.

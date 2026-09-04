@@ -40,7 +40,7 @@ func NewLinux() *Linux {
 }
 
 // Collect returns an empty Info on Linux.
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

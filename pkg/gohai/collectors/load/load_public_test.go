@@ -57,11 +57,11 @@ func (s *LoadPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -72,12 +72,14 @@ func (s *LoadPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*load.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*load.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -93,7 +95,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: averages returned",
-			variant: "linux",
+			variant: osLinux,
 			fn: func(context.Context) (*gpload.AvgStat, error) {
 				return &gpload.AvgStat{Load1: 0.25, Load5: 0.5, Load15: 1.0}, nil
 			},
@@ -101,13 +103,13 @@ func (s *LoadPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: gopsutil error propagated",
-			variant: "linux",
+			variant: osLinux,
 			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
 		{
 			name:    "darwin: averages returned",
-			variant: "darwin",
+			variant: osDarwin,
 			fn: func(context.Context) (*gpload.AvgStat, error) {
 				return &gpload.AvgStat{Load1: 1.5, Load5: 2.0, Load15: 2.5}, nil
 			},
@@ -115,7 +117,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: gopsutil error propagated",
-			variant: "darwin",
+			variant: osDarwin,
 			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
 			wantErr: true,
 		},
@@ -125,10 +127,12 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			defer load.SetAvgFn(tt.fn)()
 			var c load.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &load.Linux{}
-			case "darwin":
+			case osDarwin:
 				c = &load.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

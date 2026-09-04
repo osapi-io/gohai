@@ -72,10 +72,10 @@ func (s *OSReleasePublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -89,9 +89,11 @@ func (s *OSReleasePublicTestSuite) TestNew() {
 			case "darwin":
 				_, ok := c.(*osrelease.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*osrelease.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -123,7 +125,7 @@ UBUNTU_CODENAME=noble
 	}{
 		{
 			name:    "linux: ubuntu 24.04",
-			variant: "linux",
+			variant: osLinux,
 			content: ubuntu,
 			want: osrelease.Info{
 				ID: "ubuntu", IDLike: []string{"debian"},
@@ -138,25 +140,25 @@ UBUNTU_CODENAME=noble
 		},
 		{
 			name:    "linux: missing file soft-misses",
-			variant: "linux",
+			variant: osLinux,
 			missing: true,
 			want:    osrelease.Info{},
 		},
 		{
 			name:    "linux: other read error propagated",
-			variant: "linux",
+			variant: osLinux,
 			readErr: true,
 			wantErr: true,
 		},
 		{
 			name:    "linux: comments and blanks and malformed lines",
-			variant: "linux",
+			variant: osLinux,
 			content: "# some comment\n\nmalformed\nID=\"quoted\"\n",
 			want:    osrelease.Info{ID: "quoted"},
 		},
 		{
 			name:    "linux: build/variant fields populated (Fedora-style)",
-			variant: "linux",
+			variant: osLinux,
 			content: `ID=fedora
 BUILD_ID=40.20240416.0
 VARIANT="Workstation Edition"
@@ -179,7 +181,7 @@ VARIANT_ID=workstation
 		s.Run(tt.name, func() {
 			var c osrelease.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				var vfs avfs.VFS
 				switch {
 				case tt.readErr:
@@ -195,6 +197,8 @@ VARIANT_ID=workstation
 				c = &osrelease.Linux{FS: vfs}
 			case "darwin":
 				c = osrelease.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

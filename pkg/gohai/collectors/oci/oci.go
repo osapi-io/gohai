@@ -41,6 +41,10 @@ import (
 const ProviderName = "oci"
 
 // metadataBaseURL is OCI's link-local metadata endpoint.
+// The instance metadata service is link-local and serves plain
+// HTTP only; there is no HTTPS endpoint to point this at.
+//
+//nolint:revive // unsecure-url-scheme
 const metadataBaseURL = "http://169.254.169.254/opc/v2"
 
 // metadataTimeout matches Ohai's 6s read timeout in mixin/oci_metadata.rb.
@@ -337,38 +341,80 @@ func (c *Collector) Collect(
 
 	var ri rawInstance
 	if err := c.client.GetJSON(ctx, pathInstance, &ri); err != nil {
+		// No instance document means this is not OCI after all.
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 			return nil, nil
 		}
+
 		return nil, err
 	}
+
 	info := transformInstance(ri)
 
-	var vnics []rawVNIC
-	if err := c.client.GetJSON(ctx, pathVNICs, &vnics); err == nil {
-		for _, v := range vnics {
-			info.VNICs = append(info.VNICs, VNIC(v))
-		}
-	} else if !errors.Is(err, cloudmetadata.ErrNotAvailable) {
+	if err := c.collectVNICs(ctx, info); err != nil {
 		return nil, err
 	}
 
-	var vols []rawVolumeAttachment
-	if err := c.client.GetJSON(ctx, pathVolumes, &vols); err == nil {
-		if len(vols) > 0 {
-			info.VolumeAttachments = make(map[string]VolumeAttachment, len(vols))
-		}
-		for _, v := range vols {
-			if v.ID == "" {
-				continue
-			}
-			info.VolumeAttachments[v.ID] = VolumeAttachment(v)
-		}
-	} else if !errors.Is(err, cloudmetadata.ErrNotAvailable) {
+	if err := c.collectVolumes(ctx, info); err != nil {
 		return nil, err
 	}
 
 	return info, nil
+}
+
+// collectVNICs reads the attached network interfaces. An instance whose
+// shape does not serve this endpoint simply has none.
+func (c *Collector) collectVNICs(
+	ctx context.Context,
+	info *Info,
+) error {
+	var vnics []rawVNIC
+
+	if err := c.client.GetJSON(ctx, pathVNICs, &vnics); err != nil {
+		return skipIfAbsent(err)
+	}
+
+	for _, v := range vnics {
+		info.VNICs = append(info.VNICs, VNIC(v))
+	}
+
+	return nil
+}
+
+// collectVolumes reads the attached block volumes, keyed by their id.
+func (c *Collector) collectVolumes(
+	ctx context.Context,
+	info *Info,
+) error {
+	var vols []rawVolumeAttachment
+
+	if err := c.client.GetJSON(ctx, pathVolumes, &vols); err != nil {
+		return skipIfAbsent(err)
+	}
+
+	if len(vols) > 0 {
+		info.VolumeAttachments = make(map[string]VolumeAttachment, len(vols))
+	}
+
+	for _, v := range vols {
+		if v.ID != "" {
+			info.VolumeAttachments[v.ID] = VolumeAttachment(v)
+		}
+	}
+
+	return nil
+}
+
+// skipIfAbsent swallows the error that means "this endpoint is not
+// served here", and passes anything else on.
+func skipIfAbsent(
+	err error,
+) error {
+	if errors.Is(err, cloudmetadata.ErrNotAvailable) {
+		return nil
+	}
+
+	return err
 }
 
 // onOCI checks the dmi collector's chassis.asset_tag for the

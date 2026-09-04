@@ -47,6 +47,9 @@ type Linux struct {
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem.
+// /proc/modules reports name, size and refcount at least.
+const moduleFields = 3
+
 func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
@@ -79,7 +82,7 @@ func parseProcModules(
 	sc := bufio.NewScanner(strings.NewReader(string(b)))
 	for sc.Scan() {
 		fields := strings.Fields(sc.Text())
-		if len(fields) < 3 {
+		if len(fields) < moduleFields {
 			continue
 		}
 		m := Module{}

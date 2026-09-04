@@ -69,6 +69,9 @@ type Collector interface {
 type base struct{}
 
 // Name returns "zpools".
+// zpool list -H reports six tab-separated columns.
+const poolFields = 6
+
 func (base) Name() string { return "zpools" }
 
 // Category returns "linux".
@@ -117,7 +120,7 @@ func parseZpoolList(
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Split(line, "\t")
-		if len(fields) != 6 {
+		if len(fields) != poolFields {
 			continue
 		}
 		pools = append(pools, Pool{

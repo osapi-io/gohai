@@ -101,11 +101,11 @@ func (s *KernelPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -116,12 +116,14 @@ func (s *KernelPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*kernel.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*kernel.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -133,7 +135,7 @@ func (s *KernelPublicTestSuite) TestBytesToString() {
 		in   []byte
 		want string
 	}{
-		{"NUL-terminated C string", []byte{'L', 'i', 'n', 'u', 'x', 0, 0, 0}, "Linux"},
+		{"NUL-terminated C string", []byte{'L', 'i', 'n', 'u', 'x', 0, 0, 0}, unameLinux},
 		{"no trailing NUL (full array used)", []byte{'a', 'b', 'c'}, "abc"},
 		{"empty input", []byte{}, ""},
 		{"leading NUL truncates to empty", []byte{0, 'x', 'y'}, ""},
@@ -154,10 +156,10 @@ func (s *KernelPublicTestSuite) TestDefaultUname() {
 		{
 			name: "success returns populated fields",
 			fn: func(u *unix.Utsname) error {
-				copy(u.Sysname[:], "Linux")
+				copy(u.Sysname[:], unameLinux)
 				copy(u.Release[:], "6.1.0")
 				copy(u.Version[:], "#1 SMP")
-				copy(u.Machine[:], "x86_64")
+				copy(u.Machine[:], archX8664)
 				return nil
 			},
 		},
@@ -171,31 +173,32 @@ func (s *KernelPublicTestSuite) TestDefaultUname() {
 		s.Run(tt.name, func() {
 			restore := kernel.SetUnameSyscall(tt.fn)
 			defer restore()
-			name, release, _, machine, err := kernel.DefaultUname()
+			u, err := kernel.DefaultUname()
 			if tt.wantErr {
 				s.Error(err)
+
 				return
 			}
 			s.Require().NoError(err)
-			s.Equal("Linux", name)
-			s.Equal("6.1.0", release)
-			s.Equal("x86_64", machine)
+			s.Equal(unameLinux, u.Name)
+			s.Equal("6.1.0", u.Release)
+			s.Equal(archX8664, u.Machine)
 		})
 	}
 }
 
 func (s *KernelPublicTestSuite) TestCollect() {
-	linuxOK := fakeUtsname("Linux", "5.15.0-47-generic",
-		"#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022", "x86_64")
+	linuxOK := fakeUtsname(unameLinux, "5.15.0-47-generic",
+		"#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022", archX8664)
 	darwinARM := fakeUtsname(
-		"Darwin", "23.4.0",
+		unameDarwin, "23.4.0",
 		"Darwin Kernel Version 23.4.0: Wed Feb 21 21:44:31 PST 2024",
-		"arm64",
+		archARM64,
 	)
 	darwinIntel := fakeUtsname(
-		"Darwin", "22.6.0",
+		unameDarwin, "22.6.0",
 		"Darwin Kernel Version 22.6.0",
-		"x86_64",
+		archX8664,
 	)
 
 	tests := []struct {
@@ -208,88 +211,88 @@ func (s *KernelPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: canonical identity fields",
-			variant: "linux",
+			variant: osLinux,
 			uname:   linuxOK,
 			validate: func(i *kernel.Info) {
-				s.Equal("Linux", i.Name)
+				s.Equal(unameLinux, i.Name)
 				s.Equal("5.15.0-47-generic", i.Release)
-				s.Equal("x86_64", i.Machine)
-				s.Equal("x86_64", i.Processor)
+				s.Equal(archX8664, i.Machine)
+				s.Equal(archX8664, i.Processor)
 				s.Equal("GNU/Linux", i.OS)
 			},
 		},
 		{
 			name:    "linux: uname error propagated",
-			variant: "linux",
+			variant: osLinux,
 			uname:   func(*unix.Utsname) error { return errors.New("uname failed") },
 			wantErr: true,
 		},
 		{
 			name:    "darwin: native arm64 Apple Silicon — no rosetta",
-			variant: "darwin",
+			variant: osDarwin,
 			uname:   darwinARM,
 			exec: func(t *testing.T) executor.Executor {
 				return rosettaExec(t, []byte("0\n"), nil)
 			},
 			validate: func(i *kernel.Info) {
-				s.Equal("Darwin", i.Name)
-				s.Equal("arm64", i.Machine)
-				s.Equal("arm64", i.Processor)
-				s.Equal("Darwin", i.OS)
+				s.Equal(unameDarwin, i.Name)
+				s.Equal(archARM64, i.Machine)
+				s.Equal(archARM64, i.Processor)
+				s.Equal(unameDarwin, i.OS)
 				s.False(i.RosettaTranslated)
 			},
 		},
 		{
 			name:    "darwin: native Intel Mac, sysctl returns 0 machine stays x86_64",
-			variant: "darwin",
+			variant: osDarwin,
 			uname:   darwinIntel,
 			exec: func(t *testing.T) executor.Executor {
 				return rosettaExec(t, []byte("0\n"), nil)
 			},
 			validate: func(i *kernel.Info) {
-				s.Equal("x86_64", i.Machine)
-				s.Equal("x86_64", i.Processor)
+				s.Equal(archX8664, i.Machine)
+				s.Equal(archX8664, i.Processor)
 				s.False(i.RosettaTranslated)
 			},
 		},
 		{
 			name:    "darwin: native Intel Mac, sysctl errors no rosetta",
-			variant: "darwin",
+			variant: osDarwin,
 			uname:   darwinIntel,
 			exec: func(t *testing.T) executor.Executor {
 				return rosettaExec(t, nil, errors.New("no sysctl"))
 			},
 			validate: func(i *kernel.Info) {
-				s.Equal("x86_64", i.Machine)
+				s.Equal(archX8664, i.Machine)
 				s.False(i.RosettaTranslated)
 			},
 		},
 		{
 			name:    "darwin: Rosetta on Apple Silicon, machine corrected to arm64",
-			variant: "darwin",
+			variant: osDarwin,
 			uname:   darwinIntel,
 			exec: func(t *testing.T) executor.Executor {
 				return rosettaExec(t, []byte("1\n"), nil)
 			},
 			validate: func(i *kernel.Info) {
-				s.Equal("arm64", i.Machine)
-				s.Equal("arm64", i.Processor)
+				s.Equal(archARM64, i.Machine)
+				s.Equal(archARM64, i.Processor)
 				s.True(i.RosettaTranslated)
 			},
 		},
 		{
 			name:    "darwin: nil Exec, no rosetta",
-			variant: "darwin",
+			variant: osDarwin,
 			uname:   darwinARM,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			validate: func(i *kernel.Info) {
-				s.Equal("arm64", i.Machine)
+				s.Equal(archARM64, i.Machine)
 				s.False(i.RosettaTranslated)
 			},
 		},
 		{
 			name:    "darwin: uname error propagated",
-			variant: "darwin",
+			variant: osDarwin,
 			uname:   func(*unix.Utsname) error { return errors.New("uname failed") },
 			exec:    func(*testing.T) executor.Executor { return nil },
 			wantErr: true,
@@ -300,14 +303,16 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			defer kernel.SetUnameSyscall(tt.uname)()
 			var c kernel.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &kernel.Linux{}
-			case "darwin":
+			case osDarwin:
 				d := &kernel.Darwin{}
 				if tt.exec != nil {
 					d.Exec = tt.exec(s.T())
 				}
 				c = d
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

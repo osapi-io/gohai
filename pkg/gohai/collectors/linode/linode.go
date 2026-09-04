@@ -97,7 +97,7 @@ func (*Collector) Dependencies() []string { return []string{"hostname"} }
 // Collect returns the Linode Info when any detection signal fires
 // (apt-sources OR domain contains "linode"), else (nil, nil).
 // Mirrors Ohai's looks_like_linode? OR chain.
-func (c *Collector) Collect(
+func (*Collector) Collect(
 	_ context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
@@ -117,18 +117,30 @@ func (c *Collector) Collect(
 func onLinode(
 	prior collector.PriorResults,
 ) bool {
-	if b, err := os.ReadFile(aptSourcesPath); err == nil {
-		if bytes.Contains(bytes.ToLower(b), []byte(linodeSignature)) {
-			return true
-		}
+	return aptSourcesNameLinode() || hostnameSaysLinode(prior)
+}
+
+// aptSourcesNameLinode looks for Linode's mirror in the apt sources.
+func aptSourcesNameLinode() bool {
+	b, err := os.ReadFile(aptSourcesPath)
+	if err != nil {
+		return false
 	}
-	if h, ok := collector.GetDep[*hostname.Info](prior, "hostname"); ok && h != nil {
-		if strings.Contains(strings.ToLower(h.FQDN), linodeSignature) ||
-			strings.Contains(strings.ToLower(h.Domain), linodeSignature) {
-			return true
-		}
+
+	return bytes.Contains(bytes.ToLower(b), []byte(linodeSignature))
+}
+
+// hostnameSaysLinode looks for Linode in the FQDN or search domain.
+func hostnameSaysLinode(
+	prior collector.PriorResults,
+) bool {
+	h, ok := collector.GetDep[*hostname.Info](prior, "hostname")
+	if !ok || h == nil {
+		return false
 	}
-	return false
+
+	return strings.Contains(strings.ToLower(h.FQDN), linodeSignature) ||
+		strings.Contains(strings.ToLower(h.Domain), linodeSignature)
 }
 
 // firstIPv4 returns the first non-link-local IPv4 address on the
@@ -141,19 +153,30 @@ func firstIPv4(
 	if err != nil {
 		return ""
 	}
+
 	for _, a := range addrs {
-		ipnet, ok := a.(*net.IPNet)
-		if !ok {
-			continue
+		if ip := routableIPv4(a); ip != "" {
+			return ip
 		}
-		ip4 := ipnet.IP.To4()
-		if ip4 == nil {
-			continue
-		}
-		if ip4.IsLinkLocalUnicast() {
-			continue
-		}
-		return ip4.String()
 	}
+
 	return ""
+}
+
+// routableIPv4 returns the address as IPv4 when it is one and is not
+// link-local, which is not an address anyone can reach us on.
+func routableIPv4(
+	a net.Addr,
+) string {
+	ipnet, ok := a.(*net.IPNet)
+	if !ok {
+		return ""
+	}
+
+	ip4 := ipnet.IP.To4()
+	if ip4 == nil || ip4.IsLinkLocalUnicast() {
+		return ""
+	}
+
+	return ip4.String()
 }

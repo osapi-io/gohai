@@ -30,7 +30,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
@@ -55,7 +55,7 @@ func main() {
 	for name := range facts.Timings.Collectors {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 
 	var failed int
 	for _, name := range names {

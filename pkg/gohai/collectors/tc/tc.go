@@ -59,6 +59,9 @@ type Collector interface {
 type base struct{}
 
 // Name returns "tc".
+// A qdisc line reads: "qdisc" <kind> <handle> "dev" <iface>.
+const qdiscFields = 5
+
 func (base) Name() string { return "tc" }
 
 // Category returns "linux".
@@ -91,58 +94,71 @@ func parseTCOutput(
 	output string,
 ) *Info {
 	info := &Info{Interfaces: []Interface{}}
-	// Build a map to accumulate qdiscs per interface.
 	ifaceMap := map[string]*Interface{}
-	// Track insertion order so output is deterministic.
+
+	// Insertion order, so the output is deterministic.
 	var order []string
 
 	sc := bufio.NewScanner(strings.NewReader(output))
 	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || !strings.HasPrefix(line, "qdisc ") {
+		iface, qd, ok := parseQDiscLine(strings.TrimSpace(sc.Text()))
+		if !ok {
 			continue
-		}
-		fields := strings.Fields(line)
-		// Minimum: "qdisc" <kind> <handle> "dev" <iface>
-		if len(fields) < 5 {
-			continue
-		}
-		kind := fields[1]
-		handle := strings.TrimSuffix(fields[2], ":")
-		// Find "dev" keyword.
-		devIdx := -1
-		for i, f := range fields {
-			if f == "dev" {
-				devIdx = i
-				break
-			}
-		}
-		if devIdx < 0 || devIdx+1 >= len(fields) {
-			continue
-		}
-		iface := fields[devIdx+1]
-
-		// Extract optional parent.
-		parent := ""
-		for i, f := range fields {
-			if f == "parent" && i+1 < len(fields) {
-				parent = fields[i+1]
-				break
-			}
 		}
 
 		if _, exists := ifaceMap[iface]; !exists {
 			ifaceMap[iface] = &Interface{Name: iface, QDiscs: []QDisc{}}
 			order = append(order, iface)
 		}
-		ifaceMap[iface].QDiscs = append(ifaceMap[iface].QDiscs, QDisc{
-			Kind:   kind,
-			Handle: handle,
-			Parent: parent,
-		})
+
+		ifaceMap[iface].QDiscs = append(ifaceMap[iface].QDiscs, qd)
 	}
+
 	for _, name := range order {
 		info.Interfaces = append(info.Interfaces, *ifaceMap[name])
 	}
+
 	return info
+}
+
+// parseQDiscLine reads one qdisc line and the interface it belongs to.
+func parseQDiscLine(
+	line string,
+) (string, QDisc, bool) {
+	if !strings.HasPrefix(line, "qdisc ") {
+		return "", QDisc{}, false
+	}
+
+	fields := strings.Fields(line)
+	if len(fields) < qdiscFields {
+		return "", QDisc{}, false
+	}
+
+	iface, ok := valueAfter(fields, "dev")
+	if !ok {
+		return "", QDisc{}, false
+	}
+
+	// A qdisc without a parent is the root one.
+	parent, _ := valueAfter(fields, "parent")
+
+	return iface, QDisc{
+		Kind:   fields[1],
+		Handle: strings.TrimSuffix(fields[2], ":"),
+		Parent: parent,
+	}, true
+}
+
+// valueAfter returns the field following a keyword.
+func valueAfter(
+	fields []string,
+	keyword string,
+) (string, bool) {
+	for i, f := range fields {
+		if f == keyword && i+1 < len(fields) {
+			return fields[i+1], true
+		}
+	}
+
+	return "", false
 }

@@ -38,6 +38,9 @@ type Linux struct {
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
+// virshBinary is the command this collector shells out to.
+const virshBinary = "virsh"
+
 func NewLinux() *Linux {
 	return &Linux{Exec: executor.New()}
 }
@@ -53,7 +56,7 @@ func (l *Linux) Collect(
 	}
 
 	// Probe: if virsh version fails, virsh is absent or the daemon is down.
-	verOut, err := l.Exec.Execute(ctx, "virsh", "version")
+	verOut, err := l.Exec.Execute(ctx, virshBinary, "version")
 	if err != nil {
 		return nil, nil
 	}
@@ -63,27 +66,36 @@ func (l *Linux) Collect(
 	}
 
 	// Collect the connection URI.
-	if uriOut, uriErr := l.Exec.Execute(ctx, "virsh", "uri"); uriErr == nil {
+	if uriOut, uriErr := l.Exec.Execute(ctx, virshBinary, "uri"); uriErr == nil {
 		info.URI = parseVirshURI(uriOut)
 	}
 
-	// Enumerate domains; errors yield an empty list rather than a failure.
-	listOut, listErr := l.Exec.Execute(ctx, "virsh", "list", "--all")
-	if listErr != nil {
-		return info, nil
+	if domains := l.collectDomains(ctx); len(domains) > 0 {
+		info.Domains = domains
 	}
+
+	return info, nil
+}
+
+// collectDomains lists the domains and fills in what dominfo adds. A
+// failure anywhere yields fewer domains rather than an error: the
+// hypervisor itself was already reported successfully.
+func (l *Linux) collectDomains(
+	ctx context.Context,
+) []Domain {
+	listOut, err := l.Exec.Execute(ctx, virshBinary, "list", "--all")
+	if err != nil {
+		return nil
+	}
+
 	domains := parseVirshList(listOut)
 
-	// Enrich each domain with UUID, vCPUs, memory, and autostart via dominfo.
 	for i := range domains {
-		diOut, diErr := l.Exec.Execute(ctx, "virsh", "dominfo", domains[i].Name)
-		if diErr == nil {
-			parseVirshDominfo(diOut, &domains[i])
+		out, err := l.Exec.Execute(ctx, virshBinary, "dominfo", domains[i].Name)
+		if err == nil {
+			parseVirshDominfo(out, &domains[i])
 		}
 	}
 
-	if len(domains) > 0 {
-		info.Domains = domains
-	}
-	return info, nil
+	return domains
 }

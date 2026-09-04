@@ -86,8 +86,8 @@ func (s *UsersPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -101,9 +101,11 @@ func (s *UsersPublicTestSuite) TestNew() {
 			case "darwin":
 				_, ok := c.(*users.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*users.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -119,7 +121,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: full fixture parses passwd + group + current_user",
-			variant: "linux",
+			variant: osLinux,
 			files: map[string]string{
 				"/etc/passwd": passwdFixture,
 				"/etc/group":  groupFixture,
@@ -152,7 +154,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: missing files produces empty maps, no error",
-			variant: "linux",
+			variant: osLinux,
 			files:   map[string]string{},
 			euid:    0,
 			validate: func(info *users.Info) {
@@ -163,7 +165,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: current user lookup misses when euid absent",
-			variant: "linux",
+			variant: osLinux,
 			files: map[string]string{
 				"/etc/passwd": "root:x:0:0:root:/root:/bin/bash\n",
 			},
@@ -193,10 +195,12 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			defer users.SetGeteuidFn(func() int { return tt.euid })()
 			var c users.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &users.Linux{FS: newFS(tt.files)}
 			case "darwin":
 				c = &users.Darwin{FS: newFS(tt.files)}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

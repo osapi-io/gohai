@@ -84,58 +84,73 @@ func parseHostnamectl(
 	output string,
 ) *Info {
 	info := &Info{}
+
 	sc := bufio.NewScanner(strings.NewReader(output))
 	for sc.Scan() {
-		line := sc.Text()
-		idx := strings.Index(line, ": ")
-		if idx < 0 {
-			continue
-		}
-		rawKey := strings.TrimSpace(line[:idx])
-		rawVal := strings.TrimSpace(line[idx+2:])
-		// Strip non-ASCII visual decorators (systemd ≥ v250 emoji icons).
-		val := strings.TrimSpace(nonASCIIRe.ReplaceAllString(rawVal, ""))
-		// Collapse multiple spaces introduced by stripping non-ASCII.
-		for strings.Contains(val, "  ") {
-			val = strings.ReplaceAll(val, "  ", " ")
-		}
-		val = strings.TrimSpace(val)
-		// Map to fields using the same key→snake_case logic as Ohai:
-		// key.downcase.tr(" ", "_").
-		key := strings.ToLower(strings.ReplaceAll(rawKey, " ", "_"))
-		switch key {
-		case "static_hostname":
-			info.StaticHostname = val
-		case "icon_name":
-			info.IconName = val
-		case "chassis":
-			info.Chassis = val
-		case "deployment":
-			info.Deployment = val
-		case "location":
-			info.Location = val
-		case "kernel":
-			// "Kernel: Linux 5.15.0-91-generic" — split into name and release.
-			parts := strings.SplitN(val, " ", 2)
-			if len(parts) >= 1 {
-				info.KernelName = parts[0]
-			}
-			if len(parts) >= 2 {
-				info.KernelRelease = parts[1]
-			}
-		case "operating_system_pretty_name", "operating_system":
-			info.OperatingSystemPrettyName = val
-		case "operating_system_cpe_name", "cpe_os_name":
-			info.OperatingSystemCPEName = val
-		case "virtualization":
-			info.Virtualization = val
-		case "hardware_vendor":
-			info.HardwareVendor = val
-		case "hardware_model":
-			info.HardwareModel = val
-		case "firmware_version":
-			info.FirmwareVersion = val
+		key, val, ok := hostnamectlField(sc.Text())
+		if ok {
+			setHostnamectlField(info, key, val)
 		}
 	}
+
 	return info
+}
+
+// hostnamectlField splits one "Key: value" line, normalising the key the
+// way Ohai does — downcase, spaces to underscores — and stripping the
+// emoji decorators systemd v250 and later print.
+func hostnamectlField(
+	line string,
+) (key string, val string, ok bool) {
+	rawKey, rawVal, found := strings.Cut(line, ": ")
+	if !found {
+		return "", "", false
+	}
+
+	v := strings.TrimSpace(nonASCIIRe.ReplaceAllString(strings.TrimSpace(rawVal), ""))
+
+	// Stripping the decorators can leave runs of spaces behind.
+	for strings.Contains(v, "  ") {
+		v = strings.ReplaceAll(v, "  ", " ")
+	}
+
+	k := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(rawKey), " ", "_"))
+
+	return k, strings.TrimSpace(v), true
+}
+
+// setHostnamectlField files one normalised key.
+func setHostnamectlField(
+	info *Info,
+	key string,
+	val string,
+) {
+	if key == "kernel" {
+		// "Kernel: Linux 5.15.0-91-generic" is a name and a release.
+		name, release, _ := strings.Cut(val, " ")
+		info.KernelName = name
+		info.KernelRelease = release
+
+		return
+	}
+
+	dst := map[string]*string{
+		"static_hostname":              &info.StaticHostname,
+		"icon_name":                    &info.IconName,
+		"chassis":                      &info.Chassis,
+		"deployment":                   &info.Deployment,
+		"location":                     &info.Location,
+		"operating_system_pretty_name": &info.OperatingSystemPrettyName,
+		"operating_system":             &info.OperatingSystemPrettyName,
+		"operating_system_cpe_name":    &info.OperatingSystemCPEName,
+		"cpe_os_name":                  &info.OperatingSystemCPEName,
+		"virtualization":               &info.Virtualization,
+		"hardware_vendor":              &info.HardwareVendor,
+		"hardware_model":               &info.HardwareModel,
+		"firmware_version":             &info.FirmwareVersion,
+	}[key]
+
+	if dst != nil {
+		*dst = val
+	}
 }

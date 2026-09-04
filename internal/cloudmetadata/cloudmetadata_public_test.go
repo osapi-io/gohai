@@ -96,13 +96,13 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			name: "200 returns body",
 			setup: func() (string, []cloudmetadata.Option, func()) {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-					"/ok": func(w http.ResponseWriter, _ *http.Request) {
+					pathOk: func(w http.ResponseWriter, _ *http.Request) {
 						_, _ = w.Write([]byte("hello"))
 					},
 				})
 				return srv.URL, nil, srv.Close
 			},
-			path:     "/ok",
+			path:     pathOk,
 			wantBody: "hello",
 		},
 		{
@@ -122,13 +122,13 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			name: "baseURL trailing slash is stripped",
 			setup: func() (string, []cloudmetadata.Option, func()) {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-					"/ok": func(w http.ResponseWriter, _ *http.Request) {
+					pathOk: func(w http.ResponseWriter, _ *http.Request) {
 						_, _ = w.Write([]byte("trim-ok"))
 					},
 				})
 				return srv.URL + "/", nil, srv.Close
 			},
-			path:     "/ok",
+			path:     pathOk,
 			wantBody: "trim-ok",
 		},
 		{
@@ -138,7 +138,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
 					"/h": func(w http.ResponseWriter, r *http.Request) {
 						got = r.Header.Clone()
-						_, _ = w.Write([]byte("ok"))
+						_, _ = w.Write([]byte(valueOK))
 					},
 				})
 				opts := []cloudmetadata.Option{
@@ -152,7 +152,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				}
 			},
 			path:     "/h",
-			wantBody: "ok",
+			wantBody: valueOK,
 		},
 		{
 			name: "default User-Agent is sent when caller doesn't override",
@@ -161,16 +161,16 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
 					"/ua": func(w http.ResponseWriter, r *http.Request) {
 						got = r.Header.Clone()
-						_, _ = w.Write([]byte("ok"))
+						_, _ = w.Write([]byte(valueOK))
 					},
 				})
 				return srv.URL, nil, func() {
 					srv.Close()
-					s.Equal(cloudmetadata.DefaultUserAgent, got.Get("User-Agent"))
+					s.Equal(cloudmetadata.DefaultUserAgent, got.Get(headerUserAgent))
 				}
 			},
 			path:     "/ua",
-			wantBody: "ok",
+			wantBody: valueOK,
 		},
 		{
 			name: "WithHeader overrides the default User-Agent",
@@ -179,19 +179,19 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
 					"/ua": func(w http.ResponseWriter, r *http.Request) {
 						got = r.Header.Clone()
-						_, _ = w.Write([]byte("ok"))
+						_, _ = w.Write([]byte(valueOK))
 					},
 				})
 				opts := []cloudmetadata.Option{
-					cloudmetadata.WithHeader("User-Agent", "custom/1.0"),
+					cloudmetadata.WithHeader(headerUserAgent, "custom/1.0"),
 				}
 				return srv.URL, opts, func() {
 					srv.Close()
-					s.Equal("custom/1.0", got.Get("User-Agent"))
+					s.Equal("custom/1.0", got.Get(headerUserAgent))
 				}
 			},
 			path:     "/ua",
-			wantBody: "ok",
+			wantBody: valueOK,
 		},
 		{
 			name: "404 wraps ErrNotAvailable",
@@ -271,7 +271,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			name: "WithHTTPClient swaps underlying transport",
 			setup: func() (string, []cloudmetadata.Option, func()) {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-					"/ok": func(w http.ResponseWriter, _ *http.Request) {
+					pathOk: func(w http.ResponseWriter, _ *http.Request) {
 						_, _ = w.Write([]byte("custom-ok"))
 					},
 				})
@@ -279,7 +279,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				opts := []cloudmetadata.Option{cloudmetadata.WithHTTPClient(custom)}
 				return srv.URL, opts, srv.Close
 			},
-			path:     "/ok",
+			path:     pathOk,
 			wantBody: "custom-ok",
 		},
 		{
@@ -292,7 +292,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				}
 				return "http://example.invalid", opts, func() {}
 			},
-			path:    "/x",
+			path:    pathX,
 			wantErr: true,
 		},
 		{
@@ -302,7 +302,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				// rejects before any transport call.
 				return "http://\x7f", nil, func() {}
 			},
-			path:    "/x",
+			path:    pathX,
 			wantErr: true,
 		},
 	}
@@ -338,21 +338,21 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 func (s *CloudMetadataPublicTestSuite) TestGetWithHeaders() {
 	var got http.Header
 	srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-		"/x": func(w http.ResponseWriter, r *http.Request) {
+		pathX: func(w http.ResponseWriter, r *http.Request) {
 			got = r.Header.Clone()
-			_, _ = w.Write([]byte("ok"))
+			_, _ = w.Write([]byte(valueOK))
 		},
 	})
 	defer srv.Close()
 
 	client := cloudmetadata.New(srv.URL)
-	body, err := client.GetWithHeaders(context.Background(), "/x", map[string]string{
+	body, err := client.GetWithHeaders(context.Background(), pathX, map[string]string{
 		"X-Token": "abc123",
 	})
 	s.Require().NoError(err)
-	s.Equal("ok", string(body))
+	s.Equal(valueOK, string(body))
 	s.Equal("abc123", got.Get("X-Token"))
-	s.Equal(cloudmetadata.DefaultUserAgent, got.Get("User-Agent"))
+	s.Equal(cloudmetadata.DefaultUserAgent, got.Get(headerUserAgent))
 }
 
 func (s *CloudMetadataPublicTestSuite) TestRawGet() {
@@ -368,13 +368,13 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 			name: "200 returns body + status",
 			setup: func() (string, func()) {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-					"/ok": func(w http.ResponseWriter, _ *http.Request) {
+					pathOk: func(w http.ResponseWriter, _ *http.Request) {
 						_, _ = w.Write([]byte("hello"))
 					},
 				})
 				return srv.URL, srv.Close
 			},
-			path:       "/ok",
+			path:       pathOk,
 			wantStatus: http.StatusOK,
 			wantBody:   "hello",
 		},
@@ -401,7 +401,7 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 				srv.Close()
 				return url, func() {}
 			},
-			path:    "/x",
+			path:    pathX,
 			wantErr: true,
 		},
 		{
@@ -409,7 +409,7 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 			setup: func() (string, func()) {
 				return "http://\x7f", func() {}
 			},
-			path:    "/x",
+			path:    pathX,
 			wantErr: true,
 		},
 		{
@@ -417,7 +417,7 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 			setup: func() (string, func()) {
 				return "http://example.invalid", func() {}
 			},
-			path:    "/x",
+			path:    pathX,
 			wantErr: true,
 		},
 		{

@@ -76,8 +76,8 @@ func (s *SCSIPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -91,9 +91,11 @@ func (s *SCSIPublicTestSuite) TestNew() {
 			case "darwin":
 				_, ok := c.(*scsi.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*scsi.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -116,7 +118,7 @@ malformed
 	}{
 		{
 			name:    "linux: happy path parses lsscsi output",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, []byte(lsscsiOut), nil)
 			},
@@ -147,7 +149,7 @@ malformed
 		},
 		{
 			name:    "linux: missing lsscsi binary yields empty info, no error",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, nil, errors.New("not found"))
 			},
@@ -157,7 +159,7 @@ malformed
 		},
 		{
 			name:    "linux: nil Exec yields empty info",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			validate: func(info *scsi.Info) {
 				s.Empty(info.Devices)
@@ -165,7 +167,7 @@ malformed
 		},
 		{
 			name:    "linux: empty output yields empty info",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, []byte{}, nil)
 			},
@@ -175,7 +177,7 @@ malformed
 		},
 		{
 			name:    "linux: minimum 5-field row (no name) still parses",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, []byte("[0:0:0:0] disk ATA KC48 /dev/sda\n"), nil)
 			},
@@ -191,7 +193,7 @@ malformed
 		},
 		{
 			name:    "linux: row with empty brackets is skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, []byte("[] disk ATA KC48 /dev/sda\n"), nil)
 			},
@@ -212,10 +214,12 @@ malformed
 		s.Run(tt.name, func() {
 			var c scsi.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &scsi.Linux{Exec: tt.exec(s.T())}
 			case "darwin":
 				c = &scsi.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

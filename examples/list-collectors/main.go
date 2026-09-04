@@ -26,7 +26,7 @@ package main
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
@@ -44,11 +44,11 @@ func main() {
 	for category := range byCategory {
 		categories = append(categories, category)
 	}
-	sort.Strings(categories)
+	slices.Sort(categories)
 
 	for _, category := range categories {
 		names := byCategory[category]
-		sort.Strings(names)
+		slices.Sort(names)
 		fmt.Printf("%s (%d)\n", category, len(names))
 		for _, name := range names {
 			fmt.Printf("  %s\n", name)

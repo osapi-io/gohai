@@ -38,7 +38,7 @@ func NewLinux() *Linux {
 }
 
 // Collect derives the shard seed from hostname + dmi prior results.
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	_ context.Context,
 	prior collector.PriorResults,
 ) (any, error) {

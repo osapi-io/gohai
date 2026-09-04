@@ -90,26 +90,28 @@ func (s *RPMPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := rpm.New()
 			s.Equal("rpm", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*rpm.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*rpm.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -130,7 +132,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: rpm not installed — empty macros, no error",
-			variant: "linux",
+			variant: osLinux,
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				m := execmocks.NewMockExecutor(ctrl)
 				m.EXPECT().
@@ -142,7 +144,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: rpm --showrc parsed correctly",
-			variant: "linux",
+			variant: osLinux,
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				m := execmocks.NewMockExecutor(ctrl)
 				m.EXPECT().
@@ -163,7 +165,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: no marker lines — empty macros",
-			variant: "linux",
+			variant: osLinux,
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				m := execmocks.NewMockExecutor(ctrl)
 				m.EXPECT().
@@ -175,7 +177,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 		},
 		{
 			name:       "linux: nil executor — empty macros",
-			variant:    "linux",
+			variant:    osLinux,
 			setupExec:  nil,
 			wantMacros: map[string]string{},
 		},
@@ -184,7 +186,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 			// len(parts) < 2 branch; a macro line with only "-  name"
 			// (no value) exercises the len(parts) != 3 branch.
 			name:    "linux: edge-case macro lines",
-			variant: "linux",
+			variant: osLinux,
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				m := execmocks.NewMockExecutor(ctrl)
 				// "-" alone: len(SplitN("-", " ", 3)) == 1 → skip.
@@ -210,7 +212,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 
 			var c rpm.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				l := &rpm.Linux{}
 				if tt.setupExec != nil {
 					l.Exec = tt.setupExec(ctrl)
@@ -218,6 +220,8 @@ func (s *RPMPublicTestSuite) TestCollect() {
 				c = l
 			case "darwin":
 				c = &rpm.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 
 			got, err := c.Collect(context.Background(), nil)

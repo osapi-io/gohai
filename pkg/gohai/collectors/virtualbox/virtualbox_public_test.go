@@ -85,10 +85,10 @@ func (s *VirtualBoxPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -99,12 +99,14 @@ func (s *VirtualBoxPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*virtualbox.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*virtualbox.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -121,21 +123,21 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		// ----- Linux -----
 		{
 			name:    "linux: canonical guestproperty output parsed",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(t, []byte(vboxControlOutput), nil)
 			},
 			validate: func(i *virtualbox.Info) {
-				s.Equal("7.0.14", i.HostVersion)
+				s.Equal(value7014, i.HostVersion)
 				s.Equal("161095", i.HostRevision)
-				s.Equal("7.0.14", i.GuestAdditionsVersion)
+				s.Equal(value7014, i.GuestAdditionsVersion)
 				s.Equal("161095", i.GuestAdditionsRevision)
 				s.Equal("en_US", i.LanguageID)
 			},
 		},
 		{
 			name:    "linux: VBoxControl not found returns nil",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(t, nil, errors.New("exec: not found"))
 			},
@@ -143,13 +145,13 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: nil Exec returns nil",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			wantNil: true,
 		},
 		{
 			name:    "linux: output with no matching lines yields empty Info",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(
 					t,
@@ -164,7 +166,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: partial output — only VBoxVer present",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(
 					t,
@@ -183,19 +185,19 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		// ----- Darwin -----
 		{
 			name:    "darwin: canonical guestproperty output parsed",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(t, []byte(vboxControlOutput), nil)
 			},
 			validate: func(i *virtualbox.Info) {
-				s.Equal("7.0.14", i.HostVersion)
-				s.Equal("7.0.14", i.GuestAdditionsVersion)
+				s.Equal(value7014, i.HostVersion)
+				s.Equal(value7014, i.GuestAdditionsVersion)
 				s.Equal("en_US", i.LanguageID)
 			},
 		},
 		{
 			name:    "darwin: VBoxControl not found returns nil",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(t, nil, errors.New("exec: not found"))
 			},
@@ -203,7 +205,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: nil Exec returns nil",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			wantNil: true,
 		},
@@ -212,10 +214,12 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c virtualbox.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &virtualbox.Linux{Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &virtualbox.Darwin{Exec: tt.exec(s.T())}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

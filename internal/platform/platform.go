@@ -65,7 +65,7 @@ var rhelFamily = map[string]bool{
 // branch without importing gopsutil.
 //
 // Return values:
-//   - "darwin" on macOS
+//   - osDarwin on macOS
 //   - "debian" for debian/ubuntu/raspbian
 //   - "rhel"   for rhel/redhat/centos/fedora/rocky/alma/amazon/oracle
 //   - ""       for generic linux (arch, alpine, suse, gentoo, etc.) or
@@ -74,7 +74,7 @@ var rhelFamily = map[string]bool{
 // Callers dispatch with a switch statement:
 //
 //	switch platform.Detect() {
-//	case "darwin":  return NewDarwin()
+//	case osDarwin:  return NewDarwin()
 //	case "debian":  return NewDebian()
 //	case "rhel":    return NewRHEL()
 //	default:        return NewLinux()
@@ -84,8 +84,11 @@ var rhelFamily = map[string]bool{
 //
 //	orig := platform.Detect
 //	defer func() { platform.Detect = orig }()
-//	platform.Detect = func() string { return "darwin" }
+//	platform.Detect = func() string { return osDarwin }
 var Detect = detect
+
+// osDarwin is what runtime.GOOS reports on macOS.
+const osDarwin = "darwin"
 
 func detect() string {
 	info, _ := hostInfoFn()
@@ -94,8 +97,8 @@ func detect() string {
 	}
 
 	p := strings.ToLower(info.Platform)
-	if p == "" && strings.ToLower(info.OS) == "darwin" {
-		return "darwin"
+	if p == "" && strings.ToLower(info.OS) == osDarwin {
+		return osDarwin
 	}
 
 	if debianFamily[p] {
@@ -112,10 +115,10 @@ func detect() string {
 // same thing on all Linux variants.
 func IsLinux() bool {
 	p := Detect()
-	return p != "darwin" && p != ""
+	return p != osDarwin && p != ""
 }
 
 // IsDarwin reports whether the host is macOS.
 func IsDarwin() bool {
-	return Detect() == "darwin"
+	return Detect() == osDarwin
 }

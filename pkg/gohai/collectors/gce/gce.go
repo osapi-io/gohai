@@ -48,6 +48,10 @@ const dmiProductName = "Google Compute Engine"
 // metadataBaseURL is GCE's link-local metadata service. The trailing
 // dot on the hostname defeats the host's DNS search path (matches
 // Ohai's Ohai::Mixin::GCEMetadata::GCE_METADATA_ADDR).
+// The instance metadata service is link-local and serves plain
+// HTTP only; there is no HTTPS endpoint to point this at.
+//
+//nolint:revive // unsecure-url-scheme
 const metadataBaseURL = "http://metadata.google.internal./computeMetadata/v1"
 
 // metadataTimeout matches Ohai's 6s read timeout in mixin/gce_metadata.rb.

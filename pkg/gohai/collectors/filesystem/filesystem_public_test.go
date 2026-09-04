@@ -76,10 +76,10 @@ func btrfsFS(
 	root := "/sys/fs/btrfs/" + uuid + "/allocation"
 	s.Require().NoError(fs.MkdirAll(root, 0o755))
 	for bg, fix := range bgs {
-		dir := root + "/" + bg
+		dir := root + pathRoot + bg
 		s.Require().NoError(fs.MkdirAll(dir, 0o755))
 		if fix.raid != "" {
-			s.Require().NoError(fs.MkdirAll(dir+"/"+fix.raid, 0o755))
+			s.Require().NoError(fs.MkdirAll(dir+pathRoot+fix.raid, 0o755))
 		}
 		if fix.totalRaw != "" {
 			s.Require().NoError(fs.WriteFile(dir+"/total_bytes", []byte(fix.totalRaw), 0o644))
@@ -180,11 +180,11 @@ func (s *FilesystemPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -195,12 +195,14 @@ func (s *FilesystemPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*filesystem.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*filesystem.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -208,14 +210,14 @@ func (s *FilesystemPublicTestSuite) TestNew() {
 
 func (s *FilesystemPublicTestSuite) TestCollect() {
 	baseParts := []gpdisk.PartitionStat{
-		{Device: "/dev/sda1", Mountpoint: "/", Fstype: "ext4"},
+		{Device: pathDevSda1, Mountpoint: pathRoot, Fstype: "ext4"},
 		{Device: "/dev/sda2", Mountpoint: "/boot", Fstype: "ext4"},
 	}
 	okPartitions := func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 		return baseParts, nil
 	}
 	okUsage := func(_ context.Context, mp string) (*gpdisk.UsageStat, error) {
-		if mp == "/" {
+		if mp == pathRoot {
 			return &gpdisk.UsageStat{
 				Total:             100,
 				Used:              50,
@@ -232,7 +234,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 	darwinParts := []gpdisk.PartitionStat{
 		{
 			Device:     "/dev/disk3s1",
-			Mountpoint: "/",
+			Mountpoint: pathRoot,
 			Fstype:     "apfs",
 			Opts:       []string{"rw"},
 		},
@@ -256,7 +258,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:         "linux: no lsblk, mounts unchanged no unmounted",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec:         func(t *testing.T) executor.Executor { return noLsblkExec(t) },
@@ -270,7 +272,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: lsblk merges uuid/label into matching mounts",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec: func(t *testing.T) executor.Executor {
@@ -293,7 +295,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: lsblk unmounted entry surfaces as Unmounted",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec: func(t *testing.T) executor.Executor {
@@ -316,7 +318,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: lsblk node with empty fstype ignored (raw disk)",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec: func(t *testing.T) executor.Executor {
@@ -333,7 +335,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: lsblk entry with mountpoint but not in gopsutil mounts is ignored",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec: func(t *testing.T) executor.Executor {
@@ -347,7 +349,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: malformed lsblk json, extension silently skipped",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec:         func(t *testing.T) executor.Executor { return lsblkExec(t, `not json`) },
@@ -359,7 +361,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: nil Exec, extension skipped cleanly",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec:         func(*testing.T) executor.Executor { return nil },
@@ -370,7 +372,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: gopsutil partitions error propagated",
-			variant: "linux",
+			variant: osLinux,
 			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 				return nil, errors.New("partitions error")
 			},
@@ -380,7 +382,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: usage error keeps mount without usage",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
 				return nil, errors.New("usage failed")
@@ -393,7 +395,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: ZFS datasets parsed with pool + nested + mountpoints",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec: func(t *testing.T) executor.Executor {
@@ -448,12 +450,12 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 
 				snap := i.ZFSDatasets[4]
 				s.Equal("tank@snap1", snap.Name)
-				s.True(snap.IsPool) // no "/" → looks like a pool-level name
+				s.True(snap.IsPool) // no pathRoot → looks like a pool-level name
 			},
 		},
 		{
 			name:         "linux: zfs binary present but empty output yields no datasets",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec: func(t *testing.T) executor.Executor {
@@ -465,7 +467,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "linux: zfs malformed line skipped, well-formed line parsed",
-			variant:      "linux",
+			variant:      osLinux,
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec: func(t *testing.T) executor.Executor {
@@ -483,10 +485,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: btrfs mount enriched with allocation + raid profile",
-			variant: "linux",
+			variant: osLinux,
 			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+					{Device: pathDevSda1, Mountpoint: pathRoot, Fstype: btrfs},
 				}, nil
 			},
 			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
@@ -505,7 +507,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			validate: func(i *filesystem.Info) {
 				s.Require().Len(i.Mounts, 1)
 				m := i.Mounts[0]
-				s.Equal("btrfs", m.Type)
+				s.Equal(btrfs, m.Type)
 				s.Equal("abc-123", m.UUID)
 				s.Require().NotNil(m.Btrfs)
 				s.Equal("raid1", m.Btrfs.RAID)
@@ -517,10 +519,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: btrfs single profile recognised + zero-byte file tolerated",
-			variant: "linux",
+			variant: osLinux,
 			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+					{Device: pathDevSda1, Mountpoint: pathRoot, Fstype: btrfs},
 				}, nil
 			},
 			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
@@ -545,10 +547,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: btrfs mount without /sys/fs/btrfs entry leaves Btrfs nil",
-			variant: "linux",
+			variant: osLinux,
 			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+					{Device: pathDevSda1, Mountpoint: pathRoot, Fstype: btrfs},
 				}, nil
 			},
 			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
@@ -566,10 +568,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: btrfs bg dirs exist but with no profile + missing files",
-			variant: "linux",
+			variant: osLinux,
 			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+					{Device: pathDevSda1, Mountpoint: pathRoot, Fstype: btrfs},
 				}, nil
 			},
 			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
@@ -599,10 +601,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: btrfs allocation root exists but no bg subdirs yields nil Btrfs",
-			variant: "linux",
+			variant: osLinux,
 			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
+					{Device: pathDevSda1, Mountpoint: pathRoot, Fstype: btrfs},
 				}, nil
 			},
 			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
@@ -624,10 +626,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: non-btrfs mount left alone even with FS configured",
-			variant: "linux",
+			variant: osLinux,
 			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "ext4"},
+					{Device: pathDevSda1, Mountpoint: pathRoot, Fstype: "ext4"},
 				}, nil
 			},
 			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
@@ -645,7 +647,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:         "darwin: APFS root populated",
-			variant:      "darwin",
+			variant:      osDarwin,
 			partitionsFn: darwinPartitions,
 			usageFn:      darwinUsage,
 			validate: func(i *filesystem.Info) {
@@ -657,7 +659,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: gopsutil error wrapped and returned",
-			variant: "darwin",
+			variant: osDarwin,
 			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
 				return nil, errors.New("getfsstat failed")
 			},
@@ -671,10 +673,12 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			defer filesystem.SetUsageFn(tt.usageFn)()
 			var c filesystem.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &filesystem.Linux{FS: tt.fs, Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &filesystem.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

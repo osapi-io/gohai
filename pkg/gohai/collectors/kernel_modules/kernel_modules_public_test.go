@@ -104,9 +104,9 @@ func (s *KernelModulesPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -117,12 +117,14 @@ func (s *KernelModulesPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*kernelmodules.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*kernelmodules.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -145,7 +147,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: canonical modules with versions",
-			variant: "linux",
+			variant: osLinux,
 			fs: linuxFS(s, map[string]string{
 				"/proc/modules": "nf_tables 217088 25 rfkill,nf_conntrack - Live 0x0000000000000000\n" +
 					"ipv6 557056 24 - Live 0x0000000000000000\n",
@@ -163,7 +165,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: missing /proc/modules yields empty Info",
-			variant: "linux",
+			variant: osLinux,
 			fs:      linuxFS(s, nil),
 			validate: func(i *kernelmodules.Info) {
 				s.Nil(i.Modules)
@@ -171,7 +173,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: malformed line skipped, remaining rows parsed",
-			variant: "linux",
+			variant: osLinux,
 			fs: linuxFS(s, map[string]string{
 				"/proc/modules": "short\nvalid_mod 1024 3 - Live 0x0\n",
 			}),
@@ -183,7 +185,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: unparseable size/refcount leaves field zero",
-			variant: "linux",
+			variant: osLinux,
 			fs: linuxFS(s, map[string]string{
 				"/proc/modules": "broken abc xyz - Live 0x0\n",
 			}),
@@ -195,7 +197,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: kextstat output parsed into modules",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return kextstatExec(t, kextstatOut, nil)
 			},
@@ -210,7 +212,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: kextstat error yields empty modules",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return kextstatExec(t, nil, errors.New("not found"))
 			},
@@ -220,7 +222,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: unparseable line skipped leaves empty",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return kextstatExec(t, []byte("garbage line that cannot match\n"), nil)
 			},
@@ -230,7 +232,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: nil Exec yields empty modules",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			validate: func(i *kernelmodules.Info) {
 				s.Empty(i.Modules)
@@ -241,14 +243,16 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c kernelmodules.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &kernelmodules.Linux{FS: tt.fs}
-			case "darwin":
+			case osDarwin:
 				d := &kernelmodules.Darwin{}
 				if tt.exec != nil {
 					d.Exec = tt.exec(s.T())
 				}
 				c = d
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

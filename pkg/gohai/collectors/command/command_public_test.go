@@ -75,11 +75,11 @@ func (s *CommandPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -90,12 +90,14 @@ func (s *CommandPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*command.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*command.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -116,7 +118,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 	}{
 		{
 			name:    "linux: ps output parsed and trailing whitespace trimmed",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, psOutput, nil) },
 			want: []string{
 				"UID        PID  PPID  C STIME TTY          TIME CMD",
@@ -127,13 +129,13 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		},
 		{
 			name:    "linux: empty output yields empty slice",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, []byte{}, nil) },
 			want:    []string{},
 		},
 		{
 			name:    "linux: blank lines in output are skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return psExec(t, []byte("header\n\nprocess1\n\n"), nil)
 			},
@@ -141,19 +143,19 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		},
 		{
 			name:    "linux: exec error yields empty slice, no error",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, nil, errors.New("not found")) },
 			want:    []string{},
 		},
 		{
 			name:    "linux: nil Exec yields empty slice, no error",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			want:    []string{},
 		},
 		{
 			name:    "darwin: ps output parsed",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, psOutput, nil) },
 			want: []string{
 				"UID        PID  PPID  C STIME TTY          TIME CMD",
@@ -164,13 +166,13 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		},
 		{
 			name:    "darwin: exec error yields empty slice, no error",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, nil, errors.New("not found")) },
 			want:    []string{},
 		},
 		{
 			name:    "darwin: nil Exec yields empty slice, no error",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			want:    []string{},
 		},
@@ -179,10 +181,12 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		s.Run(tt.name, func() {
 			var c command.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &command.Linux{Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &command.Darwin{Exec: tt.exec(s.T())}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

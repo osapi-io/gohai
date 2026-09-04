@@ -29,7 +29,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sort"
+	"slices"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
@@ -61,7 +61,7 @@ func main() {
 	for k := range flat {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	fmt.Printf("flat:   %d keys, first five:\n", len(keys))
 	for _, k := range keys[:min(5, len(keys))] {

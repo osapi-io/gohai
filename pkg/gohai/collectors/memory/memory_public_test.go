@@ -117,11 +117,11 @@ func (s *MemoryPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -132,12 +132,14 @@ func (s *MemoryPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*memory.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*memory.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -210,7 +212,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: canonical host, gopsutil + extension fields populated",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    fullGopsutilVM,
 			swapFn:  swapOK,
 			fs:      meminfoFS(s, procMeminfoSample),
@@ -243,7 +245,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: missing /proc/meminfo leaves extension fields zero",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs:      meminfoFS(s, ""),
@@ -254,7 +256,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: high/low memory split + NFS + Bounce parity with Ohai",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs: meminfoFS(s, "HighTotal:    1048576 kB\n"+
@@ -274,7 +276,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: Hugetlb without gopsutil hugepages still allocates struct",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs:      meminfoFS(s, "Hugetlb: 2048 kB\n"),
@@ -285,7 +287,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: hugepages surfaced when gopsutil reports any hugepage field",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    hugepagesVM,
 			swapFn:  zeroSwap,
 			fs:      meminfoFS(s, ""),
@@ -295,7 +297,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: malformed lines skipped, valid lines still parsed",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs: meminfoFS(s, "no colon here\n"+
@@ -310,7 +312,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: value without kB unit treated as bytes",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs:      meminfoFS(s, "KernelStack: 4096\n"),
@@ -320,7 +322,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: nil FS, extension skipped cleanly",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs:      nil,
@@ -330,7 +332,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: swap error tolerated silently (Swap stays nil)",
-			variant: "linux",
+			variant: osLinux,
 			vmFn:    zeroVM,
 			swapFn: func(context.Context) (*mem.SwapMemoryStat, error) {
 				return nil, errors.New("swap failed")
@@ -342,7 +344,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: gopsutil error propagated",
-			variant: "linux",
+			variant: osLinux,
 			vmFn: func(context.Context) (*mem.VirtualMemoryStat, error) {
 				return nil, errors.New("vm failed")
 			},
@@ -352,7 +354,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: apple silicon vm_stat parsed, speculative + compressed populated",
-			variant: "darwin",
+			variant: osDarwin,
 			vmFn:    darwinVM,
 			swapFn:  zeroSwap,
 			exec: func(t *testing.T) executor.Executor {
@@ -366,7 +368,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: non-default page size still parsed correctly",
-			variant: "darwin",
+			variant: osDarwin,
 			vmFn:    darwinVM,
 			swapFn:  zeroSwap,
 			exec: func(t *testing.T) executor.Executor {
@@ -384,7 +386,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: vm_stat without page-size header defaults to 4096",
-			variant: "darwin",
+			variant: osDarwin,
 			vmFn:    darwinVM,
 			swapFn:  zeroSwap,
 			exec: func(t *testing.T) executor.Executor {
@@ -397,7 +399,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: vm_stat with non-numeric value skipped",
-			variant: "darwin",
+			variant: osDarwin,
 			vmFn:    darwinVM,
 			swapFn:  zeroSwap,
 			exec: func(t *testing.T) executor.Executor {
@@ -412,7 +414,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: vm_stat missing, extension skipped, gopsutil totals intact",
-			variant: "darwin",
+			variant: osDarwin,
 			vmFn:    darwinVM,
 			swapFn:  zeroSwap,
 			exec: func(t *testing.T) executor.Executor {
@@ -424,7 +426,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: nil Exec, extension skipped cleanly",
-			variant: "darwin",
+			variant: osDarwin,
 			vmFn:    darwinVM,
 			swapFn:  zeroSwap,
 			exec:    func(*testing.T) executor.Executor { return nil },
@@ -434,7 +436,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: gopsutil error propagated",
-			variant: "darwin",
+			variant: osDarwin,
 			vmFn: func(context.Context) (*mem.VirtualMemoryStat, error) {
 				return nil, errors.New("mach vm error")
 			},
@@ -446,7 +448,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: line without colon and zero-page-size header both skipped",
-			variant: "darwin",
+			variant: osDarwin,
 			vmFn:    darwinVM,
 			swapFn:  zeroSwap,
 			exec: func(t *testing.T) executor.Executor {
@@ -468,10 +470,12 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			defer memory.SetSwapMemoryFn(tt.swapFn)()
 			var c memory.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &memory.Linux{FS: tt.fs}
-			case "darwin":
+			case osDarwin:
 				c = &memory.Darwin{Exec: tt.exec(s.T())}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

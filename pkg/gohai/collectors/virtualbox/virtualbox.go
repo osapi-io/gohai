@@ -97,28 +97,30 @@ func parseVBoxControlOutput(
 	output []byte,
 ) *Info {
 	info := &Info{}
+
+	fields := []struct {
+		re  *regexp.Regexp
+		dst *string
+	}{
+		{reLanguageID, &info.LanguageID},
+		{reVBoxVer, &info.HostVersion},
+		{reVBoxRev, &info.HostRevision},
+		{reGuestAddVer, &info.GuestAdditionsVersion},
+		{reGuestAddRev, &info.GuestAdditionsRevision},
+	}
+
 	sc := bufio.NewScanner(strings.NewReader(string(output)))
 	for sc.Scan() {
 		line := sc.Text()
-		if m := reLanguageID.FindStringSubmatch(line); m != nil {
-			info.LanguageID = m[1]
-			continue
-		}
-		if m := reVBoxVer.FindStringSubmatch(line); m != nil {
-			info.HostVersion = m[1]
-			continue
-		}
-		if m := reVBoxRev.FindStringSubmatch(line); m != nil {
-			info.HostRevision = m[1]
-			continue
-		}
-		if m := reGuestAddVer.FindStringSubmatch(line); m != nil {
-			info.GuestAdditionsVersion = m[1]
-			continue
-		}
-		if m := reGuestAddRev.FindStringSubmatch(line); m != nil {
-			info.GuestAdditionsRevision = m[1]
+
+		for _, f := range fields {
+			if m := f.re.FindStringSubmatch(line); m != nil {
+				*f.dst = m[1]
+
+				break
+			}
 		}
 	}
+
 	return info
 }

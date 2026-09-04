@@ -38,7 +38,7 @@ func NewLinux() *Linux {
 }
 
 // Collect performs the two-hop lookup (root → gid → group name).
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

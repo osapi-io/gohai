@@ -99,7 +99,7 @@ func readInput(
 
 	info, err := os.Stdin.Stat()
 	if err == nil && info.Mode()&os.ModeCharDevice != 0 {
-		return nil, fmt.Errorf("no input: pass --file or pipe JSON to stdin")
+		return nil, errors.New("no input: pass --file or pipe JSON to stdin")
 	}
 
 	data, err := io.ReadAll(os.Stdin)
@@ -108,7 +108,7 @@ func readInput(
 	}
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf("no input: pass --file or pipe JSON to stdin")
+		return nil, errors.New("no input: pass --file or pipe JSON to stdin")
 	}
 
 	return data, nil

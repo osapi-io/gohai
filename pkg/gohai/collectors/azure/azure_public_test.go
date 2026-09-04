@@ -196,7 +196,7 @@ func handler(
 			http.NotFound(w, r)
 			return
 		}
-		if r.URL.Query().Get("api-version") == "" {
+		if r.URL.Query().Get(apiVersionParam) == "" {
 			w.WriteHeader(negotiationStatus)
 			_, _ = w.Write([]byte(negotiationJSON))
 			return
@@ -226,7 +226,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			negotiationJSON:   negotiationBody,
 			negotiationStatus: http.StatusBadRequest,
 			verify: func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string) {
-				s.Equal("2023-07-01", gotAPI)
+				s.Equal(value20230701, gotAPI)
 				s.Require().NotNil(info)
 				s.Equal("abcd-1234", info.ID)
 				s.Equal("eastus", info.Region)
@@ -281,7 +281,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			negotiationJSON:   "",
 			negotiationStatus: http.StatusNotFound,
 			verify: func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string) {
-				s.Equal("2023-07-01", gotAPI)
+				s.Equal(value20230701, gotAPI)
 				s.Require().NotNil(info)
 			},
 		},
@@ -291,7 +291,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			negotiationJSON:   "not json",
 			negotiationStatus: http.StatusBadRequest,
 			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
-				s.Equal("2023-07-01", gotAPI)
+				s.Equal(value20230701, gotAPI)
 			},
 		},
 		{
@@ -300,7 +300,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			negotiationJSON:   `{"newest-versions":[]}`,
 			negotiationStatus: http.StatusBadRequest,
 			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
-				s.Equal("2023-07-01", gotAPI)
+				s.Equal(value20230701, gotAPI)
 			},
 		},
 		{
@@ -309,7 +309,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			negotiationJSON:   `{"newest-versions":["2099-01-01", "2099-02-01"]}`,
 			negotiationStatus: http.StatusBadRequest,
 			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
-				s.Equal("2023-07-01", gotAPI)
+				s.Equal(value20230701, gotAPI)
 			},
 		},
 		{
@@ -318,7 +318,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			negotiationJSON:   `{"newest-versions":["2021-02-01","2023-07-01","2019-11-01"]}`,
 			negotiationStatus: http.StatusBadRequest,
 			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
-				s.Equal("2023-07-01", gotAPI)
+				s.Equal(value20230701, gotAPI)
 			},
 		},
 		{
@@ -339,7 +339,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			name:    "malformed main JSON surfaces as error",
 			waagent: true,
 			overrideHandler: func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Query().Get("api-version") == "" {
+				if r.URL.Query().Get(apiVersionParam) == "" {
 					w.WriteHeader(http.StatusBadRequest)
 					_, _ = w.Write([]byte(negotiationBody))
 					return
@@ -352,7 +352,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			name:    "empty compute and network skip transform branches",
 			waagent: true,
 			overrideHandler: func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Query().Get("api-version") == "" {
+				if r.URL.Query().Get(apiVersionParam) == "" {
 					w.WriteHeader(http.StatusBadRequest)
 					_, _ = w.Write([]byte(negotiationBody))
 					return
@@ -363,6 +363,34 @@ func (s *AzurePublicTestSuite) TestCollect() {
 				s.Require().NotNil(info)
 				s.Empty(info.ID)
 				s.Empty(info.Interfaces)
+			},
+		},
+		{
+			// A compute block with no storageProfile, and an interface
+			// carrying neither addresses nor subnets for either family.
+			name:    "compute without storage and an interface without addresses",
+			waagent: true,
+			overrideHandler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Query().Get(apiVersionParam) == "" {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(negotiationBody))
+
+					return
+				}
+
+				_, _ = w.Write([]byte(`{
+                                  "compute": {"vmId": "no-storage"},
+                                  "network": {"interface": [{"macAddress": "AABBCC"}]}
+                                }`))
+			},
+			verify: func(s *AzurePublicTestSuite, info *azure.Info, _ string) {
+				s.Require().NotNil(info)
+				s.Equal("no-storage", info.ID)
+				s.Nil(info.StorageProfile)
+				s.Require().Len(info.Interfaces, 1)
+				iface := info.Interfaces["AABBCC"]
+				s.Nil(iface.IPv4)
+				s.Nil(iface.IPv6)
 			},
 		},
 	}
@@ -385,8 +413,8 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					httpCalled = true
-					if r.URL.Query().Get("api-version") != "" {
-						gotAPI = r.URL.Query().Get("api-version")
+					if r.URL.Query().Get(apiVersionParam) != "" {
+						gotAPI = r.URL.Query().Get(apiVersionParam)
 					}
 					handler(tt.overrideHandler, tt.negotiationJSON, tt.negotiationStatus)(w, r)
 				},

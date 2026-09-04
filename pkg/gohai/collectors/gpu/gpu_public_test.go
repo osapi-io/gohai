@@ -78,9 +78,9 @@ func (s *GPUPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -91,12 +91,14 @@ func (s *GPUPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*gpu.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*gpu.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -149,7 +151,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: ghw returns cards with + without DeviceInfo",
-			variant: "linux",
+			variant: osLinux,
 			ghw:     ghwPopulated,
 			validate: func(i *gpu.Info) {
 				s.Require().Len(i.Cards, 2)
@@ -164,19 +166,19 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "linux: ghw error yields empty Info",
-			variant:  "linux",
+			variant:  osLinux,
 			ghw:      ghwErr,
 			validate: func(i *gpu.Info) { s.Empty(i.Cards) },
 		},
 		{
 			name:     "linux: ghw nil Info yields empty",
-			variant:  "linux",
+			variant:  osLinux,
 			ghw:      ghwNil,
 			validate: func(i *gpu.Info) { s.Empty(i.Cards) },
 		},
 		{
 			name:    "darwin: system_profiler JSON parsed for Apple GPU + discrete",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return displayExec(t, []byte(darwinJSON), nil)
 			},
@@ -194,7 +196,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: missing model falls back to _name",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return displayExec(
 					t,
@@ -212,7 +214,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: exec error yields empty Info",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return displayExec(t, nil, errors.New("not found"))
 			},
@@ -220,7 +222,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: malformed JSON yields empty Info",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return displayExec(t, []byte("not json"), nil)
 			},
@@ -228,7 +230,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "darwin: nil Exec yields empty",
-			variant:  "darwin",
+			variant:  osDarwin,
 			exec:     func(*testing.T) executor.Executor { return nil },
 			validate: func(i *gpu.Info) { s.Empty(i.Cards) },
 		},
@@ -237,15 +239,17 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c gpu.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				defer gpu.SetGHWGPUFn(tt.ghw)()
 				c = &gpu.Linux{}
-			case "darwin":
+			case osDarwin:
 				d := &gpu.Darwin{}
 				if tt.exec != nil {
 					d.Exec = tt.exec(s.T())
 				}
 				c = d
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

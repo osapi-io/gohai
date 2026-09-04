@@ -60,48 +60,79 @@ func NewLinux() *Linux {
 // ghw fails to read is omitted (nil in the result); a completely
 // empty Info is still returned as a non-nil pointer so consumers can
 // check `facts.DMI != nil` reliably.
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{}
 
-	if b, err := biosFn(); err == nil && b != nil {
-		info.BIOS = &BIOS{
-			Manufacturer: b.Vendor,
-			Ver:          b.Version,
-			Date:         b.Date,
-		}
-	}
-	if bb, err := baseboardFn(); err == nil && bb != nil {
-		info.Baseboard = &Baseboard{
-			Vendor:       bb.Vendor,
-			Product:      bb.Product,
-			Version:      bb.Version,
-			SerialNumber: bb.SerialNumber,
-			AssetTag:     bb.AssetTag,
-		}
-	}
-	if ch, err := chassisFn(); err == nil && ch != nil {
-		info.Chassis = &Chassis{
-			Vendor:          ch.Vendor,
-			Type:            ch.Type,
-			TypeDescription: ch.TypeDescription,
-			Version:         ch.Version,
-			SerialNumber:    ch.SerialNumber,
-			AssetTag:        ch.AssetTag,
-		}
-	}
-	if p, err := productFn(); err == nil && p != nil {
-		info.Product = &Product{
-			VendorName:   p.Vendor,
-			Name:         p.Name,
-			Family:       p.Family,
-			Version:      p.Version,
-			SerialNumber: p.SerialNumber,
-			UUID:         p.UUID,
-			SKU:          p.SKU,
-		}
-	}
+	// Each of the four sysfs groups is independent: a machine that does
+	// not expose one still reports the others.
+	info.BIOS = readBIOS()
+	info.Baseboard = readBaseboard()
+	info.Chassis = readChassis()
+	info.Product = readProduct()
+
 	return info, nil
+}
+
+func readBIOS() *BIOS {
+	b, err := biosFn()
+	if err != nil || b == nil {
+		return nil
+	}
+
+	return &BIOS{
+		Manufacturer: b.Vendor,
+		Ver:          b.Version,
+		Date:         b.Date,
+	}
+}
+
+func readBaseboard() *Baseboard {
+	bb, err := baseboardFn()
+	if err != nil || bb == nil {
+		return nil
+	}
+
+	return &Baseboard{
+		Vendor:       bb.Vendor,
+		Product:      bb.Product,
+		Version:      bb.Version,
+		SerialNumber: bb.SerialNumber,
+		AssetTag:     bb.AssetTag,
+	}
+}
+
+func readChassis() *Chassis {
+	ch, err := chassisFn()
+	if err != nil || ch == nil {
+		return nil
+	}
+
+	return &Chassis{
+		Vendor:          ch.Vendor,
+		Type:            ch.Type,
+		TypeDescription: ch.TypeDescription,
+		Version:         ch.Version,
+		SerialNumber:    ch.SerialNumber,
+		AssetTag:        ch.AssetTag,
+	}
+}
+
+func readProduct() *Product {
+	p, err := productFn()
+	if err != nil || p == nil {
+		return nil
+	}
+
+	return &Product{
+		VendorName:   p.Vendor,
+		Name:         p.Name,
+		Family:       p.Family,
+		Version:      p.Version,
+		SerialNumber: p.SerialNumber,
+		UUID:         p.UUID,
+		SKU:          p.SKU,
+	}
 }

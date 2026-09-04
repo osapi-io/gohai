@@ -176,7 +176,7 @@ func (s *HardwarePublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
 		{"debian dispatches to Linux", "debian", "linux"},
 		{"unknown dispatches to Linux", "", "linux"},
 	}
@@ -189,12 +189,14 @@ func (s *HardwarePublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*hardware.Darwin)
 				s.True(ok)
 			case "linux":
 				_, ok := c.(*hardware.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -209,7 +211,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "darwin: happy path Apple Silicon + APFS + battery + charger",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(
 					t,
@@ -260,9 +262,17 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: Intel Mac populates cpu_type/packages",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
-				return hwExec(t, []byte(hwJSONIntel), []byte(`{}`), []byte(`{}`), nil, nil, nil)
+				return hwExec(
+					t,
+					[]byte(hwJSONIntel),
+					[]byte(emptyJSON),
+					[]byte(emptyJSON),
+					nil,
+					nil,
+					nil,
+				)
 			},
 			validate: func(info *hardware.Info) {
 				s.Equal("Intel Core i7", info.CPUType)
@@ -277,7 +287,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: all three calls fail → empty Info",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(t, nil, nil, nil,
 					errors.New("no"), errors.New("no"), errors.New("no"))
@@ -291,9 +301,17 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: malformed hardware JSON tolerated",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
-				return hwExec(t, []byte("not json"), []byte(`{}`), []byte(`{}`), nil, nil, nil)
+				return hwExec(
+					t,
+					[]byte("not json"),
+					[]byte(emptyJSON),
+					[]byte(emptyJSON),
+					nil,
+					nil,
+					nil,
+				)
 			},
 			validate: func(info *hardware.Info) {
 				s.Empty(info.MachineModel)
@@ -301,13 +319,13 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: empty SPHardwareDataType items array tolerated",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(
 					t,
 					[]byte(`{"SPHardwareDataType": []}`),
-					[]byte(`{}`),
-					[]byte(`{}`),
+					[]byte(emptyJSON),
+					[]byte(emptyJSON),
 					nil,
 					nil,
 					nil,
@@ -319,15 +337,15 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: storage without CoreStorage (modern APFS only)",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(
 					t,
-					[]byte(`{}`),
+					[]byte(emptyJSON),
 					[]byte(
 						`{"SPStorageDataType": [{"_name": "Data", "bsd_name": "disk2", "size_in_bytes": 1000}]}`,
 					),
-					[]byte(`{}`),
+					[]byte(emptyJSON),
 					nil,
 					nil,
 					nil,
@@ -342,9 +360,17 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: malformed storage JSON tolerated",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
-				return hwExec(t, []byte(`{}`), []byte("not json"), []byte(`{}`), nil, nil, nil)
+				return hwExec(
+					t,
+					[]byte(emptyJSON),
+					[]byte("not json"),
+					[]byte(emptyJSON),
+					nil,
+					nil,
+					nil,
+				)
 			},
 			validate: func(info *hardware.Info) {
 				s.Empty(info.Storage)
@@ -352,9 +378,17 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: malformed power JSON tolerated",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
-				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte("not json"), nil, nil, nil)
+				return hwExec(
+					t,
+					[]byte(emptyJSON),
+					[]byte(emptyJSON),
+					[]byte("not json"),
+					nil,
+					nil,
+					nil,
+				)
 			},
 			validate: func(info *hardware.Info) {
 				s.Nil(info.Battery)
@@ -362,10 +396,24 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: max_capacity zero → remaining stays 0",
-			variant: "darwin",
+			// system_profiler is free-form JSON: an item whose _name is
+			// not a string names nothing this can dispatch on.
+			name:    "darwin: power item with a non-string _name is skipped",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
-				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte(`{
+				return hwExec(t, []byte(emptyJSON), []byte(emptyJSON), []byte(`{
+                    "SPPowerDataType": [{"_name": 42}]
+                }`), nil, nil, nil)
+			},
+			validate: func(info *hardware.Info) {
+				s.Nil(info.Battery)
+			},
+		},
+		{
+			name:    "darwin: max_capacity zero → remaining stays 0",
+			variant: osDarwin,
+			exec: func(t *testing.T) executor.Executor {
+				return hwExec(t, []byte(emptyJSON), []byte(emptyJSON), []byte(`{
                     "SPPowerDataType": [{
                         "_name": "spbattery_information",
                         "sppower_battery_charge_info": {
@@ -382,7 +430,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: nil Exec yields empty",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			validate: func(info *hardware.Info) {
 				s.Empty(info.MachineModel)
@@ -390,13 +438,13 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: int-as-string fields parse correctly",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(
 					t,
 					[]byte(`{"SPHardwareDataType": [{"packages": "4"}]}`),
-					[]byte(`{}`),
-					[]byte(`{}`),
+					[]byte(emptyJSON),
+					[]byte(emptyJSON),
 					nil,
 					nil,
 					nil,
@@ -408,11 +456,11 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: battery ints and booleans in odd JSON shapes",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				// cycle_count as string, amperage missing entirely,
 				// fully_charged as native bool, is_charging as "yes".
-				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte(`{
+				return hwExec(t, []byte(emptyJSON), []byte(emptyJSON), []byte(`{
                     "SPPowerDataType": [{
                         "_name": "spbattery_information",
                         "sppower_battery_charge_info": {
@@ -436,9 +484,9 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: battery unparseable string cycle count leaves zero",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
-				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte(`{
+				return hwExec(t, []byte(emptyJSON), []byte(emptyJSON), []byte(`{
                     "SPPowerDataType": [{
                         "_name": "spbattery_information",
                         "sppower_battery_health_info": {
@@ -454,13 +502,13 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: number_processors as float parses to string",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(
 					t,
 					[]byte(`{"SPHardwareDataType": [{"number_processors": 8}]}`),
-					[]byte(`{}`),
-					[]byte(`{}`),
+					[]byte(emptyJSON),
+					[]byte(emptyJSON),
 					nil,
 					nil,
 					nil,
@@ -486,10 +534,12 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c hardware.Collector
 			switch tt.variant {
-			case "darwin":
+			case osDarwin:
 				c = &hardware.Darwin{Exec: tt.exec(s.T())}
 			case "linux":
 				c = &hardware.Linux{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

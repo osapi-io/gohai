@@ -41,6 +41,13 @@ type Linux struct {
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
+// dpkg-query reports name, version, arch and status; rpm reports the
+// first three.
+const (
+	dpkgFields = 4
+	rpmFields  = 3
+)
+
 func NewLinux() *Linux {
 	return &Linux{Exec: executor.New()}
 }
@@ -80,7 +87,7 @@ func collectDpkg(
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
 	for sc.Scan() {
 		parts := strings.Split(sc.Text(), "\t")
-		if len(parts) < 4 {
+		if len(parts) < dpkgFields {
 			continue
 		}
 		name, version, arch, status := parts[0], parts[1], parts[2], strings.TrimSpace(parts[3])
@@ -112,7 +119,7 @@ func collectRPM(
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
 	for sc.Scan() {
 		parts := strings.Split(sc.Text(), "\t")
-		if len(parts) < 3 {
+		if len(parts) < rpmFields {
 			continue
 		}
 		name, version, arch := parts[0], parts[1], strings.TrimSpace(parts[2])

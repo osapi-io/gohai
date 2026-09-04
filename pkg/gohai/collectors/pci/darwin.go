@@ -41,7 +41,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns an empty Info on macOS.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

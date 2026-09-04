@@ -60,6 +60,9 @@ type Collector interface {
 type base struct{}
 
 // Name returns "libvirt".
+// virsh list reports id, name and state.
+const domainFields = 3
+
 func (base) Name() string { return "libvirt" }
 
 // Category returns "virtualization".
@@ -97,22 +100,36 @@ func parseVirshVersion(
 	output []byte,
 ) string {
 	var libraryVer string
+
 	sc := bufio.NewScanner(strings.NewReader(string(output)))
 	for sc.Scan() {
 		line := sc.Text()
+
+		// The daemon's own version wins, and ends the search.
 		if after, ok := strings.CutPrefix(line, "Running against daemon:"); ok {
 			return strings.TrimSpace(after)
 		}
+
 		if after, ok := strings.CutPrefix(line, "Using library:"); ok {
-			v := strings.TrimSpace(after)
-			if after2, ok2 := strings.CutPrefix(v, "libvirt "); ok2 {
-				libraryVer = strings.TrimSpace(after2)
-			} else {
-				libraryVer = v
-			}
+			libraryVer = trimLibvirtPrefix(after)
 		}
 	}
+
 	return libraryVer
+}
+
+// trimLibvirtPrefix drops the "libvirt " that the library line carries
+// and the version line does not.
+func trimLibvirtPrefix(
+	s string,
+) string {
+	v := strings.TrimSpace(s)
+
+	if after, ok := strings.CutPrefix(v, "libvirt "); ok {
+		return strings.TrimSpace(after)
+	}
+
+	return v
 }
 
 // parseVirshURI extracts the connection URI from `virsh uri` output (a single
@@ -142,7 +159,7 @@ func parseVirshList(
 		line := sc.Text()
 		fields := strings.Fields(line)
 		// A valid data row has at least 3 fields: id, name, state (possibly multi-word).
-		if len(fields) < 3 {
+		if len(fields) < domainFields {
 			continue
 		}
 		// Skip the header line — first field is "Id".
@@ -179,24 +196,33 @@ func parseVirshDominfo(
 ) {
 	sc := bufio.NewScanner(strings.NewReader(string(output)))
 	for sc.Scan() {
-		line := sc.Text()
-		i := strings.Index(line, ":")
-		if i < 0 {
+		key, val, ok := strings.Cut(sc.Text(), ":")
+		if !ok {
 			continue
 		}
-		key := strings.TrimSpace(line[:i])
-		val := strings.TrimSpace(line[i+1:])
-		switch key {
-		case "UUID":
-			d.UUID = val
-		case "CPU(s)":
-			if n, err := strconv.Atoi(strings.Fields(val)[0]); err == nil {
-				d.VCPUs = n
-			}
-		case "Max memory":
-			d.MaxMemory = val
-		case "Autostart":
-			d.Autostart = val == "enable"
+
+		setDominfoField(d, strings.TrimSpace(key), strings.TrimSpace(val))
+	}
+}
+
+// setDominfoField files one "key: value" line of virsh dominfo output.
+func setDominfoField(
+	d *Domain,
+	key string,
+	val string,
+) {
+	switch key {
+	case "UUID":
+		d.UUID = val
+	case "CPU(s)":
+		if n, err := strconv.Atoi(strings.Fields(val)[0]); err == nil {
+			d.VCPUs = n
 		}
+	case "Max memory":
+		d.MaxMemory = val
+	case "Autostart":
+		d.Autostart = val == "enable"
+	default:
+		// A key this collector does not report.
 	}
 }

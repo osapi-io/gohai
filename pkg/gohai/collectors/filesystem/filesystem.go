@@ -152,6 +152,15 @@ type Collector interface {
 
 type base struct{}
 
+// zfs get -H reports name, property, value and source.
+const (
+	zfsFields = 4
+	zfsSource = 3
+)
+
+// pathSep separates the components of a dataset name.
+const pathSep = "/"
+
 func (base) Name() string           { return "filesystem" }
 func (base) Category() string       { return collector.CategoryHardware }
 func (base) DefaultEnabled() bool   { return true }
@@ -302,24 +311,40 @@ func readBtrfsInfo(
 	if _, err := fs.Stat(allocRoot); err != nil {
 		return nil
 	}
+
 	info := &BtrfsInfo{Allocation: map[string]BtrfsAllocation{}}
+
 	for _, bg := range btrfsBlockGroupTypes {
-		dir := allocRoot + "/" + bg
-		if _, err := fs.Stat(dir); err != nil {
-			continue
-		}
-		info.Allocation[bg] = BtrfsAllocation{
-			TotalBytes: readUint(fs, dir+"/total_bytes"),
-			BytesUsed:  readUint(fs, dir+"/bytes_used"),
-		}
-		if r := detectBtrfsRAID(fs, dir); r != "" {
-			info.RAID = r
-		}
+		readBtrfsBlockGroup(fs, allocRoot+pathSep+bg, bg, info)
 	}
+
 	if len(info.Allocation) == 0 && info.RAID == "" {
 		return nil
 	}
+
 	return info
+}
+
+// readBtrfsBlockGroup records one block group's usage, and the RAID
+// profile if this group names one.
+func readBtrfsBlockGroup(
+	fs avfs.VFS,
+	dir string,
+	bg string,
+	info *BtrfsInfo,
+) {
+	if _, err := fs.Stat(dir); err != nil {
+		return
+	}
+
+	info.Allocation[bg] = BtrfsAllocation{
+		TotalBytes: readUint(fs, dir+"/total_bytes"),
+		BytesUsed:  readUint(fs, dir+"/bytes_used"),
+	}
+
+	if r := detectBtrfsRAID(fs, dir); r != "" {
+		info.RAID = r
+	}
 }
 
 // btrfsRAIDProfiles is the full set of RAID profile subdirectory
@@ -340,7 +365,7 @@ func detectBtrfsRAID(
 	dir string,
 ) string {
 	for _, p := range btrfsRAIDProfiles {
-		if _, err := fs.Stat(dir + "/" + p); err == nil {
+		if _, err := fs.Stat(dir + pathSep + p); err == nil {
 			return p
 		}
 	}
@@ -386,36 +411,84 @@ func parseZFSGetAll(
 ) []ZFSDataset {
 	byName := map[string]*ZFSDataset{}
 	order := []string{}
+
 	for _, line := range strings.Split(string(raw), "\n") {
-		fields := strings.Split(strings.TrimRight(line, "\r"), "\t")
-		if len(fields) != 4 {
-			continue
-		}
-		name, property, value, source := fields[0], fields[1], fields[2], fields[3]
-		if name == "" || property == "" {
-			continue
-		}
-		ds, ok := byName[name]
+		row, ok := parseZFSRow(line)
 		if !ok {
-			ds = &ZFSDataset{
-				Name:       name,
-				Properties: map[string]ZFSProperty{},
-				IsPool:     !strings.Contains(name, "/"),
-				Parents:    zfsParentsOf(name),
-			}
-			byName[name] = ds
-			order = append(order, name)
+			continue
 		}
-		ds.Properties[property] = ZFSProperty{Value: value, Source: source}
-		if property == "mountpoint" && strings.HasPrefix(value, "/") {
-			ds.Mountpoint = value
+
+		ds, seen := byName[row.Name]
+		if !seen {
+			ds = newZFSDataset(row.Name)
+			byName[row.Name] = ds
+			order = append(order, row.Name)
 		}
+
+		addZFSProperty(ds, row)
 	}
+
 	out := make([]ZFSDataset, 0, len(order))
 	for _, n := range order {
 		out = append(out, *byName[n])
 	}
+
 	return out
+}
+
+// zfsRow is one row of `zfs get -H all`.
+type zfsRow struct {
+	Name     string
+	Property string
+	Value    string
+	Source   string
+}
+
+// parseZFSRow splits one row, rejecting anything that is not four
+// tab-separated fields naming a dataset and a property.
+func parseZFSRow(
+	line string,
+) (zfsRow, bool) {
+	fields := strings.Split(strings.TrimRight(line, "\r"), "\t")
+	if len(fields) != zfsFields || fields[0] == "" || fields[1] == "" {
+		return zfsRow{}, false
+	}
+
+	return zfsRow{
+		Name:     fields[0],
+		Property: fields[1],
+		Value:    fields[2],
+		Source:   fields[zfsSource],
+	}, true
+}
+
+// addZFSProperty records one property, and notes the mountpoint when
+// the dataset has a real one.
+func addZFSProperty(
+	ds *ZFSDataset,
+	row zfsRow,
+) {
+	ds.Properties[row.Property] = ZFSProperty{
+		Value:  row.Value,
+		Source: row.Source,
+	}
+
+	if row.Property == "mountpoint" && strings.HasPrefix(row.Value, pathSep) {
+		ds.Mountpoint = row.Value
+	}
+}
+
+// newZFSDataset starts a dataset record. A name with no slash in it is
+// the pool itself rather than a dataset within one.
+func newZFSDataset(
+	name string,
+) *ZFSDataset {
+	return &ZFSDataset{
+		Name:       name,
+		Properties: map[string]ZFSProperty{},
+		IsPool:     !strings.Contains(name, pathSep),
+		Parents:    zfsParentsOf(name),
+	}
 }
 
 // zfsParentsOf returns the proper-ancestor dataset paths of name,
@@ -424,13 +497,13 @@ func parseZFSGetAll(
 func zfsParentsOf(
 	name string,
 ) []string {
-	parts := strings.Split(name, "/")
+	parts := strings.Split(name, pathSep)
 	if len(parts) <= 1 {
 		return nil
 	}
 	out := make([]string, 0, len(parts)-1)
 	for i := 1; i < len(parts); i++ {
-		out = append(out, strings.Join(parts[:i], "/"))
+		out = append(out, strings.Join(parts[:i], pathSep))
 	}
 	return out
 }
@@ -447,26 +520,40 @@ func mergeLsblkIntoMounts(
 	for _, e := range entries {
 		byDevice[e.Device] = e
 	}
+
+	// Anything lsblk knows about a mounted device is copied onto it, and
+	// the device struck off the list.
 	for i, m := range mounts {
-		if e, ok := byDevice[m.Device]; ok {
-			mounts[i].UUID = e.UUID
-			mounts[i].Label = e.Label
-			mounts[i].PartUUID = e.PartUUID
-			mounts[i].PartLabel = e.PartLabel
-			delete(byDevice, m.Device)
+		e, ok := byDevice[m.Device]
+		if !ok {
+			continue
 		}
+
+		mounts[i].UUID = e.UUID
+		mounts[i].Label = e.Label
+		mounts[i].PartUUID = e.PartUUID
+		mounts[i].PartLabel = e.PartLabel
+
+		delete(byDevice, m.Device)
 	}
-	var unmounted []Filesystem
+
+	return mounts, unmountedFilesystems(entries, byDevice)
+}
+
+// unmountedFilesystems lists the devices no mount claimed. One that
+// lsblk says has a mountpoint is mounted but unobserved, not unmounted.
+func unmountedFilesystems(
+	entries []lsblkEntry,
+	remaining map[string]lsblkEntry,
+) []Filesystem {
+	var out []Filesystem
+
 	for _, e := range entries {
-		if _, still := byDevice[e.Device]; !still {
+		if _, still := remaining[e.Device]; !still || e.Mountpoint != "" {
 			continue
 		}
-		if e.Mountpoint != "" {
-			// mountpoint exists in lsblk but not in gopsutil's view;
-			// treat as mounted-but-unobserved rather than unmounted.
-			continue
-		}
-		unmounted = append(unmounted, Filesystem{
+
+		out = append(out, Filesystem{
 			Device:    e.Device,
 			Type:      e.Fstype,
 			UUID:      e.UUID,
@@ -475,5 +562,6 @@ func mergeLsblkIntoMounts(
 			PartLabel: e.PartLabel,
 		})
 	}
-	return mounts, unmounted
+
+	return out
 }

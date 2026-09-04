@@ -65,6 +65,9 @@ type Collector interface {
 type base struct{}
 
 // Name returns "interrupts".
+// In /proc/interrupts the trailing columns are type, vector, device.
+const irqDevice = 2
+
 func (base) Name() string { return "interrupts" }
 
 // Category returns "linux".
@@ -100,67 +103,83 @@ func parseInterrupts(
 ) (*Info, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(content))
 
-	// First line: "           CPU0       CPU1 ..."
+	// The first line names the CPUs: "           CPU0       CPU1 ..."
 	if !scanner.Scan() {
 		return &Info{IRQs: []IRQ{}}, nil
 	}
-	header := scanner.Text()
-	cpuCount := len(strings.Fields(header))
+
+	cpuCount := len(strings.Fields(scanner.Text()))
 
 	irqs := []IRQ{}
-	for scanner.Scan() {
-		line := scanner.Text()
 
-		colonIdx := strings.Index(line, ":")
-		if colonIdx < 0 {
+	for scanner.Scan() {
+		number, rest, ok := strings.Cut(scanner.Text(), ":")
+		if !ok {
 			continue
 		}
 
-		number := strings.TrimSpace(line[:colonIdx])
-		rest := line[colonIdx+1:]
-
+		number = strings.TrimSpace(number)
 		fields := strings.Fields(rest)
 
-		counts := make([]int64, cpuCount)
-		for i := range cpuCount {
-			if i < len(fields) {
-				v, err := strconv.ParseInt(fields[i], 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("parse interrupt count cpu%d irq %s: %w", i, number, err)
-				}
-				counts[i] = v
-			}
+		counts, err := irqCounts(fields, cpuCount, number)
+		if err != nil {
+			return nil, err
 		}
 
-		irq := IRQ{
-			Number:       number,
-			CountsPerCPU: counts,
-		}
-
-		// Fields after the CPU counts are type, optional vector, and device.
-		// For non-numeric IRQs the trailing content is just a type label.
-		// Guard against lines with fewer fields than cpuCount (e.g. ERR on
-		// a multi-CPU host that only reports one count).
-		extraStart := cpuCount
-		if extraStart > len(fields) {
-			extraStart = len(fields)
-		}
-		extra := fields[extraStart:]
-		isNumeric := isNumericIRQ(number)
-		if isNumeric && len(extra) >= 1 {
-			irq.Type = extra[0]
-			// extra[1] is the vector (skipped), extra[2:] joined is the device.
-			if len(extra) >= 3 {
-				irq.Device = strings.Join(extra[2:], " ")
-			}
-		} else if !isNumeric && len(extra) >= 1 {
-			irq.Type = strings.Join(extra, " ")
-		}
+		irq := IRQ{Number: number, CountsPerCPU: counts}
+		describeIRQ(&irq, fields, cpuCount)
 
 		irqs = append(irqs, irq)
 	}
 
 	return &Info{IRQs: irqs}, nil
+}
+
+// irqCounts reads one count per CPU. A line may carry fewer than there
+// are CPUs — ERR on a multi-CPU host reports one — and the rest stay zero.
+func irqCounts(
+	fields []string,
+	cpuCount int,
+	number string,
+) ([]int64, error) {
+	counts := make([]int64, cpuCount)
+
+	for i := range min(cpuCount, len(fields)) {
+		v, err := strconv.ParseInt(fields[i], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"parse interrupt count cpu%d irq %s: %w", i, number, err,
+			)
+		}
+
+		counts[i] = v
+	}
+
+	return counts, nil
+}
+
+// describeIRQ reads what follows the counts. A numbered IRQ reports a
+// type, a vector we skip, and a device; a named one reports only a label.
+func describeIRQ(
+	irq *IRQ,
+	fields []string,
+	cpuCount int,
+) {
+	extra := fields[min(cpuCount, len(fields)):]
+	if len(extra) == 0 {
+		return
+	}
+
+	if !isNumericIRQ(irq.Number) {
+		irq.Type = strings.Join(extra, " ")
+
+		return
+	}
+
+	irq.Type = extra[0]
+	if len(extra) > irqDevice {
+		irq.Device = strings.Join(extra[irqDevice:], " ")
+	}
 }
 
 // isNumericIRQ reports whether the IRQ number string is a decimal integer.

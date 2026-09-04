@@ -46,28 +46,43 @@ func NewLinux() *Linux {
 // Collect enumerates graphics cards. A ghw load error yields an empty
 // Info with no error — containers and minimal VMs routinely lack
 // /sys/class/drm and we shouldn't noisily fail for that.
-func (l *Linux) Collect(
+func (*Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{}
+
 	gi, err := ghwGPUFn()
 	if err != nil || gi == nil {
 		return info, nil
 	}
+
 	for _, c := range gi.GraphicsCards {
-		card := Card{Address: c.Address}
-		if c.DeviceInfo != nil {
-			if c.DeviceInfo.Vendor != nil {
-				card.Vendor = c.DeviceInfo.Vendor.Name
-				card.VendorID = c.DeviceInfo.Vendor.ID
-			}
-			if c.DeviceInfo.Product != nil {
-				card.Model = c.DeviceInfo.Product.Name
-				card.DeviceID = c.DeviceInfo.Product.ID
-			}
-		}
-		info.Cards = append(info.Cards, card)
+		info.Cards = append(info.Cards, graphicsCard(c))
 	}
+
 	return info, nil
+}
+
+// graphicsCard reads one card. A card whose PCI database lookup failed
+// carries only its address.
+func graphicsCard(
+	c *ghwgpu.GraphicsCard,
+) Card {
+	card := Card{Address: c.Address}
+	if c.DeviceInfo == nil {
+		return card
+	}
+
+	if v := c.DeviceInfo.Vendor; v != nil {
+		card.Vendor = v.Name
+		card.VendorID = v.ID
+	}
+
+	if p := c.DeviceInfo.Product; p != nil {
+		card.Model = p.Name
+		card.DeviceID = p.ID
+	}
+
+	return card
 }

@@ -81,12 +81,15 @@ const DefaultUserAgent = "gohai"
 // route cloud probes through a proxy and almost certainly fail).
 // The User-Agent header defaults to DefaultUserAgent; override with
 // WithHeader("User-Agent", "...") if needed.
+// pathSep is the separator every metadata path is built from.
+const pathSep = "/"
+
 func New(
 	baseURL string,
 	opts ...Option,
 ) *Client {
 	c := &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
+		baseURL: strings.TrimRight(baseURL, pathSep),
 		headers: map[string]string{"User-Agent": DefaultUserAgent},
 		httpClient: &http.Client{
 			Timeout: defaultTimeout,
@@ -161,8 +164,8 @@ func (c *Client) RawGet(
 	ctx context.Context,
 	path string,
 ) ([]byte, int, error) {
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
+	if !strings.HasPrefix(path, pathSep) {
+		path = pathSep + path
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
@@ -199,31 +202,51 @@ func (c *Client) Put(
 // missing, applies the Client's default headers plus any per-request
 // headers, runs the request, and returns the body for 2xx responses.
 // Transport failures and non-2xx responses wrap ErrNotAvailable.
+// newRequest builds the request, with the client's standing headers and
+// then whatever this call adds.
+func (c *Client) newRequest(
+	ctx context.Context,
+	method string,
+	path string,
+	extraHeaders map[string]string,
+) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+
+	for k, v := range c.headers {
+		req.Header.Set(k, v)
+	}
+
+	for k, v := range extraHeaders {
+		req.Header.Set(k, v)
+	}
+
+	return req, nil
+}
+
 func (c *Client) do(
 	ctx context.Context,
 	method string,
 	path string,
 	extraHeaders map[string]string,
 ) ([]byte, error) {
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
+	if !strings.HasPrefix(path, pathSep) {
+		path = pathSep + path
 	}
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, nil)
+	req, err := c.newRequest(ctx, method, path, extraHeaders)
 	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
+		return nil, err
 	}
-	for k, v := range c.headers {
-		req.Header.Set(k, v)
-	}
-	for k, v := range extraHeaders {
-		req.Header.Set(k, v)
-	}
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrNotAvailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode < http.StatusOK ||
+		resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, fmt.Errorf(
 			"%w: unexpected status %d from %s",
 			ErrNotAvailable,

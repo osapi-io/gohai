@@ -46,6 +46,21 @@ type Collector interface {
 
 type base struct{}
 
+// The roles a detected system can take, and the systems named often
+// enough here to be worth stating once.
+const (
+	roleHost  = "host"
+	roleGuest = "guest"
+
+	systemXen       = "xen"
+	systemKVM       = "kvm"
+	systemDocker    = "docker"
+	systemOpenStack = "openstack"
+)
+
+// cgroupFields is how many colon-separated parts a /proc/*/cgroup line has.
+const cgroupFields = 3
+
 func (base) Name() string         { return "virtualization" }
 func (base) Category() string     { return collector.CategoryVirtualization }
 func (base) DefaultEnabled() bool { return true }
@@ -72,14 +87,30 @@ func New() Collector {
 func addSystem(
 	info *Info,
 	name, role string,
-	force bool,
 ) {
 	if info.Systems == nil {
 		info.Systems = map[string]string{}
 	}
-	if _, exists := info.Systems[name]; !exists || force {
+
+	if _, exists := info.Systems[name]; !exists {
 		info.Systems[name] = role
 	}
+
+	info.System = name
+	info.Role = role
+}
+
+// overrideSystem records an authoritative detection — `.dockerenv` and
+// the like — replacing whatever an earlier layer claimed.
+func overrideSystem(
+	info *Info,
+	name, role string,
+) {
+	if info.Systems == nil {
+		info.Systems = map[string]string{}
+	}
+
+	info.Systems[name] = role
 	info.System = name
 	info.Role = role
 }

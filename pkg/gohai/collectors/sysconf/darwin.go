@@ -40,7 +40,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns the POSIX sysconf values on macOS.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

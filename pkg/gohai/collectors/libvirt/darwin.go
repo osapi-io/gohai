@@ -44,7 +44,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect always returns nil on macOS — libvirt is not supported on Darwin.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

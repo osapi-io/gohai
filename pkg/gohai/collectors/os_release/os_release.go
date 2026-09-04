@@ -78,51 +78,77 @@ func parseOSRelease(
 	content string,
 ) *Info {
 	info := &Info{Extra: map[string]string{}}
+
 	sc := bufio.NewScanner(strings.NewReader(content))
 	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+		key, val, ok := osReleaseField(sc.Text())
+		if !ok {
 			continue
 		}
-		i := strings.Index(line, "=")
-		if i < 0 {
-			continue
-		}
-		key := line[:i]
-		val := strings.Trim(line[i+1:], `"'`)
-		switch key {
-		case "ID":
-			info.ID = val
-		case "ID_LIKE":
-			info.IDLike = strings.Fields(val)
-		case "NAME":
-			info.Name = val
-		case "PRETTY_NAME":
-			info.PrettyName = val
-		case "VERSION":
-			info.Version = val
-		case "VERSION_ID":
-			info.VersionID = val
-		case "VERSION_CODENAME":
-			info.VersionCodename = val
-		case "BUILD_ID":
-			info.BuildID = val
-		case "VARIANT":
-			info.Variant = val
-		case "VARIANT_ID":
-			info.VariantID = val
-		case "HOME_URL":
-			info.HomeURL = val
-		case "SUPPORT_URL":
-			info.SupportURL = val
-		case "BUG_REPORT_URL":
-			info.BugReportURL = val
-		default:
+
+		if !setOSReleaseField(info, key, val) {
 			info.Extra[key] = val
 		}
 	}
+
 	if len(info.Extra) == 0 {
 		info.Extra = nil
 	}
+
 	return info
+}
+
+// osReleaseField splits one KEY="value" line, skipping blanks and
+// comments.
+func osReleaseField(
+	raw string,
+) (key string, val string, ok bool) {
+	line := strings.TrimSpace(raw)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return "", "", false
+	}
+
+	k, v, found := strings.Cut(line, "=")
+	if !found {
+		return "", "", false
+	}
+
+	return k, strings.Trim(v, `"'`), true
+}
+
+// setOSReleaseField files a key the Info struct has a home for,
+// reporting whether it did.
+func setOSReleaseField(
+	info *Info,
+	key string,
+	val string,
+) bool {
+	if key == "ID_LIKE" {
+		info.IDLike = strings.Fields(val)
+
+		return true
+	}
+
+	dst := map[string]*string{
+		"ID":               &info.ID,
+		"NAME":             &info.Name,
+		"PRETTY_NAME":      &info.PrettyName,
+		"VERSION":          &info.Version,
+		"VERSION_ID":       &info.VersionID,
+		"VERSION_CODENAME": &info.VersionCodename,
+		"BUILD_ID":         &info.BuildID,
+		"VARIANT":          &info.Variant,
+		"VARIANT_ID":       &info.VariantID,
+		"HOME_URL":         &info.HomeURL,
+		"SUPPORT_URL":      &info.SupportURL,
+		"BUG_REPORT_URL":   &info.BugReportURL,
+	}[key]
+
+	if dst == nil {
+		return false
+	}
+
+	*dst = val
+
+	return true
 }

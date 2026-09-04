@@ -24,7 +24,7 @@ package cpu
 
 import (
 	"context"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -291,105 +291,182 @@ func parseLscpu(
 	out []byte,
 ) lscpuSummary {
 	s := lscpuSummary{numaNodes: map[int][]int{}}
+
 	for _, raw := range strings.Split(string(out), "\n") {
-		line := strings.TrimSpace(raw)
-		if line == "" {
+		key, val, ok := lscpuField(raw)
+		if !ok {
 			continue
 		}
-		// key: value (value starts at first non-space after the colon)
-		i := strings.Index(line, ":")
-		if i < 0 {
-			continue
-		}
-		key := strings.TrimSpace(line[:i])
-		val := strings.TrimSpace(line[i+1:])
-		if val == "" {
-			continue
-		}
-		switch {
-		case key == "Architecture":
-			s.architecture = val
-			s.haveLscpuLayout = true
-		case key == "Socket(s)":
-			s.sockets = atoi(val)
-			s.haveLscpuLayout = true
-		case key == "Core(s) per socket", key == "Core(s) per cluster":
-			s.coresPerSocket = atoi(val)
-			s.haveLscpuLayout = true
-		case key == "Thread(s) per core":
-			s.threadsPerCore = atoi(val)
-			s.haveLscpuLayout = true
-		case key == "Socket(s) per book":
-			s.socketsPerBook = atoi(val)
-			s.haveLscpuLayout = true
-		case key == "Book(s) per drawer":
-			s.booksPerDrawer = atoi(val)
-			s.haveLscpuLayout = true
-		case key == "Drawer(s)":
-			s.drawers = atoi(val)
-			s.haveLscpuLayout = true
-		case key == "L1d cache":
-			s.caches.L1d = val
-		case key == "L1i cache":
-			s.caches.L1i = val
-		case key == "L2 cache":
-			s.caches.L2 = val
-		case key == "L2d cache":
-			s.caches.L2d = val
-		case key == "L2i cache":
-			s.caches.L2i = val
-		case key == "L3 cache":
-			s.caches.L3 = val
-		case key == "L4 cache":
-			s.caches.L4 = val
-		case key == "NUMA node(s)":
-			s.numaNodesCount = atoi(val)
-		case key == "On-line CPU(s) list":
-			s.cpusOnline = len(parseCPURange(val))
-		case key == "Off-line CPU(s) list":
-			s.cpusOffline = len(parseCPURange(val))
-		case key == "BIOS Vendor ID":
-			s.biosVendorID = val
-		case key == "BIOS Model name":
-			s.biosModelName = val
-		case key == "Machine type":
-			s.machineType = val
-		case key == "CPU max MHz":
-			s.mhzMax = val
-		case key == "CPU min MHz":
-			s.mhzMin = val
-		case key == "CPU dynamic MHz":
-			s.mhzDynamic = val
-		case key == "BogoMIPS":
-			s.bogomips = val
-		case key == "CPU op-mode(s)":
-			s.cpuOpmodes = splitCSV(val)
-		case key == "Byte Order":
-			s.byteOrder = strings.ToLower(val)
-		case key == "Address sizes":
-			s.addressSizes = splitCSV(val)
-		case key == "Virtualization":
-			s.virtualization = val
-		case key == "Virtualization type":
-			s.virtualizationType = val
-		case key == "Hypervisor vendor":
-			s.hypervisorVendor = val
-		case key == "Dispatching mode":
-			s.dispatchingMode = val
-		case strings.HasPrefix(key, "NUMA node") && strings.HasSuffix(key, "CPU(s)"):
-			// "NUMA node0 CPU(s)" → node 0
-			mid := strings.TrimPrefix(key, "NUMA node")
-			mid = strings.TrimSuffix(mid, " CPU(s)")
-			mid = strings.TrimSpace(mid)
-			if node, err := strconv.Atoi(mid); err == nil {
-				s.numaNodes[node] = parseCPURange(val)
-			}
-		}
+
+		s.set(key, val)
 	}
+
 	if len(s.numaNodes) == 0 {
 		s.numaNodes = nil
 	}
+
 	return s
+}
+
+// lscpuField splits one "key: value" line. A line without a colon, or
+// with nothing after it, carries nothing.
+func lscpuField(
+	raw string,
+) (key string, val string, ok bool) {
+	key, val, found := strings.Cut(strings.TrimSpace(raw), ":")
+	if !found {
+		return "", "", false
+	}
+
+	key, val = strings.TrimSpace(key), strings.TrimSpace(val)
+	if key == "" || val == "" {
+		return "", "", false
+	}
+
+	return key, val, true
+}
+
+// set files one lscpu field, trying each group of keys in turn.
+func (s *lscpuSummary) set(
+	key string,
+	val string,
+) {
+	if s.setLayout(key, val) {
+		return
+	}
+
+	if s.setCache(key, val) {
+		return
+	}
+
+	if s.setDerived(key, val) {
+		return
+	}
+
+	s.setNUMANode(key, val)
+}
+
+// setLayout records the topology. Any of these keys means lscpu
+// described a layout, which is what haveLscpuLayout records.
+func (s *lscpuSummary) setLayout(
+	key string,
+	val string,
+) bool {
+	switch key {
+	case "Architecture":
+		s.architecture = val
+	case "Socket(s)":
+		s.sockets = atoi(val)
+	case "Core(s) per socket", "Core(s) per cluster":
+		s.coresPerSocket = atoi(val)
+	case "Thread(s) per core":
+		s.threadsPerCore = atoi(val)
+	case "Socket(s) per book":
+		s.socketsPerBook = atoi(val)
+	case "Book(s) per drawer":
+		s.booksPerDrawer = atoi(val)
+	case "Drawer(s)":
+		s.drawers = atoi(val)
+	default:
+		return false
+	}
+
+	s.haveLscpuLayout = true
+
+	return true
+}
+
+// setCache records the cache sizes, which lscpu reports as free text.
+func (s *lscpuSummary) setCache(
+	key string,
+	val string,
+) bool {
+	switch key {
+	case "L1d cache":
+		s.caches.L1d = val
+	case "L1i cache":
+		s.caches.L1i = val
+	case "L2 cache":
+		s.caches.L2 = val
+	case "L2d cache":
+		s.caches.L2d = val
+	case "L2i cache":
+		s.caches.L2i = val
+	case "L3 cache":
+		s.caches.L3 = val
+	case "L4 cache":
+		s.caches.L4 = val
+	default:
+		return false
+	}
+
+	return true
+}
+
+// setDerived records the fields that need converting, then falls back to
+// the ones copied across as they are.
+func (s *lscpuSummary) setDerived(
+	key string,
+	val string,
+) bool {
+	switch key {
+	case "NUMA node(s)":
+		s.numaNodesCount = atoi(val)
+	case "On-line CPU(s) list":
+		s.cpusOnline = len(parseCPURange(val))
+	case "Off-line CPU(s) list":
+		s.cpusOffline = len(parseCPURange(val))
+	case "CPU op-mode(s)":
+		s.cpuOpmodes = splitCSV(val)
+	case "Address sizes":
+		s.addressSizes = splitCSV(val)
+	case "Byte Order":
+		s.byteOrder = strings.ToLower(val)
+	default:
+		p, ok := s.stringFields()[key]
+		if !ok {
+			return false
+		}
+
+		*p = val
+	}
+
+	return true
+}
+
+// stringFields are the lscpu keys whose values are kept verbatim.
+func (s *lscpuSummary) stringFields() map[string]*string {
+	return map[string]*string{
+		"BIOS Vendor ID":      &s.biosVendorID,
+		"BIOS Model name":     &s.biosModelName,
+		"Machine type":        &s.machineType,
+		"CPU max MHz":         &s.mhzMax,
+		"CPU min MHz":         &s.mhzMin,
+		"CPU dynamic MHz":     &s.mhzDynamic,
+		"BogoMIPS":            &s.bogomips,
+		"Virtualization":      &s.virtualization,
+		"Virtualization type": &s.virtualizationType,
+		"Hypervisor vendor":   &s.hypervisorVendor,
+		"Dispatching mode":    &s.dispatchingMode,
+	}
+}
+
+// setNUMANode records a per-node CPU list, whose key names the node:
+// "NUMA node0 CPU(s)" is node zero.
+func (s *lscpuSummary) setNUMANode(
+	key string,
+	val string,
+) {
+	if !strings.HasPrefix(key, "NUMA node") ||
+		!strings.HasSuffix(key, "CPU(s)") {
+		return
+	}
+
+	mid := strings.TrimSuffix(strings.TrimPrefix(key, "NUMA node"), " CPU(s)")
+
+	if node, err := strconv.Atoi(strings.TrimSpace(mid)); err == nil {
+		s.numaNodes[node] = parseCPURange(val)
+	}
 }
 
 // atoi is an error-suppressing Atoi for lscpu values that are
@@ -429,34 +506,61 @@ func parseCPURange(
 	v string,
 ) []int {
 	out := []int{}
+
 	for _, part := range strings.Split(v, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
-		if strings.Contains(part, "-") {
-			bounds := strings.SplitN(part, "-", 2)
-			lo, err1 := strconv.Atoi(strings.TrimSpace(bounds[0]))
-			hi, err2 := strconv.Atoi(strings.TrimSpace(bounds[1]))
-			if err1 != nil || err2 != nil || lo > hi {
-				return nil
-			}
-			for i := lo; i <= hi; i++ {
-				out = append(out, i)
-			}
-			continue
-		}
-		n, err := strconv.Atoi(part)
-		if err != nil {
+
+		got, ok := parseCPUPart(part)
+		if !ok {
 			return nil
 		}
-		out = append(out, n)
+
+		out = append(out, got...)
 	}
+
 	if len(out) == 0 {
 		return nil
 	}
-	sort.Ints(out)
+
+	slices.Sort(out)
+
 	return out
+}
+
+// parseCPUPart reads one comma-separated element, which is either a
+// single CPU number or an inclusive "lo-hi" range.
+func parseCPUPart(
+	part string,
+) ([]int, bool) {
+	lo, hi, isRange := strings.Cut(part, "-")
+	if !isRange {
+		n, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, false
+		}
+
+		return []int{n}, true
+	}
+
+	from, err := strconv.Atoi(strings.TrimSpace(lo))
+	if err != nil {
+		return nil, false
+	}
+
+	to, err := strconv.Atoi(strings.TrimSpace(hi))
+	if err != nil || from > to {
+		return nil, false
+	}
+
+	out := make([]int, 0, to-from+1)
+	for i := from; i <= to; i++ {
+		out = append(out, i)
+	}
+
+	return out, true
 }
 
 // applyLscpuToInfo merges a parsed lscpu summary into the Info built
@@ -468,22 +572,8 @@ func applyLscpuToInfo(
 	info *Info,
 	s lscpuSummary,
 ) {
-	if s.caches != (Caches{}) {
-		c := s.caches
-		info.Caches = &c
-	}
-	if len(s.numaNodes) > 0 {
-		info.NumaNodes = s.numaNodes
-	}
-	if s.numaNodesCount > 0 {
-		info.NumaNodesCount = s.numaNodesCount
-	}
-	if s.cpusOnline > 0 {
-		info.Online = s.cpusOnline
-	}
-	if s.cpusOffline > 0 {
-		info.Offline = s.cpusOffline
-	}
+	applyLscpuOptional(info, s)
+
 	info.BIOSVendorID = s.biosVendorID
 	info.BIOSModelName = s.biosModelName
 	info.MachineType = s.machineType
@@ -498,45 +588,80 @@ func applyLscpuToInfo(
 	info.VirtualizationType = s.virtualizationType
 	info.HypervisorVendor = s.hypervisorVendor
 	info.DispatchingMode = s.dispatchingMode
+
 	if !s.haveLscpuLayout {
 		return
 	}
+
+	applyLscpuLayout(info, s)
+}
+
+// applyLscpuOptional copies the fields that are only set when lscpu
+// reported something, so a zero does not overwrite another source.
+func applyLscpuOptional(
+	info *Info,
+	s lscpuSummary,
+) {
+	if s.caches != (Caches{}) {
+		c := s.caches
+		info.Caches = &c
+	}
+
+	if len(s.numaNodes) > 0 {
+		info.NumaNodes = s.numaNodes
+	}
+
+	if s.numaNodesCount > 0 {
+		info.NumaNodesCount = s.numaNodesCount
+	}
+
+	if s.cpusOnline > 0 {
+		info.Online = s.cpusOnline
+	}
+
+	if s.cpusOffline > 0 {
+		info.Offline = s.cpusOffline
+	}
+}
+
+// applyLscpuLayout derives the CPU counts. Two architectures describe
+// their topology differently enough to need their own arithmetic;
+// everywhere else the generic path already computed it.
+func applyLscpuLayout(
+	info *Info,
+	s lscpuSummary,
+) {
+	var total, cores, sockets int
+
 	switch s.architecture {
 	case "s390x":
-		// total = sockets_per_book * cores_per_socket * threads_per_core * books_per_drawer * drawers
-		total := nonZero(s.socketsPerBook) *
-			nonZero(s.coresPerSocket) *
-			nonZero(s.threadsPerCore) *
-			nonZero(s.booksPerDrawer) *
-			nonZero(s.drawers)
-		cores := nonZero(s.socketsPerBook) *
+		// Drawers hold books, books hold sockets, and lscpu reports the
+		// nesting rather than a socket count.
+		sockets = s.socketsPerBook
+		cores = nonZero(s.socketsPerBook) *
 			nonZero(s.coresPerSocket) *
 			nonZero(s.booksPerDrawer) *
 			nonZero(s.drawers)
-		if total > 0 {
-			info.Count = total
-		}
-		if cores > 0 {
-			info.Cores = cores
-		}
-		if s.socketsPerBook > 0 {
-			info.Sockets = s.socketsPerBook
-		}
+		total = cores * nonZero(s.threadsPerCore)
 	case "ppc64le":
-		// total = sockets * cores_per_socket * threads_per_core
-		total := nonZero(s.sockets) *
-			nonZero(s.coresPerSocket) *
-			nonZero(s.threadsPerCore)
-		cores := nonZero(s.sockets) * nonZero(s.coresPerSocket)
-		if total > 0 {
-			info.Count = total
-		}
-		if cores > 0 {
-			info.Cores = cores
-		}
-		if s.sockets > 0 {
-			info.Sockets = s.sockets
-		}
+		sockets = s.sockets
+		cores = nonZero(s.sockets) * nonZero(s.coresPerSocket)
+		total = cores * nonZero(s.threadsPerCore)
+	default:
+		// Every other architecture reports a usable socket count.
+		return
+	}
+
+	if total > 0 {
+		info.Count = total
+	}
+
+	if cores > 0 {
+		info.Cores = cores
+	}
+
+	if sockets > 0 {
+		info.Sockets = sockets
 	}
 }
 

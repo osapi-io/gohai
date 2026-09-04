@@ -57,11 +57,11 @@ func (s *DiskPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -72,12 +72,14 @@ func (s *DiskPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*disk.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*disk.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -93,7 +95,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: sda snapshot",
-			variant: "linux",
+			variant: osLinux,
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return map[string]gpdisk.IOCountersStat{
 					"sda": {
@@ -109,7 +111,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: empty devices",
-			variant: "linux",
+			variant: osLinux,
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return map[string]gpdisk.IOCountersStat{}, nil
 			},
@@ -117,7 +119,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: gopsutil error propagated",
-			variant: "linux",
+			variant: osLinux,
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return nil, errors.New("boom")
 			},
@@ -125,7 +127,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: disk0 snapshot",
-			variant: "darwin",
+			variant: osDarwin,
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return map[string]gpdisk.IOCountersStat{
 					"disk0": {Name: "disk0", ReadCount: 200, WriteCount: 100},
@@ -135,7 +137,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: iokit error propagated",
-			variant: "darwin",
+			variant: osDarwin,
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return nil, errors.New("iokit unavailable")
 			},
@@ -147,10 +149,12 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			defer disk.SetIOCountersFn(tt.fn)()
 			var c disk.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &disk.Linux{}
-			case "darwin":
+			case osDarwin:
 				c = &disk.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

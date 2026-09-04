@@ -64,6 +64,12 @@ type Collector interface {
 
 type base struct{}
 
+// loginctl reports SESSION UID USER, and SEAT when the session has one.
+const (
+	sessionFields = 3
+	sessionSeat   = 3
+)
+
 func (base) Name() string     { return "sessions" }
 func (base) Category() string { return collector.CategoryUsers }
 
@@ -117,7 +123,7 @@ func parseLoginctlSessions(
 	sc := bufio.NewScanner(strings.NewReader(string(raw)))
 	for sc.Scan() {
 		fields := strings.Fields(sc.Text())
-		if len(fields) < 3 {
+		if len(fields) < sessionFields {
 			continue
 		}
 		s := Session{
@@ -125,8 +131,8 @@ func parseLoginctlSessions(
 			UID:       fields[1],
 			User:      fields[2],
 		}
-		if len(fields) >= 4 {
-			s.Seat = fields[3]
+		if len(fields) > sessionSeat {
+			s.Seat = fields[sessionSeat]
 		}
 		out = append(out, s)
 	}

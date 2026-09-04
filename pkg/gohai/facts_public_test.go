@@ -47,7 +47,7 @@ func (s *FactsPublicTestSuite) SetupTest() {
 	s.facts = &gohai.Facts{
 		Platform: &platform.Info{
 			OS:              "linux",
-			Name:            "ubuntu",
+			Name:            platformUbuntu,
 			Version:         "24.04",
 			Family:          "debian",
 			CPUArchitecture: "amd64",
@@ -128,7 +128,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 			check: func(f *gohai.Facts) {
 				s.Require().NotNil(f.Platform)
 				s.Equal("linux", f.Platform.OS)
-				s.Equal("ubuntu", f.Platform.Name)
+				s.Equal(platformUbuntu, f.Platform.Name)
 				s.Equal("24.04", f.Platform.Version)
 				s.Equal("debian", f.Platform.Family)
 				s.Equal("amd64", f.Platform.CPUArchitecture)
@@ -191,7 +191,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 
 func (s *FactsPublicTestSuite) TestFlat() {
 	flat := s.facts.Flat()
-	s.Equal("ubuntu", flat["platform.name"])
+	s.Equal(platformUbuntu, flat["platform.name"])
 	s.Equal("24.04", flat["platform.version"])
 	s.EqualValues(8, flat["cpu.count"])
 }
@@ -201,7 +201,7 @@ func (s *FactsPublicTestSuite) TestGet() {
 		path string
 		want any
 	}{
-		{"platform.name", "ubuntu"},
+		{"platform.name", platformUbuntu},
 		{"cpu.count", float64(8)},
 		{"missing", nil},
 	}

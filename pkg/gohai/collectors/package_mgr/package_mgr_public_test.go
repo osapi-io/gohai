@@ -56,13 +56,13 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 	tests := []struct {
 		name     string
 		detect   string
-		wantKind string // "linux"|"darwin"|"debian"|"rhel"
+		wantKind string // osLinux|osDarwin|platformDebian|platformRHEL
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Debian", "debian", "debian"},
-		{"rhel dispatches to RHEL", "rhel", "rhel"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Debian", platformDebian, platformDebian},
+		{"rhel dispatches to RHEL", platformRHEL, platformRHEL},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -73,18 +73,20 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*packagemgr.Darwin)
 				s.True(ok)
-			case "debian":
+			case platformDebian:
 				_, ok := c.(*packagemgr.Debian)
 				s.True(ok)
-			case "rhel":
+			case platformRHEL:
 				_, ok := c.(*packagemgr.RHEL)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*packagemgr.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -93,68 +95,68 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 func (s *PackageMgrPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name     string
-		variant  string // "linux" | "darwin" | "debian" | "rhel"
+		variant  string // osLinux | osDarwin | platformDebian | platformRHEL
 		probed   map[string]string
 		wantName string
 		wantPath string
 	}{
 		{
 			"debian with apt",
-			"debian",
+			platformDebian,
 			map[string]string{"apt": "/usr/bin/apt"},
 			"apt",
 			"/usr/bin/apt",
 		},
 		{
 			"debian with apt-get only",
-			"debian",
+			platformDebian,
 			map[string]string{"apt-get": "/usr/bin/apt-get"},
 			"apt-get",
 			"/usr/bin/apt-get",
 		},
 		{
 			"rhel with dnf wins over yum",
-			"rhel",
+			platformRHEL,
 			map[string]string{"dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum"},
 			"dnf",
 			"/usr/bin/dnf",
 		},
 		{
 			"rhel yum fallback",
-			"rhel",
+			platformRHEL,
 			map[string]string{"yum": "/usr/bin/yum"},
 			"yum",
 			"/usr/bin/yum",
 		},
 		{
 			"darwin brew",
-			"darwin",
+			osDarwin,
 			map[string]string{"brew": "/opt/homebrew/bin/brew"},
 			"brew",
 			"/opt/homebrew/bin/brew",
 		},
 		{
 			"darwin port fallback",
-			"darwin",
+			osDarwin,
 			map[string]string{"port": "/opt/local/bin/port"},
 			"port",
 			"/opt/local/bin/port",
 		},
 		{
 			"linux arch with pacman",
-			"linux",
+			osLinux,
 			map[string]string{"pacman": "/usr/bin/pacman"},
 			"pacman",
 			"/usr/bin/pacman",
 		},
 		{
 			"linux alpine with apk",
-			"linux",
+			osLinux,
 			map[string]string{"apk": "/sbin/apk"},
 			"apk",
 			"/sbin/apk",
 		},
-		{"none found returns empty", "linux", map[string]string{}, "", ""},
+		{"none found returns empty", osLinux, map[string]string{}, "", ""},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -167,14 +169,16 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			var got any
 			var err error
 			switch tt.variant {
-			case "debian":
+			case platformDebian:
 				got, err = (&packagemgr.Debian{}).Collect(context.Background(), nil)
-			case "rhel":
+			case platformRHEL:
 				got, err = (&packagemgr.RHEL{}).Collect(context.Background(), nil)
-			case "darwin":
+			case osDarwin:
 				got, err = (&packagemgr.Darwin{}).Collect(context.Background(), nil)
-			case "linux":
+			case osLinux:
 				got, err = (&packagemgr.Linux{}).Collect(context.Background(), nil)
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			s.Require().NoError(err)
 			info, ok := got.(*packagemgr.Info)

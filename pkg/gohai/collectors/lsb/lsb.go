@@ -84,6 +84,8 @@ func parseLsbReleaseCLI(
 			info.Codename = val
 		case "Description":
 			info.Description = val
+		default:
+			// A key this collector does not report.
 		}
 	}
 	return info

@@ -43,7 +43,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns an empty Info — macOS has no SMBIOS/DMI surface.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

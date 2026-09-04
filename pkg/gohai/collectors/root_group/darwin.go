@@ -40,7 +40,7 @@ func NewDarwin() *Darwin {
 // Collect performs the two-hop lookup. macOS and BSD set root's primary
 // group to "wheel"; we don't special-case the name — whatever the OS
 // reports is what we ship.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

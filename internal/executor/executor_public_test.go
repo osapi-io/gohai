@@ -38,6 +38,9 @@ import (
 func TestMain(
 	m *testing.M,
 ) {
+	// This binary doubles as the fake subprocess the executor runs, so
+	// these two exits are the point of the branch, not a redundancy.
+	//nolint:revive // redundant-test-main-exit
 	if out := os.Getenv("GOHAI_EXECUTOR_TEST_OUT"); out != "" {
 		fmt.Print(out)
 		if os.Getenv("GOHAI_EXECUTOR_TEST_EXIT") == "1" {
@@ -45,7 +48,7 @@ func TestMain(
 		}
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	m.Run()
 }
 
 type ExecutorPublicTestSuite struct {

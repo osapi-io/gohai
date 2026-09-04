@@ -58,11 +58,11 @@ func (s *SysconfPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -73,12 +73,14 @@ func (s *SysconfPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*sysconf.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*sysconf.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -129,7 +131,7 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: all values returned",
-			variant: "linux",
+			variant: osLinux,
 			stub:    stubFn(100, 4096, 4, 4),
 			want: sysconf.Info{
 				ClkTck:          100,
@@ -140,31 +142,31 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: CLK_TCK error propagated",
-			variant: "linux",
+			variant: osLinux,
 			stub:    errorAt(0),
 			wantErr: true,
 		},
 		{
 			name:    "linux: PAGESIZE error propagated",
-			variant: "linux",
+			variant: osLinux,
 			stub:    errorAt(1),
 			wantErr: true,
 		},
 		{
 			name:    "linux: NPROCESSORS_CONF error propagated",
-			variant: "linux",
+			variant: osLinux,
 			stub:    errorAt(2),
 			wantErr: true,
 		},
 		{
 			name:    "linux: NPROCESSORS_ONLN error propagated",
-			variant: "linux",
+			variant: osLinux,
 			stub:    errorAt(3),
 			wantErr: true,
 		},
 		{
 			name:    "darwin: all values returned",
-			variant: "darwin",
+			variant: osDarwin,
 			stub:    stubFn(100, 16384, 8, 8),
 			want: sysconf.Info{
 				ClkTck:          100,
@@ -175,7 +177,7 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: CLK_TCK error propagated",
-			variant: "darwin",
+			variant: osDarwin,
 			stub:    errorAt(0),
 			wantErr: true,
 		},
@@ -187,10 +189,12 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 
 			var c sysconf.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = sysconf.NewLinux()
-			case "darwin":
+			case osDarwin:
 				c = sysconf.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

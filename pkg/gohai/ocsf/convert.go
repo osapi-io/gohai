@@ -22,6 +22,7 @@ package ocsf
 
 import (
 	"github.com/osapi-io/gohai/pkg/gohai"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 )
 
 const schemaVersion = "1.8.0"
@@ -30,6 +31,13 @@ const schemaVersion = "1.8.0"
 // inventory_info event (class_uid 5001). Standard OCSF attributes
 // map directly; gohai extension (uid 1337) attributes carry fields
 // OCSF doesn't yet cover.
+// OS type IDs as OCSF defines them.
+const (
+	osTypeWindows = 100
+	osTypeLinux   = 200
+	osTypeMacOS   = 300
+)
+
 func FromFacts(
 	f *gohai.Facts,
 ) *InventoryInfo {
@@ -58,10 +66,21 @@ func FromFacts(
 func buildDevice(
 	f *gohai.Facts,
 ) *Device {
-	d := &Device{
-		TypeID: 0,
-	}
+	d := &Device{TypeID: 0}
 
+	applyIdentity(d, f)
+	applyHardware(d, f)
+	applyNetworking(d, f)
+	applyRuntime(d, f)
+
+	return d
+}
+
+// applyIdentity copies what names the machine.
+func applyIdentity(
+	d *Device,
+	f *gohai.Facts,
+) {
 	if f.Hostname != nil {
 		d.Hostname = f.Hostname.Name
 		d.Domain = f.Hostname.Domain
@@ -75,18 +94,41 @@ func buildDevice(
 	if f.Platform != nil {
 		d.OS = buildOS(f)
 	}
+}
 
+// applyHardware copies the hardware description, which is assembled from
+// three collectors and reported only when at least one of them ran.
+func applyHardware(
+	d *Device,
+	f *gohai.Facts,
+) {
 	if f.CPU != nil || f.Memory != nil || f.DMI != nil {
 		d.HWInfo = buildHWInfo(f)
 	}
+}
 
-	if f.Network != nil {
-		d.NetworkInterfaces = buildNetworkInterfaces(f)
-		if f.Network.DefaultInterface != "" {
-			d.IP = findPrimaryIP(f)
-		}
+// applyNetworking copies the interfaces, and the address of the default
+// one as the device's own.
+func applyNetworking(
+	d *Device,
+	f *gohai.Facts,
+) {
+	if f.Network == nil {
+		return
 	}
 
+	d.NetworkInterfaces = buildNetworkInterfaces(f)
+
+	if f.Network.DefaultInterface != "" {
+		d.IP = findPrimaryIP(f)
+	}
+}
+
+// applyRuntime copies what the machine is doing rather than what it is.
+func applyRuntime(
+	d *Device,
+	f *gohai.Facts,
+) {
 	if f.Virtualization != nil {
 		d.Hypervisor = f.Virtualization.System
 		d.VirtRole = f.Virtualization.Role
@@ -106,8 +148,6 @@ func buildDevice(
 		d.TimezoneName = f.Timezone.Name
 		d.TimezoneOffset = f.Timezone.Offset
 	}
-
-	return d
 }
 
 func buildOS(
@@ -153,41 +193,64 @@ func buildHWInfo(
 ) *DeviceHWInfo {
 	hw := &DeviceHWInfo{}
 
-	if f.CPU != nil {
-		hw.CPUCount = f.CPU.Count
-		hw.CPUCores = f.CPU.Cores
-		hw.CPUType = f.CPU.ModelName
-		hw.CPUSpeed = f.CPU.Speed
-		hw.CPUSockets = f.CPU.Sockets
-		hw.CPUVendorID = f.CPU.VendorID
-		hw.CPUFamily = f.CPU.Family
-		hw.CPUModelID = f.CPU.ModelID
-		hw.CPUStepping = f.CPU.Stepping
-		hw.CPUFlags = f.CPU.Flags
-		hw.CPUVulnerabilities = f.CPU.Vulnerabilities
-	}
+	applyCPUInfo(hw, f)
 
 	if f.Memory != nil {
 		hw.RAMSize = f.Memory.Total
 	}
 
-	if f.DMI != nil {
-		if f.DMI.BIOS != nil {
-			hw.BIOSManufacturer = f.DMI.BIOS.Manufacturer
-			hw.BIOSVer = f.DMI.BIOS.Ver
-			hw.BIOSDate = f.DMI.BIOS.Date
-		}
-		if f.DMI.Product != nil {
-			hw.SerialNumber = f.DMI.Product.SerialNumber
-			hw.UUID = f.DMI.Product.UUID
-			hw.VendorName = f.DMI.Product.VendorName
-		}
-		if f.DMI.Chassis != nil {
-			hw.Chassis = f.DMI.Chassis.Type
-		}
-	}
+	applyDMIInfo(hw, f)
 
 	return hw
+}
+
+// applyCPUInfo copies what the cpu collector reported.
+func applyCPUInfo(
+	hw *DeviceHWInfo,
+	f *gohai.Facts,
+) {
+	if f.CPU == nil {
+		return
+	}
+
+	hw.CPUCount = f.CPU.Count
+	hw.CPUCores = f.CPU.Cores
+	hw.CPUType = f.CPU.ModelName
+	hw.CPUSpeed = f.CPU.Speed
+	hw.CPUSockets = f.CPU.Sockets
+	hw.CPUVendorID = f.CPU.VendorID
+	hw.CPUFamily = f.CPU.Family
+	hw.CPUModelID = f.CPU.ModelID
+	hw.CPUStepping = f.CPU.Stepping
+	hw.CPUFlags = f.CPU.Flags
+	hw.CPUVulnerabilities = f.CPU.Vulnerabilities
+}
+
+// applyDMIInfo copies the firmware and chassis description. Each of the
+// three groups is reported independently by the machine.
+func applyDMIInfo(
+	hw *DeviceHWInfo,
+	f *gohai.Facts,
+) {
+	if f.DMI == nil {
+		return
+	}
+
+	if b := f.DMI.BIOS; b != nil {
+		hw.BIOSManufacturer = b.Manufacturer
+		hw.BIOSVer = b.Ver
+		hw.BIOSDate = b.Date
+	}
+
+	if p := f.DMI.Product; p != nil {
+		hw.SerialNumber = p.SerialNumber
+		hw.UUID = p.UUID
+		hw.VendorName = p.VendorName
+	}
+
+	if c := f.DMI.Chassis; c != nil {
+		hw.Chassis = c.Type
+	}
 }
 
 func buildNetworkInterfaces(
@@ -225,75 +288,91 @@ func buildNetworkInterfaces(
 func buildCloud(
 	f *gohai.Facts,
 ) *Cloud {
-	c := &Cloud{}
-	found := false
-
-	if f.Ec2 != nil {
-		found = true
-		c.Provider = "AWS"
-		c.Region = f.Ec2.Region
-		c.Zone = f.Ec2.Zone
-		c.Account = &Account{UID: f.Ec2.AccountUID}
-		c.CloudPartition = f.Ec2.CloudPartition
-	} else if f.Gce != nil {
-		found = true
-		c.Provider = "GCP"
-		c.Region = f.Gce.Region
-		c.Zone = f.Gce.Zone
-		c.ProjectUID = f.Gce.ProjectUID
-	} else if f.Azure != nil {
-		found = true
-		c.Provider = "Azure"
-		c.Region = f.Azure.Region
-		c.Zone = f.Azure.Zone
-		c.Account = &Account{UID: f.Azure.AccountUID}
-		c.CloudPartition = f.Azure.CloudPartition
-	} else if f.OCI != nil {
-		found = true
-		c.Provider = "OCI"
-		c.Region = f.OCI.Region
-		c.Zone = f.OCI.Zone
-		c.Account = &Account{UID: f.OCI.AccountUID}
-	} else if f.Alibaba != nil {
-		found = true
-		c.Provider = "Alibaba Cloud"
-		c.Region = f.Alibaba.Region
-		c.Zone = f.Alibaba.Zone
-		c.Account = &Account{UID: f.Alibaba.AccountUID}
-	} else if f.DigitalOcean != nil {
-		found = true
-		c.Provider = "DigitalOcean"
-		c.Region = f.DigitalOcean.Region
-	} else if f.OpenStack != nil {
-		found = true
-		c.Provider = "OpenStack"
-		c.Zone = f.OpenStack.Zone
-		c.ProjectUID = f.OpenStack.ProjectUID
-	} else if f.Scaleway != nil {
-		found = true
-		c.Provider = "Scaleway"
-		c.Zone = f.Scaleway.Zone
-		c.Account = &Account{UID: f.Scaleway.AccountUID}
-		c.ProjectUID = f.Scaleway.ProjectUID
-	}
-
-	if !found {
+	// The first provider that reported anything wins; a host is not on
+	// two clouds at once.
+	switch {
+	case f.Ec2 != nil:
+		return &Cloud{
+			Provider:       "AWS",
+			Region:         f.Ec2.Region,
+			Zone:           f.Ec2.Zone,
+			Account:        &Account{UID: f.Ec2.AccountUID},
+			CloudPartition: f.Ec2.CloudPartition,
+		}
+	case f.Gce != nil:
+		return &Cloud{
+			Provider:   "GCP",
+			Region:     f.Gce.Region,
+			Zone:       f.Gce.Zone,
+			ProjectUID: f.Gce.ProjectUID,
+		}
+	case f.Azure != nil:
+		return &Cloud{
+			Provider:       "Azure",
+			Region:         f.Azure.Region,
+			Zone:           f.Azure.Zone,
+			Account:        &Account{UID: f.Azure.AccountUID},
+			CloudPartition: f.Azure.CloudPartition,
+		}
+	case f.OCI != nil:
+		return &Cloud{
+			Provider: "OCI",
+			Region:   f.OCI.Region,
+			Zone:     f.OCI.Zone,
+			Account:  &Account{UID: f.OCI.AccountUID},
+		}
+	case f.Alibaba != nil:
+		return &Cloud{
+			Provider: "Alibaba Cloud",
+			Region:   f.Alibaba.Region,
+			Zone:     f.Alibaba.Zone,
+			Account:  &Account{UID: f.Alibaba.AccountUID},
+		}
+	case f.DigitalOcean != nil:
+		return &Cloud{
+			Provider: "DigitalOcean",
+			Region:   f.DigitalOcean.Region,
+		}
+	case f.OpenStack != nil:
+		return &Cloud{
+			Provider:   "OpenStack",
+			Zone:       f.OpenStack.Zone,
+			ProjectUID: f.OpenStack.ProjectUID,
+		}
+	case f.Scaleway != nil:
+		return &Cloud{
+			Provider:   "Scaleway",
+			Zone:       f.Scaleway.Zone,
+			Account:    &Account{UID: f.Scaleway.AccountUID},
+			ProjectUID: f.Scaleway.ProjectUID,
+		}
+	default:
+		// Not on a cloud this collector recognises.
 		return nil
 	}
-
-	return c
 }
 
 func findPrimaryIP(
 	f *gohai.Facts,
 ) string {
 	for _, iface := range f.Network.Interfaces {
-		if iface.Name == f.Network.DefaultInterface {
-			for _, addr := range iface.Addresses {
-				if addr.Family == "inet" {
-					return addr.Addr
-				}
-			}
+		if iface.Name != f.Network.DefaultInterface {
+			continue
+		}
+
+		return firstIPv4Addr(iface.Addresses)
+	}
+
+	return ""
+}
+
+// firstIPv4Addr returns the first IPv4 address of an interface.
+func firstIPv4Addr(
+	addrs []network.Address,
+) string {
+	for _, addr := range addrs {
+		if addr.Family == "inet" {
+			return addr.Addr
 		}
 	}
 
@@ -305,11 +384,11 @@ func osTypeID(
 ) int {
 	switch osType {
 	case "linux":
-		return 200
+		return osTypeLinux
 	case "darwin":
-		return 300
+		return osTypeMacOS
 	case "windows":
-		return 100
+		return osTypeWindows
 	default:
 		return 0
 	}

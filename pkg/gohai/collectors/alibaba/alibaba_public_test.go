@@ -40,20 +40,20 @@ func aliPrior() collector.PriorResults {
 	}
 }
 
-// treeResponses mirrors Alibaba's metadata tree. Paths ending with "/"
+// treeResponses mirrors Alibaba's metadata tree. Paths ending with pathRoot
 // are directory listings (newline-separated children); others are
 // leaves. Matches what Ohai's fetch_metadata would encounter.
 var treeResponses = map[string]string{
-	"/":                                                     "meta-data/\nuser-data",
-	"/meta-data/":                                           "hostname\ninstance-id\nregion-id\nzone-id\nimage-id\ninstance/\nmac\nprivate-ipv4\neipv4\nvpc-id\nvpc-cidr-block\nvswitch-id\nvswitch-cidr-block\nserial-number\nnetwork-type\nowner-account-id\nsource-address\ndns-conf/\nntp-conf/\nram/\nimage/\ntags/\ndisks/\nnetwork/",
-	"/meta-data/hostname":                                   "prod-1",
+	pathRoot:                                                "meta-data/\nuser-data",
+	pathMetaData:                                            "hostname\ninstance-id\nregion-id\nzone-id\nimage-id\ninstance/\nmac\nprivate-ipv4\neipv4\nvpc-id\nvpc-cidr-block\nvswitch-id\nvswitch-cidr-block\nserial-number\nnetwork-type\nowner-account-id\nsource-address\ndns-conf/\nntp-conf/\nram/\nimage/\ntags/\ndisks/\nnetwork/",
+	pathMetaDataHostname:                                    hostProd1,
 	"/meta-data/instance-id":                                "i-abc",
 	"/meta-data/region-id":                                  "cn-hangzhou",
 	"/meta-data/zone-id":                                    "cn-hangzhou-b",
 	"/meta-data/image-id":                                   "img-1",
 	"/meta-data/instance/":                                  "instance-type\ninstance-name\nmax-netbw-ingress\nmax-netbw-egress\nvirtualization-solution\nvirtualization-solution-version\nspot/",
 	"/meta-data/instance/instance-type":                     "ecs.g6.large",
-	"/meta-data/instance/instance-name":                     "prod-1",
+	"/meta-data/instance/instance-name":                     hostProd1,
 	"/meta-data/instance/max-netbw-ingress":                 "1048576",
 	"/meta-data/instance/max-netbw-egress":                  "1048576",
 	"/meta-data/instance/virtualization-solution":           "ECS Virt",
@@ -89,9 +89,9 @@ var treeResponses = map[string]string{
 	"/meta-data/disks/bp1abc/":                              "id\nname",
 	"/meta-data/disks/bp1abc/id":                            "d-bp1abc",
 	"/meta-data/disks/bp1abc/name":                          "root-disk",
-	"/meta-data/network/":                                   "interfaces/",
-	"/meta-data/network/interfaces/":                        "macs/",
-	"/meta-data/network/interfaces/macs/":                   "00:16:3e:00:00:01/",
+	pathMetaDataNetwork:                                     segInterfaces,
+	pathMetaDataNetworkInterfaces:                           segMacs,
+	pathMetaDataNetworkInterfacesMacs:                       "00:16:3e:00:00:01/",
 	"/meta-data/network/interfaces/macs/00:16:3e:00:00:01/": "network-interface-id\nprimary-ip-address\nprivate-ipv4s\nnetmask\ngateway\nvpc-id\nvpc-cidr-block\nvswitch-id\nvswitch-cidr-block\nipv6s\nipv6-gateway",
 	"/meta-data/network/interfaces/macs/00:16:3e:00:00:01/network-interface-id": "eni-bp1-primary",
 	"/meta-data/network/interfaces/macs/00:16:3e:00:00:01/primary-ip-address":   "172.16.0.5",
@@ -170,11 +170,11 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, hitUserData bool) {
 				s.Require().NotNil(info)
 				s.Equal("i-abc", info.ID)
-				s.Equal("prod-1", info.Hostname)
+				s.Equal(hostProd1, info.Hostname)
 				s.Equal("cn-hangzhou", info.Region)
 				s.Equal("cn-hangzhou-b", info.Zone)
 				s.Equal("ecs.g6.large", info.Type)
-				s.Equal("prod-1", info.Name)
+				s.Equal(hostProd1, info.Name)
 				s.Equal("172.16.0.5", info.PrivateIPv4)
 				s.Equal("47.1.2.3", info.PublicIPv4)
 				s.Equal("vpc-1", info.VPCID)
@@ -233,6 +233,43 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			// Every optional sub-object is listed but empty, which is
+			// what a bare instance reports.
+			name: "listed sub-objects that are empty are skipped",
+			tree: map[string]string{
+				pathRoot:             "meta-data/",
+				pathMetaData:         "hostname\nimage/\ntags/\nnetwork/",
+				pathMetaDataHostname: hostProd1,
+				"/meta-data/image/":  "",
+				"/meta-data/tags/":   "",
+				pathMetaDataNetwork:  "",
+			},
+			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+				s.Require().NotNil(info)
+				s.Equal(hostProd1, info.Hostname)
+				s.Nil(info.Marketplace)
+				s.Nil(info.Tags)
+				s.Nil(info.NetworkInterfaces)
+				// No instance/ was listed at all.
+				s.Empty(info.Type)
+			},
+		},
+		{
+			// The interfaces tree exists but names no MAC addresses.
+			name: "interfaces without macs yields no interfaces",
+			tree: map[string]string{
+				pathRoot:                      "meta-data/",
+				pathMetaData:                  "hostname\nnetwork/",
+				pathMetaDataHostname:          hostProd1,
+				pathMetaDataNetwork:           segInterfaces,
+				pathMetaDataNetworkInterfaces: "",
+			},
+			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+				s.Require().NotNil(info)
+				s.Nil(info.NetworkInterfaces)
+			},
+		},
+		{
 			name:    "first-probe 404 drops silently",
 			tree:    map[string]string{},
 			wantNil: true,
@@ -245,9 +282,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "subdir fetch error is tolerated",
 			tree: map[string]string{
-				"/":                   "meta-data/",
-				"/meta-data/":         "hostname\nbroken-subdir/",
-				"/meta-data/hostname": "only-me",
+				pathRoot:             segMetaData,
+				pathMetaData:         "hostname\nbroken-subdir/",
+				pathMetaDataHostname: "only-me",
 				// /meta-data/broken-subdir/ intentionally absent → 404
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
@@ -257,21 +294,21 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "leaf fetch error is tolerated",
 			tree: map[string]string{
-				"/":                   "meta-data/",
-				"/meta-data/":         "hostname\nmissing",
-				"/meta-data/hostname": "prod-1",
+				pathRoot:             segMetaData,
+				pathMetaData:         "hostname\nmissing",
+				pathMetaDataHostname: hostProd1,
 				// /meta-data/missing intentionally absent → 404
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
-				s.Equal("prod-1", info.Hostname)
+				s.Equal(hostProd1, info.Hostname)
 			},
 		},
 		{
 			name: "empty dns-conf produces nil nameservers",
 			tree: map[string]string{
-				"/":                               "meta-data/",
-				"/meta-data/":                     "hostname\ndns-conf/",
-				"/meta-data/hostname":             "h",
+				pathRoot:                          segMetaData,
+				pathMetaData:                      "hostname\ndns-conf/",
+				pathMetaDataHostname:              keyH,
 				"/meta-data/dns-conf/":            "nameservers",
 				"/meta-data/dns-conf/nameservers": "   ",
 			},
@@ -282,9 +319,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "empty ntp-servers produces nil NTPServers",
 			tree: map[string]string{
-				"/":                               "meta-data/",
-				"/meta-data/":                     "hostname\nntp-conf/",
-				"/meta-data/hostname":             "h",
+				pathRoot:                          segMetaData,
+				pathMetaData:                      "hostname\nntp-conf/",
+				pathMetaDataHostname:              keyH,
 				"/meta-data/ntp-conf/":            "ntp-servers",
 				"/meta-data/ntp-conf/ntp-servers": "",
 			},
@@ -295,7 +332,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "tree without meta-data directory returns empty typed fields",
 			tree: map[string]string{
-				"/":                 "some-other-dir/",
+				pathRoot:            "some-other-dir/",
 				"/some-other-dir/":  "x",
 				"/some-other-dir/x": "y",
 			},
@@ -308,20 +345,20 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "wrong-typed sub-objects for canonical sections are tolerated",
 			tree: map[string]string{
-				"/":                   "meta-data/",
-				"/meta-data/":         "hostname\ninstance\ndns-conf\nntp-conf\nram\nimage\ntags\ndisks\nnetwork",
-				"/meta-data/hostname": "h",
-				"/meta-data/instance": `"not-a-map"`,
+				pathRoot:              segMetaData,
+				pathMetaData:          "hostname\ninstance\ndns-conf\nntp-conf\nram\nimage\ntags\ndisks\nnetwork",
+				pathMetaDataHostname:  keyH,
+				"/meta-data/instance": notAMapJSON,
 				"/meta-data/dns-conf": `"neither"`,
 				"/meta-data/ntp-conf": `"nor"`,
 				"/meta-data/ram":      `"nope"`,
-				"/meta-data/image":    `"not-a-map"`,
-				"/meta-data/tags":     `"not-a-map"`,
-				"/meta-data/disks":    `"not-a-map"`,
-				"/meta-data/network":  `"not-a-map"`,
+				"/meta-data/image":    notAMapJSON,
+				"/meta-data/tags":     notAMapJSON,
+				"/meta-data/disks":    notAMapJSON,
+				"/meta-data/network":  notAMapJSON,
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
-				s.Equal("h", info.Hostname)
+				s.Equal(keyH, info.Hostname)
 				s.Empty(info.Type)
 				s.Nil(info.Nameservers)
 				s.Nil(info.NTPServers)
@@ -335,19 +372,19 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "empty marketplace / empty tags / non-map disk / non-map eni tolerated",
 			tree: map[string]string{
-				"/":                              "meta-data/",
-				"/meta-data/":                    "image/\ntags/\ndisks/\nnetwork/",
+				pathRoot:                         segMetaData,
+				pathMetaData:                     "image/\ntags/\ndisks/\nnetwork/",
 				"/meta-data/image/":              "market-place/",
 				"/meta-data/image/market-place/": "product-code",
 				"/meta-data/image/market-place/product-code": "",
 				"/meta-data/tags/":                           "instance/",
 				"/meta-data/tags/instance/":                  "",
 				"/meta-data/disks/":                          "bad",
-				"/meta-data/disks/bad":                       `"not-a-map"`,
-				"/meta-data/network/":                        "interfaces/",
-				"/meta-data/network/interfaces/":             "macs/",
-				"/meta-data/network/interfaces/macs/":        "aa:bb",
-				"/meta-data/network/interfaces/macs/aa:bb":   `"not-a-map"`,
+				"/meta-data/disks/bad":                       notAMapJSON,
+				pathMetaDataNetwork:                          segInterfaces,
+				pathMetaDataNetworkInterfaces:                segMacs,
+				pathMetaDataNetworkInterfacesMacs:            "aa:bb",
+				"/meta-data/network/interfaces/macs/aa:bb":   notAMapJSON,
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
 				// Empty marketplace (no product code, no charge type)
@@ -364,8 +401,8 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "wrong-typed leaf value is tolerated by strVal",
 			tree: map[string]string{
-				"/":                      "meta-data/",
-				"/meta-data/":            "instance-id",
+				pathRoot:                 segMetaData,
+				pathMetaData:             "instance-id",
 				"/meta-data/instance-id": `123`, // parses as JSON number, not string
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
@@ -375,19 +412,19 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "empty listing lines are skipped",
 			tree: map[string]string{
-				"/":                   "\n\nmeta-data/\n",
-				"/meta-data/":         "\nhostname\n\n",
-				"/meta-data/hostname": "h",
+				pathRoot:             "\n\nmeta-data/\n",
+				pathMetaData:         "\nhostname\n\n",
+				pathMetaDataHostname: keyH,
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
-				s.Equal("h", info.Hostname)
+				s.Equal(keyH, info.Hostname)
 			},
 		},
 		{
 			name: "instance sub-map without bandwidth fields hits intVal miss branch",
 			tree: map[string]string{
-				"/":                                 "meta-data/",
-				"/meta-data/":                       "instance/",
+				pathRoot:                            segMetaData,
+				pathMetaData:                        "instance/",
 				"/meta-data/instance/":              "instance-type",
 				"/meta-data/instance/instance-type": "ecs.g6.large",
 			},
@@ -400,12 +437,12 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "network interface whitespace-separated ipv4s parse",
 			tree: map[string]string{
-				"/":                                   "meta-data/",
-				"/meta-data/":                         "network/",
-				"/meta-data/network/":                 "interfaces/",
-				"/meta-data/network/interfaces/":      "macs/",
-				"/meta-data/network/interfaces/macs/": "aa:bb/",
-				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
+				pathRoot:                                    segMetaData,
+				pathMetaData:                                "network/",
+				pathMetaDataNetwork:                         segInterfaces,
+				pathMetaDataNetworkInterfaces:               segMacs,
+				pathMetaDataNetworkInterfacesMacs:           "aa:bb/",
+				"/meta-data/network/interfaces/macs/aa:bb/": "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": "10.0.0.1 10.0.0.2",
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
@@ -419,12 +456,12 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "network interface empty ipv4s stays nil",
 			tree: map[string]string{
-				"/":                                   "meta-data/",
-				"/meta-data/":                         "network/",
-				"/meta-data/network/":                 "interfaces/",
-				"/meta-data/network/interfaces/":      "macs/",
-				"/meta-data/network/interfaces/macs/": "aa:bb/",
-				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
+				pathRoot:                                    segMetaData,
+				pathMetaData:                                "network/",
+				pathMetaDataNetwork:                         segInterfaces,
+				pathMetaDataNetworkInterfaces:               segMacs,
+				pathMetaDataNetworkInterfacesMacs:           "aa:bb/",
+				"/meta-data/network/interfaces/macs/aa:bb/": "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": "   ",
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
@@ -435,12 +472,12 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "network interface only-commas ipv4s collapses to nil",
 			tree: map[string]string{
-				"/":                                   "meta-data/",
-				"/meta-data/":                         "network/",
-				"/meta-data/network/":                 "interfaces/",
-				"/meta-data/network/interfaces/":      "macs/",
-				"/meta-data/network/interfaces/macs/": "aa:bb/",
-				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
+				pathRoot:                                    segMetaData,
+				pathMetaData:                                "network/",
+				pathMetaDataNetwork:                         segInterfaces,
+				pathMetaDataNetworkInterfaces:               segMacs,
+				pathMetaDataNetworkInterfacesMacs:           "aa:bb/",
+				"/meta-data/network/interfaces/macs/aa:bb/": "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": ",, ,",
 			},
 			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {

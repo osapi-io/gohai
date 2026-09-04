@@ -110,9 +110,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
 				Platform: &platform.Info{
-					OS:              "linux",
+					OS:              osLinux,
 					Name:            "Ubuntu",
-					Version:         "22.04",
+					Version:         value2204,
 					Family:          "debian",
 					CPUArchitecture: "amd64",
 					Build:           "SMP",
@@ -121,8 +121,8 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			verify: func(event *ocsf.InventoryInfo) {
 				s.NotNil(event.Device.OS)
 				s.Equal("Ubuntu", event.Device.OS.Name)
-				s.Equal("22.04", event.Device.OS.Version)
-				s.Equal("linux", event.Device.OS.Type)
+				s.Equal(value2204, event.Device.OS.Version)
+				s.Equal(osLinux, event.Device.OS.Type)
 				s.Equal(200, event.Device.OS.TypeID)
 				s.Equal("debian", event.Device.OS.Family)
 				s.Equal("amd64", event.Device.OS.CPUArchitecture)
@@ -179,7 +179,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			name: "kernel maps to device.os kernel fields",
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
-				Platform:    &platform.Info{OS: "linux"},
+				Platform:    &platform.Info{OS: osLinux},
 				Kernel: &kernel.Info{
 					Name:    "Linux",
 					Release: "5.15.0-76-generic",
@@ -197,10 +197,10 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
 				Network: &network.Info{
-					DefaultInterface: "eth0",
+					DefaultInterface: ifaceEth0,
 					Interfaces: []network.Interface{
 						{
-							Name:  "eth0",
+							Name:  ifaceEth0,
 							MAC:   "00:11:22:33:44:55",
 							MTU:   1500,
 							Flags: []string{"up", "broadcast"},
@@ -214,7 +214,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			verify: func(event *ocsf.InventoryInfo) {
 				s.Len(event.Device.NetworkInterfaces, 1)
 				ni := event.Device.NetworkInterfaces[0]
-				s.Equal("eth0", ni.Name)
+				s.Equal(ifaceEth0, ni.Name)
 				s.Equal("00:11:22:33:44:55", ni.MAC)
 				s.Equal(1500, ni.MTU)
 				s.Equal("10.0.0.5", ni.IP)
@@ -405,10 +405,10 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			name: "os_release maps to device.os extension fields",
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
-				Platform:    &platform.Info{OS: "linux"},
+				Platform:    &platform.Info{OS: osLinux},
 				OSRelease: &osrelease.Info{
 					ID:              "ubuntu",
-					VersionID:       "22.04",
+					VersionID:       value2204,
 					VersionCodename: "jammy",
 					VariantID:       "server",
 					Name:            "Ubuntu",
@@ -416,7 +416,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			},
 			verify: func(event *ocsf.InventoryInfo) {
 				s.Equal("ubuntu", event.Device.OS.DistributionID)
-				s.Equal("22.04", event.Device.OS.VersionID)
+				s.Equal(value2204, event.Device.OS.VersionID)
 				s.Equal("jammy", event.Device.OS.VersionCodename)
 				s.Equal("server", event.Device.OS.VariantID)
 			},
@@ -425,7 +425,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			name: "hostnamectl cpe_name maps to device.os",
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
-				Platform:    &platform.Info{OS: "linux"},
+				Platform:    &platform.Info{OS: osLinux},
 				Hostnamectl: &hostnamectl.Info{
 					OperatingSystemCPEName: "cpe:/o:canonical:ubuntu:22.04",
 				},
@@ -479,7 +479,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			name: "os_release fills name when platform name is empty",
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
-				Platform:    &platform.Info{OS: "linux"},
+				Platform:    &platform.Info{OS: osLinux},
 				OSRelease:   &osrelease.Info{Name: "Alpine Linux"},
 			},
 			verify: func(event *ocsf.InventoryInfo) {
@@ -510,11 +510,31 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
 				Network: &network.Info{
-					DefaultInterface: "eth0",
+					DefaultInterface: ifaceEth0,
 					Interfaces: []network.Interface{
 						{
-							Name:      "eth0",
+							Name:      ifaceEth0,
 							Addresses: []network.Address{{Addr: "fe80::1", Family: "inet6"}},
+						},
+					},
+				},
+			},
+			verify: func(event *ocsf.InventoryInfo) {
+				s.Empty(event.Device.IP)
+			},
+		},
+		{
+			// The default interface is named but absent from the list,
+			// so the search runs to the end without matching.
+			name: "findPrimaryIP with the default interface absent",
+			facts: &gohai.Facts{
+				CollectTime: time.Now(),
+				Network: &network.Info{
+					DefaultInterface: ifaceEth0,
+					Interfaces: []network.Interface{
+						{
+							Name:      "lo",
+							Addresses: []network.Address{{Addr: "127.0.0.1", Family: "inet"}},
 						},
 					},
 				},
@@ -529,7 +549,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				CollectTime: time.Now(),
 				Network: &network.Info{
 					Interfaces: []network.Interface{
-						{Name: "eth0", MAC: "aa:bb:cc:dd:ee:ff"},
+						{Name: ifaceEth0, MAC: "aa:bb:cc:dd:ee:ff"},
 					},
 				},
 			},
@@ -544,7 +564,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				CollectTime: time.Now(),
 				Network: &network.Info{
 					Interfaces: []network.Interface{
-						{Name: "eth0", Encapsulation: "Ethernet"},
+						{Name: ifaceEth0, Encapsulation: "Ethernet"},
 					},
 				},
 			},

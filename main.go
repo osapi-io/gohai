@@ -21,8 +21,16 @@
 // Command gohai collects system facts and prints them as JSON.
 package main
 
-import "github.com/osapi-io/gohai/cmd"
+import (
+	"fmt"
+	"os"
+
+	"github.com/osapi-io/gohai/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
 }

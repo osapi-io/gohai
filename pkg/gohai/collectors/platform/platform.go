@@ -195,17 +195,34 @@ func applyRedhatReleaseSupplement(
 	fs avfs.VFS,
 	info *Info,
 ) {
-	if minorVersionDistros[info.Name] && majorOnlyVersionRE.MatchString(info.Version) {
-		if b, err := fs.ReadFile("/etc/redhat-release"); err == nil {
-			if m := redhatReleaseVersionRE.FindStringSubmatch(string(b)); m != nil {
-				info.Version = m[1]
-			}
-		}
-	}
+	applyRedhatMinorVersion(fs, info)
+
+	// Debian's os-release carries no VERSION_ID on testing/unstable.
 	if info.Name == "debian" && info.Version == "" {
 		if b, err := fs.ReadFile("/etc/debian_version"); err == nil {
 			info.Version = strings.TrimSpace(string(b))
 		}
+	}
+}
+
+// applyRedhatMinorVersion recovers the minor version for the
+// distributions whose os-release reports only the major one.
+func applyRedhatMinorVersion(
+	fs avfs.VFS,
+	info *Info,
+) {
+	if !minorVersionDistros[info.Name] ||
+		!majorOnlyVersionRE.MatchString(info.Version) {
+		return
+	}
+
+	b, err := fs.ReadFile("/etc/redhat-release")
+	if err != nil {
+		return
+	}
+
+	if m := redhatReleaseVersionRE.FindStringSubmatch(string(b)); m != nil {
+		info.Version = m[1]
 	}
 }
 
@@ -246,7 +263,7 @@ var (
 // produce `centos` / `gentoo` rather than the noisier full prefix.
 func parseGenericRelease(
 	content string,
-) (string, string) {
+) (distro string, version string) {
 	m := genericReleaseRE.FindStringSubmatch(content)
 	if m == nil {
 		return "", ""
@@ -261,12 +278,12 @@ func parseGenericRelease(
 // /etc/SuSE-release content. Drops PATCHLEVEL when absent.
 func parseSuseRelease(
 	content string,
-) (string, string) {
+) (distro string, version string) {
 	v := suseReleaseVersionRE.FindStringSubmatch(content)
 	if v == nil {
 		return "", ""
 	}
-	version := v[1]
+	version = v[1]
 	if pl := suseReleasePatchLevelRE.FindStringSubmatch(content); pl != nil {
 		version = version + "." + pl[1]
 	}

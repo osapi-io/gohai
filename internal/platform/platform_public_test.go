@@ -53,42 +53,42 @@ func (s *PlatformPublicTestSuite) TestDetect() {
 		{
 			name:   "ubuntu → debian",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil },
-			want:   "debian",
+			want:   platformDebian,
 		},
 		{
 			name:   "debian → debian",
-			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "debian"}, nil },
-			want:   "debian",
+			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: platformDebian}, nil },
+			want:   platformDebian,
 		},
 		{
 			name:   "raspbian → debian",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "raspbian"}, nil },
-			want:   "debian",
+			want:   platformDebian,
 		},
 		{
 			name:   "rhel → rhel",
-			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "rhel"}, nil },
-			want:   "rhel",
+			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: platformRHEL}, nil },
+			want:   platformRHEL,
 		},
 		{
 			name:   "centos → rhel",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "centos"}, nil },
-			want:   "rhel",
+			want:   platformRHEL,
 		},
 		{
 			name:   "fedora → rhel",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "fedora"}, nil },
-			want:   "rhel",
+			want:   platformRHEL,
 		},
 		{
 			name:   "amazon linux → rhel",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "amzn"}, nil },
-			want:   "rhel",
+			want:   platformRHEL,
 		},
 		{
 			name:   "darwin platform empty, OS=darwin",
-			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "", OS: "darwin"}, nil },
-			want:   "darwin",
+			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "", OS: osDarwin}, nil },
+			want:   osDarwin,
 		},
 		{
 			name:   "arch linux passes through",
@@ -118,7 +118,7 @@ func (s *PlatformPublicTestSuite) TestDetect() {
 		{
 			name:   "mixed-case platform is normalized",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "Ubuntu"}, nil },
-			want:   "debian",
+			want:   platformDebian,
 		},
 		{
 			name:     "Detect var is swappable by callers without gopsutil",
@@ -163,7 +163,7 @@ func (s *PlatformPublicTestSuite) TestIsLinux() {
 		},
 		{
 			"darwin is not linux",
-			func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil },
+			func() (*host.InfoStat, error) { return &host.InfoStat{OS: osDarwin}, nil },
 			false,
 		},
 		{"empty not linux", func() (*host.InfoStat, error) { return nil, nil }, false},
@@ -185,7 +185,7 @@ func (s *PlatformPublicTestSuite) TestIsDarwin() {
 	}{
 		{
 			"darwin is darwin",
-			func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil },
+			func() (*host.InfoStat, error) { return &host.InfoStat{OS: osDarwin}, nil },
 			true,
 		},
 		{

@@ -78,24 +78,35 @@ func applySwVers(
 	if err != nil {
 		return
 	}
+
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
 	for sc.Scan() {
-		line := sc.Text()
-		i := strings.Index(line, ":")
-		if i < 0 {
+		key, val, ok := strings.Cut(sc.Text(), ":")
+		if !ok {
 			continue
 		}
-		key := strings.TrimSpace(line[:i])
-		val := strings.TrimSpace(line[i+1:])
-		switch key {
-		case "BuildVersion":
-			if val != "" {
-				info.Build = val
-			}
-		case "ProductVersionExtra":
-			if val != "" {
-				info.VersionExtra = val
-			}
-		}
+
+		setSwVersField(info, strings.TrimSpace(key), strings.TrimSpace(val))
+	}
+}
+
+// setSwVersField records the two sw_vers fields this reports, leaving an
+// empty value to whatever supplied it earlier.
+func setSwVersField(
+	info *Info,
+	key string,
+	val string,
+) {
+	if val == "" {
+		return
+	}
+
+	switch key {
+	case "BuildVersion":
+		info.Build = val
+	case "ProductVersionExtra":
+		info.VersionExtra = val
+	default:
+		// A key this collector does not report.
 	}
 }

@@ -125,11 +125,11 @@ func (s *CPUPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -140,12 +140,14 @@ func (s *CPUPublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*cpu.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*cpu.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -154,9 +156,9 @@ func (s *CPUPublicTestSuite) TestNew() {
 func (s *CPUPublicTestSuite) TestCollect() {
 	// linuxBaseStats mirrors the old baseInfo() result: Xeon w/ 16 logical / 8 cores / 1 socket.
 	linuxBaseStats := []gpcpu.InfoStat{{
-		PhysicalID: "0", Cores: 8,
+		PhysicalID: value0, Cores: 8,
 		ModelName: "Intel(R) Xeon(R) CPU",
-		VendorID:  "GenuineIntel",
+		VendorID:  vendorIntel,
 		Family:    "6", Model: "85",
 		Stepping: 7, Mhz: 2400, CacheSize: 25600,
 		Flags: []string{"fpu", "vme"},
@@ -166,7 +168,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 
 	// darwinBaseStats mirrors the old darwin baseInfo(): 12 logical / 12 cores / 1 socket / 0 Mhz.
 	darwinBaseStats := []gpcpu.InfoStat{{
-		PhysicalID: "0", Cores: 12,
+		PhysicalID: value0, Cores: 12,
 		ModelName: "Apple M2 Pro",
 	}}
 	darwinBaseInfo := func(context.Context) ([]gpcpu.InfoStat, error) { return darwinBaseStats, nil }
@@ -174,7 +176,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 
 	// onecoreStats: 1 logical / 1 core / 1 socket — used by s390x/ppc64le tests whose counts
 	// are fully overridden by lscpu.
-	onecoreStats := []gpcpu.InfoStat{{PhysicalID: "0", Cores: 1}}
+	onecoreStats := []gpcpu.InfoStat{{PhysicalID: value0, Cores: 1}}
 	onecoreInfo := func(context.Context) ([]gpcpu.InfoStat, error) { return onecoreStats, nil }
 	onecoreCounts := func(context.Context, bool) (int, error) { return 1, nil }
 
@@ -208,7 +210,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:     "linux: base only, no vulns dir no lscpu",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -222,30 +224,30 @@ func (s *CPUPublicTestSuite) TestCollect() {
 				s.Equal(1, i.Sockets)
 				// Per-CPU breakdown populated from gopsutil's InfoStat slice.
 				s.Require().Len(i.CPUs, 1)
-				s.Equal("GenuineIntel", i.CPUs[0].VendorID)
-				s.Equal("0", i.CPUs[0].PhysicalID)
+				s.Equal(vendorIntel, i.CPUs[0].VendorID)
+				s.Equal(value0, i.CPUs[0].PhysicalID)
 				s.Equal(int32(8), i.CPUs[0].Cores)
 			},
 		},
 		{
 			name:    "linux: hybrid-core per-CPU differs per socket",
-			variant: "linux",
+			variant: osLinux,
 			infoFn: func(context.Context) ([]gpcpu.InfoStat, error) {
 				return []gpcpu.InfoStat{
 					{
-						PhysicalID: "0",
-						CoreID:     "0",
+						PhysicalID: value0,
+						CoreID:     value0,
 						Cores:      8,
 						ModelName:  "P-core",
-						VendorID:   "GenuineIntel",
+						VendorID:   vendorIntel,
 						Mhz:        5200,
 					},
 					{
-						PhysicalID: "0",
+						PhysicalID: value0,
 						CoreID:     "8",
 						Cores:      16,
 						ModelName:  "E-core",
-						VendorID:   "GenuineIntel",
+						VendorID:   vendorIntel,
 						Mhz:        3800,
 					},
 				}, nil
@@ -263,7 +265,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "linux: vulnerabilities populated",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs: newVulnFS(s, map[string]string{
@@ -280,7 +282,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "linux: empty vulnerabilities directory yields nil map",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, map[string]string{}),
@@ -291,7 +293,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "linux: x86 lscpu populates caches + numa_nodes, counts unchanged",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -360,7 +362,7 @@ NUMA node0 CPU(s):   0-15
 		},
 		{
 			name:     "linux: s390x lscpu populates machine_type + dispatching_mode",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   onecoreInfo,
 			countsFn: onecoreCounts,
 			fs:       newVulnFS(s, nil),
@@ -383,7 +385,7 @@ Drawer(s):           2
 		},
 		{
 			name:     "linux: s390x lscpu overrides counts",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   onecoreInfo,
 			countsFn: onecoreCounts,
 			fs:       newVulnFS(s, nil),
@@ -404,7 +406,7 @@ Drawer(s):           2
 		},
 		{
 			name:     "linux: ppc64le lscpu overrides counts",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   onecoreInfo,
 			countsFn: onecoreCounts,
 			fs:       newVulnFS(s, nil),
@@ -423,7 +425,7 @@ Socket(s):           2
 		},
 		{
 			name:     "linux: lscpu whitespace-only CPU op-mode(s) leaves slice nil",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -436,7 +438,7 @@ Socket(s):           2
 		},
 		{
 			name:     "linux: malformed lscpu no-ops, base Info preserved",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -451,7 +453,7 @@ Socket(s):           2
 		},
 		{
 			name:     "linux: NUMA CPU list with range+singletons",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -466,7 +468,7 @@ NUMA node0 CPU(s):   0-3,8,10-11
 		},
 		{
 			name:     "linux: NUMA CPU list malformed yields nil entry",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -483,7 +485,7 @@ NUMA node0 CPU(s):   bad-data,x-y
 		},
 		{
 			name:     "linux: NUMA CPU list reversed range yields nil",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -500,7 +502,7 @@ NUMA node0 CPU(s):   5-2
 		},
 		{
 			name:     "linux: vulnerabilities dir with subdir, subdir skipped files still read",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs: func() avfs.VFS {
@@ -518,7 +520,7 @@ NUMA node0 CPU(s):   5-2
 		},
 		{
 			name:     "linux: vulnerabilities dir with unreadable file skipped",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs: vulnReadErrorFS{
@@ -535,7 +537,7 @@ NUMA node0 CPU(s):   5-2
 		},
 		{
 			name:     "linux: lscpu with empty-value line skipped",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -553,7 +555,7 @@ L1i cache:           32 KiB
 		},
 		{
 			name:     "linux: NUMA CPU list with empty parts parses remaining",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -568,7 +570,7 @@ NUMA node0 CPU(s):   0,,3
 		},
 		{
 			name:     "linux: NUMA CPU list single non-numeric yields no entry",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -585,7 +587,7 @@ NUMA node0 CPU(s):   abc
 		},
 		{
 			name:     "linux: NUMA CPU list all-empty yields nil entry",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -602,7 +604,7 @@ NUMA node0 CPU(s):   ,,,
 		},
 		{
 			name:     "linux: s390x lscpu with missing drawers falls back to 1",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   onecoreInfo,
 			countsFn: onecoreCounts,
 			fs:       newVulnFS(s, nil),
@@ -622,7 +624,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "linux: gopsutil info error propagated",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   func(context.Context) ([]gpcpu.InfoStat, error) { return nil, errors.New("cpuinfo error") },
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
@@ -631,7 +633,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "linux: gopsutil counts error ignored (Count zero), info still populated",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   linuxBaseInfo,
 			countsFn: func(context.Context, bool) (int, error) { return 0, errors.New("counts failed") },
 			fs:       newVulnFS(s, nil),
@@ -644,7 +646,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "linux: empty gopsutil info stats leaves zero-value derived fields",
-			variant:  "linux",
+			variant:  osLinux,
 			infoFn:   func(context.Context) ([]gpcpu.InfoStat, error) { return nil, nil },
 			countsFn: func(context.Context, bool) (int, error) { return 4, nil },
 			fs:       newVulnFS(s, nil),
@@ -658,7 +660,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "darwin: Intel Mac with hyperthreading, all sysctls override",
-			variant:  "darwin",
+			variant:  osDarwin,
 			infoFn:   darwinBaseInfo,
 			countsFn: darwinBaseCounts,
 			exec: func(t *testing.T) executor.Executor {
@@ -677,7 +679,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "darwin: Apple Silicon, cpufrequency_max and cpufrequency both absent",
-			variant:  "darwin",
+			variant:  osDarwin,
 			infoFn:   darwinBaseInfo,
 			countsFn: darwinBaseCounts,
 			exec: func(t *testing.T) executor.Executor {
@@ -696,7 +698,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "darwin: Apple Silicon fallback, cpufrequency_max absent but cpufrequency present",
-			variant:  "darwin",
+			variant:  osDarwin,
 			infoFn:   darwinBaseInfo,
 			countsFn: darwinBaseCounts,
 			exec: func(t *testing.T) executor.Executor {
@@ -713,7 +715,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "darwin: hw.physicalcpu fails, Cores unchanged",
-			variant:  "darwin",
+			variant:  osDarwin,
 			infoFn:   darwinBaseInfo,
 			countsFn: darwinBaseCounts,
 			exec: func(t *testing.T) executor.Executor {
@@ -730,7 +732,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "darwin: hw.packages fails, Sockets unchanged",
-			variant:  "darwin",
+			variant:  osDarwin,
 			infoFn:   darwinBaseInfo,
 			countsFn: darwinBaseCounts,
 			exec: func(t *testing.T) executor.Executor {
@@ -747,7 +749,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "darwin: hw.physicalcpu non-numeric, Cores unchanged",
-			variant:  "darwin",
+			variant:  osDarwin,
 			infoFn:   darwinBaseInfo,
 			countsFn: darwinBaseCounts,
 			exec: func(t *testing.T) executor.Executor {
@@ -764,7 +766,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "darwin: hw.cpufrequency_max non-numeric falls through to hw.cpufrequency",
-			variant:  "darwin",
+			variant:  osDarwin,
 			infoFn:   darwinBaseInfo,
 			countsFn: darwinBaseCounts,
 			exec: func(t *testing.T) executor.Executor {
@@ -781,7 +783,7 @@ Book(s) per drawer:  1
 		},
 		{
 			name:     "darwin: gopsutil error propagated",
-			variant:  "darwin",
+			variant:  osDarwin,
 			infoFn:   func(context.Context) ([]gpcpu.InfoStat, error) { return nil, errors.New("sysctl error") },
 			countsFn: darwinBaseCounts,
 			exec:     func(t *testing.T) executor.Executor { return darwinExec(t, map[string]sysctlRet{}) },
@@ -794,10 +796,12 @@ Book(s) per drawer:  1
 			defer cpu.SetCountsFn(tt.countsFn)()
 			var c cpu.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &cpu.Linux{FS: tt.fs, Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &cpu.Darwin{Exec: tt.exec(s.T())}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

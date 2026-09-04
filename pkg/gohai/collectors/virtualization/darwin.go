@@ -74,72 +74,105 @@ func cascadeDarwin(
 	exec executor.Executor,
 	info *Info,
 ) {
-	// 1-3. Hypervisor host binaries on PATH.
-	if execBinaryOnPath(ctx, exec, "docker") {
-		addSystem(info, "docker", "host", false)
-	}
-	if execBinaryOnPath(ctx, exec, "VBoxManage") {
-		addSystem(info, "vbox", "host", false)
-	}
-	if execBinaryOnPath(ctx, exec, "prlctl") {
-		addSystem(info, "parallels", "host", false)
-	}
-
-	// 4. VMware Fusion app presence.
-	if fileExists(fs, "/Applications/VMware Fusion.app") {
-		addSystem(info, "vmware", "host", false)
-	}
+	detectDarwinHostTools(ctx, fs, exec, info) // 1-4.
 
 	if exec == nil {
 		return
 	}
 
-	// 5-9. Fan out the three slow execs. `ioreg -n pci1ab8,4000` targets
-	// the Parallels PCI node directly instead of dumping the full I/O
-	// registry — same semantic as Ohai's `ioreg -l | grep`, ~7x faster.
-	var sysctlOut, ioregOut, spOut []byte
+	sysctlOut, ioregOut, spOut := probeDarwinGuest(ctx, exec)
+
+	if strings.TrimSpace(string(sysctlOut)) == "1" {
+		addSystem(info, "qemu", roleGuest)
+	}
+
+	if strings.Contains(string(ioregOut), "pci1ab8,4000") {
+		addSystem(info, "parallels", roleGuest)
+	}
+
+	detectDarwinFromProfile(string(spOut), info)
+}
+
+// detectDarwinHostTools treats a hypervisor's own tooling as evidence
+// this machine is the host. Steps 1 through 4.
+func detectDarwinHostTools(
+	ctx context.Context,
+	fs avfs.VFS,
+	exec executor.Executor,
+	info *Info,
+) {
+	for _, b := range []struct{ bin, system string }{
+		{systemDocker, systemDocker},
+		{"VBoxManage", "vbox"},
+		{"prlctl", "parallels"},
+	} {
+		if execBinaryOnPath(ctx, exec, b.bin) {
+			addSystem(info, b.system, roleHost)
+		}
+	}
+
+	if fileExists(fs, "/Applications/VMware Fusion.app") {
+		addSystem(info, "vmware", roleHost)
+	}
+}
+
+// probeDarwinGuest runs the three slow probes at once. `ioreg -n
+// pci1ab8,4000` targets the Parallels PCI node directly rather than
+// dumping the whole I/O registry — the same answer as Ohai's
+// `ioreg -l | grep`, about seven times faster.
+func probeDarwinGuest(
+	ctx context.Context,
+	exec executor.Executor,
+) (sysctlOut, ioregOut, spOut []byte) {
 	var wg sync.WaitGroup
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
+
+	wg.Go(func() {
 		out, err := exec.Execute(ctx, "sysctl", "-n", "kern.hv_vmm_present")
 		if err == nil {
 			sysctlOut = out
 		}
-	}()
-	go func() {
-		defer wg.Done()
+	})
+
+	wg.Go(func() {
 		out, err := exec.Execute(ctx, "ioreg", "-n", "pci1ab8,4000")
 		if err == nil {
 			ioregOut = out
 		}
-	}()
-	go func() {
-		defer wg.Done()
+	})
+
+	wg.Go(func() {
 		out, err := exec.Execute(ctx, "system_profiler", "SPHardwareDataType")
 		if err == nil {
 			spOut = out
 		}
-	}()
+	})
+
 	wg.Wait()
 
-	if strings.TrimSpace(string(sysctlOut)) == "1" {
-		addSystem(info, "qemu", "guest", false)
+	return sysctlOut, ioregOut, spOut
+}
+
+// detectDarwinFromProfile reads the boot ROM and model identifier, which
+// name the hypervisor a guest is running under.
+func detectDarwinFromProfile(
+	text string,
+	info *Info,
+) {
+	if text == "" {
+		return
 	}
-	if strings.Contains(string(ioregOut), "pci1ab8,4000") {
-		addSystem(info, "parallels", "guest", false)
+
+	switch {
+	case bootROMContains(text, "VirtualBox"):
+		addSystem(info, "vbox", roleGuest)
+	case bootROMContains(text, "VMW"):
+		addSystem(info, "vmware", roleGuest)
+	default:
+		// The boot ROM names no hypervisor.
 	}
-	if len(spOut) > 0 {
-		text := string(spOut)
-		switch {
-		case bootROMContains(text, "VirtualBox"):
-			addSystem(info, "vbox", "guest", false)
-		case bootROMContains(text, "VMW"):
-			addSystem(info, "vmware", "guest", false)
-		}
-		if modelIDContains(text, "VirtualMac") {
-			addSystem(info, "apple", "guest", false)
-		}
+
+	if modelIDContains(text, "VirtualMac") {
+		addSystem(info, "apple", roleGuest)
 	}
 }
 

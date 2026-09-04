@@ -131,29 +131,10 @@ func (g *Gohai) Collect(
 	for _, c := range g.selected {
 		names = append(names, c.Name())
 	}
+
 	start := time.Now()
 
-	var (
-		samplesMu sync.Mutex
-		samples   map[string]CollectorTiming
-	)
-	hooks := collector.Hooks{}
-	if g.withTimings {
-		samples = make(map[string]CollectorTiming, len(names))
-		hooks.OnComplete = func(name string, dur time.Duration, err error) {
-			entry := CollectorTiming{
-				DurationNs: dur.Nanoseconds(),
-				Status:     "ok",
-			}
-			if err != nil {
-				entry.Status = "err"
-				entry.Error = err.Error()
-			}
-			samplesMu.Lock()
-			samples[name] = entry
-			samplesMu.Unlock()
-		}
-	}
+	timings, hooks := g.timingHooks(len(names))
 
 	results, err := g.registry.Run(ctx, names, hooks)
 	if err != nil {
@@ -164,56 +145,136 @@ func (g *Gohai) Collect(
 		CollectTime:     start,
 		CollectDuration: time.Since(start),
 	}
-	if g.withTimings {
-		facts.Timings = &Timings{Collectors: samples}
+
+	if timings != nil {
+		facts.Timings = &Timings{Collectors: timings.samples}
 	}
+
 	for name, result := range results {
 		facts.set(name, result)
 	}
+
 	return facts, nil
+}
+
+// timingRecorder gathers per-collector timings from the run hooks.
+type timingRecorder struct {
+	mu      sync.Mutex
+	samples map[string]CollectorTiming
+}
+
+// record stores one collector's outcome.
+func (t *timingRecorder) record(
+	name string,
+	dur time.Duration,
+	err error,
+) {
+	entry := CollectorTiming{
+		DurationNs: dur.Nanoseconds(),
+		Status:     "ok",
+	}
+
+	if err != nil {
+		entry.Status = "err"
+		entry.Error = err.Error()
+	}
+
+	t.mu.Lock()
+	t.samples[name] = entry
+	t.mu.Unlock()
+}
+
+// timingHooks returns a recorder and the hooks that feed it, or nil
+// hooks when timings were not asked for.
+func (g *Gohai) timingHooks(
+	n int,
+) (*timingRecorder, collector.Hooks) {
+	if !g.withTimings {
+		return nil, collector.Hooks{}
+	}
+
+	rec := &timingRecorder{samples: make(map[string]CollectorTiming, n)}
+
+	return rec, collector.Hooks{OnComplete: rec.record}
 }
 
 func selectCollectors(
 	reg *collector.Registry,
 	cfg config,
 ) ([]collector.Collector, error) {
-	// WithCollectors wins outright — explicit roster, no defaults.
+	// WithCollectors wins outright: an explicit roster, no defaults.
 	if len(cfg.only) > 0 {
-		out := make([]collector.Collector, 0, len(cfg.only))
-		for _, n := range cfg.only {
-			c, ok := reg.Get(n)
-			if !ok {
-				return nil, fmt.Errorf("unknown collector %q", n)
-			}
-			out = append(out, c)
-		}
-		return out, nil
+		return namedCollectors(reg, cfg.only)
 	}
-	// Expand WithCategory into an additive enable list. Unknown
-	// categories (zero collectors match) error so typos surface
-	// immediately rather than silently selecting nothing.
+
+	enabled, err := expandCategories(reg, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	// gohai.New() is opt-in: with none of WithDefaults, WithEnabled or
+	// WithCategory it collects nothing. The disabled list is still
+	// validated, so an unknown name errors either way.
+	if !cfg.useDefaults && len(enabled) == 0 {
+		_, err := reg.SelectedWith(collector.Selection{Disable: cfg.disabled})
+		if err != nil {
+			return nil, fmt.Errorf("select collectors: %w", err)
+		}
+
+		return nil, nil
+	}
+
+	sel, err := reg.SelectedWith(collector.Selection{
+		UseDefaults: cfg.useDefaults,
+		Enable:      enabled,
+		Disable:     cfg.disabled,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("select collectors: %w", err)
+	}
+
+	return sel, nil
+}
+
+// namedCollectors resolves an explicit roster, erroring on a name no
+// collector answers to.
+func namedCollectors(
+	reg *collector.Registry,
+	names []string,
+) ([]collector.Collector, error) {
+	out := make([]collector.Collector, 0, len(names))
+
+	for _, n := range names {
+		c, ok := reg.Get(n)
+		if !ok {
+			return nil, fmt.Errorf("unknown collector %q", n)
+		}
+
+		out = append(out, c)
+	}
+
+	return out, nil
+}
+
+// expandCategories turns WithCategory into names to add. A category no
+// collector belongs to errors, so a typo surfaces rather than quietly
+// selecting nothing.
+func expandCategories(
+	reg *collector.Registry,
+	cfg config,
+) ([]string, error) {
 	enabled := cfg.enabled
+
 	for _, cat := range cfg.categories {
 		names := reg.NamesInCategory(cat)
 		if len(names) == 0 {
 			return nil, fmt.Errorf("unknown category %q", cat)
 		}
+
 		enabled = append(enabled, names...)
 	}
-	// Without WithDefaults / WithEnabled / WithCategory, return
-	// empty — gohai.New() is opt-in. Still validate the disabled
-	// list so unknown names error consistently.
-	if !cfg.useDefaults && len(enabled) == 0 {
-		if _, err := reg.SelectedWith(false, nil, cfg.disabled); err != nil {
-			return nil, fmt.Errorf("select collectors: %w", err)
-		}
-		return nil, nil
-	}
-	sel, err := reg.SelectedWith(cfg.useDefaults, enabled, cfg.disabled)
-	if err != nil {
-		return nil, fmt.Errorf("select collectors: %w", err)
-	}
-	return sel, nil
+
+	return enabled, nil
 }
 
 // registerBuiltins registers every built-in collector. Registration errors

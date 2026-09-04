@@ -101,7 +101,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "ec2 wrong type ignored",
 			key:    "ec2",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Ec2) },
 		},
 		{
@@ -116,7 +116,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "azure wrong type ignored",
 			key:    "azure",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Azure) },
 		},
 		{
@@ -131,7 +131,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "digital_ocean wrong type ignored",
 			key:    "digital_ocean",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.DigitalOcean) },
 		},
 		{
@@ -146,7 +146,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "oci wrong type ignored",
 			key:    "oci",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.OCI) },
 		},
 		{
@@ -161,7 +161,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "alibaba wrong type ignored",
 			key:    "alibaba",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Alibaba) },
 		},
 		{
@@ -176,7 +176,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "linode wrong type ignored",
 			key:    "linode",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Linode) },
 		},
 		{
@@ -191,7 +191,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "openstack wrong type ignored",
 			key:    "openstack",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.OpenStack) },
 		},
 		{
@@ -206,7 +206,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "scaleway wrong type ignored",
 			key:    "scaleway",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Scaleway) },
 		},
 		{
@@ -221,7 +221,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "kernel_modules wrong type ignored",
 			key:    "kernel_modules",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.KernelModules) },
 		},
 		{
@@ -236,7 +236,7 @@ func (s *GohaiTestSuite) TestFactsSet() {
 		{
 			name:   "gpu wrong type ignored",
 			key:    "gpu",
-			value:  "x",
+			value:  valueX,
 			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.GPU) },
 		},
 		{

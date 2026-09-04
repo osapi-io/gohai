@@ -81,26 +81,28 @@ func (s *TCPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := tc.New()
 			s.Equal("tc", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*tc.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*tc.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -116,56 +118,56 @@ func (s *TCPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: tc returns qdisc data",
-			variant: "linux",
+			variant: osLinux,
 			exec:    tcExec(s.T(), []byte(tcOut), nil),
 			want: []tc.Interface{
 				{
 					Name: "lo",
 					QDiscs: []tc.QDisc{
-						{Kind: "noqueue", Handle: "0"},
+						{Kind: "noqueue", Handle: value0},
 					},
 				},
 				{
 					Name: "eth0",
 					QDiscs: []tc.QDisc{
-						{Kind: "fq_codel", Handle: "0"},
+						{Kind: "fq_codel", Handle: value0},
 					},
 				},
 				{
 					Name: "eth1",
 					QDiscs: []tc.QDisc{
-						{Kind: "pfifo_fast", Handle: "0", Parent: "1:1"},
+						{Kind: "pfifo_fast", Handle: value0, Parent: "1:1"},
 					},
 				},
 			},
 		},
 		{
 			name:    "linux: tc fails, empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec:    tcExec(s.T(), nil, errors.New("not found")),
 			want:    []tc.Interface{},
 		},
 		{
 			name:    "linux: nil Exec returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec:    nil,
 			want:    []tc.Interface{},
 		},
 		{
 			name:    "linux: empty output returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			exec:    tcExec(s.T(), []byte(""), nil),
 			want:    []tc.Interface{},
 		},
 		{
 			name:    "linux: short qdisc lines skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec:    tcExec(s.T(), []byte("qdisc noqueue 0:\n"), nil),
 			want:    []tc.Interface{},
 		},
 		{
 			name:    "linux: non-qdisc lines and blank lines skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: tcExec(
 				s.T(),
 				[]byte("\n Sent 0 bytes\nqdisc fq_codel 0: dev eth0 root\n"),
@@ -175,14 +177,14 @@ func (s *TCPublicTestSuite) TestCollect() {
 				{
 					Name: "eth0",
 					QDiscs: []tc.QDisc{
-						{Kind: "fq_codel", Handle: "0"},
+						{Kind: "fq_codel", Handle: value0},
 					},
 				},
 			},
 		},
 		{
 			name:    "linux: qdisc line without dev keyword skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec:    tcExec(s.T(), []byte("qdisc noqueue 0: root refcnt 2\n"), nil),
 			want:    []tc.Interface{},
 		},
@@ -196,10 +198,12 @@ func (s *TCPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c tc.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &tc.Linux{Exec: tt.exec}
 			case "darwin":
 				c = tc.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

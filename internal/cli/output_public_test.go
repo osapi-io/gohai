@@ -79,7 +79,12 @@ func (s *OutputPublicTestSuite) TestWriteOutput() {
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
 			var buf bytes.Buffer
-			err := cli.WriteOutput(&buf, &gohai.Facts{}, tc.pretty, tc.flat)
+			format := cli.FormatJSON
+			if tc.flat {
+				format = cli.FormatFlat
+			}
+
+			err := cli.WriteOutput(&buf, &gohai.Facts{}, format, tc.pretty)
 
 			s.NoError(err)
 			tc.verify(buf.String())
@@ -115,7 +120,7 @@ func (s *OutputPublicTestSuite) TestWriteJSON() {
 		},
 		{
 			name:    "write error",
-			w:       &errWriter{err: errors.New("disk full")},
+			w:       &errWriter{err: errors.New(errDiskFull)},
 			pretty:  false,
 			wantErr: "write output",
 		},
@@ -161,7 +166,7 @@ func (s *OutputPublicTestSuite) TestWriteFlat() {
 		},
 		{
 			name:    "write error",
-			w:       &errWriter{err: errors.New("disk full")},
+			w:       &errWriter{err: errors.New(errDiskFull)},
 			wantErr: "write flat output",
 		},
 	}
@@ -192,12 +197,12 @@ func (s *OutputPublicTestSuite) TestWriteCollectorList() {
 		},
 		{
 			name:    "write error on category header",
-			w:       &errWriter{err: errors.New("disk full")},
+			w:       &errWriter{err: errors.New(errDiskFull)},
 			wantErr: "write collector list",
 		},
 		{
 			name:    "write error on collector name",
-			w:       &errWriter{err: errors.New("disk full"), failAfter: 1},
+			w:       &errWriter{err: errors.New(errDiskFull), failAfter: 1},
 			wantErr: "write collector list",
 		},
 	}
@@ -238,7 +243,7 @@ func (s *OutputPublicTestSuite) TestWriteOCSF() {
 		},
 		{
 			name:    "write error",
-			w:       &errWriter{err: errors.New("disk full")},
+			w:       &errWriter{err: errors.New(errDiskFull)},
 			pretty:  false,
 			wantErr: "write ocsf output",
 		},

@@ -77,11 +77,11 @@ func (s *PackagesPublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", platformDebian, osLinux},
+		{"rhel dispatches to Linux", platformRHEL, osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -92,12 +92,14 @@ func (s *PackagesPublicTestSuite) TestNew() {
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*packages.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*packages.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -123,12 +125,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux debian: dpkg-query returns packages",
-			variant: "linux",
-			detect:  "debian",
+			variant: osLinux,
+			detect:  platformDebian,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"dpkg-query",
+					binDpkgQuery,
 					[]string{
 						"-W",
 						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
@@ -138,18 +140,28 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
-				{Name: "libc6", Version: "2.35-0", Architecture: "amd64", PackageManager: "dpkg"},
+				{
+					Name:           shellBash,
+					Version:        "5.1-6",
+					Architecture:   archAMD64,
+					PackageManager: mgrDpkg,
+				},
+				{
+					Name:           "libc6",
+					Version:        "2.35-0",
+					Architecture:   archAMD64,
+					PackageManager: mgrDpkg,
+				},
 			},
 		},
 		{
 			name:    "linux debian: dpkg skips non-installed and malformed lines",
-			variant: "linux",
-			detect:  "debian",
+			variant: osLinux,
+			detect:  platformDebian,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"dpkg-query",
+					binDpkgQuery,
 					[]string{
 						"-W",
 						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
@@ -159,17 +171,22 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
+				{
+					Name:           shellBash,
+					Version:        "5.1-6",
+					Architecture:   archAMD64,
+					PackageManager: mgrDpkg,
+				},
 			},
 		},
 		{
 			name:    "linux debian: dpkg skips short lines",
-			variant: "linux",
-			detect:  "debian",
+			variant: osLinux,
+			detect:  platformDebian,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"dpkg-query",
+					binDpkgQuery,
 					[]string{
 						"-W",
 						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
@@ -182,12 +199,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux debian: dpkg skips empty-name entries",
-			variant: "linux",
-			detect:  "debian",
+			variant: osLinux,
+			detect:  platformDebian,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"dpkg-query",
+					binDpkgQuery,
 					[]string{
 						"-W",
 						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
@@ -197,17 +214,17 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				)
 			},
 			want: []packages.Package{
-				{Name: "bash", Version: "5.1", Architecture: "amd64", PackageManager: "dpkg"},
+				{Name: shellBash, Version: "5.1", Architecture: archAMD64, PackageManager: mgrDpkg},
 			},
 		},
 		{
 			name:    "linux debian: dpkg-query fails, empty list",
-			variant: "linux",
-			detect:  "debian",
+			variant: osLinux,
+			detect:  platformDebian,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"dpkg-query",
+					binDpkgQuery,
 					[]string{
 						"-W",
 						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
@@ -220,12 +237,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux rhel: rpm returns packages",
-			variant: "linux",
-			detect:  "rhel",
+			variant: osLinux,
+			detect:  platformRHEL,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"rpm",
+					mgrRPM,
 					[]string{"-qa", "--qf", "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"},
 					rpmOut,
 					nil,
@@ -233,27 +250,27 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			},
 			want: []packages.Package{
 				{
-					Name:           "bash",
+					Name:           shellBash,
 					Version:        "5.1-6.fc36",
 					Architecture:   "x86_64",
-					PackageManager: "rpm",
+					PackageManager: mgrRPM,
 				},
 				{
 					Name:           "libc",
 					Version:        "2.35-1.fc36",
 					Architecture:   "x86_64",
-					PackageManager: "rpm",
+					PackageManager: mgrRPM,
 				},
 			},
 		},
 		{
 			name:    "linux rhel: rpm fails, empty list",
-			variant: "linux",
-			detect:  "rhel",
+			variant: osLinux,
+			detect:  platformRHEL,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"rpm",
+					mgrRPM,
 					[]string{"-qa", "--qf", "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"},
 					nil,
 					errors.New("not found"),
@@ -263,12 +280,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux rhel: rpm skips short lines",
-			variant: "linux",
-			detect:  "rhel",
+			variant: osLinux,
+			detect:  platformRHEL,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"rpm",
+					mgrRPM,
 					[]string{"-qa", "--qf", "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"},
 					[]byte("bash\n"),
 					nil,
@@ -278,12 +295,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux rhel: rpm skips empty-name entries",
-			variant: "linux",
-			detect:  "rhel",
+			variant: osLinux,
+			detect:  platformRHEL,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"rpm",
+					mgrRPM,
 					[]string{"-qa", "--qf", "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"},
 					[]byte("\t1.0-1.fc36\tx86_64\nbash\t5.1-6.fc36\tx86_64\n"),
 					nil,
@@ -291,63 +308,63 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			},
 			want: []packages.Package{
 				{
-					Name:           "bash",
+					Name:           shellBash,
 					Version:        "5.1-6.fc36",
 					Architecture:   "x86_64",
-					PackageManager: "rpm",
+					PackageManager: mgrRPM,
 				},
 			},
 		},
 		{
 			name:    "linux: nil Exec returns empty list",
-			variant: "linux",
-			detect:  "debian",
+			variant: osLinux,
+			detect:  platformDebian,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			want:    []packages.Package{},
 		},
 		{
 			name:    "darwin: brew list returns packages",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
-				return mockExec(t, "brew", []string{"list", "--versions"}, brewOut, nil)
+				return mockExec(t, mgrBrew, []string{"list", "--versions"}, brewOut, nil)
 			},
 			want: []packages.Package{
-				{Name: "git", Version: "2.40.0", PackageManager: "brew"},
-				{Name: "zsh", Version: "5.9", PackageManager: "brew"},
-				{Name: "curl", Version: "8.1.1", PackageManager: "brew"},
+				{Name: "git", Version: "2.40.0", PackageManager: mgrBrew},
+				{Name: "zsh", Version: "5.9", PackageManager: mgrBrew},
+				{Name: "curl", Version: "8.1.1", PackageManager: mgrBrew},
 			},
 		},
 		{
 			name:    "darwin: brew output with blank lines skipped",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"brew",
+					mgrBrew,
 					[]string{"list", "--versions"},
 					[]byte("\ngit 2.40.0\n\n"),
 					nil,
 				)
 			},
 			want: []packages.Package{
-				{Name: "git", Version: "2.40.0", PackageManager: "brew"},
+				{Name: "git", Version: "2.40.0", PackageManager: mgrBrew},
 			},
 		},
 		{
 			name:    "darwin: brew output with only-name line skipped",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
-				return mockExec(t, "brew", []string{"list", "--versions"}, []byte("git\n"), nil)
+				return mockExec(t, mgrBrew, []string{"list", "--versions"}, []byte("git\n"), nil)
 			},
 			want: []packages.Package{},
 		},
 		{
 			name:    "darwin: brew fails, empty list",
-			variant: "darwin",
+			variant: osDarwin,
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(
 					t,
-					"brew",
+					mgrBrew,
 					[]string{"list", "--versions"},
 					nil,
 					errors.New("not found"),
@@ -357,7 +374,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "darwin: nil Exec returns empty list",
-			variant: "darwin",
+			variant: osDarwin,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			want:    []packages.Package{},
 		},
@@ -371,10 +388,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			}
 			var c packages.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &packages.Linux{Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &packages.Darwin{Exec: tt.exec(s.T())}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

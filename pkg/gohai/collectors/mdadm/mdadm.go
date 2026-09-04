@@ -28,7 +28,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -106,48 +106,55 @@ func parseMdstat(
 	content []byte,
 ) map[string]*Array {
 	devices := map[string]*Array{}
+
 	scanner := bufio.NewScanner(bytes.NewReader(content))
 	for scanner.Scan() {
-		line := scanner.Text()
-		// Lines with MD devices look like:
-		//   md0 : active raid1 sda1[0] sdb1[1]
-		//   md127 : inactive sdc1[0](S)
-		mdIdx := strings.Index(line, " : ")
-		if mdIdx < 0 {
+		// An MD device line reads "md0 : active raid1 sda1[0] sdb1[1]".
+		devName, rest, ok := strings.Cut(scanner.Text(), " : ")
+		if !ok {
 			continue
 		}
-		devName := strings.TrimSpace(line[:mdIdx])
+
+		devName = strings.TrimSpace(devName)
 		if !strings.HasPrefix(devName, "md") {
 			continue
 		}
 
-		rest := strings.Fields(line[mdIdx+3:])
-		// rest[0] is "active" or "inactive"; rest[1] (optional) is raid level.
-		// Members follow, possibly mixed with raid level token.
-		arr := &Array{
-			Device:  devName,
-			Members: []string{},
-			Spares:  []string{},
-		}
-
-		for _, token := range rest {
-			m := memberRE.FindStringSubmatch(token)
-			if m == nil {
-				continue
-			}
-			memberDev := m[1]
-			memberType := m[2] // "S" for spare, "J" for journal, "" for active
-			switch memberType {
-			case "S":
-				arr.Spares = append(arr.Spares, memberDev)
-			default:
-				arr.Members = append(arr.Members, memberDev)
-			}
-		}
-
-		devices[devName] = arr
+		devices[devName] = mdstatArray(devName, strings.Fields(rest))
 	}
+
 	return devices
+}
+
+// mdstatArray reads one device's members. The tokens after the state and
+// raid level name the members, each suffixed with its role.
+func mdstatArray(
+	devName string,
+	tokens []string,
+) *Array {
+	arr := &Array{
+		Device:  devName,
+		Members: []string{},
+		Spares:  []string{},
+	}
+
+	for _, token := range tokens {
+		m := memberRE.FindStringSubmatch(token)
+		if m == nil {
+			continue
+		}
+
+		// "S" marks a spare, "J" a journal, empty an active member.
+		if m[2] == "S" {
+			arr.Spares = append(arr.Spares, m[1])
+
+			continue
+		}
+
+		arr.Members = append(arr.Members, m[1])
+	}
+
+	return arr
 }
 
 // raidLevelRE matches "Raid Level : raidN" or "RAID Level : raidN".
@@ -177,29 +184,52 @@ func applyDetail(
 	scanner := bufio.NewScanner(bytes.NewReader(detail))
 	for scanner.Scan() {
 		line := scanner.Text()
-		if m := raidLevelRE.FindStringSubmatch(line); m != nil {
-			arr.Level = m[1]
+
+		applyDetailStrings(arr, line)
+		applyDetailCounts(arr, line)
+	}
+}
+
+// applyDetailStrings records the fields mdadm --detail reports as text.
+func applyDetailStrings(
+	arr *Array,
+	line string,
+) {
+	for _, f := range []struct {
+		re  *regexp.Regexp
+		dst *string
+	}{
+		{raidLevelRE, &arr.Level},
+		{arrayStateRE, &arr.State},
+		{uuidRE, &arr.UUID},
+	} {
+		if m := f.re.FindStringSubmatch(line); m != nil {
+			*f.dst = m[1]
 		}
-		if m := arrayStateRE.FindStringSubmatch(line); m != nil {
-			arr.State = m[1]
+	}
+}
+
+// applyDetailCounts records the disk counts, leaving a count that will
+// not parse at zero.
+func applyDetailCounts(
+	arr *Array,
+	line string,
+) {
+	for _, f := range []struct {
+		re  *regexp.Regexp
+		dst *int
+	}{
+		{activeDevicesRE, &arr.ActiveDisks},
+		{totalDevicesRE, &arr.TotalDisks},
+		{spareDevicesRE, &arr.SpareDisks},
+	} {
+		m := f.re.FindStringSubmatch(line)
+		if m == nil {
+			continue
 		}
-		if m := uuidRE.FindStringSubmatch(line); m != nil {
-			arr.UUID = m[1]
-		}
-		if m := activeDevicesRE.FindStringSubmatch(line); m != nil {
-			if v, err := strconv.Atoi(m[1]); err == nil {
-				arr.ActiveDisks = v
-			}
-		}
-		if m := totalDevicesRE.FindStringSubmatch(line); m != nil {
-			if v, err := strconv.Atoi(m[1]); err == nil {
-				arr.TotalDisks = v
-			}
-		}
-		if m := spareDevicesRE.FindStringSubmatch(line); m != nil {
-			if v, err := strconv.Atoi(m[1]); err == nil {
-				arr.SpareDisks = v
-			}
+
+		if v, err := strconv.Atoi(m[1]); err == nil {
+			*f.dst = v
 		}
 	}
 }
@@ -216,10 +246,11 @@ func collectArrays(
 ) ([]Array, error) {
 	b, err := readFn("/proc/mdstat")
 	if err != nil {
-		if strings.Contains(err.Error(), "no such file or directory") ||
-			strings.Contains(err.Error(), "file does not exist") {
+		// A host with no MD support has no mdstat, which is not a failure.
+		if isNotExist(err) {
 			return []Array{}, nil
 		}
+
 		return nil, fmt.Errorf("read /proc/mdstat: %w", err)
 	}
 
@@ -228,23 +259,52 @@ func collectArrays(
 		return []Array{}, nil
 	}
 
-	// Sort device names for deterministic output.
+	// Sorted, so the output does not depend on map order.
 	names := make([]string, 0, len(devices))
 	for k := range devices {
 		names = append(names, k)
 	}
-	sort.Strings(names)
+
+	slices.Sort(names)
 
 	arrays := make([]Array, 0, len(names))
+
 	for _, name := range names {
 		arr := devices[name]
-		if execFn != nil {
-			detail, execErr := execFn(ctx, "mdadm", "--detail", "/dev/"+name)
-			if execErr == nil {
-				applyDetail(arr, detail)
-			}
-		}
+		enrichFromDetail(ctx, execFn, name, arr)
 		arrays = append(arrays, *arr)
 	}
+
 	return arrays, nil
+}
+
+// isNotExist recognises a missing file across the filesystem
+// implementations this reads through, which report it differently.
+func isNotExist(
+	err error,
+) bool {
+	msg := err.Error()
+
+	return strings.Contains(msg, "no such file or directory") ||
+		strings.Contains(msg, "file does not exist")
+}
+
+// enrichFromDetail adds what mdadm --detail knows. It is best-effort:
+// mdstat alone already describes the array.
+func enrichFromDetail(
+	ctx context.Context,
+	execFn func(context.Context, string, ...string) ([]byte, error),
+	name string,
+	arr *Array,
+) {
+	if execFn == nil {
+		return
+	}
+
+	detail, err := execFn(ctx, "mdadm", "--detail", "/dev/"+name)
+	if err != nil {
+		return
+	}
+
+	applyDetail(arr, detail)
 }

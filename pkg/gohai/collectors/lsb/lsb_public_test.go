@@ -75,26 +75,28 @@ func (s *LSBPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := lsb.New()
 			s.Equal("lsb", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*lsb.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*lsb.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -116,7 +118,7 @@ Codename:	noble
 	}{
 		{
 			name:    "linux: CLI succeeds, four fields populated",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return lsbReleaseExec(t, cliFull, nil) },
 			want: lsb.Info{
 				ID: "Ubuntu", Release: "24.04", Codename: "noble",
@@ -125,7 +127,7 @@ Codename:	noble
 		},
 		{
 			name:    "linux: CLI returns subset, only matching fields populated",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return lsbReleaseExec(t, []byte("Distributor ID:\tDebian\nRelease:\t12\n"), nil)
 			},
@@ -133,7 +135,7 @@ Codename:	noble
 		},
 		{
 			name:    "linux: CLI output with unmatched / no-colon lines: skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return lsbReleaseExec(t,
 					[]byte("no colon line here\nunrelated: value\nDistributor ID:\tArch\n"),
@@ -143,7 +145,7 @@ Codename:	noble
 		},
 		{
 			name:    "linux: CLI missing, empty Info no error",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return lsbReleaseExec(t, nil, errors.New("not found"))
 			},
@@ -151,7 +153,7 @@ Codename:	noble
 		},
 		{
 			name:    "linux: nil Exec, empty Info no error",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			want:    lsb.Info{},
 		},
@@ -165,10 +167,12 @@ Codename:	noble
 		s.Run(tt.name, func() {
 			var c lsb.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &lsb.Linux{Exec: tt.exec(s.T())}
 			case "darwin":
 				c = lsb.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

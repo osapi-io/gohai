@@ -21,6 +21,8 @@
 // Package initd detects the init system a Linux host is using —
 // systemd, upstart, sysvinit, openrc, or runit — by reading
 // /proc/1/comm. On macOS the answer is always launchd.
+//
+//nolint:revive // package-directory-mismatch: init is not a legal package name
 package initd
 
 import (

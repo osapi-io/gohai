@@ -33,6 +33,9 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
+// schemaFileMode is what the generated schema files are written with.
+const schemaFileMode = 0o644
+
 func qualifiedNamer(
 	t reflect.Type,
 ) string {
@@ -66,16 +69,16 @@ func main() {
 
 	data, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "marshal: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "marshal: %v\n", err)
 		os.Exit(1)
 	}
 
 	data = append(data, '\n')
 
-	if err := os.WriteFile(*out, data, 0o644); err != nil {
-		fmt.Fprintf(os.Stderr, "write %s: %v\n", *out, err)
+	if err := os.WriteFile(*out, data, schemaFileMode); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "write %s: %v\n", *out, err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("wrote %s (%d bytes)\n", *out, len(data))
+	_, _ = fmt.Printf("wrote %s (%d bytes)\n", *out, len(data))
 }

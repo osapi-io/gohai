@@ -35,6 +35,25 @@ var (
 	builtBy   = ""
 )
 
+// applyBuildInfo overlays whatever the linker stamped in, leaving the
+// library's own defaults where a variable was not set.
+func applyBuildInfo(i *goversion.Info) {
+	for _, f := range []struct {
+		value string
+		dst   *string
+	}{
+		{commit, &i.GitCommit},
+		{treestate, &i.GitTreeState},
+		{date, &i.BuildDate},
+		{version, &i.GitVersion},
+		{builtBy, &i.BuiltBy},
+	} {
+		if f.value != "" {
+			*f.dst = f.value
+		}
+	}
+}
+
 func buildVersion() goversion.Info {
 	return goversion.GetVersionInfo(
 		goversion.WithAppDetails(
@@ -42,23 +61,7 @@ func buildVersion() goversion.Info {
 			"SDK-first Go library for collecting system facts.\n",
 			"https://github.com/osapi-io/gohai",
 		),
-		func(i *goversion.Info) {
-			if commit != "" {
-				i.GitCommit = commit
-			}
-			if treestate != "" {
-				i.GitTreeState = treestate
-			}
-			if date != "" {
-				i.BuildDate = date
-			}
-			if version != "" {
-				i.GitVersion = version
-			}
-			if builtBy != "" {
-				i.BuiltBy = builtBy
-			}
-		},
+		applyBuildInfo,
 	)
 }
 

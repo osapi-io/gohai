@@ -41,7 +41,7 @@ func NewDarwin() *Darwin {
 
 // Collect returns the machine ID. gopsutil's darwin path is
 // correct — no extension needed.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

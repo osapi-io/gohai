@@ -50,7 +50,7 @@ func (s *DmiPublicTestSuite) TestNew() {
 		name   string
 		detect string
 	}{
-		{"linux", "debian"},
+		{osLinux, "debian"},
 		{"darwin", "darwin"},
 	}
 	for _, tt := range tests {
@@ -80,25 +80,25 @@ func (s *DmiPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux populates all sections when ghw succeeds",
-			variant: "linux",
+			variant: osLinux,
 			biosFn: func(...any) (*bios.Info, error) {
 				return &bios.Info{Vendor: "SeaBIOS", Version: "1.16.2", Date: "04/01/2014"}, nil
 			},
 			bbFn: func(...any) (*baseboard.Info, error) {
 				return &baseboard.Info{
-					Vendor: "Google", Product: "Google Compute Engine",
+					Vendor: vendorGoogle, Product: productGCE,
 					Version: "", SerialNumber: "Board-GoogleCloud", AssetTag: "",
 				}, nil
 			},
 			chFn: func(...any) (*chassis.Info, error) {
 				return &chassis.Info{
-					Vendor: "Google", Type: "1", TypeDescription: "Other",
+					Vendor: vendorGoogle, Type: "1", TypeDescription: "Other",
 					Version: "", SerialNumber: "GoogleCloud-1234", AssetTag: "",
 				}, nil
 			},
 			prodFn: func(...any) (*product.Info, error) {
 				return &product.Info{
-					Vendor: "Google", Name: "Google Compute Engine",
+					Vendor: vendorGoogle, Name: productGCE,
 					Family: "", Version: "",
 					SerialNumber: "GoogleCloud-1234",
 					UUID:         "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
@@ -113,22 +113,22 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				s.Equal("04/01/2014", info.BIOS.Date)
 
 				s.Require().NotNil(info.Baseboard)
-				s.Equal("Google", info.Baseboard.Vendor)
-				s.Equal("Google Compute Engine", info.Baseboard.Product)
+				s.Equal(vendorGoogle, info.Baseboard.Vendor)
+				s.Equal(productGCE, info.Baseboard.Product)
 
 				s.Require().NotNil(info.Chassis)
-				s.Equal("Google", info.Chassis.Vendor)
+				s.Equal(vendorGoogle, info.Chassis.Vendor)
 				s.Equal("Other", info.Chassis.TypeDescription)
 
 				s.Require().NotNil(info.Product)
-				s.Equal("Google", info.Product.VendorName)
-				s.Equal("Google Compute Engine", info.Product.Name)
+				s.Equal(vendorGoogle, info.Product.VendorName)
+				s.Equal(productGCE, info.Product.Name)
 				s.Equal("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", info.Product.UUID)
 			},
 		},
 		{
 			name:    "linux drops sections whose ghw call errors",
-			variant: "linux",
+			variant: osLinux,
 			biosFn: func(...any) (*bios.Info, error) {
 				return nil, errors.New("permission denied")
 			},
@@ -151,7 +151,7 @@ func (s *DmiPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux drops sections when ghw returns nil",
-			variant: "linux",
+			variant: osLinux,
 			biosFn:  func(...any) (*bios.Info, error) { return nil, nil },
 			bbFn:    func(...any) (*baseboard.Info, error) { return nil, nil },
 			chFn:    func(...any) (*chassis.Info, error) { return nil, nil },
@@ -181,7 +181,7 @@ func (s *DmiPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c dmi.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				defer dmi.SetBIOSFn(tt.biosFn)()
 				defer dmi.SetBaseboardFn(tt.bbFn)()
 				defer dmi.SetChassisFn(tt.chFn)()
@@ -189,6 +189,8 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				c = dmi.NewLinux()
 			case "darwin":
 				c = dmi.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 
 			out, err := c.Collect(context.Background(), nil)

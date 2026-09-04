@@ -186,54 +186,84 @@ func deriveKeyLength(
 ) int {
 	switch {
 	case strings.HasPrefix(keyType, "ecdsa"):
-		// Derive from curve name embedded in the key type string.
-		// ecdsa-sha2-nistp256 → 256, nistp384 → 384, nistp521 → 521.
-		switch {
-		case strings.Contains(keyType, "nistp256"):
-			return 256
-		case strings.Contains(keyType, "nistp384"):
-			return 384
-		case strings.Contains(keyType, "nistp521"):
-			return 521
-		}
-		return 0
+		return ecdsaKeyLength(keyType)
 	case keyType == "ssh-ed25519":
-		return 256
+		return bitsEd25519
 	case keyType == "ssh-rsa":
-		// Skip algorithm name field, skip exponent field, read modulus.
-		blob := raw
-		// Skip algorithm name (field 0).
-		blob = skipWireString(blob)
-		// Skip public exponent (field 1).
-		blob = skipWireString(blob)
-		// Read modulus (field 2).
-		modBytes := readWireString(blob)
-		if modBytes == nil {
-			return 0
-		}
-		// Strip leading zero byte (sign bit padding) if present.
-		for len(modBytes) > 0 && modBytes[0] == 0 {
-			modBytes = modBytes[1:]
-		}
-		return len(modBytes) * 8
+		return rsaKeyLength(raw)
 	default:
+		// A key type this does not know how to size.
 		return 0
 	}
 }
+
+// ecdsaKeyLength reads the size off the curve named in the key type:
+// ecdsa-sha2-nistp256 is 256 bits.
+func ecdsaKeyLength(
+	keyType string,
+) int {
+	switch {
+	case strings.Contains(keyType, "nistp256"):
+		return bitsNISTP256
+	case strings.Contains(keyType, "nistp384"):
+		return bitsNISTP384
+	case strings.Contains(keyType, "nistp521"):
+		return bitsNISTP521
+	default:
+		// An ECDSA curve this does not know the size of.
+		return 0
+	}
+}
+
+// rsaKeyLength measures the modulus, which is the third field of the
+// blob after the algorithm name and the public exponent.
+func rsaKeyLength(
+	raw []byte,
+) int {
+	blob := skipWireString(raw) // algorithm name
+	blob = skipWireString(blob) // public exponent
+
+	modBytes := readWireString(blob)
+	if modBytes == nil {
+		return 0
+	}
+
+	// A leading zero is sign-bit padding, not part of the modulus.
+	for len(modBytes) > 0 && modBytes[0] == 0 {
+		modBytes = modBytes[1:]
+	}
+
+	return len(modBytes) * bitsPerByte
+}
+
+// Key sizes the SSH key types report, and the shape of the wire format
+// they are read out of.
+const (
+	bitsNISTP256 = 256
+	bitsNISTP384 = 384
+	bitsNISTP521 = 521
+	bitsEd25519  = 256
+	bitsPerByte  = 8
+
+	// Every field in an SSH public key blob is preceded by a four-byte
+	// big-endian length.
+	wireLenPrefix = 4
+)
 
 // skipWireString advances past one length-prefixed wire string and
 // returns the remaining bytes. Returns nil on underflow.
 func skipWireString(
 	b []byte,
 ) []byte {
-	if len(b) < 4 {
+	if len(b) < wireLenPrefix {
 		return nil
 	}
-	n := int(binary.BigEndian.Uint32(b[:4]))
-	if len(b) < 4+n {
+
+	n := int(binary.BigEndian.Uint32(b[:wireLenPrefix]))
+	if len(b) < wireLenPrefix+n {
 		return nil
 	}
-	return b[4+n:]
+	return b[wireLenPrefix+n:]
 }
 
 // readWireString returns the bytes of the first length-prefixed wire
@@ -241,12 +271,13 @@ func skipWireString(
 func readWireString(
 	b []byte,
 ) []byte {
-	if len(b) < 4 {
+	if len(b) < wireLenPrefix {
 		return nil
 	}
-	n := int(binary.BigEndian.Uint32(b[:4]))
-	if len(b) < 4+n {
+
+	n := int(binary.BigEndian.Uint32(b[:wireLenPrefix]))
+	if len(b) < wireLenPrefix+n {
 		return nil
 	}
-	return b[4 : 4+n]
+	return b[wireLenPrefix : wireLenPrefix+n]
 }

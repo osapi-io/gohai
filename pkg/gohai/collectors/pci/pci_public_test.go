@@ -59,8 +59,8 @@ func (s *PCIPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -74,9 +74,11 @@ func (s *PCIPublicTestSuite) TestNew() {
 			case "darwin":
 				_, ok := c.(*pci.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*pci.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -91,7 +93,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: happy path maps ghw devices",
-			variant: "linux",
+			variant: osLinux,
 			pciFn: func(...any) (*ghwpci.Info, error) {
 				return &ghwpci.Info{
 					Devices: []*ghwpci.Device{
@@ -133,7 +135,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: ghw error yields empty info, no error",
-			variant: "linux",
+			variant: osLinux,
 			pciFn: func(...any) (*ghwpci.Info, error) {
 				return nil, errors.New("no /sys/bus/pci")
 			},
@@ -143,7 +145,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: ghw nil info yields empty",
-			variant: "linux",
+			variant: osLinux,
 			pciFn: func(...any) (*ghwpci.Info, error) {
 				return nil, nil
 			},
@@ -153,7 +155,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: devices with nil/empty fields tolerated",
-			variant: "linux",
+			variant: osLinux,
 			pciFn: func(...any) (*ghwpci.Info, error) {
 				return &ghwpci.Info{
 					Devices: []*ghwpci.Device{
@@ -188,11 +190,13 @@ func (s *PCIPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c pci.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				defer pci.SetGHWPCIFn(tt.pciFn)()
 				c = &pci.Linux{}
 			case "darwin":
 				c = &pci.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

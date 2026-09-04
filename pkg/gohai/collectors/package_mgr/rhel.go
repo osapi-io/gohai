@@ -39,7 +39,7 @@ func NewRHEL() *RHEL {
 }
 
 // Collect returns dnf if present, else yum.
-func (r *RHEL) Collect(
+func (*RHEL) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

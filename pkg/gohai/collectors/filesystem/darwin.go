@@ -38,7 +38,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns filesystem Info.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

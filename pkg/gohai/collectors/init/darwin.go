@@ -18,6 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
+//nolint:revive // package-directory-mismatch: init is not a legal package name
 package initd
 
 import (
@@ -38,7 +39,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns launchd.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

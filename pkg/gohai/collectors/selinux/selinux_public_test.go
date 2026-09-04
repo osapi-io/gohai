@@ -102,10 +102,10 @@ func (s *SelinuxPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -119,9 +119,11 @@ func (s *SelinuxPublicTestSuite) TestNew() {
 			case "darwin":
 				_, ok := c.(*selinux.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*selinux.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -150,7 +152,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: no /etc/selinux/config — disabled",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return memfs.New() },
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				return execmocks.NewMockExecutor(ctrl)
@@ -159,7 +161,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: config SELINUX=disabled — disabled, no sestatus",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/etc/selinux/config": "# comment\nSELINUX=disabled\nSELINUXTYPE=targeted\n",
@@ -169,11 +171,11 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 				return execmocks.NewMockExecutor(ctrl)
 			},
 			wantStatus: "disabled",
-			wantLoaded: "targeted",
+			wantLoaded: selinuxTargeted,
 		},
 		{
 			name:    "linux: enforcing with sestatus",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
@@ -186,15 +188,15 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusEnforcing), nil)
 				return m
 			},
-			wantStatus: "enabled",
+			wantStatus: stateEnabled,
 			wantMode:   "enforcing",
-			wantLoaded: "targeted",
-			wantMaxKV:  "33",
-			wantPV:     "33",
+			wantLoaded: selinuxTargeted,
+			wantMaxKV:  value33,
+			wantPV:     value33,
 		},
 		{
 			name:    "linux: permissive with sestatus",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/etc/selinux/config": "SELINUX=permissive\nSELINUXTYPE=minimum\n",
@@ -207,14 +209,14 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusPermissive), nil)
 				return m
 			},
-			wantStatus: "enabled",
+			wantStatus: stateEnabled,
 			wantMode:   "permissive",
 			wantLoaded: "minimum",
 			wantMaxKV:  "30",
 		},
 		{
 			name:    "linux: sestatus fails — status derived from config",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
@@ -227,12 +229,12 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("sestatus: command not found"))
 				return m
 			},
-			wantStatus: "enabled",
-			wantLoaded: "targeted",
+			wantStatus: stateEnabled,
+			wantLoaded: selinuxTargeted,
 		},
 		{
 			name:    "linux: sestatus returns disabled status",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
@@ -246,25 +248,25 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 				return m
 			},
 			wantStatus: "disabled",
-			wantLoaded: "targeted",
+			wantLoaded: selinuxTargeted,
 		},
 		{
 			name:    "linux: nil executor — falls back to config only",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
 			setupExec:  nil,
-			wantStatus: "enabled",
-			wantLoaded: "targeted",
+			wantStatus: stateEnabled,
+			wantLoaded: selinuxTargeted,
 		},
 		{
 			// config line with no '=' separator exercises the !ok branch
 			// in parseConfigFile.
 			name:    "linux: config line without equals sign skipped",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/etc/selinux/config": "SELINUX=enforcing\nthis line has no equals\nSELINUXTYPE=targeted\n",
@@ -277,17 +279,17 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusEnforcing), nil)
 				return m
 			},
-			wantStatus: "enabled",
+			wantStatus: stateEnabled,
 			wantMode:   "enforcing",
-			wantLoaded: "targeted",
-			wantMaxKV:  "33",
-			wantPV:     "33",
+			wantLoaded: selinuxTargeted,
+			wantMaxKV:  value33,
+			wantPV:     value33,
 		},
 		{
 			// sestatus output line with no ':' exercises the !ok branch
 			// in parseSestatus.
 			name:    "linux: sestatus line without colon skipped",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
@@ -302,9 +304,9 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(out), nil)
 				return m
 			},
-			wantStatus: "enabled",
+			wantStatus: stateEnabled,
 			wantMode:   "enforcing",
-			wantLoaded: "targeted",
+			wantLoaded: selinuxTargeted,
 		},
 	}
 	for _, tt := range tests {
@@ -313,7 +315,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 
 			var c selinux.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				l := &selinux.Linux{FS: tt.setupFS()}
 				if tt.setupExec != nil {
 					l.Exec = tt.setupExec(ctrl)
@@ -321,6 +323,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 				c = l
 			case "darwin":
 				c = &selinux.Darwin{}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 
 			got, err := c.Collect(context.Background(), nil)

@@ -24,6 +24,9 @@ package gohai
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
@@ -218,181 +221,16 @@ func (f *Facts) String() string {
 
 // countPopulated returns how many collector fields are non-nil.
 func (f *Facts) countPopulated() int {
+	v := reflect.ValueOf(f).Elem()
+
 	n := 0
-	if f.Platform != nil {
-		n++
+
+	for _, i := range factFields {
+		if !v.Field(i).IsNil() {
+			n++
+		}
 	}
-	if f.Hostname != nil {
-		n++
-	}
-	if f.Kernel != nil {
-		n++
-	}
-	if f.KernelModules != nil {
-		n++
-	}
-	if f.Uptime != nil {
-		n++
-	}
-	if f.Virtualization != nil {
-		n++
-	}
-	if f.MachineID != nil {
-		n++
-	}
-	if f.CPU != nil {
-		n++
-	}
-	if f.Load != nil {
-		n++
-	}
-	if f.Memory != nil {
-		n++
-	}
-	if f.Filesystem != nil {
-		n++
-	}
-	if f.Disk != nil {
-		n++
-	}
-	if f.Network != nil {
-		n++
-	}
-	if f.Process != nil {
-		n++
-	}
-	if f.Users != nil {
-		n++
-	}
-	if f.Timezone != nil {
-		n++
-	}
-	if f.RootGroup != nil {
-		n++
-	}
-	if f.Shells != nil {
-		n++
-	}
-	if f.Fips != nil {
-		n++
-	}
-	if f.OSRelease != nil {
-		n++
-	}
-	if f.LSB != nil {
-		n++
-	}
-	if f.Init != nil {
-		n++
-	}
-	if f.Shard != nil {
-		n++
-	}
-	if f.PackageMgr != nil {
-		n++
-	}
-	if f.Gce != nil {
-		n++
-	}
-	if f.Ec2 != nil {
-		n++
-	}
-	if f.Azure != nil {
-		n++
-	}
-	if f.DigitalOcean != nil {
-		n++
-	}
-	if f.OCI != nil {
-		n++
-	}
-	if f.Alibaba != nil {
-		n++
-	}
-	if f.Linode != nil {
-		n++
-	}
-	if f.OpenStack != nil {
-		n++
-	}
-	if f.Scaleway != nil {
-		n++
-	}
-	if f.DMI != nil {
-		n++
-	}
-	if f.GPU != nil {
-		n++
-	}
-	if f.BlockDevice != nil {
-		n++
-	}
-	if f.Command != nil {
-		n++
-	}
-	if f.Docker != nil {
-		n++
-	}
-	if f.Grub2 != nil {
-		n++
-	}
-	if f.Hostnamectl != nil {
-		n++
-	}
-	if f.Interrupts != nil {
-		n++
-	}
-	if f.IPC != nil {
-		n++
-	}
-	if f.Languages != nil {
-		n++
-	}
-	if f.Libvirt != nil {
-		n++
-	}
-	if f.Livepatch != nil {
-		n++
-	}
-	if f.Mdadm != nil {
-		n++
-	}
-	if f.Packages != nil {
-		n++
-	}
-	if f.RPM != nil {
-		n++
-	}
-	if f.SELinux != nil {
-		n++
-	}
-	if f.Services != nil {
-		n++
-	}
-	if f.SSH != nil {
-		n++
-	}
-	if f.Sysconf != nil {
-		n++
-	}
-	if f.Sysctl != nil {
-		n++
-	}
-	if f.SystemdPaths != nil {
-		n++
-	}
-	if f.TC != nil {
-		n++
-	}
-	if f.VirtualBox != nil {
-		n++
-	}
-	if f.VMware != nil {
-		n++
-	}
-	if f.Zpools != nil {
-		n++
-	}
+
 	return n
 }
 
@@ -403,256 +241,48 @@ func (f *Facts) set(
 	name string,
 	result any,
 ) {
-	switch name {
-	case "platform":
-		if v, ok := result.(*platform.Info); ok {
-			f.Platform = v
-		}
-	case "hostname":
-		if v, ok := result.(*hostname.Info); ok {
-			f.Hostname = v
-		}
-	case "kernel":
-		if v, ok := result.(*kernel.Info); ok {
-			f.Kernel = v
-		}
-	case "kernel_modules":
-		if v, ok := result.(*kernelmodules.Info); ok {
-			f.KernelModules = v
-		}
-	case "uptime":
-		if v, ok := result.(*uptime.Info); ok {
-			f.Uptime = v
-		}
-	case "virtualization":
-		if v, ok := result.(*virtualization.Info); ok {
-			f.Virtualization = v
-		}
-	case "machine_id":
-		if v, ok := result.(*machineid.Info); ok {
-			f.MachineID = v
-		}
-	case "cpu":
-		if v, ok := result.(*cpu.Info); ok {
-			f.CPU = v
-		}
-	case "load":
-		if v, ok := result.(*load.Info); ok {
-			f.Load = v
-		}
-	case "memory":
-		if v, ok := result.(*memory.Info); ok {
-			f.Memory = v
-		}
-	case "filesystem":
-		if v, ok := result.(*filesystem.Info); ok {
-			f.Filesystem = v
-		}
-	case "disk":
-		if v, ok := result.(*disk.Info); ok {
-			f.Disk = v
-		}
-	case "network":
-		if v, ok := result.(*network.Info); ok {
-			f.Network = v
-		}
-	case "process":
-		if v, ok := result.(*process.Info); ok {
-			f.Process = v
-		}
-	case "users":
-		if v, ok := result.(*users.Info); ok {
-			f.Users = v
-		}
-	case "sessions":
-		if v, ok := result.(*sessions.Info); ok {
-			f.Sessions = v
-		}
-	case "timezone":
-		if v, ok := result.(*timezone.Info); ok {
-			f.Timezone = v
-		}
-	case "root_group":
-		if v, ok := result.(*rootgroup.Info); ok {
-			f.RootGroup = v
-		}
-	case "shells":
-		if v, ok := result.(*shells.Info); ok {
-			f.Shells = v
-		}
-	case "fips":
-		if v, ok := result.(*fips.Info); ok {
-			f.Fips = v
-		}
-	case "os_release":
-		if v, ok := result.(*osrelease.Info); ok {
-			f.OSRelease = v
-		}
-	case "lsb":
-		if v, ok := result.(*lsb.Info); ok {
-			f.LSB = v
-		}
-	case "init":
-		if v, ok := result.(*initd.Info); ok {
-			f.Init = v
-		}
-	case "shard":
-		if v, ok := result.(*shard.Info); ok {
-			f.Shard = v
-		}
-	case "package_mgr":
-		if v, ok := result.(*packagemgr.Info); ok {
-			f.PackageMgr = v
-		}
-	case "gce":
-		if v, ok := result.(*gce.Info); ok {
-			f.Gce = v
-		}
-	case "ec2":
-		if v, ok := result.(*ec2.Info); ok {
-			f.Ec2 = v
-		}
-	case "azure":
-		if v, ok := result.(*azure.Info); ok {
-			f.Azure = v
-		}
-	case "digital_ocean":
-		if v, ok := result.(*digitalocean.Info); ok {
-			f.DigitalOcean = v
-		}
-	case "oci":
-		if v, ok := result.(*oci.Info); ok {
-			f.OCI = v
-		}
-	case "alibaba":
-		if v, ok := result.(*alibaba.Info); ok {
-			f.Alibaba = v
-		}
-	case "linode":
-		if v, ok := result.(*linode.Info); ok {
-			f.Linode = v
-		}
-	case "openstack":
-		if v, ok := result.(*openstack.Info); ok {
-			f.OpenStack = v
-		}
-	case "scaleway":
-		if v, ok := result.(*scaleway.Info); ok {
-			f.Scaleway = v
-		}
-	case "dmi":
-		if v, ok := result.(*dmi.Info); ok {
-			f.DMI = v
-		}
-	case "gpu":
-		if v, ok := result.(*gpu.Info); ok {
-			f.GPU = v
-		}
-	case "pci":
-		if v, ok := result.(*pci.Info); ok {
-			f.PCI = v
-		}
-	case "scsi":
-		if v, ok := result.(*scsi.Info); ok {
-			f.SCSI = v
-		}
-	case "hardware":
-		if v, ok := result.(*hardware.Info); ok {
-			f.Hardware = v
-		}
-	case "block_device":
-		if v, ok := result.(*blockdevice.Info); ok {
-			f.BlockDevice = v
-		}
-	case "command":
-		if v, ok := result.(*command.Info); ok {
-			f.Command = v
-		}
-	case "docker":
-		if v, ok := result.(*docker.Info); ok {
-			f.Docker = v
-		}
-	case "grub2":
-		if v, ok := result.(*grub2.Info); ok {
-			f.Grub2 = v
-		}
-	case "hostnamectl":
-		if v, ok := result.(*hostnamectl.Info); ok {
-			f.Hostnamectl = v
-		}
-	case "interrupts":
-		if v, ok := result.(*interrupts.Info); ok {
-			f.Interrupts = v
-		}
-	case "ipc":
-		if v, ok := result.(*ipc.Info); ok {
-			f.IPC = v
-		}
-	case "languages":
-		if v, ok := result.(*languages.Info); ok {
-			f.Languages = v
-		}
-	case "libvirt":
-		if v, ok := result.(*libvirt.Info); ok {
-			f.Libvirt = v
-		}
-	case "livepatch":
-		if v, ok := result.(*livepatch.Info); ok {
-			f.Livepatch = v
-		}
-	case "mdadm":
-		if v, ok := result.(*mdadm.Info); ok {
-			f.Mdadm = v
-		}
-	case "packages":
-		if v, ok := result.(*packages.Info); ok {
-			f.Packages = v
-		}
-	case "rpm":
-		if v, ok := result.(*rpm.Info); ok {
-			f.RPM = v
-		}
-	case "selinux":
-		if v, ok := result.(*selinux.Info); ok {
-			f.SELinux = v
-		}
-	case "services":
-		if v, ok := result.(*services.Info); ok {
-			f.Services = v
-		}
-	case "ssh":
-		if v, ok := result.(*ssh.Info); ok {
-			f.SSH = v
-		}
-	case "sysconf":
-		if v, ok := result.(*sysconf.Info); ok {
-			f.Sysconf = v
-		}
-	case "sysctl":
-		if v, ok := result.(*sysctl.Info); ok {
-			f.Sysctl = v
-		}
-	case "systemd_paths":
-		if v, ok := result.(*systemdpaths.Info); ok {
-			f.SystemdPaths = v
-		}
-	case "tc":
-		if v, ok := result.(*tc.Info); ok {
-			f.TC = v
-		}
-	case "virtualbox":
-		if v, ok := result.(*virtualbox.Info); ok {
-			f.VirtualBox = v
-		}
-	case "vmware":
-		if v, ok := result.(*vmware.Info); ok {
-			f.VMware = v
-		}
-	case "zpools":
-		if v, ok := result.(*zpools.Info); ok {
-			f.Zpools = v
-		}
+	i, ok := factFields[name]
+	if !ok {
+		return
 	}
+
+	field := reflect.ValueOf(f).Elem().Field(i)
+
+	v := reflect.ValueOf(result)
+	if !v.IsValid() || !v.Type().AssignableTo(field.Type()) {
+		return
+	}
+
+	field.Set(v)
+}
+
+// factFields maps a collector's name to the Facts field that carries its
+// result, read off the struct's own json tags. Before this the mapping
+// was written out twice — a 62-case switch in set and 58 nil checks in
+// countPopulated — and the two had already drifted: sessions, hardware,
+// scsi and pci were stored but never counted.
+var factFields = buildFactFields()
+
+func buildFactFields() map[string]int {
+	m := make(map[string]int)
+
+	t := reflect.TypeOf(Facts{})
+	for i := range t.NumField() {
+		field := t.Field(i)
+		if field.Type.Kind() != reflect.Pointer {
+			continue
+		}
+
+		tag, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+		// A leading underscore marks a field that is not a collector.
+		if tag == "" || tag == "-" || strings.HasPrefix(tag, "_") {
+			continue
+		}
+
+		m[tag] = i
+	}
+
+	return m
 }
 
 func flattenMap(
@@ -660,18 +290,22 @@ func flattenMap(
 	in map[string]any,
 ) map[string]any {
 	out := make(map[string]any)
+
 	for k, v := range in {
 		key := k
 		if prefix != "" {
 			key = prefix + "." + k
 		}
-		if sub, ok := v.(map[string]any); ok {
-			for sk, sv := range flattenMap(key, sub) {
-				out[sk] = sv
-			}
+
+		sub, nested := v.(map[string]any)
+		if !nested {
+			out[key] = v
+
 			continue
 		}
-		out[key] = v
+
+		maps.Copy(out, flattenMap(key, sub))
 	}
+
 	return out
 }

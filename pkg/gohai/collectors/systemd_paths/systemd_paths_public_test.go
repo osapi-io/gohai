@@ -76,26 +76,28 @@ func (s *SystemdPathsPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := systemdpaths.New()
 			s.Equal("systemd_paths", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*systemdpaths.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*systemdpaths.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -118,7 +120,7 @@ user-runtime: /run/user/1000
 	}{
 		{
 			name:    "linux: full output parsed",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return systemdPathExec(t, fullOutput, nil) },
 			wantPaths: map[string]string{
 				"systemd":                    "/usr/lib/systemd",
@@ -130,13 +132,13 @@ user-runtime: /run/user/1000
 		},
 		{
 			name:      "linux: empty output yields empty paths",
-			variant:   "linux",
+			variant:   osLinux,
 			exec:      func(t *testing.T) executor.Executor { return systemdPathExec(t, []byte{}, nil) },
 			wantPaths: map[string]string{},
 		},
 		{
 			name:    "linux: line without colon-space skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return systemdPathExec(t,
 					[]byte("no_separator\nsystemd: /usr/lib/systemd\n"),
@@ -146,7 +148,7 @@ user-runtime: /run/user/1000
 		},
 		{
 			name:    "linux: empty key skipped",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				return systemdPathExec(t,
 					[]byte(": /some/path\nsystemd: /usr/lib/systemd\n"),
@@ -156,13 +158,13 @@ user-runtime: /run/user/1000
 		},
 		{
 			name:      "linux: exec error yields empty paths, no error",
-			variant:   "linux",
+			variant:   osLinux,
 			exec:      func(t *testing.T) executor.Executor { return systemdPathExec(t, nil, errors.New("not found")) },
 			wantPaths: map[string]string{},
 		},
 		{
 			name:      "linux: nil Exec yields empty paths, no error",
-			variant:   "linux",
+			variant:   osLinux,
 			exec:      func(*testing.T) executor.Executor { return nil },
 			wantPaths: map[string]string{},
 		},
@@ -176,10 +178,12 @@ user-runtime: /run/user/1000
 		s.Run(tt.name, func() {
 			var c systemdpaths.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &systemdpaths.Linux{Exec: tt.exec(s.T())}
 			case "darwin":
 				c = systemdpaths.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)

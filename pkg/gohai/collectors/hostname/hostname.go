@@ -109,40 +109,58 @@ func collectWithExec(
 	ctx context.Context,
 	exec executor.Executor,
 ) (*Info, error) {
-	short, shortOK := "", false
-	machine, machineOK := "", false
+	short := hostnameFrom(ctx, exec, "-s")
 
-	if exec != nil {
-		if out, err := exec.Execute(ctx, "hostname", "-s"); err == nil {
-			if trimmed := strings.TrimSpace(string(out)); trimmed != "" {
-				short, shortOK = trimmed, true
-			}
-		}
-		if out, err := exec.Execute(ctx, "hostname"); err == nil {
-			if trimmed := strings.TrimSpace(string(out)); trimmed != "" {
-				machine, machineOK = trimmed, true
-			}
-		}
-	}
-
-	if !shortOK {
+	if short == "" {
 		gpShort, err := readShortHostname(ctx)
 		if err != nil {
 			return nil, err
 		}
+
 		short = gpShort
 	}
-	if !machineOK {
-		if raw, err := osHostnameFn(); err == nil {
-			machine = raw
-		} else {
-			machine = short
-		}
+
+	machine := hostnameFrom(ctx, exec)
+	if machine == "" {
+		machine = osHostname(short)
 	}
 
 	info := &Info{Name: short, MachineName: machine}
 	info.FQDN, info.Domain = canonicalFQDN(short)
+
 	return info, nil
+}
+
+// hostnameFrom runs the hostname command, returning "" when there is no
+// executor, the command fails, or it prints nothing.
+func hostnameFrom(
+	ctx context.Context,
+	exec executor.Executor,
+	args ...string,
+) string {
+	if exec == nil {
+		return ""
+	}
+
+	out, err := exec.Execute(ctx, "hostname", args...)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(out))
+}
+
+// osHostname falls back to the kernel's own answer, and to the short
+// name when even that fails.
+func osHostname(
+	short string,
+) string {
+	raw, err := osHostnameFn()
+	if err != nil {
+		return short
+	}
+
+	return raw
 }
 
 // canonicalFQDN resolves short hostname → IP → PTR (reverse DNS) to
@@ -162,37 +180,76 @@ func canonicalFQDN(
 	if short == "" {
 		return "", ""
 	}
-	for attempt := 0; attempt < resolverRetries; attempt++ {
+
+	if name := resolveWithRetries(short); name != "" {
+		return splitFQDN(name)
+	}
+
+	return short, ""
+}
+
+// resolveWithRetries retries a resolver that failed for a reason that
+// might not last. A name that does not exist will not start existing,
+// so that failure ends the attempt straight away.
+func resolveWithRetries(
+	short string,
+) string {
+	for attempt := range resolverRetries {
 		if attempt > 0 {
 			time.Sleep(resolverBackoff)
 		}
-		ips, err := lookupHostFn(short)
-		if err != nil {
-			if isDNSNotFound(err) {
-				break
-			}
-			continue
+
+		name, retry := reverseLookup(short)
+		if name != "" {
+			return name
 		}
-		if len(ips) == 0 {
+
+		if !retry {
 			break
 		}
-		names, err := lookupAddrFn(ips[0])
-		if err != nil {
-			if isDNSNotFound(err) {
-				break
-			}
-			continue
-		}
-		if len(names) == 0 {
-			break
-		}
-		fqdn = strings.TrimSuffix(names[0], ".")
-		if i := strings.Index(fqdn, "."); i >= 0 {
-			domain = fqdn[i+1:]
-		}
-		return fqdn, domain
 	}
-	return short, ""
+
+	return ""
+}
+
+// reverseLookup resolves the short name to an address and back again.
+// It returns the name it found, or asks to be retried when the failure
+// was transient — a name that does not exist is not.
+func reverseLookup(
+	short string,
+) (name string, retry bool) {
+	ips, err := lookupHostFn(short)
+	if err != nil {
+		return "", !isDNSNotFound(err)
+	}
+
+	if len(ips) == 0 {
+		return "", false
+	}
+
+	names, err := lookupAddrFn(ips[0])
+	if err != nil {
+		return "", !isDNSNotFound(err)
+	}
+
+	if len(names) == 0 {
+		return "", false
+	}
+
+	return names[0], false
+}
+
+// splitFQDN separates the host from its search domain.
+func splitFQDN(
+	name string,
+) (fqdn, domain string) {
+	fqdn = strings.TrimSuffix(name, ".")
+
+	if _, rest, ok := strings.Cut(fqdn, "."); ok {
+		domain = rest
+	}
+
+	return fqdn, domain
 }
 
 // isDNSNotFound reports whether err is a definitive DNS "no such host"

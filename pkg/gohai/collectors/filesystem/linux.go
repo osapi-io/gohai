@@ -66,40 +66,60 @@ func (l *Linux) Collect(
 	if err != nil {
 		return nil, err
 	}
+
 	info := &Info{Mounts: mounts}
 	if l.Exec == nil {
 		return info, nil
 	}
 
-	// lsblk enrichment — best-effort; non-fatal on failure.
-	out, err := l.Exec.Execute(ctx,
-		"lsblk", "-J", "-o", "NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL")
-	if err == nil {
-		if entries, err := parseLsblk(out); err == nil {
-			merged, unmounted := mergeLsblkIntoMounts(info.Mounts, entries)
-			info.Mounts = merged
-			info.Unmounted = unmounted
-		}
-	}
+	l.applyLsblk(ctx, info)
 
-	// ZFS enumeration — independent of lsblk; only fires when the
-	// `zfs` binary is on PATH. Any exec failure (binary missing,
-	// permission denied, module not loaded) silently skips this
-	// section, so non-ZFS hosts return zero ZFS datasets with no error.
+	// ZFS only answers where the binary is on PATH. Any failure — no
+	// binary, no permission, module not loaded — means no datasets
+	// rather than an error.
 	if out, err := l.Exec.Execute(ctx, "zfs", "get", "-p", "-H", "all"); err == nil {
 		info.ZFSDatasets = parseZFSGetAll(out)
 	}
 
-	// Btrfs allocation enrichment — only mounts identified as btrfs
-	// AND carrying a UUID (lsblk-derived) are eligible. Pure sysfs
-	// reads via FS; nil FS or missing /sys/fs/btrfs paths skip cleanly.
-	if l.FS != nil {
-		for i := range info.Mounts {
-			m := &info.Mounts[i]
-			if m.Type == "btrfs" && m.UUID != "" {
-				m.Btrfs = readBtrfsInfo(l.FS, m.UUID)
-			}
+	l.applyBtrfs(info)
+
+	return info, nil
+}
+
+// applyLsblk enriches the mounts with what lsblk knows, and records the
+// devices no mount claimed. Best-effort: lsblk may be absent.
+func (l *Linux) applyLsblk(
+	ctx context.Context,
+	info *Info,
+) {
+	out, err := l.Exec.Execute(ctx,
+		"lsblk", "-J", "-o",
+		"NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL")
+	if err != nil {
+		return
+	}
+
+	entries, err := parseLsblk(out)
+	if err != nil {
+		return
+	}
+
+	info.Mounts, info.Unmounted = mergeLsblkIntoMounts(info.Mounts, entries)
+}
+
+// applyBtrfs reads allocation figures out of sysfs. Only a btrfs mount
+// carrying a UUID — which lsblk supplies — can be looked up.
+func (l *Linux) applyBtrfs(
+	info *Info,
+) {
+	if l.FS == nil {
+		return
+	}
+
+	for i := range info.Mounts {
+		m := &info.Mounts[i]
+		if m.Type == "btrfs" && m.UUID != "" {
+			m.Btrfs = readBtrfsInfo(l.FS, m.UUID)
 		}
 	}
-	return info, nil
 }

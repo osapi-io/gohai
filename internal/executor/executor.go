@@ -60,7 +60,7 @@ func New() Executor {
 // Execute runs the command and returns its combined stdout+stderr.
 // On non-zero exit, returns the captured output plus a wrapped error
 // carrying the exit status via errors.As(*exec.ExitError).
-func (d *defaultExecutor) Execute(
+func (*defaultExecutor) Execute(
 	ctx context.Context,
 	name string,
 	args ...string,

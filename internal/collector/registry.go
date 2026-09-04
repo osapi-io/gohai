@@ -24,7 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"sync"
 	"time"
 )
@@ -122,7 +122,7 @@ func (r *Registry) Selected(
 	enable []string,
 	disable []string,
 ) ([]Collector, error) {
-	return r.SelectedWith(true, enable, disable)
+	return r.SelectedWith(Selection{UseDefaults: true, Enable: enable, Disable: disable})
 }
 
 // SelectedWith returns the collectors that should run. When
@@ -130,44 +130,79 @@ func (r *Registry) Selected(
 // included. The enable list adds names regardless of DefaultEnabled.
 // The disable list subtracts names. Unknown names in enable/disable
 // return an error.
+// Selection describes which collectors a caller wants: the defaults or
+// not, plus names to add and names to take away.
+type Selection struct {
+	UseDefaults bool
+	Enable      []string
+	Disable     []string
+}
+
 func (r *Registry) SelectedWith(
-	useDefaults bool,
-	enable []string,
-	disable []string,
+	sel Selection,
 ) ([]Collector, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	for _, n := range enable {
-		if _, ok := r.collectors[n]; !ok {
-			return nil, fmt.Errorf("unknown collector %q in enable list", n)
-		}
-	}
-	for _, n := range disable {
-		if _, ok := r.collectors[n]; !ok {
-			return nil, fmt.Errorf("unknown collector %q in disable list", n)
-		}
+	if err := r.checkKnown(sel.Enable, "enable"); err != nil {
+		return nil, err
 	}
 
-	enableSet := make(map[string]bool, len(enable))
-	for _, n := range enable {
-		enableSet[n] = true
+	if err := r.checkKnown(sel.Disable, "disable"); err != nil {
+		return nil, err
 	}
-	disableSet := make(map[string]bool, len(disable))
-	for _, n := range disable {
-		disableSet[n] = true
-	}
+
+	return r.pick(sel), nil
+}
+
+// pick chooses what sel asks for: the defaults when it wants them,
+// plus anything named in Enable, less anything named in Disable.
+func (r *Registry) pick(
+	sel Selection,
+) []Collector {
+	enabled := asSet(sel.Enable)
+	disabled := asSet(sel.Disable)
 
 	out := make([]Collector, 0, len(r.collectors))
+
 	for name, c := range r.collectors {
-		if disableSet[name] {
+		if disabled[name] {
 			continue
 		}
-		if (useDefaults && c.DefaultEnabled()) || enableSet[name] {
+
+		if (sel.UseDefaults && c.DefaultEnabled()) || enabled[name] {
 			out = append(out, c)
 		}
 	}
-	return out, nil
+
+	return out
+}
+
+// checkKnown rejects a name no collector answers to, naming which list
+// it came from.
+func (r *Registry) checkKnown(
+	names []string,
+	list string,
+) error {
+	for _, n := range names {
+		if _, ok := r.collectors[n]; !ok {
+			return fmt.Errorf("unknown collector %q in %s list", n, list)
+		}
+	}
+
+	return nil
+}
+
+// asSet turns a name list into a lookup.
+func asSet(
+	names []string,
+) map[string]bool {
+	set := make(map[string]bool, len(names))
+	for _, n := range names {
+		set[n] = true
+	}
+
+	return set
 }
 
 // Run executes the named collectors in dependency order. Dependencies are
@@ -194,75 +229,117 @@ func (r *Registry) Run(
 	}
 
 	results := make(map[string]any, len(wanted))
+
 	var resultsMu sync.Mutex
 
 	for _, level := range levels {
-		// Snapshot prior results once per level. Collectors at the
-		// same level have no inter-dependencies by definition, so
-		// they all see the same prior state — matches the
-		// topological contract.
-		resultsMu.Lock()
-		prior := make(PriorResults, len(results))
-		for k, v := range results {
-			prior[k] = v
-		}
-		resultsMu.Unlock()
-
-		var wg sync.WaitGroup
-		for _, name := range level {
-			c := r.collectors[name]
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				start := time.Now()
-				out, cerr := c.Collect(ctx, prior)
-				dur := time.Since(start)
-				if hooks.OnComplete != nil {
-					hooks.OnComplete(c.Name(), dur, cerr)
-				}
-				if cerr != nil {
-					if hooks.OnError != nil {
-						hooks.OnError(c.Name(), cerr)
-					}
-					return
-				}
-				resultsMu.Lock()
-				results[c.Name()] = out
-				resultsMu.Unlock()
-			}()
-		}
-		wg.Wait()
+		r.runLevel(ctx, level, results, &resultsMu, hooks)
 	}
+
 	return results, nil
+}
+
+// runLevel runs one level's collectors at the same time. They have no
+// dependencies on each other by definition, so they all see the same
+// snapshot of what earlier levels produced.
+func (r *Registry) runLevel(
+	ctx context.Context,
+	level []string,
+	results map[string]any,
+	mu *sync.Mutex,
+	hooks Hooks,
+) {
+	mu.Lock()
+	prior := make(PriorResults, len(results))
+
+	for k, v := range results {
+		prior[k] = v
+	}
+	mu.Unlock()
+
+	var wg sync.WaitGroup
+
+	for _, name := range level {
+		c := r.collectors[name]
+		wg.Go(func() {
+			out, ok := runOne(ctx, c, prior, hooks)
+			if !ok {
+				return
+			}
+
+			mu.Lock()
+			results[c.Name()] = out
+			mu.Unlock()
+		})
+	}
+
+	wg.Wait()
+}
+
+// runOne runs a single collector, timing it and reporting through the
+// hooks. It returns false when the collector failed, which keeps it out
+// of the results.
+func runOne(
+	ctx context.Context,
+	c Collector,
+	prior PriorResults,
+	hooks Hooks,
+) (any, bool) {
+	start := time.Now()
+	out, err := c.Collect(ctx, prior)
+
+	if hooks.OnComplete != nil {
+		hooks.OnComplete(c.Name(), time.Since(start), err)
+	}
+
+	if err != nil {
+		if hooks.OnError != nil {
+			hooks.OnError(c.Name(), err)
+		}
+
+		return nil, false
+	}
+
+	return out, true
 }
 
 func (r *Registry) expandWithDeps(
 	names []string,
 ) (map[string]bool, error) {
 	wanted := make(map[string]bool)
-	var visit func(string) error
-	visit = func(n string) error {
-		if wanted[n] {
-			return nil
-		}
-		c, ok := r.collectors[n]
-		if !ok {
-			return fmt.Errorf("unknown collector %q", n)
-		}
-		wanted[n] = true
-		for _, dep := range c.Dependencies() {
-			if err := visit(dep); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
+
 	for _, n := range names {
-		if err := visit(n); err != nil {
+		if err := r.visitDeps(n, wanted); err != nil {
 			return nil, err
 		}
 	}
+
 	return wanted, nil
+}
+
+// visitDeps marks a collector and everything it depends on, depth-first.
+func (r *Registry) visitDeps(
+	name string,
+	wanted map[string]bool,
+) error {
+	if wanted[name] {
+		return nil
+	}
+
+	c, ok := r.collectors[name]
+	if !ok {
+		return fmt.Errorf("unknown collector %q", name)
+	}
+
+	wanted[name] = true
+
+	for _, dep := range c.Dependencies() {
+		if err := r.visitDeps(dep, wanted); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (r *Registry) topoLevels(
@@ -270,39 +347,62 @@ func (r *Registry) topoLevels(
 ) ([][]string, error) {
 	indeg := make(map[string]int, len(wanted))
 	for n := range wanted {
-		indeg[n] = 0
-	}
-	for n := range wanted {
-		for range r.collectors[n].Dependencies() {
-			indeg[n]++
-		}
+		indeg[n] = len(r.collectors[n].Dependencies())
 	}
 
 	var levels [][]string
-	remaining := len(indeg)
-	for remaining > 0 {
-		var level []string
-		for n, d := range indeg {
-			if d == 0 {
-				level = append(level, n)
-			}
-		}
+
+	for len(indeg) > 0 {
+		level := readyNames(indeg)
 		if len(level) == 0 {
-			return nil, fmt.Errorf("dependency cycle detected among collectors")
+			return nil, errors.New("dependency cycle detected among collectors")
 		}
-		sort.Strings(level)
+
+		slices.Sort(level)
 		levels = append(levels, level)
-		for _, n := range level {
-			delete(indeg, n)
-			remaining--
-			for m := range indeg {
-				for _, dep := range r.collectors[m].Dependencies() {
-					if dep == n {
-						indeg[m]--
-					}
-				}
+		r.removeLevel(indeg, level)
+	}
+
+	return levels, nil
+}
+
+// readyNames lists the collectors whose dependencies have all run.
+func readyNames(
+	indeg map[string]int,
+) []string {
+	var level []string
+
+	for n, d := range indeg {
+		if d == 0 {
+			level = append(level, n)
+		}
+	}
+
+	return level
+}
+
+// removeLevel drops a level from the graph and decrements whatever was
+// waiting on it.
+func (r *Registry) removeLevel(
+	indeg map[string]int,
+	level []string,
+) {
+	for _, n := range level {
+		delete(indeg, n)
+		r.decrementDependents(indeg, n)
+	}
+}
+
+// decrementDependents drops one from every collector still waiting on n.
+func (r *Registry) decrementDependents(
+	indeg map[string]int,
+	n string,
+) {
+	for m := range indeg {
+		for _, dep := range r.collectors[m].Dependencies() {
+			if dep == n {
+				indeg[m]--
 			}
 		}
 	}
-	return levels, nil
 }

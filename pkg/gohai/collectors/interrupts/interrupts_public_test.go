@@ -81,26 +81,28 @@ func (s *InterruptsPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
 			c := interrupts.New()
 			s.Equal("interrupts", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal(osLinux, c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
 			case "darwin":
 				_, ok := c.(*interrupts.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*interrupts.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -117,15 +119,15 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 	}{
 		{
 			name:    "linux: two-cpu with numeric and non-numeric IRQs",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/interrupts", twoCPUInterrupts, fs.FileMode(0o444))
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcInterrupts, twoCPUInterrupts, fs.FileMode(0o444))
 				return f
 			},
 			want: []interrupts.IRQ{
-				{Number: "0", Type: "IO-APIC", Device: "timer", CountsPerCPU: []int64{46, 0}},
+				{Number: "0", Type: irqIOAPIC, Device: "timer", CountsPerCPU: []int64{46, 0}},
 				{Number: "9", Type: "ACPI", Device: "acpi", CountsPerCPU: []int64{0, 0}},
 				{Number: "NMI", Type: "Non-maskable interrupts", CountsPerCPU: []int64{0, 0}},
 				{Number: "ERR", CountsPerCPU: []int64{0, 0}},
@@ -133,34 +135,34 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: empty /proc/interrupts yields empty list",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/interrupts", []byte{}, fs.FileMode(0o444))
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcInterrupts, []byte{}, fs.FileMode(0o444))
 				return f
 			},
 			want: []interrupts.IRQ{},
 		},
 		{
 			name:    "linux: /proc/interrupts absent returns empty list",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return memfs.New() },
 			want:    []interrupts.IRQ{},
 		},
 		{
 			name:    "linux: permission denied propagates error",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
 			wantErr: true,
 		},
 		{
 			name:    "linux: invalid count field returns error",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/interrupts",
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcInterrupts,
 					[]byte("           CPU0\n  0:      BAD   IO-APIC   2-edge   timer\n"),
 					fs.FileMode(0o444))
 				return f
@@ -169,12 +171,12 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: line without colon is skipped",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
+				_ = f.MkdirAll(pathProc, 0o755)
 				_ = f.WriteFile(
-					"/proc/interrupts",
+					pathProcInterrupts,
 					[]byte(
 						"           CPU0\n  0:        10   IO-APIC   2-edge   timer\nno colon here\n",
 					),
@@ -183,37 +185,37 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 				return f
 			},
 			want: []interrupts.IRQ{
-				{Number: "0", Type: "IO-APIC", Device: "timer", CountsPerCPU: []int64{10}},
+				{Number: "0", Type: irqIOAPIC, Device: "timer", CountsPerCPU: []int64{10}},
 			},
 		},
 		{
 			name:    "linux: numeric IRQ with only type (no vector or device)",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/interrupts",
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcInterrupts,
 					[]byte("           CPU0\n  7:          0   IO-APIC\n"),
 					fs.FileMode(0o444))
 				return f
 			},
 			want: []interrupts.IRQ{
-				{Number: "7", Type: "IO-APIC", CountsPerCPU: []int64{0}},
+				{Number: "7", Type: irqIOAPIC, CountsPerCPU: []int64{0}},
 			},
 		},
 		{
 			name:    "linux: numeric IRQ with type and vector but no device",
-			variant: "linux",
+			variant: osLinux,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/proc", 0o755)
-				_ = f.WriteFile("/proc/interrupts",
+				_ = f.MkdirAll(pathProc, 0o755)
+				_ = f.WriteFile(pathProcInterrupts,
 					[]byte("           CPU0\n  8:          3   IO-APIC   8-edge\n"),
 					fs.FileMode(0o444))
 				return f
 			},
 			want: []interrupts.IRQ{
-				{Number: "8", Type: "IO-APIC", CountsPerCPU: []int64{3}},
+				{Number: "8", Type: irqIOAPIC, CountsPerCPU: []int64{3}},
 			},
 		},
 		{
@@ -226,10 +228,12 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c interrupts.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &interrupts.Linux{FS: tt.setupFS()}
 			case "darwin":
 				c = interrupts.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

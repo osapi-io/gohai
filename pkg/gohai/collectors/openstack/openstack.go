@@ -47,6 +47,10 @@ const ProviderName = "openstack"
 // EC2's. We root at the host so the collector can reach both the
 // EC2-mirror tree under /latest/meta-data/ and Nova's enriched
 // document under /openstack/latest/meta_data.json.
+// The instance metadata service is link-local and serves plain
+// HTTP only; there is no HTTPS endpoint to point this at.
+//
+//nolint:revive // unsecure-url-scheme
 const metadataBaseURL = "http://169.254.169.254"
 
 // dmiProductSignature is the substring OpenStack writes to
@@ -202,46 +206,64 @@ func (c *Collector) Collect(
 		return nil, nil
 	}
 
+	// A minimal Nova deployment serves only the JSON document, so a
+	// failed EC2-mirror walk is not on its own a reason to give up.
 	tree, err := walk(ctx, c.client, "/latest/meta-data/")
 	if err != nil {
-		// Even if EC2-mirror walk fails, try the Nova doc — some
-		// minimal Nova deployments only serve the JSON. Don't drop
-		// detection just because /latest 404s.
 		tree = nil
 	}
-	info := &Info{
-		Provider: detectProvider(),
-	}
+
+	info := &Info{Provider: detectProvider()}
+
 	if tree != nil {
 		populateFromTree(info, tree)
 	}
 
-	if body, err := c.fetchNovaDoc(ctx); err == nil {
-		var doc openStackMetaDoc
-		if jerr := json.Unmarshal(body, &doc); jerr == nil {
-			info.UUID = doc.UUID
-			info.Name = doc.Name
-			info.ProjectUID = doc.ProjectID
-			info.LaunchIndex = doc.LaunchIndex
-			info.MetaData = doc.Meta
-			info.PublicKeys = doc.PublicKeys
-			for _, d := range doc.Devices {
-				info.Devices = append(info.Devices, Device(d))
-			}
-			if info.Zone == "" {
-				info.Zone = doc.AvailabilityZone
-			}
-			if info.Hostname == "" {
-				info.Hostname = doc.Hostname
-			}
-		}
-	}
+	c.applyNovaDoc(ctx, info)
 
 	if tree == nil && info.UUID == "" {
-		// Nothing came back from either source — not actually OpenStack.
+		// Neither source answered, so this is not OpenStack.
 		return nil, nil
 	}
+
 	return info, nil
+}
+
+// applyNovaDoc overlays Nova's own metadata document, which names things
+// the EC2 mirror does not.
+func (c *Collector) applyNovaDoc(
+	ctx context.Context,
+	info *Info,
+) {
+	body, err := c.fetchNovaDoc(ctx)
+	if err != nil {
+		return
+	}
+
+	var doc openStackMetaDoc
+	if json.Unmarshal(body, &doc) != nil {
+		return
+	}
+
+	info.UUID = doc.UUID
+	info.Name = doc.Name
+	info.ProjectUID = doc.ProjectID
+	info.LaunchIndex = doc.LaunchIndex
+	info.MetaData = doc.Meta
+	info.PublicKeys = doc.PublicKeys
+
+	for _, d := range doc.Devices {
+		info.Devices = append(info.Devices, Device(d))
+	}
+
+	// The mirror's answers win where it gave one.
+	if info.Zone == "" {
+		info.Zone = doc.AvailabilityZone
+	}
+
+	if info.Hostname == "" {
+		info.Hostname = doc.Hostname
+	}
 }
 
 // detectProvider checks /etc/passwd for the "dhc-user" account that
@@ -279,29 +301,49 @@ func walk(
 	if err != nil {
 		return nil, err
 	}
+
 	result := make(map[string]any)
+
 	for _, line := range strings.Split(string(listing), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		key := sanitizeKey(line)
-		child := path + line
-		if strings.HasSuffix(line, "/") {
-			sub, err := walk(ctx, c, child)
-			if err != nil {
-				continue
-			}
-			result[key] = sub
-		} else {
-			leaf, err := c.Get(ctx, child)
-			if err != nil {
-				continue
-			}
-			result[key] = strings.TrimSpace(string(leaf))
+
+		if v, ok := walkEntry(ctx, c, path, line); ok {
+			result[sanitizeKey(line)] = v
 		}
 	}
+
 	return result, nil
+}
+
+// walkEntry reads one listing entry: a trailing slash is a subtree to
+// descend into, anything else a leaf to fetch. An entry that cannot be
+// read is skipped rather than failing the whole walk.
+func walkEntry(
+	ctx context.Context,
+	c *cloudmetadata.Client,
+	path string,
+	line string,
+) (any, bool) {
+	child := path + line
+
+	if strings.HasSuffix(line, "/") {
+		sub, err := walk(ctx, c, child)
+		if err != nil {
+			return nil, false
+		}
+
+		return sub, true
+	}
+
+	leaf, err := c.Get(ctx, child)
+	if err != nil {
+		return nil, false
+	}
+
+	return strings.TrimSpace(string(leaf)), true
 }
 
 // sanitizeKey mirrors Ohai's metadata_key — strip trailing slash,

@@ -81,11 +81,11 @@ func (s *HostnamePublicTestSuite) TestNew() {
 		detect   string
 		wantKind string
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"darwin dispatches to Darwin", osDarwin, osDarwin},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"arch dispatches to Linux", "arch", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -96,22 +96,25 @@ func (s *HostnamePublicTestSuite) TestNew() {
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			switch tt.wantKind {
-			case "darwin":
+			case osDarwin:
 				_, ok := c.(*hostname.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*hostname.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
 }
 
 func (s *HostnamePublicTestSuite) TestCollect() {
-	defer hostname.SetResolverBackoff(0)()
+	restore0 := hostname.SetResolverBackoff(0)
+	defer restore0()
 
 	okHostInfo := func(context.Context) (*host.InfoStat, error) {
-		return &host.InfoStat{Hostname: "gopsutil-short"}, nil
+		return &host.InfoStat{Hostname: hostGopsutil}, nil
 	}
 	errHostInfo := func(context.Context) (*host.InfoStat, error) {
 		return nil, errors.New("boom")
@@ -123,7 +126,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 	emptyLookupHost := func(string) ([]string, error) { return nil, nil }
 	emptyLookupAddr := func(string) ([]string, error) { return nil, nil }
 	failLookupHost := func(string) ([]string, error) { return nil, errors.New("no host") }
-	failLookupAddr := func(string) ([]string, error) { return nil, errors.New("unused") }
+	failLookupAddr := func(string) ([]string, error) { return nil, errors.New(valueUnused) }
 
 	tests := []struct {
 		name       string
@@ -138,75 +141,99 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 	}{
 		{
 			name:       "linux: canonical success with reverse DNS",
-			variant:    "linux",
+			variant:    osLinux,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: okLookupHost,
 			lookupAddr: okLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
+				return hostnameExec(
+					t,
+					[]byte(hostWeb01WithNewline),
+					nil,
+					[]byte(hostWeb01WithNewline),
+					nil,
+				)
 			},
 			want: hostname.Info{
-				Name:        "web01",
-				MachineName: "web01",
+				Name:        hostWeb01,
+				MachineName: hostWeb01,
 				FQDN:        "web01.example.com",
 				Domain:      "example.com",
 			},
 		},
 		{
 			name:       "linux: empty forward lookup short-circuits",
-			variant:    "linux",
+			variant:    osLinux,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: emptyLookupHost,
 			lookupAddr: emptyLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
+				return hostnameExec(
+					t,
+					[]byte(hostWeb01WithNewline),
+					nil,
+					[]byte(hostWeb01WithNewline),
+					nil,
+				)
 			},
-			want: hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
+			want: hostname.Info{Name: hostWeb01, MachineName: hostWeb01, FQDN: hostWeb01},
 		},
 		{
 			name:       "linux: empty reverse lookup treated as miss",
-			variant:    "linux",
+			variant:    osLinux,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: okLookupHost,
 			lookupAddr: emptyLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
+				return hostnameExec(
+					t,
+					[]byte(hostWeb01WithNewline),
+					nil,
+					[]byte(hostWeb01WithNewline),
+					nil,
+				)
 			},
-			want: hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
+			want: hostname.Info{Name: hostWeb01, MachineName: hostWeb01, FQDN: hostWeb01},
 		},
 		{
 			name:       "linux: FQDN without domain component",
-			variant:    "linux",
+			variant:    osLinux,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: okLookupHost,
 			lookupAddr: func(string) ([]string, error) { return []string{"web01."}, nil },
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
+				return hostnameExec(
+					t,
+					[]byte(hostWeb01WithNewline),
+					nil,
+					[]byte(hostWeb01WithNewline),
+					nil,
+				)
 			},
-			want: hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
+			want: hostname.Info{Name: hostWeb01, MachineName: hostWeb01, FQDN: hostWeb01},
 		},
 		{
 			name:       "darwin: exec succeeds, hostname -s + hostname beat gopsutil",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: darwinLookupHost,
 			lookupAddr: darwinLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(
 					t,
-					[]byte("johns-mbp\n"),
+					[]byte(hostMBPWithNewline),
 					nil,
 					[]byte("Johns MacBook Pro\n"),
 					nil,
 				)
 			},
 			want: hostname.Info{
-				Name:        "johns-mbp",
+				Name:        hostMBP,
 				MachineName: "Johns MacBook Pro",
 				FQDN:        "johns-mbp.local",
 				Domain:      "local",
@@ -214,9 +241,9 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 		},
 		{
 			name:       "darwin: hostname -s fails, short falls back to gopsutil",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
@@ -229,90 +256,90 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				)
 			},
 			want: hostname.Info{
-				Name:        "gopsutil-short",
+				Name:        hostGopsutil,
 				MachineName: "Friendly Name",
-				FQDN:        "gopsutil-short",
+				FQDN:        hostGopsutil,
 			},
 		},
 		{
 			name:       "darwin: both exec fail, fall back to gopsutil + os.Hostname",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "os-hostname", nil },
+			osHostname: func() (string, error) { return hostFromOS, nil },
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
+				return hostnameExec(t, nil, errors.New(entryOne), nil, errors.New(entryTwo))
 			},
 			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "os-hostname",
-				FQDN:        "gopsutil-short",
+				Name:        hostGopsutil,
+				MachineName: hostFromOS,
+				FQDN:        hostGopsutil,
 			},
 		},
 		{
 			name:       "darwin: both exec fail and os.Hostname errors, machine_name mirrors short",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
 			osHostname: func() (string, error) { return "", errors.New("nope") },
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
+				return hostnameExec(t, nil, errors.New(entryOne), nil, errors.New(entryTwo))
 			},
 			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "gopsutil-short",
-				FQDN:        "gopsutil-short",
+				Name:        hostGopsutil,
+				MachineName: hostGopsutil,
+				FQDN:        hostGopsutil,
 			},
 		},
 		{
 			name:       "darwin: empty exec output treated as fallback",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "os-hostname", nil },
+			osHostname: func() (string, error) { return hostFromOS, nil },
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("\n"), nil, []byte(""), nil)
 			},
 			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "os-hostname",
-				FQDN:        "gopsutil-short",
+				Name:        hostGopsutil,
+				MachineName: hostFromOS,
+				FQDN:        hostGopsutil,
 			},
 		},
 		{
 			name:       "darwin: nil Exec path",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "os-hostname", nil },
+			osHostname: func() (string, error) { return hostFromOS, nil },
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
 			exec:       func(*testing.T) executor.Executor { return nil },
 			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "os-hostname",
-				FQDN:        "gopsutil-short",
+				Name:        hostGopsutil,
+				MachineName: hostFromOS,
+				FQDN:        hostGopsutil,
 			},
 		},
 		{
 			name:       "darwin: short hostname error propagated",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   errHostInfo,
 			osHostname: func() (string, error) { return "", nil },
 			lookupHost: emptyLookupHost,
 			lookupAddr: emptyLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
+				return hostnameExec(t, nil, errors.New(entryOne), nil, errors.New(entryTwo))
 			},
 			wantErr: true,
 		},
 		{
 			name:       "darwin: transient DNS failure recovers on retry",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: func() func(string) ([]string, error) {
 				n := 0
 				return func(string) ([]string, error) {
@@ -325,20 +352,26 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			}(),
 			lookupAddr: darwinLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
+				return hostnameExec(
+					t,
+					[]byte(hostMBPWithNewline),
+					nil,
+					[]byte(nameJohnsWithNewline),
+					nil,
+				)
 			},
 			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns",
+				Name:        hostMBP,
+				MachineName: nameJohns,
 				FQDN:        "johns-mbp.local",
 				Domain:      "local",
 			},
 		},
 		{
 			name:       "darwin: transient LookupAddr failure recovers on retry",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: darwinLookupHost,
 			lookupAddr: func() func(string) ([]string, error) {
 				n := 0
@@ -351,20 +384,26 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				}
 			}(),
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
+				return hostnameExec(
+					t,
+					[]byte(hostMBPWithNewline),
+					nil,
+					[]byte(nameJohnsWithNewline),
+					nil,
+				)
 			},
 			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns",
+				Name:        hostMBP,
+				MachineName: nameJohns,
 				FQDN:        "johns-mbp.local",
 				Domain:      "local",
 			},
 		},
 		{
 			name:       "darwin: IsNotFound on LookupHost short-circuits (no retry sleep)",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: func() func(string) ([]string, error) {
 				calls := 0
 				return func(string) ([]string, error) {
@@ -375,19 +414,25 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			}(),
 			lookupAddr: failLookupAddr,
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
+				return hostnameExec(
+					t,
+					[]byte(hostMBPWithNewline),
+					nil,
+					[]byte(nameJohnsWithNewline),
+					nil,
+				)
 			},
 			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns",
-				FQDN:        "johns-mbp",
+				Name:        hostMBP,
+				MachineName: nameJohns,
+				FQDN:        hostMBP,
 			},
 		},
 		{
 			name:       "darwin: IsNotFound on LookupAddr short-circuits",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   okHostInfo,
-			osHostname: func() (string, error) { return "unused", nil },
+			osHostname: func() (string, error) { return valueUnused, nil },
 			lookupHost: darwinLookupHost,
 			lookupAddr: func() func(string) ([]string, error) {
 				calls := 0
@@ -398,40 +443,52 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				}
 			}(),
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
+				return hostnameExec(
+					t,
+					[]byte(hostMBPWithNewline),
+					nil,
+					[]byte(nameJohnsWithNewline),
+					nil,
+				)
 			},
 			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns",
-				FQDN:        "johns-mbp",
+				Name:        hostMBP,
+				MachineName: nameJohns,
+				FQDN:        hostMBP,
 			},
 		},
 		{
 			name:       "darwin: empty short name skips FQDN",
-			variant:    "darwin",
+			variant:    osDarwin,
 			hostInfo:   func(context.Context) (*host.InfoStat, error) { return nil, nil },
 			osHostname: func() (string, error) { return "", errors.New("no hostname") },
-			lookupHost: func(string) ([]string, error) { return nil, errors.New("unused") },
-			lookupAddr: func(string) ([]string, error) { return nil, errors.New("unused") },
+			lookupHost: func(string) ([]string, error) { return nil, errors.New(valueUnused) },
+			lookupAddr: func(string) ([]string, error) { return nil, errors.New(valueUnused) },
 			exec: func(t *testing.T) executor.Executor {
-				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
+				return hostnameExec(t, nil, errors.New(entryOne), nil, errors.New(entryTwo))
 			},
 			want: hostname.Info{},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer hostname.SetHostInfoFn(tt.hostInfo)()
-			defer hostname.SetOSHostnameFn(tt.osHostname)()
-			defer hostname.SetLookupHostFn(tt.lookupHost)()
-			defer hostname.SetLookupAddrFn(tt.lookupAddr)()
+			restore1 := hostname.SetHostInfoFn(tt.hostInfo)
+			defer restore1()
+			restore2 := hostname.SetOSHostnameFn(tt.osHostname)
+			defer restore2()
+			restore3 := hostname.SetLookupHostFn(tt.lookupHost)
+			defer restore3()
+			restore4 := hostname.SetLookupAddrFn(tt.lookupAddr)
+			defer restore4()
 
 			var c hostname.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &hostname.Linux{Exec: tt.exec(s.T())}
-			case "darwin":
+			case osDarwin:
 				c = &hostname.Darwin{Exec: tt.exec(s.T())}
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr {

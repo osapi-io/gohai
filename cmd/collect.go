@@ -24,7 +24,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -32,16 +32,58 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
-func newCollectCommand() *cobra.Command {
-	var (
-		pretty         bool
-		flat           bool
-		format         string
-		listCollectors bool
-		noDefaults     bool
-		withTimings    bool
-		categories     []string
+// outputFlags holds what `gohai collect` was asked to produce.
+type outputFlags struct {
+	pretty         bool
+	flat           bool
+	format         string
+	listCollectors bool
+	noDefaults     bool
+	withTimings    bool
+	categories     []string
+}
+
+// registerOutputFlags wires the output flags onto the command.
+func registerOutputFlags(
+	cmd *cobra.Command,
+	out *outputFlags,
+) {
+	cmd.Flags().StringVar(
+		&out.format,
+		"format",
+		"ohai",
+		"output format: ohai (default) or ocsf",
 	)
+	cmd.Flags().BoolVar(&out.pretty, "pretty", false, "pretty-print JSON output")
+	cmd.Flags().BoolVar(&out.flat, "flat", false, "output flat key=value pairs")
+	cmd.Flags().BoolVar(
+		&out.listCollectors,
+		"list-collectors",
+		false,
+		"list available collectors and exit",
+	)
+	cmd.Flags().BoolVar(
+		&out.noDefaults,
+		"no-defaults",
+		false,
+		"skip the recommended default collector set; only --collector.X flags are honoured",
+	)
+	cmd.Flags().BoolVar(
+		&out.withTimings,
+		"with-timings",
+		false,
+		"embed per-collector timings and errors under _timings in the JSON output",
+	)
+	cmd.Flags().StringSliceVar(
+		&out.categories,
+		"category",
+		nil,
+		"enable every collector in a category (repeatable): system, hardware, network, cloud, virtualization, security, software, users, linux, misc",
+	)
+}
+
+func newCollectCommand() *cobra.Command {
+	var out outputFlags
 
 	enabled := newFlagSet()
 	disabled := newFlagSet()
@@ -66,53 +108,24 @@ Examples:
 			c *cobra.Command,
 			_ []string,
 		) error {
-			if listCollectors {
+			if out.listCollectors {
 				return cli.WriteCollectorList(c.OutOrStdout())
 			}
 
-			return runCollect(
-				c.Context(),
-				c.OutOrStdout(),
-				enabled,
-				disabled,
-				categories,
-				format,
-				pretty,
-				flat,
-				noDefaults,
-				withTimings,
-			)
+			return runCollect(c.Context(), c.OutOrStdout(), collectRequest{
+				enabled:     enabled,
+				disabled:    disabled,
+				categories:  out.categories,
+				format:      out.format,
+				pretty:      out.pretty,
+				flat:        out.flat,
+				noDefaults:  out.noDefaults,
+				withTimings: out.withTimings,
+			})
 		},
 	}
 
-	cmd.Flags().StringVar(
-		&format,
-		"format",
-		"ohai",
-		"output format: ohai (default) or ocsf",
-	)
-	cmd.Flags().BoolVar(&pretty, "pretty", false, "pretty-print JSON output")
-	cmd.Flags().BoolVar(&flat, "flat", false, "output flat key=value pairs")
-	cmd.Flags().
-		BoolVar(&listCollectors, "list-collectors", false, "list available collectors and exit")
-	cmd.Flags().BoolVar(
-		&noDefaults,
-		"no-defaults",
-		false,
-		"skip the recommended default collector set; only --collector.X flags are honoured",
-	)
-	cmd.Flags().BoolVar(
-		&withTimings,
-		"with-timings",
-		false,
-		"embed per-collector timings and errors under _timings in the JSON output",
-	)
-	cmd.Flags().StringSliceVar(
-		&categories,
-		"category",
-		nil,
-		"enable every collector in a category (repeatable): system, hardware, network, cloud, virtualization, security, software, users, linux, misc",
-	)
+	registerOutputFlags(cmd, &out)
 	registerCollectorFlags(cmd, enabled, disabled)
 
 	return cmd
@@ -132,9 +145,28 @@ func (f *flagSet) values() []string {
 	for n := range f.set {
 		out = append(out, n)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 
 	return out
+}
+
+// readCollectorFlags moves the per-collector flags into the two sets the
+// command was given.
+func readCollectorFlags(
+	c *cobra.Command,
+	names []string,
+	enabled *flagSet,
+	disabled *flagSet,
+) {
+	for _, n := range names {
+		if v, _ := c.Flags().GetBool("collector." + n); v {
+			enabled.set[n] = true
+		}
+
+		if v, _ := c.Flags().GetBool("no-collector." + n); v {
+			disabled.set[n] = true
+		}
+	}
 }
 
 func registerCollectorFlags(
@@ -151,14 +183,7 @@ func registerCollectorFlags(
 		c *cobra.Command,
 		_ []string,
 	) error {
-		for _, n := range names {
-			if v, _ := c.Flags().GetBool("collector." + n); v {
-				enabled.set[n] = true
-			}
-			if v, _ := c.Flags().GetBool("no-collector." + n); v {
-				disabled.set[n] = true
-			}
-		}
+		readCollectorFlags(c, names, enabled, disabled)
 
 		return nil
 	}
@@ -166,45 +191,65 @@ func registerCollectorFlags(
 
 func listAllCollectorNames() []string {
 	names := gohai.NewRegistry().Names()
-	sort.Strings(names)
+	slices.Sort(names)
 
 	return names
+}
+
+// collectRequest is what one invocation of `gohai collect` was asked
+// for. It travels as a struct because the flags outgrew a parameter list.
+type collectRequest struct {
+	enabled     *flagSet
+	disabled    *flagSet
+	categories  []string
+	format      string
+	pretty      bool
+	flat        bool
+	noDefaults  bool
+	withTimings bool
+}
+
+// collectorOptions turns the command's flags into library options.
+func collectorOptions(
+	req collectRequest,
+) []gohai.Option {
+	var opts []gohai.Option
+
+	if !req.noDefaults {
+		opts = append(opts, gohai.WithDefaults())
+	}
+
+	if names := req.enabled.values(); len(names) > 0 {
+		opts = append(opts, gohai.WithEnabled(names...))
+	}
+
+	if names := req.disabled.values(); len(names) > 0 {
+		opts = append(opts, gohai.WithDisabled(names...))
+	}
+
+	if len(req.categories) > 0 {
+		opts = append(opts, gohai.WithCategory(req.categories...))
+	}
+
+	if req.withTimings {
+		opts = append(opts, gohai.WithTimings())
+	}
+
+	return opts
 }
 
 func runCollect(
 	ctx context.Context,
 	out io.Writer,
-	enabled, disabled *flagSet,
-	categories []string,
-	format string,
-	pretty, flat, noDefaults, withTimings bool,
+	req collectRequest,
 ) error {
-	switch format {
+	switch req.format {
 	case "ohai", "ocsf":
 	default:
-		return fmt.Errorf("unknown format %q: must be ohai or ocsf", format)
+		return fmt.Errorf("unknown format %q: must be ohai or ocsf", req.format)
 	}
 
-	var opts []gohai.Option
-	if !noDefaults {
-		opts = append(opts, gohai.WithDefaults())
-	}
-
-	if names := enabled.values(); len(names) > 0 {
-		opts = append(opts, gohai.WithEnabled(names...))
-	}
-
-	if names := disabled.values(); len(names) > 0 {
-		opts = append(opts, gohai.WithDisabled(names...))
-	}
-
-	if len(categories) > 0 {
-		opts = append(opts, gohai.WithCategory(categories...))
-	}
-
-	if withTimings {
-		opts = append(opts, gohai.WithTimings())
-	}
+	opts := collectorOptions(req)
 
 	g, err := gohai.New(opts...)
 	if err != nil {
@@ -216,9 +261,14 @@ func runCollect(
 		return err
 	}
 
-	if format == "ocsf" {
-		return cli.WriteOCSF(out, facts, pretty)
+	if req.format == "ocsf" {
+		return cli.WriteOCSF(out, facts, req.pretty)
 	}
 
-	return cli.WriteOutput(out, facts, pretty, flat)
+	format := cli.FormatJSON
+	if req.flat {
+		format = cli.FormatFlat
+	}
+
+	return cli.WriteOutput(out, facts, format, req.pretty)
 }

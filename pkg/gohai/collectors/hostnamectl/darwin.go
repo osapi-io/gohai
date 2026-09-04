@@ -38,7 +38,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns nil on Darwin.
-func (d *Darwin) Collect(
+func (*Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {

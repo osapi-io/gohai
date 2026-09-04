@@ -138,9 +138,9 @@ func (s *LibvirtPublicTestSuite) TestNew() {
 		wantKind string
 	}{
 		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{"debian dispatches to Linux", "debian", osLinux},
+		{"rhel dispatches to Linux", "rhel", osLinux},
+		{"unknown dispatches to Linux", "", osLinux},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -154,9 +154,11 @@ func (s *LibvirtPublicTestSuite) TestNew() {
 			case "darwin":
 				_, ok := c.(*libvirt.Darwin)
 				s.True(ok)
-			case "linux":
+			case osLinux:
 				_, ok := c.(*libvirt.Linux)
 				s.True(ok)
+			default:
+				s.Failf("unhandled case", "%v", tt.wantKind)
 			}
 		})
 	}
@@ -173,10 +175,10 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		// ----- Linux -----
 		{
 			name:    "linux: full happy path — version, URI, two domains with dominfo",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(t *testing.T) executor.Executor { return fullVirshMock(t) },
 			validate: func(i *libvirt.Info) {
-				s.Equal("10.0.0", i.Version)
+				s.Equal(value1000, i.Version)
 				s.Equal("qemu:///system", i.URI)
 				s.Len(i.Domains, 2)
 
@@ -198,7 +200,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: version without daemon line uses library fallback",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				ctrl := gomock.NewController(t)
 				m := execmocks.NewMockExecutor(ctrl)
@@ -211,13 +213,13 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				return m
 			},
 			validate: func(i *libvirt.Info) {
-				s.Equal("10.0.0", i.Version)
+				s.Equal(value1000, i.Version)
 				s.Nil(i.Domains)
 			},
 		},
 		{
 			name:    "linux: library line without libvirt prefix — raw value used",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				ctrl := gomock.NewController(t)
 				m := execmocks.NewMockExecutor(ctrl)
@@ -236,7 +238,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: dominfo with no-colon lines skipped, valid fields parsed",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				ctrl := gomock.NewController(t)
 				m := execmocks.NewMockExecutor(ctrl)
@@ -261,7 +263,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: virsh version fails — returns nil",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				ctrl := gomock.NewController(t)
 				m := execmocks.NewMockExecutor(ctrl)
@@ -273,13 +275,13 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: nil Exec returns nil",
-			variant: "linux",
+			variant: osLinux,
 			exec:    func(*testing.T) executor.Executor { return nil },
 			wantNil: true,
 		},
 		{
 			name:    "linux: virsh uri fails — URI stays empty, domains still collected",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				ctrl := gomock.NewController(t)
 				m := execmocks.NewMockExecutor(ctrl)
@@ -293,12 +295,12 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 			validate: func(i *libvirt.Info) {
 				s.Empty(i.URI)
-				s.Equal("10.0.0", i.Version)
+				s.Equal(value1000, i.Version)
 			},
 		},
 		{
 			name:    "linux: virsh list fails — returns Info with version only",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				ctrl := gomock.NewController(t)
 				m := execmocks.NewMockExecutor(ctrl)
@@ -311,13 +313,13 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				return m
 			},
 			validate: func(i *libvirt.Info) {
-				s.Equal("10.0.0", i.Version)
+				s.Equal(value1000, i.Version)
 				s.Nil(i.Domains)
 			},
 		},
 		{
 			name:    "linux: virsh dominfo fails — domain kept with name+state only",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				ctrl := gomock.NewController(t)
 				m := execmocks.NewMockExecutor(ctrl)
@@ -341,7 +343,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		},
 		{
 			name:    "linux: empty domain list — Domains field nil",
-			variant: "linux",
+			variant: osLinux,
 			exec: func(t *testing.T) executor.Executor {
 				ctrl := gomock.NewController(t)
 				m := execmocks.NewMockExecutor(ctrl)
@@ -369,10 +371,12 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c libvirt.Collector
 			switch tt.variant {
-			case "linux":
+			case osLinux:
 				c = &libvirt.Linux{Exec: tt.exec(s.T())}
 			case "darwin":
 				c = libvirt.NewDarwin()
+			default:
+				s.Failf("unhandled case", "%v", tt.variant)
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
