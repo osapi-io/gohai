@@ -54,13 +54,34 @@ func (s *PCIPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(pci.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c pci.Collector) {
+				_, ok := c.(*pci.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c pci.Collector) {
+				_, ok := c.(*pci.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c pci.Collector) {
+				_, ok := c.(*pci.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -70,24 +91,17 @@ func (s *PCIPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*pci.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*pci.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *PCIPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string
-		pciFn    func(...any) (*ghwpci.Info, error)
-		validate func(*pci.Info)
+		name         string
+		variant      string
+		pciFn        func(...any) (*ghwpci.Info, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: happy path maps ghw devices",
@@ -113,7 +127,10 @@ func (s *PCIPublicTestSuite) TestCollect() {
 					},
 				}, nil
 			},
-			validate: func(info *pci.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*pci.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.Devices, 1)
 				d := info.Devices["0000:03:00.0"]
 				s.Equal("8086", d.VendorID)
@@ -137,7 +154,10 @@ func (s *PCIPublicTestSuite) TestCollect() {
 			pciFn: func(...any) (*ghwpci.Info, error) {
 				return nil, errors.New("no /sys/bus/pci")
 			},
-			validate: func(info *pci.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*pci.Info)
+				s.Require().True(ok)
 				s.Empty(info.Devices)
 			},
 		},
@@ -147,7 +167,10 @@ func (s *PCIPublicTestSuite) TestCollect() {
 			pciFn: func(...any) (*ghwpci.Info, error) {
 				return nil, nil
 			},
-			validate: func(info *pci.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*pci.Info)
+				s.Require().True(ok)
 				s.Empty(info.Devices)
 			},
 		},
@@ -167,7 +190,10 @@ func (s *PCIPublicTestSuite) TestCollect() {
 					},
 				}, nil
 			},
-			validate: func(info *pci.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*pci.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.Devices, 2)
 				s.Equal("", info.Devices["0000:00:00.0"].Driver)
 				s.Equal("10de", info.Devices["0000:01:00.0"].VendorID)
@@ -178,7 +204,10 @@ func (s *PCIPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: returns empty",
 			variant: "darwin",
-			validate: func(info *pci.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*pci.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.Devices)
 			},
@@ -194,11 +223,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &pci.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*pci.Info)
-			s.Require().True(ok)
-			tt.validate(info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

@@ -58,7 +58,7 @@ func (s *BlockDevicePublicTestSuite) TestNew() {
 		validateFunc func(blockdevice.Collector)
 	}{
 		{
-			name:   "darwin dispatches to Darwin",
+			name: "darwin dispatches to Darwin",
 			detect: "darwin",
 			validateFunc: func(c blockdevice.Collector) {
 				_, ok := c.(*blockdevice.Darwin)
@@ -66,7 +66,7 @@ func (s *BlockDevicePublicTestSuite) TestNew() {
 			},
 		},
 		{
-			name:   "debian dispatches to Linux",
+			name: "debian dispatches to Linux",
 			detect: "debian",
 			validateFunc: func(c blockdevice.Collector) {
 				_, ok := c.(*blockdevice.Linux)
@@ -74,7 +74,7 @@ func (s *BlockDevicePublicTestSuite) TestNew() {
 			},
 		},
 		{
-			name:   "rhel dispatches to Linux",
+			name: "rhel dispatches to Linux",
 			detect: "rhel",
 			validateFunc: func(c blockdevice.Collector) {
 				_, ok := c.(*blockdevice.Linux)
@@ -82,7 +82,7 @@ func (s *BlockDevicePublicTestSuite) TestNew() {
 			},
 		},
 		{
-			name:   "arch dispatches to Linux",
+			name: "arch dispatches to Linux",
 			detect: "arch",
 			validateFunc: func(c blockdevice.Collector) {
 				_, ok := c.(*blockdevice.Linux)
@@ -90,7 +90,7 @@ func (s *BlockDevicePublicTestSuite) TestNew() {
 			},
 		},
 		{
-			name:   "unknown dispatches to Linux",
+			name: "unknown dispatches to Linux",
 			detect: "",
 			validateFunc: func(c blockdevice.Collector) {
 				_, ok := c.(*blockdevice.Linux)
@@ -119,7 +119,7 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "linux: single disk with full sysfs tree",
+			name: "linux: single disk with full sysfs tree",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
@@ -167,29 +167,29 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 				return f
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*blockdevice.Info)
-				s.Require().True(ok)
-				s.Equal([]blockdevice.BlockDevice{
-					{
-						Name:              "sda",
-						Size:              "976773168",
-						Removable:         "0",
-						Rotational:        "1",
-						PhysicalBlockSize: "512",
-						LogicalBlockSize:  "512",
-						Model:             "WDC WD5000AAKX",
-						Vendor:            "ATA",
-						Rev:               "1H15",
-						State:             "running",
-						Timeout:           "30",
-						QueueDepth:        "32",
+			s.Require().NoError(err)
+			info, ok := got.(*blockdevice.Info)
+			s.Require().True(ok)
+			s.Equal([]blockdevice.BlockDevice{
+				{
+					Name:              "sda",
+					Size:              "976773168",
+					Removable:         "0",
+					Rotational:        "1",
+					PhysicalBlockSize: "512",
+					LogicalBlockSize:  "512",
+					Model:             "WDC WD5000AAKX",
+					Vendor:            "ATA",
+					Rev:               "1H15",
+					State:             "running",
+					Timeout:           "30",
+					QueueDepth:        "32",
+				},
+			}, info.Devices)
 					},
-				}, info.Devices)
-			},
 		},
 		{
-			name:    "linux: multiple devices sorted by readdir order",
+			name: "linux: multiple devices sorted by readdir order",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
@@ -210,36 +210,36 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 				return f
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*blockdevice.Info)
-				s.Require().True(ok)
-				s.Equal([]blockdevice.BlockDevice{
-					{
-						Name:       "nvme0n1",
-						Size:       "1000215216",
-						Removable:  "0",
-						Rotational: "0",
+			s.Require().NoError(err)
+			info, ok := got.(*blockdevice.Info)
+			s.Require().True(ok)
+			s.Equal([]blockdevice.BlockDevice{
+				{
+					Name:       "nvme0n1",
+					Size:       "1000215216",
+					Removable:  "0",
+					Rotational: "0",
+				},
+				{
+					Name: "sda",
+					Size: "500107862",
+				},
+			}, info.Devices)
 					},
-					{
-						Name: "sda",
-						Size: "500107862",
-					},
-				}, info.Devices)
-			},
 		},
 		{
-			name:    "linux: /sys/block absent returns empty list",
+			name: "linux: /sys/block absent returns empty list",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*blockdevice.Info)
-				s.Require().True(ok)
-				s.Equal([]blockdevice.BlockDevice{}, info.Devices)
-			},
+			s.Require().NoError(err)
+			info, ok := got.(*blockdevice.Info)
+			s.Require().True(ok)
+			s.Equal([]blockdevice.BlockDevice{}, info.Devices)
+					},
 		},
 		{
-			name:    "linux: device with no optional sysfs files",
+			name: "linux: device with no optional sysfs files",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
@@ -247,16 +247,16 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 				return f
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*blockdevice.Info)
-				s.Require().True(ok)
-				s.Equal([]blockdevice.BlockDevice{
-					{Name: "vda"},
-				}, info.Devices)
-			},
+			s.Require().NoError(err)
+			info, ok := got.(*blockdevice.Info)
+			s.Require().True(ok)
+			s.Equal([]blockdevice.BlockDevice{
+				{Name: "vda"},
+			}, info.Devices)
+					},
 		},
 		{
-			name:    "linux: firmware_rev populated",
+			name: "linux: firmware_rev populated",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
@@ -269,16 +269,16 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 				return f
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*blockdevice.Info)
-				s.Require().True(ok)
-				s.Equal([]blockdevice.BlockDevice{
-					{Name: "sdb", FirmwareRev: "GXA2"},
-				}, info.Devices)
-			},
+			s.Require().NoError(err)
+			info, ok := got.(*blockdevice.Info)
+			s.Require().True(ok)
+			s.Equal([]blockdevice.BlockDevice{
+				{Name: "sdb", FirmwareRev: "GXA2"},
+			}, info.Devices)
+					},
 		},
 		{
-			name:    "linux: non-directory entries in /sys/block are skipped",
+			name: "linux: non-directory entries in /sys/block are skipped",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
@@ -290,27 +290,27 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 				return f
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*blockdevice.Info)
-				s.Require().True(ok)
-				s.Equal([]blockdevice.BlockDevice{
-					{Name: "sdc", Size: "1024"},
-				}, info.Devices)
-			},
+			s.Require().NoError(err)
+			info, ok := got.(*blockdevice.Info)
+			s.Require().True(ok)
+			s.Equal([]blockdevice.BlockDevice{
+				{Name: "sdc", Size: "1024"},
+			}, info.Devices)
+					},
 		},
 		{
-			name:    "darwin returns nil",
+			name: "darwin returns nil",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				if true {
-					s.Nil(got)
-					return
-				}
-				info, ok := got.(*blockdevice.Info)
-				s.Require().True(ok)
-				s.Equal([]blockdevice.BlockDevice(nil), info.Devices)
-			},
+			s.Require().NoError(err)
+			if true {
+				s.Nil(got)
+				return
+			}
+			info, ok := got.(*blockdevice.Info)
+			s.Require().True(ok)
+			s.Equal([]blockdevice.BlockDevice(nil), info.Devices)
+					},
 		},
 	}
 	for _, tt := range tests {
@@ -323,6 +323,6 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 				c = blockdevice.NewDarwin()
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
-		})
+})
 	}
 }

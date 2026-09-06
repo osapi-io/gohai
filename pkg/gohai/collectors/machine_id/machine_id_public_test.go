@@ -56,15 +56,50 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(machineid.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c machineid.Collector) {
+				_, ok := c.(*machineid.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c machineid.Collector) {
+				_, ok := c.(*machineid.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c machineid.Collector) {
+				_, ok := c.(*machineid.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c machineid.Collector) {
+				_, ok := c.(*machineid.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c machineid.Collector) {
+				_, ok := c.(*machineid.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -74,14 +109,7 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*machineid.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*machineid.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -89,12 +117,11 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 func (s *MachineIDPublicTestSuite) TestCollect() {
 	const dbusPath = "/var/lib/dbus/machine-id"
 	tests := []struct {
-		name    string
-		variant string
-		hostFn  func(context.Context) (*host.InfoStat, error)
-		dbus    string // empty → file absent
-		wantErr bool
-		wantID  string
+		name         string
+		variant      string
+		hostFn       func(context.Context) (*host.InfoStat, error)
+		dbus         string // empty → file absent
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: gopsutil returns /etc/machine-id → use it",
@@ -102,39 +129,66 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: "gopsutil-id"}, nil
 			},
-			wantID: "gopsutil-id",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*machineid.Info)
+				s.Require().True(ok)
+				s.Equal("gopsutil-id", info.ID)
+			},
 		},
 		{
 			name:    "linux: gopsutil empty, dbus fallback wins",
 			variant: "linux",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
 			dbus:    "dbus-id\n",
-			wantID:  "dbus-id",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*machineid.Info)
+				s.Require().True(ok)
+				s.Equal("dbus-id", info.ID)
+			},
 		},
 		{
 			name:    "linux: gopsutil empty, dbus missing → empty ID (no error)",
 			variant: "linux",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
-			wantID:  "",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*machineid.Info)
+				s.Require().True(ok)
+				s.Equal("", info.ID)
+			},
 		},
 		{
 			name:    "linux: gopsutil empty, dbus whitespace-only → empty ID",
 			variant: "linux",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
 			dbus:    "   \n",
-			wantID:  "",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*machineid.Info)
+				s.Require().True(ok)
+				s.Equal("", info.ID)
+			},
 		},
 		{
 			name:    "linux: gopsutil nil info returns empty",
 			variant: "linux",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, nil },
-			wantID:  "",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*machineid.Info)
+				s.Require().True(ok)
+				s.Equal("", info.ID)
+			},
 		},
 		{
 			name:    "linux: gopsutil error wrapped and returned",
 			variant: "linux",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: gopsutil returns IOPlatformUUID",
@@ -142,19 +196,31 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: "iokit-uuid-1234"}, nil
 			},
-			wantID: "iokit-uuid-1234",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*machineid.Info)
+				s.Require().True(ok)
+				s.Equal("iokit-uuid-1234", info.ID)
+			},
 		},
 		{
 			name:    "darwin: nil info returns empty",
 			variant: "darwin",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, nil },
-			wantID:  "",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*machineid.Info)
+				s.Require().True(ok)
+				s.Equal("", info.ID)
+			},
 		},
 		{
 			name:    "darwin: gopsutil error wrapped and returned",
 			variant: "darwin",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -174,15 +240,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &machineid.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*machineid.Info)
-			s.Require().True(ok)
-			s.Equal(tt.wantID, info.ID)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

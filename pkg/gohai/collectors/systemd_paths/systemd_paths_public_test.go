@@ -71,15 +71,50 @@ func (s *SystemdPathsPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(systemdpaths.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c systemdpaths.Collector) {
+				_, ok := c.(*systemdpaths.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c systemdpaths.Collector) {
+				_, ok := c.(*systemdpaths.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c systemdpaths.Collector) {
+				_, ok := c.(*systemdpaths.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c systemdpaths.Collector) {
+				_, ok := c.(*systemdpaths.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c systemdpaths.Collector) {
+				_, ok := c.(*systemdpaths.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -89,14 +124,7 @@ func (s *SystemdPathsPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*systemdpaths.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*systemdpaths.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -110,29 +138,38 @@ user-runtime: /run/user/1000
 `)
 
 	tests := []struct {
-		name      string
-		variant   string
-		exec      func(*testing.T) executor.Executor
-		wantNil   bool
-		wantPaths map[string]string
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: full output parsed",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return systemdPathExec(t, fullOutput, nil) },
-			wantPaths: map[string]string{
-				"systemd":                    "/usr/lib/systemd",
-				"systemd-search-system-unit": "/etc/systemd/system.control",
-				"systemd-system-unit":        "/etc/systemd/system",
-				"user-configuration":         "/home/user/.config",
-				"user-runtime":               "/run/user/1000",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*systemdpaths.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"systemd":                    "/usr/lib/systemd",
+					"systemd-search-system-unit": "/etc/systemd/system.control",
+					"systemd-system-unit":        "/etc/systemd/system",
+					"user-configuration":         "/home/user/.config",
+					"user-runtime":               "/run/user/1000",
+				}, info.Paths)
 			},
 		},
 		{
-			name:      "linux: empty output yields empty paths",
-			variant:   "linux",
-			exec:      func(t *testing.T) executor.Executor { return systemdPathExec(t, []byte{}, nil) },
-			wantPaths: map[string]string{},
+			name:    "linux: empty output yields empty paths",
+			variant: "linux",
+			exec:    func(t *testing.T) executor.Executor { return systemdPathExec(t, []byte{}, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*systemdpaths.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: line without colon-space skipped",
@@ -142,7 +179,12 @@ user-runtime: /run/user/1000
 					[]byte("no_separator\nsystemd: /usr/lib/systemd\n"),
 					nil)
 			},
-			wantPaths: map[string]string{"systemd": "/usr/lib/systemd"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*systemdpaths.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"systemd": "/usr/lib/systemd"}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: empty key skipped",
@@ -152,24 +194,48 @@ user-runtime: /run/user/1000
 					[]byte(": /some/path\nsystemd: /usr/lib/systemd\n"),
 					nil)
 			},
-			wantPaths: map[string]string{"systemd": "/usr/lib/systemd"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*systemdpaths.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"systemd": "/usr/lib/systemd"}, info.Paths)
+			},
 		},
 		{
-			name:      "linux: exec error yields empty paths, no error",
-			variant:   "linux",
-			exec:      func(t *testing.T) executor.Executor { return systemdPathExec(t, nil, errors.New("not found")) },
-			wantPaths: map[string]string{},
+			name:    "linux: exec error yields empty paths, no error",
+			variant: "linux",
+			exec:    func(t *testing.T) executor.Executor { return systemdPathExec(t, nil, errors.New("not found")) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*systemdpaths.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Paths)
+			},
 		},
 		{
-			name:      "linux: nil Exec yields empty paths, no error",
-			variant:   "linux",
-			exec:      func(*testing.T) executor.Executor { return nil },
-			wantPaths: map[string]string{},
+			name:    "linux: nil Exec yields empty paths, no error",
+			variant: "linux",
+			exec:    func(*testing.T) executor.Executor { return nil },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*systemdpaths.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Paths)
+			},
 		},
 		{
 			name:    "darwin: returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*systemdpaths.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string(nil), info.Paths)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -181,15 +247,7 @@ user-runtime: /run/user/1000
 			case "darwin":
 				c = systemdpaths.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*systemdpaths.Info)
-			s.Require().True(ok)
-			s.Equal(tt.wantPaths, info.Paths)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

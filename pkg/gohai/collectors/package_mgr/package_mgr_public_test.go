@@ -54,15 +54,50 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string // "linux"|"darwin"|"debian"|"rhel"
+		name         string
+		detect       string
+		validateFunc func(packagemgr.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Debian", "debian", "debian"},
-		{"rhel dispatches to RHEL", "rhel", "rhel"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Debian",
+			detect: "debian",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.Debian)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to RHEL",
+			detect: "rhel",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.RHEL)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -72,20 +107,7 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 			s.Equal("software", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*packagemgr.Darwin)
-				s.True(ok)
-			case "debian":
-				_, ok := c.(*packagemgr.Debian)
-				s.True(ok)
-			case "rhel":
-				_, ok := c.(*packagemgr.RHEL)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*packagemgr.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }

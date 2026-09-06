@@ -53,15 +53,50 @@ func (s *RootGroupPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(rootgroup.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c rootgroup.Collector) {
+				_, ok := c.(*rootgroup.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c rootgroup.Collector) {
+				_, ok := c.(*rootgroup.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c rootgroup.Collector) {
+				_, ok := c.(*rootgroup.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c rootgroup.Collector) {
+				_, ok := c.(*rootgroup.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c rootgroup.Collector) {
+				_, ok := c.(*rootgroup.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -71,14 +106,7 @@ func (s *RootGroupPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*rootgroup.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*rootgroup.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -95,57 +123,79 @@ func (s *RootGroupPublicTestSuite) TestCollect() {
 		variant       string
 		lookupUserFn  func(string) (*user.User, error)
 		lookupGroupFn func(string) (*user.Group, error)
-		wantErr       bool
-		want          string
+		validateFunc  func(any, error)
 	}{
 		{
 			name:          "linux: root user → root group (standard Linux)",
 			variant:       "linux",
 			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
 			lookupGroupFn: func(string) (*user.Group, error) { return rootGroup, nil },
-			want:          "root",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*rootgroup.Info)
+				s.Require().True(ok)
+				s.Equal("root", info.Name)
+			},
 		},
 		{
 			name:          "linux: root primary gid customized to non-zero",
 			variant:       "linux",
 			lookupUserFn:  func(string) (*user.User, error) { return customRootUser, nil },
 			lookupGroupFn: func(string) (*user.Group, error) { return customGroup, nil },
-			want:          "wheel",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*rootgroup.Info)
+				s.Require().True(ok)
+				s.Equal("wheel", info.Name)
+			},
 		},
 		{
 			name:          "linux: user lookup error propagated",
 			variant:       "linux",
 			lookupUserFn:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
 			lookupGroupFn: func(string) (*user.Group, error) { return rootGroup, nil },
-			wantErr:       true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:          "linux: group lookup error propagated",
 			variant:       "linux",
 			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
 			lookupGroupFn: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
-			wantErr:       true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:          "darwin: root user → wheel group on macOS",
 			variant:       "darwin",
 			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
 			lookupGroupFn: func(string) (*user.Group, error) { return wheelGroup, nil },
-			want:          "wheel",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*rootgroup.Info)
+				s.Require().True(ok)
+				s.Equal("wheel", info.Name)
+			},
 		},
 		{
 			name:          "darwin: user lookup error propagated",
 			variant:       "darwin",
 			lookupUserFn:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
 			lookupGroupFn: func(string) (*user.Group, error) { return wheelGroup, nil },
-			wantErr:       true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:          "darwin: group lookup error propagated",
 			variant:       "darwin",
 			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
 			lookupGroupFn: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
-			wantErr:       true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -159,15 +209,7 @@ func (s *RootGroupPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &rootgroup.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*rootgroup.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.Name)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

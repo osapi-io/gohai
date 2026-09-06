@@ -71,13 +71,34 @@ func (s *SCSIPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(scsi.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c scsi.Collector) {
+				_, ok := c.(*scsi.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c scsi.Collector) {
+				_, ok := c.(*scsi.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c scsi.Collector) {
+				_, ok := c.(*scsi.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -87,14 +108,7 @@ func (s *SCSIPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*scsi.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*scsi.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -109,10 +123,10 @@ malformed
 `
 
 	tests := []struct {
-		name     string
-		variant  string
-		exec     func(*testing.T) executor.Executor
-		validate func(*scsi.Info)
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: happy path parses lsscsi output",
@@ -120,7 +134,10 @@ malformed
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, []byte(lsscsiOut), nil)
 			},
-			validate: func(info *scsi.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*scsi.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.Devices, 3)
 
 				d := info.Devices["0:0:0:0"]
@@ -151,7 +168,10 @@ malformed
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, nil, errors.New("not found"))
 			},
-			validate: func(info *scsi.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*scsi.Info)
+				s.Require().True(ok)
 				s.Empty(info.Devices)
 			},
 		},
@@ -159,7 +179,10 @@ malformed
 			name:    "linux: nil Exec yields empty info",
 			variant: "linux",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			validate: func(info *scsi.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*scsi.Info)
+				s.Require().True(ok)
 				s.Empty(info.Devices)
 			},
 		},
@@ -169,7 +192,10 @@ malformed
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, []byte{}, nil)
 			},
-			validate: func(info *scsi.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*scsi.Info)
+				s.Require().True(ok)
 				s.Empty(info.Devices)
 			},
 		},
@@ -179,7 +205,10 @@ malformed
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, []byte("[0:0:0:0] disk ATA KC48 /dev/sda\n"), nil)
 			},
-			validate: func(info *scsi.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*scsi.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.Devices, 1)
 				d := info.Devices["0:0:0:0"]
 				s.Equal("disk", d.Type)
@@ -195,14 +224,20 @@ malformed
 			exec: func(t *testing.T) executor.Executor {
 				return lsscsiExec(t, []byte("[] disk ATA KC48 /dev/sda\n"), nil)
 			},
-			validate: func(info *scsi.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*scsi.Info)
+				s.Require().True(ok)
 				s.Empty(info.Devices)
 			},
 		},
 		{
 			name:    "darwin: returns empty",
 			variant: "darwin",
-			validate: func(info *scsi.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*scsi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.Devices)
 			},
@@ -217,11 +252,7 @@ malformed
 			case "darwin":
 				c = &scsi.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*scsi.Info)
-			s.Require().True(ok)
-			tt.validate(info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

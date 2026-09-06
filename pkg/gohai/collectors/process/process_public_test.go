@@ -54,15 +54,50 @@ func (s *ProcessPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(process.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c process.Collector) {
+				_, ok := c.(*process.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c process.Collector) {
+				_, ok := c.(*process.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c process.Collector) {
+				_, ok := c.(*process.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c process.Collector) {
+				_, ok := c.(*process.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c process.Collector) {
+				_, ok := c.(*process.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -72,14 +107,7 @@ func (s *ProcessPublicTestSuite) TestNew() {
 			s.Equal("misc", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*process.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*process.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -87,11 +115,10 @@ func (s *ProcessPublicTestSuite) TestNew() {
 func (s *ProcessPublicTestSuite) TestCollect() {
 	ownPID := int32(os.Getpid())
 	tests := []struct {
-		name    string
-		variant string
-		fn      func(context.Context) ([]*gpprocess.Process, error)
-		wantErr bool
-		wantLen int
+		name         string
+		variant      string
+		fn           func(context.Context) ([]*gpprocess.Process, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: snapshot wraps gopsutil processes",
@@ -100,7 +127,12 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 				p, _ := gpprocess.NewProcess(ownPID)
 				return []*gpprocess.Process{p}, nil
 			},
-			wantLen: 1,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*process.Info)
+				s.Require().True(ok)
+				s.Equal(1, info.Count)
+			},
 		},
 		{
 			name:    "linux: empty process list",
@@ -108,13 +140,20 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			fn: func(context.Context) ([]*gpprocess.Process, error) {
 				return []*gpprocess.Process{}, nil
 			},
-			wantLen: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*process.Info)
+				s.Require().True(ok)
+				s.Equal(0, info.Count)
+			},
 		},
 		{
 			name:    "linux: gopsutil error propagated",
 			variant: "linux",
 			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: macOS snapshot",
@@ -122,13 +161,20 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			fn: func(context.Context) ([]*gpprocess.Process, error) {
 				return []*gpprocess.Process{}, nil
 			},
-			wantLen: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*process.Info)
+				s.Require().True(ok)
+				s.Equal(0, info.Count)
+			},
 		},
 		{
 			name:    "darwin: processes error propagated",
 			variant: "darwin",
 			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("kauth denied") },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -141,15 +187,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &process.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*process.Info)
-			s.Require().True(ok)
-			s.Equal(tt.wantLen, info.Count)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

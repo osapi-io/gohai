@@ -53,15 +53,50 @@ func (s *LoadPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(load.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c load.Collector) {
+				_, ok := c.(*load.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c load.Collector) {
+				_, ok := c.(*load.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c load.Collector) {
+				_, ok := c.(*load.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c load.Collector) {
+				_, ok := c.(*load.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c load.Collector) {
+				_, ok := c.(*load.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -71,25 +106,17 @@ func (s *LoadPublicTestSuite) TestNew() {
 			s.Equal("misc", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*load.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*load.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *LoadPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		fn      func(context.Context) (*gpload.AvgStat, error)
-		wantErr bool
-		want    load.Info
+		name         string
+		variant      string
+		fn           func(context.Context) (*gpload.AvgStat, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: averages returned",
@@ -97,13 +124,20 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			fn: func(context.Context) (*gpload.AvgStat, error) {
 				return &gpload.AvgStat{Load1: 0.25, Load5: 0.5, Load15: 1.0}, nil
 			},
-			want: load.Info{One: 0.25, Five: 0.5, Fifteen: 1.0},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*load.Info)
+				s.Require().True(ok)
+				s.Equal(load.Info{One: 0.25, Five: 0.5, Fifteen: 1.0}, *info)
+			},
 		},
 		{
 			name:    "linux: gopsutil error propagated",
 			variant: "linux",
 			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: averages returned",
@@ -111,13 +145,20 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			fn: func(context.Context) (*gpload.AvgStat, error) {
 				return &gpload.AvgStat{Load1: 1.5, Load5: 2.0, Load15: 2.5}, nil
 			},
-			want: load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*load.Info)
+				s.Require().True(ok)
+				s.Equal(load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5}, *info)
+			},
 		},
 		{
 			name:    "darwin: gopsutil error propagated",
 			variant: "darwin",
 			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -130,15 +171,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &load.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*load.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

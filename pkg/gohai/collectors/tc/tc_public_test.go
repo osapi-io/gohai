@@ -76,15 +76,50 @@ func (s *TCPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(tc.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c tc.Collector) {
+				_, ok := c.(*tc.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c tc.Collector) {
+				_, ok := c.(*tc.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c tc.Collector) {
+				_, ok := c.(*tc.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c tc.Collector) {
+				_, ok := c.(*tc.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c tc.Collector) {
+				_, ok := c.(*tc.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -94,74 +129,91 @@ func (s *TCPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*tc.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*tc.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *TCPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		exec    executor.Executor
-		wantNil bool
-		want    []tc.Interface
+		name         string
+		variant      string
+		exec         executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: tc returns qdisc data",
 			variant: "linux",
 			exec:    tcExec(s.T(), []byte(tcOut), nil),
-			want: []tc.Interface{
-				{
-					Name: "lo",
-					QDiscs: []tc.QDisc{
-						{Kind: "noqueue", Handle: "0"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Equal([]tc.Interface{
+					{
+						Name: "lo",
+						QDiscs: []tc.QDisc{
+							{Kind: "noqueue", Handle: "0"},
+						},
 					},
-				},
-				{
-					Name: "eth0",
-					QDiscs: []tc.QDisc{
-						{Kind: "fq_codel", Handle: "0"},
+					{
+						Name: "eth0",
+						QDiscs: []tc.QDisc{
+							{Kind: "fq_codel", Handle: "0"},
+						},
 					},
-				},
-				{
-					Name: "eth1",
-					QDiscs: []tc.QDisc{
-						{Kind: "pfifo_fast", Handle: "0", Parent: "1:1"},
+					{
+						Name: "eth1",
+						QDiscs: []tc.QDisc{
+							{Kind: "pfifo_fast", Handle: "0", Parent: "1:1"},
+						},
 					},
-				},
+				}, info.Interfaces)
 			},
 		},
 		{
 			name:    "linux: tc fails, empty list",
 			variant: "linux",
 			exec:    tcExec(s.T(), nil, errors.New("not found")),
-			want:    []tc.Interface{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Equal([]tc.Interface{}, info.Interfaces)
+			},
 		},
 		{
 			name:    "linux: nil Exec returns empty list",
 			variant: "linux",
 			exec:    nil,
-			want:    []tc.Interface{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Equal([]tc.Interface{}, info.Interfaces)
+			},
 		},
 		{
 			name:    "linux: empty output returns empty list",
 			variant: "linux",
 			exec:    tcExec(s.T(), []byte(""), nil),
-			want:    []tc.Interface{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Equal([]tc.Interface{}, info.Interfaces)
+			},
 		},
 		{
 			name:    "linux: short qdisc lines skipped",
 			variant: "linux",
 			exec:    tcExec(s.T(), []byte("qdisc noqueue 0:\n"), nil),
-			want:    []tc.Interface{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Equal([]tc.Interface{}, info.Interfaces)
+			},
 		},
 		{
 			name:    "linux: non-qdisc lines and blank lines skipped",
@@ -171,25 +223,44 @@ func (s *TCPublicTestSuite) TestCollect() {
 				[]byte("\n Sent 0 bytes\nqdisc fq_codel 0: dev eth0 root\n"),
 				nil,
 			),
-			want: []tc.Interface{
-				{
-					Name: "eth0",
-					QDiscs: []tc.QDisc{
-						{Kind: "fq_codel", Handle: "0"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Equal([]tc.Interface{
+					{
+						Name: "eth0",
+						QDiscs: []tc.QDisc{
+							{Kind: "fq_codel", Handle: "0"},
+						},
 					},
-				},
+				}, info.Interfaces)
 			},
 		},
 		{
 			name:    "linux: qdisc line without dev keyword skipped",
 			variant: "linux",
 			exec:    tcExec(s.T(), []byte("qdisc noqueue 0: root refcnt 2\n"), nil),
-			want:    []tc.Interface{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Equal([]tc.Interface{}, info.Interfaces)
+			},
 		},
 		{
 			name:    "darwin: returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Equal([]tc.Interface(nil), info.Interfaces)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -201,15 +272,7 @@ func (s *TCPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = tc.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*tc.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.Interfaces)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

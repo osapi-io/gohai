@@ -78,15 +78,50 @@ func (s *Grub2PublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(grub2.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c grub2.Collector) {
+				_, ok := c.(*grub2.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c grub2.Collector) {
+				_, ok := c.(*grub2.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c grub2.Collector) {
+				_, ok := c.(*grub2.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c grub2.Collector) {
+				_, ok := c.(*grub2.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c grub2.Collector) {
+				_, ok := c.(*grub2.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -96,37 +131,46 @@ func (s *Grub2PublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*grub2.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*grub2.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *Grub2PublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		setupFS func() avfs.VFS
-		wantNil bool
-		wantEnv map[string]string
+		name         string
+		variant      string
+		setupFS      func() avfs.VFS
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "darwin: returns nil",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				if true {
+					s.Nil(got)
+					return
+				}
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string(nil), info.Environment)
+			},
 		},
 		{
 			name:    "linux: no grubenv on any path — nil environment",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			wantEnv: nil,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string(nil), info.Environment)
+			},
 		},
 		{
 			name:    "linux: grubenv at /boot/grub2/grubenv",
@@ -136,11 +180,17 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 					"/boot/grub2/grubenv": grubenv,
 				})
 			},
-			wantEnv: map[string]string{
-				"saved_entry":        "0",
-				"boot_success":       "1",
-				"boot_indeterminate": "0",
-				"kernelopts":         "root=/dev/mapper/fedora-root ro",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"saved_entry":        "0",
+					"boot_success":       "1",
+					"boot_indeterminate": "0",
+					"kernelopts":         "root=/dev/mapper/fedora-root ro",
+				}, info.Environment)
 			},
 		},
 		{
@@ -151,8 +201,14 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 					"/boot/grub/grubenv": "# GRUB Environment Block\nsaved_entry=ubuntu\n",
 				})
 			},
-			wantEnv: map[string]string{
-				"saved_entry": "ubuntu",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"saved_entry": "ubuntu",
+				}, info.Environment)
 			},
 		},
 		{
@@ -164,7 +220,13 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 					"/boot/grub/grubenv":  "from=grub\n",
 				})
 			},
-			wantEnv: map[string]string{"from": "grub2"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"from": "grub2"}, info.Environment)
+			},
 		},
 		{
 			name:    "linux: empty grubenv file",
@@ -174,7 +236,13 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 					"/boot/grub2/grubenv": "",
 				})
 			},
-			wantEnv: map[string]string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Environment)
+			},
 		},
 		{
 			name:    "linux: lines without equals sign are skipped",
@@ -184,7 +252,13 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 					"/boot/grub2/grubenv": "# comment\nno_equals_here\nkey=value\n",
 				})
 			},
-			wantEnv: map[string]string{"key": "value"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"key": "value"}, info.Environment)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -196,17 +270,7 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &grub2.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-
-			info, ok := got.(*grub2.Info)
-			s.Require().True(ok)
-			s.Equal(tt.wantEnv, info.Environment)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

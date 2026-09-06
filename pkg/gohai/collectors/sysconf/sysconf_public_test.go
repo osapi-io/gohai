@@ -54,15 +54,50 @@ func (s *SysconfPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(sysconf.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c sysconf.Collector) {
+				_, ok := c.(*sysconf.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c sysconf.Collector) {
+				_, ok := c.(*sysconf.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c sysconf.Collector) {
+				_, ok := c.(*sysconf.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c sysconf.Collector) {
+				_, ok := c.(*sysconf.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c sysconf.Collector) {
+				_, ok := c.(*sysconf.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -72,14 +107,7 @@ func (s *SysconfPublicTestSuite) TestNew() {
 			s.Equal("misc", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*sysconf.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*sysconf.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -121,63 +149,82 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 	}
 
 	tests := []struct {
-		name    string
-		variant string
-		stub    func(int) (int64, error)
-		wantErr bool
-		want    sysconf.Info
+		name         string
+		variant      string
+		stub         func(int) (int64, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: all values returned",
 			variant: "linux",
 			stub:    stubFn(100, 4096, 4, 4),
-			want: sysconf.Info{
-				ClkTck:          100,
-				Pagesize:        4096,
-				NprocessorsConf: 4,
-				NprocessorsOnln: 4,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysconf.Info)
+				s.Require().True(ok)
+				s.Equal(sysconf.Info{
+					ClkTck:          100,
+					Pagesize:        4096,
+					NprocessorsConf: 4,
+					NprocessorsOnln: 4,
+				}, *info)
 			},
 		},
 		{
 			name:    "linux: CLK_TCK error propagated",
 			variant: "linux",
 			stub:    errorAt(0),
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "linux: PAGESIZE error propagated",
 			variant: "linux",
 			stub:    errorAt(1),
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "linux: NPROCESSORS_CONF error propagated",
 			variant: "linux",
 			stub:    errorAt(2),
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "linux: NPROCESSORS_ONLN error propagated",
 			variant: "linux",
 			stub:    errorAt(3),
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: all values returned",
 			variant: "darwin",
 			stub:    stubFn(100, 16384, 8, 8),
-			want: sysconf.Info{
-				ClkTck:          100,
-				Pagesize:        16384,
-				NprocessorsConf: 8,
-				NprocessorsOnln: 8,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysconf.Info)
+				s.Require().True(ok)
+				s.Equal(sysconf.Info{
+					ClkTck:          100,
+					Pagesize:        16384,
+					NprocessorsConf: 8,
+					NprocessorsOnln: 8,
+				}, *info)
 			},
 		},
 		{
 			name:    "darwin: CLK_TCK error propagated",
 			variant: "darwin",
 			stub:    errorAt(0),
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -192,15 +239,7 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = sysconf.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*sysconf.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

@@ -77,15 +77,50 @@ func (s *HostnamePublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(hostname.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c hostname.Collector) {
+				_, ok := c.(*hostname.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c hostname.Collector) {
+				_, ok := c.(*hostname.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c hostname.Collector) {
+				_, ok := c.(*hostname.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c hostname.Collector) {
+				_, ok := c.(*hostname.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c hostname.Collector) {
+				_, ok := c.(*hostname.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -95,14 +130,7 @@ func (s *HostnamePublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*hostname.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*hostname.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -126,15 +154,14 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 	failLookupAddr := func(string) ([]string, error) { return nil, errors.New("unused") }
 
 	tests := []struct {
-		name       string
-		variant    string
-		hostInfo   func(context.Context) (*host.InfoStat, error)
-		osHostname func() (string, error)
-		lookupHost func(string) ([]string, error)
-		lookupAddr func(string) ([]string, error)
-		exec       func(*testing.T) executor.Executor
-		want       hostname.Info
-		wantErr    bool
+		name         string
+		variant      string
+		hostInfo     func(context.Context) (*host.InfoStat, error)
+		osHostname   func() (string, error)
+		lookupHost   func(string) ([]string, error)
+		lookupAddr   func(string) ([]string, error)
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:       "linux: canonical success with reverse DNS",
@@ -146,11 +173,16 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
 			},
-			want: hostname.Info{
-				Name:        "web01",
-				MachineName: "web01",
-				FQDN:        "web01.example.com",
-				Domain:      "example.com",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "web01",
+					MachineName: "web01",
+					FQDN:        "web01.example.com",
+					Domain:      "example.com",
+				}, *info)
 			},
 		},
 		{
@@ -163,7 +195,12 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
 			},
-			want: hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"}, *info)
+			},
 		},
 		{
 			name:       "linux: empty reverse lookup treated as miss",
@@ -175,7 +212,12 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
 			},
-			want: hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"}, *info)
+			},
 		},
 		{
 			name:       "linux: FQDN without domain component",
@@ -187,7 +229,12 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
 			},
-			want: hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{Name: "web01", MachineName: "web01", FQDN: "web01"}, *info)
+			},
 		},
 		{
 			name:       "darwin: exec succeeds, hostname -s + hostname beat gopsutil",
@@ -205,11 +252,16 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns MacBook Pro",
-				FQDN:        "johns-mbp.local",
-				Domain:      "local",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "johns-mbp",
+					MachineName: "Johns MacBook Pro",
+					FQDN:        "johns-mbp.local",
+					Domain:      "local",
+				}, *info)
 			},
 		},
 		{
@@ -228,10 +280,15 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "Friendly Name",
-				FQDN:        "gopsutil-short",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "gopsutil-short",
+					MachineName: "Friendly Name",
+					FQDN:        "gopsutil-short",
+				}, *info)
 			},
 		},
 		{
@@ -244,10 +301,15 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
 			},
-			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "os-hostname",
-				FQDN:        "gopsutil-short",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "gopsutil-short",
+					MachineName: "os-hostname",
+					FQDN:        "gopsutil-short",
+				}, *info)
 			},
 		},
 		{
@@ -260,10 +322,15 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
 			},
-			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "gopsutil-short",
-				FQDN:        "gopsutil-short",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "gopsutil-short",
+					MachineName: "gopsutil-short",
+					FQDN:        "gopsutil-short",
+				}, *info)
 			},
 		},
 		{
@@ -276,10 +343,15 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("\n"), nil, []byte(""), nil)
 			},
-			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "os-hostname",
-				FQDN:        "gopsutil-short",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "gopsutil-short",
+					MachineName: "os-hostname",
+					FQDN:        "gopsutil-short",
+				}, *info)
 			},
 		},
 		{
@@ -290,10 +362,15 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
 			exec:       func(*testing.T) executor.Executor { return nil },
-			want: hostname.Info{
-				Name:        "gopsutil-short",
-				MachineName: "os-hostname",
-				FQDN:        "gopsutil-short",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "gopsutil-short",
+					MachineName: "os-hostname",
+					FQDN:        "gopsutil-short",
+				}, *info)
 			},
 		},
 		{
@@ -306,7 +383,9 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:       "darwin: transient DNS failure recovers on retry",
@@ -327,11 +406,16 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
 			},
-			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns",
-				FQDN:        "johns-mbp.local",
-				Domain:      "local",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "johns-mbp",
+					MachineName: "Johns",
+					FQDN:        "johns-mbp.local",
+					Domain:      "local",
+				}, *info)
 			},
 		},
 		{
@@ -353,11 +437,16 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
 			},
-			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns",
-				FQDN:        "johns-mbp.local",
-				Domain:      "local",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "johns-mbp",
+					MachineName: "Johns",
+					FQDN:        "johns-mbp.local",
+					Domain:      "local",
+				}, *info)
 			},
 		},
 		{
@@ -377,10 +466,15 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
 			},
-			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns",
-				FQDN:        "johns-mbp",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "johns-mbp",
+					MachineName: "Johns",
+					FQDN:        "johns-mbp",
+				}, *info)
 			},
 		},
 		{
@@ -400,10 +494,15 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
 			},
-			want: hostname.Info{
-				Name:        "johns-mbp",
-				MachineName: "Johns",
-				FQDN:        "johns-mbp",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{
+					Name:        "johns-mbp",
+					MachineName: "Johns",
+					FQDN:        "johns-mbp",
+				}, *info)
 			},
 		},
 		{
@@ -416,7 +515,12 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
 			},
-			want: hostname.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal(hostname.Info{}, *info)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -433,15 +537,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &hostname.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*hostname.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

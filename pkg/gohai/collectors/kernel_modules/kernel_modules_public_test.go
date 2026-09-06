@@ -100,13 +100,34 @@ func (s *KernelModulesPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(kernelmodules.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c kernelmodules.Collector) {
+				_, ok := c.(*kernelmodules.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c kernelmodules.Collector) {
+				_, ok := c.(*kernelmodules.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c kernelmodules.Collector) {
+				_, ok := c.(*kernelmodules.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -116,14 +137,7 @@ func (s *KernelModulesPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*kernelmodules.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*kernelmodules.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -137,11 +151,11 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 	)
 
 	tests := []struct {
-		name     string
-		variant  string
-		fs       avfs.VFS
-		exec     func(*testing.T) executor.Executor
-		validate func(*kernelmodules.Info)
+		name         string
+		variant      string
+		fs           avfs.VFS
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: canonical modules with versions",
@@ -152,7 +166,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 				"/sys/module/nf_tables/version": "1.2.3\n",
 				"/sys/module/ipv6/version":      "\n",
 			}),
-			validate: func(i *kernelmodules.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
 				s.Len(i.Modules, 2)
 				s.Equal(uint64(217088), i.Modules["nf_tables"].Size)
 				s.Equal(25, i.Modules["nf_tables"].RefCount)
@@ -165,7 +182,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			name:    "linux: missing /proc/modules yields empty Info",
 			variant: "linux",
 			fs:      linuxFS(s, nil),
-			validate: func(i *kernelmodules.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
 				s.Nil(i.Modules)
 			},
 		},
@@ -175,7 +195,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			fs: linuxFS(s, map[string]string{
 				"/proc/modules": "short\nvalid_mod 1024 3 - Live 0x0\n",
 			}),
-			validate: func(i *kernelmodules.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
 				s.Len(i.Modules, 1)
 				s.Equal(uint64(1024), i.Modules["valid_mod"].Size)
 				s.Equal(3, i.Modules["valid_mod"].RefCount)
@@ -187,7 +210,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			fs: linuxFS(s, map[string]string{
 				"/proc/modules": "broken abc xyz - Live 0x0\n",
 			}),
-			validate: func(i *kernelmodules.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
 				s.Contains(i.Modules, "broken")
 				s.Equal(uint64(0), i.Modules["broken"].Size)
 				s.Equal(0, i.Modules["broken"].RefCount)
@@ -199,7 +225,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return kextstatExec(t, kextstatOut, nil)
 			},
-			validate: func(i *kernelmodules.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
 				s.Len(i.Modules, 2)
 				s.Equal("2.9", i.Modules["com.apple.iokit.IOPCIFamily"].Version)
 				s.Equal(uint64(0x8a8), i.Modules["com.apple.iokit.IOPCIFamily"].Size)
@@ -214,7 +243,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return kextstatExec(t, nil, errors.New("not found"))
 			},
-			validate: func(i *kernelmodules.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
 				s.Empty(i.Modules)
 			},
 		},
@@ -224,7 +256,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return kextstatExec(t, []byte("garbage line that cannot match\n"), nil)
 			},
-			validate: func(i *kernelmodules.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
 				s.Empty(i.Modules)
 			},
 		},
@@ -232,7 +267,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			name:    "darwin: nil Exec yields empty modules",
 			variant: "darwin",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			validate: func(i *kernelmodules.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
 				s.Empty(i.Modules)
 			},
 		},
@@ -250,13 +288,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 				}
 				c = d
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*kernelmodules.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

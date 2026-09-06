@@ -95,15 +95,50 @@ func (s *DockerPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(docker.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c docker.Collector) {
+				_, ok := c.(*docker.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c docker.Collector) {
+				_, ok := c.(*docker.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c docker.Collector) {
+				_, ok := c.(*docker.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c docker.Collector) {
+				_, ok := c.(*docker.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c docker.Collector) {
+				_, ok := c.(*docker.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -113,25 +148,17 @@ func (s *DockerPublicTestSuite) TestNew() {
 			s.Equal("software", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*docker.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*docker.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *DockerPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		exec    executor.Executor
-		wantNil bool
-		want    *docker.Info
+		name         string
+		variant      string
+		exec         executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: docker present, full result",
@@ -142,41 +169,64 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(containersOut), nil,
 				[]byte(imagesOut), nil,
 			),
-			want: &docker.Info{
-				Version: "24.0.5",
-				Containers: []docker.Container{
-					{
-						ID:     "abc123",
-						Name:   "web",
-						Image:  "nginx:latest",
-						State:  "running",
-						Status: "Up 2 hours",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal(&docker.Info{
+					Version: "24.0.5",
+					Containers: []docker.Container{
+						{
+							ID:     "abc123",
+							Name:   "web",
+							Image:  "nginx:latest",
+							State:  "running",
+							Status: "Up 2 hours",
+						},
+						{
+							ID:     "def456",
+							Name:   "db",
+							Image:  "postgres:15",
+							State:  "exited",
+							Status: "Exited (0)",
+						},
 					},
-					{
-						ID:     "def456",
-						Name:   "db",
-						Image:  "postgres:15",
-						State:  "exited",
-						Status: "Exited (0)",
+					Images: []docker.Image{
+						{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+						{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
 					},
-				},
-				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
-					{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
-				},
+				}, info)
 			},
 		},
 		{
 			name:    "linux: docker version fails, returns nil",
 			variant: "linux",
 			exec:    buildMock(s.T(), nil, errors.New("no docker"), nil, nil, nil, nil),
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal((*docker.Info)(nil), info)
+			},
 		},
 		{
 			name:    "linux: nil Exec returns nil",
 			variant: "linux",
 			exec:    nil,
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal((*docker.Info)(nil), info)
+			},
 		},
 		{
 			name:    "linux: ps fails, containers empty",
@@ -187,13 +237,18 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				nil, errors.New("ps failed"),
 				[]byte(imagesOut), nil,
 			),
-			want: &docker.Info{
-				Version:    "24.0.5",
-				Containers: []docker.Container{},
-				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
-					{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal(&docker.Info{
+					Version:    "24.0.5",
+					Containers: []docker.Container{},
+					Images: []docker.Image{
+						{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+						{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
+					},
+				}, info)
 			},
 		},
 		{
@@ -205,25 +260,30 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(containersOut), nil,
 				nil, errors.New("images failed"),
 			),
-			want: &docker.Info{
-				Version: "24.0.5",
-				Containers: []docker.Container{
-					{
-						ID:     "abc123",
-						Name:   "web",
-						Image:  "nginx:latest",
-						State:  "running",
-						Status: "Up 2 hours",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal(&docker.Info{
+					Version: "24.0.5",
+					Containers: []docker.Container{
+						{
+							ID:     "abc123",
+							Name:   "web",
+							Image:  "nginx:latest",
+							State:  "running",
+							Status: "Up 2 hours",
+						},
+						{
+							ID:     "def456",
+							Name:   "db",
+							Image:  "postgres:15",
+							State:  "exited",
+							Status: "Exited (0)",
+						},
 					},
-					{
-						ID:     "def456",
-						Name:   "db",
-						Image:  "postgres:15",
-						State:  "exited",
-						Status: "Exited (0)",
-					},
-				},
-				Images: []docker.Image{},
+					Images: []docker.Image{},
+				}, info)
 			},
 		},
 		{
@@ -240,12 +300,17 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(""),
 				nil,
 			),
-			want: &docker.Info{
-				Version: "24.0.5",
-				Containers: []docker.Container{
-					{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
-				},
-				Images: nil,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal(&docker.Info{
+					Version: "24.0.5",
+					Containers: []docker.Container{
+						{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
+					},
+					Images: nil,
+				}, info)
 			},
 		},
 		{
@@ -262,12 +327,17 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(""),
 				nil,
 			),
-			want: &docker.Info{
-				Version: "24.0.5",
-				Containers: []docker.Container{
-					{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
-				},
-				Images: nil,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal(&docker.Info{
+					Version: "24.0.5",
+					Containers: []docker.Container{
+						{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
+					},
+					Images: nil,
+				}, info)
 			},
 		},
 		{
@@ -284,12 +354,17 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				),
 				nil,
 			),
-			want: &docker.Info{
-				Version:    "24.0.5",
-				Containers: nil,
-				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal(&docker.Info{
+					Version:    "24.0.5",
+					Containers: nil,
+					Images: []docker.Image{
+						{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+					},
+				}, info)
 			},
 		},
 		{
@@ -306,12 +381,17 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				),
 				nil,
 			),
-			want: &docker.Info{
-				Version:    "24.0.5",
-				Containers: nil,
-				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal(&docker.Info{
+					Version:    "24.0.5",
+					Containers: nil,
+					Images: []docker.Image{
+						{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+					},
+				}, info)
 			},
 		},
 		{
@@ -323,41 +403,64 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(containersOut), nil,
 				[]byte(imagesOut), nil,
 			),
-			want: &docker.Info{
-				Version: "24.0.5",
-				Containers: []docker.Container{
-					{
-						ID:     "abc123",
-						Name:   "web",
-						Image:  "nginx:latest",
-						State:  "running",
-						Status: "Up 2 hours",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal(&docker.Info{
+					Version: "24.0.5",
+					Containers: []docker.Container{
+						{
+							ID:     "abc123",
+							Name:   "web",
+							Image:  "nginx:latest",
+							State:  "running",
+							Status: "Up 2 hours",
+						},
+						{
+							ID:     "def456",
+							Name:   "db",
+							Image:  "postgres:15",
+							State:  "exited",
+							Status: "Exited (0)",
+						},
 					},
-					{
-						ID:     "def456",
-						Name:   "db",
-						Image:  "postgres:15",
-						State:  "exited",
-						Status: "Exited (0)",
+					Images: []docker.Image{
+						{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
+						{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
 					},
-				},
-				Images: []docker.Image{
-					{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
-					{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
-				},
+				}, info)
 			},
 		},
 		{
 			name:    "darwin: docker absent, returns nil",
 			variant: "darwin",
 			exec:    buildMock(s.T(), nil, errors.New("not found"), nil, nil, nil, nil),
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal((*docker.Info)(nil), info)
+			},
 		},
 		{
 			name:    "darwin: nil Exec returns nil",
 			variant: "darwin",
 			exec:    nil,
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal((*docker.Info)(nil), info)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -369,15 +472,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &docker.Darwin{Exec: tt.exec}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*docker.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

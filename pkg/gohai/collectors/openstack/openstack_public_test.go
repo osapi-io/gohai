@@ -107,18 +107,42 @@ func (s *OpenStackPublicTestSuite) writePasswd(
 func (s *OpenStackPublicTestSuite) TestInterface() {
 	c := openstack.New()
 	tests := []struct {
-		name string
-		got  any
-		want any
+		name         string
+		got          any
+		validateFunc func(any)
 	}{
-		{"Name", c.Name(), "openstack"},
-		{"Category", c.Category(), "cloud"},
-		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+		{
+			name: "Name",
+			got:  c.Name(),
+			validateFunc: func(got any) {
+				s.Equal("openstack", got)
+			},
+		},
+		{
+			name: "Category",
+			got:  c.Category(),
+			validateFunc: func(got any) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name: "DefaultEnabled",
+			got:  c.DefaultEnabled(),
+			validateFunc: func(got any) {
+				s.Equal(false, got)
+			},
+		},
+		{
+			name: "Dependencies",
+			got:  c.Dependencies(),
+			validateFunc: func(got any) {
+				s.Equal([]string{"dmi"}, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.got)
+			tt.validateFunc(tt.got)
 		})
 	}
 }
@@ -147,22 +171,22 @@ func canned(
 
 func (s *OpenStackPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name        string
-		prior       collector.PriorResults
-		tree        map[string]string
-		novaBody    string
-		passwdLines string // when non-empty, written before Collect
-		handler     http.HandlerFunc
-		closed      bool
-		wantNil     bool
-		wantNoHTTP  bool
-		verify      func(s *OpenStackPublicTestSuite, info *openstack.Info)
+		name         string
+		prior        collector.PriorResults
+		tree         map[string]string
+		novaBody     string
+		passwdLines  string // when non-empty, written before Collect
+		handler      http.HandlerFunc
+		closed       bool
+		validateFunc func(any, bool)
 	}{
 		{
 			name:     "happy path combines EC2-mirror walk + Nova doc + openstack provider",
 			tree:     metadataTree,
 			novaBody: novaDoc,
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("openstack", info.Provider)
 				s.Equal("i-abc", info.ID)
@@ -185,7 +209,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			tree:        metadataTree,
 			novaBody:    novaDoc,
 			passwdLines: "root:x:0:0:root:/root:/bin/bash\nuser:x:1000:1000::/home/user:/bin/bash\n",
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Equal("openstack", info.Provider)
 			},
 		},
@@ -194,7 +220,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			tree:        metadataTree,
 			novaBody:    novaDoc,
 			passwdLines: "root:x:0:0:root:/root:/bin/bash\ndhc-user:x:1000:1000::/home/dhc-user:/bin/bash\n",
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Equal("dreamhost", info.Provider)
 			},
 		},
@@ -203,17 +231,21 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Product: &dmi.Product{Name: "VMware"}},
 			},
-			tree:       metadataTree,
-			novaBody:   novaDoc,
-			wantNil:    true,
-			wantNoHTTP: true,
+			tree:     metadataTree,
+			novaBody: novaDoc,
+			validateFunc: func(out any, httpCalled bool) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name:     "no dmi in prior fails open",
 			prior:    collector.PriorResults{},
 			tree:     metadataTree,
 			novaBody: novaDoc,
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Equal("i-abc", info.ID)
 			},
 		},
@@ -221,7 +253,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			name:     "EC2-mirror missing but Nova doc present → still detected",
 			tree:     map[string]string{},
 			novaBody: novaDoc,
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("uuid-xxx", info.UUID)
 				s.Empty(info.ID) // no EC2-mirror data
@@ -231,7 +265,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			name:     "both EC2-mirror and Nova doc missing → drop",
 			tree:     map[string]string{},
 			novaBody: "",
-			wantNil:  true,
+			validateFunc: func(out any, _ bool) {
+				s.Nil(out)
+			},
 		},
 		{
 			name: "Nova doc malformed JSON tolerated",
@@ -243,7 +279,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				}
 				canned(metadataTree, "")(w, r)
 			},
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Empty(info.UUID)
 				s.Equal("i-abc", info.ID)
 			},
@@ -255,7 +293,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				"/latest/meta-data/ami-id": "ami-yyy",
 			},
 			novaBody: `{"uuid": "uuid-solo", "hostname": "h"}`,
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Equal("uuid-solo", info.UUID)
 				s.Equal("h", info.Hostname)
 				s.Equal("ami-yyy", info.ImageID)
@@ -269,7 +309,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				// /latest/meta-data/broken/ intentionally missing → 404
 			},
 			novaBody: novaDoc,
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Equal("ami-zzz", info.ImageID)
 			},
 		},
@@ -281,7 +323,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				// /latest/meta-data/missing-leaf intentionally absent → 404
 			},
 			novaBody: novaDoc,
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Equal("ami-aaa", info.ImageID)
 			},
 		},
@@ -289,7 +333,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			name:    "connection refused drops silently",
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
-			wantNil: true,
+			validateFunc: func(out any, _ bool) {
+				s.Nil(out)
+			},
 		},
 		{
 			name: "empty listing lines are skipped",
@@ -298,7 +344,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				"/latest/meta-data/ami-id": "ami-skip",
 			},
 			novaBody: novaDoc,
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Equal("ami-skip", info.ImageID)
 			},
 		},
@@ -309,7 +357,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				"/latest/meta-data/ami-id": "ami-no-placement",
 			},
 			novaBody: novaDoc,
-			verify: func(s *OpenStackPublicTestSuite, info *openstack.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
 				s.Equal("nova", info.Zone) // from Nova doc
 			},
 		},
@@ -348,18 +398,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			out, err := c.Collect(context.Background(), prior)
 			s.Require().NoError(err)
 
-			if tt.wantNoHTTP {
-				s.False(httpCalled)
-			}
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-			info, ok := out.(*openstack.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info)
-			}
+			tt.validateFunc(out, httpCalled)
 		})
 	}
 }

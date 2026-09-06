@@ -62,15 +62,50 @@ func (s *NetworkPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(network.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -80,14 +115,7 @@ func (s *NetworkPublicTestSuite) TestNew() {
 			s.Equal("network", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*network.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*network.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -1161,10 +1189,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 
 func (s *NetworkPublicTestSuite) TestReadNIC() {
 	tests := []struct {
-		name      string
-		fn        func(...any) (*ghw.NetworkInfo, error)
-		wantErr   bool
-		wantCount int
+		name         string
+		fn           func(...any) (*ghw.NetworkInfo, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name: "ghw success returns mapped NICStats",
@@ -1173,36 +1200,34 @@ func (s *NetworkPublicTestSuite) TestReadNIC() {
 					{Name: "eth0", Speed: "1Gb/s", Duplex: "Full"},
 				}}, nil
 			},
-			wantCount: 1,
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Len(out, 1)
+			},
 		},
 		{
 			name: "ghw error propagated",
 			fn: func(...any) (*ghw.NetworkInfo, error) {
 				return nil, errors.New("ghw failed")
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			defer network.SetGHWNetworkFn(tt.fn)()
-			out, err := network.ReadNIC()
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Len(out, tt.wantCount)
+			tt.validateFunc(network.ReadNIC())
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestReadNeighbours() {
 	tests := []struct {
-		name    string
-		fn      func(int, int) ([]netlink.Neigh, error)
-		wantErr bool
-		wantLen int
+		name         string
+		fn           func(int, int) ([]netlink.Neigh, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name: "netlink success returns mapped neighbours",
@@ -1211,24 +1236,23 @@ func (s *NetworkPublicTestSuite) TestReadNeighbours() {
 					{IP: net.ParseIP("10.0.0.1"), Family: 2, State: 0x02},
 				}, nil
 			},
-			wantLen: 1,
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Len(out, 1)
+			},
 		},
 		{
-			name:    "netlink error propagated",
-			fn:      func(int, int) ([]netlink.Neigh, error) { return nil, errors.New("netlink failed") },
-			wantErr: true,
+			name: "netlink error propagated",
+			fn:   func(int, int) ([]netlink.Neigh, error) { return nil, errors.New("netlink failed") },
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			defer network.SetNetlinkNeighListFn(tt.fn)()
-			out, err := network.ReadNeighbours()
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Len(out, tt.wantLen)
+			tt.validateFunc(network.ReadNeighbours())
 		})
 	}
 }
@@ -1407,11 +1431,10 @@ func (s *NetworkPublicTestSuite) TestNeighState() {
 
 func (s *NetworkPublicTestSuite) TestReadInterfaces() {
 	tests := []struct {
-		name       string
-		ifsFn      func(context.Context) (gpnet.InterfaceStatList, error)
-		countersFn func(context.Context, bool) ([]gpnet.IOCountersStat, error)
-		wantErr    bool
-		wantLen    int
+		name         string
+		ifsFn        func(context.Context) (gpnet.InterfaceStatList, error)
+		countersFn   func(context.Context, bool) ([]gpnet.IOCountersStat, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name: "interfaces + counters merged",
@@ -1423,7 +1446,10 @@ func (s *NetworkPublicTestSuite) TestReadInterfaces() {
 			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
 				return []gpnet.IOCountersStat{{Name: "eth0", BytesSent: 100}}, nil
 			},
-			wantLen: 1,
+			validateFunc: func(ifs any, err error) {
+				s.Require().NoError(err)
+				s.Len(ifs, 1)
+			},
 		},
 		{
 			name: "gopsutil error wrapped and returned",
@@ -1433,20 +1459,16 @@ func (s *NetworkPublicTestSuite) TestReadInterfaces() {
 			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
 				return nil, nil
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			defer network.SetInterfacesFn(tt.ifsFn)()
 			defer network.SetIOCountersFn(tt.countersFn)()
-			ifs, err := network.ReadInterfaces(context.Background())
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Len(ifs, tt.wantLen)
+			tt.validateFunc(network.ReadInterfaces(context.Background()))
 		})
 	}
 }

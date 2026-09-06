@@ -71,15 +71,50 @@ func (s *CommandPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(command.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c command.Collector) {
+				_, ok := c.(*command.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c command.Collector) {
+				_, ok := c.(*command.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c command.Collector) {
+				_, ok := c.(*command.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c command.Collector) {
+				_, ok := c.(*command.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c command.Collector) {
+				_, ok := c.(*command.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -89,14 +124,7 @@ func (s *CommandPublicTestSuite) TestNew() {
 			s.Equal("misc", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*command.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*command.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -109,27 +137,37 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 `)
 
 	tests := []struct {
-		name    string
-		variant string
-		exec    func(*testing.T) executor.Executor
-		want    []string
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: ps output parsed and trailing whitespace trimmed",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, psOutput, nil) },
-			want: []string{
-				"UID        PID  PPID  C STIME TTY          TIME CMD",
-				"root         1     0  0 10:00 ?        00:00:01 /sbin/init",
-				"root         2     0  0 10:00 ?        00:00:00 [kthreadd]",
-				"user      1234     1  0 10:01 pts/0    00:00:00 bash",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{
+					"UID        PID  PPID  C STIME TTY          TIME CMD",
+					"root         1     0  0 10:00 ?        00:00:01 /sbin/init",
+					"root         2     0  0 10:00 ?        00:00:00 [kthreadd]",
+					"user      1234     1  0 10:01 pts/0    00:00:00 bash",
+				}, info.PS)
 			},
 		},
 		{
 			name:    "linux: empty output yields empty slice",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, []byte{}, nil) },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
 		},
 		{
 			name:    "linux: blank lines in output are skipped",
@@ -137,42 +175,72 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			exec: func(t *testing.T) executor.Executor {
 				return psExec(t, []byte("header\n\nprocess1\n\n"), nil)
 			},
-			want: []string{"header", "process1"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"header", "process1"}, info.PS)
+			},
 		},
 		{
 			name:    "linux: exec error yields empty slice, no error",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, nil, errors.New("not found")) },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
 		},
 		{
 			name:    "linux: nil Exec yields empty slice, no error",
 			variant: "linux",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
 		},
 		{
 			name:    "darwin: ps output parsed",
 			variant: "darwin",
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, psOutput, nil) },
-			want: []string{
-				"UID        PID  PPID  C STIME TTY          TIME CMD",
-				"root         1     0  0 10:00 ?        00:00:01 /sbin/init",
-				"root         2     0  0 10:00 ?        00:00:00 [kthreadd]",
-				"user      1234     1  0 10:01 pts/0    00:00:00 bash",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{
+					"UID        PID  PPID  C STIME TTY          TIME CMD",
+					"root         1     0  0 10:00 ?        00:00:01 /sbin/init",
+					"root         2     0  0 10:00 ?        00:00:00 [kthreadd]",
+					"user      1234     1  0 10:01 pts/0    00:00:00 bash",
+				}, info.PS)
 			},
 		},
 		{
 			name:    "darwin: exec error yields empty slice, no error",
 			variant: "darwin",
 			exec:    func(t *testing.T) executor.Executor { return psExec(t, nil, errors.New("not found")) },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
 		},
 		{
 			name:    "darwin: nil Exec yields empty slice, no error",
 			variant: "darwin",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -184,11 +252,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			case "darwin":
 				c = &command.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*command.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.PS)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

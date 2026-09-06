@@ -114,11 +114,10 @@ func (s *ShellsPublicTestSuite) TestNew() {
 
 func (s *ShellsPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		setupFS func() avfs.VFS
-		wantErr bool
-		want    []string
+		name         string
+		variant      string
+		setupFS      func() avfs.VFS
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: canonical /etc/shells",
@@ -131,7 +130,12 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: non-absolute entries skipped",
@@ -144,7 +148,12 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/sh", "/bin/zsh"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"/bin/sh", "/bin/zsh"}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: whitespace trimmed",
@@ -157,7 +166,12 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/bash", "/bin/sh"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"/bin/bash", "/bin/sh"}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: empty file",
@@ -168,19 +182,31 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/etc/shells", []byte{}, fs.FileMode(0o644))
 				return f
 			},
-			want: []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: missing file soft-misses",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: other read error propagated",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: canonical macOS /etc/shells",
@@ -197,21 +223,31 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 				)
 				return f
 			},
-			want: []string{
-				"/bin/bash",
-				"/bin/csh",
-				"/bin/dash",
-				"/bin/ksh",
-				"/bin/sh",
-				"/bin/tcsh",
-				"/bin/zsh",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{
+					"/bin/bash",
+					"/bin/csh",
+					"/bin/dash",
+					"/bin/ksh",
+					"/bin/sh",
+					"/bin/tcsh",
+					"/bin/zsh",
+				}, info.Paths)
 			},
 		},
 		{
 			name:    "darwin: missing file soft-misses",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.Paths)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -223,15 +259,7 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &shells.Darwin{FS: tt.setupFS()}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*shells.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.Paths)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

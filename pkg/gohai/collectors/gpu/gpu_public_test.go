@@ -74,13 +74,34 @@ func (s *GPUPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(gpu.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c gpu.Collector) {
+				_, ok := c.(*gpu.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c gpu.Collector) {
+				_, ok := c.(*gpu.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c gpu.Collector) {
+				_, ok := c.(*gpu.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -90,14 +111,7 @@ func (s *GPUPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*gpu.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*gpu.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -141,17 +155,20 @@ func (s *GPUPublicTestSuite) TestCollect() {
 	ghwNil := func(...any) (*ghwgpu.Info, error) { return nil, nil }
 
 	tests := []struct {
-		name     string
-		variant  string
-		ghw      func(...any) (*ghwgpu.Info, error)
-		exec     func(*testing.T) executor.Executor
-		validate func(*gpu.Info)
+		name         string
+		variant      string
+		ghw          func(...any) (*ghwgpu.Info, error)
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: ghw returns cards with + without DeviceInfo",
 			variant: "linux",
 			ghw:     ghwPopulated,
-			validate: func(i *gpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*gpu.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Cards, 2)
 				s.Equal("NVIDIA Corporation", i.Cards[0].Vendor)
 				s.Equal("10de", i.Cards[0].VendorID)
@@ -163,16 +180,26 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:     "linux: ghw error yields empty Info",
-			variant:  "linux",
-			ghw:      ghwErr,
-			validate: func(i *gpu.Info) { s.Empty(i.Cards) },
+			name:    "linux: ghw error yields empty Info",
+			variant: "linux",
+			ghw:     ghwErr,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*gpu.Info)
+				s.Require().True(ok)
+				s.Empty(i.Cards)
+			},
 		},
 		{
-			name:     "linux: ghw nil Info yields empty",
-			variant:  "linux",
-			ghw:      ghwNil,
-			validate: func(i *gpu.Info) { s.Empty(i.Cards) },
+			name:    "linux: ghw nil Info yields empty",
+			variant: "linux",
+			ghw:     ghwNil,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*gpu.Info)
+				s.Require().True(ok)
+				s.Empty(i.Cards)
+			},
 		},
 		{
 			name:    "darwin: system_profiler JSON parsed for Apple GPU + discrete",
@@ -180,7 +207,10 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return displayExec(t, []byte(darwinJSON), nil)
 			},
-			validate: func(i *gpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*gpu.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Cards, 2)
 				s.Equal("Apple", i.Cards[0].Vendor)
 				s.Equal("Apple M1 Pro", i.Cards[0].Model)
@@ -204,7 +234,10 @@ func (s *GPUPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			validate: func(i *gpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*gpu.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Cards, 1)
 				s.Equal("Fallback", i.Cards[0].Model)
 				s.Equal("Intel", i.Cards[0].Vendor)
@@ -216,7 +249,12 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return displayExec(t, nil, errors.New("not found"))
 			},
-			validate: func(i *gpu.Info) { s.Empty(i.Cards) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*gpu.Info)
+				s.Require().True(ok)
+				s.Empty(i.Cards)
+			},
 		},
 		{
 			name:    "darwin: malformed JSON yields empty Info",
@@ -224,13 +262,23 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return displayExec(t, []byte("not json"), nil)
 			},
-			validate: func(i *gpu.Info) { s.Empty(i.Cards) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*gpu.Info)
+				s.Require().True(ok)
+				s.Empty(i.Cards)
+			},
 		},
 		{
-			name:     "darwin: nil Exec yields empty",
-			variant:  "darwin",
-			exec:     func(*testing.T) executor.Executor { return nil },
-			validate: func(i *gpu.Info) { s.Empty(i.Cards) },
+			name:    "darwin: nil Exec yields empty",
+			variant: "darwin",
+			exec:    func(*testing.T) executor.Executor { return nil },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*gpu.Info)
+				s.Require().True(ok)
+				s.Empty(i.Cards)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -247,13 +295,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 				}
 				c = d
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*gpu.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

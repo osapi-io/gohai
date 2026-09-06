@@ -116,15 +116,50 @@ func (s *MdadmPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(mdadm.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c mdadm.Collector) {
+				_, ok := c.(*mdadm.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c mdadm.Collector) {
+				_, ok := c.(*mdadm.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c mdadm.Collector) {
+				_, ok := c.(*mdadm.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c mdadm.Collector) {
+				_, ok := c.(*mdadm.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c mdadm.Collector) {
+				_, ok := c.(*mdadm.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -134,14 +169,7 @@ func (s *MdadmPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*mdadm.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*mdadm.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -151,12 +179,10 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		setupFS func() avfs.VFS
-		// setupEx returns an executor.Executor to inject. Return nil to test
-		// the no-executor path (Exec field left nil on the Linux struct).
-		setupEx func(*testing.T) *execmocks.MockExecutor
-		wantErr bool
-		wantNil bool
-		want    []mdadm.Array
+		//           setupEx returns an executor.Executor to inject. Return nil to test
+		//           the no-executor path (Exec field left nil on the Linux struct).
+		setupEx      func(*testing.T) *execmocks.MockExecutor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: raid1 array enriched by mdadm --detail",
@@ -175,18 +201,23 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 					Return(detailRaid1, nil)
 				return m
 			},
-			want: []mdadm.Array{
-				{
-					Device:      "md0",
-					Level:       "raid1",
-					State:       "clean",
-					UUID:        "a5d3:1234:dead:beef",
-					ActiveDisks: 2,
-					TotalDisks:  2,
-					SpareDisks:  0,
-					Members:     []string{"sda1", "sdb1"},
-					Spares:      []string{},
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Equal([]mdadm.Array{
+					{
+						Device:      "md0",
+						Level:       "raid1",
+						State:       "clean",
+						UUID:        "a5d3:1234:dead:beef",
+						ActiveDisks: 2,
+						TotalDisks:  2,
+						SpareDisks:  0,
+						Members:     []string{"sda1", "sdb1"},
+						Spares:      []string{},
+					},
+				}, info.Arrays)
 			},
 		},
 		{
@@ -206,12 +237,17 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("mdadm not found"))
 				return m
 			},
-			want: []mdadm.Array{
-				{
-					Device:  "md1",
-					Members: []string{"sda1", "sdb1"},
-					Spares:  []string{"sdc1"},
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Equal([]mdadm.Array{
+					{
+						Device:  "md1",
+						Members: []string{"sda1", "sdb1"},
+						Spares:  []string{"sdc1"},
+					},
+				}, info.Arrays)
 			},
 		},
 		{
@@ -230,9 +266,14 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("not found")).AnyTimes()
 				return m
 			},
-			want: []mdadm.Array{
-				{Device: "md0", Members: []string{"sda1", "sdd1"}, Spares: []string{}},
-				{Device: "md1", Members: []string{"sdb1", "sdc1"}, Spares: []string{}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Equal([]mdadm.Array{
+					{Device: "md0", Members: []string{"sda1", "sdd1"}, Spares: []string{}},
+					{Device: "md1", Members: []string{"sdb1", "sdc1"}, Spares: []string{}},
+				}, info.Arrays)
 			},
 		},
 		{
@@ -247,14 +288,24 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				return f
 			},
 			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
-			want:    []mdadm.Array{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Equal([]mdadm.Array{}, info.Arrays)
+			},
 		},
 		{
 			name:    "linux: /proc/mdstat absent returns empty list",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
 			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
-			want:    []mdadm.Array{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Equal([]mdadm.Array{}, info.Arrays)
+			},
 		},
 		{
 			name:    "linux: nil Exec skips mdadm --detail enrichment",
@@ -266,8 +317,13 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				return f
 			},
 			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
-			want: []mdadm.Array{
-				{Device: "md0", Members: []string{"sda1", "sdb1"}, Spares: []string{}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Equal([]mdadm.Array{
+					{Device: "md0", Members: []string{"sda1", "sdb1"}, Spares: []string{}},
+				}, info.Arrays)
 			},
 		},
 		{
@@ -275,13 +331,24 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
 			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin returns nil",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Equal([]mdadm.Array(nil), info.Arrays)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -299,19 +366,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = mdadm.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*mdadm.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.Arrays)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

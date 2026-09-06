@@ -71,15 +71,50 @@ func (s *SysctlPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(sysctl.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c sysctl.Collector) {
+				_, ok := c.(*sysctl.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c sysctl.Collector) {
+				_, ok := c.(*sysctl.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c sysctl.Collector) {
+				_, ok := c.(*sysctl.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c sysctl.Collector) {
+				_, ok := c.(*sysctl.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c sysctl.Collector) {
+				_, ok := c.(*sysctl.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -89,14 +124,7 @@ func (s *SysctlPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*sysctl.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*sysctl.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -114,27 +142,37 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 `)
 
 	tests := []struct {
-		name       string
-		variant    string
-		exec       func(*testing.T) executor.Executor
-		wantParams map[string]string
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: canonical key=value output parsed",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, linuxOutput, nil) },
-			wantParams: map[string]string{
-				"kernel.hostname":     "myhost",
-				"kernel.ostype":       "Linux",
-				"net.ipv4.ip_forward": "0",
-				"vm.swappiness":       "60",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"kernel.hostname":     "myhost",
+					"kernel.ostype":       "Linux",
+					"net.ipv4.ip_forward": "0",
+					"vm.swappiness":       "60",
+				}, info.Params)
 			},
 		},
 		{
-			name:       "linux: empty output yields empty params map",
-			variant:    "linux",
-			exec:       func(t *testing.T) executor.Executor { return sysctlExec(t, []byte{}, nil) },
-			wantParams: map[string]string{},
+			name:    "linux: empty output yields empty params map",
+			variant: "linux",
+			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, []byte{}, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Params)
+			},
 		},
 		{
 			name:    "linux: lines without separator skipped",
@@ -142,7 +180,12 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			exec: func(t *testing.T) executor.Executor {
 				return sysctlExec(t, []byte("no_separator\nkernel.panic = 1\n"), nil)
 			},
-			wantParams: map[string]string{"kernel.panic": "1"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"kernel.panic": "1"}, info.Params)
+			},
 		},
 		{
 			name:    "linux: empty key skipped",
@@ -151,42 +194,72 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 				// Line with separator but no key portion — key becomes empty, skipped.
 				return sysctlExec(t, []byte(": value\nkernel.panic = 2\n"), nil)
 			},
-			wantParams: map[string]string{"kernel.panic": "2"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"kernel.panic": "2"}, info.Params)
+			},
 		},
 		{
-			name:       "linux: exec error yields empty params, no error",
-			variant:    "linux",
-			exec:       func(t *testing.T) executor.Executor { return sysctlExec(t, nil, errors.New("not found")) },
-			wantParams: map[string]string{},
+			name:    "linux: exec error yields empty params, no error",
+			variant: "linux",
+			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, nil, errors.New("not found")) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Params)
+			},
 		},
 		{
-			name:       "linux: nil Exec yields empty params, no error",
-			variant:    "linux",
-			exec:       func(*testing.T) executor.Executor { return nil },
-			wantParams: map[string]string{},
+			name:    "linux: nil Exec yields empty params, no error",
+			variant: "linux",
+			exec:    func(*testing.T) executor.Executor { return nil },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Params)
+			},
 		},
 		{
 			name:    "darwin: colon-separated output parsed",
 			variant: "darwin",
 			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, darwinOutput, nil) },
-			wantParams: map[string]string{
-				"kern.ostype":    "Darwin",
-				"kern.osrelease": "23.5.0",
-				"hw.ncpu":        "10",
-				"vm.swapusage":   "total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"kern.ostype":    "Darwin",
+					"kern.osrelease": "23.5.0",
+					"hw.ncpu":        "10",
+					"vm.swapusage":   "total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)",
+				}, info.Params)
 			},
 		},
 		{
-			name:       "darwin: exec error yields empty params, no error",
-			variant:    "darwin",
-			exec:       func(t *testing.T) executor.Executor { return sysctlExec(t, nil, errors.New("not found")) },
-			wantParams: map[string]string{},
+			name:    "darwin: exec error yields empty params, no error",
+			variant: "darwin",
+			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, nil, errors.New("not found")) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Params)
+			},
 		},
 		{
-			name:       "darwin: nil Exec yields empty params, no error",
-			variant:    "darwin",
-			exec:       func(*testing.T) executor.Executor { return nil },
-			wantParams: map[string]string{},
+			name:    "darwin: nil Exec yields empty params, no error",
+			variant: "darwin",
+			exec:    func(*testing.T) executor.Executor { return nil },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Params)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -198,11 +271,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			case "darwin":
 				c = &sysctl.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*sysctl.Info)
-			s.Require().True(ok)
-			s.Equal(tt.wantParams, info.Params)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

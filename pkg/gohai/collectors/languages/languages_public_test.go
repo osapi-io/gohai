@@ -155,15 +155,50 @@ func (s *LanguagesPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(languages.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c languages.Collector) {
+				_, ok := c.(*languages.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c languages.Collector) {
+				_, ok := c.(*languages.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c languages.Collector) {
+				_, ok := c.(*languages.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c languages.Collector) {
+				_, ok := c.(*languages.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c languages.Collector) {
+				_, ok := c.(*languages.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -173,92 +208,130 @@ func (s *LanguagesPublicTestSuite) TestNew() {
 			s.Equal("software", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*languages.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*languages.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *LanguagesPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		exec    executor.Executor
-		want    languages.Info
+		name         string
+		variant      string
+		exec         executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: all runtimes present",
 			variant: "linux",
 			exec:    buildFullMock(s.T()),
-			want: languages.Info{
-				Go:     strPtr("1.21.0"),
-				Python: strPtr("3.11.4"),
-				Ruby:   strPtr("3.2.2"),
-				Node:   strPtr("20.1.0"),
-				Java:   strPtr("21.0.1"),
-				Perl:   strPtr("v5.36.0"),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{
+					Go:     strPtr("1.21.0"),
+					Python: strPtr("3.11.4"),
+					Ruby:   strPtr("3.2.2"),
+					Node:   strPtr("20.1.0"),
+					Java:   strPtr("21.0.1"),
+					Perl:   strPtr("v5.36.0"),
+				}, *info)
 			},
 		},
 		{
 			name:    "linux: no runtimes present, all nil",
 			variant: "linux",
 			exec:    buildAbsentMock(s.T()),
-			want:    languages.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{}, *info)
+			},
 		},
 		{
 			name:    "linux: nil Exec returns empty Info",
 			variant: "linux",
 			exec:    nil,
-			want:    languages.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{}, *info)
+			},
 		},
 		{
 			name:    "darwin: all runtimes present",
 			variant: "darwin",
 			exec:    buildFullMock(s.T()),
-			want: languages.Info{
-				Go:     strPtr("1.21.0"),
-				Python: strPtr("3.11.4"),
-				Ruby:   strPtr("3.2.2"),
-				Node:   strPtr("20.1.0"),
-				Java:   strPtr("21.0.1"),
-				Perl:   strPtr("v5.36.0"),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{
+					Go:     strPtr("1.21.0"),
+					Python: strPtr("3.11.4"),
+					Ruby:   strPtr("3.2.2"),
+					Node:   strPtr("20.1.0"),
+					Java:   strPtr("21.0.1"),
+					Perl:   strPtr("v5.36.0"),
+				}, *info)
 			},
 		},
 		{
 			name:    "darwin: no runtimes present, all nil",
 			variant: "darwin",
 			exec:    buildAbsentMock(s.T()),
-			want:    languages.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{}, *info)
+			},
 		},
 		{
 			name:    "darwin: nil Exec returns empty Info",
 			variant: "darwin",
 			exec:    nil,
-			want:    languages.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{}, *info)
+			},
 		},
 		{
 			name:    "linux: go version without go prefix falls back to trimmed output",
 			variant: "linux",
 			exec:    buildSingleMock(s.T(), langOverride{"go", "version", "something 1.2.3"}),
-			want:    languages.Info{Go: strPtr("something 1.2.3")},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{Go: strPtr("something 1.2.3")}, *info)
+			},
 		},
 		{
 			name:    "linux: python single token fallback",
 			variant: "linux",
 			exec:    buildSingleMock(s.T(), langOverride{"python3", "--version", "3.11.4"}),
-			want:    languages.Info{Python: strPtr("3.11.4")},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{Python: strPtr("3.11.4")}, *info)
+			},
 		},
 		{
 			name:    "linux: ruby single token fallback",
 			variant: "linux",
 			exec:    buildSingleMock(s.T(), langOverride{"ruby", "--version", "3.2.2"}),
-			want:    languages.Info{Ruby: strPtr("3.2.2")},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{Ruby: strPtr("3.2.2")}, *info)
+			},
 		},
 		{
 			name:    "linux: java version without quotes uses first line",
@@ -267,13 +340,23 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 				s.T(),
 				langOverride{"java", "-version", "java version abc\nother line"},
 			),
-			want: languages.Info{Java: strPtr("java version abc")},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{Java: strPtr("java version abc")}, *info)
+			},
 		},
 		{
 			name:    "linux: perl version without parens falls back to first line",
 			variant: "linux",
 			exec:    buildSingleMock(s.T(), langOverride{"perl", "--version", "perl 5.36"}),
-			want:    languages.Info{Perl: strPtr("perl 5.36")},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{Perl: strPtr("perl 5.36")}, *info)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -285,11 +368,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &languages.Darwin{Exec: tt.exec}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*languages.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

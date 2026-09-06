@@ -53,15 +53,50 @@ func (s *IPCPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(ipc.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c ipc.Collector) {
+				_, ok := c.(*ipc.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c ipc.Collector) {
+				_, ok := c.(*ipc.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c ipc.Collector) {
+				_, ok := c.(*ipc.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c ipc.Collector) {
+				_, ok := c.(*ipc.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c ipc.Collector) {
+				_, ok := c.(*ipc.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -71,25 +106,17 @@ func (s *IPCPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*ipc.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*ipc.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *IPCPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		setupFS func() *memfs.MemFS
-		wantNil bool
-		want    *ipc.Info
+		name         string
+		variant      string
+		setupFS      func() *memfs.MemFS
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: all sysctl files present",
@@ -118,24 +145,34 @@ func (s *IPCPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/sys/kernel/shmmni", []byte("4096\n"), fs.FileMode(0o444))
 				return f
 			},
-			want: &ipc.Info{
-				Sem: ipc.SemLimits{SEMMSL: "250", SEMMNS: "32000", SEMOPM: "32", SEMMNI: "128"},
-				Msg: ipc.MsgLimits{MSGMNB: "65536", MSGMNI: "32000", MSGMAX: "8192"},
-				Shm: ipc.ShmLimits{
-					SHMALL: "18446744073692774399",
-					SHMMAX: "18446744073692774399",
-					SHMMNI: "4096",
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*ipc.Info)
+				s.Require().True(ok)
+				s.Equal(&ipc.Info{
+					Sem: ipc.SemLimits{SEMMSL: "250", SEMMNS: "32000", SEMOPM: "32", SEMMNI: "128"},
+					Msg: ipc.MsgLimits{MSGMNB: "65536", MSGMNI: "32000", MSGMAX: "8192"},
+					Shm: ipc.ShmLimits{
+						SHMALL: "18446744073692774399",
+						SHMMAX: "18446744073692774399",
+						SHMMNI: "4096",
+					},
+				}, info)
 			},
 		},
 		{
 			name:    "linux: missing sysctl files yield empty strings",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS { return memfs.New() },
-			want: &ipc.Info{
-				Sem: ipc.SemLimits{},
-				Msg: ipc.MsgLimits{},
-				Shm: ipc.ShmLimits{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*ipc.Info)
+				s.Require().True(ok)
+				s.Equal(&ipc.Info{
+					Sem: ipc.SemLimits{},
+					Msg: ipc.MsgLimits{},
+					Shm: ipc.ShmLimits{},
+				}, info)
 			},
 		},
 		{
@@ -147,10 +184,15 @@ func (s *IPCPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/sys/kernel/sem", []byte("250\t32000\n"), fs.FileMode(0o444))
 				return f
 			},
-			want: &ipc.Info{
-				Sem: ipc.SemLimits{SEMMSL: "250", SEMMNS: "32000"},
-				Msg: ipc.MsgLimits{},
-				Shm: ipc.ShmLimits{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*ipc.Info)
+				s.Require().True(ok)
+				s.Equal(&ipc.Info{
+					Sem: ipc.SemLimits{SEMMSL: "250", SEMMNS: "32000"},
+					Msg: ipc.MsgLimits{},
+					Shm: ipc.ShmLimits{},
+				}, info)
 			},
 		},
 		{
@@ -162,10 +204,15 @@ func (s *IPCPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/sys/kernel/sem", []byte("250\n"), fs.FileMode(0o444))
 				return f
 			},
-			want: &ipc.Info{
-				Sem: ipc.SemLimits{SEMMSL: "250"},
-				Msg: ipc.MsgLimits{},
-				Shm: ipc.ShmLimits{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*ipc.Info)
+				s.Require().True(ok)
+				s.Equal(&ipc.Info{
+					Sem: ipc.SemLimits{SEMMSL: "250"},
+					Msg: ipc.MsgLimits{},
+					Shm: ipc.ShmLimits{},
+				}, info)
 			},
 		},
 		{
@@ -181,16 +228,30 @@ func (s *IPCPublicTestSuite) TestCollect() {
 				)
 				return f
 			},
-			want: &ipc.Info{
-				Sem: ipc.SemLimits{SEMMSL: "250", SEMMNS: "32000", SEMOPM: "32"},
-				Msg: ipc.MsgLimits{},
-				Shm: ipc.ShmLimits{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*ipc.Info)
+				s.Require().True(ok)
+				s.Equal(&ipc.Info{
+					Sem: ipc.SemLimits{SEMMSL: "250", SEMMNS: "32000", SEMOPM: "32"},
+					Msg: ipc.MsgLimits{},
+					Shm: ipc.ShmLimits{},
+				}, info)
 			},
 		},
 		{
 			name:    "darwin returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*ipc.Info)
+				s.Require().True(ok)
+				s.Equal((*ipc.Info)(nil), info)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -202,15 +263,7 @@ func (s *IPCPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = ipc.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*ipc.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

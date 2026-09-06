@@ -85,15 +85,50 @@ func (s *ServicesPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(services.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c services.Collector) {
+				_, ok := c.(*services.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c services.Collector) {
+				_, ok := c.(*services.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c services.Collector) {
+				_, ok := c.(*services.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c services.Collector) {
+				_, ok := c.(*services.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c services.Collector) {
+				_, ok := c.(*services.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -103,53 +138,65 @@ func (s *ServicesPublicTestSuite) TestNew() {
 			s.Equal("software", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*services.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*services.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *ServicesPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		exec    executor.Executor
-		wantNil bool
-		want    []services.Service
+		name         string
+		variant      string
+		exec         executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: systemctl returns services",
 			variant: "linux",
 			exec:    systemctlExec(s.T(), []byte(systemctlOut), nil),
-			want: []services.Service{
-				{Name: "ssh", State: "running", Enabled: true},
-				{Name: "cron", State: "running", Enabled: true},
-				{Name: "NetworkManager", State: "dead", Enabled: false},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{
+					{Name: "ssh", State: "running", Enabled: true},
+					{Name: "cron", State: "running", Enabled: true},
+					{Name: "NetworkManager", State: "dead", Enabled: false},
+				}, info.Services)
 			},
 		},
 		{
 			name:    "linux: systemctl fails, empty list",
 			variant: "linux",
 			exec:    systemctlExec(s.T(), nil, errors.New("not found")),
-			want:    []services.Service{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{}, info.Services)
+			},
 		},
 		{
 			name:    "linux: nil Exec returns empty list",
 			variant: "linux",
 			exec:    nil,
-			want:    []services.Service{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{}, info.Services)
+			},
 		},
 		{
 			name:    "linux: empty output returns empty list",
 			variant: "linux",
 			exec:    systemctlExec(s.T(), []byte(""), nil),
-			want:    []services.Service{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{}, info.Services)
+			},
 		},
 		{
 			name:    "linux: lines without .service are skipped",
@@ -159,20 +206,39 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				[]byte("not-a-service-line\nssh.service loaded active running OpenSSH\n"),
 				nil,
 			),
-			want: []services.Service{
-				{Name: "ssh", State: "running", Enabled: true},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{
+					{Name: "ssh", State: "running", Enabled: true},
+				}, info.Services)
 			},
 		},
 		{
 			name:    "linux: short field lines skipped",
 			variant: "linux",
 			exec:    systemctlExec(s.T(), []byte("ssh.service loaded\n"), nil),
-			want:    []services.Service{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{}, info.Services)
+			},
 		},
 		{
 			name:    "darwin: returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service(nil), info.Services)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -184,15 +250,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = services.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*services.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.Services)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }
