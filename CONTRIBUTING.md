@@ -132,9 +132,10 @@ just deps
 - **`internal/collector/`.** Collector interface + registry plumbing
   - `collector.go`. `Collector` interface
   - `registry.go`. `Registry` (register, resolve deps, run concurrently)
+  - `mocks/`. Gomock mock generation (`go generate`) and the committed mock
 - **`internal/executor/`.** command execution abstraction
   - `executor.go`. `Executor` interface (`Execute(ctx, name, args...)`)
-  - `gen/`. Gomock mock generation (`go generate`) and the committed mock
+  - `mocks/`. Gomock mock generation (`go generate`) and the committed mock
 
 ## Code style
 
@@ -305,9 +306,9 @@ module. Change both together.
   setter. Do not use an alias to re-cover behavior the caller's own test already
   reaches; a helper with its own contract is what the pattern is for.
 
-External tests in this repository live in `package gohai_test` or
-`package collector_test`, and the setter form is `SetXFn(fn) func()`, returning
-a restore func the caller defers.
+External tests in this repository live in a `_test` package beside the code they
+cover, tables carry `validateFunc` callbacks, and the setter form is
+`SetXFn(fn) func()`, returning a restore func the caller defers.
 
 Collector-specific rules on top of that:
 
@@ -383,7 +384,7 @@ Reference implementation: `pkg/gohai/collectors/shells/`.
 
 `internal/executor` provides a minimal interface (single method:
 `Execute(ctx, name, args...) ([]byte, error)`) with a gomock mock at
-`internal/executor/gen/`. Production impl wraps `exec.CommandContext` and
+`internal/executor/mocks/`. Production impl wraps `exec.CommandContext` and
 returns combined stdout+stderr. Collectors that shell out (sysctl, sw_vers,
 lsb_release, loginctl, lscpu, kextstat, etc.) hold the Executor as a struct
 field.
