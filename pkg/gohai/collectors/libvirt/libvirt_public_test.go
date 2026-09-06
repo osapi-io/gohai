@@ -185,18 +185,19 @@ func (s *LibvirtPublicTestSuite) TestNew() {
 
 func (s *LibvirtPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string
-		exec     func(*testing.T) executor.Executor
-		wantNil  bool
-		validate func(*libvirt.Info)
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
-		// ----- Linux -----
 		{
 			name:    "linux: full happy path — version, URI, two domains with dominfo",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return fullVirshMock(t) },
-			validate: func(i *libvirt.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
 				s.Equal("10.0.0", i.Version)
 				s.Equal("qemu:///system", i.URI)
 				s.Len(i.Domains, 2)
@@ -215,6 +216,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				s.Equal("11112222-3333-4444-5555-666677778888", stopped.UUID)
 				s.Equal(2, stopped.VCPUs)
 				s.False(stopped.Autostart)
+
 			},
 		},
 		{
@@ -231,9 +233,13 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 					Return([]byte(virshListEmptyOutput), nil).AnyTimes()
 				return m
 			},
-			validate: func(i *libvirt.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
 				s.Equal("10.0.0", i.Version)
 				s.Nil(i.Domains)
+
 			},
 		},
 		{
@@ -251,8 +257,12 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 					Return([]byte(virshListEmptyOutput), nil).AnyTimes()
 				return m
 			},
-			validate: func(i *libvirt.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
 				s.Equal("somevendor 9.0.0", i.Version)
+
 			},
 		},
 		{
@@ -274,10 +284,14 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 					AnyTimes()
 				return m
 			},
-			validate: func(i *libvirt.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
 				s.Len(i.Domains, 1)
 				s.Equal("deadbeef-dead-beef-dead-beefdeadbeef", i.Domains[0].UUID)
 				s.True(i.Domains[0].Autostart)
+
 			},
 		},
 		{
@@ -290,13 +304,19 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("virsh: command not found")).AnyTimes()
 				return m
 			},
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "linux: nil Exec returns nil",
 			variant: "linux",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "linux: virsh uri fails — URI stays empty, domains still collected",
@@ -312,9 +332,13 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 					Return([]byte(virshListEmptyOutput), nil).AnyTimes()
 				return m
 			},
-			validate: func(i *libvirt.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
 				s.Empty(i.URI)
 				s.Equal("10.0.0", i.Version)
+
 			},
 		},
 		{
@@ -331,9 +355,13 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("permission denied")).AnyTimes()
 				return m
 			},
-			validate: func(i *libvirt.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
 				s.Equal("10.0.0", i.Version)
 				s.Nil(i.Domains)
+
 			},
 		},
 		{
@@ -353,11 +381,15 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("permission denied")).AnyTimes()
 				return m
 			},
-			validate: func(i *libvirt.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
 				s.Len(i.Domains, 1)
 				s.Equal("myvm", i.Domains[0].Name)
 				s.Equal("running", i.Domains[0].State)
 				s.Empty(i.Domains[0].UUID)
+
 			},
 		},
 		{
@@ -374,16 +406,22 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 					Return([]byte(virshListEmptyOutput), nil).AnyTimes()
 				return m
 			},
-			validate: func(i *libvirt.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
 				s.Nil(i.Domains)
+
 			},
 		},
-		// ----- Darwin -----
 		{
 			name:    "darwin always returns nil",
 			variant: "darwin",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -395,17 +433,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = libvirt.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*libvirt.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }
