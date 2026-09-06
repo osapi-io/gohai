@@ -45,16 +45,17 @@ func TestOutputPublicTestSuite(
 
 func (s *OutputPublicTestSuite) TestWriteOutput() {
 	tests := []struct {
-		name   string
-		pretty bool
-		flat   bool
-		verify func(string)
+		name         string
+		pretty       bool
+		flat         bool
+		validateFunc func(string, error)
 	}{
 		{
 			name:   "json compact",
 			pretty: false,
 			flat:   false,
-			verify: func(out string) {
+			validateFunc: func(out string, err error) {
+				s.NoError(err)
 				s.Contains(out, "collect_time")
 			},
 		},
@@ -62,7 +63,8 @@ func (s *OutputPublicTestSuite) TestWriteOutput() {
 			name:   "json pretty",
 			pretty: true,
 			flat:   false,
-			verify: func(out string) {
+			validateFunc: func(out string, err error) {
+				s.NoError(err)
 				s.Contains(out, "  ")
 			},
 		},
@@ -70,7 +72,8 @@ func (s *OutputPublicTestSuite) TestWriteOutput() {
 			name:   "flat format",
 			pretty: false,
 			flat:   true,
-			verify: func(out string) {
+			validateFunc: func(out string, err error) {
+				s.NoError(err)
 				s.Contains(out, "collect_time=")
 			},
 		},
@@ -81,26 +84,26 @@ func (s *OutputPublicTestSuite) TestWriteOutput() {
 			var buf bytes.Buffer
 			err := cli.WriteOutput(&buf, &gohai.Facts{}, tc.pretty, tc.flat)
 
-			s.NoError(err)
-			tc.verify(buf.String())
+			tc.validateFunc(buf.String(), err)
 		})
 	}
 }
 
 func (s *OutputPublicTestSuite) TestWriteJSON() {
 	tests := []struct {
-		name      string
-		w         io.Writer
-		pretty    bool
-		marshalFn func(*gohai.Facts, bool) ([]byte, error)
-		wantErr   string
-		validate  func(string)
+		name         string
+		w            io.Writer
+		pretty       bool
+		marshalFn    func(*gohai.Facts, bool) ([]byte, error)
+		validateFunc func(io.Writer, error)
 	}{
 		{
 			name:   "compact",
 			w:      &bytes.Buffer{},
 			pretty: false,
-			validate: func(out string) {
+			validateFunc: func(w io.Writer, err error) {
+				s.NoError(err)
+				out := w.(*bytes.Buffer).String()
 				var m map[string]any
 				s.NoError(json.Unmarshal([]byte(out), &m))
 			},
@@ -109,15 +112,19 @@ func (s *OutputPublicTestSuite) TestWriteJSON() {
 			name:   "pretty",
 			w:      &bytes.Buffer{},
 			pretty: true,
-			validate: func(out string) {
+			validateFunc: func(w io.Writer, err error) {
+				s.NoError(err)
+				out := w.(*bytes.Buffer).String()
 				s.Contains(out, "\n  ")
 			},
 		},
 		{
-			name:    "write error",
-			w:       &errWriter{err: errors.New("disk full")},
-			pretty:  false,
-			wantErr: "write output",
+			name:   "write error",
+			w:      &errWriter{err: errors.New("disk full")},
+			pretty: false,
+			validateFunc: func(_ io.Writer, err error) {
+				s.ErrorContains(err, "write output")
+			},
 		},
 		{
 			name:   "marshal error",
@@ -126,7 +133,9 @@ func (s *OutputPublicTestSuite) TestWriteJSON() {
 			marshalFn: func(_ *gohai.Facts, _ bool) ([]byte, error) {
 				return nil, errors.New("marshal boom")
 			},
-			wantErr: "encode output",
+			validateFunc: func(_ io.Writer, err error) {
+				s.ErrorContains(err, "encode output")
+			},
 		},
 	}
 
@@ -137,110 +146,117 @@ func (s *OutputPublicTestSuite) TestWriteJSON() {
 				defer restore()
 			}
 
-			err := cli.WriteJSON(tc.w, &gohai.Facts{}, tc.pretty)
-
-			if tc.wantErr != "" {
-				s.ErrorContains(err, tc.wantErr)
-			} else {
-				s.NoError(err)
-				tc.validate(tc.w.(*bytes.Buffer).String())
-			}
+			tc.validateFunc(tc.w, cli.WriteJSON(tc.w, &gohai.Facts{}, tc.pretty))
 		})
 	}
 }
 
 func (s *OutputPublicTestSuite) TestWriteFlat() {
 	tests := []struct {
-		name    string
-		w       io.Writer
-		wantErr string
+		name         string
+		w            io.Writer
+		validateFunc func(io.Writer, error)
 	}{
 		{
 			name: "success",
 			w:    &bytes.Buffer{},
+			validateFunc: func(w io.Writer, err error) {
+				s.NoError(err)
+				s.Contains(w.(*bytes.Buffer).String(), "collect_time=")
+			},
 		},
 		{
-			name:    "write error",
-			w:       &errWriter{err: errors.New("disk full")},
-			wantErr: "write flat output",
+			name: "write error",
+			w:    &errWriter{err: errors.New("disk full")},
+			validateFunc: func(_ io.Writer, err error) {
+				s.ErrorContains(err, "write flat output")
+			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			err := cli.WriteFlat(tc.w, &gohai.Facts{})
-
-			if tc.wantErr != "" {
-				s.ErrorContains(err, tc.wantErr)
-			} else {
-				s.NoError(err)
-				s.Contains(tc.w.(*bytes.Buffer).String(), "collect_time=")
-			}
+			tc.validateFunc(tc.w, cli.WriteFlat(tc.w, &gohai.Facts{}))
 		})
 	}
 }
 
 func (s *OutputPublicTestSuite) TestWriteCollectorList() {
 	tests := []struct {
-		name    string
-		w       io.Writer
-		wantErr string
+		name         string
+		w            io.Writer
+		validateFunc func(io.Writer, error)
 	}{
 		{
 			name: "success",
 			w:    &bytes.Buffer{},
+			validateFunc: func(w io.Writer, err error) {
+				s.NoError(err)
+				out := w.(*bytes.Buffer).String()
+				s.Contains(out, "[")
+				s.Contains(out, "platform")
+			},
 		},
 		{
-			name:    "write error on category header",
-			w:       &errWriter{err: errors.New("disk full")},
-			wantErr: "write collector list",
+			name: "write error on category header",
+			w:    &errWriter{err: errors.New("disk full")},
+			validateFunc: func(_ io.Writer, err error) {
+				s.ErrorContains(err, "write collector list")
+			},
 		},
 		{
-			name:    "write error on collector name",
-			w:       &errWriter{err: errors.New("disk full"), failAfter: 1},
-			wantErr: "write collector list",
+			name: "write error on collector name",
+			w:    &errWriter{err: errors.New("disk full"), failAfter: 1},
+			validateFunc: func(_ io.Writer, err error) {
+				s.ErrorContains(err, "write collector list")
+			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			err := cli.WriteCollectorList(tc.w)
-
-			if tc.wantErr != "" {
-				s.ErrorContains(err, tc.wantErr)
-			} else {
-				s.NoError(err)
-				out := tc.w.(*bytes.Buffer).String()
-				s.Contains(out, "[")
-				s.Contains(out, "platform")
-			}
+			tc.validateFunc(tc.w, cli.WriteCollectorList(tc.w))
 		})
 	}
 }
 
 func (s *OutputPublicTestSuite) TestWriteOCSF() {
 	tests := []struct {
-		name      string
-		w         io.Writer
-		pretty    bool
-		marshalFn func(*gohai.Facts, bool) ([]byte, error)
-		wantErr   string
+		name         string
+		w            io.Writer
+		pretty       bool
+		marshalFn    func(*gohai.Facts, bool) ([]byte, error)
+		validateFunc func(io.Writer, error)
 	}{
 		{
 			name:   "compact",
 			w:      &bytes.Buffer{},
 			pretty: false,
+			validateFunc: func(w io.Writer, err error) {
+				s.NoError(err)
+				out := w.(*bytes.Buffer).String()
+				s.Contains(out, "class_uid")
+				s.Contains(out, "5001")
+			},
 		},
 		{
 			name:   "pretty",
 			w:      &bytes.Buffer{},
 			pretty: true,
+			validateFunc: func(w io.Writer, err error) {
+				s.NoError(err)
+				out := w.(*bytes.Buffer).String()
+				s.Contains(out, "class_uid")
+				s.Contains(out, "5001")
+			},
 		},
 		{
-			name:    "write error",
-			w:       &errWriter{err: errors.New("disk full")},
-			pretty:  false,
-			wantErr: "write ocsf output",
+			name:   "write error",
+			w:      &errWriter{err: errors.New("disk full")},
+			pretty: false,
+			validateFunc: func(_ io.Writer, err error) {
+				s.ErrorContains(err, "write ocsf output")
+			},
 		},
 		{
 			name:   "marshal error",
@@ -249,7 +265,9 @@ func (s *OutputPublicTestSuite) TestWriteOCSF() {
 			marshalFn: func(_ *gohai.Facts, _ bool) ([]byte, error) {
 				return nil, errors.New("marshal boom")
 			},
-			wantErr: "encode ocsf output",
+			validateFunc: func(_ io.Writer, err error) {
+				s.ErrorContains(err, "encode ocsf output")
+			},
 		},
 	}
 
@@ -260,16 +278,7 @@ func (s *OutputPublicTestSuite) TestWriteOCSF() {
 				defer restore()
 			}
 
-			err := cli.WriteOCSF(tc.w, &gohai.Facts{}, tc.pretty)
-
-			if tc.wantErr != "" {
-				s.ErrorContains(err, tc.wantErr)
-			} else {
-				s.NoError(err)
-				out := tc.w.(*bytes.Buffer).String()
-				s.Contains(out, "class_uid")
-				s.Contains(out, "5001")
-			}
+			tc.validateFunc(tc.w, cli.WriteOCSF(tc.w, &gohai.Facts{}, tc.pretty))
 		})
 	}
 }

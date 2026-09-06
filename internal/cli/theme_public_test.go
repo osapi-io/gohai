@@ -43,14 +43,38 @@ func TestThemePublicTestSuite(
 
 func (s *ThemePublicTestSuite) TestMute() {
 	tests := []struct {
-		name     string
-		w        io.Writer
-		tty      bool
-		wantAnsi bool
+		name         string
+		w            io.Writer
+		tty          bool
+		validateFunc func(string)
 	}{
-		{name: "non-file writer returns plain", w: &bytes.Buffer{}, tty: false, wantAnsi: false},
-		{name: "file non-TTY returns plain", w: devNull(s.T()), tty: false, wantAnsi: false},
-		{name: "file TTY wraps with ANSI", w: devNull(s.T()), tty: true, wantAnsi: true},
+		{
+			name: "non-file writer returns plain",
+			w:    &bytes.Buffer{},
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Equal("hello", got)
+			},
+		},
+		{
+			name: "file non-TTY returns plain",
+			w:    devNull(s.T()),
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Equal("hello", got)
+			},
+		},
+		{
+			name: "file TTY wraps with ANSI",
+			w:    devNull(s.T()),
+			tty:  true,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Contains(got, "\033[")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -59,24 +83,33 @@ func (s *ThemePublicTestSuite) TestMute() {
 			got := cli.Mute(tc.w, "hello")
 			restore()
 
-			s.Contains(got, "hello")
-			if tc.wantAnsi {
-				s.Contains(got, "\033[")
-			} else {
-				s.Equal("hello", got)
-			}
+			tc.validateFunc(got)
 		})
 	}
 }
 
 func (s *ThemePublicTestSuite) TestAccent() {
 	tests := []struct {
-		name     string
-		tty      bool
-		wantAnsi bool
+		name         string
+		tty          bool
+		validateFunc func(string)
 	}{
-		{name: "non-TTY returns plain text", tty: false, wantAnsi: false},
-		{name: "TTY wraps with ANSI", tty: true, wantAnsi: true},
+		{
+			name: "non-TTY returns plain text",
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Equal("hello", got)
+			},
+		},
+		{
+			name: "TTY wraps with ANSI",
+			tty:  true,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Contains(got, "\033[")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -85,24 +118,33 @@ func (s *ThemePublicTestSuite) TestAccent() {
 			got := cli.Accent(devNull(s.T()), "hello")
 			restore()
 
-			s.Contains(got, "hello")
-			if tc.wantAnsi {
-				s.Contains(got, "\033[")
-			} else {
-				s.Equal("hello", got)
-			}
+			tc.validateFunc(got)
 		})
 	}
 }
 
 func (s *ThemePublicTestSuite) TestOK() {
 	tests := []struct {
-		name     string
-		tty      bool
-		wantAnsi bool
+		name         string
+		tty          bool
+		validateFunc func(string)
 	}{
-		{name: "non-TTY returns plain text", tty: false, wantAnsi: false},
-		{name: "TTY wraps with ANSI", tty: true, wantAnsi: true},
+		{
+			name: "non-TTY returns plain text",
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Equal("hello", got)
+			},
+		},
+		{
+			name: "TTY wraps with ANSI",
+			tty:  true,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Contains(got, "\033[")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -111,24 +153,33 @@ func (s *ThemePublicTestSuite) TestOK() {
 			got := cli.OK(devNull(s.T()), "hello")
 			restore()
 
-			s.Contains(got, "hello")
-			if tc.wantAnsi {
-				s.Contains(got, "\033[")
-			} else {
-				s.Equal("hello", got)
-			}
+			tc.validateFunc(got)
 		})
 	}
 }
 
 func (s *ThemePublicTestSuite) TestErr() {
 	tests := []struct {
-		name     string
-		tty      bool
-		wantAnsi bool
+		name         string
+		tty          bool
+		validateFunc func(string)
 	}{
-		{name: "non-TTY returns plain text", tty: false, wantAnsi: false},
-		{name: "TTY wraps with ANSI", tty: true, wantAnsi: true},
+		{
+			name: "non-TTY returns plain text",
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Equal("hello", got)
+			},
+		},
+		{
+			name: "TTY wraps with ANSI",
+			tty:  true,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Contains(got, "\033[")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -137,24 +188,33 @@ func (s *ThemePublicTestSuite) TestErr() {
 			got := cli.Err(devNull(s.T()), "hello")
 			restore()
 
-			s.Contains(got, "hello")
-			if tc.wantAnsi {
-				s.Contains(got, "\033[")
-			} else {
-				s.Equal("hello", got)
-			}
+			tc.validateFunc(got)
 		})
 	}
 }
 
 func (s *ThemePublicTestSuite) TestInfo() {
 	tests := []struct {
-		name     string
-		tty      bool
-		wantAnsi bool
+		name         string
+		tty          bool
+		validateFunc func(string)
 	}{
-		{name: "non-TTY returns plain text", tty: false, wantAnsi: false},
-		{name: "TTY wraps with ANSI", tty: true, wantAnsi: true},
+		{
+			name: "non-TTY returns plain text",
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Equal("hello", got)
+			},
+		},
+		{
+			name: "TTY wraps with ANSI",
+			tty:  true,
+			validateFunc: func(got string) {
+				s.Contains(got, "hello")
+				s.Contains(got, "\033[")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -163,24 +223,35 @@ func (s *ThemePublicTestSuite) TestInfo() {
 			got := cli.Info(devNull(s.T()), "hello")
 			restore()
 
-			s.Contains(got, "hello")
-			if tc.wantAnsi {
-				s.Contains(got, "\033[")
-			} else {
-				s.Equal("hello", got)
-			}
+			tc.validateFunc(got)
 		})
 	}
 }
 
 func (s *ThemePublicTestSuite) TestBanner() {
 	tests := []struct {
-		name     string
-		tty      bool
-		wantAnsi bool
+		name         string
+		tty          bool
+		validateFunc func(string)
 	}{
-		{name: "non-TTY plain text", tty: false, wantAnsi: false},
-		{name: "TTY with ANSI colors", tty: true, wantAnsi: true},
+		{
+			name: "non-TTY plain text",
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "█▀▀ █▀█ █░█ █▀█ █")
+				s.Contains(got, "█▄█ █▄█ █▀█ █░█ █")
+				s.NotContains(got, "\033[")
+			},
+		},
+		{
+			name: "TTY with ANSI colors",
+			tty:  true,
+			validateFunc: func(got string) {
+				s.Contains(got, "█▀▀ █▀█ █░█ █▀█ █")
+				s.Contains(got, "█▄█ █▄█ █▀█ █░█ █")
+				s.Contains(got, "\033[")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -189,27 +260,33 @@ func (s *ThemePublicTestSuite) TestBanner() {
 			got := cli.Banner(devNull(s.T()))
 			restore()
 
-			s.Contains(got, "█▀▀ █▀█ █░█ █▀█ █")
-			s.Contains(got, "█▄█ █▄█ █▀█ █░█ █")
-
-			if tc.wantAnsi {
-				s.Contains(got, "\033[")
-			} else {
-				s.NotContains(got, "\033[")
-			}
+			tc.validateFunc(got)
 		})
 	}
 }
 
 func (s *ThemePublicTestSuite) TestSuccess() {
 	tests := []struct {
-		name     string
-		tty      bool
-		contains string
-		wantAnsi bool
+		name         string
+		tty          bool
+		validateFunc func(string)
 	}{
-		{name: "non-TTY prefix", tty: false, contains: "[ok] done", wantAnsi: false},
-		{name: "TTY colored mark", tty: true, contains: "done", wantAnsi: true},
+		{
+			name: "non-TTY prefix",
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "[ok] done")
+			},
+		},
+		{
+			name: "TTY colored mark",
+			tty:  true,
+			validateFunc: func(got string) {
+				s.Contains(got, "done")
+				s.Contains(got, "\033[")
+				s.Contains(got, "✓")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -218,25 +295,33 @@ func (s *ThemePublicTestSuite) TestSuccess() {
 			got := cli.Success(devNull(s.T()), "done")
 			restore()
 
-			s.Contains(got, tc.contains)
-
-			if tc.wantAnsi {
-				s.Contains(got, "\033[")
-				s.Contains(got, "✓")
-			}
+			tc.validateFunc(got)
 		})
 	}
 }
 
 func (s *ThemePublicTestSuite) TestFailure() {
 	tests := []struct {
-		name     string
-		tty      bool
-		contains string
-		wantAnsi bool
+		name         string
+		tty          bool
+		validateFunc func(string)
 	}{
-		{name: "non-TTY prefix", tty: false, contains: "[err] broken", wantAnsi: false},
-		{name: "TTY colored mark", tty: true, contains: "broken", wantAnsi: true},
+		{
+			name: "non-TTY prefix",
+			tty:  false,
+			validateFunc: func(got string) {
+				s.Contains(got, "[err] broken")
+			},
+		},
+		{
+			name: "TTY colored mark",
+			tty:  true,
+			validateFunc: func(got string) {
+				s.Contains(got, "broken")
+				s.Contains(got, "\033[")
+				s.Contains(got, "✗")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -245,12 +330,7 @@ func (s *ThemePublicTestSuite) TestFailure() {
 			got := cli.Failure(devNull(s.T()), "broken")
 			restore()
 
-			s.Contains(got, tc.contains)
-
-			if tc.wantAnsi {
-				s.Contains(got, "\033[")
-				s.Contains(got, "✗")
-			}
+			tc.validateFunc(got)
 		})
 	}
 }

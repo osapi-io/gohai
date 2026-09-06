@@ -64,18 +64,20 @@ func (s *ExecutorPublicTestSuite) TestNew() {
 
 func (s *ExecutorPublicTestSuite) TestExecute() {
 	tests := []struct {
-		name    string
-		setenv  map[string]string
-		cmd     string
-		args    []string
-		wantOut string
-		wantErr bool
+		name         string
+		setenv       map[string]string
+		cmd          string
+		args         []string
+		validateFunc func([]byte, error)
 	}{
 		{
-			name:    "success returns combined output",
-			setenv:  map[string]string{"GOHAI_EXECUTOR_TEST_OUT": "hello"},
-			cmd:     os.Args[0],
-			wantOut: "hello",
+			name:   "success returns combined output",
+			setenv: map[string]string{"GOHAI_EXECUTOR_TEST_OUT": "hello"},
+			cmd:    os.Args[0],
+			validateFunc: func(out []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("hello", string(out))
+			},
 		},
 		{
 			name: "non-zero exit returns wrapped error with output captured",
@@ -83,14 +85,18 @@ func (s *ExecutorPublicTestSuite) TestExecute() {
 				"GOHAI_EXECUTOR_TEST_OUT":  "boom\n",
 				"GOHAI_EXECUTOR_TEST_EXIT": "1",
 			},
-			cmd:     os.Args[0],
-			wantOut: "boom\n",
-			wantErr: true,
+			cmd: os.Args[0],
+			validateFunc: func(out []byte, err error) {
+				s.Error(err)
+				s.Equal("boom\n", string(out))
+			},
 		},
 		{
-			name:    "missing binary returns wrapped error",
-			cmd:     "/gohai-test-does-not-exist",
-			wantErr: true,
+			name: "missing binary returns wrapped error",
+			cmd:  "/gohai-test-does-not-exist",
+			validateFunc: func(_ []byte, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -99,16 +105,7 @@ func (s *ExecutorPublicTestSuite) TestExecute() {
 				s.T().Setenv(k, v)
 			}
 			e := executor.New()
-			out, err := e.Execute(context.Background(), tt.cmd, tt.args...)
-			if tt.wantErr {
-				s.Error(err)
-				if tt.wantOut != "" {
-					s.Equal(tt.wantOut, string(out))
-				}
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.wantOut, string(out))
+			tt.validateFunc(e.Execute(context.Background(), tt.cmd, tt.args...))
 		})
 	}
 }
