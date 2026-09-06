@@ -157,18 +157,42 @@ func (s *KernelPublicTestSuite) TestNew() {
 
 func (s *KernelPublicTestSuite) TestBytesToString() {
 	tests := []struct {
-		name string
-		in   []byte
-		want string
+		name         string
+		in           []byte
+		validateFunc func(string)
 	}{
-		{"NUL-terminated C string", []byte{'L', 'i', 'n', 'u', 'x', 0, 0, 0}, "Linux"},
-		{"no trailing NUL (full array used)", []byte{'a', 'b', 'c'}, "abc"},
-		{"empty input", []byte{}, ""},
-		{"leading NUL truncates to empty", []byte{0, 'x', 'y'}, ""},
+		{
+			name: "NUL-terminated C string",
+			in:   []byte{'L', 'i', 'n', 'u', 'x', 0, 0, 0},
+			validateFunc: func(got string) {
+				s.Equal("Linux", got)
+			},
+		},
+		{
+			name: "no trailing NUL (full array used)",
+			in:   []byte{'a', 'b', 'c'},
+			validateFunc: func(got string) {
+				s.Equal("abc", got)
+			},
+		},
+		{
+			name: "empty input",
+			in:   []byte{},
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
+		{
+			name: "leading NUL truncates to empty",
+			in:   []byte{0, 'x', 'y'},
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, kernel.BytesToString(tt.in))
+			tt.validateFunc(kernel.BytesToString(tt.in))
 		})
 	}
 }

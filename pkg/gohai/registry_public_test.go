@@ -70,17 +70,35 @@ func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 func (s *RegistryPublicTestSuite) TestCategoryOf() {
 	reg := gohai.NewRegistry()
 	tests := []struct {
-		name      string
-		collector string
-		want      string
+		name         string
+		collector    string
+		validateFunc func(string)
 	}{
-		{"gce is cloud", "gce", "cloud"},
-		{"dmi is hardware", "dmi", "hardware"},
-		{"missing collector returns empty", "nope", ""},
+		{
+			name:      "gce is cloud",
+			collector: "gce",
+			validateFunc: func(got string) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name:      "dmi is hardware",
+			collector: "dmi",
+			validateFunc: func(got string) {
+				s.Equal("hardware", got)
+			},
+		},
+		{
+			name:      "missing collector returns empty",
+			collector: "nope",
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, reg.CategoryOf(tt.collector))
+			tt.validateFunc(reg.CategoryOf(tt.collector))
 		})
 	}
 }

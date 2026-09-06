@@ -256,19 +256,49 @@ func (s *UptimePublicTestSuite) TestCollect() {
 
 func (s *UptimePublicTestSuite) TestHumanDuration() {
 	tests := []struct {
-		name    string
-		seconds uint64
-		want    string
+		name         string
+		seconds      uint64
+		validateFunc func(string)
 	}{
-		{"zero seconds", 0, "0s"},
-		{"seconds only", 45, "45s"},
-		{"minutes and seconds", 75, "1m 15s"},
-		{"hours/minutes/seconds", 3*3600 + 12*60 + 5, "3h 12m 5s"},
-		{"days+hours+minutes+seconds", 2*86400 + 5*3600 + 12*60 + 5, "2d 5h 12m 5s"},
+		{
+			name:    "zero seconds",
+			seconds: 0,
+			validateFunc: func(got string) {
+				s.Equal("0s", got)
+			},
+		},
+		{
+			name:    "seconds only",
+			seconds: 45,
+			validateFunc: func(got string) {
+				s.Equal("45s", got)
+			},
+		},
+		{
+			name:    "minutes and seconds",
+			seconds: 75,
+			validateFunc: func(got string) {
+				s.Equal("1m 15s", got)
+			},
+		},
+		{
+			name:    "hours/minutes/seconds",
+			seconds: 3*3600 + 12*60 + 5,
+			validateFunc: func(got string) {
+				s.Equal("3h 12m 5s", got)
+			},
+		},
+		{
+			name:    "days+hours+minutes+seconds",
+			seconds: 2*86400 + 5*3600 + 12*60 + 5,
+			validateFunc: func(got string) {
+				s.Equal("2d 5h 12m 5s", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, uptime.HumanDuration(tt.seconds))
+			tt.validateFunc(uptime.HumanDuration(tt.seconds))
 		})
 	}
 }

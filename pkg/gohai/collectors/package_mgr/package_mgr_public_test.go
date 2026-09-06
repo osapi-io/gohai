@@ -114,69 +114,93 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 
 func (s *PackageMgrPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string // "linux" | "darwin" | "debian" | "rhel"
-		probed   map[string]string
-		wantName string
-		wantPath string
+		name         string
+		variant      string // "linux" | "darwin" | "debian" | "rhel"
+		probed       map[string]string
+		wantName     string
+		validateFunc func(string)
 	}{
 		{
-			"debian with apt",
-			"debian",
-			map[string]string{"apt": "/usr/bin/apt"},
-			"apt",
-			"/usr/bin/apt",
+			name:     "debian with apt",
+			variant:  "debian",
+			probed:   map[string]string{"apt": "/usr/bin/apt"},
+			wantName: "apt",
+			validateFunc: func(got string) {
+				s.Equal("/usr/bin/apt", got)
+			},
 		},
 		{
-			"debian with apt-get only",
-			"debian",
-			map[string]string{"apt-get": "/usr/bin/apt-get"},
-			"apt-get",
-			"/usr/bin/apt-get",
+			name:     "debian with apt-get only",
+			variant:  "debian",
+			probed:   map[string]string{"apt-get": "/usr/bin/apt-get"},
+			wantName: "apt-get",
+			validateFunc: func(got string) {
+				s.Equal("/usr/bin/apt-get", got)
+			},
 		},
 		{
-			"rhel with dnf wins over yum",
-			"rhel",
-			map[string]string{"dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum"},
-			"dnf",
-			"/usr/bin/dnf",
+			name:     "rhel with dnf wins over yum",
+			variant:  "rhel",
+			probed:   map[string]string{"dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum"},
+			wantName: "dnf",
+			validateFunc: func(got string) {
+				s.Equal("/usr/bin/dnf", got)
+			},
 		},
 		{
-			"rhel yum fallback",
-			"rhel",
-			map[string]string{"yum": "/usr/bin/yum"},
-			"yum",
-			"/usr/bin/yum",
+			name:     "rhel yum fallback",
+			variant:  "rhel",
+			probed:   map[string]string{"yum": "/usr/bin/yum"},
+			wantName: "yum",
+			validateFunc: func(got string) {
+				s.Equal("/usr/bin/yum", got)
+			},
 		},
 		{
-			"darwin brew",
-			"darwin",
-			map[string]string{"brew": "/opt/homebrew/bin/brew"},
-			"brew",
-			"/opt/homebrew/bin/brew",
+			name:     "darwin brew",
+			variant:  "darwin",
+			probed:   map[string]string{"brew": "/opt/homebrew/bin/brew"},
+			wantName: "brew",
+			validateFunc: func(got string) {
+				s.Equal("/opt/homebrew/bin/brew", got)
+			},
 		},
 		{
-			"darwin port fallback",
-			"darwin",
-			map[string]string{"port": "/opt/local/bin/port"},
-			"port",
-			"/opt/local/bin/port",
+			name:     "darwin port fallback",
+			variant:  "darwin",
+			probed:   map[string]string{"port": "/opt/local/bin/port"},
+			wantName: "port",
+			validateFunc: func(got string) {
+				s.Equal("/opt/local/bin/port", got)
+			},
 		},
 		{
-			"linux arch with pacman",
-			"linux",
-			map[string]string{"pacman": "/usr/bin/pacman"},
-			"pacman",
-			"/usr/bin/pacman",
+			name:     "linux arch with pacman",
+			variant:  "linux",
+			probed:   map[string]string{"pacman": "/usr/bin/pacman"},
+			wantName: "pacman",
+			validateFunc: func(got string) {
+				s.Equal("/usr/bin/pacman", got)
+			},
 		},
 		{
-			"linux alpine with apk",
-			"linux",
-			map[string]string{"apk": "/sbin/apk"},
-			"apk",
-			"/sbin/apk",
+			name:     "linux alpine with apk",
+			variant:  "linux",
+			probed:   map[string]string{"apk": "/sbin/apk"},
+			wantName: "apk",
+			validateFunc: func(got string) {
+				s.Equal("/sbin/apk", got)
+			},
 		},
-		{"none found returns empty", "linux", map[string]string{}, "", ""},
+		{
+			name:     "none found returns empty",
+			variant:  "linux",
+			probed:   map[string]string{},
+			wantName: "",
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -202,7 +226,7 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			info, ok := got.(*packagemgr.Info)
 			s.Require().True(ok)
 			s.Equal(tt.wantName, info.Name)
-			s.Equal(tt.wantPath, info.Path)
+			tt.validateFunc(info.Path)
 		})
 	}
 }

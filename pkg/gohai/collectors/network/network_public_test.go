@@ -1259,34 +1259,38 @@ func (s *NetworkPublicTestSuite) TestReadNeighbours() {
 
 func (s *NetworkPublicTestSuite) TestIndexToInterfaceName() {
 	tests := []struct {
-		name string
-		fn   func(int) (*net.Interface, error)
-		want string
+		name         string
+		fn           func(int) (*net.Interface, error)
+		validateFunc func(string)
 	}{
 		{
 			name: "lookup success returns name",
 			fn:   func(int) (*net.Interface, error) { return &net.Interface{Name: "eth0"}, nil },
-			want: "eth0",
+			validateFunc: func(got string) {
+				s.Equal("eth0", got)
+			},
 		},
 		{
 			name: "lookup error returns empty",
 			fn:   func(int) (*net.Interface, error) { return nil, errors.New("no such index") },
-			want: "",
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			defer network.SetNetInterfaceByIndex(tt.fn)()
-			s.Equal(tt.want, network.IndexToIfaceName(1))
+			tt.validateFunc(network.IndexToIfaceName(1))
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestNICMapFromGHW() {
 	tests := []struct {
-		name string
-		nics []*ghw.NIC
-		want map[string]network.NICStat
+		name         string
+		nics         []*ghw.NIC
+		validateFunc func(map[string]network.NICStat)
 	}{
 		{
 			name: "two NICs mapped",
@@ -1294,27 +1298,33 @@ func (s *NetworkPublicTestSuite) TestNICMapFromGHW() {
 				{Name: "eth0", Speed: "1000Mb/s", Duplex: "Full"},
 				{Name: "wlan0", Speed: "300Mb/s", Duplex: "Half"},
 			},
-			want: map[string]network.NICStat{
-				"eth0":  {Speed: "1000Mb/s", Duplex: "Full"},
-				"wlan0": {Speed: "300Mb/s", Duplex: "Half"},
+			validateFunc: func(got map[string]network.NICStat) {
+				s.Equal(map[string]network.NICStat{
+					"eth0":  {Speed: "1000Mb/s", Duplex: "Full"},
+					"wlan0": {Speed: "300Mb/s", Duplex: "Half"},
+				}, got)
 			},
 		},
 		{
 			name: "nil NIC entries skipped",
 			nics: []*ghw.NIC{nil, {Name: "eth0", Speed: "10Gb/s", Duplex: "Full"}},
-			want: map[string]network.NICStat{
-				"eth0": {Speed: "10Gb/s", Duplex: "Full"},
+			validateFunc: func(got map[string]network.NICStat) {
+				s.Equal(map[string]network.NICStat{
+					"eth0": {Speed: "10Gb/s", Duplex: "Full"},
+				}, got)
 			},
 		},
 		{
 			name: "empty input",
 			nics: nil,
-			want: map[string]network.NICStat{},
+			validateFunc: func(got map[string]network.NICStat) {
+				s.Equal(map[string]network.NICStat{}, got)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, network.NICMapFromGHW(tt.nics))
+			tt.validateFunc(network.NICMapFromGHW(tt.nics))
 		})
 	}
 }
@@ -1330,9 +1340,9 @@ func (s *NetworkPublicTestSuite) TestNeighboursFromNetlink() {
 		return ""
 	}
 	tests := []struct {
-		name    string
-		entries []netlink.Neigh
-		want    []network.Neighbour
+		name         string
+		entries      []netlink.Neigh
+		validateFunc func([]network.Neighbour)
 	}{
 		{
 			name: "v4 + v6 neighbours mapped",
@@ -1346,21 +1356,23 @@ func (s *NetworkPublicTestSuite) TestNeighboursFromNetlink() {
 					HardwareAddr: parseMAC(s.T(), "aa:bb:cc:dd:ee:02"),
 				},
 			},
-			want: []network.Neighbour{
-				{
-					Address:   "10.0.0.1",
-					Family:    "inet",
-					MAC:       "aa:bb:cc:dd:ee:01",
-					Interface: "eth0",
-					State:     "REACHABLE",
-				},
-				{
-					Address:   "fe80::1",
-					Family:    "inet6",
-					MAC:       "aa:bb:cc:dd:ee:02",
-					Interface: "eth0",
-					State:     "STALE",
-				},
+			validateFunc: func(got []network.Neighbour) {
+				s.Equal([]network.Neighbour{
+					{
+						Address:   "10.0.0.1",
+						Family:    "inet",
+						MAC:       "aa:bb:cc:dd:ee:01",
+						Interface: "eth0",
+						State:     "REACHABLE",
+					},
+					{
+						Address:   "fe80::1",
+						Family:    "inet6",
+						MAC:       "aa:bb:cc:dd:ee:02",
+						Interface: "eth0",
+						State:     "STALE",
+					},
+				}, got)
 			},
 		},
 		{
@@ -1368,14 +1380,16 @@ func (s *NetworkPublicTestSuite) TestNeighboursFromNetlink() {
 			entries: []netlink.Neigh{
 				{IP: net.ParseIP("10.0.0.2"), Family: 2, State: 0x02, LinkIndex: 1},
 			},
-			want: []network.Neighbour{
-				{Address: "10.0.0.2", Family: "inet", Interface: "lo", State: "REACHABLE"},
+			validateFunc: func(got []network.Neighbour) {
+				s.Equal([]network.Neighbour{
+					{Address: "10.0.0.2", Family: "inet", Interface: "lo", State: "REACHABLE"},
+				}, got)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, network.NeighboursFromNetlink(tt.entries, indexToName))
+			tt.validateFunc(network.NeighboursFromNetlink(tt.entries, indexToName))
 		})
 	}
 }
@@ -1391,40 +1405,112 @@ func parseMAC(
 
 func (s *NetworkPublicTestSuite) TestNeighFamily() {
 	tests := []struct {
-		name string
-		in   int
-		want string
+		name         string
+		in           int
+		validateFunc func(string)
 	}{
-		{"AF_INET → inet", 2, "inet"},
-		{"AF_INET6 → inet6", 10, "inet6"},
-		{"unknown → empty", 99, ""},
+		{
+			name: "AF_INET → inet",
+			in:   2,
+			validateFunc: func(got string) {
+				s.Equal("inet", got)
+			},
+		},
+		{
+			name: "AF_INET6 → inet6",
+			in:   10,
+			validateFunc: func(got string) {
+				s.Equal("inet6", got)
+			},
+		},
+		{
+			name: "unknown → empty",
+			in:   99,
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, network.NeighFamily(tt.in))
+			tt.validateFunc(network.NeighFamily(tt.in))
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestNeighState() {
 	tests := []struct {
-		name string
-		in   int
-		want string
+		name         string
+		in           int
+		validateFunc func(string)
 	}{
-		{"INCOMPLETE", 0x01, "INCOMPLETE"},
-		{"REACHABLE", 0x02, "REACHABLE"},
-		{"STALE", 0x04, "STALE"},
-		{"DELAY", 0x08, "DELAY"},
-		{"PROBE", 0x10, "PROBE"},
-		{"FAILED", 0x20, "FAILED"},
-		{"NOARP", 0x40, "NOARP"},
-		{"PERMANENT", 0x80, "PERMANENT"},
-		{"unknown bitmask returns empty", 0x100, ""},
+		{
+			name: "INCOMPLETE",
+			in:   0x01,
+			validateFunc: func(got string) {
+				s.Equal("INCOMPLETE", got)
+			},
+		},
+		{
+			name: "REACHABLE",
+			in:   0x02,
+			validateFunc: func(got string) {
+				s.Equal("REACHABLE", got)
+			},
+		},
+		{
+			name: "STALE",
+			in:   0x04,
+			validateFunc: func(got string) {
+				s.Equal("STALE", got)
+			},
+		},
+		{
+			name: "DELAY",
+			in:   0x08,
+			validateFunc: func(got string) {
+				s.Equal("DELAY", got)
+			},
+		},
+		{
+			name: "PROBE",
+			in:   0x10,
+			validateFunc: func(got string) {
+				s.Equal("PROBE", got)
+			},
+		},
+		{
+			name: "FAILED",
+			in:   0x20,
+			validateFunc: func(got string) {
+				s.Equal("FAILED", got)
+			},
+		},
+		{
+			name: "NOARP",
+			in:   0x40,
+			validateFunc: func(got string) {
+				s.Equal("NOARP", got)
+			},
+		},
+		{
+			name: "PERMANENT",
+			in:   0x80,
+			validateFunc: func(got string) {
+				s.Equal("PERMANENT", got)
+			},
+		},
+		{
+			name: "unknown bitmask returns empty",
+			in:   0x100,
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, network.NeighState(tt.in))
+			tt.validateFunc(network.NeighState(tt.in))
 		})
 	}
 }

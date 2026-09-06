@@ -147,59 +147,81 @@ func (s *PlatformPublicTestSuite) TestDetect() {
 
 func (s *PlatformPublicTestSuite) TestIsLinux() {
 	tests := []struct {
-		name   string
-		infoFn func() (*host.InfoStat, error)
-		want   bool
+		name         string
+		infoFn       func() (*host.InfoStat, error)
+		validateFunc func(bool)
 	}{
 		{
-			"ubuntu is linux",
-			func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil },
-			true,
+			name:   "ubuntu is linux",
+			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil },
+			validateFunc: func(got bool) {
+				s.Equal(true, got)
+			},
 		},
 		{
-			"arch is linux",
-			func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "arch"}, nil },
-			true,
+			name:   "arch is linux",
+			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "arch"}, nil },
+			validateFunc: func(got bool) {
+				s.Equal(true, got)
+			},
 		},
 		{
-			"darwin is not linux",
-			func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil },
-			false,
+			name:   "darwin is not linux",
+			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil },
+			validateFunc: func(got bool) {
+				s.Equal(false, got)
+			},
 		},
-		{"empty not linux", func() (*host.InfoStat, error) { return nil, nil }, false},
+		{
+			name:   "empty not linux",
+			infoFn: func() (*host.InfoStat, error) { return nil, nil },
+			validateFunc: func(got bool) {
+				s.Equal(false, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			restore := platform.SetHostInfoFn(tt.infoFn)
 			defer restore()
-			s.Equal(tt.want, platform.IsLinux())
+			tt.validateFunc(platform.IsLinux())
 		})
 	}
 }
 
 func (s *PlatformPublicTestSuite) TestIsDarwin() {
 	tests := []struct {
-		name   string
-		infoFn func() (*host.InfoStat, error)
-		want   bool
+		name         string
+		infoFn       func() (*host.InfoStat, error)
+		validateFunc func(bool)
 	}{
 		{
-			"darwin is darwin",
-			func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil },
-			true,
+			name:   "darwin is darwin",
+			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{OS: "darwin"}, nil },
+			validateFunc: func(got bool) {
+				s.Equal(true, got)
+			},
 		},
 		{
-			"ubuntu is not darwin",
-			func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil },
-			false,
+			name:   "ubuntu is not darwin",
+			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil },
+			validateFunc: func(got bool) {
+				s.Equal(false, got)
+			},
 		},
-		{"empty not darwin", func() (*host.InfoStat, error) { return nil, nil }, false},
+		{
+			name:   "empty not darwin",
+			infoFn: func() (*host.InfoStat, error) { return nil, nil },
+			validateFunc: func(got bool) {
+				s.Equal(false, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			restore := platform.SetHostInfoFn(tt.infoFn)
 			defer restore()
-			s.Equal(tt.want, platform.IsDarwin())
+			tt.validateFunc(platform.IsDarwin())
 		})
 	}
 }

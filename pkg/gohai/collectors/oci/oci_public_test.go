@@ -100,18 +100,42 @@ func TestOCIPublicTestSuite(
 func (s *OCIPublicTestSuite) TestInterface() {
 	c := oci.New()
 	tests := []struct {
-		name string
-		got  any
-		want any
+		name         string
+		got          any
+		validateFunc func(any)
 	}{
-		{"Name", c.Name(), "oci"},
-		{"Category", c.Category(), "cloud"},
-		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+		{
+			name: "Name",
+			got:  c.Name(),
+			validateFunc: func(got any) {
+				s.Equal("oci", got)
+			},
+		},
+		{
+			name: "Category",
+			got:  c.Category(),
+			validateFunc: func(got any) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name: "DefaultEnabled",
+			got:  c.DefaultEnabled(),
+			validateFunc: func(got any) {
+				s.Equal(false, got)
+			},
+		},
+		{
+			name: "Dependencies",
+			got:  c.Dependencies(),
+			validateFunc: func(got any) {
+				s.Equal([]string{"dmi"}, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.got)
+			tt.validateFunc(tt.got)
 		})
 	}
 }
