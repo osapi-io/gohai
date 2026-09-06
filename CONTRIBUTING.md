@@ -522,7 +522,7 @@ Run `just ready` before committing to ensure generated code, package docs,
 formatting, and lint are all up to date:
 
 ```bash
-just ready   # generate, md-fmt, go-fmt, go-vet
+just ready
 ```
 
 ## Branching
