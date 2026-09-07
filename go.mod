@@ -1,6 +1,6 @@
 module github.com/osapi-io/gohai
 
-go 1.25.7
+go 1.26.0
 
 require (
 	github.com/avfs/avfs v0.35.0
@@ -15,7 +15,7 @@ require (
 	github.com/tklauser/go-sysconf v0.4.0
 	github.com/vishvananda/netlink v1.3.1
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
 )
