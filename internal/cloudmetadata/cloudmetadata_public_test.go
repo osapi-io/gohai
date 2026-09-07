@@ -83,14 +83,11 @@ func newServer(
 
 func (s *CloudMetadataPublicTestSuite) TestGet() {
 	tests := []struct {
-		name        string
-		setup       func() (baseURL string, opts []cloudmetadata.Option, cleanup func())
-		path        string
-		ctx         func() (context.Context, context.CancelFunc)
-		wantErr     bool
-		wantErrIs   error
-		wantBody    string
-		wantHeaders map[string]string
+		name         string
+		setup        func() (baseURL string, opts []cloudmetadata.Option, cleanup func())
+		path         string
+		ctx          func() (context.Context, context.CancelFunc)
+		validateFunc func([]byte, error)
 	}{
 		{
 			name: "200 returns body",
@@ -102,8 +99,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				})
 				return srv.URL, nil, srv.Close
 			},
-			path:     "/ok",
-			wantBody: "hello",
+			path: "/ok",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("hello", string(body))
+			},
 		},
 		{
 			name: "path without leading slash is normalized",
@@ -115,8 +115,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				})
 				return srv.URL, nil, srv.Close
 			},
-			path:     "rel",
-			wantBody: "relative-ok",
+			path: "rel",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("relative-ok", string(body))
+			},
 		},
 		{
 			name: "baseURL trailing slash is stripped",
@@ -128,8 +131,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				})
 				return srv.URL + "/", nil, srv.Close
 			},
-			path:     "/ok",
-			wantBody: "trim-ok",
+			path: "/ok",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("trim-ok", string(body))
+			},
 		},
 		{
 			name: "headers are sent on every request",
@@ -151,8 +157,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 					s.Equal("Bearer Oracle", got.Get("Authorization"))
 				}
 			},
-			path:     "/h",
-			wantBody: "ok",
+			path: "/h",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ok", string(body))
+			},
 		},
 		{
 			name: "default User-Agent is sent when caller doesn't override",
@@ -169,8 +178,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 					s.Equal(cloudmetadata.DefaultUserAgent, got.Get("User-Agent"))
 				}
 			},
-			path:     "/ua",
-			wantBody: "ok",
+			path: "/ua",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ok", string(body))
+			},
 		},
 		{
 			name: "WithHeader overrides the default User-Agent",
@@ -190,8 +202,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 					s.Equal("custom/1.0", got.Get("User-Agent"))
 				}
 			},
-			path:     "/ua",
-			wantBody: "ok",
+			path: "/ua",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ok", string(body))
+			},
 		},
 		{
 			name: "404 wraps ErrNotAvailable",
@@ -199,9 +214,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				srv := newServer(nil)
 				return srv.URL, nil, srv.Close
 			},
-			path:      "/missing",
-			wantErr:   true,
-			wantErrIs: cloudmetadata.ErrNotAvailable,
+			path: "/missing",
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+			},
 		},
 		{
 			name: "500 wraps ErrNotAvailable",
@@ -213,9 +230,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				})
 				return srv.URL, nil, srv.Close
 			},
-			path:      "/bad",
-			wantErr:   true,
-			wantErrIs: cloudmetadata.ErrNotAvailable,
+			path: "/bad",
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+			},
 		},
 		{
 			name: "connection refused wraps ErrNotAvailable",
@@ -227,9 +246,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				srv.Close()
 				return url, nil, func() {}
 			},
-			path:      "/anything",
-			wantErr:   true,
-			wantErrIs: cloudmetadata.ErrNotAvailable,
+			path: "/anything",
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+			},
 		},
 		{
 			name: "timeout wraps ErrNotAvailable",
@@ -244,9 +265,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				}
 				return srv.URL, opts, srv.Close
 			},
-			path:      "/slow",
-			wantErr:   true,
-			wantErrIs: cloudmetadata.ErrNotAvailable,
+			path: "/slow",
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+			},
 		},
 		{
 			name: "context cancellation propagates",
@@ -258,14 +281,16 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				})
 				return srv.URL, nil, srv.Close
 			},
+			path: "/slow",
 			ctx: func() (context.Context, context.CancelFunc) {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
 				return ctx, func() {}
 			},
-			path:      "/slow",
-			wantErr:   true,
-			wantErrIs: cloudmetadata.ErrNotAvailable,
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+			},
 		},
 		{
 			name: "WithHTTPClient swaps underlying transport",
@@ -279,8 +304,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				opts := []cloudmetadata.Option{cloudmetadata.WithHTTPClient(custom)}
 				return srv.URL, opts, srv.Close
 			},
-			path:     "/ok",
-			wantBody: "custom-ok",
+			path: "/ok",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("custom-ok", string(body))
+			},
 		},
 		{
 			name: "body read failure returns non-ErrNotAvailable error",
@@ -292,8 +320,10 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				}
 				return "http://example.invalid", opts, func() {}
 			},
-			path:    "/x",
-			wantErr: true,
+			path: "/x",
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+			},
 		},
 		{
 			name: "invalid URL builds fail before transport",
@@ -302,8 +332,10 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				// rejects before any transport call.
 				return "http://\x7f", nil, func() {}
 			},
-			path:    "/x",
-			wantErr: true,
+			path: "/x",
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -319,18 +351,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			}
 
 			client := cloudmetadata.New(baseURL, opts...)
-			body, err := client.Get(ctx, tt.path)
-			if tt.wantErr {
-				s.Require().Error(err)
-				if tt.wantErrIs != nil {
-					s.True(errors.Is(err, tt.wantErrIs),
-						"expected error chain to include %v, got %v",
-						tt.wantErrIs, err)
-				}
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.wantBody, string(body))
+			tt.validateFunc(client.Get(ctx, tt.path))
 		})
 	}
 }
@@ -357,12 +378,10 @@ func (s *CloudMetadataPublicTestSuite) TestGetWithHeaders() {
 
 func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 	tests := []struct {
-		name       string
-		setup      func() (baseURL string, cleanup func())
-		path       string
-		wantErr    bool
-		wantStatus int
-		wantBody   string
+		name         string
+		setup        func() (baseURL string, cleanup func())
+		path         string
+		validateFunc func([]byte, int, error)
 	}{
 		{
 			name: "200 returns body + status",
@@ -374,9 +393,12 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 				})
 				return srv.URL, srv.Close
 			},
-			path:       "/ok",
-			wantStatus: http.StatusOK,
-			wantBody:   "hello",
+			path: "/ok",
+			validateFunc: func(body []byte, status int, err error) {
+				s.Require().NoError(err)
+				s.Equal(http.StatusOK, status)
+				s.Equal("hello", string(body))
+			},
 		},
 		{
 			name: "400 returns body + status without wrapping ErrNotAvailable",
@@ -389,9 +411,12 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 				})
 				return srv.URL, srv.Close
 			},
-			path:       "/v",
-			wantStatus: http.StatusBadRequest,
-			wantBody:   `{"newest-versions":["2024-01-01"]}`,
+			path: "/v",
+			validateFunc: func(body []byte, status int, err error) {
+				s.Require().NoError(err)
+				s.Equal(http.StatusBadRequest, status)
+				s.Equal(`{"newest-versions":["2024-01-01"]}`, string(body))
+			},
 		},
 		{
 			name: "connection refused wraps ErrNotAvailable",
@@ -401,24 +426,30 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 				srv.Close()
 				return url, func() {}
 			},
-			path:    "/x",
-			wantErr: true,
+			path: "/x",
+			validateFunc: func(_ []byte, _ int, err error) {
+				s.Require().Error(err)
+			},
 		},
 		{
 			name: "invalid URL builds fail before transport",
 			setup: func() (string, func()) {
 				return "http://\x7f", func() {}
 			},
-			path:    "/x",
-			wantErr: true,
+			path: "/x",
+			validateFunc: func(_ []byte, _ int, err error) {
+				s.Require().Error(err)
+			},
 		},
 		{
 			name: "body read failure returns non-ErrNotAvailable error",
 			setup: func() (string, func()) {
 				return "http://example.invalid", func() {}
 			},
-			path:    "/x",
-			wantErr: true,
+			path: "/x",
+			validateFunc: func(_ []byte, _ int, err error) {
+				s.Require().Error(err)
+			},
 		},
 		{
 			name: "path without leading slash is normalized",
@@ -430,9 +461,12 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 				})
 				return srv.URL, srv.Close
 			},
-			path:       "rel",
-			wantStatus: http.StatusOK,
-			wantBody:   "relative-ok",
+			path: "rel",
+			validateFunc: func(body []byte, status int, err error) {
+				s.Require().NoError(err)
+				s.Equal(http.StatusOK, status)
+				s.Equal("relative-ok", string(body))
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -448,26 +482,18 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 			}
 
 			client := cloudmetadata.New(baseURL, opts...)
-			body, status, err := client.RawGet(context.Background(), tt.path)
-			if tt.wantErr {
-				s.Require().Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.wantStatus, status)
-			s.Equal(tt.wantBody, string(body))
+			tt.validateFunc(client.RawGet(context.Background(), tt.path))
 		})
 	}
 }
 
 func (s *CloudMetadataPublicTestSuite) TestPut() {
 	tests := []struct {
-		name        string
-		setup       func() (baseURL string, cleanup func())
-		headers     map[string]string
-		wantErr     bool
-		wantBody    string
-		verifyAfter func(s *CloudMetadataPublicTestSuite)
+		name         string
+		setup        func() (baseURL string, cleanup func())
+		headers      map[string]string
+		verifyAfter  func(s *CloudMetadataPublicTestSuite)
+		validateFunc func([]byte, error)
 	}{
 		{
 			name: "200 with extra headers forwards the headers",
@@ -487,8 +513,11 @@ func (s *CloudMetadataPublicTestSuite) TestPut() {
 					s.Equal(http.MethodPut, gotMethod)
 				}
 			},
-			headers:  map[string]string{"X-TTL": "60"},
-			wantBody: "TOKEN123",
+			headers: map[string]string{"X-TTL": "60"},
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("TOKEN123", string(body))
+			},
 		},
 		{
 			name: "404 wraps ErrNotAvailable",
@@ -496,7 +525,9 @@ func (s *CloudMetadataPublicTestSuite) TestPut() {
 				srv := newServer(nil)
 				return srv.URL, srv.Close
 			},
-			wantErr: true,
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -505,13 +536,7 @@ func (s *CloudMetadataPublicTestSuite) TestPut() {
 			defer cleanup()
 
 			client := cloudmetadata.New(baseURL)
-			body, err := client.Put(context.Background(), "/token", tt.headers)
-			if tt.wantErr {
-				s.Require().Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.wantBody, string(body))
+			tt.validateFunc(client.Put(context.Background(), "/token", tt.headers))
 		})
 	}
 }
@@ -523,10 +548,9 @@ func (s *CloudMetadataPublicTestSuite) TestGetJSON() {
 	}
 
 	tests := []struct {
-		name     string
-		setup    func() (baseURL string, cleanup func())
-		wantErr  bool
-		wantBody payload
+		name         string
+		setup        func() (baseURL string, cleanup func())
+		validateFunc func(payload, error)
 	}{
 		{
 			name: "decodes 200 body into struct",
@@ -538,7 +562,10 @@ func (s *CloudMetadataPublicTestSuite) TestGetJSON() {
 				})
 				return srv.URL, srv.Close
 			},
-			wantBody: payload{Instance: "i-123", Cores: 8},
+			validateFunc: func(got payload, err error) {
+				s.Require().NoError(err)
+				s.Equal(payload{Instance: "i-123", Cores: 8}, got)
+			},
 		},
 		{
 			name: "malformed JSON returns decode error (not ErrNotAvailable)",
@@ -550,7 +577,9 @@ func (s *CloudMetadataPublicTestSuite) TestGetJSON() {
 				})
 				return srv.URL, srv.Close
 			},
-			wantErr: true,
+			validateFunc: func(_ payload, err error) {
+				s.Require().Error(err)
+			},
 		},
 		{
 			name: "transport failure propagates ErrNotAvailable",
@@ -558,7 +587,9 @@ func (s *CloudMetadataPublicTestSuite) TestGetJSON() {
 				srv := newServer(nil)
 				return srv.URL, srv.Close
 			},
-			wantErr: true,
+			validateFunc: func(_ payload, err error) {
+				s.Require().Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -568,13 +599,12 @@ func (s *CloudMetadataPublicTestSuite) TestGetJSON() {
 
 			client := cloudmetadata.New(baseURL)
 			var got payload
+
+			// GetJSON fills got, so the call has to finish before the row
+			// is handed the value
 			err := client.GetJSON(context.Background(), "/m", &got)
-			if tt.wantErr {
-				s.Require().Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.wantBody, got)
+
+			tt.validateFunc(got, err)
 		})
 	}
 }

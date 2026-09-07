@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/validate"
@@ -53,25 +54,32 @@ func TestValidatePublicTestSuite(
 
 func (s *ValidatePublicTestSuite) TestCompileSchema() {
 	tests := []struct {
-		name        string
-		schemaFn    func() []byte
-		resourceURL string
-		wantErr     bool
+		name         string
+		schemaFn     func() []byte
+		resourceURL  string
+		validateFunc func(*jsonschema.Schema, error)
 	}{
 		{
-			name:    "valid embedded schema compiles",
-			wantErr: false,
+			name: "valid embedded schema compiles",
+			validateFunc: func(sch *jsonschema.Schema, err error) {
+				s.NoError(err)
+				s.NotNil(sch)
+			},
 		},
 		{
 			name:     "invalid JSON schema fails unmarshal",
 			schemaFn: func() []byte { return []byte(`{not json}`) },
-			wantErr:  true,
+			validateFunc: func(_ *jsonschema.Schema, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:        "invalid resource URL fails AddResource",
 			schemaFn:    func() []byte { return []byte(`{"type": "object"}`) },
 			resourceURL: "://bad\x00url",
-			wantErr:     true,
+			validateFunc: func(_ *jsonschema.Schema, err error) {
+				s.Error(err)
+			},
 		},
 	}
 
@@ -86,51 +94,53 @@ func (s *ValidatePublicTestSuite) TestCompileSchema() {
 				defer restore()
 			}
 
-			sch, err := validate.CompileSchema()
-
-			if tc.wantErr {
-				s.Error(err)
-				s.Nil(sch)
-			} else {
-				s.NoError(err)
-				s.NotNil(sch)
-			}
+			tc.validateFunc(validate.CompileSchema())
 		})
 	}
 }
 
 func (s *ValidatePublicTestSuite) TestJSON() {
 	tests := []struct {
-		name     string
-		data     []byte
-		schemaFn func() []byte
-		wantErr  bool
+		name         string
+		data         []byte
+		schemaFn     func() []byte
+		validateFunc func(error)
 	}{
 		{
-			name:    "valid minimal facts",
-			data:    mustMarshal(s.T(), &gohai.Facts{CollectTime: time.Now()}),
-			wantErr: false,
+			name: "valid minimal facts",
+			data: mustMarshal(s.T(), &gohai.Facts{CollectTime: time.Now()}),
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
 		},
 		{
-			name:    "valid fully populated facts",
-			data:    mustMarshal(s.T(), fullyPopulatedFacts()),
-			wantErr: false,
+			name: "valid fully populated facts",
+			data: mustMarshal(s.T(), fullyPopulatedFacts()),
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
 		},
 		{
-			name:    "invalid JSON",
-			data:    []byte(`{not json}`),
-			wantErr: true,
+			name: "invalid JSON",
+			data: []byte(`{not json}`),
+			validateFunc: func(err error) {
+				s.Error(err)
+			},
 		},
 		{
-			name:    "schema violation: wrong type",
-			data:    []byte(`{"platform": {"os": 123}}`),
-			wantErr: true,
+			name: "schema violation: wrong type",
+			data: []byte(`{"platform": {"os": 123}}`),
+			validateFunc: func(err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:     "compile schema error",
 			data:     []byte(`{}`),
 			schemaFn: func() []byte { return []byte(`{bad}`) },
-			wantErr:  true,
+			validateFunc: func(err error) {
+				s.Error(err)
+			},
 		},
 	}
 
@@ -141,13 +151,7 @@ func (s *ValidatePublicTestSuite) TestJSON() {
 				defer restore()
 			}
 
-			err := validate.JSON(tc.data)
-
-			if tc.wantErr {
-				s.Error(err)
-			} else {
-				s.NoError(err)
-			}
+			tc.validateFunc(validate.JSON(tc.data))
 		})
 	}
 }
