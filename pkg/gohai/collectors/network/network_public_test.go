@@ -401,7 +401,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("255.255.255.0", eth0.Addresses[0].Netmask)
 				s.Equal("10.0.0.255", eth0.Addresses[0].Broadcast)
 				s.Equal("Link", eth0.Addresses[1].Scope)
-
 			},
 		},
 		{
@@ -417,7 +416,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal(7, i.Interfaces[0].Number)
 				s.Equal("down", i.Interfaces[0].State)
-
 			},
 		},
 		{
@@ -455,7 +453,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("0000:00:19.0", di["bus_info"])
 				s.Equal("yes", di["supports_statistics"])
 				s.Equal("no", di["supports_priv_flags"])
-
 			},
 		},
 		{
@@ -473,7 +470,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Interfaces, 2)
 				s.Nil(i.Interfaces[0].Ethtool)
 				s.Nil(i.Interfaces[1].Ethtool)
-
 			},
 		},
 		{
@@ -493,7 +489,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				i, ok := got.(*network.Info)
 				s.Require().True(ok)
 				s.Nil(i.Interfaces[1].Ethtool)
-
 			},
 		},
 		{
@@ -574,7 +569,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 
 				// loopback got nothing
 				s.Nil(i.Interfaces[0].Ethtool)
-
 			},
 		},
 		{
@@ -623,7 +617,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Nil(et.CoalesceParams)
 				s.Nil(et.OffloadParams)
 				s.Nil(et.PauseParams)
-
 			},
 		},
 		{
@@ -663,7 +656,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				// bare `xdp` in `prog/xdp` normalises to it.
 				s.Equal("xdpgeneric", eth0.XDP.Attached[1].Mode)
 				s.Equal("18", eth0.XDP.Attached[1].ID)
-
 			},
 		},
 		{
@@ -721,7 +713,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("65536", t.TunnelInfo.GsoMaxSize)
 				s.Equal("65535", t.TunnelInfo.GsoMaxSegs)
 				s.True(t.TunnelInfo.External)
-
 			},
 		},
 		{
@@ -745,7 +736,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					s.Nil(i.Interfaces[j].TunnelInfo)
 					s.Nil(i.Interfaces[j].XDP)
 				}
-
 			},
 		},
 		{
@@ -767,7 +757,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					s.Nil(i.Interfaces[j].TunnelInfo)
 					s.Nil(i.Interfaces[j].XDP)
 				}
-
 			},
 		},
 		{
@@ -808,7 +797,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().NotNil(t.TunnelInfo)
 				s.Equal("ipip6", t.TunnelInfo.Proto)
 				s.Empty(t.TunnelInfo.Remote)
-
 			},
 		},
 		{
@@ -827,7 +815,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				for j := range i.Interfaces {
 					s.Nil(i.Interfaces[j].VLAN)
 				}
-
 			},
 		},
 		{
@@ -854,7 +841,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Nil(i.Interfaces[0].VLAN)
 				s.Nil(i.Interfaces[0].TunnelInfo)
 				s.Nil(i.Interfaces[0].XDP)
-
 			},
 		},
 		{
@@ -878,7 +864,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Routes, 4)
 				eth0 := i.Interfaces[1]
 				s.Len(eth0.Routes, 4)
-
 			},
 		},
 		{
@@ -910,7 +895,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				// Default route picks the first nexthop's interface/gateway.
 				s.Equal("eth0", i.DefaultInterface)
 				s.Equal("10.0.0.1", i.DefaultGateway)
-
 			},
 		},
 		{
@@ -930,7 +914,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Equal("eth0", i.Routes[0].Interface)
-
 			},
 		},
 		{
@@ -949,7 +932,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Empty(i.Routes[0].Interface)
-
 			},
 		},
 		{
@@ -971,7 +953,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Empty(i.Routes)
 				s.Empty(i.DefaultInterface)
 				s.Len(i.Interfaces, 2)
-
 			},
 		},
 		{
@@ -998,7 +979,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("venet0", i.Interfaces[0].Name)
 				s.Require().Len(i.Interfaces[0].Addresses, 1)
 				s.Equal("203.0.113.5", i.Interfaces[0].Addresses[0].Addr)
-
 			},
 		},
 		{
@@ -1020,7 +1000,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal("venet0:0", i.Interfaces[0].Name)
-
 			},
 		},
 		{
@@ -1041,7 +1020,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal("venet0:0", i.Interfaces[0].Name)
-
 			},
 		},
 		{
@@ -1059,7 +1037,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Empty(i.Interfaces[0].Encapsulation)
 				s.Empty(i.Interfaces[1].Encapsulation)
-
 			},
 		},
 		{
@@ -1085,7 +1062,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("link", r.Scope)
 				s.Equal("10.0.0.5", r.Source)
 				s.Equal(100, r.Metric)
-
 			},
 		},
 		{
@@ -1101,7 +1077,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				i, ok := got.(*network.Info)
 				s.Require().True(ok)
 				s.Empty(i.Routes)
-
 			},
 		},
 		{
@@ -1118,7 +1093,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Zero(i.Routes[0].Metric)
-
 			},
 		},
 		{
@@ -1135,7 +1109,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Equal("nonexistent0", i.Routes[0].Interface)
-
 			},
 		},
 		{
@@ -1150,7 +1123,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Len(i.Interfaces, 2)
 				s.Empty(i.Routes)
-
 			},
 		},
 		{
@@ -1169,7 +1141,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("e1000e", eth0.Driver)
 				s.Equal("1000Mb/s", eth0.Speed)
 				s.Equal("Full", eth0.Duplex)
-
 			},
 		},
 		{
@@ -1188,7 +1159,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("virtio_net", eth0.Driver)
 				s.Empty(eth0.Speed)
 				s.Empty(eth0.Duplex)
-
 			},
 		},
 		{
@@ -1204,7 +1174,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				i, ok := got.(*network.Info)
 				s.Require().True(ok)
 				s.Equal("ixgbe", i.Interfaces[1].Driver)
-
 			},
 		},
 		{
@@ -1221,7 +1190,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("10.0.0.1", i.Neighbours[0].Address)
 				s.Equal("inet", i.Neighbours[0].Family)
 				s.Equal("REACHABLE", i.Neighbours[0].State)
-
 			},
 		},
 		{
@@ -1255,7 +1223,6 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal("en0", i.Interfaces[0].Name)
-
 			},
 		},
 		{

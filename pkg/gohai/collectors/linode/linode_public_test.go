@@ -210,7 +210,6 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Equal("50.1.2.3", info.PublicIP)
-
 			},
 		},
 		{
@@ -242,7 +241,6 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info)
-
 			},
 		},
 		{

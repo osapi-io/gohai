@@ -217,7 +217,6 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				s.Equal("11112222-3333-4444-5555-666677778888", stopped.UUID)
 				s.Equal(2, stopped.VCPUs)
 				s.False(stopped.Autostart)
-
 			},
 		},
 		{
@@ -240,7 +239,6 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal("10.0.0", i.Version)
 				s.Nil(i.Domains)
-
 			},
 		},
 		{
@@ -263,7 +261,6 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				i, ok := got.(*libvirt.Info)
 				s.Require().True(ok)
 				s.Equal("somevendor 9.0.0", i.Version)
-
 			},
 		},
 		{
@@ -292,7 +289,6 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				s.Len(i.Domains, 1)
 				s.Equal("deadbeef-dead-beef-dead-beefdeadbeef", i.Domains[0].UUID)
 				s.True(i.Domains[0].Autostart)
-
 			},
 		},
 		{
@@ -339,7 +335,6 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Empty(i.URI)
 				s.Equal("10.0.0", i.Version)
-
 			},
 		},
 		{
@@ -362,7 +357,6 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal("10.0.0", i.Version)
 				s.Nil(i.Domains)
-
 			},
 		},
 		{
@@ -390,7 +384,6 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				s.Equal("myvm", i.Domains[0].Name)
 				s.Equal("running", i.Domains[0].State)
 				s.Empty(i.Domains[0].UUID)
-
 			},
 		},
 		{
@@ -412,7 +405,6 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				i, ok := got.(*libvirt.Info)
 				s.Require().True(ok)
 				s.Nil(i.Domains)
-
 			},
 		},
 		// ----- Darwin -----

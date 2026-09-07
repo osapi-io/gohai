@@ -154,7 +154,6 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 				s.Equal("7.0.14", i.GuestAdditionsVersion)
 				s.Equal("161095", i.GuestAdditionsRevision)
 				s.Equal("en_US", i.LanguageID)
-
 			},
 		},
 		{
@@ -193,7 +192,6 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Empty(i.HostVersion)
 				s.Empty(i.GuestAdditionsVersion)
-
 			},
 		},
 		{
@@ -215,7 +213,6 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 				s.Equal("6.1.0", i.HostVersion)
 				s.Empty(i.HostRevision)
 				s.Empty(i.GuestAdditionsVersion)
-
 			},
 		},
 		// ----- Darwin -----
@@ -232,7 +229,6 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 				s.Equal("7.0.14", i.HostVersion)
 				s.Equal("7.0.14", i.GuestAdditionsVersion)
 				s.Equal("en_US", i.LanguageID)
-
 			},
 		},
 		{

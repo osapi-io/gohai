@@ -221,7 +221,6 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				s.Equal("12.3.0 build-21581411", i.Version)
 				s.Equal("vmware_desktop", i.HostType)
 				s.Equal("01 Jan 2026 12:00:00", i.Hosttime)
-
 			},
 		},
 		{
@@ -241,7 +240,6 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal("vmware_vsphere", i.HostType)
 				s.Equal("7.0.3", i.HostVersion)
-
 			},
 		},
 		{
@@ -309,7 +307,6 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal("12.3.0", i.Version)
 				s.Equal("vmware_desktop", i.HostType)
-
 			},
 		},
 		{
@@ -376,7 +373,6 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				i, ok := got.(*vmware.Info)
 				s.Require().True(ok)
 				s.Empty(i.Hosttime)
-
 			},
 		},
 		{
@@ -447,7 +443,6 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal("vmware_vsphere", i.HostType)
 				s.Empty(i.HostVersion)
-
 			},
 		},
 		{
@@ -489,7 +484,6 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal("12.3.0 build-21581411", i.Version)
 				s.Equal("vmware_desktop", i.HostType)
-
 			},
 		},
 		{
@@ -555,7 +549,6 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Empty(i.Speed)
 				s.Equal("vmware_desktop", i.HostType)
-
 			},
 		},
 		{

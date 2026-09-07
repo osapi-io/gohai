@@ -226,7 +226,6 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Equal("image", info.SourceDetails.SourceType)
 				s.Equal(50, info.SourceDetails.BootVolumeSizeInGBs)
 				s.Equal("AMD_VM", info.PlatformConfig["type"])
-
 			},
 		},
 		{
@@ -239,7 +238,6 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Require().NotNil(info)
 				s.Empty(info.VNICs)
 				s.Empty(info.VolumeAttachments)
-
 			},
 		},
 		{
@@ -263,7 +261,6 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("VM.Standard.E4.Flex", info.Type)
-
 			},
 		},
 		{
@@ -284,7 +281,6 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Require().Len(info.VolumeAttachments, 1)
 				_, found := info.VolumeAttachments["ocid1.va.oc1.bbb"]
 				s.True(found)
-
 			},
 		},
 		{

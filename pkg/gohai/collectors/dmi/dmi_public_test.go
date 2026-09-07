@@ -144,7 +144,6 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				s.Equal("Google", info.Product.VendorName)
 				s.Equal("Google Compute Engine", info.Product.Name)
 				s.Equal("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", info.Product.UUID)
-
 			},
 		},
 		{
@@ -171,7 +170,6 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				s.Equal("Dell Inc.", info.Baseboard.Vendor)
 				s.Require().NotNil(info.Product)
 				s.Equal("OptiPlex 3070", info.Product.Name)
-
 			},
 		},
 		{
@@ -190,7 +188,6 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				s.Nil(info.Baseboard)
 				s.Nil(info.Chassis)
 				s.Nil(info.Product)
-
 			},
 		},
 		{
@@ -205,7 +202,6 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				s.Nil(info.Baseboard)
 				s.Nil(info.Chassis)
 				s.Nil(info.Product)
-
 			},
 		},
 	}

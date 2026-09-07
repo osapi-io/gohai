@@ -296,7 +296,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Equal("", i.Mounts[0].UUID)
 				s.Equal(uint64(1000), i.Mounts[0].InodesTotal)
 				s.Equal(float64(25), i.Mounts[0].InodesUsedPercent)
-
 			},
 		},
 		{
@@ -323,7 +322,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Equal("EFI", i.Mounts[1].Label)
 				s.Equal("EFI", i.Mounts[1].PartLabel)
 				s.Empty(i.Unmounted)
-
 			},
 		},
 		{
@@ -350,7 +348,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Equal("crypto_LUKS", i.Unmounted[0].Type)
 				s.Equal("luks-uuid", i.Unmounted[0].UUID)
 				s.Equal("data", i.Unmounted[0].Label)
-
 			},
 		},
 		{
@@ -371,7 +368,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal("u", i.Mounts[0].UUID)
 				s.Empty(i.Unmounted)
-
 			},
 		},
 		{
@@ -389,7 +385,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				i, ok := got.(*filesystem.Info)
 				s.Require().True(ok)
 				s.Empty(i.Unmounted)
-
 			},
 		},
 		{
@@ -405,7 +400,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Len(i.Mounts, 2)
 				s.Empty(i.Unmounted)
 				s.Equal("", i.Mounts[0].UUID)
-
 			},
 		},
 		{
@@ -420,7 +414,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Len(i.Mounts, 2)
 				s.Empty(i.Unmounted)
-
 			},
 		},
 		{
@@ -449,7 +442,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Len(i.Mounts, 2)
 				s.Zero(i.Mounts[0].Total)
-
 			},
 		},
 		{
@@ -513,7 +505,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				snap := i.ZFSDatasets[4]
 				s.Equal("tank@snap1", snap.Name)
 				s.True(snap.IsPool) // no "/" → looks like a pool-level name
-
 			},
 		},
 		{
@@ -529,7 +520,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				i, ok := got.(*filesystem.Info)
 				s.Require().True(ok)
 				s.Empty(i.ZFSDatasets)
-
 			},
 		},
 		{
@@ -551,7 +541,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Require().Len(i.ZFSDatasets, 1)
 				s.Equal("name", i.ZFSDatasets[0].Name)
 				s.Equal("val", i.ZFSDatasets[0].Properties["prop"].Value)
-
 			},
 		},
 		{
@@ -589,7 +578,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Equal(uint64(524288000), m.Btrfs.Allocation["data"].BytesUsed)
 				s.Equal(uint64(268435456), m.Btrfs.Allocation["metadata"].TotalBytes)
 				s.Equal(uint64(33554432), m.Btrfs.Allocation["system"].TotalBytes)
-
 			},
 		},
 		{
@@ -621,7 +609,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Equal("single", m.Btrfs.RAID)
 				s.Equal(uint64(0), m.Btrfs.Allocation["data"].TotalBytes) // unparseable
 				s.Equal(uint64(1024), m.Btrfs.Allocation["metadata"].TotalBytes)
-
 			},
 		},
 		{
@@ -646,7 +633,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				i, ok := got.(*filesystem.Info)
 				s.Require().True(ok)
 				s.Nil(i.Mounts[0].Btrfs)
-
 			},
 		},
 		{
@@ -683,7 +669,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Empty(m.Btrfs.RAID)
 				s.Equal(uint64(0), m.Btrfs.Allocation["data"].TotalBytes)
 				s.Equal(uint64(0), m.Btrfs.Allocation["data"].BytesUsed)
-
 			},
 		},
 		{
@@ -712,7 +697,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				i, ok := got.(*filesystem.Info)
 				s.Require().True(ok)
 				s.Nil(i.Mounts[0].Btrfs)
-
 			},
 		},
 		{
@@ -737,7 +721,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				i, ok := got.(*filesystem.Info)
 				s.Require().True(ok)
 				s.Nil(i.Mounts[0].Btrfs)
-
 			},
 		},
 		{
@@ -753,7 +736,6 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Equal("/dev/disk3s1", i.Mounts[0].Device)
 				s.Equal("apfs", i.Mounts[0].Type)
 				s.Equal(uint64(500), i.Mounts[0].Total)
-
 			},
 		},
 		{
