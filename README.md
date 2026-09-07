@@ -1,6 +1,5 @@
 [![release](https://img.shields.io/github/release/osapi-io/gohai.svg?style=for-the-badge)](https://github.com/osapi-io/gohai/releases/latest)
 [![codecov](https://img.shields.io/codecov/c/github/osapi-io/gohai?style=for-the-badge)](https://codecov.io/gh/osapi-io/gohai)
-[![go report card](https://goreportcard.com/badge/github.com/osapi-io/gohai?style=for-the-badge)](https://goreportcard.com/report/github.com/osapi-io/gohai)
 [![license](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge)](LICENSE)
 [![build](https://img.shields.io/github/actions/workflow/status/osapi-io/gohai/go.yml?style=for-the-badge)](https://github.com/osapi-io/gohai/actions/workflows/go.yml)
 [![powered by](https://img.shields.io/badge/powered%20by-goreleaser-green.svg?style=for-the-badge)](https://github.com/goreleaser)
