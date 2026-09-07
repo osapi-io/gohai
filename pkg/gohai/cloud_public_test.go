@@ -49,59 +49,88 @@ func TestCloudPublicTestSuite(
 
 func (s *CloudPublicTestSuite) TestCloud() {
 	tests := []struct {
-		name  string
-		facts *gohai.Facts
-		want  string
+		name         string
+		facts        *gohai.Facts
+		validateFunc func(*gohai.Cloud)
 	}{
 		{
 			name:  "no provider returns nil",
 			facts: &gohai.Facts{},
-			want:  "",
+			validateFunc: func(got *gohai.Cloud) {
+				s.Nil(got)
+			},
 		},
 		{
 			name:  "ec2 returns aws",
 			facts: &gohai.Facts{Ec2: &ec2.Info{ID: "i-abc"}},
-			want:  gohai.CloudAWS,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudAWS, got.Name)
+			},
 		},
 		{
 			name:  "gce returns gce",
 			facts: &gohai.Facts{Gce: &gce.Info{}},
-			want:  gohai.CloudGCE,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudGCE, got.Name)
+			},
 		},
 		{
 			name:  "azure returns azure",
 			facts: &gohai.Facts{Azure: &azure.Info{}},
-			want:  gohai.CloudAzure,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudAzure, got.Name)
+			},
 		},
 		{
 			name:  "digital_ocean returns digital_ocean",
 			facts: &gohai.Facts{DigitalOcean: &digitalocean.Info{}},
-			want:  gohai.CloudDigitalOcean,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudDigitalOcean, got.Name)
+			},
 		},
 		{
 			name:  "oci returns oci",
 			facts: &gohai.Facts{OCI: &oci.Info{}},
-			want:  gohai.CloudOCI,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudOCI, got.Name)
+			},
 		},
 		{
 			name:  "alibaba returns alibaba",
 			facts: &gohai.Facts{Alibaba: &alibaba.Info{}},
-			want:  gohai.CloudAlibaba,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudAlibaba, got.Name)
+			},
 		},
 		{
 			name:  "linode returns linode",
 			facts: &gohai.Facts{Linode: &linode.Info{}},
-			want:  gohai.CloudLinode,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudLinode, got.Name)
+			},
 		},
 		{
 			name:  "openstack returns openstack",
 			facts: &gohai.Facts{OpenStack: &openstack.Info{}},
-			want:  gohai.CloudOpenStack,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudOpenStack, got.Name)
+			},
 		},
 		{
 			name:  "scaleway returns scaleway",
 			facts: &gohai.Facts{Scaleway: &scaleway.Info{}},
-			want:  gohai.CloudScaleway,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudScaleway, got.Name)
+			},
 		},
 		{
 			name: "first-match wins (ec2 before gce)",
@@ -109,18 +138,15 @@ func (s *CloudPublicTestSuite) TestCloud() {
 				Ec2: &ec2.Info{},
 				Gce: &gce.Info{},
 			},
-			want: gohai.CloudAWS,
+			validateFunc: func(got *gohai.Cloud) {
+				s.Require().NotNil(got)
+				s.Equal(gohai.CloudAWS, got.Name)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got := tt.facts.Cloud()
-			if tt.want == "" {
-				s.Nil(got)
-				return
-			}
-			s.Require().NotNil(got)
-			s.Equal(tt.want, got.Name)
+			tt.validateFunc(tt.facts.Cloud())
 		})
 	}
 }

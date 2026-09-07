@@ -228,13 +228,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 	}()
 
 	tests := []struct {
-		name          string
-		variant       string
-		setupFS       func() avfs.VFS
-		wantErr       bool
-		wantKeyCount  int
-		wantFirstType string
-		wantKeyLength int
+		name         string
+		variant      string
+		setupFS      func() avfs.VFS
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: no key files",
@@ -244,7 +241,12 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				_ = f.MkdirAll("/etc/ssh", 0o755)
 				return f
 			},
-			wantKeyCount: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 0)
+			},
 		},
 		{
 			name:    "linux: rsa-2048 key",
@@ -254,9 +256,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_rsa_key.pub": generateRSAKey(s.T(), 2048),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
-			wantKeyLength: 2048,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-rsa" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-rsa", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(2048, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: rsa-4096 key",
@@ -266,9 +277,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_rsa_key.pub": generateRSAKey(s.T(), 4096),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
-			wantKeyLength: 4096,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-rsa" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-rsa", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(4096, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: truncated rsa wire blob — key length 0",
@@ -278,9 +298,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(truncatedRSABlob),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
-			wantKeyLength: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-rsa" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-rsa", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(0, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: ecdsa-p256 key",
@@ -290,9 +319,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P256()),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ecdsa-sha2-nistp256",
-			wantKeyLength: 256,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ecdsa-sha2-nistp256" != "" && len(info.Keys) > 0 {
+					s.Equal("ecdsa-sha2-nistp256", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(256, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: ecdsa-p384 key",
@@ -302,9 +340,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P384()),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ecdsa-sha2-nistp384",
-			wantKeyLength: 384,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ecdsa-sha2-nistp384" != "" && len(info.Keys) > 0 {
+					s.Equal("ecdsa-sha2-nistp384", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(384, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: ecdsa-p521 key",
@@ -314,9 +361,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P521()),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ecdsa-sha2-nistp521",
-			wantKeyLength: 521,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ecdsa-sha2-nistp521" != "" && len(info.Keys) > 0 {
+					s.Equal("ecdsa-sha2-nistp521", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(521, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: ed25519 key",
@@ -326,9 +382,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_ed25519_key.pub": generateEd25519Key(s.T()),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-ed25519",
-			wantKeyLength: 256,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-ed25519" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-ed25519", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(256, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: all three key types",
@@ -340,19 +405,28 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_ed25519_key.pub": generateEd25519Key(s.T()),
 				})
 			},
-			wantKeyCount: 3,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 3)
+			},
 		},
 		{
 			name:    "linux: malformed base64 returns error",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return malformFS{memfs.New()} },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "linux: too few fields returns error",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return badFieldsFS{memfs.New()} },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: ed25519 key",
@@ -362,9 +436,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_ed25519_key.pub": generateEd25519Key(s.T()),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-ed25519",
-			wantKeyLength: 256,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-ed25519" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-ed25519", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(256, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "darwin: no key files",
@@ -374,13 +457,20 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				_ = f.MkdirAll("/etc/ssh", 0o755)
 				return f
 			},
-			wantKeyCount: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 0)
+			},
 		},
 		{
 			name:    "darwin: malformed base64 returns error",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return malformFS{memfs.New()} },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "linux: unknown key type — key length 0",
@@ -393,9 +483,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(unknownBlob),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
-			wantKeyLength: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-rsa" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-rsa", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(0, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: wire blob too short for length header — key length 0",
@@ -408,9 +507,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(shortBlob),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
-			wantKeyLength: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-rsa" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-rsa", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(0, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			name:    "linux: wire blob length field exceeds bytes — key length 0",
@@ -423,9 +531,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(tooShort),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
-			wantKeyLength: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-rsa" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-rsa", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(0, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			// Exercise readWireString's len(b) < 4+n branch: blob has two
@@ -443,9 +560,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(blob),
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-rsa",
-			wantKeyLength: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-rsa" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-rsa", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(0, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			// Exercise deriveKeyLength default branch: a fake type that is
@@ -463,9 +589,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_rsa_key.pub": line,
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ssh-dss",
-			wantKeyLength: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ssh-dss" != "" && len(info.Keys) > 0 {
+					s.Equal("ssh-dss", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(0, info.Keys[0].KeyLength)
+				}
+			},
 		},
 		{
 			// Exercise deriveKeyLength ecdsa inner-switch default: key type
@@ -483,9 +618,18 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					"/etc/ssh/ssh_host_ecdsa_key.pub": line,
 				})
 			},
-			wantKeyCount:  1,
-			wantFirstType: "ecdsa-sha2-unknown",
-			wantKeyLength: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.Keys, 1)
+				if "ecdsa-sha2-unknown" != "" && len(info.Keys) > 0 {
+					s.Equal("ecdsa-sha2-unknown", info.Keys[0].Type)
+					s.NotEmpty(info.Keys[0].FingerprintSHA256)
+					s.NotEmpty(info.Keys[0].FingerprintMD5)
+					s.Equal(0, info.Keys[0].KeyLength)
+				}
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -497,21 +641,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &gohaisssh.Darwin{FS: tt.setupFS()}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*gohaisssh.Info)
-			s.Require().True(ok)
-			s.Len(info.Keys, tt.wantKeyCount)
-			if tt.wantFirstType != "" && len(info.Keys) > 0 {
-				s.Equal(tt.wantFirstType, info.Keys[0].Type)
-				s.NotEmpty(info.Keys[0].FingerprintSHA256)
-				s.NotEmpty(info.Keys[0].FingerprintMD5)
-				s.Equal(tt.wantKeyLength, info.Keys[0].KeyLength)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

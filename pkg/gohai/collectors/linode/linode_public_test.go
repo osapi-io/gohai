@@ -85,31 +85,31 @@ func (s *LinodePublicTestSuite) TestDefaultInterfaceAddrs() {
 	s.Require().NotEmpty(loName)
 
 	tests := []struct {
-		name    string
-		iface   string
-		wantErr bool
+		name         string
+		iface        string
+		validateFunc func(any, error)
 	}{
 		{
 			// Loopback exists on every Unix — exercises the happy
 			// path through net.InterfaceByName + Addrs().
 			name:  "loopback returns addresses",
 			iface: loName,
+			validateFunc: func(addrs any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(addrs)
+			},
 		},
 		{
-			name:    "missing interface returns error",
-			iface:   "gohai-nonexistent-iface-xyz",
-			wantErr: true,
+			name:  "missing interface returns error",
+			iface: "gohai-nonexistent-iface-xyz",
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			addrs, err := linode.DefaultInterfaceAddrs(tt.iface)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.NotNil(addrs)
+			tt.validateFunc(linode.DefaultInterfaceAddrs(tt.iface))
 		})
 	}
 }
@@ -159,14 +159,13 @@ func (s *LinodePublicTestSuite) TestInterface() {
 
 func (s *LinodePublicTestSuite) TestCollect() {
 	tests := []struct {
-		name      string
-		apt       string
-		noApt     bool
-		hostname  *hostname.Info // when set, added to prior under "hostname"
-		lookups   map[string][]net.Addr
-		lookupErr error
-		wantNil   bool
-		verify    func(s *LinodePublicTestSuite, info *linode.Info)
+		name         string
+		apt          string
+		noApt        bool
+		hostname     *hostname.Info // when set, added to prior under "hostname"
+		lookups      map[string][]net.Addr
+		lookupErr    error
+		validateFunc func(any)
 	}{
 		{
 			name:     "FQDN contains 'linode' triggers detection without apt",
@@ -175,7 +174,9 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			lookups: map[string][]net.Addr{
 				"eth0": {mustCIDR(s, "50.1.2.3/24")},
 			},
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("50.1.2.3", info.PublicIP)
 			},
@@ -185,7 +186,9 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			apt:      "deb http://archive.ubuntu.com/ubuntu focal main",
 			hostname: &hostname.Info{Domain: "members.linode.com"},
 			lookups:  map[string][]net.Addr{"eth0": {mustCIDR(s, "50.1.2.3/24")}},
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("50.1.2.3", info.PublicIP)
 			},
@@ -194,15 +197,20 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			name:     "hostname without linode + no apt → nil",
 			apt:      "deb http://archive.ubuntu.com/ubuntu focal main",
 			hostname: &hostname.Info{FQDN: "host.example.com", Domain: "example.com"},
-			wantNil:  true,
+			validateFunc: func(out any) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:     "nil hostname Info is tolerated",
 			apt:      "linode",
 			hostname: nil,
 			lookups:  map[string][]net.Addr{"eth0": {mustCIDR(s, "50.1.2.3/24")}},
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Equal("50.1.2.3", info.PublicIP)
+
 			},
 		},
 		{
@@ -214,7 +222,9 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				"eth0":   {mustCIDR(s, "169.254.0.1/16"), mustCIDR(s, "50.1.2.3/24")},
 				"eth0:1": {mustCIDR(s, "10.0.0.5/16")},
 			},
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("50.1.2.3", info.PublicIP)
 				s.Equal("10.0.0.5", info.PrivateIP)
@@ -228,19 +238,26 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			// certainly don't exist in the test environment, so the
 			// result is just an empty Info — we only care that the
 			// code path is exercised.
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
+
 			},
 		},
 		{
-			name:    "no linode in apt → nil",
-			apt:     "deb http://archive.ubuntu.com/ubuntu focal main",
-			wantNil: true,
+			name: "no linode in apt → nil",
+			apt:  "deb http://archive.ubuntu.com/ubuntu focal main",
+			validateFunc: func(out any) {
+				s.Nil(out)
+			},
 		},
 		{
-			name:    "missing apt file → nil",
-			noApt:   true,
-			wantNil: true,
+			name:  "missing apt file → nil",
+			noApt: true,
+			validateFunc: func(out any) {
+				s.Nil(out)
+			},
 		},
 		{
 			name: "eth0 missing produces empty public_ip",
@@ -248,7 +265,9 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			lookups: map[string][]net.Addr{
 				"eth0:1": {mustCIDR(s, "10.0.0.5/16")},
 			},
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.PublicIP)
 				s.Equal("10.0.0.5", info.PrivateIP)
@@ -260,7 +279,9 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			lookups: map[string][]net.Addr{
 				"eth0": {mustCIDR(s, "fe80::1/64")},
 			},
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.PublicIP)
 			},
@@ -273,7 +294,9 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				// net.IPAddr — to hit the type-assert-miss branch.
 				"eth0": {&net.IPAddr{IP: net.ParseIP("50.1.2.3")}},
 			},
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.PublicIP)
 			},
@@ -282,7 +305,9 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			name:      "interface lookup error returns empty IP",
 			apt:       "linode",
 			lookupErr: errors.New("no such interface"),
-			verify: func(s *LinodePublicTestSuite, info *linode.Info) {
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.PublicIP)
 				s.Empty(info.PrivateIP)
@@ -318,15 +343,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			c := linode.New()
 			out, err := c.Collect(context.Background(), prior)
 			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-			info, ok := out.(*linode.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info)
-			}
+			tt.validateFunc(out)
 		})
 	}
 }
