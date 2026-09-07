@@ -176,24 +176,24 @@ func handler(
 
 func (s *OCIPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		prior      collector.PriorResults
-		instance   string
-		vnics      string
-		volumes    string
-		handler    http.HandlerFunc // overrides the default when set
-		closed     bool
-		wantNil    bool
-		wantErr    bool
-		wantNoHTTP bool
-		verify     func(s *OCIPublicTestSuite, info *oci.Info, gotAuth string)
+		name         string
+		prior        collector.PriorResults
+		instance     string
+		vnics        string
+		volumes      string
+		handler      http.HandlerFunc // overrides the default when set
+		closed       bool
+		wantErr      bool
+		validateFunc func(any, bool, string)
 	}{
 		{
 			name:     "happy path populates all three sections",
 			instance: instanceResponse,
 			vnics:    vnicsResponse,
 			volumes:  volumesResponse,
-			verify: func(s *OCIPublicTestSuite, info *oci.Info, gotAuth string) {
+			validateFunc: func(out any, _ bool, gotAuth string) {
+				info, ok := out.(*oci.Info)
+				s.Require().True(ok)
 				s.Equal("Bearer Oracle", gotAuth)
 				s.Require().NotNil(info)
 				s.Equal("ocid1.instance.oc1.phx.xxx", info.ID)
@@ -226,15 +226,19 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Equal("image", info.SourceDetails.SourceType)
 				s.Equal(50, info.SourceDetails.BootVolumeSizeInGBs)
 				s.Equal("AMD_VM", info.PlatformConfig["type"])
+
 			},
 		},
 		{
 			name:     "missing vnics and volumes tolerated",
 			instance: instanceResponse,
-			verify: func(s *OCIPublicTestSuite, info *oci.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string) {
+				info, ok := out.(*oci.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.VNICs)
 				s.Empty(info.VolumeAttachments)
+
 			},
 		},
 		{
@@ -242,53 +246,71 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Chassis: &dmi.Chassis{AssetTag: "Something Else"}},
 			},
-			wantNil:    true,
-			wantNoHTTP: true,
+			validateFunc: func(out any, httpCalled bool, _ string) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name:     "no dmi in prior fails open",
 			prior:    collector.PriorResults{},
 			instance: instanceResponse,
-			verify: func(s *OCIPublicTestSuite, info *oci.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string) {
+				info, ok := out.(*oci.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("VM.Standard.E4.Flex", info.Type)
+
 			},
 		},
 		{
-			name:    "404 on instance drops silently",
-			wantNil: true,
+			name: "404 on instance drops silently",
+			validateFunc: func(out any, _ bool, _ string) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:     "volumes with empty id are skipped",
 			instance: instanceResponse,
 			volumes:  `[{"id": "", "lifecycleState": "ATTACHED"}, {"id": "ocid1.va.oc1.bbb", "lifecycleState": "ATTACHED"}]`,
-			verify: func(s *OCIPublicTestSuite, info *oci.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string) {
+				info, ok := out.(*oci.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.VolumeAttachments, 1)
-				_, ok := info.VolumeAttachments["ocid1.va.oc1.bbb"]
-				s.True(ok)
+				_, found := info.VolumeAttachments["ocid1.va.oc1.bbb"]
+				s.True(found)
+
 			},
 		},
 		{
-			name:    "connection refused drops silently",
-			closed:  true,
-			wantNil: true,
+			name:   "connection refused drops silently",
+			closed: true,
+			validateFunc: func(out any, _ bool, _ string) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:     "malformed instance JSON surfaces error",
 			instance: "not json",
 			wantErr:  true,
+			validateFunc: func(_ any, _ bool, _ string) {
+			},
 		},
 		{
 			name:     "malformed vnics JSON surfaces error",
 			instance: instanceResponse,
 			vnics:    "not json",
 			wantErr:  true,
+			validateFunc: func(_ any, _ bool, _ string) {
+			},
 		},
 		{
 			name:     "malformed volumes JSON surfaces error",
 			instance: instanceResponse,
 			volumes:  "not json",
 			wantErr:  true,
+			validateFunc: func(_ any, _ bool, _ string) {
+			},
 		},
 	}
 
@@ -327,18 +349,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			}
 			s.Require().NoError(err)
 
-			if tt.wantNoHTTP {
-				s.False(httpCalled)
-			}
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-			info, ok := out.(*oci.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info, gotAuth)
-			}
+			tt.validateFunc(out, httpCalled, gotAuth)
 		})
 	}
 }

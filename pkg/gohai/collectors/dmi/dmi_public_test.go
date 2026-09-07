@@ -70,13 +70,13 @@ func (s *DmiPublicTestSuite) TestNew() {
 
 func (s *DmiPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		biosFn  func(...any) (*bios.Info, error)
-		bbFn    func(...any) (*baseboard.Info, error)
-		chFn    func(...any) (*chassis.Info, error)
-		prodFn  func(...any) (*product.Info, error)
-		verify  func(s *DmiPublicTestSuite, info *dmi.Info)
+		name         string
+		variant      string
+		biosFn       func(...any) (*bios.Info, error)
+		bbFn         func(...any) (*baseboard.Info, error)
+		chFn         func(...any) (*chassis.Info, error)
+		prodFn       func(...any) (*product.Info, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux populates all sections when ghw succeeds",
@@ -105,7 +105,10 @@ func (s *DmiPublicTestSuite) TestCollect() {
 					SKU:          "",
 				}, nil
 			},
-			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*dmi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Require().NotNil(info.BIOS)
 				s.Equal("SeaBIOS", info.BIOS.Manufacturer)
@@ -124,6 +127,7 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				s.Equal("Google", info.Product.VendorName)
 				s.Equal("Google Compute Engine", info.Product.Name)
 				s.Equal("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", info.Product.UUID)
+
 			},
 		},
 		{
@@ -139,7 +143,10 @@ func (s *DmiPublicTestSuite) TestCollect() {
 			prodFn: func(...any) (*product.Info, error) {
 				return &product.Info{Name: "OptiPlex 3070"}, nil
 			},
-			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*dmi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Nil(info.BIOS)
 				s.Nil(info.Chassis)
@@ -147,6 +154,7 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				s.Equal("Dell Inc.", info.Baseboard.Vendor)
 				s.Require().NotNil(info.Product)
 				s.Equal("OptiPlex 3070", info.Product.Name)
+
 			},
 		},
 		{
@@ -156,23 +164,31 @@ func (s *DmiPublicTestSuite) TestCollect() {
 			bbFn:    func(...any) (*baseboard.Info, error) { return nil, nil },
 			chFn:    func(...any) (*chassis.Info, error) { return nil, nil },
 			prodFn:  func(...any) (*product.Info, error) { return nil, nil },
-			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*dmi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Nil(info.BIOS)
 				s.Nil(info.Baseboard)
 				s.Nil(info.Chassis)
 				s.Nil(info.Product)
+
 			},
 		},
 		{
 			name:    "darwin returns empty info",
 			variant: "darwin",
-			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*dmi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Nil(info.BIOS)
 				s.Nil(info.Baseboard)
 				s.Nil(info.Chassis)
 				s.Nil(info.Product)
+
 			},
 		},
 	}
@@ -191,11 +207,7 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				c = dmi.NewDarwin()
 			}
 
-			out, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := out.(*dmi.Info)
-			s.Require().True(ok)
-			tt.verify(s, info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

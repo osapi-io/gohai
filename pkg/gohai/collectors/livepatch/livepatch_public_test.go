@@ -134,23 +134,28 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 		name         string
 		variant      string
 		setupFS      func() avfs.VFS
-		wantNil      bool
-		wantErr      bool
-		wantPatches  map[string]livepatch.Patch
-		wantNilPatch bool
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "darwin: returns nil",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "linux: livepatch sysfs absent — nil patches",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			// /sys/kernel/livepatch does not exist — no livepatch support
-			wantNilPatch: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*livepatch.Info)
+				s.Require().True(ok)
+				s.Nil(info.Patches)
+			},
 		},
 		{
 			name:    "linux: livepatch dir exists but empty",
@@ -162,7 +167,13 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 					map[string]string{},
 				)
 			},
-			wantPatches: map[string]livepatch.Patch{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*livepatch.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]livepatch.Patch{}, info.Patches)
+			},
 		},
 		{
 			name:    "linux: one patch enabled not in transition",
@@ -177,8 +188,14 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 					},
 				)
 			},
-			wantPatches: map[string]livepatch.Patch{
-				"lp_cve_2023_0001": {Enabled: true, Transition: false},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*livepatch.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]livepatch.Patch{
+					"lp_cve_2023_0001": {Enabled: true, Transition: false},
+				}, info.Patches)
 			},
 		},
 		{
@@ -194,8 +211,14 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 					},
 				)
 			},
-			wantPatches: map[string]livepatch.Patch{
-				"lp_test": {Enabled: false, Transition: true},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*livepatch.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]livepatch.Patch{
+					"lp_test": {Enabled: false, Transition: true},
+				}, info.Patches)
 			},
 		},
 		{
@@ -216,9 +239,15 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 					},
 				)
 			},
-			wantPatches: map[string]livepatch.Patch{
-				"lp_a": {Enabled: true, Transition: false},
-				"lp_b": {Enabled: true, Transition: false},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*livepatch.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]livepatch.Patch{
+					"lp_a": {Enabled: true, Transition: false},
+					"lp_b": {Enabled: true, Transition: false},
+				}, info.Patches)
 			},
 		},
 		{
@@ -232,8 +261,14 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 					map[string]string{},
 				)
 			},
-			wantPatches: map[string]livepatch.Patch{
-				"lp_nofiles": {Enabled: false, Transition: false},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*livepatch.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]livepatch.Patch{
+					"lp_nofiles": {Enabled: false, Transition: false},
+				}, info.Patches)
 			},
 		},
 		{
@@ -250,8 +285,14 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 					},
 				)
 			},
-			wantPatches: map[string]livepatch.Patch{
-				"lp_real": {Enabled: true, Transition: false},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*livepatch.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]livepatch.Patch{
+					"lp_real": {Enabled: true, Transition: false},
+				}, info.Patches)
 			},
 		},
 	}
@@ -264,27 +305,7 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &livepatch.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-
-			info, ok := got.(*livepatch.Info)
-			s.Require().True(ok)
-
-			if tt.wantNilPatch {
-				s.Nil(info.Patches)
-				return
-			}
-
-			s.Equal(tt.wantPatches, info.Patches)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

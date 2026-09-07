@@ -46,23 +46,35 @@ func (s *RegistryPublicTestSuite) TestNewRegistry() {
 func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 	reg := gohai.NewRegistry()
 	tests := []struct {
-		name      string
-		category  string
-		contains  string // expected member of the category; empty when wantEmpty
-		wantEmpty bool
+		name         string
+		category     string
+		validateFunc func([]string)
 	}{
-		{"cloud contains gce", "cloud", "gce", false},
-		{"hardware contains dmi", "hardware", "dmi", false},
-		{"unknown category returns empty", "nope", "", true},
+		{
+			name:     "cloud contains gce",
+			category: "cloud",
+			validateFunc: func(got []string) {
+				s.Contains(got, "gce")
+			},
+		},
+		{
+			name:     "hardware contains dmi",
+			category: "hardware",
+			validateFunc: func(got []string) {
+				s.Contains(got, "dmi")
+			},
+		},
+		{
+			name:     "unknown category returns empty",
+			category: "nope",
+			validateFunc: func(got []string) {
+				s.Empty(got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got := reg.NamesInCategory(tt.category)
-			if tt.wantEmpty {
-				s.Empty(got)
-				return
-			}
-			s.Contains(got, tt.contains)
+			tt.validateFunc(reg.NamesInCategory(tt.category))
 		})
 	}
 }

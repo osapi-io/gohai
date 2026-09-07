@@ -68,26 +68,52 @@ func (s *ShellsPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name       string
-		detect     string
-		wantKind   string
-		wantFSFrom func() avfs.VFS
+		name         string
+		detect       string
+		validateFunc func(shells.Collector)
 	}{
 		{
-			"darwin dispatches to Darwin + wires FS",
-			"darwin",
-			"darwin",
-			func() avfs.VFS { return shells.NewDarwin().FS },
+			name:   "darwin dispatches to Darwin + wires FS",
+			detect: "darwin",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Darwin)
+				s.True(ok)
+				s.NotNil(func() avfs.VFS { return shells.NewDarwin().FS }())
+			},
 		},
 		{
-			"debian dispatches to Linux + wires FS",
-			"debian",
-			"linux",
-			func() avfs.VFS { return shells.NewLinux().FS },
+			name:   "debian dispatches to Linux + wires FS",
+			detect: "debian",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
+				s.NotNil(func() avfs.VFS { return shells.NewLinux().FS }())
+			},
 		},
-		{"rhel dispatches to Linux", "rhel", "linux", nil},
-		{"arch dispatches to Linux", "arch", "linux", nil},
-		{"unknown dispatches to Linux", "", "linux", nil},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -97,17 +123,7 @@ func (s *ShellsPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*shells.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*shells.Linux)
-				s.True(ok)
-			}
-			if tt.wantFSFrom != nil {
-				s.NotNil(tt.wantFSFrom())
-			}
+			tt.validateFunc(c)
 		})
 	}
 }

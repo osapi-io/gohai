@@ -45,85 +45,115 @@ func TestPlatformPublicTestSuite(
 // swappable-var contract that collector tests rely on.
 func (s *PlatformPublicTestSuite) TestDetect() {
 	tests := []struct {
-		name     string
-		infoFn   func() (*host.InfoStat, error)
-		override func() string // non-nil swaps platform.Detect directly
-		want     string
+		name         string
+		infoFn       func() (*host.InfoStat, error)
+		override     func() string // non-nil swaps platform.Detect directly
+		validateFunc func(string)
 	}{
 		{
 			name:   "ubuntu → debian",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "ubuntu"}, nil },
-			want:   "debian",
+			validateFunc: func(got string) {
+				s.Equal("debian", got)
+			},
 		},
 		{
 			name:   "debian → debian",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "debian"}, nil },
-			want:   "debian",
+			validateFunc: func(got string) {
+				s.Equal("debian", got)
+			},
 		},
 		{
 			name:   "raspbian → debian",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "raspbian"}, nil },
-			want:   "debian",
+			validateFunc: func(got string) {
+				s.Equal("debian", got)
+			},
 		},
 		{
 			name:   "rhel → rhel",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "rhel"}, nil },
-			want:   "rhel",
+			validateFunc: func(got string) {
+				s.Equal("rhel", got)
+			},
 		},
 		{
 			name:   "centos → rhel",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "centos"}, nil },
-			want:   "rhel",
+			validateFunc: func(got string) {
+				s.Equal("rhel", got)
+			},
 		},
 		{
 			name:   "fedora → rhel",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "fedora"}, nil },
-			want:   "rhel",
+			validateFunc: func(got string) {
+				s.Equal("rhel", got)
+			},
 		},
 		{
 			name:   "amazon linux → rhel",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "amzn"}, nil },
-			want:   "rhel",
+			validateFunc: func(got string) {
+				s.Equal("rhel", got)
+			},
 		},
 		{
 			name:   "darwin platform empty, OS=darwin",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "", OS: "darwin"}, nil },
-			want:   "darwin",
+			validateFunc: func(got string) {
+				s.Equal("darwin", got)
+			},
 		},
 		{
 			name:   "arch linux passes through",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "arch"}, nil },
-			want:   "arch",
+			validateFunc: func(got string) {
+				s.Equal("arch", got)
+			},
 		},
 		{
 			name:   "alpine passes through",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "alpine"}, nil },
-			want:   "alpine",
+			validateFunc: func(got string) {
+				s.Equal("alpine", got)
+			},
 		},
 		{
 			name:   "suse passes through (not rhel family)",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "suse"}, nil },
-			want:   "suse",
+			validateFunc: func(got string) {
+				s.Equal("suse", got)
+			},
 		},
 		{
 			name:   "gopsutil error returns empty",
 			infoFn: func() (*host.InfoStat, error) { return nil, errors.New("boom") },
-			want:   "",
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
 		},
 		{
 			name:   "nil info returns empty",
 			infoFn: func() (*host.InfoStat, error) { return nil, nil },
-			want:   "",
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
 		},
 		{
 			name:   "mixed-case platform is normalized",
 			infoFn: func() (*host.InfoStat, error) { return &host.InfoStat{Platform: "Ubuntu"}, nil },
-			want:   "debian",
+			validateFunc: func(got string) {
+				s.Equal("debian", got)
+			},
 		},
 		{
 			name:     "Detect var is swappable by callers without gopsutil",
 			override: func() string { return "custom" },
-			want:     "custom",
+			validateFunc: func(got string) {
+				s.Equal("custom", got)
+			},
 		},
 	}
 
@@ -134,13 +164,17 @@ func (s *PlatformPublicTestSuite) TestDetect() {
 		s.Run(tt.name, func() {
 			if tt.override != nil {
 				platform.Detect = tt.override
-				s.Equal(tt.want, platform.Detect())
+
+				tt.validateFunc(platform.Detect())
+
 				platform.Detect = origDetect
+
 				return
 			}
 			restore := platform.SetHostInfoFn(tt.infoFn)
 			defer restore()
-			s.Equal(tt.want, platform.Detect())
+
+			tt.validateFunc(platform.Detect())
 		})
 	}
 }
