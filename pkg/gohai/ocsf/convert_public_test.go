@@ -64,16 +64,16 @@ func TestConvertPublicTestSuite(
 
 func (s *ConvertPublicTestSuite) TestFromFacts() {
 	tests := []struct {
-		name   string
-		facts  *gohai.Facts
-		verify func(*ocsf.InventoryInfo)
+		name         string
+		facts        *gohai.Facts
+		validateFunc func(*ocsf.InventoryInfo)
 	}{
 		{
 			name: "empty facts produces valid event envelope",
 			facts: &gohai.Facts{
 				CollectTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal(ocsf.ClassUIDInventoryInfo, event.ClassUID)
 				s.Equal(ocsf.CategoryUIDDiscovery, event.CategoryUID)
 				s.Equal(ocsf.TypeUIDCollect, event.TypeUID)
@@ -87,6 +87,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal("osapi-io", event.Metadata.Product.VendorName)
 				s.NotNil(event.Device)
 				s.Nil(event.Cloud)
+
 			},
 		},
 		{
@@ -99,10 +100,11 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					FQDN:   "web-01.example.com",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("web-01", event.Device.Hostname)
 				s.Equal("example.com", event.Device.Domain)
 				s.Equal("web-01.example.com", event.Device.FQDN)
+
 			},
 		},
 		{
@@ -118,7 +120,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					Build:           "SMP",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.NotNil(event.Device.OS)
 				s.Equal("Ubuntu", event.Device.OS.Name)
 				s.Equal("22.04", event.Device.OS.Version)
@@ -127,6 +129,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal("debian", event.Device.OS.Family)
 				s.Equal("amd64", event.Device.OS.CPUArchitecture)
 				s.Equal("SMP", event.Device.OS.Build)
+
 			},
 		},
 		{
@@ -135,8 +138,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				CollectTime: time.Now(),
 				Platform:    &platform.Info{OS: "darwin"},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal(300, event.Device.OS.TypeID)
+
 			},
 		},
 		{
@@ -159,7 +163,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					Total: 16384000000,
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				hw := event.Device.HWInfo
 				s.NotNil(hw)
 				s.Equal(8, hw.CPUCount)
@@ -173,6 +177,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal(int32(7), hw.CPUStepping)
 				s.Equal([]string{"aes", "avx2"}, hw.CPUFlags)
 				s.Equal(uint64(16384000000), hw.RAMSize)
+
 			},
 		},
 		{
@@ -186,10 +191,11 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					Version: "SMP PREEMPT_DYNAMIC",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("5.15.0-76-generic", event.Device.OS.KernelRelease)
 				s.Equal("Linux", event.Device.OS.KernelName)
 				s.Equal("SMP PREEMPT_DYNAMIC", event.Device.OS.KernelVersion)
+
 			},
 		},
 		{
@@ -211,7 +217,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					},
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Len(event.Device.NetworkInterfaces, 1)
 				ni := event.Device.NetworkInterfaces[0]
 				s.Equal("eth0", ni.Name)
@@ -219,6 +225,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal(1500, ni.MTU)
 				s.Equal("10.0.0.5", ni.IP)
 				s.Equal("10.0.0.5", event.Device.IP)
+
 			},
 		},
 		{
@@ -234,7 +241,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					Systems: map[string]string{"docker": "host"},
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				d := event.Device
 				s.Equal("abc-123", d.MachineID)
 				s.Equal(int64(1700000000), d.BootTime)
@@ -244,6 +251,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal("docker", d.Hypervisor)
 				s.Equal("host", d.VirtRole)
 				s.Equal(map[string]string{"docker": "host"}, d.VirtSystems)
+
 			},
 		},
 		{
@@ -251,8 +259,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Nil(event.Cloud)
+
 			},
 		},
 		{
@@ -266,13 +275,14 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					CloudPartition: "aws",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.NotNil(event.Cloud)
 				s.Equal("AWS", event.Cloud.Provider)
 				s.Equal("us-east-1", event.Cloud.Region)
 				s.Equal("us-east-1a", event.Cloud.Zone)
 				s.Equal("123456789012", event.Cloud.Account.UID)
 				s.Equal("aws", event.Cloud.CloudPartition)
+
 			},
 		},
 		{
@@ -285,9 +295,10 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					ProjectUID: "my-project",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("GCP", event.Cloud.Provider)
 				s.Equal("my-project", event.Cloud.ProjectUID)
+
 			},
 		},
 		{
@@ -301,11 +312,12 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					CloudPartition: "AzureCloud",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("Azure", event.Cloud.Provider)
 				s.Equal("eastus", event.Cloud.Region)
 				s.Equal("sub-123", event.Cloud.Account.UID)
 				s.Equal("AzureCloud", event.Cloud.CloudPartition)
+
 			},
 		},
 		{
@@ -318,9 +330,10 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					AccountUID: "ocid1.tenancy",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("OCI", event.Cloud.Provider)
 				s.Equal("ocid1.tenancy", event.Cloud.Account.UID)
+
 			},
 		},
 		{
@@ -333,9 +346,10 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					AccountUID: "ali-123",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("Alibaba Cloud", event.Cloud.Provider)
 				s.Equal("ali-123", event.Cloud.Account.UID)
+
 			},
 		},
 		{
@@ -344,9 +358,10 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				CollectTime:  time.Now(),
 				DigitalOcean: &digitalocean.Info{Region: "nyc3"},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("DigitalOcean", event.Cloud.Provider)
 				s.Equal("nyc3", event.Cloud.Region)
+
 			},
 		},
 		{
@@ -355,9 +370,10 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				CollectTime: time.Now(),
 				OpenStack:   &openstack.Info{Zone: "nova", ProjectUID: "proj-123"},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("OpenStack", event.Cloud.Provider)
 				s.Equal("proj-123", event.Cloud.ProjectUID)
+
 			},
 		},
 		{
@@ -370,10 +386,11 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					ProjectUID: "proj-456",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("Scaleway", event.Cloud.Provider)
 				s.Equal("org-123", event.Cloud.Account.UID)
 				s.Equal("proj-456", event.Cloud.ProjectUID)
+
 			},
 		},
 		{
@@ -390,7 +407,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					Chassis: &dmi.Chassis{Type: "Rack Mount"},
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				hw := event.Device.HWInfo
 				s.Equal("Dell", hw.BIOSManufacturer)
 				s.Equal("2.18", hw.BIOSVer)
@@ -399,6 +416,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal("uuid-456", hw.UUID)
 				s.Equal("Dell Inc.", hw.VendorName)
 				s.Equal("Rack Mount", hw.Chassis)
+
 			},
 		},
 		{
@@ -414,11 +432,12 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					Name:            "Ubuntu",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("ubuntu", event.Device.OS.DistributionID)
 				s.Equal("22.04", event.Device.OS.VersionID)
 				s.Equal("jammy", event.Device.OS.VersionCodename)
 				s.Equal("server", event.Device.OS.VariantID)
+
 			},
 		},
 		{
@@ -430,8 +449,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					OperatingSystemCPEName: "cpe:/o:canonical:ubuntu:22.04",
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("cpe:/o:canonical:ubuntu:22.04", event.Device.OS.CPEName)
+
 			},
 		},
 		{
@@ -440,22 +460,25 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				CollectTime: time.Now(),
 				Init:        &initd.Info{Name: "systemd"},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("systemd", event.Device.InitSystem)
+
 			},
 		},
 		{
 			name:  "windows os type_id",
 			facts: &gohai.Facts{CollectTime: time.Now(), Platform: &platform.Info{OS: "windows"}},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal(100, event.Device.OS.TypeID)
+
 			},
 		},
 		{
 			name:  "unknown os type_id",
 			facts: &gohai.Facts{CollectTime: time.Now(), Platform: &platform.Info{OS: "freebsd"}},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal(0, event.Device.OS.TypeID)
+
 			},
 		},
 		{
@@ -471,8 +494,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					},
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Empty(event.Device.IP)
+
 			},
 		},
 		{
@@ -482,8 +506,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				Platform:    &platform.Info{OS: "linux"},
 				OSRelease:   &osrelease.Info{Name: "Alpine Linux"},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("Alpine Linux", event.Device.OS.Name)
+
 			},
 		},
 		{
@@ -491,8 +516,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			facts: &gohai.Facts{
 				CollectTime: time.Now(),
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Nil(event.Device.NetworkInterfaces)
+
 			},
 		},
 		{
@@ -501,8 +527,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				CollectTime: time.Now(),
 				Network:     &network.Info{Interfaces: []network.Interface{}},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Nil(event.Device.NetworkInterfaces)
+
 			},
 		},
 		{
@@ -519,8 +546,9 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					},
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Empty(event.Device.IP)
+
 			},
 		},
 		{
@@ -533,9 +561,10 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					},
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Len(event.Device.NetworkInterfaces, 1)
 				s.Empty(event.Device.NetworkInterfaces[0].IP)
+
 			},
 		},
 		{
@@ -548,16 +577,16 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 					},
 				},
 			},
-			verify: func(event *ocsf.InventoryInfo) {
+			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal("Ethernet", event.Device.NetworkInterfaces[0].Type)
+
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			event := ocsf.FromFacts(tc.facts)
-			tc.verify(event)
+			tc.validateFunc(ocsf.FromFacts(tc.facts))
 		})
 	}
 }

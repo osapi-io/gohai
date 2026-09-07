@@ -149,6 +149,7 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 			name:    "linux: livepatch sysfs absent — nil patches",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
+			// /sys/kernel/livepatch does not exist — no livepatch support
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 

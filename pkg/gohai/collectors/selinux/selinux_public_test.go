@@ -161,15 +161,14 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 		variant      string
 		setupFS      func() avfs.VFS
 		setupExec    func(ctrl *gomock.Controller) *execmocks.MockExecutor
-		wantErr      bool
-		wantPolicy   string
-		validateFunc func(any)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "darwin: returns nil — no SELinux",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				s.Nil(got)
 			},
 		},
@@ -180,7 +179,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				return execmocks.NewMockExecutor(ctrl)
 			},
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("disabled", info.Status)
@@ -201,7 +201,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				return execmocks.NewMockExecutor(ctrl)
 			},
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("disabled", info.Status)
@@ -226,7 +227,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusEnforcing), nil)
 				return m
 			},
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("enabled", info.Status)
@@ -251,7 +253,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusPermissive), nil)
 				return m
 			},
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("enabled", info.Status)
@@ -276,7 +279,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("sestatus: command not found"))
 				return m
 			},
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("enabled", info.Status)
@@ -301,7 +305,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusDisabled), nil)
 				return m
 			},
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("disabled", info.Status)
@@ -320,7 +325,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 				})
 			},
 			setupExec: nil,
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("enabled", info.Status)
@@ -347,7 +353,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusEnforcing), nil)
 				return m
 			},
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("enabled", info.Status)
@@ -376,7 +383,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(out), nil)
 				return m
 			},
-			validateFunc: func(got any) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("enabled", info.Status)
@@ -404,13 +412,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			}
 
 			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
 
-			tt.validateFunc(got)
+			tt.validateFunc(got, err)
 		})
 	}
 }

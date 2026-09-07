@@ -183,15 +183,15 @@ func (s *OCIPublicTestSuite) TestCollect() {
 		volumes      string
 		handler      http.HandlerFunc // overrides the default when set
 		closed       bool
-		wantErr      bool
-		validateFunc func(any, bool, string)
+		validateFunc func(any, bool, string, error)
 	}{
 		{
 			name:     "happy path populates all three sections",
 			instance: instanceResponse,
 			vnics:    vnicsResponse,
 			volumes:  volumesResponse,
-			validateFunc: func(out any, _ bool, gotAuth string) {
+			validateFunc: func(out any, _ bool, gotAuth string, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*oci.Info)
 				s.Require().True(ok)
 				s.Equal("Bearer Oracle", gotAuth)
@@ -232,7 +232,8 @@ func (s *OCIPublicTestSuite) TestCollect() {
 		{
 			name:     "missing vnics and volumes tolerated",
 			instance: instanceResponse,
-			validateFunc: func(out any, _ bool, _ string) {
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*oci.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info)
@@ -246,7 +247,8 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Chassis: &dmi.Chassis{AssetTag: "Something Else"}},
 			},
-			validateFunc: func(out any, httpCalled bool, _ string) {
+			validateFunc: func(out any, httpCalled bool, _ string, err error) {
+				s.Require().NoError(err)
 				s.False(httpCalled)
 				s.Nil(out)
 			},
@@ -255,7 +257,8 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			name:     "no dmi in prior fails open",
 			prior:    collector.PriorResults{},
 			instance: instanceResponse,
-			validateFunc: func(out any, _ bool, _ string) {
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*oci.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info)
@@ -265,7 +268,8 @@ func (s *OCIPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "404 on instance drops silently",
-			validateFunc: func(out any, _ bool, _ string) {
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
@@ -273,7 +277,8 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			name:     "volumes with empty id are skipped",
 			instance: instanceResponse,
 			volumes:  `[{"id": "", "lifecycleState": "ATTACHED"}, {"id": "ocid1.va.oc1.bbb", "lifecycleState": "ATTACHED"}]`,
-			validateFunc: func(out any, _ bool, _ string) {
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*oci.Info)
 				s.Require().True(ok)
 				s.Require().Len(info.VolumeAttachments, 1)
@@ -285,31 +290,32 @@ func (s *OCIPublicTestSuite) TestCollect() {
 		{
 			name:   "connection refused drops silently",
 			closed: true,
-			validateFunc: func(out any, _ bool, _ string) {
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
 		{
 			name:     "malformed instance JSON surfaces error",
 			instance: "not json",
-			wantErr:  true,
-			validateFunc: func(_ any, _ bool, _ string) {
+			validateFunc: func(_ any, _ bool, _ string, err error) {
+				s.Require().Error(err)
 			},
 		},
 		{
 			name:     "malformed vnics JSON surfaces error",
 			instance: instanceResponse,
 			vnics:    "not json",
-			wantErr:  true,
-			validateFunc: func(_ any, _ bool, _ string) {
+			validateFunc: func(_ any, _ bool, _ string, err error) {
+				s.Require().Error(err)
 			},
 		},
 		{
 			name:     "malformed volumes JSON surfaces error",
 			instance: instanceResponse,
 			volumes:  "not json",
-			wantErr:  true,
-			validateFunc: func(_ any, _ bool, _ string) {
+			validateFunc: func(_ any, _ bool, _ string, err error) {
+				s.Require().Error(err)
 			},
 		},
 	}
@@ -343,13 +349,8 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				prior = ociPrior()
 			}
 			out, err := c.Collect(context.Background(), prior)
-			if tt.wantErr {
-				s.Require().Error(err)
-				return
-			}
-			s.Require().NoError(err)
 
-			tt.validateFunc(out, httpCalled, gotAuth)
+			tt.validateFunc(out, httpCalled, gotAuth, err)
 		})
 	}
 }

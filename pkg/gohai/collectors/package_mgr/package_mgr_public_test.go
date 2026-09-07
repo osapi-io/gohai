@@ -117,87 +117,95 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 		name         string
 		variant      string // "linux" | "darwin" | "debian" | "rhel"
 		probed       map[string]string
-		wantName     string
-		validateFunc func(string)
+		validateFunc func(*packagemgr.Info)
 	}{
 		{
-			name:     "debian with apt",
-			variant:  "debian",
-			probed:   map[string]string{"apt": "/usr/bin/apt"},
-			wantName: "apt",
-			validateFunc: func(got string) {
+			name:    "debian with apt",
+			variant: "debian",
+			probed:  map[string]string{"apt": "/usr/bin/apt"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("apt", info.Name)
+				got := info.Path
 				s.Equal("/usr/bin/apt", got)
 			},
 		},
 		{
-			name:     "debian with apt-get only",
-			variant:  "debian",
-			probed:   map[string]string{"apt-get": "/usr/bin/apt-get"},
-			wantName: "apt-get",
-			validateFunc: func(got string) {
+			name:    "debian with apt-get only",
+			variant: "debian",
+			probed:  map[string]string{"apt-get": "/usr/bin/apt-get"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("apt-get", info.Name)
+				got := info.Path
 				s.Equal("/usr/bin/apt-get", got)
 			},
 		},
 		{
-			name:     "rhel with dnf wins over yum",
-			variant:  "rhel",
-			probed:   map[string]string{"dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum"},
-			wantName: "dnf",
-			validateFunc: func(got string) {
+			name:    "rhel with dnf wins over yum",
+			variant: "rhel",
+			probed:  map[string]string{"dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("dnf", info.Name)
+				got := info.Path
 				s.Equal("/usr/bin/dnf", got)
 			},
 		},
 		{
-			name:     "rhel yum fallback",
-			variant:  "rhel",
-			probed:   map[string]string{"yum": "/usr/bin/yum"},
-			wantName: "yum",
-			validateFunc: func(got string) {
+			name:    "rhel yum fallback",
+			variant: "rhel",
+			probed:  map[string]string{"yum": "/usr/bin/yum"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("yum", info.Name)
+				got := info.Path
 				s.Equal("/usr/bin/yum", got)
 			},
 		},
 		{
-			name:     "darwin brew",
-			variant:  "darwin",
-			probed:   map[string]string{"brew": "/opt/homebrew/bin/brew"},
-			wantName: "brew",
-			validateFunc: func(got string) {
+			name:    "darwin brew",
+			variant: "darwin",
+			probed:  map[string]string{"brew": "/opt/homebrew/bin/brew"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("brew", info.Name)
+				got := info.Path
 				s.Equal("/opt/homebrew/bin/brew", got)
 			},
 		},
 		{
-			name:     "darwin port fallback",
-			variant:  "darwin",
-			probed:   map[string]string{"port": "/opt/local/bin/port"},
-			wantName: "port",
-			validateFunc: func(got string) {
+			name:    "darwin port fallback",
+			variant: "darwin",
+			probed:  map[string]string{"port": "/opt/local/bin/port"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("port", info.Name)
+				got := info.Path
 				s.Equal("/opt/local/bin/port", got)
 			},
 		},
 		{
-			name:     "linux arch with pacman",
-			variant:  "linux",
-			probed:   map[string]string{"pacman": "/usr/bin/pacman"},
-			wantName: "pacman",
-			validateFunc: func(got string) {
+			name:    "linux arch with pacman",
+			variant: "linux",
+			probed:  map[string]string{"pacman": "/usr/bin/pacman"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("pacman", info.Name)
+				got := info.Path
 				s.Equal("/usr/bin/pacman", got)
 			},
 		},
 		{
-			name:     "linux alpine with apk",
-			variant:  "linux",
-			probed:   map[string]string{"apk": "/sbin/apk"},
-			wantName: "apk",
-			validateFunc: func(got string) {
+			name:    "linux alpine with apk",
+			variant: "linux",
+			probed:  map[string]string{"apk": "/sbin/apk"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("apk", info.Name)
+				got := info.Path
 				s.Equal("/sbin/apk", got)
 			},
 		},
 		{
-			name:     "none found returns empty",
-			variant:  "linux",
-			probed:   map[string]string{},
-			wantName: "",
-			validateFunc: func(got string) {
+			name:    "none found returns empty",
+			variant: "linux",
+			probed:  map[string]string{},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("", info.Name)
+				got := info.Path
 				s.Equal("", got)
 			},
 		},
@@ -225,8 +233,8 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*packagemgr.Info)
 			s.Require().True(ok)
-			s.Equal(tt.wantName, info.Name)
-			tt.validateFunc(info.Path)
+
+			tt.validateFunc(info)
 		})
 	}
 }

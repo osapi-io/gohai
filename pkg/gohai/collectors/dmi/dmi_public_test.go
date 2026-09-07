@@ -47,11 +47,26 @@ func TestDmiPublicTestSuite(
 
 func (s *DmiPublicTestSuite) TestNew() {
 	tests := []struct {
-		name   string
-		detect string
+		name         string
+		detect       string
+		validateFunc func(dmi.Collector)
 	}{
-		{"linux", "debian"},
-		{"darwin", "darwin"},
+		{
+			name:   "linux",
+			detect: "debian",
+			validateFunc: func(c dmi.Collector) {
+				_, ok := c.(*dmi.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "darwin",
+			detect: "darwin",
+			validateFunc: func(c dmi.Collector) {
+				_, ok := c.(*dmi.Darwin)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -64,6 +79,8 @@ func (s *DmiPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Nil(c.Dependencies())
+
+			tt.validateFunc(c)
 		})
 	}
 }

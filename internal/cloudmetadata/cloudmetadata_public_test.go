@@ -492,7 +492,6 @@ func (s *CloudMetadataPublicTestSuite) TestPut() {
 		name         string
 		setup        func() (baseURL string, cleanup func())
 		headers      map[string]string
-		verifyAfter  func(s *CloudMetadataPublicTestSuite)
 		validateFunc func([]byte, error)
 	}{
 		{

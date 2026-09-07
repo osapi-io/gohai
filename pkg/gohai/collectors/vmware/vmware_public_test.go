@@ -198,6 +198,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 		setupDarwin  func() *vmware.Darwin
 		validateFunc func(any, error)
 	}{
+		// ----- Linux -----
 		{
 			name:    "linux: vmware SCSI in /proc/scsi/scsi + tools cmd",
 			variant: "linux",
@@ -475,6 +476,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				s.Nil(got)
 			},
 		},
+		// ----- Darwin -----
 		{
 			name:    "darwin: toolbox-cmd present returns Info",
 			variant: "darwin",

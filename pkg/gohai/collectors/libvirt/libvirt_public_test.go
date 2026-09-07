@@ -190,6 +190,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		exec         func(*testing.T) executor.Executor
 		validateFunc func(any, error)
 	}{
+		// ----- Linux -----
 		{
 			name:    "linux: full happy path — version, URI, two domains with dominfo",
 			variant: "linux",
@@ -414,6 +415,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 
 			},
 		},
+		// ----- Darwin -----
 		{
 			name:    "darwin always returns nil",
 			variant: "darwin",

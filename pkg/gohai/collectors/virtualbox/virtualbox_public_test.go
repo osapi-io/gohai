@@ -138,6 +138,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		exec         func(*testing.T) executor.Executor
 		validateFunc func(any, error)
 	}{
+		// ----- Linux -----
 		{
 			name:    "linux: canonical guestproperty output parsed",
 			variant: "linux",
@@ -217,6 +218,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 
 			},
 		},
+		// ----- Darwin -----
 		{
 			name:    "darwin: canonical guestproperty output parsed",
 			variant: "darwin",

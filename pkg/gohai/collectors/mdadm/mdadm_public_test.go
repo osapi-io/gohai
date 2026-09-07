@@ -179,8 +179,8 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		setupFS func() avfs.VFS
-		//           setupEx returns an executor.Executor to inject. Return nil to test
-		//           the no-executor path (Exec field left nil on the Linux struct).
+		// setupEx returns an executor.Executor to inject. Return nil to test
+		// the no-executor path (Exec field left nil on the Linux struct).
 		setupEx      func(*testing.T) *execmocks.MockExecutor
 		validateFunc func(any, error)
 	}{
