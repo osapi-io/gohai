@@ -81,13 +81,34 @@ func (s *UsersPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(users.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c users.Collector) {
+				_, ok := c.(*users.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c users.Collector) {
+				_, ok := c.(*users.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c users.Collector) {
+				_, ok := c.(*users.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -97,25 +118,18 @@ func (s *UsersPublicTestSuite) TestNew() {
 			s.Equal("users", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*users.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*users.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *UsersPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string
-		files    map[string]string
-		euid     int
-		validate func(*users.Info)
+		name         string
+		variant      string
+		files        map[string]string
+		euid         int
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: full fixture parses passwd + group + current_user",
@@ -125,7 +139,10 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"/etc/group":  groupFixture,
 			},
 			euid: 1000,
-			validate: func(info *users.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.Passwd, 4)
 				root := info.Passwd["root"]
 				s.Equal(0, root.UID)
@@ -155,7 +172,10 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			variant: "linux",
 			files:   map[string]string{},
 			euid:    0,
-			validate: func(info *users.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
 				s.Empty(info.Passwd)
 				s.Empty(info.Group)
 				s.Empty(info.CurrentUser)
@@ -168,7 +188,10 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"/etc/passwd": "root:x:0:0:root:/root:/bin/bash\n",
 			},
 			euid: 9999,
-			validate: func(info *users.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
 				s.Equal("", info.CurrentUser)
 			},
 		},
@@ -180,7 +203,10 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"/etc/group":  "admin:x:80:root,john\n",
 			},
 			euid: 501,
-			validate: func(info *users.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.Passwd, 2)
 				s.Equal(501, info.Passwd["john"].UID)
 				s.Equal([]string{"root", "john"}, info.Group["admin"].Members)
@@ -198,11 +224,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &users.Darwin{FS: newFS(tt.files)}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*users.Info)
-			s.Require().True(ok)
-			tt.validate(info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

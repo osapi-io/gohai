@@ -67,15 +67,50 @@ func (s *InitPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(initd.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c initd.Collector) {
+				_, ok := c.(*initd.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c initd.Collector) {
+				_, ok := c.(*initd.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c initd.Collector) {
+				_, ok := c.(*initd.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c initd.Collector) {
+				_, ok := c.(*initd.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c initd.Collector) {
+				_, ok := c.(*initd.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -85,77 +120,115 @@ func (s *InitPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*initd.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*initd.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *InitPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string // "linux" | "darwin"
-		comm    string
-		readErr bool
-		want    initd.Info
+		name         string
+		variant      string // "linux" | "darwin"
+		comm         string
+		readErr      bool
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: systemd host",
 			variant: "linux",
 			comm:    "systemd\n",
-			want:    initd.Info{Name: "systemd"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{Name: "systemd"}, *info)
+			},
 		},
 		{
 			name:    "linux: upstart host",
 			variant: "linux",
 			comm:    "upstart\n",
-			want:    initd.Info{Name: "upstart"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{Name: "upstart"}, *info)
+			},
 		},
 		{
 			name:    "linux: sysvinit (comm=init) normalized",
 			variant: "linux",
 			comm:    "init\n",
-			want:    initd.Info{Name: "sysvinit"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{Name: "sysvinit"}, *info)
+			},
 		},
 		{
 			name:    "linux: openrc-init normalized to openrc",
 			variant: "linux",
 			comm:    "openrc-init\n",
-			want:    initd.Info{Name: "openrc"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{Name: "openrc"}, *info)
+			},
 		},
 		{
 			name:    "linux: runit host",
 			variant: "linux",
 			comm:    "runit\n",
-			want:    initd.Info{Name: "runit"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{Name: "runit"}, *info)
+			},
 		},
 		{
 			name:    "linux: unknown comm passed through",
 			variant: "linux",
 			comm:    "exoticinit\n",
-			want:    initd.Info{Name: "exoticinit"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{Name: "exoticinit"}, *info)
+			},
 		},
 		{
 			name:    "linux: missing file soft-misses",
 			variant: "linux",
-			want:    initd.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{}, *info)
+			},
 		},
 		{
 			name:    "linux: read error soft-misses",
 			variant: "linux",
 			readErr: true,
-			want:    initd.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{}, *info)
+			},
 		},
 		{
 			name:    "darwin always reports launchd",
 			variant: "darwin",
-			want:    initd.Info{Name: "launchd"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*initd.Info)
+				s.Require().True(ok)
+				s.Equal(initd.Info{Name: "launchd"}, *info)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -179,11 +252,7 @@ func (s *InitPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = initd.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*initd.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

@@ -172,13 +172,34 @@ func (s *HardwarePublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(hardware.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c hardware.Collector) {
+				_, ok := c.(*hardware.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c hardware.Collector) {
+				_, ok := c.(*hardware.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c hardware.Collector) {
+				_, ok := c.(*hardware.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -188,24 +209,17 @@ func (s *HardwarePublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*hardware.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*hardware.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *HardwarePublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string
-		exec     func(*testing.T) executor.Executor
-		validate func(*hardware.Info)
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "darwin: happy path Apple Silicon + APFS + battery + charger",
@@ -221,7 +235,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Equal("MacBookPro18,2", info.MachineModel)
 				s.Equal("Apple M1 Pro", info.ChipType)
 				s.Equal("F5K123ABC", info.SerialNumber)
@@ -264,7 +281,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(t, []byte(hwJSONIntel), []byte(`{}`), []byte(`{}`), nil, nil, nil)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Equal("Intel Core i7", info.CPUType)
 				s.Equal("3 GHz", info.CurrentProcessorSpeed)
 				s.Equal("2", info.NumberProcessors)
@@ -282,7 +302,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 				return hwExec(t, nil, nil, nil,
 					errors.New("no"), errors.New("no"), errors.New("no"))
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Empty(info.MachineModel)
 				s.Empty(info.Storage)
 				s.Nil(info.Battery)
@@ -295,7 +318,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(t, []byte("not json"), []byte(`{}`), []byte(`{}`), nil, nil, nil)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Empty(info.MachineModel)
 			},
 		},
@@ -313,7 +339,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Empty(info.MachineModel)
 			},
 		},
@@ -333,7 +362,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.Storage, 1)
 				s.Empty(info.Storage[0].DriveType)
 				s.Empty(info.Storage[0].SmartStatus)
@@ -346,7 +378,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(t, []byte(`{}`), []byte("not json"), []byte(`{}`), nil, nil, nil)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Empty(info.Storage)
 			},
 		},
@@ -356,7 +391,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte("not json"), nil, nil, nil)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Nil(info.Battery)
 				s.Nil(info.Charger)
 			},
@@ -375,7 +413,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
                     }]
                 }`), nil, nil, nil)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info.Battery)
 				s.Equal(0, info.Battery.Remaining)
 			},
@@ -384,7 +425,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			name:    "darwin: nil Exec yields empty",
 			variant: "darwin",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Empty(info.MachineModel)
 			},
 		},
@@ -402,7 +446,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Equal(4, info.Packages)
 			},
 		},
@@ -427,7 +474,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
                     }]
                 }`), nil, nil, nil)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info.Battery)
 				s.Equal(42, info.Battery.ChargeCycleCount)
 				s.True(info.Battery.FullyCharged)
@@ -447,7 +497,10 @@ func (s *HardwarePublicTestSuite) TestCollect() {
                     }]
                 }`), nil, nil, nil)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info.Battery)
 				s.Equal(0, info.Battery.ChargeCycleCount)
 			},
@@ -466,14 +519,20 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Equal("8", info.NumberProcessors)
 			},
 		},
 		{
 			name:    "linux: returns empty",
 			variant: "linux",
-			validate: func(info *hardware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.MachineModel)
 				s.Empty(info.Storage)
@@ -491,11 +550,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			case "linux":
 				c = &hardware.Linux{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*hardware.Info)
-			s.Require().True(ok)
-			tt.validate(info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

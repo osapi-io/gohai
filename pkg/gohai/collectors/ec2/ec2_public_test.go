@@ -261,40 +261,64 @@ func handlerFor(
 func (s *EC2PublicTestSuite) TestInterface() {
 	c := ec2.New()
 	tests := []struct {
-		name string
-		got  any
-		want any
+		name         string
+		got          any
+		validateFunc func(any)
 	}{
-		{"Name", c.Name(), "ec2"},
-		{"Category", c.Category(), "cloud"},
-		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+		{
+			name: "Name",
+			got:  c.Name(),
+			validateFunc: func(got any) {
+				s.Equal("ec2", got)
+			},
+		},
+		{
+			name: "Category",
+			got:  c.Category(),
+			validateFunc: func(got any) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name: "DefaultEnabled",
+			got:  c.DefaultEnabled(),
+			validateFunc: func(got any) {
+				s.Equal(false, got)
+			},
+		},
+		{
+			name: "Dependencies",
+			got:  c.Dependencies(),
+			validateFunc: func(got any) {
+				s.Equal([]string{"dmi"}, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.got)
+			tt.validateFunc(tt.got)
 		})
 	}
 }
 
 func (s *EC2PublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		prior      collector.PriorResults
-		hypervisor string // content for /sys/hypervisor/uuid; "" = don't write
-		opts       *serverOpts
-		handler    http.HandlerFunc // overrides opts-based handler when set
-		closed     bool
-		wantNil    bool
-		wantNoHTTP bool
-		verify     func(s *EC2PublicTestSuite, info *ec2.Info)
+		name         string
+		prior        collector.PriorResults
+		hypervisor   string // content for /sys/hypervisor/uuid; "" = don't write
+		opts         *serverOpts
+		handler      http.HandlerFunc // overrides opts-based handler when set
+		closed       bool
+		validateFunc func(any, bool)
 	}{
 		{
 			name: "IMDSv2 happy path with version negotiation + full walk",
 			opts: (&serverOpts{
 				userData: []byte("plain user-data"),
 			}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("2021-07-15", info.APIVersion)
 				s.Equal("i-abc", info.ID)
@@ -344,7 +368,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		{
 			name: "IMDSv1 fallback when token PUT 404s",
 			opts: (&serverOpts{token404: true}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("i-abc", info.ID)
 			},
@@ -363,7 +389,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 					return m
 				}(),
 			}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("latest", info.APIVersion)
 			},
@@ -381,7 +409,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 					return m
 				}(),
 			}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("latest", info.APIVersion)
 			},
@@ -402,7 +432,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 					return m
 				}(),
 			}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Nil(info.BlockDeviceMapping)
 			},
@@ -422,7 +454,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 					return m
 				}(),
 			}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal([]string{"ssh-rsa BARE"}, info.PublicKeys)
 			},
@@ -432,9 +466,11 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Dell Inc."}},
 			},
-			opts:       (&serverOpts{}).withDefaults(),
-			wantNil:    true,
-			wantNoHTTP: true,
+			opts: (&serverOpts{}).withDefaults(),
+			validateFunc: func(out any, httpCalled bool) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name: "detection via bios_version substring",
@@ -442,7 +478,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Xen", Ver: "4.2.amazon"}},
 			},
 			opts: (&serverOpts{}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("i-abc", info.ID)
 			},
@@ -454,7 +492,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			},
 			hypervisor: "ec2-abc-def",
 			opts:       (&serverOpts{}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("i-abc", info.ID)
 			},
@@ -466,8 +506,10 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			},
 			hypervisor: "kvm-12345",
 			opts:       (&serverOpts{}).withDefaults(),
-			wantNil:    true,
-			wantNoHTTP: true,
+			validateFunc: func(out any, httpCalled bool) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name: "no BIOS in dmi still triggers hypervisor UUID check",
@@ -476,7 +518,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			},
 			hypervisor: "ec2-abc",
 			opts:       (&serverOpts{}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Equal("i-abc", info.ID)
 			},
 		},
@@ -484,7 +528,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			name:  "no dmi in prior fails open",
 			prior: collector.PriorResults{},
 			opts:  (&serverOpts{}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Equal("i-abc", info.ID)
 			},
 		},
@@ -501,25 +547,33 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				}
 				http.NotFound(w, r)
 			},
-			wantNil: true,
+			validateFunc: func(out any, _ bool) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "connection refused drops silently",
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
-			wantNil: true,
+			validateFunc: func(out any, _ bool) {
+				s.Nil(out)
+			},
 		},
 		{
 			name: "iam info missing tolerated",
 			opts: (&serverOpts{iamMissing: true}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Nil(info.IAMInfo)
 			},
 		},
 		{
 			name: "malformed iam JSON tolerated",
 			opts: (&serverOpts{iamBad: true}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Nil(info.IAMInfo)
 			},
 		},
@@ -530,7 +584,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				o.identityDoc = ""
 				return o
 			}(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				// meta-data/placement/region still populates it
 				s.Equal("us-east-1", info.Region)
 				s.Empty(info.AccountUID)
@@ -539,7 +595,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		{
 			name: "malformed identity doc JSON tolerated",
 			opts: (&serverOpts{identityBad: true}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Equal("us-east-1", info.Region)
 				s.Empty(info.AccountUID)
 			},
@@ -566,7 +624,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				}
 				http.NotFound(w, r)
 			},
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Equal("i-abc", info.ID)
 				s.Equal("us-east-1", info.Region)
 				s.Equal("us-east-1a", info.Zone)
@@ -576,7 +636,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		{
 			name: "binary user-data is base64-encoded",
 			opts: (&serverOpts{userData: []byte{0xff, 0xfe, 0xfd, 0x01}}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Equal(
 					base64.StdEncoding.EncodeToString([]byte{0xff, 0xfe, 0xfd, 0x01}),
 					info.UserData,
@@ -586,14 +648,18 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		{
 			name: "empty user-data body is empty string",
 			opts: (&serverOpts{userData: []byte{}}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Empty(info.UserData)
 			},
 		},
 		{
 			name: "no user-data configured returns empty string",
 			opts: (&serverOpts{}).withDefaults(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Empty(info.UserData)
 			},
 		},
@@ -612,7 +678,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				o.responseMap = m
 				return o
 			}(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Empty(info.NetworkInterfaces)
 			},
 		},
@@ -628,7 +696,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				o.responseMap = m
 				return o
 			}(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Equal([]string{"default", "ssh"}, info.SecurityGroups)
 			},
 		},
@@ -646,7 +716,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				o.responseMap = m
 				return o
 			}(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Nil(info.LocalIPv4s)
 			},
 		},
@@ -664,7 +736,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				o.responseMap = m
 				return o
 			}(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Nil(info.SecurityGroups)
 			},
 		},
@@ -686,7 +760,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				}
 				http.NotFound(w, r)
 			},
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("latest", info.APIVersion)
 				s.Equal("ami-fallback", info.ImageID)
@@ -704,7 +780,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				o.responseMap = m
 				return o
 			}(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Nil(info.SecurityGroups)
 			},
 		},
@@ -720,7 +798,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				o.responseMap = m
 				return o
 			}(),
-			verify: func(s *EC2PublicTestSuite, info *ec2.Info) {
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
 				s.Len(info.NetworkInterfaces, 1)
 			},
 		},
@@ -759,18 +839,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			out, err := c.Collect(context.Background(), prior)
 			s.Require().NoError(err)
 
-			if tt.wantNoHTTP {
-				s.False(httpCalled)
-			}
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-			info, ok := out.(*ec2.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info)
-			}
+			tt.validateFunc(out, httpCalled)
 		})
 	}
 }

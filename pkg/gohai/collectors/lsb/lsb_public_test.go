@@ -70,15 +70,50 @@ func (s *LSBPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(lsb.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c lsb.Collector) {
+				_, ok := c.(*lsb.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c lsb.Collector) {
+				_, ok := c.(*lsb.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c lsb.Collector) {
+				_, ok := c.(*lsb.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c lsb.Collector) {
+				_, ok := c.(*lsb.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c lsb.Collector) {
+				_, ok := c.(*lsb.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -88,14 +123,7 @@ func (s *LSBPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*lsb.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*lsb.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -108,19 +136,23 @@ Codename:	noble
 `)
 
 	tests := []struct {
-		name    string
-		variant string
-		exec    func(*testing.T) executor.Executor
-		wantNil bool
-		want    lsb.Info
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: CLI succeeds, four fields populated",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return lsbReleaseExec(t, cliFull, nil) },
-			want: lsb.Info{
-				ID: "Ubuntu", Release: "24.04", Codename: "noble",
-				Description: "Ubuntu 24.04 LTS",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*lsb.Info)
+				s.Require().True(ok)
+				s.Equal(lsb.Info{
+					ID: "Ubuntu", Release: "24.04", Codename: "noble",
+					Description: "Ubuntu 24.04 LTS",
+				}, *info)
 			},
 		},
 		{
@@ -129,7 +161,12 @@ Codename:	noble
 			exec: func(t *testing.T) executor.Executor {
 				return lsbReleaseExec(t, []byte("Distributor ID:\tDebian\nRelease:\t12\n"), nil)
 			},
-			want: lsb.Info{ID: "Debian", Release: "12"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*lsb.Info)
+				s.Require().True(ok)
+				s.Equal(lsb.Info{ID: "Debian", Release: "12"}, *info)
+			},
 		},
 		{
 			name:    "linux: CLI output with unmatched / no-colon lines: skipped",
@@ -139,7 +176,12 @@ Codename:	noble
 					[]byte("no colon line here\nunrelated: value\nDistributor ID:\tArch\n"),
 					nil)
 			},
-			want: lsb.Info{ID: "Arch"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*lsb.Info)
+				s.Require().True(ok)
+				s.Equal(lsb.Info{ID: "Arch"}, *info)
+			},
 		},
 		{
 			name:    "linux: CLI missing, empty Info no error",
@@ -147,18 +189,37 @@ Codename:	noble
 			exec: func(t *testing.T) executor.Executor {
 				return lsbReleaseExec(t, nil, errors.New("not found"))
 			},
-			want: lsb.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*lsb.Info)
+				s.Require().True(ok)
+				s.Equal(lsb.Info{}, *info)
+			},
 		},
 		{
 			name:    "linux: nil Exec, empty Info no error",
 			variant: "linux",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			want:    lsb.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*lsb.Info)
+				s.Require().True(ok)
+				s.Equal(lsb.Info{}, *info)
+			},
 		},
 		{
 			name:    "darwin returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*lsb.Info)
+				s.Require().True(ok)
+				s.Equal(lsb.Info{}, *info)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -170,15 +231,7 @@ Codename:	noble
 			case "darwin":
 				c = lsb.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*lsb.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

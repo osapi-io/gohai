@@ -76,15 +76,50 @@ func (s *InterruptsPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(interrupts.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c interrupts.Collector) {
+				_, ok := c.(*interrupts.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c interrupts.Collector) {
+				_, ok := c.(*interrupts.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c interrupts.Collector) {
+				_, ok := c.(*interrupts.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c interrupts.Collector) {
+				_, ok := c.(*interrupts.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c interrupts.Collector) {
+				_, ok := c.(*interrupts.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -94,26 +129,17 @@ func (s *InterruptsPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*interrupts.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*interrupts.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *InterruptsPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		setupFS func() avfs.VFS
-		wantErr bool
-		wantNil bool
-		want    []interrupts.IRQ
+		name         string
+		variant      string
+		setupFS      func() avfs.VFS
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: two-cpu with numeric and non-numeric IRQs",
@@ -124,11 +150,16 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/interrupts", twoCPUInterrupts, fs.FileMode(0o444))
 				return f
 			},
-			want: []interrupts.IRQ{
-				{Number: "0", Type: "IO-APIC", Device: "timer", CountsPerCPU: []int64{46, 0}},
-				{Number: "9", Type: "ACPI", Device: "acpi", CountsPerCPU: []int64{0, 0}},
-				{Number: "NMI", Type: "Non-maskable interrupts", CountsPerCPU: []int64{0, 0}},
-				{Number: "ERR", CountsPerCPU: []int64{0, 0}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{
+					{Number: "0", Type: "IO-APIC", Device: "timer", CountsPerCPU: []int64{46, 0}},
+					{Number: "9", Type: "ACPI", Device: "acpi", CountsPerCPU: []int64{0, 0}},
+					{Number: "NMI", Type: "Non-maskable interrupts", CountsPerCPU: []int64{0, 0}},
+					{Number: "ERR", CountsPerCPU: []int64{0, 0}},
+				}, info.IRQs)
 			},
 		},
 		{
@@ -140,19 +171,31 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/interrupts", []byte{}, fs.FileMode(0o444))
 				return f
 			},
-			want: []interrupts.IRQ{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{}, info.IRQs)
+			},
 		},
 		{
 			name:    "linux: /proc/interrupts absent returns empty list",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			want:    []interrupts.IRQ{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{}, info.IRQs)
+			},
 		},
 		{
 			name:    "linux: permission denied propagates error",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "linux: invalid count field returns error",
@@ -165,7 +208,9 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o444))
 				return f
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "linux: line without colon is skipped",
@@ -182,8 +227,13 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 				)
 				return f
 			},
-			want: []interrupts.IRQ{
-				{Number: "0", Type: "IO-APIC", Device: "timer", CountsPerCPU: []int64{10}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{
+					{Number: "0", Type: "IO-APIC", Device: "timer", CountsPerCPU: []int64{10}},
+				}, info.IRQs)
 			},
 		},
 		{
@@ -197,8 +247,13 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o444))
 				return f
 			},
-			want: []interrupts.IRQ{
-				{Number: "7", Type: "IO-APIC", CountsPerCPU: []int64{0}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{
+					{Number: "7", Type: "IO-APIC", CountsPerCPU: []int64{0}},
+				}, info.IRQs)
 			},
 		},
 		{
@@ -212,14 +267,28 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o444))
 				return f
 			},
-			want: []interrupts.IRQ{
-				{Number: "8", Type: "IO-APIC", CountsPerCPU: []int64{3}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{
+					{Number: "8", Type: "IO-APIC", CountsPerCPU: []int64{3}},
+				}, info.IRQs)
 			},
 		},
 		{
 			name:    "darwin returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ(nil), info.IRQs)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -231,19 +300,7 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = interrupts.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*interrupts.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.IRQs)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

@@ -97,15 +97,50 @@ func (s *KernelPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(kernel.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c kernel.Collector) {
+				_, ok := c.(*kernel.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c kernel.Collector) {
+				_, ok := c.(*kernel.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c kernel.Collector) {
+				_, ok := c.(*kernel.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c kernel.Collector) {
+				_, ok := c.(*kernel.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c kernel.Collector) {
+				_, ok := c.(*kernel.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -115,41 +150,58 @@ func (s *KernelPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*kernel.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*kernel.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *KernelPublicTestSuite) TestBytesToString() {
 	tests := []struct {
-		name string
-		in   []byte
-		want string
+		name         string
+		in           []byte
+		validateFunc func(string)
 	}{
-		{"NUL-terminated C string", []byte{'L', 'i', 'n', 'u', 'x', 0, 0, 0}, "Linux"},
-		{"no trailing NUL (full array used)", []byte{'a', 'b', 'c'}, "abc"},
-		{"empty input", []byte{}, ""},
-		{"leading NUL truncates to empty", []byte{0, 'x', 'y'}, ""},
+		{
+			name: "NUL-terminated C string",
+			in:   []byte{'L', 'i', 'n', 'u', 'x', 0, 0, 0},
+			validateFunc: func(got string) {
+				s.Equal("Linux", got)
+			},
+		},
+		{
+			name: "no trailing NUL (full array used)",
+			in:   []byte{'a', 'b', 'c'},
+			validateFunc: func(got string) {
+				s.Equal("abc", got)
+			},
+		},
+		{
+			name: "empty input",
+			in:   []byte{},
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
+		{
+			name: "leading NUL truncates to empty",
+			in:   []byte{0, 'x', 'y'},
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, kernel.BytesToString(tt.in))
+			tt.validateFunc(kernel.BytesToString(tt.in))
 		})
 	}
 }
 
 func (s *KernelPublicTestSuite) TestDefaultUname() {
 	tests := []struct {
-		name    string
-		fn      func(*unix.Utsname) error
-		wantErr bool
+		name         string
+		fn           func(*unix.Utsname) error
+		validateFunc func(any, any, any, any, error)
 	}{
 		{
 			name: "success returns populated fields",
@@ -160,26 +212,26 @@ func (s *KernelPublicTestSuite) TestDefaultUname() {
 				copy(u.Machine[:], "x86_64")
 				return nil
 			},
+			validateFunc: func(name any, release any, _ any, machine any, err error) {
+				s.Require().NoError(err)
+				s.Equal("Linux", name)
+				s.Equal("6.1.0", release)
+				s.Equal("x86_64", machine)
+			},
 		},
 		{
-			name:    "syscall error propagated",
-			fn:      func(*unix.Utsname) error { return errors.New("uname failed") },
-			wantErr: true,
+			name: "syscall error propagated",
+			fn:   func(*unix.Utsname) error { return errors.New("uname failed") },
+			validateFunc: func(_ any, _ any, _ any, _ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			restore := kernel.SetUnameSyscall(tt.fn)
 			defer restore()
-			name, release, _, machine, err := kernel.DefaultUname()
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal("Linux", name)
-			s.Equal("6.1.0", release)
-			s.Equal("x86_64", machine)
+			tt.validateFunc(kernel.DefaultUname())
 		})
 	}
 }
@@ -199,18 +251,20 @@ func (s *KernelPublicTestSuite) TestCollect() {
 	)
 
 	tests := []struct {
-		name     string
-		variant  string
-		uname    func(*unix.Utsname) error
-		exec     func(*testing.T) executor.Executor
-		wantErr  bool
-		validate func(*kernel.Info)
+		name         string
+		variant      string
+		uname        func(*unix.Utsname) error
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: canonical identity fields",
 			variant: "linux",
 			uname:   linuxOK,
-			validate: func(i *kernel.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernel.Info)
+				s.Require().True(ok)
 				s.Equal("Linux", i.Name)
 				s.Equal("5.15.0-47-generic", i.Release)
 				s.Equal("x86_64", i.Machine)
@@ -222,7 +276,9 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			name:    "linux: uname error propagated",
 			variant: "linux",
 			uname:   func(*unix.Utsname) error { return errors.New("uname failed") },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: native arm64 Apple Silicon — no rosetta",
@@ -231,7 +287,10 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return rosettaExec(t, []byte("0\n"), nil)
 			},
-			validate: func(i *kernel.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernel.Info)
+				s.Require().True(ok)
 				s.Equal("Darwin", i.Name)
 				s.Equal("arm64", i.Machine)
 				s.Equal("arm64", i.Processor)
@@ -246,7 +305,10 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return rosettaExec(t, []byte("0\n"), nil)
 			},
-			validate: func(i *kernel.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernel.Info)
+				s.Require().True(ok)
 				s.Equal("x86_64", i.Machine)
 				s.Equal("x86_64", i.Processor)
 				s.False(i.RosettaTranslated)
@@ -259,7 +321,10 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return rosettaExec(t, nil, errors.New("no sysctl"))
 			},
-			validate: func(i *kernel.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernel.Info)
+				s.Require().True(ok)
 				s.Equal("x86_64", i.Machine)
 				s.False(i.RosettaTranslated)
 			},
@@ -271,7 +336,10 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return rosettaExec(t, []byte("1\n"), nil)
 			},
-			validate: func(i *kernel.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernel.Info)
+				s.Require().True(ok)
 				s.Equal("arm64", i.Machine)
 				s.Equal("arm64", i.Processor)
 				s.True(i.RosettaTranslated)
@@ -282,7 +350,10 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			uname:   darwinARM,
 			exec:    func(*testing.T) executor.Executor { return nil },
-			validate: func(i *kernel.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernel.Info)
+				s.Require().True(ok)
 				s.Equal("arm64", i.Machine)
 				s.False(i.RosettaTranslated)
 			},
@@ -292,7 +363,9 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			uname:   func(*unix.Utsname) error { return errors.New("uname failed") },
 			exec:    func(*testing.T) executor.Executor { return nil },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -309,17 +382,7 @@ func (s *KernelPublicTestSuite) TestCollect() {
 				}
 				c = d
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*kernel.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

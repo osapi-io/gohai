@@ -55,15 +55,50 @@ func (s *TimezonePublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(timezone.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c timezone.Collector) {
+				_, ok := c.(*timezone.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c timezone.Collector) {
+				_, ok := c.(*timezone.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c timezone.Collector) {
+				_, ok := c.(*timezone.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c timezone.Collector) {
+				_, ok := c.(*timezone.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c timezone.Collector) {
+				_, ok := c.(*timezone.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -73,14 +108,7 @@ func (s *TimezonePublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*timezone.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*timezone.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -94,13 +122,11 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 	}
 
 	tests := []struct {
-		name       string
-		variant    string
-		now        func() time.Time
-		setupFS    func() avfs.VFS
-		wantName   string
-		wantAbbrev string
-		wantOffset int
+		name         string
+		variant      string
+		now          func() time.Time
+		setupFS      func() avfs.VFS
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: symlink points to IANA zone",
@@ -118,9 +144,14 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 				_ = f.Symlink("/usr/share/zoneinfo/America/Los_Angeles", "/etc/localtime")
 				return f
 			},
-			wantName:   "America/Los_Angeles",
-			wantAbbrev: "PDT",
-			wantOffset: -7 * 3600,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("America/Los_Angeles", info.Name)
+				s.Equal("PDT", info.Abbrev)
+				s.Equal(-7*3600, info.Offset)
+			},
 		},
 		{
 			name:    "linux: target without zoneinfo prefix passed through",
@@ -132,9 +163,14 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 				_ = f.Symlink("UTC", "/etc/localtime")
 				return f
 			},
-			wantName:   "UTC",
-			wantAbbrev: "PDT",
-			wantOffset: -7 * 3600,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("UTC", info.Name)
+				s.Equal("PDT", info.Abbrev)
+				s.Equal(-7*3600, info.Offset)
+			},
 		},
 		{
 			name:    "linux: readlink fails, falls back to /etc/timezone",
@@ -146,18 +182,28 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/etc/timezone", []byte("Europe/Berlin\n"), fs.FileMode(0o644))
 				return f
 			},
-			wantName:   "Europe/Berlin",
-			wantAbbrev: "PDT",
-			wantOffset: -7 * 3600,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("Europe/Berlin", info.Name)
+				s.Equal("PDT", info.Abbrev)
+				s.Equal(-7*3600, info.Offset)
+			},
 		},
 		{
-			name:       "linux: both sources missing leaves name empty",
-			variant:    "linux",
-			now:        pdt,
-			setupFS:    func() avfs.VFS { return memfs.New() },
-			wantName:   "",
-			wantAbbrev: "PDT",
-			wantOffset: -7 * 3600,
+			name:    "linux: both sources missing leaves name empty",
+			variant: "linux",
+			now:     pdt,
+			setupFS: func() avfs.VFS { return memfs.New() },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("", info.Name)
+				s.Equal("PDT", info.Abbrev)
+				s.Equal(-7*3600, info.Offset)
+			},
 		},
 		{
 			name:    "darwin: macOS zoneinfo symlink",
@@ -169,9 +215,14 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 				_ = f.Symlink("/var/db/timezone/zoneinfo/America/Los_Angeles", "/etc/localtime")
 				return f
 			},
-			wantName:   "America/Los_Angeles",
-			wantAbbrev: "PST",
-			wantOffset: -8 * 3600,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("America/Los_Angeles", info.Name)
+				s.Equal("PST", info.Abbrev)
+				s.Equal(-8*3600, info.Offset)
+			},
 		},
 		{
 			name:    "darwin: target without prefix passed through",
@@ -183,18 +234,28 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 				_ = f.Symlink("UTC", "/etc/localtime")
 				return f
 			},
-			wantName:   "UTC",
-			wantAbbrev: "PST",
-			wantOffset: -8 * 3600,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("UTC", info.Name)
+				s.Equal("PST", info.Abbrev)
+				s.Equal(-8*3600, info.Offset)
+			},
 		},
 		{
-			name:       "darwin: readlink error leaves name empty",
-			variant:    "darwin",
-			now:        pst,
-			setupFS:    func() avfs.VFS { return memfs.New() },
-			wantName:   "",
-			wantAbbrev: "PST",
-			wantOffset: -8 * 3600,
+			name:    "darwin: readlink error leaves name empty",
+			variant: "darwin",
+			now:     pst,
+			setupFS: func() avfs.VFS { return memfs.New() },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("", info.Name)
+				s.Equal("PST", info.Abbrev)
+				s.Equal(-8*3600, info.Offset)
+			},
 		},
 	}
 
@@ -208,13 +269,7 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &timezone.Darwin{FS: tt.setupFS()}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*timezone.Info)
-			s.Require().True(ok)
-			s.Equal(tt.wantName, info.Name)
-			s.Equal(tt.wantAbbrev, info.Abbrev)
-			s.Equal(tt.wantOffset, info.Offset)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

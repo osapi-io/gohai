@@ -68,26 +68,52 @@ func (s *ShellsPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name       string
-		detect     string
-		wantKind   string
-		wantFSFrom func() avfs.VFS
+		name         string
+		detect       string
+		validateFunc func(shells.Collector)
 	}{
 		{
-			"darwin dispatches to Darwin + wires FS",
-			"darwin",
-			"darwin",
-			func() avfs.VFS { return shells.NewDarwin().FS },
+			name:   "darwin dispatches to Darwin + wires FS",
+			detect: "darwin",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Darwin)
+				s.True(ok)
+				s.NotNil(func() avfs.VFS { return shells.NewDarwin().FS }())
+			},
 		},
 		{
-			"debian dispatches to Linux + wires FS",
-			"debian",
-			"linux",
-			func() avfs.VFS { return shells.NewLinux().FS },
+			name:   "debian dispatches to Linux + wires FS",
+			detect: "debian",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
+				s.NotNil(func() avfs.VFS { return shells.NewLinux().FS }())
+			},
 		},
-		{"rhel dispatches to Linux", "rhel", "linux", nil},
-		{"arch dispatches to Linux", "arch", "linux", nil},
-		{"unknown dispatches to Linux", "", "linux", nil},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c shells.Collector) {
+				_, ok := c.(*shells.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -97,28 +123,17 @@ func (s *ShellsPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*shells.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*shells.Linux)
-				s.True(ok)
-			}
-			if tt.wantFSFrom != nil {
-				s.NotNil(tt.wantFSFrom())
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *ShellsPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		setupFS func() avfs.VFS
-		wantErr bool
-		want    []string
+		name         string
+		variant      string
+		setupFS      func() avfs.VFS
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: canonical /etc/shells",
@@ -131,7 +146,12 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: non-absolute entries skipped",
@@ -144,7 +164,12 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/sh", "/bin/zsh"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"/bin/sh", "/bin/zsh"}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: whitespace trimmed",
@@ -157,7 +182,12 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 					fs.FileMode(0o644))
 				return f
 			},
-			want: []string{"/bin/bash", "/bin/sh"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"/bin/bash", "/bin/sh"}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: empty file",
@@ -168,19 +198,31 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/etc/shells", []byte{}, fs.FileMode(0o644))
 				return f
 			},
-			want: []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: missing file soft-misses",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.Paths)
+			},
 		},
 		{
 			name:    "linux: other read error propagated",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: canonical macOS /etc/shells",
@@ -197,21 +239,31 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 				)
 				return f
 			},
-			want: []string{
-				"/bin/bash",
-				"/bin/csh",
-				"/bin/dash",
-				"/bin/ksh",
-				"/bin/sh",
-				"/bin/tcsh",
-				"/bin/zsh",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{
+					"/bin/bash",
+					"/bin/csh",
+					"/bin/dash",
+					"/bin/ksh",
+					"/bin/sh",
+					"/bin/tcsh",
+					"/bin/zsh",
+				}, info.Paths)
 			},
 		},
 		{
 			name:    "darwin: missing file soft-misses",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			want:    []string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.Paths)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -223,15 +275,7 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &shells.Darwin{FS: tt.setupFS()}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*shells.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.Paths)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

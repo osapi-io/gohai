@@ -47,11 +47,26 @@ func TestDmiPublicTestSuite(
 
 func (s *DmiPublicTestSuite) TestNew() {
 	tests := []struct {
-		name   string
-		detect string
+		name         string
+		detect       string
+		validateFunc func(dmi.Collector)
 	}{
-		{"linux", "debian"},
-		{"darwin", "darwin"},
+		{
+			name:   "linux",
+			detect: "debian",
+			validateFunc: func(c dmi.Collector) {
+				_, ok := c.(*dmi.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "darwin",
+			detect: "darwin",
+			validateFunc: func(c dmi.Collector) {
+				_, ok := c.(*dmi.Darwin)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -64,19 +79,21 @@ func (s *DmiPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Nil(c.Dependencies())
+
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *DmiPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		biosFn  func(...any) (*bios.Info, error)
-		bbFn    func(...any) (*baseboard.Info, error)
-		chFn    func(...any) (*chassis.Info, error)
-		prodFn  func(...any) (*product.Info, error)
-		verify  func(s *DmiPublicTestSuite, info *dmi.Info)
+		name         string
+		variant      string
+		biosFn       func(...any) (*bios.Info, error)
+		bbFn         func(...any) (*baseboard.Info, error)
+		chFn         func(...any) (*chassis.Info, error)
+		prodFn       func(...any) (*product.Info, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux populates all sections when ghw succeeds",
@@ -105,7 +122,10 @@ func (s *DmiPublicTestSuite) TestCollect() {
 					SKU:          "",
 				}, nil
 			},
-			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*dmi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Require().NotNil(info.BIOS)
 				s.Equal("SeaBIOS", info.BIOS.Manufacturer)
@@ -139,7 +159,10 @@ func (s *DmiPublicTestSuite) TestCollect() {
 			prodFn: func(...any) (*product.Info, error) {
 				return &product.Info{Name: "OptiPlex 3070"}, nil
 			},
-			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*dmi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Nil(info.BIOS)
 				s.Nil(info.Chassis)
@@ -156,7 +179,10 @@ func (s *DmiPublicTestSuite) TestCollect() {
 			bbFn:    func(...any) (*baseboard.Info, error) { return nil, nil },
 			chFn:    func(...any) (*chassis.Info, error) { return nil, nil },
 			prodFn:  func(...any) (*product.Info, error) { return nil, nil },
-			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*dmi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Nil(info.BIOS)
 				s.Nil(info.Baseboard)
@@ -167,7 +193,10 @@ func (s *DmiPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin returns empty info",
 			variant: "darwin",
-			verify: func(s *DmiPublicTestSuite, info *dmi.Info) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*dmi.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Nil(info.BIOS)
 				s.Nil(info.Baseboard)
@@ -191,11 +220,7 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				c = dmi.NewDarwin()
 			}
 
-			out, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := out.(*dmi.Info)
-			s.Require().True(ok)
-			tt.verify(s, info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

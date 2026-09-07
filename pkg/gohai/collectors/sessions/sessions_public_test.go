@@ -78,15 +78,50 @@ func (s *SessionsPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(sessions.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c sessions.Collector) {
+				_, ok := c.(*sessions.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c sessions.Collector) {
+				_, ok := c.(*sessions.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c sessions.Collector) {
+				_, ok := c.(*sessions.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c sessions.Collector) {
+				_, ok := c.(*sessions.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c sessions.Collector) {
+				_, ok := c.(*sessions.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -96,14 +131,7 @@ func (s *SessionsPublicTestSuite) TestNew() {
 			s.Equal("users", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*sessions.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*sessions.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -120,19 +148,21 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 	}
 
 	tests := []struct {
-		name     string
-		variant  string
-		exec     func(*testing.T) executor.Executor
-		usersFn  func(context.Context) ([]host.UserStat, error)
-		wantErr  bool
-		validate func(*sessions.Info)
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		usersFn      func(context.Context) ([]host.UserStat, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: loginctl present, parses sessions ignores utmp",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, loginctlOutput, nil) },
 			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
-			validate: func(i *sessions.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*sessions.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.LoggedIn, 2)
 				s.Equal("c1", i.LoggedIn[0].SessionID)
 				s.Equal("1000", i.LoggedIn[0].UID)
@@ -150,7 +180,10 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 				return loginctlExec(t, nil, errors.New("not found"))
 			},
 			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
-			validate: func(i *sessions.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*sessions.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.LoggedIn, 1)
 				s.Equal("fallback", i.LoggedIn[0].User)
 				s.Equal("pts/0", i.LoggedIn[0].Terminal)
@@ -162,7 +195,10 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec:    func(*testing.T) executor.Executor { return nil },
 			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
-			validate: func(i *sessions.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*sessions.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.LoggedIn, 1)
 				s.Equal("fallback", i.LoggedIn[0].User)
 			},
@@ -172,7 +208,10 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, []byte(""), nil) },
 			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
-			validate: func(i *sessions.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*sessions.Info)
+				s.Require().True(ok)
 				s.Empty(i.LoggedIn)
 			},
 		},
@@ -185,7 +224,9 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			usersFn: func(context.Context) ([]host.UserStat, error) {
 				return nil, errors.New("utmp boom")
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: console session",
@@ -195,7 +236,10 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 					{User: "john", Terminal: "console", Started: 1712908800},
 				}, nil
 			},
-			validate: func(i *sessions.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*sessions.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.LoggedIn, 1)
 				s.Equal("john", i.LoggedIn[0].User)
 				s.Equal("console", i.LoggedIn[0].Terminal)
@@ -208,7 +252,9 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			usersFn: func(context.Context) ([]host.UserStat, error) {
 				return nil, errors.New("utmpx error")
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -221,15 +267,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &sessions.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*sessions.Info)
-			s.Require().True(ok)
-			tt.validate(info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

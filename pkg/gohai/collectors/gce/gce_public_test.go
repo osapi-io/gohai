@@ -138,21 +138,20 @@ func (s *GcePublicTestSuite) TestNew() {
 
 func (s *GcePublicTestSuite) TestMetadata() {
 	tests := []struct {
-		name       string
-		handler    func(w http.ResponseWriter, r *http.Request)
-		closed     bool                   // if true, close server before calling Collect
-		prior      collector.PriorResults // defaults to gcePrior() when nil
-		wantNil    bool
-		wantErr    bool
-		wantNoHTTP bool // if true, the gate should have short-circuited before the HTTP call
-		verify     func(s *GcePublicTestSuite, info *gce.Info, hdrGot string)
+		name         string
+		handler      func(w http.ResponseWriter, r *http.Request)
+		closed       bool                   // if true, close server before calling Collect
+		prior        collector.PriorResults // defaults to gcePrior() when nil
+		validateFunc func(any, bool, string, error)
 	}{
 		{
 			name: "happy path transforms raw response",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(cannedResponse))
 			},
-			verify: func(s *GcePublicTestSuite, info *gce.Info, hdrGot string) {
+			validateFunc: func(out any, _ bool, hdrGot string, _ error) {
+				info, ok := out.(*gce.Info)
+				s.Require().True(ok)
 				s.Equal("Google", hdrGot)
 				s.Require().NotNil(info)
 				s.Equal(int64(1234567890123), info.ID)
@@ -213,7 +212,9 @@ func (s *GcePublicTestSuite) TestMetadata() {
 					[]byte(`{"instance":{"scheduling":{"preemptible":"TRUE"}},"project":{}}`),
 				)
 			},
-			verify: func(s *GcePublicTestSuite, info *gce.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				info, ok := out.(*gce.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.True(info.Preemptible)
 			},
@@ -226,7 +227,9 @@ func (s *GcePublicTestSuite) TestMetadata() {
 					"extra":{"email":"b@x.iam.gserviceaccount.com"}
 				}},"project":{}}`))
 			},
-			verify: func(s *GcePublicTestSuite, info *gce.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				info, ok := out.(*gce.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				emails := make([]string, 0, len(info.ServiceAccounts))
 				for _, sa := range info.ServiceAccounts {
@@ -244,27 +247,35 @@ func (s *GcePublicTestSuite) TestMetadata() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				http.NotFound(w, nil)
 			},
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name: "500 drops silently",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				http.Error(w, "boom", http.StatusInternalServerError)
 			},
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "connection refused drops silently",
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name: "malformed JSON surfaces as error",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte("not json"))
 			},
-			wantErr: true,
+			validateFunc: func(_ any, _ bool, _ string, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "dmi says not GCE short-circuits without HTTP call",
@@ -272,14 +283,18 @@ func (s *GcePublicTestSuite) TestMetadata() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Product: &dmi.Product{Name: "OptiPlex 3070"}},
 			},
-			wantNil:    true,
-			wantNoHTTP: true,
+			validateFunc: func(out any, httpCalled bool, _ string, _ error) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "empty dmi product fails open and tries HTTP",
 			handler: func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(cannedResponse)) },
 			prior:   collector.PriorResults{"dmi": &dmi.Info{}},
-			verify: func(s *GcePublicTestSuite, info *gce.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				info, ok := out.(*gce.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("my-vm", info.Name)
 			},
@@ -288,7 +303,9 @@ func (s *GcePublicTestSuite) TestMetadata() {
 			name:    "no dmi in prior fails open and tries HTTP",
 			handler: func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(cannedResponse)) },
 			prior:   collector.PriorResults{},
-			verify: func(s *GcePublicTestSuite, info *gce.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				info, ok := out.(*gce.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("my-vm", info.Name)
 			},
@@ -321,26 +338,7 @@ func (s *GcePublicTestSuite) TestMetadata() {
 				prior = gcePrior()
 			}
 			out, err := c.Collect(context.Background(), prior)
-			if tt.wantErr {
-				s.Require().Error(err)
-				return
-			}
-			s.Require().NoError(err)
-
-			if tt.wantNoHTTP {
-				s.False(httpCalled)
-			}
-
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-
-			info, ok := out.(*gce.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info, hdrGot)
-			}
+			tt.validateFunc(out, httpCalled, hdrGot, err)
 		})
 	}
 }
@@ -348,18 +346,42 @@ func (s *GcePublicTestSuite) TestMetadata() {
 func (s *GcePublicTestSuite) TestMetadataInterface() {
 	c := gce.New()
 	tests := []struct {
-		name string
-		got  any
-		want any
+		name         string
+		got          any
+		validateFunc func(any)
 	}{
-		{"Name", c.Name(), "gce"},
-		{"Category", c.Category(), "cloud"},
-		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+		{
+			name: "Name",
+			got:  c.Name(),
+			validateFunc: func(got any) {
+				s.Equal("gce", got)
+			},
+		},
+		{
+			name: "Category",
+			got:  c.Category(),
+			validateFunc: func(got any) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name: "DefaultEnabled",
+			got:  c.DefaultEnabled(),
+			validateFunc: func(got any) {
+				s.Equal(false, got)
+			},
+		},
+		{
+			name: "Dependencies",
+			got:  c.Dependencies(),
+			validateFunc: func(got any) {
+				s.Equal([]string{"dmi"}, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.got)
+			tt.validateFunc(tt.got)
 		})
 	}
 }

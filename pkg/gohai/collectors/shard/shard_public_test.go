@@ -78,13 +78,34 @@ func (s *ShardPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(shard.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c shard.Collector) {
+				_, ok := c.(*shard.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c shard.Collector) {
+				_, ok := c.(*shard.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c shard.Collector) {
+				_, ok := c.(*shard.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -94,33 +115,36 @@ func (s *ShardPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Equal([]string{"hostname", "dmi"}, c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*shard.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*shard.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *ShardPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string
-		prior    collector.PriorResults
-		hostFn   func(context.Context) (*host.InfoStat, error)
-		spOut    []byte
-		spErr    error
-		wantSeed int
+		name         string
+		variant      string
+		prior        collector.PriorResults
+		hostFn       func(context.Context) (*host.InfoStat, error)
+		spOut        []byte
+		spErr        error
+		validateFunc func(any, error)
 	}{
 		{
-			name:     "linux: matches Ohai test vector (machinename + serial + uuid)",
-			variant:  "linux",
-			prior:    priorWithDMI(),
-			wantSeed: ohaiDefaultSeed,
+			name:    "linux: matches Ohai test vector (machinename + serial + uuid)",
+			variant: "linux",
+			prior:   priorWithDMI(),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if ohaiDefaultSeed >= 0 {
+					s.Equal(ohaiDefaultSeed, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "linux: baseboard serial fallback when product serial empty",
@@ -132,7 +156,17 @@ func (s *ShardPublicTestSuite) TestCollect() {
 					Baseboard: &dmi.Baseboard{SerialNumber: serial},
 				},
 			},
-			wantSeed: ohaiDefaultSeed,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if ohaiDefaultSeed >= 0 {
+					s.Equal(ohaiDefaultSeed, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "linux: chassis serial fallback",
@@ -144,7 +178,17 @@ func (s *ShardPublicTestSuite) TestCollect() {
 					Chassis: &dmi.Chassis{SerialNumber: serial},
 				},
 			},
-			wantSeed: ohaiDefaultSeed,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if ohaiDefaultSeed >= 0 {
+					s.Equal(ohaiDefaultSeed, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "linux: no dmi → seed from machinename only",
@@ -152,7 +196,17 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
-			wantSeed: -1,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "linux: no hostname prior → seed from serial+uuid only",
@@ -162,13 +216,33 @@ func (s *ShardPublicTestSuite) TestCollect() {
 					Product: &dmi.Product{SerialNumber: serial, UUID: uuid},
 				},
 			},
-			wantSeed: -1,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
-			name:     "linux: empty prior → deterministic zero-input seed",
-			variant:  "linux",
-			prior:    collector.PriorResults{},
-			wantSeed: -1,
+			name:    "linux: empty prior → deterministic zero-input seed",
+			variant: "linux",
+			prior:   collector.PriorResults{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "linux: nil dmi sub-structs → empty serial+uuid",
@@ -177,7 +251,17 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				"hostname": &hostname.Info{MachineName: machinename},
 				"dmi":      &dmi.Info{},
 			},
-			wantSeed: -1,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "darwin: matches Ohai test vector",
@@ -188,8 +272,18 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: uuid}, nil
 			},
-			spOut:    []byte(sysProfJSON),
-			wantSeed: ohaiDefaultSeed,
+			spOut: []byte(sysProfJSON),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if ohaiDefaultSeed >= 0 {
+					s.Equal(ohaiDefaultSeed, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "darwin: gopsutil error → empty uuid, seed still computes",
@@ -197,9 +291,19 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
-			hostFn:   func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			spOut:    []byte(sysProfJSON),
-			wantSeed: -1,
+			hostFn: func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
+			spOut:  []byte(sysProfJSON),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "darwin: malformed system_profiler JSON → empty serial",
@@ -210,8 +314,18 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: uuid}, nil
 			},
-			spOut:    []byte("not json"),
-			wantSeed: -1,
+			spOut: []byte("not json"),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "darwin: empty items array → empty serial",
@@ -222,8 +336,18 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: uuid}, nil
 			},
-			spOut:    []byte(`{"SPHardwareDataType": []}`),
-			wantSeed: -1,
+			spOut: []byte(`{"SPHardwareDataType": []}`),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 		{
 			name:    "darwin: system_profiler error → empty serial",
@@ -234,8 +358,18 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{HostID: uuid}, nil
 			},
-			spErr:    errors.New("not found"),
-			wantSeed: -1,
+			spErr: errors.New("not found"),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -260,16 +394,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				c = &shard.Darwin{Exec: mockExec}
 			}
 
-			got, err := c.Collect(context.Background(), tt.prior)
-			s.Require().NoError(err)
-			info, ok := got.(*shard.Info)
-			s.Require().True(ok)
-
-			if tt.wantSeed >= 0 {
-				s.Equal(tt.wantSeed, info.Seed)
-			} else {
-				s.GreaterOrEqual(info.Seed, 0)
-			}
+			tt.validateFunc(c.Collect(context.Background(), tt.prior))
 		})
 	}
 }

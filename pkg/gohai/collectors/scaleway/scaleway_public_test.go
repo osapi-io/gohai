@@ -83,33 +83,54 @@ func (s *ScalewayPublicTestSuite) writeCmdline(
 func (s *ScalewayPublicTestSuite) TestInterface() {
 	c := scaleway.New()
 	tests := []struct {
-		name string
-		got  any
-		want any
+		name         string
+		got          any
+		validateFunc func(any)
 	}{
-		{"Name", c.Name(), "scaleway"},
-		{"Category", c.Category(), "cloud"},
-		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string(nil)},
+		{
+			name: "Name",
+			got:  c.Name(),
+			validateFunc: func(got any) {
+				s.Equal("scaleway", got)
+			},
+		},
+		{
+			name: "Category",
+			got:  c.Category(),
+			validateFunc: func(got any) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name: "DefaultEnabled",
+			got:  c.DefaultEnabled(),
+			validateFunc: func(got any) {
+				s.Equal(false, got)
+			},
+		},
+		{
+			name: "Dependencies",
+			got:  c.Dependencies(),
+			validateFunc: func(got any) {
+				s.Equal([]string(nil), got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.got)
+			tt.validateFunc(tt.got)
 		})
 	}
 }
 
 func (s *ScalewayPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		cmdline    string
-		noCmdline  bool // if true, point at a nonexistent file
-		handler    func(w http.ResponseWriter, r *http.Request)
-		closed     bool
-		wantNil    bool
-		wantErr    bool
-		wantNoHTTP bool
-		verify     func(s *ScalewayPublicTestSuite, info *scaleway.Info)
+		name         string
+		cmdline      string
+		noCmdline    bool // if true, point at a nonexistent file
+		handler      func(w http.ResponseWriter, r *http.Request)
+		closed       bool
+		validateFunc func(any, bool, error)
 	}{
 		{
 			name:    "happy path transforms canned response",
@@ -117,7 +138,9 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(cannedResponse))
 			},
-			verify: func(s *ScalewayPublicTestSuite, info *scaleway.Info) {
+			validateFunc: func(out any, _ bool, _ error) {
+				info, ok := out.(*scaleway.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("sc-abc", info.ID)
 				s.Equal("prod-1", info.Name)
@@ -143,18 +166,22 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "cmdline without scaleway signature short-circuits",
-			cmdline:    "LABEL=cloudinit boot=local",
-			handler:    func(http.ResponseWriter, *http.Request) {},
-			wantNil:    true,
-			wantNoHTTP: true,
+			name:    "cmdline without scaleway signature short-circuits",
+			cmdline: "LABEL=cloudinit boot=local",
+			handler: func(http.ResponseWriter, *http.Request) {},
+			validateFunc: func(out any, httpCalled bool, _ error) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
-			name:       "missing /proc/cmdline short-circuits",
-			noCmdline:  true,
-			handler:    func(http.ResponseWriter, *http.Request) {},
-			wantNil:    true,
-			wantNoHTTP: true,
+			name:      "missing /proc/cmdline short-circuits",
+			noCmdline: true,
+			handler:   func(http.ResponseWriter, *http.Request) {},
+			validateFunc: func(out any, httpCalled bool, _ error) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "404 drops silently when cmdline says scaleway",
@@ -162,14 +189,18 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				http.NotFound(w, nil)
 			},
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "connection refused drops silently",
 			cmdline: "scaleway",
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "malformed JSON surfaces as error",
@@ -177,7 +208,9 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte("not json"))
 			},
-			wantErr: true,
+			validateFunc: func(_ any, _ bool, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "empty optional nested objects produce empty fields",
@@ -185,7 +218,9 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(`{"id":"sc-x","tags":[]}`))
 			},
-			verify: func(s *ScalewayPublicTestSuite, info *scaleway.Info) {
+			validateFunc: func(out any, _ bool, _ error) {
+				info, ok := out.(*scaleway.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("sc-x", info.ID)
 				s.Empty(info.PublicIP)
@@ -220,24 +255,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			c := scaleway.NewWithClient(client)
 
 			out, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Require().Error(err)
-				return
-			}
-			s.Require().NoError(err)
-
-			if tt.wantNoHTTP {
-				s.False(httpCalled)
-			}
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-			info, ok := out.(*scaleway.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info)
-			}
+			tt.validateFunc(out, httpCalled, err)
 		})
 	}
 }

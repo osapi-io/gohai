@@ -67,15 +67,50 @@ func (s *OSReleasePublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(osrelease.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -85,14 +120,7 @@ func (s *OSReleasePublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*osrelease.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*osrelease.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -112,47 +140,62 @@ UBUNTU_CODENAME=noble
 `
 
 	tests := []struct {
-		name    string
-		variant string
-		content string
-		missing bool
-		readErr bool
-		wantErr bool
-		wantNil bool
-		want    osrelease.Info
+		name         string
+		variant      string
+		content      string
+		missing      bool
+		readErr      bool
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: ubuntu 24.04",
 			variant: "linux",
 			content: ubuntu,
-			want: osrelease.Info{
-				ID: "ubuntu", IDLike: []string{"debian"},
-				Name: "Ubuntu", PrettyName: "Ubuntu 24.04 LTS",
-				Version: "24.04 LTS (Noble Numbat)", VersionID: "24.04",
-				VersionCodename: "noble",
-				HomeURL:         "https://www.ubuntu.com/",
-				SupportURL:      "https://help.ubuntu.com/",
-				BugReportURL:    "https://bugs.launchpad.net/ubuntu/",
-				Extra:           map[string]string{"UBUNTU_CODENAME": "noble"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal(osrelease.Info{
+					ID: "ubuntu", IDLike: []string{"debian"},
+					Name: "Ubuntu", PrettyName: "Ubuntu 24.04 LTS",
+					Version: "24.04 LTS (Noble Numbat)", VersionID: "24.04",
+					VersionCodename: "noble",
+					HomeURL:         "https://www.ubuntu.com/",
+					SupportURL:      "https://help.ubuntu.com/",
+					BugReportURL:    "https://bugs.launchpad.net/ubuntu/",
+					Extra:           map[string]string{"UBUNTU_CODENAME": "noble"},
+				}, *info)
 			},
 		},
 		{
 			name:    "linux: missing file soft-misses",
 			variant: "linux",
 			missing: true,
-			want:    osrelease.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal(osrelease.Info{}, *info)
+			},
 		},
 		{
 			name:    "linux: other read error propagated",
 			variant: "linux",
 			readErr: true,
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "linux: comments and blanks and malformed lines",
 			variant: "linux",
 			content: "# some comment\n\nmalformed\nID=\"quoted\"\n",
-			want:    osrelease.Info{ID: "quoted"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal(osrelease.Info{ID: "quoted"}, *info)
+			},
 		},
 		{
 			name:    "linux: build/variant fields populated (Fedora-style)",
@@ -162,17 +205,31 @@ BUILD_ID=40.20240416.0
 VARIANT="Workstation Edition"
 VARIANT_ID=workstation
 `,
-			want: osrelease.Info{
-				ID:        "fedora",
-				BuildID:   "40.20240416.0",
-				Variant:   "Workstation Edition",
-				VariantID: "workstation",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal(osrelease.Info{
+					ID:        "fedora",
+					BuildID:   "40.20240416.0",
+					Variant:   "Workstation Edition",
+					VariantID: "workstation",
+				}, *info)
 			},
 		},
 		{
 			name:    "darwin returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal(osrelease.Info{}, *info)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -196,19 +253,7 @@ VARIANT_ID=workstation
 			case "darwin":
 				c = osrelease.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*osrelease.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

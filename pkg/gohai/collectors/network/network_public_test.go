@@ -62,15 +62,50 @@ func (s *NetworkPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(network.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c network.Collector) {
+				_, ok := c.(*network.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -80,14 +115,7 @@ func (s *NetworkPublicTestSuite) TestNew() {
 			s.Equal("network", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*network.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*network.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -330,14 +358,13 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 	}
 
 	tests := []struct {
-		name       string
-		variant    string
-		ifsFn      func(context.Context) (gpnet.InterfaceStatList, error)
-		countersFn func(context.Context, bool) ([]gpnet.IOCountersStat, error)
-		fs         avfs.VFS
-		exec       executor.Executor
-		wantErr    bool
-		validate   func(*network.Info)
+		name         string
+		variant      string
+		ifsFn        func(context.Context) (gpnet.InterfaceStatList, error)
+		countersFn   func(context.Context, bool) ([]gpnet.IOCountersStat, error)
+		fs           avfs.VFS
+		exec         executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:       "linux: addresses parsed into family/prefixlen/netmask/scope/broadcast",
@@ -348,7 +375,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/sys/class/net/eth0/type": "1\n",
 			}),
 			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 2)
 				lo := i.Interfaces[0]
 				s.Equal("Loopback", lo.Encapsulation)
@@ -379,7 +409,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			countersFn: zeroCounters,
 			fs:         fsWith(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, errors.New("n/a"), nil, errors.New("n/a")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal(7, i.Interfaces[0].Number)
 				s.Equal("down", i.Interfaces[0].State)
@@ -401,7 +434,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					"supports-statistics: yes\n" +
 					"supports-priv-flags: no\n",
 			}),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 2)
 
 				// lo is Loopback — ethtool path skipped.
@@ -426,8 +462,11 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), map[string]string{
 				"/sys/class/net/eth0/type": "1\n",
 			}),
-			exec: ipRouteAndEthtoolExec(s.T(), nil), // no driver_info → all ethtool calls error
-			validate: func(i *network.Info) {
+			exec: ipRouteAndEthtoolExec(s.T(), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 2)
 				s.Nil(i.Interfaces[0].Ethtool)
 				s.Nil(i.Interfaces[1].Ethtool)
@@ -445,7 +484,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				// the "no colon" continue and the "empty key" continue.
 				"eth0": "\n   \n: only-value\n",
 			}),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Nil(i.Interfaces[1].Ethtool)
 			},
 		},
@@ -493,7 +535,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					"Autonegotiate: on\n" +
 					"RX: on\n" +
 					"TX: off\n"}),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				et := i.Interfaces[1].Ethtool
 				s.Require().NotNil(et)
 
@@ -559,7 +604,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					"broken line\n" +
 					"empty-value:   \n"}, // empty after trim
 			),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				et := i.Interfaces[1].Ethtool
 				// ring got the one valid RX after the bad lines
 				s.Require().NotNil(et)
@@ -586,7 +634,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
     xdpgeneric  prog/xdp id 18 tag cafebabe
 `,
 			),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				var eth0 *network.Interface
 				for j := range i.Interfaces {
 					if i.Interfaces[j].Name == "eth0" {
@@ -627,7 +678,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
     link/ether aa:bb:cc:dd:ee:ff brd ff:ff:ff:ff:ff:ff
     xdp xdpdrv/prog/xdpdrv id 42 tag deadbeef
 `),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				var v, t *network.Interface
 				for j := range i.Interfaces {
 					switch i.Interfaces[j].Name {
@@ -672,8 +726,11 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				errors.New("nope"),
 				nil,
 				errors.New("nope"),
-			), // ip -d link errors via the default mock
-			validate: func(i *network.Info) {
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				for j := range i.Interfaces {
 					s.Nil(i.Interfaces[j].VLAN)
 					s.Nil(i.Interfaces[j].TunnelInfo)
@@ -691,7 +748,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 2: eth0: <BROADCAST,MULTICAST,UP> mtu 1500
     link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff
 `),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				for j := range i.Interfaces {
 					s.Nil(i.Interfaces[j].VLAN)
 					s.Nil(i.Interfaces[j].TunnelInfo)
@@ -714,7 +774,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 2: tun0: <NOARP> mtu 1452
     ipip ipip6 remote
 `),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				var v, t *network.Interface
 				for j := range i.Interfaces {
 					switch i.Interfaces[j].Name {
@@ -745,7 +808,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 1: lo: <LOOPBACK,UP> mtu 65536
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 `),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				for j := range i.Interfaces {
 					s.Nil(i.Interfaces[j].VLAN)
 				}
@@ -766,7 +832,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
     ip6tnl
     xdp
 `),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				// Bare keywords with no payload — parsers see substring matches but
 				// extract nothing; per-iface annotations stay nil.
 				s.Nil(i.Interfaces[0].VLAN)
@@ -784,7 +853,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					"10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.5\n"), nil,
 				[]byte("::/0 via fe80::1 dev eth0 proto ra metric 1024\n"+
 					"fe80::/64 dev eth0 proto kernel metric 256\n"), nil),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Equal("eth0", i.DefaultInterface)
 				s.Equal("10.0.0.1", i.DefaultGateway)
 				s.Equal("eth0", i.DefaultInet6Interface)
@@ -808,7 +880,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				nil,
 				errors.New("nope"),
 			),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Routes, 2)
 				s.Equal("default", i.Routes[0].Destination)
 				s.Equal("10.0.0.1", i.Routes[0].Gateway)
@@ -833,7 +908,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				[]byte("10.0.0.0/24 proto kernel scope link src 10.0.0.5\n"),
 				nil, nil, errors.New("nope"),
 			),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Equal("eth0", i.Routes[0].Interface)
 			},
@@ -848,7 +926,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				[]byte("10.0.0.0/24 proto kernel scope link src 1.2.3.4\n"),
 				nil, nil, errors.New("nope"),
 			),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Empty(i.Routes[0].Interface)
 			},
@@ -865,7 +946,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				nil,
 				errors.New("not found"),
 			),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Empty(i.Routes)
 				s.Empty(i.DefaultInterface)
 				s.Len(i.Interfaces, 2)
@@ -887,7 +971,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/proc/vz/version": "",
 			}),
 			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal("venet0", i.Interfaces[0].Name)
 				s.Require().Len(i.Interfaces[0].Addresses, 1)
@@ -907,7 +994,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/proc/bc/0":       "",
 			}),
 			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal("venet0:0", i.Interfaces[0].Name)
 			},
@@ -924,7 +1014,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/proc/vz/version": "",
 			}),
 			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal("venet0:0", i.Interfaces[0].Name)
 			},
@@ -938,7 +1031,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/sys/class/net/eth0/type": "9999\n", // unknown ARPHRD
 			}),
 			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Empty(i.Interfaces[0].Encapsulation)
 				s.Empty(i.Interfaces[1].Encapsulation)
 			},
@@ -955,7 +1051,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			exec: ipRouteExec(s.T(),
 				[]byte("10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.5 metric 100\n"),
 				nil, nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				r := i.Routes[0]
 				s.Equal("10.0.0.0/24", r.Destination)
@@ -973,7 +1072,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			exec: ipRouteExec(s.T(),
 				[]byte("   \n\n"),
 				nil, nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Empty(i.Routes)
 			},
 		},
@@ -985,7 +1087,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			exec: ipRouteExec(s.T(),
 				[]byte("default via 10.0.0.1 dev eth0 metric oops\n"),
 				nil, nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Zero(i.Routes[0].Metric)
 			},
@@ -998,7 +1103,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			exec: ipRouteExec(s.T(),
 				[]byte("default via 10.0.0.1 dev nonexistent0\n"),
 				nil, nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Equal("nonexistent0", i.Routes[0].Interface)
 			},
@@ -1009,7 +1117,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			countersFn: zeroCounters,
 			fs:         nil,
 			exec:       nil,
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Len(i.Interfaces, 2)
 				s.Empty(i.Routes)
 			},
@@ -1022,7 +1133,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/sys/class/net/eth0/device/driver": "../../../../bus/pci/drivers/e1000e",
 			}),
 			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				eth0 := i.Interfaces[1]
 				s.Equal("e1000e", eth0.Driver)
 				s.Equal("1000Mb/s", eth0.Speed)
@@ -1037,7 +1151,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/sys/class/net/eth0/device/driver": "../../../../bus/pci/drivers/virtio_net",
 			}),
 			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				eth0 := i.Interfaces[1]
 				s.Equal("virtio_net", eth0.Driver)
 				s.Empty(eth0.Speed)
@@ -1052,7 +1169,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/sys/class/net/eth0/device/driver": "ixgbe",
 			}),
 			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Equal("ixgbe", i.Interfaces[1].Driver)
 			},
 		},
@@ -1062,7 +1182,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			countersFn: zeroCounters,
 			fs:         fsWith(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Neighbours, 2)
 				s.Equal("10.0.0.1", i.Neighbours[0].Address)
 				s.Equal("inet", i.Neighbours[0].Family)
@@ -1077,7 +1200,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			countersFn: zeroCounters,
 			fs:         fsWith(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, nil, nil, nil),
-			wantErr:    true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: en0 with MAC and global IPv4",
@@ -1092,7 +1217,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			validate: func(i *network.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 1)
 				s.Equal("en0", i.Interfaces[0].Name)
 			},
@@ -1104,7 +1232,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return nil, errors.New("net error")
 			},
 			countersFn: zeroCounters,
-			wantErr:    true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	defer network.SetNICFn(func() (map[string]network.NICStat, error) {
@@ -1146,25 +1276,16 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			default:
 				c = &network.Linux{FS: tt.fs, Exec: tt.exec}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*network.Info)
-			s.Require().True(ok)
-			tt.validate(info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestReadNIC() {
 	tests := []struct {
-		name      string
-		fn        func(...any) (*ghw.NetworkInfo, error)
-		wantErr   bool
-		wantCount int
+		name         string
+		fn           func(...any) (*ghw.NetworkInfo, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name: "ghw success returns mapped NICStats",
@@ -1173,36 +1294,34 @@ func (s *NetworkPublicTestSuite) TestReadNIC() {
 					{Name: "eth0", Speed: "1Gb/s", Duplex: "Full"},
 				}}, nil
 			},
-			wantCount: 1,
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Len(out, 1)
+			},
 		},
 		{
 			name: "ghw error propagated",
 			fn: func(...any) (*ghw.NetworkInfo, error) {
 				return nil, errors.New("ghw failed")
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			defer network.SetGHWNetworkFn(tt.fn)()
-			out, err := network.ReadNIC()
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Len(out, tt.wantCount)
+			tt.validateFunc(network.ReadNIC())
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestReadNeighbours() {
 	tests := []struct {
-		name    string
-		fn      func(int, int) ([]netlink.Neigh, error)
-		wantErr bool
-		wantLen int
+		name         string
+		fn           func(int, int) ([]netlink.Neigh, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name: "netlink success returns mapped neighbours",
@@ -1211,58 +1330,61 @@ func (s *NetworkPublicTestSuite) TestReadNeighbours() {
 					{IP: net.ParseIP("10.0.0.1"), Family: 2, State: 0x02},
 				}, nil
 			},
-			wantLen: 1,
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Len(out, 1)
+			},
 		},
 		{
-			name:    "netlink error propagated",
-			fn:      func(int, int) ([]netlink.Neigh, error) { return nil, errors.New("netlink failed") },
-			wantErr: true,
+			name: "netlink error propagated",
+			fn:   func(int, int) ([]netlink.Neigh, error) { return nil, errors.New("netlink failed") },
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			defer network.SetNetlinkNeighListFn(tt.fn)()
-			out, err := network.ReadNeighbours()
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Len(out, tt.wantLen)
+			tt.validateFunc(network.ReadNeighbours())
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestIndexToInterfaceName() {
 	tests := []struct {
-		name string
-		fn   func(int) (*net.Interface, error)
-		want string
+		name         string
+		fn           func(int) (*net.Interface, error)
+		validateFunc func(string)
 	}{
 		{
 			name: "lookup success returns name",
 			fn:   func(int) (*net.Interface, error) { return &net.Interface{Name: "eth0"}, nil },
-			want: "eth0",
+			validateFunc: func(got string) {
+				s.Equal("eth0", got)
+			},
 		},
 		{
 			name: "lookup error returns empty",
 			fn:   func(int) (*net.Interface, error) { return nil, errors.New("no such index") },
-			want: "",
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			defer network.SetNetInterfaceByIndex(tt.fn)()
-			s.Equal(tt.want, network.IndexToIfaceName(1))
+			tt.validateFunc(network.IndexToIfaceName(1))
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestNICMapFromGHW() {
 	tests := []struct {
-		name string
-		nics []*ghw.NIC
-		want map[string]network.NICStat
+		name         string
+		nics         []*ghw.NIC
+		validateFunc func(map[string]network.NICStat)
 	}{
 		{
 			name: "two NICs mapped",
@@ -1270,27 +1392,33 @@ func (s *NetworkPublicTestSuite) TestNICMapFromGHW() {
 				{Name: "eth0", Speed: "1000Mb/s", Duplex: "Full"},
 				{Name: "wlan0", Speed: "300Mb/s", Duplex: "Half"},
 			},
-			want: map[string]network.NICStat{
-				"eth0":  {Speed: "1000Mb/s", Duplex: "Full"},
-				"wlan0": {Speed: "300Mb/s", Duplex: "Half"},
+			validateFunc: func(got map[string]network.NICStat) {
+				s.Equal(map[string]network.NICStat{
+					"eth0":  {Speed: "1000Mb/s", Duplex: "Full"},
+					"wlan0": {Speed: "300Mb/s", Duplex: "Half"},
+				}, got)
 			},
 		},
 		{
 			name: "nil NIC entries skipped",
 			nics: []*ghw.NIC{nil, {Name: "eth0", Speed: "10Gb/s", Duplex: "Full"}},
-			want: map[string]network.NICStat{
-				"eth0": {Speed: "10Gb/s", Duplex: "Full"},
+			validateFunc: func(got map[string]network.NICStat) {
+				s.Equal(map[string]network.NICStat{
+					"eth0": {Speed: "10Gb/s", Duplex: "Full"},
+				}, got)
 			},
 		},
 		{
 			name: "empty input",
 			nics: nil,
-			want: map[string]network.NICStat{},
+			validateFunc: func(got map[string]network.NICStat) {
+				s.Equal(map[string]network.NICStat{}, got)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, network.NICMapFromGHW(tt.nics))
+			tt.validateFunc(network.NICMapFromGHW(tt.nics))
 		})
 	}
 }
@@ -1306,9 +1434,9 @@ func (s *NetworkPublicTestSuite) TestNeighboursFromNetlink() {
 		return ""
 	}
 	tests := []struct {
-		name    string
-		entries []netlink.Neigh
-		want    []network.Neighbour
+		name         string
+		entries      []netlink.Neigh
+		validateFunc func([]network.Neighbour)
 	}{
 		{
 			name: "v4 + v6 neighbours mapped",
@@ -1322,21 +1450,23 @@ func (s *NetworkPublicTestSuite) TestNeighboursFromNetlink() {
 					HardwareAddr: parseMAC(s.T(), "aa:bb:cc:dd:ee:02"),
 				},
 			},
-			want: []network.Neighbour{
-				{
-					Address:   "10.0.0.1",
-					Family:    "inet",
-					MAC:       "aa:bb:cc:dd:ee:01",
-					Interface: "eth0",
-					State:     "REACHABLE",
-				},
-				{
-					Address:   "fe80::1",
-					Family:    "inet6",
-					MAC:       "aa:bb:cc:dd:ee:02",
-					Interface: "eth0",
-					State:     "STALE",
-				},
+			validateFunc: func(got []network.Neighbour) {
+				s.Equal([]network.Neighbour{
+					{
+						Address:   "10.0.0.1",
+						Family:    "inet",
+						MAC:       "aa:bb:cc:dd:ee:01",
+						Interface: "eth0",
+						State:     "REACHABLE",
+					},
+					{
+						Address:   "fe80::1",
+						Family:    "inet6",
+						MAC:       "aa:bb:cc:dd:ee:02",
+						Interface: "eth0",
+						State:     "STALE",
+					},
+				}, got)
 			},
 		},
 		{
@@ -1344,14 +1474,16 @@ func (s *NetworkPublicTestSuite) TestNeighboursFromNetlink() {
 			entries: []netlink.Neigh{
 				{IP: net.ParseIP("10.0.0.2"), Family: 2, State: 0x02, LinkIndex: 1},
 			},
-			want: []network.Neighbour{
-				{Address: "10.0.0.2", Family: "inet", Interface: "lo", State: "REACHABLE"},
+			validateFunc: func(got []network.Neighbour) {
+				s.Equal([]network.Neighbour{
+					{Address: "10.0.0.2", Family: "inet", Interface: "lo", State: "REACHABLE"},
+				}, got)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, network.NeighboursFromNetlink(tt.entries, indexToName))
+			tt.validateFunc(network.NeighboursFromNetlink(tt.entries, indexToName))
 		})
 	}
 }
@@ -1367,51 +1499,122 @@ func parseMAC(
 
 func (s *NetworkPublicTestSuite) TestNeighFamily() {
 	tests := []struct {
-		name string
-		in   int
-		want string
+		name         string
+		in           int
+		validateFunc func(string)
 	}{
-		{"AF_INET → inet", 2, "inet"},
-		{"AF_INET6 → inet6", 10, "inet6"},
-		{"unknown → empty", 99, ""},
+		{
+			name: "AF_INET → inet",
+			in:   2,
+			validateFunc: func(got string) {
+				s.Equal("inet", got)
+			},
+		},
+		{
+			name: "AF_INET6 → inet6",
+			in:   10,
+			validateFunc: func(got string) {
+				s.Equal("inet6", got)
+			},
+		},
+		{
+			name: "unknown → empty",
+			in:   99,
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, network.NeighFamily(tt.in))
+			tt.validateFunc(network.NeighFamily(tt.in))
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestNeighState() {
 	tests := []struct {
-		name string
-		in   int
-		want string
+		name         string
+		in           int
+		validateFunc func(string)
 	}{
-		{"INCOMPLETE", 0x01, "INCOMPLETE"},
-		{"REACHABLE", 0x02, "REACHABLE"},
-		{"STALE", 0x04, "STALE"},
-		{"DELAY", 0x08, "DELAY"},
-		{"PROBE", 0x10, "PROBE"},
-		{"FAILED", 0x20, "FAILED"},
-		{"NOARP", 0x40, "NOARP"},
-		{"PERMANENT", 0x80, "PERMANENT"},
-		{"unknown bitmask returns empty", 0x100, ""},
+		{
+			name: "INCOMPLETE",
+			in:   0x01,
+			validateFunc: func(got string) {
+				s.Equal("INCOMPLETE", got)
+			},
+		},
+		{
+			name: "REACHABLE",
+			in:   0x02,
+			validateFunc: func(got string) {
+				s.Equal("REACHABLE", got)
+			},
+		},
+		{
+			name: "STALE",
+			in:   0x04,
+			validateFunc: func(got string) {
+				s.Equal("STALE", got)
+			},
+		},
+		{
+			name: "DELAY",
+			in:   0x08,
+			validateFunc: func(got string) {
+				s.Equal("DELAY", got)
+			},
+		},
+		{
+			name: "PROBE",
+			in:   0x10,
+			validateFunc: func(got string) {
+				s.Equal("PROBE", got)
+			},
+		},
+		{
+			name: "FAILED",
+			in:   0x20,
+			validateFunc: func(got string) {
+				s.Equal("FAILED", got)
+			},
+		},
+		{
+			name: "NOARP",
+			in:   0x40,
+			validateFunc: func(got string) {
+				s.Equal("NOARP", got)
+			},
+		},
+		{
+			name: "PERMANENT",
+			in:   0x80,
+			validateFunc: func(got string) {
+				s.Equal("PERMANENT", got)
+			},
+		},
+		{
+			name: "unknown bitmask returns empty",
+			in:   0x100,
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, network.NeighState(tt.in))
+			tt.validateFunc(network.NeighState(tt.in))
 		})
 	}
 }
 
 func (s *NetworkPublicTestSuite) TestReadInterfaces() {
 	tests := []struct {
-		name       string
-		ifsFn      func(context.Context) (gpnet.InterfaceStatList, error)
-		countersFn func(context.Context, bool) ([]gpnet.IOCountersStat, error)
-		wantErr    bool
-		wantLen    int
+		name         string
+		ifsFn        func(context.Context) (gpnet.InterfaceStatList, error)
+		countersFn   func(context.Context, bool) ([]gpnet.IOCountersStat, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name: "interfaces + counters merged",
@@ -1423,7 +1626,10 @@ func (s *NetworkPublicTestSuite) TestReadInterfaces() {
 			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
 				return []gpnet.IOCountersStat{{Name: "eth0", BytesSent: 100}}, nil
 			},
-			wantLen: 1,
+			validateFunc: func(ifs any, err error) {
+				s.Require().NoError(err)
+				s.Len(ifs, 1)
+			},
 		},
 		{
 			name: "gopsutil error wrapped and returned",
@@ -1433,20 +1639,16 @@ func (s *NetworkPublicTestSuite) TestReadInterfaces() {
 			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
 				return nil, nil
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			defer network.SetInterfacesFn(tt.ifsFn)()
 			defer network.SetIOCountersFn(tt.countersFn)()
-			ifs, err := network.ReadInterfaces(context.Background())
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.Len(ifs, tt.wantLen)
+			tt.validateFunc(network.ReadInterfaces(context.Background()))
 		})
 	}
 }

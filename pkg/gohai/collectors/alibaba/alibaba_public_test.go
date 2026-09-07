@@ -121,18 +121,42 @@ func TestAlibabaPublicTestSuite(
 func (s *AlibabaPublicTestSuite) TestInterface() {
 	c := alibaba.New()
 	tests := []struct {
-		name string
-		got  any
-		want any
+		name         string
+		got          any
+		validateFunc func(any)
 	}{
-		{"Name", c.Name(), "alibaba"},
-		{"Category", c.Category(), "cloud"},
-		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+		{
+			name: "Name",
+			got:  c.Name(),
+			validateFunc: func(got any) {
+				s.Equal("alibaba", got)
+			},
+		},
+		{
+			name: "Category",
+			got:  c.Category(),
+			validateFunc: func(got any) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name: "DefaultEnabled",
+			got:  c.DefaultEnabled(),
+			validateFunc: func(got any) {
+				s.Equal(false, got)
+			},
+		},
+		{
+			name: "Dependencies",
+			got:  c.Dependencies(),
+			validateFunc: func(got any) {
+				s.Equal([]string{"dmi"}, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.got)
+			tt.validateFunc(tt.got)
 		})
 	}
 }
@@ -155,19 +179,19 @@ func serve(
 
 func (s *AlibabaPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		prior      collector.PriorResults
-		tree       map[string]string
-		handler    http.HandlerFunc // overrides tree when set
-		closed     bool
-		wantNil    bool
-		wantNoHTTP bool
-		verify     func(s *AlibabaPublicTestSuite, info *alibaba.Info, hitUserData bool)
+		name         string
+		prior        collector.PriorResults
+		tree         map[string]string
+		handler      http.HandlerFunc // overrides tree when set
+		closed       bool
+		validateFunc func(any, bool, bool)
 	}{
 		{
 			name: "happy path populates every typed field + skips user-data",
 			tree: treeResponses,
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, hitUserData bool) {
+			validateFunc: func(out any, _ bool, hitUserData bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("i-abc", info.ID)
 				s.Equal("prod-1", info.Hostname)
@@ -219,28 +243,36 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "Dell Inc."}},
 			},
-			tree:       treeResponses,
-			wantNil:    true,
-			wantNoHTTP: true,
+			tree: treeResponses,
+			validateFunc: func(out any, httpCalled bool, _ bool) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name:  "no dmi in prior fails open",
 			prior: collector.PriorResults{},
 			tree:  treeResponses,
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
-			name:    "first-probe 404 drops silently",
-			tree:    map[string]string{},
-			wantNil: true,
+			name: "first-probe 404 drops silently",
+			tree: map[string]string{},
+			validateFunc: func(out any, _ bool, _ bool) {
+				s.Nil(out)
+			},
 		},
 		{
-			name:    "connection refused drops silently",
-			closed:  true,
-			wantNil: true,
+			name:   "connection refused drops silently",
+			closed: true,
+			validateFunc: func(out any, _ bool, _ bool) {
+				s.Nil(out)
+			},
 		},
 		{
 			name: "subdir fetch error is tolerated",
@@ -250,7 +282,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/hostname": "only-me",
 				// /meta-data/broken-subdir/ intentionally absent → 404
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Equal("only-me", info.Hostname)
 			},
 		},
@@ -262,7 +296,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/hostname": "prod-1",
 				// /meta-data/missing intentionally absent → 404
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Equal("prod-1", info.Hostname)
 			},
 		},
@@ -275,7 +311,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/dns-conf/":            "nameservers",
 				"/meta-data/dns-conf/nameservers": "   ",
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Nil(info.Nameservers)
 			},
 		},
@@ -288,7 +326,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/ntp-conf/":            "ntp-servers",
 				"/meta-data/ntp-conf/ntp-servers": "",
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Nil(info.NTPServers)
 			},
 		},
@@ -299,7 +339,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/some-other-dir/":  "x",
 				"/some-other-dir/x": "y",
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.ID)
 				s.Empty(info.Hostname)
@@ -320,7 +362,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/disks":    `"not-a-map"`,
 				"/meta-data/network":  `"not-a-map"`,
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Equal("h", info.Hostname)
 				s.Empty(info.Type)
 				s.Nil(info.Nameservers)
@@ -349,7 +393,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/network/interfaces/macs/":        "aa:bb",
 				"/meta-data/network/interfaces/macs/aa:bb":   `"not-a-map"`,
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				// Empty marketplace (no product code, no charge type)
 				// does not populate the sub-struct.
 				s.Nil(info.Marketplace)
@@ -368,7 +414,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/":            "instance-id",
 				"/meta-data/instance-id": `123`, // parses as JSON number, not string
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Empty(info.ID) // strVal returns "" when type isn't string
 			},
 		},
@@ -379,7 +427,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/":         "\nhostname\n\n",
 				"/meta-data/hostname": "h",
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Equal("h", info.Hostname)
 			},
 		},
@@ -391,7 +441,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/instance/":              "instance-type",
 				"/meta-data/instance/instance-type": "ecs.g6.large",
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Equal("ecs.g6.large", info.Type)
 				s.Equal(int64(0), info.MaxBandwidthIngress)
 				s.Equal(int64(0), info.MaxBandwidthEgress)
@@ -408,7 +460,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": "10.0.0.1 10.0.0.2",
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.NetworkInterfaces, 1)
 				s.Equal(
 					[]string{"10.0.0.1", "10.0.0.2"},
@@ -427,7 +481,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": "   ",
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Require().Len(info.NetworkInterfaces, 1)
 				s.Nil(info.NetworkInterfaces["aa:bb"].PrivateIPv4s)
 			},
@@ -443,7 +499,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": ",, ,",
 			},
-			verify: func(s *AlibabaPublicTestSuite, info *alibaba.Info, _ bool) {
+			validateFunc: func(out any, _ bool, _ bool) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
 				s.Nil(info.NetworkInterfaces["aa:bb"].PrivateIPv4s)
 			},
 		},
@@ -482,18 +540,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			out, err := c.Collect(context.Background(), prior)
 			s.Require().NoError(err)
 
-			if tt.wantNoHTTP {
-				s.False(httpCalled)
-			}
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-			info, ok := out.(*alibaba.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info, hitUserData)
-			}
+			tt.validateFunc(out, httpCalled, hitUserData)
 		})
 	}
 }

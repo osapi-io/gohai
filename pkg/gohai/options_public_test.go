@@ -40,33 +40,82 @@ func TestOptionsPublicTestSuite(
 
 func (s *OptionsPublicTestSuite) TestNew() {
 	tests := []struct {
-		name    string
-		opts    []gohai.Option
-		wantErr bool
+		name         string
+		opts         []gohai.Option
+		validateFunc func(any, error)
 	}{
-		{"defaults", nil, false},
-		{"with disabled", []gohai.Option{gohai.WithDisabled("platform")}, false},
-		{"with collectors only", []gohai.Option{gohai.WithCollectors("platform")}, false},
-		{"unknown enabled errors", []gohai.Option{gohai.WithEnabled("nope")}, true},
-		{"unknown disabled errors", []gohai.Option{gohai.WithDisabled("nope")}, true},
-		{"unknown only errors", []gohai.Option{gohai.WithCollectors("nope")}, true},
-		{"with category cloud", []gohai.Option{gohai.WithCategory("cloud")}, false},
 		{
-			"with category hardware stacks",
-			[]gohai.Option{gohai.WithCategory("hardware", "cloud")},
-			false,
+			name: "defaults",
+			opts: nil,
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
 		},
-		{"unknown category errors", []gohai.Option{gohai.WithCategory("nope")}, true},
+		{
+			name: "with disabled",
+			opts: []gohai.Option{gohai.WithDisabled("platform")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "with collectors only",
+			opts: []gohai.Option{gohai.WithCollectors("platform")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "unknown enabled errors",
+			opts: []gohai.Option{gohai.WithEnabled("nope")},
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
+		},
+		{
+			name: "unknown disabled errors",
+			opts: []gohai.Option{gohai.WithDisabled("nope")},
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
+		},
+		{
+			name: "unknown only errors",
+			opts: []gohai.Option{gohai.WithCollectors("nope")},
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
+		},
+		{
+			name: "with category cloud",
+			opts: []gohai.Option{gohai.WithCategory("cloud")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "with category hardware stacks",
+			opts: []gohai.Option{gohai.WithCategory("hardware", "cloud")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "unknown category errors",
+			opts: []gohai.Option{gohai.WithCategory("nope")},
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			g, err := gohai.New(tt.opts...)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			s.NotNil(g)
+			tt.validateFunc(gohai.New(tt.opts...))
 		})
 	}
 }

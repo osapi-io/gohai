@@ -85,15 +85,50 @@ func (s *RPMPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(rpm.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c rpm.Collector) {
+				_, ok := c.(*rpm.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c rpm.Collector) {
+				_, ok := c.(*rpm.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c rpm.Collector) {
+				_, ok := c.(*rpm.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c rpm.Collector) {
+				_, ok := c.(*rpm.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c rpm.Collector) {
+				_, ok := c.(*rpm.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -103,30 +138,25 @@ func (s *RPMPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*rpm.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*rpm.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *RPMPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		variant    string
-		setupExec  func(ctrl *gomock.Controller) *execmocks.MockExecutor
-		wantNil    bool
-		wantMacros map[string]string
+		name         string
+		variant      string
+		setupExec    func(ctrl *gomock.Controller) *execmocks.MockExecutor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "darwin: returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "linux: rpm not installed — empty macros, no error",
@@ -138,7 +168,13 @@ func (s *RPMPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("rpm: command not found"))
 				return m
 			},
-			wantMacros: map[string]string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*rpm.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Macros)
+			},
 		},
 		{
 			name:    "linux: rpm --showrc parsed correctly",
@@ -150,15 +186,21 @@ func (s *RPMPublicTestSuite) TestCollect() {
 					Return([]byte(showrcOutput), nil)
 				return m
 			},
-			wantMacros: map[string]string{
-				"%_topdir":    "/root/rpmbuild",
-				"%_builddir":  "%{_topdir}/BUILD",
-				"%_rpmdir":    "%{_topdir}/RPMS",
-				"%_sourcedir": "%{_topdir}/SOURCES",
-				"%_specdir":   "%{_topdir}/SPECS",
-				"%_srcrpmdir": "%{_topdir}/SRPMS",
-				"%__cc":       "gcc\n  -m64 -mtune=generic",
-				"%buildroot":  "%{_buildrootdir}/%{NAME}-%{VERSION}-%{RELEASE}.%{_arch}",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*rpm.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"%_topdir":    "/root/rpmbuild",
+					"%_builddir":  "%{_topdir}/BUILD",
+					"%_rpmdir":    "%{_topdir}/RPMS",
+					"%_sourcedir": "%{_topdir}/SOURCES",
+					"%_specdir":   "%{_topdir}/SPECS",
+					"%_srcrpmdir": "%{_topdir}/SRPMS",
+					"%__cc":       "gcc\n  -m64 -mtune=generic",
+					"%buildroot":  "%{_buildrootdir}/%{NAME}-%{VERSION}-%{RELEASE}.%{_arch}",
+				}, info.Macros)
 			},
 		},
 		{
@@ -171,13 +213,25 @@ func (s *RPMPublicTestSuite) TestCollect() {
 					Return([]byte(showrcNoMarker), nil)
 				return m
 			},
-			wantMacros: map[string]string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*rpm.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Macros)
+			},
 		},
 		{
-			name:       "linux: nil executor — empty macros",
-			variant:    "linux",
-			setupExec:  nil,
-			wantMacros: map[string]string{},
+			name:      "linux: nil executor — empty macros",
+			variant:   "linux",
+			setupExec: nil,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*rpm.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{}, info.Macros)
+			},
 		},
 		{
 			// A macro line that is just "-" (no name) exercises the
@@ -199,8 +253,14 @@ func (s *RPMPublicTestSuite) TestCollect() {
 					Return([]byte(out), nil)
 				return m
 			},
-			wantMacros: map[string]string{
-				"%novalue": "",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*rpm.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"%novalue": "",
+				}, info.Macros)
 			},
 		},
 	}
@@ -220,17 +280,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 				c = &rpm.Darwin{}
 			}
 
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-
-			info, ok := got.(*rpm.Info)
-			s.Require().True(ok)
-			s.Equal(tt.wantMacros, info.Macros)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

@@ -46,23 +46,35 @@ func (s *RegistryPublicTestSuite) TestNewRegistry() {
 func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 	reg := gohai.NewRegistry()
 	tests := []struct {
-		name      string
-		category  string
-		contains  string // expected member of the category; empty when wantEmpty
-		wantEmpty bool
+		name         string
+		category     string
+		validateFunc func([]string)
 	}{
-		{"cloud contains gce", "cloud", "gce", false},
-		{"hardware contains dmi", "hardware", "dmi", false},
-		{"unknown category returns empty", "nope", "", true},
+		{
+			name:     "cloud contains gce",
+			category: "cloud",
+			validateFunc: func(got []string) {
+				s.Contains(got, "gce")
+			},
+		},
+		{
+			name:     "hardware contains dmi",
+			category: "hardware",
+			validateFunc: func(got []string) {
+				s.Contains(got, "dmi")
+			},
+		},
+		{
+			name:     "unknown category returns empty",
+			category: "nope",
+			validateFunc: func(got []string) {
+				s.Empty(got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got := reg.NamesInCategory(tt.category)
-			if tt.wantEmpty {
-				s.Empty(got)
-				return
-			}
-			s.Contains(got, tt.contains)
+			tt.validateFunc(reg.NamesInCategory(tt.category))
 		})
 	}
 }
@@ -70,17 +82,35 @@ func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 func (s *RegistryPublicTestSuite) TestCategoryOf() {
 	reg := gohai.NewRegistry()
 	tests := []struct {
-		name      string
-		collector string
-		want      string
+		name         string
+		collector    string
+		validateFunc func(string)
 	}{
-		{"gce is cloud", "gce", "cloud"},
-		{"dmi is hardware", "dmi", "hardware"},
-		{"missing collector returns empty", "nope", ""},
+		{
+			name:      "gce is cloud",
+			collector: "gce",
+			validateFunc: func(got string) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name:      "dmi is hardware",
+			collector: "dmi",
+			validateFunc: func(got string) {
+				s.Equal("hardware", got)
+			},
+		},
+		{
+			name:      "missing collector returns empty",
+			collector: "nope",
+			validateFunc: func(got string) {
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, reg.CategoryOf(tt.collector))
+			tt.validateFunc(reg.CategoryOf(tt.collector))
 		})
 	}
 }

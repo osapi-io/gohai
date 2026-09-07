@@ -53,15 +53,50 @@ func (s *DiskPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(disk.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c disk.Collector) {
+				_, ok := c.(*disk.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c disk.Collector) {
+				_, ok := c.(*disk.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c disk.Collector) {
+				_, ok := c.(*disk.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c disk.Collector) {
+				_, ok := c.(*disk.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c disk.Collector) {
+				_, ok := c.(*disk.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -71,25 +106,17 @@ func (s *DiskPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*disk.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*disk.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *DiskPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name    string
-		variant string
-		fn      func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error)
-		wantErr bool
-		wantLen int
+		name         string
+		variant      string
+		fn           func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error)
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: sda snapshot",
@@ -105,7 +132,12 @@ func (s *DiskPublicTestSuite) TestCollect() {
 					},
 				}, nil
 			},
-			wantLen: 1,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*disk.Info)
+				s.Require().True(ok)
+				s.Len(info.Devices, 1)
+			},
 		},
 		{
 			name:    "linux: empty devices",
@@ -113,7 +145,12 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return map[string]gpdisk.IOCountersStat{}, nil
 			},
-			wantLen: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*disk.Info)
+				s.Require().True(ok)
+				s.Len(info.Devices, 0)
+			},
 		},
 		{
 			name:    "linux: gopsutil error propagated",
@@ -121,7 +158,9 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return nil, errors.New("boom")
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: disk0 snapshot",
@@ -131,7 +170,12 @@ func (s *DiskPublicTestSuite) TestCollect() {
 					"disk0": {Name: "disk0", ReadCount: 200, WriteCount: 100},
 				}, nil
 			},
-			wantLen: 1,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*disk.Info)
+				s.Require().True(ok)
+				s.Len(info.Devices, 1)
+			},
 		},
 		{
 			name:    "darwin: iokit error propagated",
@@ -139,7 +183,9 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
 				return nil, errors.New("iokit unavailable")
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -152,15 +198,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &disk.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*disk.Info)
-			s.Require().True(ok)
-			s.Len(info.Devices, tt.wantLen)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

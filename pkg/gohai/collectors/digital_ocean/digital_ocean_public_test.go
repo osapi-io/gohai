@@ -84,39 +84,62 @@ func TestDigitalOceanPublicTestSuite(
 func (s *DigitalOceanPublicTestSuite) TestInterface() {
 	c := digitalocean.New()
 	tests := []struct {
-		name string
-		got  any
-		want any
+		name         string
+		got          any
+		validateFunc func(any)
 	}{
-		{"Name", c.Name(), "digital_ocean"},
-		{"Category", c.Category(), "cloud"},
-		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string{"dmi"}},
+		{
+			name: "Name",
+			got:  c.Name(),
+			validateFunc: func(got any) {
+				s.Equal("digital_ocean", got)
+			},
+		},
+		{
+			name: "Category",
+			got:  c.Category(),
+			validateFunc: func(got any) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name: "DefaultEnabled",
+			got:  c.DefaultEnabled(),
+			validateFunc: func(got any) {
+				s.Equal(false, got)
+			},
+		},
+		{
+			name: "Dependencies",
+			got:  c.Dependencies(),
+			validateFunc: func(got any) {
+				s.Equal([]string{"dmi"}, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.got)
+			tt.validateFunc(tt.got)
 		})
 	}
 }
 
 func (s *DigitalOceanPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		prior      collector.PriorResults
-		handler    func(w http.ResponseWriter, r *http.Request)
-		closed     bool
-		wantNil    bool
-		wantErr    bool
-		wantNoHTTP bool
-		verify     func(s *DigitalOceanPublicTestSuite, info *digitalocean.Info)
+		name         string
+		prior        collector.PriorResults
+		handler      func(w http.ResponseWriter, r *http.Request)
+		closed       bool
+		validateFunc func(any, bool, error)
 	}{
 		{
 			name: "happy path transforms canned response",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(cannedResponse))
 			},
-			verify: func(s *DigitalOceanPublicTestSuite, info *digitalocean.Info) {
+			validateFunc: func(out any, _ bool, _ error) {
+				info, ok := out.(*digitalocean.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal(int64(123456), info.ID)
 				s.Equal("web-1", info.Hostname)
@@ -150,9 +173,11 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{BIOS: &dmi.BIOS{Manufacturer: "Dell Inc."}},
 			},
-			handler:    func(http.ResponseWriter, *http.Request) {},
-			wantNil:    true,
-			wantNoHTTP: true,
+			handler: func(http.ResponseWriter, *http.Request) {},
+			validateFunc: func(out any, httpCalled bool, _ error) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name:  "dmi without BIOS fails open and tries HTTP",
@@ -160,7 +185,9 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(`{"droplet_id": 42}`))
 			},
-			verify: func(s *DigitalOceanPublicTestSuite, info *digitalocean.Info) {
+			validateFunc: func(out any, _ bool, _ error) {
+				info, ok := out.(*digitalocean.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal(int64(42), info.ID)
 			},
@@ -171,7 +198,9 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(`{"droplet_id": 43}`))
 			},
-			verify: func(s *DigitalOceanPublicTestSuite, info *digitalocean.Info) {
+			validateFunc: func(out any, _ bool, _ error) {
+				info, ok := out.(*digitalocean.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal(int64(43), info.ID)
 			},
@@ -181,20 +210,26 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				http.NotFound(w, nil)
 			},
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "connection refused drops silently",
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name: "malformed JSON surfaces as error",
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte("not json"))
 			},
-			wantErr: true,
+			validateFunc: func(_ any, _ bool, err error) {
+				s.Error(err)
+			},
 		},
 	}
 
@@ -221,24 +256,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 				prior = doPrior()
 			}
 			out, err := c.Collect(context.Background(), prior)
-			if tt.wantErr {
-				s.Require().Error(err)
-				return
-			}
-			s.Require().NoError(err)
-
-			if tt.wantNoHTTP {
-				s.False(httpCalled)
-			}
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-			info, ok := out.(*digitalocean.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info)
-			}
+			tt.validateFunc(out, httpCalled, err)
 		})
 	}
 }

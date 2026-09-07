@@ -162,18 +162,42 @@ func (s *AzurePublicTestSuite) pointAwayFromLeases() func() {
 func (s *AzurePublicTestSuite) TestInterface() {
 	c := azure.New()
 	tests := []struct {
-		name string
-		got  any
-		want any
+		name         string
+		got          any
+		validateFunc func(any)
 	}{
-		{"Name", c.Name(), "azure"},
-		{"Category", c.Category(), "cloud"},
-		{"DefaultEnabled", c.DefaultEnabled(), false},
-		{"Dependencies", c.Dependencies(), []string(nil)},
+		{
+			name: "Name",
+			got:  c.Name(),
+			validateFunc: func(got any) {
+				s.Equal("azure", got)
+			},
+		},
+		{
+			name: "Category",
+			got:  c.Category(),
+			validateFunc: func(got any) {
+				s.Equal("cloud", got)
+			},
+		},
+		{
+			name: "DefaultEnabled",
+			got:  c.DefaultEnabled(),
+			validateFunc: func(got any) {
+				s.Equal(false, got)
+			},
+		},
+		{
+			name: "Dependencies",
+			got:  c.Dependencies(),
+			validateFunc: func(got any) {
+				s.Equal([]string(nil), got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.got)
+			tt.validateFunc(tt.got)
 		})
 	}
 }
@@ -215,17 +239,16 @@ func (s *AzurePublicTestSuite) TestCollect() {
 		negotiationStatus int
 		overrideHandler   func(w http.ResponseWriter, r *http.Request)
 		closed            bool
-		wantNil           bool
-		wantErr           bool
-		wantNoHTTP        bool
-		verify            func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string)
+		validateFunc      func(any, bool, string, error)
 	}{
 		{
 			name:              "happy path with waagent + successful version negotiation",
 			waagent:           true,
 			negotiationJSON:   negotiationBody,
 			negotiationStatus: http.StatusBadRequest,
-			verify: func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string) {
+			validateFunc: func(out any, _ bool, gotAPI string, _ error) {
+				info, ok := out.(*azure.Info)
+				s.Require().True(ok)
 				s.Equal("2023-07-01", gotAPI)
 				s.Require().NotNil(info)
 				s.Equal("abcd-1234", info.ID)
@@ -258,7 +281,9 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			leasesContent:     "lease {\n  option unknown-245 12:34;\n}\n",
 			negotiationJSON:   negotiationBody,
 			negotiationStatus: http.StatusBadRequest,
-			verify: func(s *AzurePublicTestSuite, info *azure.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				info, ok := out.(*azure.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("abcd-1234", info.ID)
 			},
@@ -266,21 +291,27 @@ func (s *AzurePublicTestSuite) TestCollect() {
 		{
 			name:          "DHCP leases without signature does not detect",
 			leasesContent: "lease { option routers 10.0.0.1; }\n",
-			wantNil:       true,
-			wantNoHTTP:    true,
+			validateFunc: func(out any, httpCalled bool, _ string, _ error) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name:        "no waagent + no leases file short-circuits",
 			noDetection: true,
-			wantNil:     true,
-			wantNoHTTP:  true,
+			validateFunc: func(out any, httpCalled bool, _ string, _ error) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
 		},
 		{
 			name:              "version negotiation: 404 falls back to latest",
 			waagent:           true,
 			negotiationJSON:   "",
 			negotiationStatus: http.StatusNotFound,
-			verify: func(s *AzurePublicTestSuite, info *azure.Info, gotAPI string) {
+			validateFunc: func(out any, _ bool, gotAPI string, _ error) {
+				info, ok := out.(*azure.Info)
+				s.Require().True(ok)
 				s.Equal("2023-07-01", gotAPI)
 				s.Require().NotNil(info)
 			},
@@ -290,7 +321,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			waagent:           true,
 			negotiationJSON:   "not json",
 			negotiationStatus: http.StatusBadRequest,
-			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
+			validateFunc: func(_ any, _ bool, gotAPI string, _ error) {
 				s.Equal("2023-07-01", gotAPI)
 			},
 		},
@@ -299,7 +330,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			waagent:           true,
 			negotiationJSON:   `{"newest-versions":[]}`,
 			negotiationStatus: http.StatusBadRequest,
-			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
+			validateFunc: func(_ any, _ bool, gotAPI string, _ error) {
 				s.Equal("2023-07-01", gotAPI)
 			},
 		},
@@ -308,7 +339,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			waagent:           true,
 			negotiationJSON:   `{"newest-versions":["2099-01-01", "2099-02-01"]}`,
 			negotiationStatus: http.StatusBadRequest,
-			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
+			validateFunc: func(_ any, _ bool, gotAPI string, _ error) {
 				s.Equal("2023-07-01", gotAPI)
 			},
 		},
@@ -317,7 +348,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			waagent:           true,
 			negotiationJSON:   `{"newest-versions":["2021-02-01","2023-07-01","2019-11-01"]}`,
 			negotiationStatus: http.StatusBadRequest,
-			verify: func(s *AzurePublicTestSuite, _ *azure.Info, gotAPI string) {
+			validateFunc: func(_ any, _ bool, gotAPI string, _ error) {
 				s.Equal("2023-07-01", gotAPI)
 			},
 		},
@@ -327,13 +358,17 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			overrideHandler: func(w http.ResponseWriter, _ *http.Request) {
 				http.NotFound(w, nil)
 			},
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "connection refused drops silently",
 			waagent: true,
 			closed:  true,
-			wantNil: true,
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				s.Nil(out)
+			},
 		},
 		{
 			name:    "malformed main JSON surfaces as error",
@@ -346,7 +381,9 @@ func (s *AzurePublicTestSuite) TestCollect() {
 				}
 				_, _ = w.Write([]byte("not json"))
 			},
-			wantErr: true,
+			validateFunc: func(_ any, _ bool, _ string, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "empty compute and network skip transform branches",
@@ -359,7 +396,9 @@ func (s *AzurePublicTestSuite) TestCollect() {
 				}
 				_, _ = w.Write([]byte(`{}`))
 			},
-			verify: func(s *AzurePublicTestSuite, info *azure.Info, _ string) {
+			validateFunc: func(out any, _ bool, _ string, _ error) {
+				info, ok := out.(*azure.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Empty(info.ID)
 				s.Empty(info.Interfaces)
@@ -402,24 +441,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			c := azure.NewWithClient(client)
 
 			out, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Require().Error(err)
-				return
-			}
-			s.Require().NoError(err)
-
-			if tt.wantNoHTTP {
-				s.False(httpCalled)
-			}
-			if tt.wantNil {
-				s.Nil(out)
-				return
-			}
-			info, ok := out.(*azure.Info)
-			s.Require().True(ok)
-			if tt.verify != nil {
-				tt.verify(s, info, gotAPI)
-			}
+			tt.validateFunc(out, httpCalled, gotAPI, err)
 		})
 	}
 }

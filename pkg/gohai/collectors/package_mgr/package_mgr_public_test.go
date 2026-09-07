@@ -54,15 +54,50 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string // "linux"|"darwin"|"debian"|"rhel"
+		name         string
+		detect       string
+		validateFunc func(packagemgr.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Debian", "debian", "debian"},
-		{"rhel dispatches to RHEL", "rhel", "rhel"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Debian",
+			detect: "debian",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.Debian)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to RHEL",
+			detect: "rhel",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.RHEL)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c packagemgr.Collector) {
+				_, ok := c.(*packagemgr.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -72,89 +107,108 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 			s.Equal("software", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*packagemgr.Darwin)
-				s.True(ok)
-			case "debian":
-				_, ok := c.(*packagemgr.Debian)
-				s.True(ok)
-			case "rhel":
-				_, ok := c.(*packagemgr.RHEL)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*packagemgr.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *PackageMgrPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string // "linux" | "darwin" | "debian" | "rhel"
-		probed   map[string]string
-		wantName string
-		wantPath string
+		name         string
+		variant      string // "linux" | "darwin" | "debian" | "rhel"
+		probed       map[string]string
+		validateFunc func(*packagemgr.Info)
 	}{
 		{
-			"debian with apt",
-			"debian",
-			map[string]string{"apt": "/usr/bin/apt"},
-			"apt",
-			"/usr/bin/apt",
+			name:    "debian with apt",
+			variant: "debian",
+			probed:  map[string]string{"apt": "/usr/bin/apt"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("apt", info.Name)
+				got := info.Path
+				s.Equal("/usr/bin/apt", got)
+			},
 		},
 		{
-			"debian with apt-get only",
-			"debian",
-			map[string]string{"apt-get": "/usr/bin/apt-get"},
-			"apt-get",
-			"/usr/bin/apt-get",
+			name:    "debian with apt-get only",
+			variant: "debian",
+			probed:  map[string]string{"apt-get": "/usr/bin/apt-get"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("apt-get", info.Name)
+				got := info.Path
+				s.Equal("/usr/bin/apt-get", got)
+			},
 		},
 		{
-			"rhel with dnf wins over yum",
-			"rhel",
-			map[string]string{"dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum"},
-			"dnf",
-			"/usr/bin/dnf",
+			name:    "rhel with dnf wins over yum",
+			variant: "rhel",
+			probed:  map[string]string{"dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("dnf", info.Name)
+				got := info.Path
+				s.Equal("/usr/bin/dnf", got)
+			},
 		},
 		{
-			"rhel yum fallback",
-			"rhel",
-			map[string]string{"yum": "/usr/bin/yum"},
-			"yum",
-			"/usr/bin/yum",
+			name:    "rhel yum fallback",
+			variant: "rhel",
+			probed:  map[string]string{"yum": "/usr/bin/yum"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("yum", info.Name)
+				got := info.Path
+				s.Equal("/usr/bin/yum", got)
+			},
 		},
 		{
-			"darwin brew",
-			"darwin",
-			map[string]string{"brew": "/opt/homebrew/bin/brew"},
-			"brew",
-			"/opt/homebrew/bin/brew",
+			name:    "darwin brew",
+			variant: "darwin",
+			probed:  map[string]string{"brew": "/opt/homebrew/bin/brew"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("brew", info.Name)
+				got := info.Path
+				s.Equal("/opt/homebrew/bin/brew", got)
+			},
 		},
 		{
-			"darwin port fallback",
-			"darwin",
-			map[string]string{"port": "/opt/local/bin/port"},
-			"port",
-			"/opt/local/bin/port",
+			name:    "darwin port fallback",
+			variant: "darwin",
+			probed:  map[string]string{"port": "/opt/local/bin/port"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("port", info.Name)
+				got := info.Path
+				s.Equal("/opt/local/bin/port", got)
+			},
 		},
 		{
-			"linux arch with pacman",
-			"linux",
-			map[string]string{"pacman": "/usr/bin/pacman"},
-			"pacman",
-			"/usr/bin/pacman",
+			name:    "linux arch with pacman",
+			variant: "linux",
+			probed:  map[string]string{"pacman": "/usr/bin/pacman"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("pacman", info.Name)
+				got := info.Path
+				s.Equal("/usr/bin/pacman", got)
+			},
 		},
 		{
-			"linux alpine with apk",
-			"linux",
-			map[string]string{"apk": "/sbin/apk"},
-			"apk",
-			"/sbin/apk",
+			name:    "linux alpine with apk",
+			variant: "linux",
+			probed:  map[string]string{"apk": "/sbin/apk"},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("apk", info.Name)
+				got := info.Path
+				s.Equal("/sbin/apk", got)
+			},
 		},
-		{"none found returns empty", "linux", map[string]string{}, "", ""},
+		{
+			name:    "none found returns empty",
+			variant: "linux",
+			probed:  map[string]string{},
+			validateFunc: func(info *packagemgr.Info) {
+				s.Equal("", info.Name)
+				got := info.Path
+				s.Equal("", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -179,8 +233,8 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			s.Require().NoError(err)
 			info, ok := got.(*packagemgr.Info)
 			s.Require().True(ok)
-			s.Equal(tt.wantName, info.Name)
-			s.Equal(tt.wantPath, info.Path)
+
+			tt.validateFunc(info)
 		})
 	}
 }

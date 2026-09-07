@@ -176,15 +176,50 @@ func (s *FilesystemPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(filesystem.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c filesystem.Collector) {
+				_, ok := c.(*filesystem.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c filesystem.Collector) {
+				_, ok := c.(*filesystem.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c filesystem.Collector) {
+				_, ok := c.(*filesystem.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c filesystem.Collector) {
+				_, ok := c.(*filesystem.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c filesystem.Collector) {
+				_, ok := c.(*filesystem.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -194,14 +229,7 @@ func (s *FilesystemPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*filesystem.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*filesystem.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -251,8 +279,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		usageFn      func(context.Context, string) (*gpdisk.UsageStat, error)
 		exec         func(*testing.T) executor.Executor
 		fs           avfs.VFS // optional; nil → btrfs sysfs reads short-circuit
-		wantErr      bool
-		validate     func(*filesystem.Info)
+		validateFunc func(any, error)
 	}{
 		{
 			name:         "linux: no lsblk, mounts unchanged no unmounted",
@@ -260,7 +287,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec:         func(t *testing.T) executor.Executor { return noLsblkExec(t) },
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Len(i.Mounts, 2)
 				s.Empty(i.Unmounted)
 				s.Equal("", i.Mounts[0].UUID)
@@ -281,7 +311,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					]}
 				]}`)
 			},
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Len(i.Mounts, 2)
 				s.Equal("root-uuid", i.Mounts[0].UUID)
 				s.Equal("part-1", i.Mounts[0].PartUUID)
@@ -305,7 +338,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					]}
 				]}`)
 			},
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Len(i.Mounts, 2)
 				s.Len(i.Unmounted, 1)
 				s.Equal("/dev/sdb1", i.Unmounted[0].Device)
@@ -326,7 +362,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					]}
 				]}`)
 			},
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Equal("u", i.Mounts[0].UUID)
 				s.Empty(i.Unmounted)
 			},
@@ -341,7 +380,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					{"name":"sdc1","fstype":"ext4","uuid":"u","label":"","mountpoint":"/mnt/foo","partuuid":"","partlabel":""}
 				]}`)
 			},
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Empty(i.Unmounted)
 			},
 		},
@@ -351,7 +393,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec:         func(t *testing.T) executor.Executor { return lsblkExec(t, `not json`) },
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Len(i.Mounts, 2)
 				s.Empty(i.Unmounted)
 				s.Equal("", i.Mounts[0].UUID)
@@ -363,7 +408,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			partitionsFn: okPartitions,
 			usageFn:      okUsage,
 			exec:         func(*testing.T) executor.Executor { return nil },
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Len(i.Mounts, 2)
 				s.Empty(i.Unmounted)
 			},
@@ -376,7 +424,9 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 			usageFn: okUsage,
 			exec:    func(t *testing.T) executor.Executor { return noLsblkExec(t) },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:         "linux: usage error keeps mount without usage",
@@ -386,7 +436,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				return nil, errors.New("usage failed")
 			},
 			exec: func(t *testing.T) executor.Executor { return noLsblkExec(t) },
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Len(i.Mounts, 2)
 				s.Zero(i.Mounts[0].Total)
 			},
@@ -413,7 +466,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					"tank@snap1\ttype\tsnapshot\t-\n"
 				return lsblkZFSExec(t, "", zfs)
 			},
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.ZFSDatasets, 5)
 
 				tank := i.ZFSDatasets[0]
@@ -459,7 +515,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkZFSExec(t, "", "")
 			},
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Empty(i.ZFSDatasets)
 			},
 		},
@@ -475,7 +534,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					"garbage\nonly two\tfields\nname\tprop\tval\tsource\n\t\t\t\n",
 				)
 			},
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.ZFSDatasets, 1)
 				s.Equal("name", i.ZFSDatasets[0].Name)
 				s.Equal("val", i.ZFSDatasets[0].Properties["prop"].Value)
@@ -502,7 +564,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				"metadata": {raid: "raid1", total: 268435456, used: 134217728},
 				"system":   {raid: "raid1", total: 33554432, used: 16384},
 			}),
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Mounts, 1)
 				m := i.Mounts[0]
 				s.Equal("btrfs", m.Type)
@@ -535,7 +600,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				"data":     {raid: "single", totalRaw: "not-a-number"},
 				"metadata": {raid: "single", total: 1024, used: 256},
 			}),
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				m := i.Mounts[0]
 				s.Require().NotNil(m.Btrfs)
 				s.Equal("single", m.Btrfs.RAID)
@@ -559,8 +627,11 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					{"name":"sda1","fstype":"btrfs","uuid":"missing","mountpoint":"/"}
 				]}`)
 			},
-			fs: memfs.New(), // empty FS — no /sys/fs/btrfs at all
-			validate: func(i *filesystem.Info) {
+			fs: memfs.New(),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Nil(i.Mounts[0].Btrfs)
 			},
 		},
@@ -589,7 +660,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				)
 				return fs
 			}(),
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				m := i.Mounts[0]
 				s.Require().NotNil(m.Btrfs)
 				s.Empty(m.Btrfs.RAID)
@@ -618,7 +692,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Require().NoError(fs.MkdirAll("/sys/fs/btrfs/empty-bg/allocation", 0o755))
 				return fs
 			}(),
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Nil(i.Mounts[0].Btrfs)
 			},
 		},
@@ -639,7 +716,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				]}`)
 			},
 			fs: memfs.New(),
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Nil(i.Mounts[0].Btrfs)
 			},
 		},
@@ -648,7 +728,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant:      "darwin",
 			partitionsFn: darwinPartitions,
 			usageFn:      darwinUsage,
-			validate: func(i *filesystem.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.Mounts, 1)
 				s.Equal("/dev/disk3s1", i.Mounts[0].Device)
 				s.Equal("apfs", i.Mounts[0].Type)
@@ -662,7 +745,9 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				return nil, errors.New("getfsstat failed")
 			},
 			usageFn: darwinUsage,
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -676,17 +761,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &filesystem.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*filesystem.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

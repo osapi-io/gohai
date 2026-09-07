@@ -81,14 +81,42 @@ func (s *VirtualBoxPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(virtualbox.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c virtualbox.Collector) {
+				_, ok := c.(*virtualbox.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c virtualbox.Collector) {
+				_, ok := c.(*virtualbox.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c virtualbox.Collector) {
+				_, ok := c.(*virtualbox.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c virtualbox.Collector) {
+				_, ok := c.(*virtualbox.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -98,25 +126,17 @@ func (s *VirtualBoxPublicTestSuite) TestNew() {
 			s.Equal("virtualization", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*virtualbox.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*virtualbox.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *VirtualBoxPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string
-		exec     func(*testing.T) executor.Executor
-		wantNil  bool
-		validate func(*virtualbox.Info)
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		// ----- Linux -----
 		{
@@ -125,7 +145,10 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(t, []byte(vboxControlOutput), nil)
 			},
-			validate: func(i *virtualbox.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualbox.Info)
+				s.Require().True(ok)
 				s.Equal("7.0.14", i.HostVersion)
 				s.Equal("161095", i.HostRevision)
 				s.Equal("7.0.14", i.GuestAdditionsVersion)
@@ -139,13 +162,19 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(t, nil, errors.New("exec: not found"))
 			},
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "linux: nil Exec returns nil",
 			variant: "linux",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "linux: output with no matching lines yields empty Info",
@@ -157,7 +186,10 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			validate: func(i *virtualbox.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualbox.Info)
+				s.Require().True(ok)
 				s.Empty(i.HostVersion)
 				s.Empty(i.GuestAdditionsVersion)
 			},
@@ -174,7 +206,10 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			validate: func(i *virtualbox.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualbox.Info)
+				s.Require().True(ok)
 				s.Equal("6.1.0", i.HostVersion)
 				s.Empty(i.HostRevision)
 				s.Empty(i.GuestAdditionsVersion)
@@ -187,7 +222,10 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(t, []byte(vboxControlOutput), nil)
 			},
-			validate: func(i *virtualbox.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualbox.Info)
+				s.Require().True(ok)
 				s.Equal("7.0.14", i.HostVersion)
 				s.Equal("7.0.14", i.GuestAdditionsVersion)
 				s.Equal("en_US", i.LanguageID)
@@ -199,13 +237,19 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return vboxExec(t, nil, errors.New("exec: not found"))
 			},
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "darwin: nil Exec returns nil",
 			variant: "darwin",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -217,17 +261,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &virtualbox.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*virtualbox.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

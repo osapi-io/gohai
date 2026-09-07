@@ -73,15 +73,50 @@ func (s *PackagesPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(packages.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c packages.Collector) {
+				_, ok := c.(*packages.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c packages.Collector) {
+				_, ok := c.(*packages.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c packages.Collector) {
+				_, ok := c.(*packages.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c packages.Collector) {
+				_, ok := c.(*packages.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c packages.Collector) {
+				_, ok := c.(*packages.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -91,14 +126,7 @@ func (s *PackagesPublicTestSuite) TestNew() {
 			s.Equal("software", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*packages.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*packages.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -115,11 +143,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 	brewOut := []byte("git 2.40.0\nzsh 5.9\ncurl 8.1.2 8.1.1\n")
 
 	tests := []struct {
-		name    string
-		variant string
-		detect  string
-		exec    func(*testing.T) executor.Executor
-		want    []packages.Package
+		name         string
+		variant      string
+		detect       string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux debian: dpkg-query returns packages",
@@ -137,9 +165,19 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: []packages.Package{
-				{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
-				{Name: "libc6", Version: "2.35-0", Architecture: "amd64", PackageManager: "dpkg"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
+					{
+						Name:           "libc6",
+						Version:        "2.35-0",
+						Architecture:   "amd64",
+						PackageManager: "dpkg",
+					},
+				}, info.Packages)
 			},
 		},
 		{
@@ -158,8 +196,13 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: []packages.Package{
-				{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
+				}, info.Packages)
 			},
 		},
 		{
@@ -178,7 +221,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: []packages.Package{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
 		},
 		{
 			name:    "linux debian: dpkg skips empty-name entries",
@@ -196,8 +244,13 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: []packages.Package{
-				{Name: "bash", Version: "5.1", Architecture: "amd64", PackageManager: "dpkg"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{Name: "bash", Version: "5.1", Architecture: "amd64", PackageManager: "dpkg"},
+				}, info.Packages)
 			},
 		},
 		{
@@ -216,7 +269,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					errors.New("not found"),
 				)
 			},
-			want: []packages.Package{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
 		},
 		{
 			name:    "linux rhel: rpm returns packages",
@@ -231,19 +289,24 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: []packages.Package{
-				{
-					Name:           "bash",
-					Version:        "5.1-6.fc36",
-					Architecture:   "x86_64",
-					PackageManager: "rpm",
-				},
-				{
-					Name:           "libc",
-					Version:        "2.35-1.fc36",
-					Architecture:   "x86_64",
-					PackageManager: "rpm",
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "bash",
+						Version:        "5.1-6.fc36",
+						Architecture:   "x86_64",
+						PackageManager: "rpm",
+					},
+					{
+						Name:           "libc",
+						Version:        "2.35-1.fc36",
+						Architecture:   "x86_64",
+						PackageManager: "rpm",
+					},
+				}, info.Packages)
 			},
 		},
 		{
@@ -259,7 +322,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					errors.New("not found"),
 				)
 			},
-			want: []packages.Package{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
 		},
 		{
 			name:    "linux rhel: rpm skips short lines",
@@ -274,7 +342,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: []packages.Package{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
 		},
 		{
 			name:    "linux rhel: rpm skips empty-name entries",
@@ -289,13 +362,18 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: []packages.Package{
-				{
-					Name:           "bash",
-					Version:        "5.1-6.fc36",
-					Architecture:   "x86_64",
-					PackageManager: "rpm",
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "bash",
+						Version:        "5.1-6.fc36",
+						Architecture:   "x86_64",
+						PackageManager: "rpm",
+					},
+				}, info.Packages)
 			},
 		},
 		{
@@ -303,7 +381,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "debian",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			want:    []packages.Package{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
 		},
 		{
 			name:    "darwin: brew list returns packages",
@@ -311,10 +394,15 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(t, "brew", []string{"list", "--versions"}, brewOut, nil)
 			},
-			want: []packages.Package{
-				{Name: "git", Version: "2.40.0", PackageManager: "brew"},
-				{Name: "zsh", Version: "5.9", PackageManager: "brew"},
-				{Name: "curl", Version: "8.1.1", PackageManager: "brew"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{Name: "git", Version: "2.40.0", PackageManager: "brew"},
+					{Name: "zsh", Version: "5.9", PackageManager: "brew"},
+					{Name: "curl", Version: "8.1.1", PackageManager: "brew"},
+				}, info.Packages)
 			},
 		},
 		{
@@ -329,8 +417,13 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					nil,
 				)
 			},
-			want: []packages.Package{
-				{Name: "git", Version: "2.40.0", PackageManager: "brew"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{Name: "git", Version: "2.40.0", PackageManager: "brew"},
+				}, info.Packages)
 			},
 		},
 		{
@@ -339,7 +432,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return mockExec(t, "brew", []string{"list", "--versions"}, []byte("git\n"), nil)
 			},
-			want: []packages.Package{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
 		},
 		{
 			name:    "darwin: brew fails, empty list",
@@ -353,13 +451,23 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					errors.New("not found"),
 				)
 			},
-			want: []packages.Package{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
 		},
 		{
 			name:    "darwin: nil Exec returns empty list",
 			variant: "darwin",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			want:    []packages.Package{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -376,11 +484,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &packages.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*packages.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, info.Packages)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

@@ -97,15 +97,50 @@ func (s *SelinuxPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(selinux.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c selinux.Collector) {
+				_, ok := c.(*selinux.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c selinux.Collector) {
+				_, ok := c.(*selinux.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c selinux.Collector) {
+				_, ok := c.(*selinux.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c selinux.Collector) {
+				_, ok := c.(*selinux.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c selinux.Collector) {
+				_, ok := c.(*selinux.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -115,38 +150,27 @@ func (s *SelinuxPublicTestSuite) TestNew() {
 			s.Equal("security", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*selinux.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*selinux.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *SelinuxPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name       string
-		variant    string
-		setupFS    func() avfs.VFS
-		setupExec  func(ctrl *gomock.Controller) *execmocks.MockExecutor
-		wantNil    bool
-		wantErr    bool
-		wantStatus string
-		wantMode   string
-		wantPolicy string
-		wantMaxKV  string
-		wantPV     string
-		wantLoaded string
+		name         string
+		variant      string
+		setupFS      func() avfs.VFS
+		setupExec    func(ctrl *gomock.Controller) *execmocks.MockExecutor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "darwin: returns nil — no SELinux",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "linux: no /etc/selinux/config — disabled",
@@ -155,7 +179,16 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				return execmocks.NewMockExecutor(ctrl)
 			},
-			wantStatus: "disabled",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("disabled", info.Status)
+				s.Equal("", info.CurrentMode)
+				s.Equal("", info.LoadedPolicyName)
+				s.Equal("", info.MaxKernelPolicyVersion)
+				s.Equal("", info.PolicyVersion)
+			},
 		},
 		{
 			name:    "linux: config SELINUX=disabled — disabled, no sestatus",
@@ -168,8 +201,16 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
 				return execmocks.NewMockExecutor(ctrl)
 			},
-			wantStatus: "disabled",
-			wantLoaded: "targeted",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("disabled", info.Status)
+				s.Equal("", info.CurrentMode)
+				s.Equal("targeted", info.LoadedPolicyName)
+				s.Equal("", info.MaxKernelPolicyVersion)
+				s.Equal("", info.PolicyVersion)
+			},
 		},
 		{
 			name:    "linux: enforcing with sestatus",
@@ -186,11 +227,16 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusEnforcing), nil)
 				return m
 			},
-			wantStatus: "enabled",
-			wantMode:   "enforcing",
-			wantLoaded: "targeted",
-			wantMaxKV:  "33",
-			wantPV:     "33",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("enabled", info.Status)
+				s.Equal("enforcing", info.CurrentMode)
+				s.Equal("targeted", info.LoadedPolicyName)
+				s.Equal("33", info.MaxKernelPolicyVersion)
+				s.Equal("33", info.PolicyVersion)
+			},
 		},
 		{
 			name:    "linux: permissive with sestatus",
@@ -207,10 +253,16 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusPermissive), nil)
 				return m
 			},
-			wantStatus: "enabled",
-			wantMode:   "permissive",
-			wantLoaded: "minimum",
-			wantMaxKV:  "30",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("enabled", info.Status)
+				s.Equal("permissive", info.CurrentMode)
+				s.Equal("minimum", info.LoadedPolicyName)
+				s.Equal("30", info.MaxKernelPolicyVersion)
+				s.Equal("", info.PolicyVersion)
+			},
 		},
 		{
 			name:    "linux: sestatus fails — status derived from config",
@@ -227,8 +279,16 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return(nil, errors.New("sestatus: command not found"))
 				return m
 			},
-			wantStatus: "enabled",
-			wantLoaded: "targeted",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("enabled", info.Status)
+				s.Equal("", info.CurrentMode)
+				s.Equal("targeted", info.LoadedPolicyName)
+				s.Equal("", info.MaxKernelPolicyVersion)
+				s.Equal("", info.PolicyVersion)
+			},
 		},
 		{
 			name:    "linux: sestatus returns disabled status",
@@ -245,8 +305,16 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusDisabled), nil)
 				return m
 			},
-			wantStatus: "disabled",
-			wantLoaded: "targeted",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("disabled", info.Status)
+				s.Equal("", info.CurrentMode)
+				s.Equal("targeted", info.LoadedPolicyName)
+				s.Equal("", info.MaxKernelPolicyVersion)
+				s.Equal("", info.PolicyVersion)
+			},
 		},
 		{
 			name:    "linux: nil executor — falls back to config only",
@@ -256,9 +324,17 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
-			setupExec:  nil,
-			wantStatus: "enabled",
-			wantLoaded: "targeted",
+			setupExec: nil,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("enabled", info.Status)
+				s.Equal("", info.CurrentMode)
+				s.Equal("targeted", info.LoadedPolicyName)
+				s.Equal("", info.MaxKernelPolicyVersion)
+				s.Equal("", info.PolicyVersion)
+			},
 		},
 		{
 			// config line with no '=' separator exercises the !ok branch
@@ -277,11 +353,16 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(sestatusEnforcing), nil)
 				return m
 			},
-			wantStatus: "enabled",
-			wantMode:   "enforcing",
-			wantLoaded: "targeted",
-			wantMaxKV:  "33",
-			wantPV:     "33",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("enabled", info.Status)
+				s.Equal("enforcing", info.CurrentMode)
+				s.Equal("targeted", info.LoadedPolicyName)
+				s.Equal("33", info.MaxKernelPolicyVersion)
+				s.Equal("33", info.PolicyVersion)
+			},
 		},
 		{
 			// sestatus output line with no ':' exercises the !ok branch
@@ -302,9 +383,16 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					Return([]byte(out), nil)
 				return m
 			},
-			wantStatus: "enabled",
-			wantMode:   "enforcing",
-			wantLoaded: "targeted",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("enabled", info.Status)
+				s.Equal("enforcing", info.CurrentMode)
+				s.Equal("targeted", info.LoadedPolicyName)
+				s.Equal("", info.MaxKernelPolicyVersion)
+				s.Equal("", info.PolicyVersion)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -324,24 +412,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			}
 
 			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
 
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-
-			info, ok := got.(*selinux.Info)
-			s.Require().True(ok)
-			s.Equal(tt.wantStatus, info.Status)
-			s.Equal(tt.wantMode, info.CurrentMode)
-			s.Equal(tt.wantLoaded, info.LoadedPolicyName)
-			s.Equal(tt.wantMaxKV, info.MaxKernelPolicyVersion)
-			s.Equal(tt.wantPV, info.PolicyVersion)
+			tt.validateFunc(got, err)
 		})
 	}
 }

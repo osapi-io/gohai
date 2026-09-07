@@ -56,15 +56,50 @@ func (s *UptimePublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(uptime.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c uptime.Collector) {
+				_, ok := c.(*uptime.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c uptime.Collector) {
+				_, ok := c.(*uptime.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c uptime.Collector) {
+				_, ok := c.(*uptime.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c uptime.Collector) {
+				_, ok := c.(*uptime.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c uptime.Collector) {
+				_, ok := c.(*uptime.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -74,14 +109,7 @@ func (s *UptimePublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*uptime.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*uptime.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -100,21 +128,25 @@ func (s *UptimePublicTestSuite) TestCollect() {
 	}
 
 	tests := []struct {
-		name    string
-		variant string
-		hostFn  func(context.Context) (*host.InfoStat, error)
-		setupFS func() avfs.VFS
-		wantErr bool
-		want    uptime.Info
+		name         string
+		variant      string
+		hostFn       func(context.Context) (*host.InfoStat, error)
+		setupFS      func() avfs.VFS
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: 3h up + idle parsed",
 			variant: "linux",
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("12345.67 9876.54\n", true) },
-			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
-				IdleSeconds: 9876, IdleHuman: "2h 44m 36s",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*uptime.Info)
+				s.Require().True(ok)
+				s.Equal(uptime.Info{
+					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+					IdleSeconds: 9876, IdleHuman: "2h 44m 36s",
+				}, *info)
 			},
 		},
 		{
@@ -122,8 +154,13 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			variant: "linux",
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("", false) },
-			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*uptime.Info)
+				s.Require().True(ok)
+				s.Equal(uptime.Info{
+					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				}, *info)
 			},
 		},
 		{
@@ -131,8 +168,13 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			variant: "linux",
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("12345.67\n", true) },
-			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*uptime.Info)
+				s.Require().True(ok)
+				s.Equal(uptime.Info{
+					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				}, *info)
 			},
 		},
 		{
@@ -140,8 +182,13 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			variant: "linux",
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("12345.67 xyz\n", true) },
-			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*uptime.Info)
+				s.Require().True(ok)
+				s.Equal(uptime.Info{
+					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				}, *info)
 			},
 		},
 		{
@@ -149,8 +196,13 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			variant: "linux",
 			hostFn:  okHost,
 			setupFS: func() avfs.VFS { return buildFS("12345.67 -1.0\n", true) },
-			want: uptime.Info{
-				Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*uptime.Info)
+				s.Require().True(ok)
+				s.Equal(uptime.Info{
+					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
+				}, *info)
 			},
 		},
 		{
@@ -158,7 +210,9 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			variant: "linux",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
 			setupFS: func() avfs.VFS { return buildFS("1 1\n", true) },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: uptime returned",
@@ -166,13 +220,23 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			hostFn: func(context.Context) (*host.InfoStat, error) {
 				return &host.InfoStat{Uptime: 7200, BootTime: 1_700_000_000}, nil
 			},
-			want: uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*uptime.Info)
+				s.Require().True(ok)
+				s.Equal(
+					uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
+					*info,
+				)
+			},
 		},
 		{
 			name:    "darwin: gopsutil error propagated",
 			variant: "darwin",
 			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -185,34 +249,56 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &uptime.Darwin{}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*uptime.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }
 
 func (s *UptimePublicTestSuite) TestHumanDuration() {
 	tests := []struct {
-		name    string
-		seconds uint64
-		want    string
+		name         string
+		seconds      uint64
+		validateFunc func(string)
 	}{
-		{"zero seconds", 0, "0s"},
-		{"seconds only", 45, "45s"},
-		{"minutes and seconds", 75, "1m 15s"},
-		{"hours/minutes/seconds", 3*3600 + 12*60 + 5, "3h 12m 5s"},
-		{"days+hours+minutes+seconds", 2*86400 + 5*3600 + 12*60 + 5, "2d 5h 12m 5s"},
+		{
+			name:    "zero seconds",
+			seconds: 0,
+			validateFunc: func(got string) {
+				s.Equal("0s", got)
+			},
+		},
+		{
+			name:    "seconds only",
+			seconds: 45,
+			validateFunc: func(got string) {
+				s.Equal("45s", got)
+			},
+		},
+		{
+			name:    "minutes and seconds",
+			seconds: 75,
+			validateFunc: func(got string) {
+				s.Equal("1m 15s", got)
+			},
+		},
+		{
+			name:    "hours/minutes/seconds",
+			seconds: 3*3600 + 12*60 + 5,
+			validateFunc: func(got string) {
+				s.Equal("3h 12m 5s", got)
+			},
+		},
+		{
+			name:    "days+hours+minutes+seconds",
+			seconds: 2*86400 + 5*3600 + 12*60 + 5,
+			validateFunc: func(got string) {
+				s.Equal("2d 5h 12m 5s", got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			s.Equal(tt.want, uptime.HumanDuration(tt.seconds))
+			tt.validateFunc(uptime.HumanDuration(tt.seconds))
 		})
 	}
 }

@@ -66,43 +66,65 @@ func TestGohaiPublicTestSuite(
 
 func (s *GohaiPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name           string
-		opts           []gohai.Option
-		injectFailing  bool
-		wantPlatform   bool
-		wantHostname   bool
-		wantTimings    bool
-		wantFailingErr bool
+		name          string
+		opts          []gohai.Option
+		injectFailing bool
+		validateFunc  func(*gohai.Facts, error)
 	}{
 		{
-			name:         "no opts collects nothing",
-			opts:         nil,
-			wantPlatform: false,
-			wantHostname: false,
+			name: "no opts collects nothing",
+			opts: nil,
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.Nil(facts.Platform)
+				s.Nil(facts.Hostname)
+				s.Nil(facts.Timings)
+			},
 		},
 		{
-			name:         "WithDefaults collects platform and hostname",
-			opts:         []gohai.Option{gohai.WithDefaults()},
-			wantPlatform: true,
-			wantHostname: true,
+			name: "WithDefaults collects platform and hostname",
+			opts: []gohai.Option{gohai.WithDefaults()},
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.NotNil(facts.Platform)
+				s.NotNil(facts.Hostname)
+				s.Nil(facts.Timings)
+			},
 		},
 		{
-			name:         "WithDefaults + WithDisabled subtracts platform",
-			opts:         []gohai.Option{gohai.WithDefaults(), gohai.WithDisabled("platform")},
-			wantPlatform: false,
-			wantHostname: true,
+			name: "WithDefaults + WithDisabled subtracts platform",
+			opts: []gohai.Option{gohai.WithDefaults(), gohai.WithDisabled("platform")},
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.Nil(facts.Platform)
+				s.NotNil(facts.Hostname)
+				s.Nil(facts.Timings)
+			},
 		},
 		{
-			name:         "WithEnabled platform without defaults still collects platform",
-			opts:         []gohai.Option{gohai.WithEnabled("platform")},
-			wantPlatform: true,
-			wantHostname: false,
+			name: "WithEnabled platform without defaults still collects platform",
+			opts: []gohai.Option{gohai.WithEnabled("platform")},
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.NotNil(facts.Platform)
+				s.Nil(facts.Hostname)
+				s.Nil(facts.Timings)
+			},
 		},
 		{
-			name:         "only platform",
-			opts:         []gohai.Option{gohai.WithCollectors("platform")},
-			wantPlatform: true,
-			wantHostname: false,
+			name: "only platform",
+			opts: []gohai.Option{gohai.WithCollectors("platform")},
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.NotNil(facts.Platform)
+				s.Nil(facts.Hostname)
+				s.Nil(facts.Timings)
+			},
 		},
 		{
 			name: "WithTimings populates Facts.Timings per collector",
@@ -110,23 +132,50 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 				gohai.WithCollectors("platform"),
 				gohai.WithTimings(),
 			},
-			wantPlatform: true,
-			wantTimings:  true,
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.NotNil(facts.Platform)
+				s.Nil(facts.Hostname)
+				s.Require().NotNil(facts.Timings)
+				s.Require().NotEmpty(facts.Timings.Collectors)
+				entry, ok := facts.Timings.Collectors["platform"]
+				s.Require().True(ok)
+				s.Equal("ok", entry.Status)
+				s.Empty(entry.Error)
+				s.Greater(entry.DurationNs, int64(0))
+			},
 		},
 		{
-			name:         "without WithTimings Facts.Timings is nil",
-			opts:         []gohai.Option{gohai.WithCollectors("platform")},
-			wantPlatform: true,
-			wantTimings:  false,
+			name: "without WithTimings Facts.Timings is nil",
+			opts: []gohai.Option{gohai.WithCollectors("platform")},
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.NotNil(facts.Platform)
+				s.Nil(facts.Hostname)
+				s.Nil(facts.Timings)
+			},
 		},
 		{
 			name: "failed collector drops from typed output, surfaces in Timings",
 			opts: []gohai.Option{
 				gohai.WithTimings(),
 			},
-			injectFailing:  true,
-			wantTimings:    true,
-			wantFailingErr: true,
+			injectFailing: true,
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.Nil(facts.Platform)
+				s.Nil(facts.Hostname)
+				s.Require().NotNil(facts.Timings)
+				s.Require().NotEmpty(facts.Timings.Collectors)
+				entry, ok := facts.Timings.Collectors["failtest"]
+				s.Require().True(ok)
+				s.Equal("err", entry.Status)
+				s.Contains(entry.Error, "simulated collector failure")
+				s.Greater(entry.DurationNs, int64(0))
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -143,30 +192,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 				)
 				s.Require().NoError(g.Select("failtest"))
 			}
-			facts, err := g.Collect(context.Background())
-			s.Require().NoError(err)
-			s.Require().NotNil(facts)
-			s.Equal(tt.wantPlatform, facts.Platform != nil)
-			s.Equal(tt.wantHostname, facts.Hostname != nil)
-			if tt.wantTimings {
-				s.Require().NotNil(facts.Timings)
-				s.Require().NotEmpty(facts.Timings.Collectors)
-				if tt.wantFailingErr {
-					entry, ok := facts.Timings.Collectors["failtest"]
-					s.Require().True(ok)
-					s.Equal("err", entry.Status)
-					s.Contains(entry.Error, "simulated collector failure")
-					s.Greater(entry.DurationNs, int64(0))
-				} else {
-					entry, ok := facts.Timings.Collectors["platform"]
-					s.Require().True(ok)
-					s.Equal("ok", entry.Status)
-					s.Empty(entry.Error)
-					s.Greater(entry.DurationNs, int64(0))
-				}
-			} else {
-				s.Nil(facts.Timings)
-			}
+			tt.validateFunc(g.Collect(context.Background()))
 		})
 	}
 }

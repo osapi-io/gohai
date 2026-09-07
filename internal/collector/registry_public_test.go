@@ -108,55 +108,73 @@ func newFailingCollector(
 
 func (s *RegistryPublicTestSuite) TestRegister() {
 	tests := []struct {
-		name      string
-		collector collector.Collector
-		wantErr   bool
+		name          string
+		collector     collector.Collector
+		registerTwice bool
+		validateFunc  func(*collector.Registry, collector.Collector, error)
 	}{
 		{
 			name:      "registers a new collector",
 			collector: newCollector(s.ctrl, "alpha", "", true),
-			wantErr:   false,
+			validateFunc: func(reg *collector.Registry, c collector.Collector, err error) {
+				s.NoError(err)
+				got, ok := reg.Get(c.Name())
+				s.True(ok)
+				s.Equal(c, got)
+			},
 		},
 		{
 			name:      "rejects empty name",
 			collector: newCollector(s.ctrl, "", "", true),
-			wantErr:   true,
+			validateFunc: func(_ *collector.Registry, _ collector.Collector, err error) {
+				s.Error(err)
+			},
 		},
 		{
-			name:      "rejects duplicate registration",
-			collector: newCollector(s.ctrl, "dup", "", true),
-			wantErr:   true,
+			name:          "rejects duplicate registration",
+			collector:     newCollector(s.ctrl, "dup", "", true),
+			registerTwice: true,
+			validateFunc: func(_ *collector.Registry, _ collector.Collector, err error) {
+				s.Error(err)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			reg := collector.NewRegistry()
-			if tt.name == "rejects duplicate registration" {
+			if tt.registerTwice {
 				s.Require().NoError(reg.Register(tt.collector))
 			}
-			err := reg.Register(tt.collector)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.NoError(err)
-			got, ok := reg.Get(tt.collector.Name())
-			s.True(ok)
-			s.Equal(tt.collector, got)
+
+			tt.validateFunc(reg, tt.collector, reg.Register(tt.collector))
 		})
 	}
 }
 
 func (s *RegistryPublicTestSuite) TestGet() {
 	tests := []struct {
-		name     string
-		register bool
-		lookup   string
-		wantOK   bool
+		name         string
+		register     bool
+		lookup       string
+		validateFunc func(bool)
 	}{
-		{"registered collector found", true, "known", true},
-		{"missing collector not found", false, "missing", false},
+		{
+			name:     "registered collector found",
+			register: true,
+			lookup:   "known",
+			validateFunc: func(ok bool) {
+				s.True(ok)
+			},
+		},
+		{
+			name:     "missing collector not found",
+			register: false,
+			lookup:   "missing",
+			validateFunc: func(ok bool) {
+				s.False(ok)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -167,7 +185,8 @@ func (s *RegistryPublicTestSuite) TestGet() {
 					NoError(reg.Register(newCollector(s.ctrl, tt.lookup, "", true)))
 			}
 			_, ok := reg.Get(tt.lookup)
-			s.Equal(tt.wantOK, ok)
+
+			tt.validateFunc(ok)
 		})
 	}
 }
@@ -178,19 +197,38 @@ func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "c", "system", false)))
 
 	tests := []struct {
-		name     string
-		category string
-		want     []string
+		name         string
+		category     string
+		validateFunc func([]string)
 	}{
-		{"multiple collectors in category", "cloud", []string{"a", "b"}},
-		{"single collector in category", "system", []string{"c"}},
-		{"unknown category returns empty", "missing", []string{}},
+		{
+			name:     "multiple collectors in category",
+			category: "cloud",
+			validateFunc: func(got []string) {
+				s.Equal([]string{"a", "b"}, got)
+			},
+		},
+		{
+			name:     "single collector in category",
+			category: "system",
+			validateFunc: func(got []string) {
+				s.Equal([]string{"c"}, got)
+			},
+		},
+		{
+			name:     "unknown category returns empty",
+			category: "missing",
+			validateFunc: func(got []string) {
+				s.Equal([]string{}, got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			got := s.reg.NamesInCategory(tt.category)
 			sort.Strings(got)
-			s.Equal(tt.want, got)
+
+			tt.validateFunc(got)
 		})
 	}
 }
@@ -203,37 +241,43 @@ func (s *RegistryPublicTestSuite) TestGetDep() {
 	}
 
 	tests := []struct {
-		name    string
-		lookup  string
-		wantOK  bool
-		wantVal string // only checked when wantOK is true
+		name         string
+		lookup       string
+		validateFunc func(string, bool)
 	}{
 		{
-			name:    "matching type returns the value",
-			lookup:  "typed",
-			wantOK:  true,
-			wantVal: "hello",
+			name:   "matching type returns the value",
+			lookup: "typed",
+			validateFunc: func(got string, ok bool) {
+				s.True(ok)
+				s.Equal("hello", got)
+			},
 		},
 		{
 			name:   "missing key returns ok=false",
 			lookup: "missing",
+			validateFunc: func(_ string, ok bool) {
+				s.False(ok)
+			},
 		},
 		{
 			name:   "type mismatch returns ok=false",
 			lookup: "wrong",
+			validateFunc: func(_ string, ok bool) {
+				s.False(ok)
+			},
 		},
 		{
 			name:   "nil-valued any does not type-assert",
 			lookup: "nil-slot",
+			validateFunc: func(_ string, ok bool) {
+				s.False(ok)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, ok := collector.GetDep[string](prior, tt.lookup)
-			s.Equal(tt.wantOK, ok)
-			if tt.wantOK {
-				s.Equal(tt.wantVal, got)
-			}
+			tt.validateFunc(collector.GetDep[string](prior, tt.lookup))
 		})
 	}
 }
@@ -248,42 +292,77 @@ func (s *RegistryPublicTestSuite) TestNames() {
 
 func (s *RegistryPublicTestSuite) TestSelected() {
 	tests := []struct {
-		name    string
-		enable  []string
-		disable []string
-		unknown bool
-		want    []string
-		wantErr bool
+		name         string
+		enable       []string
+		disable      []string
+		unknown      bool
+		validateFunc func([]collector.Collector, error)
 	}{
 		{
 			name: "defaults: core+extended on, opt-in off",
-			want: []string{"core1", "core2", "ext"},
+			validateFunc: func(got []collector.Collector, err error) {
+				s.Require().NoError(err)
+				names := make([]string, 0, len(got))
+				for _, c := range got {
+					names = append(names, c.Name())
+				}
+				sort.Strings(names)
+				s.Equal([]string{"core1", "core2", "ext"}, names)
+			},
 		},
 		{
 			name:    "disable a default-on collector",
 			disable: []string{"core1"},
-			want:    []string{"core2", "ext"},
+			validateFunc: func(got []collector.Collector, err error) {
+				s.Require().NoError(err)
+				names := make([]string, 0, len(got))
+				for _, c := range got {
+					names = append(names, c.Name())
+				}
+				sort.Strings(names)
+				s.Equal([]string{"core2", "ext"}, names)
+			},
 		},
 		{
 			name:   "enable an opt-in collector",
 			enable: []string{"opt"},
-			want:   []string{"core1", "core2", "ext", "opt"},
+			validateFunc: func(got []collector.Collector, err error) {
+				s.Require().NoError(err)
+				names := make([]string, 0, len(got))
+				for _, c := range got {
+					names = append(names, c.Name())
+				}
+				sort.Strings(names)
+				s.Equal([]string{"core1", "core2", "ext", "opt"}, names)
+			},
 		},
 		{
 			name:    "disable wins over enable for same name",
 			enable:  []string{"opt"},
 			disable: []string{"opt"},
-			want:    []string{"core1", "core2", "ext"},
+			validateFunc: func(got []collector.Collector, err error) {
+				s.Require().NoError(err)
+				names := make([]string, 0, len(got))
+				for _, c := range got {
+					names = append(names, c.Name())
+				}
+				sort.Strings(names)
+				s.Equal([]string{"core1", "core2", "ext"}, names)
+			},
 		},
 		{
-			name:    "unknown in enable list errors",
-			enable:  []string{"missing"},
-			wantErr: true,
+			name:   "unknown in enable list errors",
+			enable: []string{"missing"},
+			validateFunc: func(_ []collector.Collector, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "unknown in disable list errors",
 			disable: []string{"missing"},
-			wantErr: true,
+			validateFunc: func(_ []collector.Collector, err error) {
+				s.Error(err)
+			},
 		},
 	}
 
@@ -299,32 +378,18 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 			s.Require().
 				NoError(reg.Register(newCollector(s.ctrl, "opt", "", false)))
 
-			got, err := reg.Selected(tt.enable, tt.disable)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			names := make([]string, 0, len(got))
-			for _, c := range got {
-				names = append(names, c.Name())
-			}
-			sort.Strings(names)
-			s.Equal(tt.want, names)
+			tt.validateFunc(reg.Selected(tt.enable, tt.disable))
 		})
 	}
 }
 
 func (s *RegistryPublicTestSuite) TestRun() {
 	tests := []struct {
-		name            string
-		setup           func(reg *collector.Registry)
-		names           []string
-		hooks           func(mu *sync.Mutex, onErr *[]string, onComp *[]string) collector.Hooks
-		wantResults     []string
-		wantErrNames    []string
-		wantCompleteAll []string
-		wantErr         bool
+		name         string
+		setup        func(reg *collector.Registry)
+		names        []string
+		hooks        func(mu *sync.Mutex, onErr *[]string, onComp *[]string) collector.Hooks
+		validateFunc func(map[string]any, []string, []string, error)
 	}{
 		{
 			name: "orders by dependency",
@@ -336,8 +401,13 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.Require().
 					NoError(reg.Register(newCollector(s.ctrl, "c", "", true, "b")))
 			},
-			names:       []string{"a", "b", "c"},
-			wantResults: []string{"a", "b", "c"},
+			names: []string{"a", "b", "c"},
+			validateFunc: func(results map[string]any, _, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Contains(results, "a")
+				s.Contains(results, "b")
+				s.Contains(results, "c")
+			},
 		},
 		{
 			name: "auto-includes dependencies",
@@ -347,8 +417,12 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.Require().
 					NoError(reg.Register(newCollector(s.ctrl, "b", "", false, "a")))
 			},
-			names:       []string{"b"},
-			wantResults: []string{"a", "b"},
+			names: []string{"b"},
+			validateFunc: func(results map[string]any, _, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Contains(results, "a")
+				s.Contains(results, "b")
+			},
 		},
 		{
 			name: "detects cycle",
@@ -358,8 +432,10 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.Require().
 					NoError(reg.Register(newCollector(s.ctrl, "b", "", true, "a")))
 			},
-			names:   []string{"a", "b"},
-			wantErr: true,
+			names: []string{"a", "b"},
+			validateFunc: func(_ map[string]any, _, _ []string, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name: "missing dependency errors",
@@ -367,8 +443,10 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.Require().
 					NoError(reg.Register(newCollector(s.ctrl, "a", "", true, "missing")))
 			},
-			names:   []string{"a"},
-			wantErr: true,
+			names: []string{"a"},
+			validateFunc: func(_ map[string]any, _, _ []string, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name: "collector error omits from results",
@@ -378,16 +456,21 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.Require().
 					NoError(reg.Register(newCollector(s.ctrl, "good", "", true)))
 			},
-			names:        []string{"bad", "good"},
-			wantResults:  []string{"good"},
-			wantErrNames: []string{"bad"},
+			names: []string{"bad", "good"},
+			validateFunc: func(results map[string]any, errNames, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Contains(results, "good")
+				s.Contains(errNames, "bad")
+			},
 		},
 		{
 			name: "unknown collector errors",
 			setup: func(_ *collector.Registry) {
 			},
-			names:   []string{"missing"},
-			wantErr: true,
+			names: []string{"missing"},
+			validateFunc: func(_ map[string]any, _, _ []string, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name: "zero-value hooks tolerates error without handler",
@@ -399,7 +482,9 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			hooks: func(*sync.Mutex, *[]string, *[]string) collector.Hooks {
 				return collector.Hooks{}
 			},
-			wantResults: nil, // "bad" drops silently
+			validateFunc: func(_ map[string]any, _, _ []string, err error) {
+				s.Require().NoError(err)
+			},
 		},
 		{
 			name: "OnComplete fires for every collector (success and failure)",
@@ -428,9 +513,13 @@ func (s *RegistryPublicTestSuite) TestRun() {
 					},
 				}
 			},
-			wantResults:     []string{"good"},
-			wantErrNames:    []string{"bad"},
-			wantCompleteAll: []string{"bad", "good"},
+			validateFunc: func(results map[string]any, errNames, completeNames []string, err error) {
+				s.Require().NoError(err)
+				s.Contains(results, "good")
+				s.Contains(errNames, "bad")
+				s.Contains(completeNames, "bad")
+				s.Contains(completeNames, "good")
+			},
 		},
 	}
 
@@ -454,22 +543,11 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				hooks = tt.hooks(&mu, &errNames, &completeNames)
 			}
 			results, err := reg.Run(context.Background(), tt.names, hooks)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
+
 			mu.Lock()
 			defer mu.Unlock()
-			for _, name := range tt.wantResults {
-				s.Contains(results, name)
-			}
-			for _, name := range tt.wantErrNames {
-				s.Contains(errNames, name)
-			}
-			for _, name := range tt.wantCompleteAll {
-				s.Contains(completeNames, name)
-			}
+
+			tt.validateFunc(results, errNames, completeNames, err)
 		})
 	}
 }

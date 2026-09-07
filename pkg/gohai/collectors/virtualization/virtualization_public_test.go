@@ -129,15 +129,50 @@ func (s *VirtualizationPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(virtualization.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c virtualization.Collector) {
+				_, ok := c.(*virtualization.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c virtualization.Collector) {
+				_, ok := c.(*virtualization.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c virtualization.Collector) {
+				_, ok := c.(*virtualization.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c virtualization.Collector) {
+				_, ok := c.(*virtualization.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c virtualization.Collector) {
+				_, ok := c.(*virtualization.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -147,33 +182,32 @@ func (s *VirtualizationPublicTestSuite) TestNew() {
 			s.Equal("virtualization", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Equal([]string{"cpu"}, c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*virtualization.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*virtualization.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *VirtualizationPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name     string
-		variant  string
-		fs       func() avfs.VFS
-		exec     func(*testing.T) executor.Executor
-		prior    collector.PriorResults
-		validate func(*virtualization.Info)
+		name         string
+		variant      string
+		fs           func() avfs.VFS
+		exec         func(*testing.T) executor.Executor
+		prior        collector.PriorResults
+		validateFunc func(any, error)
 	}{
 		{
-			name:     "linux: bare metal empty Systems",
-			variant:  "linux",
-			fs:       func() avfs.VFS { return fsWith(s.T(), nil) },
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Empty(i.Systems); s.Empty(i.System) },
+			name:    "linux: bare metal empty Systems",
+			variant: "linux",
+			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			exec:    func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Empty(i.Systems)
+				s.Empty(i.System)
+			},
 		},
 		{
 			name:    "linux: systemd-detect-virt --vm reports kvm",
@@ -184,7 +218,10 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"systemd-detect-virt --vm": []byte("kvm\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
 				s.Equal("guest", i.Systems["kvm"])
 				s.Equal("kvm", i.System)
 			},
@@ -198,7 +235,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"command -v docker": []byte("/usr/bin/docker\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["docker"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "linux: podman + nova hosts",
@@ -210,7 +252,10 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"command -v nova":   []byte("/usr/bin/nova\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
 				s.Equal("host", i.Systems["podman"])
 				s.Equal("host", i.Systems["openstack"])
 			},
@@ -223,8 +268,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/xen/capabilities": "control_d\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["xen"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["xen"])
+			},
 		},
 		{
 			name:    "linux: vbox host via /proc/modules",
@@ -234,8 +284,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/modules": "vboxdrv 524288 0 - Live 0x0\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["vbox"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["vbox"])
+			},
 		},
 		{
 			name:    "linux: vbox guest via /proc/modules",
@@ -245,8 +300,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/modules": "vboxguest 360448 1 - Live 0x0\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["vbox"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["vbox"])
+			},
 		},
 		{
 			name:    "linux: kvm guest via /proc/cpuinfo QEMU string",
@@ -256,8 +316,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/cpuinfo": "model name : QEMU Virtual CPU version 2.5+\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["kvm"])
+			},
 		},
 		{
 			name:    "linux: kvm host via /sys/devices/virtual/misc/kvm without hypervisor flag",
@@ -268,8 +333,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/devices/virtual/misc/kvm": "",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["kvm"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["kvm"])
+			},
 		},
 		{
 			name:    "linux: kvm guest via hypervisor flag",
@@ -280,8 +350,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/devices/virtual/misc/kvm": "",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["kvm"])
+			},
 		},
 		{
 			name:    "linux: DMI vmware",
@@ -292,8 +367,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/product_name": "VMware Virtual Platform\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["vmware"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["vmware"])
+			},
 		},
 		{
 			name:    "linux: DMI hyperv",
@@ -304,8 +384,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/product_name": "Virtual Machine\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["hyperv"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["hyperv"])
+			},
 		},
 		{
 			name:    "linux: DMI parallels",
@@ -316,8 +401,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/product_name": "Parallels Virtual Platform\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["parallels"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["parallels"])
+			},
 		},
 		{
 			name:    "linux: DMI xen",
@@ -328,8 +418,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/sys_vendor":   "Xen\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["xen"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["xen"])
+			},
 		},
 		{
 			name:    "linux: DMI qemu/kvm",
@@ -340,8 +435,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/sys_vendor":   "QEMU\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["kvm"])
+			},
 		},
 		{
 			name:    "linux: DMI openstack via sys_vendor",
@@ -352,8 +452,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/product_name": "OpenStack Nova\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["openstack"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["openstack"])
+			},
 		},
 		{
 			name:    "linux: DMI openstack via product_name (Red Hat variant)",
@@ -364,8 +469,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/product_name": "OpenStack Compute\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["openstack"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["openstack"])
+			},
 		},
 		{
 			name:    "linux: DMI amazonec2",
@@ -375,8 +485,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/sys_vendor": "Amazon EC2\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["amazonec2"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["amazonec2"])
+			},
 		},
 		{
 			name:    "linux: DMI veertu",
@@ -386,8 +501,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/sys_vendor": "Veertu, Inc.\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["veertu"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["veertu"])
+			},
 		},
 		{
 			name:    "linux: DMI virtualbox via product_name",
@@ -398,8 +518,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/product_name": "VirtualBox\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["vbox"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["vbox"])
+			},
 		},
 		{
 			name:    "linux: DMI kvm via RHEV product",
@@ -410,8 +535,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/product_name": "RHEV Hypervisor\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["kvm"])
+			},
 		},
 		{
 			name:    "linux: DMI bhyve via product_name",
@@ -421,8 +551,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/sys/class/dmi/id/product_name": "BHYVE\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["bhyve"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["bhyve"])
+			},
 		},
 		{
 			name:    "linux: cpuinfo Common 32-bit KVM processor → kvm guest",
@@ -432,8 +567,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/cpuinfo": "model name : Common 32-bit KVM processor\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["kvm"])
+			},
 		},
 		{
 			name:    "linux: cgroup nested docker (systemd /system.slice/docker-*.scope)",
@@ -443,8 +583,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/self/cgroup": "0::/system.slice/docker-47341cd3bba14d17d3d67e6b4bd3b46f.scope\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "linux: cgroup nested docker (docker-ce layout)",
@@ -454,8 +599,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/self/cgroup": "0::/docker-ce/docker/b15b851234abcdef\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "linux: kvm via cpu prior (nested VM without /sys/devices/virtual/misc/kvm)",
@@ -467,7 +617,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"cpu": &cpu.Info{HypervisorVendor: "KVM", VirtualizationType: "full"},
 			},
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["kvm"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["kvm"])
+			},
 		},
 		{
 			name:    "linux: lxc host missing cgroup file → no lxc",
@@ -481,7 +636,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
 				)
 			},
-			validate: func(i *virtualization.Info) { s.Empty(i.Systems["lxc"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Empty(i.Systems["lxc"])
+			},
 		},
 		{
 			name:    "linux: lxc host cgroup root not / → no lxc",
@@ -497,7 +657,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
 				)
 			},
-			validate: func(i *virtualization.Info) { s.Empty(i.Systems["lxc"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Empty(i.Systems["lxc"])
+			},
 		},
 		{
 			name:    "linux: lxc host cgroup malformed line → no lxc",
@@ -513,7 +678,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
 				)
 			},
-			validate: func(i *virtualization.Info) { s.Empty(i.Systems["lxc"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Empty(i.Systems["lxc"])
+			},
 		},
 		{
 			name:    "linux: lxc host via lxc-start on PATH + cgroup roots all /",
@@ -529,7 +699,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
 				)
 			},
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["lxc"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["lxc"])
+			},
 		},
 		{
 			name:    "linux: openvz host then guest precedence (host wins)",
@@ -537,8 +712,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/proc/bc/0": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["openvz"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["openvz"])
+			},
 		},
 		{
 			name:    "linux: openvz guest",
@@ -546,8 +726,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/proc/vz": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["openvz"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["openvz"])
+			},
 		},
 		{
 			name:    "linux: hyperv guest via kvp_pool_3 with hypervisor_host extraction",
@@ -560,7 +745,10 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 				return fsWith(s.T(), map[string]string{"/var/lib/hyperv/.kvp_pool_3": blob})
 			},
 			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
 				s.Equal("guest", i.Systems["hyperv"])
 				s.Equal("hyperv-host-01", i.HypervisorHost)
 			},
@@ -572,7 +760,10 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 				return fsWith(s.T(), map[string]string{"/var/lib/hyperv/.kvp_pool_3": "empty-pool"})
 			},
 			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
 				s.Equal("guest", i.Systems["hyperv"])
 				s.Empty(i.HypervisorHost)
 			},
@@ -585,8 +776,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/self/status": "Name: bash\ns_context: 0\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["linux-vserver"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["linux-vserver"])
+			},
 		},
 		{
 			name:    "linux: linux-vserver guest via VxID",
@@ -596,8 +792,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/self/status": "Name: bash\nVxID: 42\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["linux-vserver"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["linux-vserver"])
+			},
 		},
 		{
 			name:    "linux: cgroup docker container",
@@ -607,8 +808,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/self/cgroup": "12:devices:/docker/abc123\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "linux: cgroup containerd remaps to docker",
@@ -618,8 +824,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/self/cgroup": "12:devices:/containerd/xyz\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "linux: cgroup lxc",
@@ -629,8 +840,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/self/cgroup": "12:devices:/lxc/c1\n",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["lxc"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["lxc"])
+			},
 		},
 		{
 			name:    "linux: environ container=lxc",
@@ -640,8 +856,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/1/environ": "PATH=/usr/bin\x00container=lxc\x00",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["lxc"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["lxc"])
+			},
 		},
 		{
 			name:    "linux: environ container=systemd-nspawn",
@@ -651,8 +872,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/1/environ": "container=systemd-nspawn\x00",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["nspawn"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["nspawn"])
+			},
 		},
 		{
 			name:    "linux: environ container=podman",
@@ -662,8 +888,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"/proc/1/environ": "container=podman\x00",
 				})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["podman"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["podman"])
+			},
 		},
 		{
 			name:    "linux: /.dockerenv override forces docker guest",
@@ -671,8 +902,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/.dockerenv": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "linux: /.dockerinit alternate",
@@ -680,8 +916,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/.dockerinit": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "linux: lxd guest via /dev/lxd/sock",
@@ -689,8 +930,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/dev/lxd/sock": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["lxd"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["lxd"])
+			},
 		},
 		{
 			name:    "linux: lxd host via /var/lib/lxd/devlxd",
@@ -698,8 +944,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/var/lib/lxd/devlxd": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["lxd"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["lxd"])
+			},
 		},
 		{
 			name:    "linux: lxd snap host path",
@@ -707,8 +958,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/var/snap/lxd/common/lxd/devlxd": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["lxd"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["lxd"])
+			},
 		},
 		{
 			name:    "linux: nested kvm guest + docker host",
@@ -723,7 +979,10 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"command -v docker": []byte("/usr/bin/docker\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
 				s.Equal("guest", i.Systems["kvm"])
 				s.Equal("host", i.Systems["docker"])
 				s.Len(i.Systems, 2)
@@ -735,8 +994,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/.dockerenv": ""})
 			},
-			exec:     func(*testing.T) executor.Executor { return nil },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["docker"]) },
+			exec: func(*testing.T) executor.Executor { return nil },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "linux: xen guest only (no /proc/xen/capabilities)",
@@ -744,8 +1008,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/proc/xen/other": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["xen"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["xen"])
+			},
 		},
 		{
 			name:    "linux: systemd-detect-virt empty output skipped",
@@ -754,14 +1023,24 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(t, map[string][]byte{"systemd-detect-virt --vm": []byte("\n")})
 			},
-			validate: func(i *virtualization.Info) { s.Empty(i.Systems) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Empty(i.Systems)
+			},
 		},
 		{
-			name:     "darwin: bare metal Mac empty",
-			variant:  "darwin",
-			fs:       func() avfs.VFS { return fsWith(s.T(), nil) },
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Empty(i.Systems) },
+			name:    "darwin: bare metal Mac empty",
+			variant: "darwin",
+			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			exec:    func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Empty(i.Systems)
+			},
 		},
 		{
 			name:    "darwin: docker host on PATH",
@@ -772,7 +1051,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"command -v docker": []byte("/usr/local/bin/docker\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["docker"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["docker"])
+			},
 		},
 		{
 			name:    "darwin: VBoxManage host on PATH",
@@ -783,7 +1067,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"command -v VBoxManage": []byte("/usr/local/bin/VBoxManage\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["vbox"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["vbox"])
+			},
 		},
 		{
 			name:    "darwin: prlctl host on PATH",
@@ -794,7 +1083,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"command -v prlctl": []byte("/usr/local/bin/prlctl\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["parallels"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["parallels"])
+			},
 		},
 		{
 			name:    "darwin: VMware Fusion app present",
@@ -802,8 +1096,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/Applications/VMware Fusion.app": ""})
 			},
-			exec:     func(t *testing.T) executor.Executor { return virtExec(t, nil) },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["vmware"]) },
+			exec: func(t *testing.T) executor.Executor { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["vmware"])
+			},
 		},
 		{
 			name:    "darwin: QEMU/Virtualization.framework guest via sysctl",
@@ -814,7 +1113,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"sysctl -n kern.hv_vmm_present": []byte("1\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["qemu"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["qemu"])
+			},
 		},
 		{
 			name:    "darwin: sysctl returns 0, no qemu detection",
@@ -825,7 +1129,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"sysctl -n kern.hv_vmm_present": []byte("0\n"),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.NotContains(i.Systems, "qemu") },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.NotContains(i.Systems, "qemu")
+			},
 		},
 		{
 			name:    "darwin: Parallels guest via ioreg",
@@ -838,7 +1147,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["parallels"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["parallels"])
+			},
 		},
 		{
 			name:    "darwin: VirtualBox guest via system_profiler Boot ROM",
@@ -849,7 +1163,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"system_profiler SPHardwareDataType": []byte(sysProfilerVBox),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["vbox"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["vbox"])
+			},
 		},
 		{
 			name:    "darwin: VMware guest via system_profiler Boot ROM",
@@ -860,7 +1179,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"system_profiler SPHardwareDataType": []byte(sysProfilerVMware),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["vmware"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["vmware"])
+			},
 		},
 		{
 			name:    "darwin: Apple VM via Model Identifier",
@@ -871,7 +1195,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 					"system_profiler SPHardwareDataType": []byte(sysProfilerAppleVM),
 				})
 			},
-			validate: func(i *virtualization.Info) { s.Equal("guest", i.Systems["apple"]) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["apple"])
+			},
 		},
 		{
 			name:    "darwin: nil Exec no exec detections file-based still works",
@@ -879,8 +1208,13 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{"/Applications/VMware Fusion.app": ""})
 			},
-			exec:     func(*testing.T) executor.Executor { return nil },
-			validate: func(i *virtualization.Info) { s.Equal("host", i.Systems["vmware"]) },
+			exec: func(*testing.T) executor.Executor { return nil },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["vmware"])
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -892,11 +1226,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &virtualization.Darwin{FS: tt.fs(), Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), tt.prior)
-			s.Require().NoError(err)
-			info, ok := got.(*virtualization.Info)
-			s.Require().True(ok)
-			tt.validate(info)
+			tt.validateFunc(c.Collect(context.Background(), tt.prior))
 		})
 	}
 }

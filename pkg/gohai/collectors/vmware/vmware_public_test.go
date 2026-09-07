@@ -140,14 +140,42 @@ func (s *VMwarePublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(vmware.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c vmware.Collector) {
+				_, ok := c.(*vmware.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c vmware.Collector) {
+				_, ok := c.(*vmware.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c vmware.Collector) {
+				_, ok := c.(*vmware.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c vmware.Collector) {
+				_, ok := c.(*vmware.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -157,26 +185,18 @@ func (s *VMwarePublicTestSuite) TestNew() {
 			s.Equal("virtualization", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*vmware.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*vmware.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
 
 func (s *VMwarePublicTestSuite) TestCollect() {
 	tests := []struct {
-		name        string
-		variant     string
-		setupLinux  func() *vmware.Linux
-		setupDarwin func() *vmware.Darwin
-		wantNil     bool
-		validate    func(*vmware.Info)
+		name         string
+		variant      string
+		setupLinux   func() *vmware.Linux
+		setupDarwin  func() *vmware.Darwin
+		validateFunc func(any, error)
 	}{
 		// ----- Linux -----
 		{
@@ -194,7 +214,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				)
 				return &vmware.Linux{FS: f, Exec: fullToolboxMock(s.T())}
 			},
-			validate: func(i *vmware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
 				s.Equal("12.3.0 build-21581411", i.Version)
 				s.Equal("vmware_desktop", i.HostType)
 				s.Equal("01 Jan 2026 12:00:00", i.Hosttime)
@@ -211,7 +234,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					fs.FileMode(0o444))
 				return &vmware.Linux{FS: f, Exec: vsphereMock(s.T())}
 			},
-			validate: func(i *vmware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
 				s.Equal("vmware_vsphere", i.HostType)
 				s.Equal("7.0.3", i.HostVersion)
 			},
@@ -275,7 +301,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
 			},
-			validate: func(i *vmware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
 				s.Equal("12.3.0", i.Version)
 				s.Equal("vmware_desktop", i.HostType)
 			},
@@ -339,7 +368,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware\n"), fs.FileMode(0o444))
 				return &vmware.Linux{FS: f, Exec: m}
 			},
-			validate: func(i *vmware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
 				s.Empty(i.Hosttime)
 			},
 		},
@@ -405,7 +437,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware\n"), fs.FileMode(0o444))
 				return &vmware.Linux{FS: f, Exec: m}
 			},
-			validate: func(i *vmware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
 				s.Equal("vmware_vsphere", i.HostType)
 				s.Empty(i.HostVersion)
 			},
@@ -420,7 +455,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					Return(nil, errors.New("not found")).AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
 			},
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "linux: nil Exec and no /proc/scsi/scsi returns nil",
@@ -428,7 +466,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			setupLinux: func() *vmware.Linux {
 				return &vmware.Linux{FS: memfs.New(), Exec: nil}
 			},
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		// ----- Darwin -----
 		{
@@ -437,7 +478,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			setupDarwin: func() *vmware.Darwin {
 				return &vmware.Darwin{Exec: fullToolboxMock(s.T())}
 			},
-			validate: func(i *vmware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
 				s.Equal("12.3.0 build-21581411", i.Version)
 				s.Equal("vmware_desktop", i.HostType)
 			},
@@ -499,7 +543,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					AnyTimes()
 				return &vmware.Darwin{Exec: m}
 			},
-			validate: func(i *vmware.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
 				s.Empty(i.Speed)
 				s.Equal("vmware_desktop", i.HostType)
 			},
@@ -514,7 +561,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					Return(nil, errors.New("not found")).AnyTimes()
 				return &vmware.Darwin{Exec: m}
 			},
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "darwin: toolbox-cmd returns empty output — nil",
@@ -526,7 +576,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					Return([]byte{}, nil).AnyTimes()
 				return &vmware.Darwin{Exec: m}
 			},
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 		{
 			name:    "darwin: nil Exec returns nil",
@@ -534,7 +587,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			setupDarwin: func() *vmware.Darwin {
 				return &vmware.Darwin{Exec: nil}
 			},
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -546,17 +602,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			case "darwin":
 				c = tt.setupDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*vmware.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

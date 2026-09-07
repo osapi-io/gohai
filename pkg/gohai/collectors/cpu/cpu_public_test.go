@@ -121,15 +121,50 @@ func (s *CPUPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(cpu.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c cpu.Collector) {
+				_, ok := c.(*cpu.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c cpu.Collector) {
+				_, ok := c.(*cpu.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c cpu.Collector) {
+				_, ok := c.(*cpu.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c cpu.Collector) {
+				_, ok := c.(*cpu.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c cpu.Collector) {
+				_, ok := c.(*cpu.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -139,14 +174,7 @@ func (s *CPUPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*cpu.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*cpu.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -197,14 +225,13 @@ func (s *CPUPublicTestSuite) TestCollect() {
 	}
 
 	tests := []struct {
-		name     string
-		variant  string
-		infoFn   func(context.Context) ([]gpcpu.InfoStat, error)
-		countsFn func(context.Context, bool) (int, error)
-		fs       avfs.VFS
-		exec     func(*testing.T) executor.Executor
-		wantErr  bool
-		validate func(*cpu.Info)
+		name         string
+		variant      string
+		infoFn       func(context.Context) ([]gpcpu.InfoStat, error)
+		countsFn     func(context.Context, bool) (int, error)
+		fs           avfs.VFS
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:     "linux: base only, no vulns dir no lscpu",
@@ -213,7 +240,10 @@ func (s *CPUPublicTestSuite) TestCollect() {
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
 			exec:     noLscpuExec,
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Nil(i.Vulnerabilities)
 				s.Nil(i.Caches)
 				s.Nil(i.NumaNodes)
@@ -253,7 +283,10 @@ func (s *CPUPublicTestSuite) TestCollect() {
 			countsFn: func(context.Context, bool) (int, error) { return 24, nil },
 			fs:       newVulnFS(s, nil),
 			exec:     noLscpuExec,
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Require().Len(i.CPUs, 2)
 				s.Equal("P-core", i.CPUs[0].ModelName)
 				s.Equal(float64(5200), i.CPUs[0].Speed)
@@ -272,7 +305,10 @@ func (s *CPUPublicTestSuite) TestCollect() {
 				"mds":        "Not affected\n",
 			}),
 			exec: noLscpuExec,
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal("Mitigation: PTI", i.Vulnerabilities["meltdown"])
 				s.Equal("Mitigation: Retpolines", i.Vulnerabilities["spectre_v2"])
 				s.Equal("Not affected", i.Vulnerabilities["mds"])
@@ -285,7 +321,10 @@ func (s *CPUPublicTestSuite) TestCollect() {
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, map[string]string{}),
 			exec:     noLscpuExec,
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Nil(i.Vulnerabilities)
 			},
 		},
@@ -327,7 +366,10 @@ NUMA node(s):        2
 NUMA node0 CPU(s):   0-15
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(i.Caches)
 				s.Equal("32 KiB", i.Caches.L1d)
 				s.Equal("32 KiB", i.Caches.L1i)
@@ -375,7 +417,10 @@ Book(s) per drawer:  2
 Drawer(s):           2
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal("3906", i.MachineType)
 				s.Equal("horizontal", i.DispatchingMode)
 				s.Equal(24, i.Count)
@@ -396,7 +441,10 @@ Book(s) per drawer:  2
 Drawer(s):           2
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(24, i.Count)
 				s.Equal(24, i.Cores)
 				s.Equal(2, i.Sockets)
@@ -415,7 +463,10 @@ Core(s) per socket:  20
 Socket(s):           2
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(160, i.Count)
 				s.Equal(40, i.Cores)
 				s.Equal(2, i.Sockets)
@@ -430,7 +481,10 @@ Socket(s):           2
 			exec: func(t *testing.T) executor.Executor {
 				return lscpuExec(t, "CPU op-mode(s):      ,   ,\n")
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Nil(i.Opmodes)
 			},
 		},
@@ -443,7 +497,10 @@ Socket(s):           2
 			exec: func(t *testing.T) executor.Executor {
 				return lscpuExec(t, "no colons here\nmore garbage\n")
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Nil(i.Caches)
 				s.Nil(i.NumaNodes)
 				s.Equal(16, i.Count)
@@ -460,7 +517,10 @@ Socket(s):           2
 NUMA node0 CPU(s):   0-3,8,10-11
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal([]int{0, 1, 2, 3, 8, 10, 11}, i.NumaNodes[0])
 			},
 		},
@@ -475,7 +535,10 @@ NUMA node0 CPU(s):   0-3,8,10-11
 NUMA node0 CPU(s):   bad-data,x-y
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				if i.NumaNodes != nil {
 					s.Nil(i.NumaNodes[0])
 				}
@@ -492,7 +555,10 @@ NUMA node0 CPU(s):   bad-data,x-y
 NUMA node0 CPU(s):   5-2
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				if i.NumaNodes != nil {
 					s.Nil(i.NumaNodes[0])
 				}
@@ -511,7 +577,10 @@ NUMA node0 CPU(s):   5-2
 				return f
 			}(),
 			exec: noLscpuExec,
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal("Mitigation: PTI", i.Vulnerabilities["meltdown"])
 				s.NotContains(i.Vulnerabilities, "unrelated_subdir")
 			},
@@ -528,7 +597,10 @@ NUMA node0 CPU(s):   5-2
 				failPath: "/sys/devices/system/cpu/vulnerabilities/bad",
 			},
 			exec: noLscpuExec,
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal("Mitigation: PTI", i.Vulnerabilities["meltdown"])
 				s.NotContains(i.Vulnerabilities, "bad")
 			},
@@ -545,7 +617,10 @@ L1d cache:
 L1i cache:           32 KiB
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(i.Caches)
 				s.Equal("", i.Caches.L1d)
 				s.Equal("32 KiB", i.Caches.L1i)
@@ -562,7 +637,10 @@ L1i cache:           32 KiB
 NUMA node0 CPU(s):   0,,3
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal([]int{0, 3}, i.NumaNodes[0])
 			},
 		},
@@ -577,7 +655,10 @@ NUMA node0 CPU(s):   0,,3
 NUMA node0 CPU(s):   abc
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				if i.NumaNodes != nil {
 					s.Nil(i.NumaNodes[0])
 				}
@@ -594,7 +675,10 @@ NUMA node0 CPU(s):   abc
 NUMA node0 CPU(s):   ,,,
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				if i.NumaNodes != nil {
 					s.Nil(i.NumaNodes[0])
 				}
@@ -614,7 +698,10 @@ Socket(s) per book:  1
 Book(s) per drawer:  1
 `)
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(2, i.Count)
 				s.Equal(2, i.Cores)
 				s.Equal(1, i.Sockets)
@@ -627,7 +714,9 @@ Book(s) per drawer:  1
 			countsFn: linuxBaseCounts,
 			fs:       newVulnFS(s, nil),
 			exec:     noLscpuExec,
-			wantErr:  true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:     "linux: gopsutil counts error ignored (Count zero), info still populated",
@@ -636,7 +725,10 @@ Book(s) per drawer:  1
 			countsFn: func(context.Context, bool) (int, error) { return 0, errors.New("counts failed") },
 			fs:       newVulnFS(s, nil),
 			exec:     noLscpuExec,
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(0, i.Count)
 				s.Equal(1, i.Sockets)
 				s.Equal(8, i.Cores)
@@ -649,7 +741,10 @@ Book(s) per drawer:  1
 			countsFn: func(context.Context, bool) (int, error) { return 4, nil },
 			fs:       newVulnFS(s, nil),
 			exec:     noLscpuExec,
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(4, i.Count)
 				s.Equal(0, i.Sockets)
 				s.Equal(0, i.Cores)
@@ -668,7 +763,10 @@ Book(s) per drawer:  1
 					"hw.cpufrequency_max": {out: "2600000000\n"},
 				})
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(12, i.Count)
 				s.Equal(6, i.Cores)
 				s.Equal(1, i.Sockets)
@@ -688,7 +786,10 @@ Book(s) per drawer:  1
 					"hw.cpufrequency":     {err: errors.New("unknown oid")},
 				})
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(10, i.Cores)
 				s.Equal(1, i.Sockets)
 				s.Equal(0.0, i.Speed)
@@ -707,7 +808,10 @@ Book(s) per drawer:  1
 					"hw.cpufrequency":     {out: "3200000000\n"},
 				})
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(3200.0, i.Speed)
 			},
 		},
@@ -724,7 +828,10 @@ Book(s) per drawer:  1
 					"hw.cpufrequency":     {err: errors.New("unknown oid")},
 				})
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(12, i.Cores)
 			},
 		},
@@ -741,7 +848,10 @@ Book(s) per drawer:  1
 					"hw.cpufrequency":     {err: errors.New("unknown oid")},
 				})
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(1, i.Sockets)
 			},
 		},
@@ -758,7 +868,10 @@ Book(s) per drawer:  1
 					"hw.cpufrequency":     {err: errors.New("unknown oid")},
 				})
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(12, i.Cores)
 			},
 		},
@@ -775,7 +888,10 @@ Book(s) per drawer:  1
 					"hw.cpufrequency":     {out: "2800000000\n"},
 				})
 			},
-			validate: func(i *cpu.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
 				s.Equal(2800.0, i.Speed)
 			},
 		},
@@ -785,7 +901,9 @@ Book(s) per drawer:  1
 			infoFn:   func(context.Context) ([]gpcpu.InfoStat, error) { return nil, errors.New("sysctl error") },
 			countsFn: darwinBaseCounts,
 			exec:     func(t *testing.T) executor.Executor { return darwinExec(t, map[string]sysctlRet{}) },
-			wantErr:  true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -799,17 +917,7 @@ Book(s) per drawer:  1
 			case "darwin":
 				c = &cpu.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*cpu.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

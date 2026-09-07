@@ -63,21 +63,40 @@ func (s *FactsPublicTestSuite) SetupTest() {
 
 func (s *FactsPublicTestSuite) TestJSON() {
 	tests := []struct {
-		name string
-		fn   func() ([]byte, error)
+		name         string
+		fn           func() ([]byte, error)
+		validateFunc func([]byte, error)
 	}{
-		{"compact", s.facts.JSON},
-		{"pretty", s.facts.PrettyJSON},
+		{
+			name: "compact",
+			fn:   s.facts.JSON,
+			validateFunc: func(b []byte, err error) {
+				s.Require().NoError(err)
+
+				var got map[string]any
+				s.Require().NoError(json.Unmarshal(b, &got))
+				s.Contains(got, "platform")
+				s.Contains(got, "cpu")
+				s.Contains(got, "collect_time")
+			},
+		},
+		{
+			name: "pretty",
+			fn:   s.facts.PrettyJSON,
+			validateFunc: func(b []byte, err error) {
+				s.Require().NoError(err)
+
+				var got map[string]any
+				s.Require().NoError(json.Unmarshal(b, &got))
+				s.Contains(got, "platform")
+				s.Contains(got, "cpu")
+				s.Contains(got, "collect_time")
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			b, err := tt.fn()
-			s.Require().NoError(err)
-			var got map[string]any
-			s.Require().NoError(json.Unmarshal(b, &got))
-			s.Contains(got, "platform")
-			s.Contains(got, "cpu")
-			s.Contains(got, "collect_time")
+			tt.validateFunc(tt.fn())
 		})
 	}
 }
@@ -120,12 +139,12 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 }`
 
 	tests := []struct {
-		name  string
-		check func(*gohai.Facts)
+		name         string
+		validateFunc func(*gohai.Facts)
 	}{
 		{
 			name: "platform typed fields",
-			check: func(f *gohai.Facts) {
+			validateFunc: func(f *gohai.Facts) {
 				s.Require().NotNil(f.Platform)
 				s.Equal("linux", f.Platform.OS)
 				s.Equal("ubuntu", f.Platform.Name)
@@ -136,7 +155,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 		},
 		{
 			name: "hostname typed fields",
-			check: func(f *gohai.Facts) {
+			validateFunc: func(f *gohai.Facts) {
 				s.Require().NotNil(f.Hostname)
 				s.Equal("web01", f.Hostname.Name)
 				s.Equal("web01.example.com", f.Hostname.FQDN)
@@ -145,7 +164,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 		},
 		{
 			name: "kernel typed fields",
-			check: func(f *gohai.Facts) {
+			validateFunc: func(f *gohai.Facts) {
 				s.Require().NotNil(f.Kernel)
 				s.Equal("Linux", f.Kernel.Name)
 				s.Equal("6.8.0-31-generic", f.Kernel.Release)
@@ -154,7 +173,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 		},
 		{
 			name: "cpu typed fields",
-			check: func(f *gohai.Facts) {
+			validateFunc: func(f *gohai.Facts) {
 				s.Require().NotNil(f.CPU)
 				s.Equal(8, f.CPU.Count)
 				s.Equal(4, f.CPU.Cores)
@@ -163,7 +182,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 		},
 		{
 			name: "virtualization typed fields",
-			check: func(f *gohai.Facts) {
+			validateFunc: func(f *gohai.Facts) {
 				s.Require().NotNil(f.Virtualization)
 				s.Equal("docker", f.Virtualization.System)
 				s.Equal("guest", f.Virtualization.Role)
@@ -171,7 +190,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 		},
 		{
 			name: "omitted collectors leave fields nil",
-			check: func(f *gohai.Facts) {
+			validateFunc: func(f *gohai.Facts) {
 				s.Nil(f.Memory)
 				s.Nil(f.Disk)
 				s.Nil(f.Network)
@@ -184,7 +203,7 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 		s.Run(tt.name, func() {
 			var f gohai.Facts
 			s.Require().NoError(json.Unmarshal([]byte(storedBlob), &f))
-			tt.check(&f)
+			tt.validateFunc(&f)
 		})
 	}
 }
@@ -198,16 +217,31 @@ func (s *FactsPublicTestSuite) TestFlat() {
 
 func (s *FactsPublicTestSuite) TestGet() {
 	tests := []struct {
-		path string
-		want any
+		path         string
+		validateFunc func(any)
 	}{
-		{"platform.name", "ubuntu"},
-		{"cpu.count", float64(8)},
-		{"missing", nil},
+		{
+			path: "platform.name",
+			validateFunc: func(got any) {
+				s.Equal("ubuntu", got)
+			},
+		},
+		{
+			path: "cpu.count",
+			validateFunc: func(got any) {
+				s.Equal(float64(8), got)
+			},
+		},
+		{
+			path: "missing",
+			validateFunc: func(got any) {
+				s.Nil(got)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.path, func() {
-			s.Equal(tt.want, s.facts.Get(tt.path))
+			tt.validateFunc(s.facts.Get(tt.path))
 		})
 	}
 }

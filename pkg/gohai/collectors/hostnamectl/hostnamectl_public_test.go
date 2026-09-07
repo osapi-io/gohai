@@ -71,15 +71,50 @@ func (s *HostnamectlPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(hostnamectl.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c hostnamectl.Collector) {
+				_, ok := c.(*hostnamectl.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c hostnamectl.Collector) {
+				_, ok := c.(*hostnamectl.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c hostnamectl.Collector) {
+				_, ok := c.(*hostnamectl.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c hostnamectl.Collector) {
+				_, ok := c.(*hostnamectl.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c hostnamectl.Collector) {
+				_, ok := c.(*hostnamectl.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -89,14 +124,7 @@ func (s *HostnamectlPublicTestSuite) TestNew() {
 			s.Equal("linux", c.Category())
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*hostnamectl.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*hostnamectl.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -119,11 +147,10 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 `)
 
 	tests := []struct {
-		name    string
-		variant string
-		exec    func(*testing.T) executor.Executor
-		wantNil bool
-		want    hostnamectl.Info
+		name         string
+		variant      string
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: full output parsed correctly",
@@ -131,20 +158,25 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t, fullOutput, nil)
 			},
-			want: hostnamectl.Info{
-				StaticHostname:            "myhost",
-				IconName:                  "computer-vm",
-				Chassis:                   "vm",
-				Deployment:                "production",
-				Location:                  "rack-42",
-				KernelName:                "Linux",
-				KernelRelease:             "5.15.0-91-generic",
-				OperatingSystemPrettyName: "Ubuntu 22.04.3 LTS",
-				OperatingSystemCPEName:    "cpe:/o:ubuntu:ubuntu:22.04",
-				Virtualization:            "kvm",
-				HardwareVendor:            "QEMU",
-				HardwareModel:             "Standard PC (Q35 + ICH9, 2009)",
-				FirmwareVersion:           "2.5+dfsg-4",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{
+					StaticHostname:            "myhost",
+					IconName:                  "computer-vm",
+					Chassis:                   "vm",
+					Deployment:                "production",
+					Location:                  "rack-42",
+					KernelName:                "Linux",
+					KernelRelease:             "5.15.0-91-generic",
+					OperatingSystemPrettyName: "Ubuntu 22.04.3 LTS",
+					OperatingSystemCPEName:    "cpe:/o:ubuntu:ubuntu:22.04",
+					Virtualization:            "kvm",
+					HardwareVendor:            "QEMU",
+					HardwareModel:             "Standard PC (Q35 + ICH9, 2009)",
+					FirmwareVersion:           "2.5+dfsg-4",
+				}, *info)
 			},
 		},
 		{
@@ -153,7 +185,12 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t, []byte(" Static hostname: node1\n"), nil)
 			},
-			want: hostnamectl.Info{StaticHostname: "node1"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{StaticHostname: "node1"}, *info)
+			},
 		},
 		{
 			name:    "linux: line without colon-space separator skipped",
@@ -163,7 +200,12 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 					[]byte("no separator here\n Static hostname: host2\n"),
 					nil)
 			},
-			want: hostnamectl.Info{StaticHostname: "host2"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{StaticHostname: "host2"}, *info)
+			},
 		},
 		{
 			name:    "linux: operating_system key (no pretty_name) sets PrettyName",
@@ -173,7 +215,15 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 					[]byte(" Operating System: Debian GNU/Linux 12 (bookworm)\n"),
 					nil)
 			},
-			want: hostnamectl.Info{OperatingSystemPrettyName: "Debian GNU/Linux 12 (bookworm)"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(
+					hostnamectl.Info{OperatingSystemPrettyName: "Debian GNU/Linux 12 (bookworm)"},
+					*info,
+				)
+			},
 		},
 		{
 			name:    "linux: cpe_os_name key maps to OperatingSystemCPEName",
@@ -183,7 +233,15 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 					[]byte(" CPE OS Name: cpe:/o:debian:debian_linux:12\n"),
 					nil)
 			},
-			want: hostnamectl.Info{OperatingSystemCPEName: "cpe:/o:debian:debian_linux:12"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(
+					hostnamectl.Info{OperatingSystemCPEName: "cpe:/o:debian:debian_linux:12"},
+					*info,
+				)
+			},
 		},
 		{
 			name:    "linux: non-ASCII value collapses double spaces",
@@ -194,7 +252,12 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 					[]byte(" Chassis: vm \U0001F5A5 server\n"),
 					nil)
 			},
-			want: hostnamectl.Info{Chassis: "vm server"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{Chassis: "vm server"}, *info)
+			},
 		},
 		{
 			name:    "linux: exec error yields empty Info, no error",
@@ -202,18 +265,37 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return hostnamectlExec(t, nil, errors.New("command not found"))
 			},
-			want: hostnamectl.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{}, *info)
+			},
 		},
 		{
 			name:    "linux: nil Exec yields empty Info, no error",
 			variant: "linux",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			want:    hostnamectl.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{}, *info)
+			},
 		},
 		{
 			name:    "darwin: returns nil",
 			variant: "darwin",
-			wantNil: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{}, *info)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -225,15 +307,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = hostnamectl.NewDarwin()
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			if tt.wantNil {
-				s.Nil(got)
-				return
-			}
-			info, ok := got.(*hostnamectl.Info)
-			s.Require().True(ok)
-			s.Equal(tt.want, *info)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

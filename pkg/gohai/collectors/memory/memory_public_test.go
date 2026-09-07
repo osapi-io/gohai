@@ -113,15 +113,50 @@ func (s *MemoryPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name     string
-		detect   string
-		wantKind string
+		name         string
+		detect       string
+		validateFunc func(memory.Collector)
 	}{
-		{"darwin dispatches to Darwin", "darwin", "darwin"},
-		{"debian dispatches to Linux", "debian", "linux"},
-		{"rhel dispatches to Linux", "rhel", "linux"},
-		{"arch dispatches to Linux", "arch", "linux"},
-		{"unknown dispatches to Linux", "", "linux"},
+		{
+			name:   "darwin dispatches to Darwin",
+			detect: "darwin",
+			validateFunc: func(c memory.Collector) {
+				_, ok := c.(*memory.Darwin)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "debian dispatches to Linux",
+			detect: "debian",
+			validateFunc: func(c memory.Collector) {
+				_, ok := c.(*memory.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "rhel dispatches to Linux",
+			detect: "rhel",
+			validateFunc: func(c memory.Collector) {
+				_, ok := c.(*memory.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "arch dispatches to Linux",
+			detect: "arch",
+			validateFunc: func(c memory.Collector) {
+				_, ok := c.(*memory.Linux)
+				s.True(ok)
+			},
+		},
+		{
+			name:   "unknown dispatches to Linux",
+			detect: "",
+			validateFunc: func(c memory.Collector) {
+				_, ok := c.(*memory.Linux)
+				s.True(ok)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -131,14 +166,7 @@ func (s *MemoryPublicTestSuite) TestNew() {
 			s.Equal("hardware", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			switch tt.wantKind {
-			case "darwin":
-				_, ok := c.(*memory.Darwin)
-				s.True(ok)
-			case "linux":
-				_, ok := c.(*memory.Linux)
-				s.True(ok)
-			}
+			tt.validateFunc(c)
 		})
 	}
 }
@@ -199,14 +227,13 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 	}
 
 	tests := []struct {
-		name     string
-		variant  string
-		vmFn     func(context.Context) (*mem.VirtualMemoryStat, error)
-		swapFn   func(context.Context) (*mem.SwapMemoryStat, error)
-		fs       avfs.VFS
-		exec     func(*testing.T) executor.Executor
-		wantErr  bool
-		validate func(*memory.Info)
+		name         string
+		variant      string
+		vmFn         func(context.Context) (*mem.VirtualMemoryStat, error)
+		swapFn       func(context.Context) (*mem.SwapMemoryStat, error)
+		fs           avfs.VFS
+		exec         func(*testing.T) executor.Executor
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: canonical host, gopsutil + extension fields populated",
@@ -214,7 +241,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			vmFn:    fullGopsutilVM,
 			swapFn:  swapOK,
 			fs:      meminfoFS(s, procMeminfoSample),
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(17179869184), i.Total)
 				s.Equal(uint64(6000), i.Active)
 				s.Equal(uint64(456), i.Slab)
@@ -247,7 +277,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs:      meminfoFS(s, ""),
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Zero(i.ActiveAnon)
 				s.Nil(i.DirectMap)
 			},
@@ -263,7 +296,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 				"LowFree:       262144 kB\n"+
 				"NFS_Unstable:     128 kB\n"+
 				"Bounce:            64 kB\n"),
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(1048576*1024), i.HighTotal)
 				s.Equal(uint64(524288*1024), i.HighFree)
 				s.Equal(uint64(2097152*1024), i.LowTotal)
@@ -278,7 +314,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs:      meminfoFS(s, "Hugetlb: 2048 kB\n"),
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(i.HugePages)
 				s.Equal(uint64(2048*1024), i.HugePages.Hugetlb)
 			},
@@ -289,7 +328,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			vmFn:    hugepagesVM,
 			swapFn:  zeroSwap,
 			fs:      meminfoFS(s, ""),
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Require().NotNil(i.HugePages)
 			},
 		},
@@ -302,7 +344,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 				"AnonPages: notanumber kB\n"+
 				"Shmem:\n"+
 				"KReclaimable:      42 kB\n"),
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Zero(i.AnonPages)
 				s.Zero(i.Shmem)
 				s.Equal(uint64(42*1024), i.KReclaimable)
@@ -314,7 +359,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs:      meminfoFS(s, "KernelStack: 4096\n"),
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(4096), i.KernelStack)
 			},
 		},
@@ -324,7 +372,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			vmFn:    zeroVM,
 			swapFn:  zeroSwap,
 			fs:      nil,
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Zero(i.ActiveAnon)
 			},
 		},
@@ -336,7 +387,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 				return nil, errors.New("swap failed")
 			},
 			fs: meminfoFS(s, ""),
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Nil(i.Swap)
 			},
 		},
@@ -346,9 +400,11 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			vmFn: func(context.Context) (*mem.VirtualMemoryStat, error) {
 				return nil, errors.New("vm failed")
 			},
-			swapFn:  zeroSwap,
-			fs:      meminfoFS(s, ""),
-			wantErr: true,
+			swapFn: zeroSwap,
+			fs:     meminfoFS(s, ""),
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: apple silicon vm_stat parsed, speculative + compressed populated",
@@ -358,7 +414,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return vmStatExec(t, []byte(vmStatAppleSilicon), nil)
 			},
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(8192*16384), i.Speculative)
 				s.Equal(uint64(24576*16384), i.Compressed)
 				s.Equal(uint64(3000), i.Wired)
@@ -376,7 +435,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 						"Pages stored in compressor:              2000.\n",
 				), nil)
 			},
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(1000*4096), i.Speculative)
 				s.Equal(uint64(2000*4096), i.Compressed)
 				s.Equal(uint64(3000), i.Wired)
@@ -390,7 +452,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return vmStatExec(t, []byte("Pages speculative: 1000.\n"), nil)
 			},
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(1000*4096), i.Speculative)
 				s.Equal(uint64(3000), i.Wired)
 			},
@@ -406,7 +471,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 						"Pages speculative:                       abc.\n",
 				), nil)
 			},
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(3000), i.Wired)
 			},
 		},
@@ -418,7 +486,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return vmStatExec(t, nil, errors.New("not found"))
 			},
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(3000), i.Wired)
 			},
 		},
@@ -428,7 +499,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			vmFn:    darwinVM,
 			swapFn:  zeroSwap,
 			exec:    func(*testing.T) executor.Executor { return nil },
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(3000), i.Wired)
 			},
 		},
@@ -442,7 +516,9 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return vmStatExec(t, []byte(vmStatAppleSilicon), nil)
 			},
-			wantErr: true,
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
 		},
 		{
 			name:    "darwin: line without colon and zero-page-size header both skipped",
@@ -456,7 +532,10 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 						"Pages speculative:                         500.\n",
 				), nil)
 			},
-			validate: func(i *memory.Info) {
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*memory.Info)
+				s.Require().True(ok)
 				s.Equal(uint64(500*4096), i.Speculative)
 				s.Equal(uint64(3000), i.Wired)
 			},
@@ -473,17 +552,7 @@ func (s *MemoryPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &memory.Darwin{Exec: tt.exec(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr {
-				s.Error(err)
-				return
-			}
-			s.Require().NoError(err)
-			info, ok := got.(*memory.Info)
-			s.Require().True(ok)
-			if tt.validate != nil {
-				tt.validate(info)
-			}
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }
