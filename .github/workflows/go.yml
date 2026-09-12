@@ -10,12 +10,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      # Report both results. A failure on one version is worth seeing next
+      # to a pass on the other.
+      fail-fast: false
+      matrix:
+        go: [ floor, stable ]
+    name: build (${{ matrix.go }})
     steps:
       - uses: actions/checkout@v7
-      - name: Set up Go
+
+      # The floor is the `go` directive: the oldest release a consumer may
+      # build with. Read it from go.mod rather than repeating it here, so
+      # moving the directive moves this build with it.
+      - name: Set up Go (floor)
+        if: matrix.go == 'floor'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Set up Go (stable)
+        if: matrix.go == 'stable'
         uses: actions/setup-go@v7
         with:
           go-version: stable
+
       - name: Install just
         uses: extractions/setup-just@v4
       - name: Fetch justfiles
@@ -24,7 +42,11 @@ jobs:
         run: just deps
       - name: Test
         run: just test
+
+      # One upload per commit. Both jobs produce the same profile, and a
+      # second upload reports a different number for the same commit.
       - name: Upload coverage reports to Codecov
+        if: matrix.go == 'stable'
         uses: codecov/codecov-action@v7
         with:
           # Name the profile explicitly. `just test` filters it through
