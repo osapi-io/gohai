@@ -22,7 +22,6 @@ fetch:
 # Install all dependencies
 deps:
     just go-deps
-    just go-mod
 
 # Run all tests
 test:
