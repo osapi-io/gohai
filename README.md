@@ -108,10 +108,11 @@ go build -o gohai .
 
 ## Collectors
 
-65 collectors across 9 categories. See the
+62 collectors across 10 categories. See the
 **[Collectors reference](docs/collectors/README.md)** for the full catalog,
 implementation status, default membership, schema mappings, and per-collector
-docs.
+docs — it lists 65 entries, the other three being deprecated and never
+implemented.
 
 Collectors are individually toggled using node_exporter-style flags.
 `--collector.<name>` to opt in, `--no-collector.<name>` to opt out. SDK

@@ -1,8 +1,9 @@
 # Collectors
 
-gohai collects system facts through 65 pluggable collectors across 9 categories.
-Each collector gathers a specific category of information and returns a
-strongly-typed Go struct.
+gohai collects system facts through 62 pluggable collectors across 10
+categories. This catalogue lists 65 entries; the other three are deprecated and
+will not be implemented, marked 🪦 below. Each collector gathers a specific
+category of information and returns a strongly-typed Go struct.
 
 Collectors are individually toggled using node_exporter-style flags:
 
@@ -33,8 +34,8 @@ wires `WithDefaults()` automatically; pass `--no-defaults` to turn it off and
 use only explicit `--collector.X` flags. The "Default" column below indicates
 membership in the recommended set (`✅` = on when `WithDefaults()` is in effect,
 `❌` = opt-in only). The "Implemented" column shows shipping status: `✅` =
-implemented and tested, `⚠️` = partial, `✅` = planned, `🪦` = deprecated, will
-not implement (low demand / upstream project archived).
+implemented and tested, `⚠️` = partial, `🪦` = deprecated, will not implement
+(low demand / upstream project archived).
 
 **Schema:** Field names follow a three-tier naming ladder: [OCSF] (Open
 Cybersecurity Schema Framework) as the primary authority (~108 fields),
