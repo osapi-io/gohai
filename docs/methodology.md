@@ -6,7 +6,7 @@ and where methodology gaps are tracked.
 **The rules are not here.** How a backing library is chosen, what an extension
 may do and what it may read through, why collector code carries no build tag,
 and how a field is named are stated once in the
-[specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/.specify/memory/architecture/collectors.md).
+[specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/collectors.md).
 Read that before adding or modifying a collector; this page tells you what the
 existing ones already do.
 
