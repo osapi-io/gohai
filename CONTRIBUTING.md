@@ -5,7 +5,7 @@ before submitting a PR. It covers everything you need: prerequisites, setup, the
 conventions code follows, and the pull request workflow.
 
 How a collector is designed is stated in the
-[specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/.specify/memory/architecture/collectors.md):
+[specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/collectors.md):
 which backing library to wrap and in what order, what an extension may read
 through, why collector code carries no build tag, and how a field is named.
 Three of those rules are short enough that
