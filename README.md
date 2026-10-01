@@ -1,59 +1,34 @@
-[![release](https://img.shields.io/github/release/osapi-io/gohai.svg?style=for-the-badge)](https://github.com/osapi-io/gohai/releases/latest)
-[![codecov](https://img.shields.io/codecov/c/github/osapi-io/gohai?style=for-the-badge)](https://codecov.io/gh/osapi-io/gohai)
-[![license](https://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge)](LICENSE)
-[![build](https://img.shields.io/github/actions/workflow/status/osapi-io/gohai/go.yml?style=for-the-badge)](https://github.com/osapi-io/gohai/actions/workflows/go.yml)
-[![powered by](https://img.shields.io/badge/powered%20by-goreleaser-green.svg?style=for-the-badge)](https://github.com/goreleaser)
-[![conventional commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg?style=for-the-badge)](https://conventionalcommits.org)
-[![built with just](https://img.shields.io/badge/Built_with-Just-black?style=for-the-badge&logo=just&logoColor=white)](https://just.systems)
-![gitHub commit activity](https://img.shields.io/github/commit-activity/m/osapi-io/gohai?style=for-the-badge)
-[![go reference](https://img.shields.io/badge/go-reference-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai)
+<p align="center">
+  <picture>
+    <source srcset="asset/logo-dark.svg" media="(prefers-color-scheme: dark)">
+    <source srcset="asset/logo-light.svg" media="(prefers-color-scheme: light)">
+    <img src="asset/logo-dark.svg" alt="gohai" width="250">
+  </picture>
+</p>
 
-# gohai
+<p align="center">An SDK-first Go library for collecting system facts.</p>
 
-**gohai is an SDK-first Go library** for collecting system facts, inspired by
-[Chef Ohai]. Import it into your Go application for typed access to system
-facts, or use the standalone `gohai` CLI, a thin wrapper over the same SDK.
+<p align="center">
+  <a href="https://github.com/osapi-io/gohai/releases/latest"><img alt="release" src="https://img.shields.io/github/release/osapi-io/gohai.svg?style=for-the-badge"></a>
+  <a href="https://codecov.io/gh/osapi-io/gohai"><img alt="codecov" src="https://img.shields.io/codecov/c/github/osapi-io/gohai?style=for-the-badge"></a>
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge"></a>
+  <a href="https://github.com/osapi-io/gohai/actions/workflows/go.yml"><img alt="build" src="https://img.shields.io/github/actions/workflow/status/osapi-io/gohai/go.yml?style=for-the-badge"></a>
+  <a href="https://github.com/goreleaser"><img alt="powered by" src="https://img.shields.io/badge/powered%20by-goreleaser-green.svg?style=for-the-badge"></a>
+  <a href="https://conventionalcommits.org"><img alt="conventional commits" src="https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg?style=for-the-badge"></a>
+  <a href="https://just.systems"><img alt="built with just" src="https://img.shields.io/badge/Built_with-Just-black?style=for-the-badge&logo=just&logoColor=white"></a>
+  <img alt="gitHub commit activity" src="https://img.shields.io/github/commit-activity/m/osapi-io/gohai?style=for-the-badge">
+  <a href="https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai"><img alt="go reference" src="https://img.shields.io/badge/go-reference-00ADD8?style=for-the-badge&logo=go&logoColor=white"></a>
+</p>
 
-> 🐧 **Linux-first.** macOS is supported with a narrower field surface (see
-> per-collector docs for platform coverage); Windows is not supported.
+<p align="center">
+<b>SDK first, CLI second, one contract for both.</b>
+</p>
 
-Each collector wraps a well-maintained backing source ([gopsutil], [ghw],
-[procfs], cloud SDKs) and reshapes its output into typed Go structs. gohai's
-value is the unified API, typed structs, and pluggable collector model, not
-reimplementing `/proc` parsing from scratch.
-
-### Schema: OCSF + OpenTelemetry
-
-gohai produces a validated [OCSF] `inventory_info` event (class_uid 5001) via
-`--format ocsf`. Standard OCSF attributes map directly; a
-[gohai vendor extension](schemas/ocsf-extension/) (uid 1337) carries fields OCSF
-doesn't yet cover, validated against OCSF's own schema validator (12/12 tests
-passing).
-
-Field names follow a three-tier naming ladder:
-
-1. **[OCSF]** (Open Cybersecurity Schema Framework). Primary authority. ~108
-   fields map to standard OCSF objects (`device`, `device_hw_info`, `os`,
-   `network_interface`, `cloud`, `package`, `process`). Browse
-   [schema.ocsf.io][ocsf-schema].
-2. **[OpenTelemetry Resource Semantic Conventions][otel-semconv]**. When OCSF is
-   silent. ~74 fields cover CPU microarchitecture, memory states, filesystem
-   attributes, hardware detail.
-3. **gohai convention**. For the ~768 remaining fields where no standard has an
-   opinion. Starts from the backing library's field name in `snake_case`.
-
-The complete per-field mapping lives in
-[`schemas/field-mapping.md`](schemas/field-mapping.md). Gap candidates for
-upstream OCSF PRs are tracked in [`schemas/ocsf-gaps.md`](schemas/ocsf-gaps.md).
-
-What we **collect** draws on [Chef Ohai]'s plugin methodology. What we **call**
-each field draws on OCSF + OpenTelemetry.
-
-### Intended consumer
-
-gohai embeds in Go services that need typed system facts for routing, guards,
-discovery, inventory, and compliance. [OSAPI] is the intended first consumer; it
-does not depend on gohai yet. The CLI is a convenience. The SDK is the product.
+<p align="center">
+Sixty-two collectors across ten categories, each wrapping a well-maintained
+library rather than reimplementing it, and each returning a typed struct.
+Import it, or use the CLI over the same collectors.
+</p>
 
 ## Install
 
@@ -317,9 +292,5 @@ The [MIT] License.
 [ghw]: https://github.com/jaypipes/ghw
 [gopsutil]: https://github.com/shirou/gopsutil
 [mit]: LICENSE
-[ocsf]: https://ocsf.io/
-[ocsf-schema]: https://schema.ocsf.io/
-[osapi]: https://github.com/osapi-io/osapi
-[otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 [package documentation]: https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai
 [procfs]: https://github.com/prometheus/procfs
