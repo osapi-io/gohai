@@ -4,9 +4,16 @@ Contributions to gohai are very welcome, but we ask that you read this document
 before submitting a PR. It covers everything you need: prerequisites, setup, the
 conventions code follows, and the pull request workflow.
 
-The collector methodology is reference material in
-[docs/methodology.md](docs/methodology.md): which library a collector wraps,
-what its fields are called, and how data sources are chosen.
+How a collector is designed is stated in the
+[specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/.specify/memory/architecture/collectors.md):
+which backing library to wrap and in what order, what an extension may read
+through, why collector code carries no build tag, and how a field is named.
+Three of those rules are short enough that
+[docs/methodology.md](docs/methodology.md) repeats them, and that page is also
+the per-collector reference for which library each one wraps.
+
+Validating OCSF output against the upstream schema is
+[docs/ocsf-validation.md](docs/ocsf-validation.md).
 
 ## Before you start
 
