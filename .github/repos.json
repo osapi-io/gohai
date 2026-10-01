@@ -17,22 +17,42 @@
     "secret_scanning": true,
     "secret_scanning_push_protection": true
   },
+  "subscription": {
+    "watching": true
+  },
   "branch_protection": {
     "branch": "main",
     "enforce_admins": true,
-    "required_status_checks": { "strict": true },
-    "required_pull_request_reviews": { "required_approving_review_count": 0 },
+    "required_status_checks": {
+      "strict": true
+    },
+    "required_pull_request_reviews": {
+      "required_approving_review_count": 0
+    },
     "required_conversation_resolution": true,
     "allow_force_pushes": false,
     "allow_deletions": false,
     "block_creations": true,
-    "restrictions": { "users": ["retr0h"], "teams": [], "apps": [] }
+    "restrictions": {
+      "users": [
+        "retr0h"
+      ],
+      "teams": [],
+      "apps": []
+    }
   },
   "repos": [
     {
       "name": "gohai",
       "description": "A Go-based system fact collector inspired by Chef Ohai.",
-      "topics": ["facts", "golang", "node-exporter", "ohai", "osapi", "system-information"]
+      "topics": [
+        "facts",
+        "golang",
+        "node-exporter",
+        "ohai",
+        "osapi",
+        "system-information"
+      ]
     }
   ]
 }
