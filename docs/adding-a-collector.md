@@ -164,6 +164,13 @@ func builtinCollectors() []collector.Collector {
 
 Add matching `Facts` field + `set()` switch case in `pkg/gohai/facts.go`.
 
+**This step fails silently.** `registerBuiltins` discards the error from every
+`Register` call, and no test exercises it, so a duplicate name drops a collector
+with nothing reported. The
+[registration limitation](https://github.com/osapi-io/specs/blob/main/components/gohai/.specify/memory/architecture/../spec.md#known-limitations)
+has the detail. Check `NewRegistry().Names()` contains your collector before you
+open the pull request.
+
 ## Step 5: tests (100% coverage, one test file)
 
 **One file only**: `<name>_public_test.go`. No `linux_public_test.go` or
