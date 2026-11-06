@@ -31,24 +31,24 @@ jobs:
         go: [ floor, stable ]
     name: build (${{ matrix.go }})
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The floor is the `go` directive: the oldest release a consumer may
       # build with. Read it from go.mod rather than repeating it here, so
       # moving the directive moves this build with it.
       - name: Set up Go (floor)
         if: matrix.go == 'floor'
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: Set up Go (stable)
         if: matrix.go == 'stable'
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
       - name: Fetch justfiles
         run: just fetch
       - name: Deps
@@ -60,7 +60,7 @@ jobs:
       # second upload reports a different number for the same commit.
       - name: Upload coverage reports to Codecov
         if: matrix.go == 'stable'
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           # Name the profile explicitly. `just test` filters it through
           # .coverignore; auto-discovery could pick up an unfiltered one and
