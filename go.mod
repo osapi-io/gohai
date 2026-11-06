@@ -1,6 +1,6 @@
 module github.com/osapi-io/gohai
 
-go 1.27.1
+go 1.27.3
 
 require (
 	github.com/avfs/avfs v0.35.0
