@@ -10,6 +10,10 @@ md_site_dir := ""
 
 # --- Fetch ---
 
+# List the recipes
+default:
+    @just --list
+
 # Fetch shared justfiles from osapi-justfiles
 fetch:
     mkdir -p .just/remote
