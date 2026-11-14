@@ -95,8 +95,8 @@ func main() {
         fmt.Println("GCE project", facts.Gce.ProjectID,
             "zone", facts.Gce.Zone)
     case gohai.CloudAzure:
-        fmt.Println("Azure subscription", facts.Azure.SubscriptionID,
-            "location", facts.Azure.Location)
+        fmt.Println("Azure subscription", facts.Azure.AccountUID,
+            "region", facts.Azure.Region)
     }
 }
 ```
