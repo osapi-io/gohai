@@ -4,37 +4,37 @@
 
 ## Description
 
-Reports per-device disk I/O counters (read/write counts, bytes, and latency).
-Equivalent to what `iostat` shows at the block-device layer, useful for
-detecting saturated disks, unbalanced I/O across NVMe devices, and trending
-storage workload over time.
+The collector reports the disk I/O counters of each device: the read and write
+counts, the bytes, and the latency. The data is the same as what `iostat` shows
+at the block-device layer. Use it to find saturated disks and unbalanced I/O
+across NVMe devices, and to see the storage workload over time.
 
-Note: this collector reports **I/O counters only**. Physical device metadata
-(model, vendor, serial, rotational, block sizes) will come from a forthcoming
-`block_device` collector that wraps `ghw/block`, tracked separately. Ohai splits
-these the same way.
+Note: this collector reports **I/O counters only**. The physical device metadata
+(model, vendor, serial, rotational, block sizes) will come from a future
+`block_device` collector that wraps `ghw/block`. A separate item tracks that
+collector. Ohai splits these the same way.
 
 ## Collected fields
 
-| Field per device | Type   | Description                                   | Schema mapping            |
-| ---------------- | ------ | --------------------------------------------- | ------------------------- |
-| `name`           | string | Device name (e.g. `sda`, `nvme0n1`, `disk0`). | No direct schema mapping. |
-| `read_count`     | uint64 | Number of completed reads.                    | No direct schema mapping. |
-| `write_count`    | uint64 | Number of completed writes.                   | No direct schema mapping. |
-| `read_bytes`     | uint64 | Bytes read.                                   | No direct schema mapping. |
-| `write_bytes`    | uint64 | Bytes written.                                | No direct schema mapping. |
-| `read_time`      | uint64 | Time spent reading (ms).                      | No direct schema mapping. |
-| `write_time`     | uint64 | Time spent writing (ms).                      | No direct schema mapping. |
-| `io_time`        | uint64 | Time with in-flight I/O (ms).                 | No direct schema mapping. |
+| Field per device | Type   | Description                                               | Schema mapping            |
+| ---------------- | ------ | --------------------------------------------------------- | ------------------------- |
+| `name`           | string | The device name, for example `sda`, `nvme0n1` or `disk0`. | No direct schema mapping. |
+| `read_count`     | uint64 | The number of completed reads.                            | No direct schema mapping. |
+| `write_count`    | uint64 | The number of completed writes.                           | No direct schema mapping. |
+| `read_bytes`     | uint64 | The bytes read.                                           | No direct schema mapping. |
+| `write_bytes`    | uint64 | The bytes written.                                        | No direct schema mapping. |
+| `read_time`      | uint64 | The time of the reads (ms).                               | No direct schema mapping. |
+| `write_time`     | uint64 | The time of the writes (ms).                              | No direct schema mapping. |
+| `io_time`        | uint64 | The time when I/O was in progress (ms).                   | No direct schema mapping. |
 
-Top level: `devices: []Device`.
+The top level is `devices: []Device`.
 
 ## Platform support
 
-| Platform | Supported                     |
-| -------- | ----------------------------- |
-| Linux    | ✅ (parses `/proc/diskstats`) |
-| macOS    | ✅ (IOKit via gopsutil)       |
+| Platform | Supported                    |
+| -------- | ---------------------------- |
+| Linux    | ✅ (reads `/proc/diskstats`) |
+| macOS    | ✅ (IOKit through gopsutil)  |
 
 ## Example output
 
@@ -82,20 +82,21 @@ None.
 
 On Linux:
 
-1. gopsutil's `disk.IOCountersWithContext` reads `/proc/diskstats` and returns
-   per-device read/write counts, bytes, and time spent. We forward each device
-   as a `Device` row without transformation.
+1. gopsutil's `disk.IOCountersWithContext` reads `/proc/diskstats`. For each
+   device, it returns the read and write counts, the bytes and the time. The
+   collector gives each device as a `Device` row and does not change it.
 
 On macOS:
 
-1. gopsutil's `disk.IOCountersWithContext` calls IOKit to produce the same
-   shape. Device names match what `iostat` reports (e.g. `disk0`).
+1. gopsutil's `disk.IOCountersWithContext` calls IOKit and returns the same
+   shape. The device names are the same as the names that `iostat` reports, for
+   example `disk0`.
 
-Physical device metadata (model, vendor, serial, rotational, block sizes) is out
-of this collector's scope, tracked in the planned `block_device` collector
-backed by `ghw/block`. Ohai splits the two concerns the same way (its
-`diskstats`-style data doesn't exist; `linux/block_device.rb` covers sysfs
-device metadata only).
+This collector does not report the physical device metadata (model, vendor,
+serial, rotational, block sizes). The planned `block_device` collector, which
+uses `ghw/block`, will report it. Ohai splits the two topics the same way. Ohai
+has no `diskstats` data, and `linux/block_device.rb` reads only the sysfs device
+metadata.
 
 ## Backing library
 

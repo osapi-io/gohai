@@ -4,46 +4,52 @@
 
 ## Description
 
-Enumerates PCI devices attached to the host. Reports vendor / product
-identifiers + human names, device class + subclass, subsystem IDs, kernel driver
-binding, revision, IOMMU group, and the parent (bridge) PCI address.
+The collector lists the PCI devices of the host. For each device, it reports:
 
-Mirrors Ohai's `linux/lspci.rb` output shape, a map keyed by PCI address, but
-sources the data from `/sys/bus/pci/devices` via ghw rather than shelling out to
-`lspci`. ghw resolves vendor / product / class names against its bundled pci.ids
-database.
+- The vendor and product identifiers, and their names.
+- The device class and subclass.
+- The subsystem IDs.
+- The kernel driver that the device is bound to.
+- The revision.
+- The IOMMU group.
+- The PCI address of the parent bridge.
+
+The output shape is the same as Ohai's `linux/lspci.rb`: a map with the PCI
+address as the key. But gohai reads the data from `/sys/bus/pci/devices` through
+ghw. It does not run `lspci`. ghw finds the vendor, product and class names in
+its bundled pci.ids database.
 
 ## Collected fields
 
-| Field     | Type                | Description                   | Schema mapping            |
-| --------- | ------------------- | ----------------------------- | ------------------------- |
-| `devices` | `map[string]Device` | PCI devices keyed by address. | No direct schema mapping. |
+| Field     | Type                | Description                                   | Schema mapping            |
+| --------- | ------------------- | --------------------------------------------- | ------------------------- |
+| `devices` | `map[string]Device` | The PCI devices, with the address as the key. | No direct schema mapping. |
 
 ### Device
 
-| Field            | Type     | Description                                                       |
-| ---------------- | -------- | ----------------------------------------------------------------- |
-| `vendor_id`      | `string` | 4-hex PCI vendor ID (e.g. `8086`).                                |
-| `vendor_name`    | `string` | Human vendor name from pci.ids (e.g. `Intel Corporation`).        |
-| `device_id`      | `string` | 4-hex PCI device ID (e.g. `24fd`).                                |
-| `device_name`    | `string` | Human device name (e.g. `Wireless 8265 / 8275`).                  |
-| `class_id`       | `string` | 2-hex PCI class code (e.g. `02`, Network controller).             |
-| `class_name`     | `string` | Human class name.                                                 |
-| `subclass_id`    | `string` | 2-hex subclass code.                                              |
-| `subclass_name`  | `string` | Human subclass name.                                              |
-| `sdevice_id`     | `string` | 4-hex subsystem device ID.                                        |
-| `sdevice_name`   | `string` | Human subsystem name.                                             |
-| `revision`       | `string` | PCI revision register (e.g. `0x01`).                              |
-| `driver`         | `string` | Bound kernel driver (e.g. `iwlwifi`). Empty when no driver bound. |
-| `iommu_group`    | `string` | IOMMU group identifier (when virtualization-ready hardware).      |
-| `parent_address` | `string` | PCI address of the upstream bridge (e.g. `0000:00:1c.0`).         |
+| Field            | Type     | Description                                                                        |
+| ---------------- | -------- | ---------------------------------------------------------------------------------- |
+| `vendor_id`      | `string` | The PCI vendor ID in 4 hex digits, for example `8086`.                             |
+| `vendor_name`    | `string` | The vendor name from pci.ids, for example `Intel Corporation`.                     |
+| `device_id`      | `string` | The PCI device ID in 4 hex digits, for example `24fd`.                             |
+| `device_name`    | `string` | The device name, for example `Wireless 8265 / 8275`.                               |
+| `class_id`       | `string` | The PCI class code in 2 hex digits, for example `02` (Network controller).         |
+| `class_name`     | `string` | The class name.                                                                    |
+| `subclass_id`    | `string` | The subclass code in 2 hex digits.                                                 |
+| `subclass_name`  | `string` | The subclass name.                                                                 |
+| `sdevice_id`     | `string` | The subsystem device ID in 4 hex digits.                                           |
+| `sdevice_name`   | `string` | The subsystem name.                                                                |
+| `revision`       | `string` | The PCI revision register, for example `0x01`.                                     |
+| `driver`         | `string` | The bound kernel driver, for example `iwlwifi`. It is empty if no driver is bound. |
+| `iommu_group`    | `string` | The IOMMU group identifier, on hardware that supports virtualization.              |
+| `parent_address` | `string` | The PCI address of the upstream bridge, for example `0000:00:1c.0`.                |
 
 ## Platform support
 
-| Platform | Supported                                                   |
-| -------- | ----------------------------------------------------------- |
-| Linux    | ✅                                                          |
-| macOS    | ❌ (sysfs PCI tree is Linux-specific; returns empty `Info`) |
+| Platform | Supported                                                                       |
+| -------- | ------------------------------------------------------------------------------- |
+| Linux    | ✅                                                                              |
+| macOS    | ❌ (the sysfs PCI tree is only on Linux; the collector returns an empty `Info`) |
 
 ## Example output
 
@@ -93,32 +99,33 @@ None.
 
 On Linux:
 
-1. ghw's `pci.New()` walks `/sys/bus/pci/devices` and reads each device's sysfs
-   files (`vendor`, `device`, `class`, `revision`, `subsystem_vendor`,
-   `subsystem_device`, `iommu_group`, `driver` symlink).
-2. Vendor / product / class / subclass names are resolved against ghw's bundled
-   pci.ids database (no network lookup). When a pcidb entry is missing the ID is
-   still populated but the corresponding name is empty.
-3. ghw's `Driver: "unknown"`, used when the device has no kernel driver bound,
-   is normalized to an empty string for a cleaner consumer contract.
-4. A ghw load error (missing sysfs, container without `/sys/bus/pci`) yields an
-   empty `devices` map with no error, matches the "fails quietly" behavior of
-   the other hardware collectors.
+1. ghw's `pci.New()` reads `/sys/bus/pci/devices`. For each device, it reads the
+   sysfs files `vendor`, `device`, `class`, `revision`, `subsystem_vendor`,
+   `subsystem_device`, `iommu_group` and the `driver` symlink.
+2. ghw finds the vendor, product, class and subclass names in its bundled
+   pci.ids database. It does no network lookup. If a pcidb entry is missing, the
+   ID has a value but the name is empty.
+3. ghw sets `Driver: "unknown"` if no kernel driver is bound to the device. The
+   collector changes this value to an empty string, so that consumers get a
+   clearer contract.
+4. If ghw cannot load the data (sysfs is missing, or a container has no
+   `/sys/bus/pci`), the collector returns an empty `devices` map and no error.
+   The other hardware collectors also fail quietly in this way.
 
-On macOS the collector returns an empty `Info{Devices: {}}`. macOS exposes PCI
-topology through IOKit (`ioreg -p IODeviceTree -c IOPCIDevice`) but Ohai's pci
-plugin is Linux-only and the output shape it emits is built around Linux's sysfs
-/ lspci model; we match that scope.
+On macOS, the collector returns an empty `Info{Devices: {}}`. macOS gives the
+PCI topology through IOKit (`ioreg -p IODeviceTree -c IOPCIDevice`). But Ohai's
+pci plugin is only for Linux, and its output shape follows the Linux sysfs and
+lspci model. gohai has the same scope.
 
-Mirrors Ohai's `linux/lspci.rb` field surface (`vendor_id` / `vendor_name`,
-`device_id` / `device_name`, `class_id` / `class_name`, `sdevice_id` /
-`sdevice_name`, `driver`, `revision`). Fields Ohai doesn't emit but ghw exposes
-are added on top: `subclass_id` / `subclass_name`, `iommu_group`,
-`parent_address`. Ohai's `module` array (kernel modules that _can_ bind) is not
-surfaced; `driver` reports only the currently bound kernel module, which is what
-inventory consumers typically want.
+gohai reports the same fields as Ohai's `linux/lspci.rb`: `vendor_id`,
+`vendor_name`, `device_id`, `device_name`, `class_id`, `class_name`,
+`sdevice_id`, `sdevice_name`, `driver` and `revision`. gohai also reports some
+fields that ghw gives and Ohai does not: `subclass_id`, `subclass_name`,
+`iommu_group` and `parent_address`. gohai does not report Ohai's `module` array,
+which lists the kernel modules that _can_ bind. `driver` reports only the kernel
+module that is bound now. Inventory consumers usually need only that value.
 
 ## Backing library
 
-- [`github.com/jaypipes/ghw/pkg/pci`](https://github.com/jaypipes/ghw),
-  canonical sysfs PCI reader with bundled pci.ids name resolution.
+- [`github.com/jaypipes/ghw/pkg/pci`](https://github.com/jaypipes/ghw). The
+  canonical sysfs PCI reader. It finds names in its bundled pci.ids database.

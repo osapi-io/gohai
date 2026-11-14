@@ -4,44 +4,45 @@
 
 ## Description
 
-Reports Linux IPC subsystem kernel parameters, semaphore limits, message queue
-limits, and shared memory limits, by reading the `/proc/sys/kernel/` sysctl
-tree. These values are set at boot by `/etc/sysctl.conf` (or drop-ins) and
-influence how much IPC resource any process or container can allocate.
+The collector reports the kernel parameters of the Linux IPC subsystem. These
+are the semaphore limits, the message queue limits and the shared memory limits.
+The collector reads them from the `/proc/sys/kernel/` sysctl tree.
+`/etc/sysctl.conf` or its drop-in files set these values at boot. The values
+control how much IPC resource a process or a container can allocate.
 
-The collector mirrors Ohai's `ipc` plugin methodology: it reads the same
-`/proc/sys/kernel/sem`, `msgmnb`, `msgmni`, `msgmax`, `shmall`, `shmmax`, and
+The collector uses the same method as Ohai's `ipc` plugin. It reads the same
+`/proc/sys/kernel/sem`, `msgmnb`, `msgmni`, `msgmax`, `shmall`, `shmmax` and
 `shmmni` paths.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Audit IPC resource limits for database engines (PostgreSQL, Oracle) that tune
-  shared memory extensively.
-- Detect undersized semaphore limits before deploying workloads that need many
-  semaphore sets.
-- Compare configured limits against application recommendations.
+- Audit the IPC resource limits for database engines that tune shared memory
+  very much, for example PostgreSQL and Oracle.
+- Find semaphore limits that are too small, before you deploy workloads that
+  need many semaphore sets.
+- Compare the configured limits with the recommendations of an application.
 
 ## Collected fields
 
-| Field        | Type     | Description                                                                                      | Schema mapping   |
-| ------------ | -------- | ------------------------------------------------------------------------------------------------ | ---------------- |
-| `sem`        | `object` | Semaphore limits from `/proc/sys/kernel/sem`.                                                    | gohai convention |
-| `sem.semmsl` | `string` | Maximum semaphores per semaphore set (`SEMMSL`).                                                 | gohai convention |
-| `sem.semmns` | `string` | Maximum semaphores system-wide (`SEMMNS`).                                                       | gohai convention |
-| `sem.semopm` | `string` | Maximum operations per `semop(2)` call (`SEMOPM`).                                               | gohai convention |
-| `sem.semmni` | `string` | Maximum semaphore sets system-wide (`SEMMNI`).                                                   | gohai convention |
-| `msg`        | `object` | Message queue limits.                                                                            | gohai convention |
-| `msg.msgmnb` | `string` | Default maximum size in bytes for a single message queue, from `/proc/sys/kernel/msgmnb`.        | gohai convention |
-| `msg.msgmni` | `string` | Maximum number of message queue identifiers, from `/proc/sys/kernel/msgmni`.                     | gohai convention |
-| `msg.msgmax` | `string` | Maximum message size in bytes, from `/proc/sys/kernel/msgmax`.                                   | gohai convention |
-| `shm`        | `object` | Shared memory limits.                                                                            | gohai convention |
-| `shm.shmall` | `string` | Total amount of shared memory pages (or bytes on newer kernels), from `/proc/sys/kernel/shmall`. | gohai convention |
-| `shm.shmmax` | `string` | Maximum size of a single shared memory segment in bytes, from `/proc/sys/kernel/shmmax`.         | gohai convention |
-| `shm.shmmni` | `string` | Maximum number of shared memory segments, from `/proc/sys/kernel/shmmni`.                        | gohai convention |
+| Field        | Type     | Description                                                                                         | Schema mapping   |
+| ------------ | -------- | --------------------------------------------------------------------------------------------------- | ---------------- |
+| `sem`        | `object` | The semaphore limits, from `/proc/sys/kernel/sem`.                                                  | gohai convention |
+| `sem.semmsl` | `string` | The maximum number of semaphores in one semaphore set (`SEMMSL`).                                   | gohai convention |
+| `sem.semmns` | `string` | The maximum number of semaphores on the system (`SEMMNS`).                                          | gohai convention |
+| `sem.semopm` | `string` | The maximum number of operations in one `semop(2)` call (`SEMOPM`).                                 | gohai convention |
+| `sem.semmni` | `string` | The maximum number of semaphore sets on the system (`SEMMNI`).                                      | gohai convention |
+| `msg`        | `object` | The message queue limits.                                                                           | gohai convention |
+| `msg.msgmnb` | `string` | The default maximum size in bytes of one message queue, from `/proc/sys/kernel/msgmnb`.             | gohai convention |
+| `msg.msgmni` | `string` | The maximum number of message queue identifiers, from `/proc/sys/kernel/msgmni`.                    | gohai convention |
+| `msg.msgmax` | `string` | The maximum message size in bytes, from `/proc/sys/kernel/msgmax`.                                  | gohai convention |
+| `shm`        | `object` | The shared memory limits.                                                                           | gohai convention |
+| `shm.shmall` | `string` | The total quantity of shared memory pages (bytes on newer kernels), from `/proc/sys/kernel/shmall`. | gohai convention |
+| `shm.shmmax` | `string` | The maximum size in bytes of one shared memory segment, from `/proc/sys/kernel/shmmax`.             | gohai convention |
+| `shm.shmmni` | `string` | The maximum number of shared memory segments, from `/proc/sys/kernel/shmmni`.                       | gohai convention |
 
-All values are returned as strings preserving the raw kernel representation.
-Missing sysctl files yield empty strings for their fields, not all kernels or
-container configurations expose all parameters.
+The collector returns all values as strings. The strings keep the raw format of
+the kernel. If a sysctl file is missing, its field is an empty string. Not all
+kernels or container configurations have all parameters.
 
 ## Platform support
 
@@ -50,7 +51,7 @@ container configurations expose all parameters.
 | Linux    | ✅                          |
 | macOS    | nil (no `/proc/sys/kernel`) |
 
-macOS does not expose `/proc/sys/kernel`. The Darwin variant returns `nil`.
+macOS has no `/proc/sys/kernel`. The Darwin variant returns `nil`.
 
 ## Example output
 
@@ -104,31 +105,33 @@ None.
 
 ## Data sources
 
-Ohai's `linux/ipc.rb` reads the same `/proc/sys/kernel/` files for semaphore,
-message queue, and shared memory limits. gohai follows Ohai's methodology
-exactly, reading the raw kernel tunables rather than parsing `ipcs -l` output.
-All values are returned as strings to preserve the kernel's representation
-(including large 64-bit values in `shmall`/`shmmax`).
+Ohai's `linux/ipc.rb` reads the same `/proc/sys/kernel/` files for the
+semaphore, message queue and shared memory limits. gohai uses the same method as
+Ohai. It reads the raw kernel tunables and does not parse the `ipcs -l` output.
+The collector returns all values as strings to keep the format of the kernel.
+This includes the large 64-bit values in `shmall` and `shmmax`.
 
 On Linux:
 
-1. Read `/proc/sys/kernel/sem` via the injected `avfs.VFS`. The file contains
-   four whitespace-separated values on a single line:
-   `SEMMSL SEMMNS SEMOPM SEMMNI`. Parse all four into the `sem` struct. If fewer
-   than four fields are present (truncated or misconfigured kernel), populate
-   only the available ones.
-2. Read `/proc/sys/kernel/msgmnb`, `/proc/sys/kernel/msgmni`, and
-   `/proc/sys/kernel/msgmax` individually; each contains a single decimal value.
-3. Read `/proc/sys/kernel/shmall`, `/proc/sys/kernel/shmmax`, and
-   `/proc/sys/kernel/shmmni` individually; each contains a single decimal value.
-4. Missing files are soft-missed to empty string, this happens in minimal
-   container environments where `/proc/sys` is not fully bind-mounted or the
-   kernel does not expose a given parameter.
+1. The collector reads `/proc/sys/kernel/sem` through the injected `avfs.VFS`.
+   The file has four values on one line, with whitespace between them:
+   `SEMMSL SEMMNS SEMOPM SEMMNI`. The collector parses all four into the `sem`
+   struct. If the line has fewer than four fields, the collector sets only the
+   fields that are there. This occurs if the file is truncated or the kernel is
+   not configured correctly.
+2. The collector reads `/proc/sys/kernel/msgmnb`, `/proc/sys/kernel/msgmni` and
+   `/proc/sys/kernel/msgmax` one at a time. Each file has one decimal value.
+3. The collector reads `/proc/sys/kernel/shmall`, `/proc/sys/kernel/shmmax` and
+   `/proc/sys/kernel/shmmni` one at a time. Each file has one decimal value.
+4. If a file is missing, its field is an empty string. This occurs in minimal
+   containers that do not bind-mount all of `/proc/sys`. It also occurs if the
+   kernel does not have that parameter.
 
-On macOS: returns `nil`.
+On macOS, the collector returns `nil`.
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
-  `memfs` in tests) for all sysctl reads.
-- Go stdlib `strings.Fields` for the multi-value `sem` line parsing.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for all sysctl reads.
+  Production uses `osfs`. Tests use `memfs`.
+- The Go standard library `strings.Fields` to parse the `sem` line, which has
+  more than one value.

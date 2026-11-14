@@ -4,35 +4,35 @@
 
 ## Description
 
-Reports a stable host identifier, one that survives reboots. On Linux the source
-of truth is `/etc/machine-id` (systemd) with a `/var/lib/dbus/machine-id`
-fallback for pre-systemd Debian/Ubuntu hosts. On macOS the source is
-`IOPlatformUUID` from IOKit, which Apple intends as the authoritative hardware
-identifier.
+The collector reports a stable host identifier. The identifier does not change
+after a reboot. On Linux, the main source is `/etc/machine-id` (systemd). The
+fallback is `/var/lib/dbus/machine-id`, for Debian and Ubuntu hosts that are
+older than systemd. On macOS, the source is `IOPlatformUUID` from IOKit. Apple
+makes this value the authoritative hardware identifier.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Build a stable host-identity index that survives reboots, IP changes, and
-  hostname renames.
-- Correlate asset inventory with OS-level events.
-- Dedupe hosts that appear under multiple hostnames.
+- Make a stable index of host identities. The index does not change after
+  reboots, IP changes or hostname changes.
+- Compare the asset inventory with events from the operating system.
+- Remove duplicate hosts that have more than one hostname.
 
-Caveats:
+Limits:
 
-- On a host where **none** of the expected sources exist (very minimal container
-  images, boot-from-initramfs systems), gopsutil may fall back to
-  `/proc/sys/kernel/random/boot_id`, **that value changes every reboot and is
-  not safe to use as a stable identifier.** Treat an ID that differs across two
-  consecutive reboots as unknown.
-- On Linux, if both `/etc/machine-id` and DMI product_uuid are missing, our
-  collector also consults `/var/lib/dbus/machine-id` (which gopsutil doesn't)
-  before giving up and returning empty.
+- Some hosts have **none** of the expected sources, for example very minimal
+  container images or systems that boot from initramfs. On these hosts, gopsutil
+  can fall back to `/proc/sys/kernel/random/boot_id`. **That value changes at
+  each reboot. Do not use it as a stable identifier.** If the ID is different
+  after two reboots in sequence, treat it as unknown.
+- On Linux, if `/etc/machine-id` and DMI product_uuid are both missing, the
+  collector also reads `/var/lib/dbus/machine-id`. gopsutil does not read it. If
+  that file is also missing, the collector returns an empty value.
 
 ## Collected fields
 
-| Field | Type   | Description                                 | Schema mapping                                                                                                                                                              |
-| ----- | ------ | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`  | string | Stable machine identifier (typically UUID). | OCSF `device.uid`, the canonical OCSF host-identifier field (dictionary: "unique device identifier. Typically BIOS hardware identifier, machine id, or agent identifier."). |
+| Field | Type   | Description                                    | Schema mapping                                                                                                                                                              |
+| ----- | ------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`  | string | The stable machine identifier, usually a UUID. | OCSF `device.uid`, the canonical OCSF host-identifier field (dictionary: "unique device identifier. Typically BIOS hardware identifier, machine id, or agent identifier."). |
 
 ## Platform support
 
@@ -40,7 +40,7 @@ Caveats:
 | -------- | --------- |
 | Linux    | ✅        |
 | macOS    | ✅        |
-| Other    | —         |
+| Other    | None      |
 
 ## Example output
 
@@ -94,26 +94,27 @@ None.
 
 On Linux:
 
-1. gopsutil's `host.InfoWithContext` populates `HostID` from a cascade,
-   `/etc/machine-id` first, DMI `product_uuid` next, then
-   `/proc/sys/kernel/random/boot_id` last. We forward that value as `id`.
-2. When gopsutil returns empty (minimal / pre-systemd hosts) we read
-   `/var/lib/dbus/machine-id` through the injected `avfs.VFS` as a final
-   fallback. Matches Ohai's `linux/machineid.rb` dbus fallback.
+1. gopsutil's `host.InfoWithContext` sets `HostID` from a sequence of sources.
+   It tries `/etc/machine-id` first, then DMI `product_uuid`, then
+   `/proc/sys/kernel/random/boot_id`. The collector reports that value as `id`.
+2. If gopsutil returns an empty value, the collector reads
+   `/var/lib/dbus/machine-id` through the injected `avfs.VFS`. This is the last
+   fallback, for minimal hosts and hosts older than systemd. It is the same as
+   the dbus fallback in Ohai's `linux/machineid.rb`.
 
 On macOS:
 
-1. gopsutil's `host.InfoWithContext` reads `IOPlatformUUID` via IOKit and
-   returns it as `HostID`. Forwarded verbatim as `id` so the shape matches
-   Linux. Ohai has no `:darwin` `machineid` handler, its darwin plugin surfaces
-   the same UUID under `hardware.uuid` instead.
+1. gopsutil's `host.InfoWithContext` reads `IOPlatformUUID` through IOKit and
+   returns it as `HostID`. The collector reports it as `id` with no change, so
+   the shape is the same as on Linux. Ohai has no `:darwin` `machineid` handler.
+   Its darwin plugin reports the same UUID under `hardware.uuid`.
 
-gopsutil's `boot_id` tail is reboot-unstable; consumers seeing a new value after
-a reboot should treat that as "unknown", not as a different host. The
-Description section calls this out.
+The last source of gopsutil, `boot_id`, changes at each reboot. If a consumer
+sees a new value after a reboot, it must treat the value as "unknown", not as a
+different host. The Description section also tells this.
 
 ## Backing library
 
 - [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) for
-  the primary machine-id/DMI read. Linux `/var/lib/dbus/machine-id` fallback is
-  our own `os.ReadFile`.
+  the primary read of the machine ID and DMI. On Linux, the
+  `/var/lib/dbus/machine-id` fallback is a gohai `os.ReadFile` call.

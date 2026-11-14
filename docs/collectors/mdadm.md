@@ -4,38 +4,39 @@
 
 ## Description
 
-Reports Linux software RAID arrays managed by the MD (Multiple Device) driver.
-Discovery uses `/proc/mdstat` to enumerate all arrays; each array is then
-enriched with `mdadm --detail /dev/<device>` to obtain the RAID level, health
-state, UUID, and device counts.
+The collector reports the Linux software RAID arrays that the MD (Multiple
+Device) driver manages. It reads `/proc/mdstat` to find all arrays. Then, for
+each array, it runs `mdadm --detail /dev/<device>` to get the RAID level, the
+health state, the UUID and the device counts.
 
-When `mdadm` is not installed, arrays are returned with only the members and
-spares parsed from `/proc/mdstat`. A missing `/proc/mdstat` returns an empty
-array list without error.
+If `mdadm` is not installed, the collector returns the arrays with only the
+members and spares from `/proc/mdstat`. If `/proc/mdstat` is missing, the
+collector returns an empty array list and no error.
 
-The collector mirrors Ohai's `mdadm` plugin methodology: it reads `/proc/mdstat`
-first, then calls `mdadm --detail` per array to extract the detail fields.
+The method of the collector is the same as Ohai's `mdadm` plugin. It reads
+`/proc/mdstat` first. Then it calls `mdadm --detail` for each array to get the
+detail fields.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Audit RAID health across a fleet (`state: "degraded"` or `"failed"`).
-- Track spare disk counts to detect arrays running without redundancy.
-- Verify RAID level and UUID for change management.
+- Audit the RAID health of a fleet (`state: "degraded"` or `"failed"`).
+- Monitor the count of spare disks, to find arrays that run without redundancy.
+- Make sure that the RAID level and the UUID are correct for change management.
 
 ## Collected fields
 
-| Field                   | Type       | Description                                                                           | Schema mapping   |
-| ----------------------- | ---------- | ------------------------------------------------------------------------------------- | ---------------- |
-| `arrays`                | `array`    | List of MD RAID arrays discovered via `/proc/mdstat`.                                 | gohai convention |
-| `arrays[].device`       | `string`   | Kernel device name (e.g. `"md0"`, `"md127"`).                                         | gohai convention |
-| `arrays[].level`        | `string`   | RAID level from `mdadm --detail` (e.g. `"raid1"`, `"raid5"`). Empty when unavailable. | gohai convention |
-| `arrays[].state`        | `string`   | Array state from `mdadm --detail` (e.g. `"clean"`, `"active"`, `"degraded"`).         | gohai convention |
-| `arrays[].uuid`         | `string`   | Array UUID from `mdadm --detail` (e.g. `"a5d3:1234:dead:beef"`).                      | gohai convention |
-| `arrays[].active_disks` | `int`      | Count of active member disks from `mdadm --detail`.                                   | gohai convention |
-| `arrays[].total_disks`  | `int`      | Total configured member slots from `mdadm --detail`.                                  | gohai convention |
-| `arrays[].spare_disks`  | `int`      | Count of spare disks from `mdadm --detail`.                                           | gohai convention |
-| `arrays[].members`      | `[]string` | Active member device names from `/proc/mdstat` (e.g. `["sda1","sdb1"]`).              | gohai convention |
-| `arrays[].spares`       | `[]string` | Spare member device names from `/proc/mdstat` (devices tagged `(S)`).                 | gohai convention |
+| Field                   | Type       | Description                                                                                                | Schema mapping   |
+| ----------------------- | ---------- | ---------------------------------------------------------------------------------------------------------- | ---------------- |
+| `arrays`                | `array`    | The list of MD RAID arrays in `/proc/mdstat`.                                                              | gohai convention |
+| `arrays[].device`       | `string`   | The kernel device name, for example `"md0"` or `"md127"`.                                                  | gohai convention |
+| `arrays[].level`        | `string`   | The RAID level, from `mdadm --detail`, for example `"raid1"` or `"raid5"`. Empty when it is not available. | gohai convention |
+| `arrays[].state`        | `string`   | The array state, from `mdadm --detail`, for example `"clean"`, `"active"` or `"degraded"`.                 | gohai convention |
+| `arrays[].uuid`         | `string`   | The array UUID, from `mdadm --detail`, for example `"a5d3:1234:dead:beef"`.                                | gohai convention |
+| `arrays[].active_disks` | `int`      | The count of active member disks, from `mdadm --detail`.                                                   | gohai convention |
+| `arrays[].total_disks`  | `int`      | The total count of configured member slots, from `mdadm --detail`.                                         | gohai convention |
+| `arrays[].spare_disks`  | `int`      | The count of spare disks, from `mdadm --detail`.                                                           | gohai convention |
+| `arrays[].members`      | `[]string` | The device names of the active members, from `/proc/mdstat`, for example `["sda1","sdb1"]`.                | gohai convention |
+| `arrays[].spares`       | `[]string` | The device names of the spare members, from `/proc/mdstat` (devices with the `(S)` tag).                   | gohai convention |
 
 ## Platform support
 
@@ -95,42 +96,43 @@ None.
 
 ## Data sources
 
-Ohai's `linux/mdadm.rb` reads `/proc/mdstat` for array detection and parses
-member/spare disk lists. gohai follows the same approach for `/proc/mdstat` and
-extends it by optionally running `mdadm --detail` for UUID, state, and disk
-counts, which Ohai does not do. When `mdadm` is not installed, gohai still emits
-arrays with the information available from `/proc/mdstat` alone.
+Ohai's `linux/mdadm.rb` reads `/proc/mdstat` to find the arrays and parses the
+lists of member and spare disks. gohai uses the same method for `/proc/mdstat`.
+gohai also runs `mdadm --detail`, if it is available, to get the UUID, the state
+and the disk counts. Ohai does not do this. If `mdadm` is not installed, gohai
+still reports the arrays with the data from `/proc/mdstat` only.
 
 On Linux:
 
-1. Read `/proc/mdstat` via the injected `avfs.VFS`. If the file is absent (no MD
-   kernel support, containerized host), return an empty array list without
-   error.
-2. Parse `/proc/mdstat` line by line. Lines matching
-   `<name> : active|inactive ...` with a device name starting with `md` are
-   recognized as array lines. For each such line, member tokens of the form
-   `<dev>[N]` (active) and `<dev>[N](S)` (spare) are extracted via regex.
-   Journal devices (`(J)`) are recognized and silently skipped. They are an
-   implementation detail of the MD layer, not a data or parity member.
-3. For each discovered array (sorted by device name for deterministic output),
-   run `mdadm --detail /dev/<device>` via the injected `executor.Executor`.
-   Parse the output for:
-   - `Raid Level : <level>`. RAID level string.
-   - `State : <state>`. Array state.
-   - `UUID : <uuid>`. Array UUID.
-   - `Active Devices : <n>`, `Total Devices : <n>`, `Spare Devices : <n>`,
+1. The collector reads `/proc/mdstat` through the injected `avfs.VFS`. If the
+   file is missing, the collector returns an empty array list and no error. The
+   file is missing if the kernel has no MD support, or on a host in a container.
+2. The collector parses `/proc/mdstat` line by line. An array line agrees with
+   `<name> : active|inactive ...` and has a device name that starts with `md`.
+   On each array line, a regex finds the member tokens. The form `<dev>[N]` is
+   an active member. The form `<dev>[N](S)` is a spare. The collector finds
+   journal devices (`(J)`) and skips them with no message. They are an internal
+   part of the MD layer, not a data or parity member.
+3. The collector sorts the arrays by device name, so the output is always in the
+   same order. For each array, it runs `mdadm --detail /dev/<device>` through
+   the injected `executor.Executor`. It parses these lines of the output:
+   - `Raid Level : <level>`. The RAID level.
+   - `State : <state>`. The array state.
+   - `UUID : <uuid>`. The array UUID.
+   - `Active Devices : <n>`, `Total Devices : <n>`, `Spare Devices : <n>`. The
      device counts.
-4. If `mdadm` is not installed or returns a non-zero exit, the enrichment step
-   is silently skipped for that array. The array is still returned with members
-   and spares from `/proc/mdstat`, matching Ohai's behavior of always emitting
-   what `/proc/mdstat` tells us even when `mdadm` is missing.
+4. If `mdadm` is not installed or returns a non-zero exit code, the collector
+   skips the detail step for that array with no message. It still returns the
+   array with the members and spares from `/proc/mdstat`. This is the same as
+   Ohai, which always reports the data from `/proc/mdstat`, also when `mdadm` is
+   missing.
 
-On macOS: returns `nil`.
+On macOS, the collector returns `nil`.
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
-  `memfs` in tests) for the `/proc/mdstat` read.
-- `internal/executor` (`executor.New()` in production, gomock mock in tests) for
-  the `mdadm --detail` invocation.
-- Go stdlib `bufio`, `regexp`, and `strconv` for parsing.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for the `/proc/mdstat`
+  read. Production uses `osfs`. Tests use `memfs`.
+- `internal/executor` to run `mdadm --detail`. Production uses `executor.New()`.
+  Tests use a gomock mock.
+- The Go standard library `bufio`, `regexp` and `strconv` to parse the data.

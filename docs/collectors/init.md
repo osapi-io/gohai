@@ -4,33 +4,36 @@
 
 ## Description
 
-Detects which init system (PID 1) the host is running under. Matters when
-consumers decide how to restart services, reload configuration, or declare
-dependency ordering:
+The collector finds the init system (PID 1) of the host. Consumers use this data
+to decide how to restart services, reload the configuration, or set the order of
+dependencies:
 
-- `systemd`. `systemctl` family, unit files under `/etc/systemd/system/`
-- `upstart`. `initctl`, `/etc/init/*.conf`
-- `sysvinit`. Classic `/etc/init.d/*` scripts + runlevels
-- `openrc`. Gentoo / Alpine; `rc-service`, `/etc/init.d/` + OpenRC conf
-- `runit`. Void Linux, Artix; `sv` command
-- `launchd`. MacOS; `launchctl`, `*.plist` under `/Library/LaunchDaemons/`
+- `systemd`. The `systemctl` commands, and unit files under
+  `/etc/systemd/system/`.
+- `upstart`. `initctl`, and `/etc/init/*.conf`.
+- `sysvinit`. Classic `/etc/init.d/*` scripts and runlevels.
+- `openrc`. Gentoo and Alpine. `rc-service`, `/etc/init.d/` and the OpenRC
+  configuration.
+- `runit`. Void Linux and Artix. The `sv` command.
+- `launchd`. macOS. `launchctl`, and `*.plist` files under
+  `/Library/LaunchDaemons/`.
 
 ## Collected fields
 
-| Field  | Type   | Description                                                                               | Schema mapping                                                                                                        |
-| ------ | ------ | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `name` | string | Canonical init system name. Known values listed above; unknown values pass through as-is. | No direct schema mapping, `process.name` of PID 1 is the closest concept (`os.pid_1_name`-style field doesn't exist). |
+| Field  | Type   | Description                                                                                                                   | Schema mapping                                                                                                  |
+| ------ | ------ | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `name` | string | The canonical name of the init system. The list above gives the known values. The collector does not change an unknown value. | No direct schema mapping. The nearest concept is `process.name` of PID 1. No field like `os.pid_1_name` exists. |
 
 ## Platform support
 
 | Platform | Supported                 |
 | -------- | ------------------------- |
 | Linux    | ✅ (reads `/proc/1/comm`) |
-| macOS    | ✅ (hard-coded `launchd`) |
+| macOS    | ✅ (always `launchd`)     |
 
-On Linux, if `/proc/1/comm` is unreadable (restricted containers), the `name` is
-empty. Consumers should treat empty as unknown, not as an assertion of any
-particular init system.
+On Linux, if the collector cannot read `/proc/1/comm`, `name` is empty. This
+occurs in restricted containers. Consumers must read an empty value as unknown.
+An empty value does not identify an init system.
 
 ## Example output
 
@@ -80,14 +83,15 @@ None.
 
 On Linux:
 
-1. Read `/proc/1/comm` via the injected `avfs.VFS` and trim whitespace. Apply a
-   small normalization table: `init` → `sysvinit`, `openrc-init` → `openrc`.
-   Other values pass through unchanged. Mirrors Ohai's `init_package.rb`, which
-   reads the same file; we add the canonicalization step that Ohai skips.
+1. The collector reads `/proc/1/comm` through the injected `avfs.VFS` and
+   removes the whitespace. Then it applies a small normalization table: `init`
+   becomes `sysvinit`, and `openrc-init` becomes `openrc`. Other values do not
+   change. Ohai's `init_package.rb` reads the same file. gohai adds the
+   canonicalization step, which Ohai does not do.
 
-On macOS we hard-code `launchd`, it's the only init system Darwin ships. Ohai's
-`init_package.rb` is Linux-only and returns nothing here.
+On macOS, the value is always `launchd`, because Darwin has no other init
+system. Ohai's `init_package.rb` is for Linux only and returns nothing on macOS.
 
 ## Backing library
 
-- Go stdlib (`os`), no third-party dependency.
+- The Go standard library (`os`). No third-party dependency.

@@ -4,31 +4,31 @@
 
 ## Description
 
-Reports the list of valid login shells installed on the host, as listed in
-`/etc/shells`. This file is maintained by the system package manager (and
-sometimes edited by operators) and is the authoritative source consulted by
-`login(1)`, `chsh(1)`, FTP daemons, and other tools that need to decide whether
-a given shell is "legitimate", a user whose `passwd` entry points to a shell not
-in `/etc/shells` is typically treated as non-interactive.
+The collector reports the list of valid login shells on the host, from
+`/etc/shells`. The system package manager keeps this file, and operators
+sometimes edit it. `login(1)`, `chsh(1)`, FTP daemons and other tools read this
+file to decide if a shell is "legitimate". If a user's `passwd` entry points to
+a shell that is not in `/etc/shells`, these tools usually treat the user as
+non-interactive.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Enumerate which shells can be assigned as a login shell (fleet inventory,
-  policy compliance, e.g. "is `/bin/zsh` available on this host?").
-- Drive remediation tooling that installs a missing shell before `chsh`.
-- Spot drift across a fleet (hosts where `/etc/shells` has been hand-edited or
-  pruned).
+- List the shells that you can give a user as a login shell, for fleet inventory
+  and policy compliance. For example: "is `/bin/zsh` available on this host?"
+- Start remediation tools that install a missing shell before `chsh`.
+- Find drift across a fleet: hosts where an operator edited `/etc/shells` by
+  hand or removed entries.
 
-Comments (lines beginning with `#`) and blank lines are stripped; leading and
-trailing whitespace on each entry is trimmed. Non-absolute entries (anything
-that doesn't start with `/`) are ignored, matches Ohai's strict `/`-prefix
-filter.
+The collector removes comments (lines that start with `#`) and blank lines. It
+removes the whitespace at the start and end of each entry. It ignores entries
+that are not absolute, that is, entries that do not start with `/`. This is the
+same as Ohai's strict `/`-prefix filter.
 
 ## Collected fields
 
-| Field   | Type       | Description                                          | Schema mapping                                                                                                                   |
-| ------- | ---------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `paths` | `[]string` | Absolute paths to valid login shells, in file order. | No direct schema mapping, OCSF has `user.shell` per-user but no host-level shell inventory object. Treated as a gohai extension. |
+| Field   | Type       | Description                                                  | Schema mapping                                                                                                                               |
+| ------- | ---------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `paths` | `[]string` | The absolute paths of the valid login shells, in file order. | No direct schema mapping. OCSF has `user.shell` for each user, but no object for the shells of a host. gohai treats it as a gohai extension. |
 
 ## Platform support
 
@@ -38,8 +38,9 @@ filter.
 | macOS    | ✅         |
 | Other    | Empty list |
 
-Missing `/etc/shells` (distroless/scratch containers) soft-misses to an empty
-list rather than erroring, matches Ohai's `file_exist?` gate.
+If `/etc/shells` is missing, the collector returns an empty list, not an error.
+Distroless and scratch containers have no `/etc/shells`. This is the same as
+Ohai's `file_exist?` check.
 
 ## Example output
 
@@ -119,26 +120,29 @@ None.
 
 ## Data sources
 
-On Linux and macOS (identical, `/etc/shells` follows POSIX convention and Ohai's
-plugin has no `:darwin`-specific path):
+On Linux and macOS, the steps are the same. `/etc/shells` follows the POSIX
+convention, and Ohai's plugin has no special path for `:darwin`.
 
-1. Read `/etc/shells` through the injected `avfs.VFS`. Missing file (distroless
-   containers, scratch images) soft-misses to `{paths: []}` rather than
-   erroring. Ohai omits the `shells` attribute entirely in the same situation,
-   our typed struct is always present; the empty slice is a Go-idiom divergence,
-   not a collection divergence.
-2. Scan the file line by line. Strip leading/trailing whitespace, skip blank
-   lines, skip comment lines (`#` prefix), skip any line that doesn't start with
-   `/` after trimming. The `TrimSpace` step is slightly more permissive than
-   Ohai's `line[0] == "/"` check on the raw line (we accept `  /bin/bash` as a
-   valid entry); intentional safer behavior.
-3. Append surviving absolute paths to `paths[]` in file order.
+1. The collector reads `/etc/shells` through the injected `avfs.VFS`. If the
+   file is missing, the collector returns `{paths: []}`, not an error.
+   Distroless containers and scratch images have no `/etc/shells`. In the same
+   case, Ohai does not report the `shells` attribute at all. The gohai typed
+   struct is always there. The empty slice is a difference in Go style, not a
+   difference in the collected data.
+2. The collector reads the file line by line. It removes the whitespace at the
+   start and end of each line. It skips blank lines and comment lines (`#`
+   prefix). It skips each line that does not start with `/` after this trim. The
+   `TrimSpace` step accepts a little more than Ohai's `line[0] == "/"` check on
+   the raw line. For example, gohai accepts `  /bin/bash` as a valid entry. This
+   is intentional, safer behavior.
+3. The collector adds the remaining absolute paths to `paths[]` in file order.
 
-Permission-denied or other non-not-exist read errors propagate as a real
-failure, which matches Ohai's behavior of letting `file_open` raise.
+If the read fails because the permission is denied, or for any other reason than
+a missing file, the error goes back to the caller as a real failure. This is the
+same as Ohai, which lets `file_open` raise the error.
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
-  `memfs` in tests) for the `/etc/shells` read.
-- Go stdlib `bufio` for line scanning.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read `/etc/shells`.
+  Production uses `osfs`. Tests use `memfs`.
+- The Go standard library `bufio` to read the lines.

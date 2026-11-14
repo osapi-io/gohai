@@ -4,30 +4,31 @@
 
 ## Description
 
-Reports Linux Standard Base identification fields, `id`, `release`, `codename`,
-`description`, used as a stable cross-distro identity tuple. Legacy compliance
-tooling and older packaging still consume LSB, so we surface it even though
-`os_release` has largely supplanted it on modern distros.
+The collector reports the Linux Standard Base identification fields: `id`,
+`release`, `codename` and `description`. Together, these fields are a stable
+identity that is the same on all distributions. Old compliance tools and old
+packaging still read LSB. Thus gohai reports it, although `os_release` replaces
+it on most modern distributions.
 
-The `lsb_release` CLI is the sole source, matches current Ohai's linux/lsb
-plugin. When the CLI is absent, `Info` stays empty rather than parsing
-`/etc/lsb-release`. See Data Sources for why.
+The `lsb_release` CLI is the only source. This is the same as the current
+linux/lsb plugin of Ohai. If the CLI is missing, `Info` stays empty. The
+collector does not parse `/etc/lsb-release`. Data sources tells why.
 
 ## Collected fields
 
-| Field         | Type   | Description                                              | Schema mapping                                 |
-| ------------- | ------ | -------------------------------------------------------- | ---------------------------------------------- |
-| `id`          | string | Distributor ID (`Ubuntu`, `RedHatEnterprise`, `CentOS`). | `os.name` (closest).                           |
-| `release`     | string | Release version (`22.04`, `9.3`).                        | `os.version`.                                  |
-| `codename`    | string | Release codename (`jammy`, `Plow`).                      | No direct schema mapping.                      |
-| `description` | string | Human-readable description (`Ubuntu 22.04.3 LTS`).       | No direct schema mapping (presentation-level). |
+| Field         | Type   | Description                                                  | Schema mapping                                 |
+| ------------- | ------ | ------------------------------------------------------------ | ---------------------------------------------- |
+| `id`          | string | The distributor ID (`Ubuntu`, `RedHatEnterprise`, `CentOS`). | `os.name` (closest).                           |
+| `release`     | string | The release version (`22.04`, `9.3`).                        | `os.version`.                                  |
+| `codename`    | string | The release codename (`jammy`, `Plow`).                      | No direct schema mapping.                      |
+| `description` | string | A description that people can read (`Ubuntu 22.04.3 LTS`).   | No direct schema mapping (presentation-level). |
 
 ## Platform support
 
-| Platform | Supported                          |
-| -------- | ---------------------------------- |
-| Linux    | ✅ (`lsb_release -a` via executor) |
-| macOS    | `nil` (no LSB concept on Darwin)   |
+| Platform | Supported                              |
+| -------- | -------------------------------------- |
+| Linux    | ✅ (`lsb_release -a` through executor) |
+| macOS    | `nil` (Darwin has no LSB)              |
 
 ## Example output
 
@@ -75,29 +76,31 @@ None.
 
 ## Data sources
 
-On Linux we run `lsb_release -a` through the shared `internal/executor` runner
-and parse the four labelled lines it emits (`Distributor ID`, `Release`,
-`Codename`, `Description`) into the matching `Info` fields. When the CLI is
-absent or errors, `Info` stays empty, not an error. Matches Ohai's no-panic
-behaviour.
+On Linux, the collector runs `lsb_release -a` through the shared
+`internal/executor` runner. It parses the four labelled lines of the output
+(`Distributor ID`, `Release`, `Codename`, `Description`) into the related `Info`
+fields. If the CLI is missing or fails, `Info` stays empty, and the collector
+returns no error. This is the same as Ohai, which does not panic in this case.
 
-**Why no `/etc/lsb-release` file fallback?** Our prior implementation parsed the
-file directly. We removed that path to align with Ohai, which explicitly dropped
-the file fallback in [chef/ohai#1562](https://github.com/chef/ohai/pull/1562)
-(2021). The reasoning carries over:
+**Why is there no fallback to the `/etc/lsb-release` file?** The previous
+implementation of gohai parsed the file directly. gohai removed that path to
+agree with Ohai. Ohai removed its file fallback in
+[chef/ohai#1562](https://github.com/chef/ohai/pull/1562) (2021). The same
+reasons apply to gohai:
 
-- On modern Debian/Ubuntu the `lsb-release` package ships both the file and the
-  CLI; when one is present the other is too, so the fallback is redundant.
-- The file fallback was originally added for legacy Debian \<7 where only the
-  file was installed. That class of host is out of scope.
-- Minimized container images that strip the CLI but keep the file are an edge
-  case; the correct fix there is to install the `lsb-release` package (or
-  consume `os_release` instead, which we already surface in its own collector).
+- On modern Debian and Ubuntu, the `lsb-release` package installs both the file
+  and the CLI. If one is there, the other is there too. Thus the fallback is not
+  necessary.
+- Ohai added the file fallback for old Debian \<7, where only the file was
+  installed. gohai does not support these hosts.
+- Some minimal container images remove the CLI but keep the file. This is an
+  edge case. On these images, install the `lsb-release` package. Or read
+  `os_release` instead, which gohai reports in its own collector.
 
-macOS is not covered, no LSB concept on Darwin.
+The collector does not support macOS, because Darwin has no LSB.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `lsb_release -a` on Linux. Tests mock it with
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `lsb_release -a` on Linux. Tests mock it with
   `go.uber.org/mock`.

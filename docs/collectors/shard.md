@@ -4,30 +4,36 @@
 
 ## Description
 
-Derives a deterministic shard seed from stable host identity. Matches Ohai's
-`shard` plugin algorithm: concatenate `machinename + DMI serial + DMI uuid`, MD5
-hash, take the first 7 hex characters as a base-16 integer. The same host always
-maps to the same bucket; different hosts distribute evenly.
+The collector calculates a deterministic shard seed from the stable identity of
+the host. The algorithm is the same as in Ohai's `shard` plugin:
 
-Consumers use this to:
+1. Join `machinename + DMI serial + DMI uuid`.
+2. Make the MD5 hash of the result.
+3. Read the first 7 hex characters as a base-16 integer.
 
-- Stagger scheduled work across a fleet (`seed % 60` for minute-of-hour,
-  `seed % 7` for day-of-week, etc.) without a per-host schedule file.
-- Distribute work across parallel pipelines without central coordination.
-- Pick a canary host deterministically (`seed == 0 mod N`).
+The same host always gets the same bucket. Different hosts spread evenly across
+the buckets.
+
+Consumers use this data to:
+
+- Spread scheduled work across a fleet without a schedule file for each host.
+  For example, use `seed % 60` for the minute of the hour, or `seed % 7` for the
+  day of the week.
+- Divide work across parallel pipelines without central control.
+- Select a canary host in a deterministic way (`seed == 0 mod N`).
 
 ## Collected fields
 
-| Field  | Type  | Description                                                                                                                                     | Schema mapping                                              |
-| ------ | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `seed` | `int` | First 7 hex chars of MD5(`machinename + serial + uuid`) interpreted as base-16 integer. Stable across reboots when DMI identity doesn't change. | No direct schema mapping, shard is a gohai/Ohai convention. |
+| Field  | Type  | Description                                                                                                                                                         | Schema mapping                                                  |
+| ------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `seed` | `int` | The first 7 hex characters of MD5(`machinename + serial + uuid`), read as a base-16 integer. It does not change across reboots if the DMI identity does not change. | No direct schema mapping. Shard is a gohai and Ohai convention. |
 
 ## Platform support
 
-| Platform | Supported                                                                             |
-| -------- | ------------------------------------------------------------------------------------- |
-| Linux    | ✅ (inputs: machinename from hostname + serial/uuid from DMI)                         |
-| macOS    | ✅ (inputs: machinename from hostname + serial from system_profiler + IOPlatformUUID) |
+| Platform | Supported                                                                           |
+| -------- | ----------------------------------------------------------------------------------- |
+| Linux    | ✅ (inputs: machinename from hostname, serial and uuid from DMI)                    |
+| macOS    | ✅ (inputs: machinename from hostname, serial from system_profiler, IOPlatformUUID) |
 
 ## Example output
 
@@ -58,45 +64,53 @@ gohai --no-collector.shard   # disable
 
 ## Dependencies
 
-`hostname`, `dmi`. The shard seed is derived from `hostname.Info.MachineName`
-plus DMI serial number and UUID from `dmi.Info`. On macOS where DMI is empty,
-serial comes from `system_profiler SPHardwareDataType` and UUID from
-IOPlatformUUID via gopsutil.
+`hostname`, `dmi`. The collector calculates the shard seed from
+`hostname.Info.MachineName` and from the DMI serial number and UUID in
+`dmi.Info`. On macOS, DMI is empty. There, the serial comes from
+`system_profiler SPHardwareDataType`, and the UUID comes from IOPlatformUUID
+through gopsutil.
 
 ## Data sources
 
 On Linux:
 
-1. `machinename` is read from the `hostname` prior result
+1. The collector reads `machinename` from the earlier result of `hostname`
    (`hostname.Info.MachineName`).
-2. `serial` cascades through DMI sections from the `dmi` prior result:
-   `Product.SerialNumber` → `Baseboard.SerialNumber` → `Chassis.SerialNumber`,
-   taking the first non-blank value. Mirrors Ohai's `get_dmi_property` fallback
-   chain (system → base_board → chassis).
-3. `uuid` is read from `dmi.Info.Product.UUID`.
-4. The three strings are concatenated with no separator and MD5-hashed. The
-   first 7 hex characters of the digest are interpreted as a base-16 integer.
-   Matches Ohai's `hexdigest(data)[0...7].to_i(16)`.
+2. The collector reads `serial` from the DMI sections in the earlier result of
+   `dmi`, in this order: `Product.SerialNumber` → `Baseboard.SerialNumber` →
+   `Chassis.SerialNumber`. It uses the first value that is not blank. This order
+   is the same as the fallback chain of Ohai's `get_dmi_property` (system →
+   base_board → chassis).
+3. The collector reads `uuid` from `dmi.Info.Product.UUID`.
+4. The collector joins the three strings with no separator and makes the MD5
+   hash. It reads the first 7 hex characters of the digest as a base-16 integer.
+   This is the same as Ohai's `hexdigest(data)[0...7].to_i(16)`.
 
 On macOS:
 
-1. `machinename` is read from the `hostname` prior result (same as Linux).
-2. `serial` comes from `system_profiler SPHardwareDataType -json` via the shared
-   `internal/executor` runner, matching Ohai's `hardware["serial_number"]`
-   source. Error or missing data leaves serial empty.
+1. The collector reads `machinename` from the earlier result of `hostname`, the
+   same as on Linux.
+2. `serial` comes from `system_profiler SPHardwareDataType -json` through the
+   shared `internal/executor` runner. This is the same source as Ohai's
+   `hardware["serial_number"]`. If there is an error or no data, serial stays
+   empty.
 3. `uuid` comes from gopsutil's `host.InfoWithContext` → `HostID`
-   (IOPlatformUUID). Matches Ohai's `hardware["platform_UUID"]`. Error leaves
-   uuid empty.
-4. Same MD5 → 7-hex-char → integer computation as Linux.
+   (IOPlatformUUID). This is the same as Ohai's `hardware["platform_UUID"]`. If
+   there is an error, uuid stays empty.
+4. The collector does the same MD5 → 7 hex characters → integer calculation as
+   on Linux.
 
-Mirrors Ohai's `shard.rb` algorithm with the same default sources
-(`machinename`, `serial`, `uuid`) and the same MD5 → integer output. We do not
-implement Ohai's per-plugin `[:sources]` configurability or FIPS-aware digest
-selection (SHA-256 under FIPS). Those can be added if a consumer needs them.
+The algorithm is the same as Ohai's `shard.rb`. It uses the same default sources
+(`machinename`, `serial`, `uuid`) and gives the same MD5 → integer output. gohai
+does not have two features of Ohai. It cannot configure `[:sources]` for each
+plugin. It does not select the digest for FIPS (SHA-256 under FIPS). gohai can
+add them if a consumer needs them.
 
 ## Backing library
 
-- Go stdlib (`crypto/md5`, `fmt`, `strconv`) for the hash computation.
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) for
-  IOPlatformUUID on macOS.
-- [`internal/executor`](../../internal/executor) for `system_profiler` on macOS.
+- The Go standard library (`crypto/md5`, `fmt`, `strconv`) to calculate the
+  hash.
+- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) to
+  read IOPlatformUUID on macOS.
+- [`internal/executor`](../../internal/executor) to run `system_profiler` on
+  macOS.

@@ -4,28 +4,29 @@
 
 ## Description
 
-Reports the name of root's primary group. Two-hop lookup (matches Ohai): resolve
-user `root` → its primary GID → group name. Different operating systems use
+The collector reports the name of the primary group of root. It does the lookup
+in two steps, the same as Ohai. It finds the primary GID of the user `root`.
+Then it finds the group name of that GID. Different operating systems use
 different conventions:
 
-- **Linux:** almost always `root`
-- **macOS / BSD:** `wheel`
-- **Custom / hardened hosts:** whatever site policy sets
+- **Linux:** almost always `root`.
+- **macOS / BSD:** `wheel`.
+- **Custom / hardened hosts:** the value that the site policy sets.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Set file ownership/mode portably in provisioning code (Ohai introduced this
-  fact so recipes could write `group: node['root_group']` instead of hard-coding
-  `root`).
-- Detect non-standard hosts in compliance sweeps (anything other than the
-  expected `root`/`wheel` for the platform is worth flagging).
-- Mirror the Ohai contract for consumers migrating recipes to gohai.
+- Set the file ownership and mode in provisioning code that works on all
+  platforms. Ohai added this fact so that recipes can write
+  `group: node['root_group']` and not a fixed `root`.
+- Find non-standard hosts in compliance scans. A value that is not the expected
+  `root` or `wheel` for the platform needs attention.
+- Keep the Ohai contract for consumers that move their recipes to gohai.
 
 ## Collected fields
 
-| Field  | Type   | Description                                       | Schema mapping                                                                                                                         |
-| ------ | ------ | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `name` | string | Primary group name for root (`root`, `wheel`, …). | No direct schema mapping. OCSF's `group` object targets access-control events, not host-level facts. Treated as a gohai-native scalar. |
+| Field  | Type   | Description                                                           | Schema mapping                                                                                                                  |
+| ------ | ------ | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `name` | string | The name of the primary group of root, for example `root` or `wheel`. | No direct schema mapping. OCSF's `group` object is for access-control events, not host facts. gohai keeps it as a gohai scalar. |
 
 ## Platform support
 
@@ -33,7 +34,7 @@ Consumers use this to:
 | -------- | --------- |
 | Linux    | ✅        |
 | macOS    | ✅        |
-| Other    | —         |
+| Other    | No        |
 
 ## Example output
 
@@ -85,15 +86,15 @@ None.
 
 ## Data sources
 
-| Platform | What we read                                         | Ohai plugin ([`root_group.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/root_group.rb)) | Alignment                                                                             |
-| -------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| Linux    | `os/user.Lookup("root")` → `LookupGroupId(user.Gid)` | `Etc.getgrgid(Etc.getpwnam("root").gid).name`, same two-hop pattern.                                   | **Identical.** Two-hop lookup ensures correctness even if root's primary GID isn't 0. |
-| macOS    | Same Go stdlib calls                                 | Same Ruby `Etc` call                                                                                   | **Identical.** Typical result "wheel".                                                |
+| Platform | What we read                                         | Ohai plugin ([`root_group.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/root_group.rb)) | Alignment                                                                                                |
+| -------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Linux    | `os/user.Lookup("root")` → `LookupGroupId(user.Gid)` | `Etc.getgrgid(Etc.getpwnam("root").gid).name`, same two-hop pattern.                                   | **Identical.** The lookup in two steps gives the correct name, also if the primary GID of root is not 0. |
+| macOS    | The same Go standard library calls                   | The same Ruby `Etc` call                                                                               | **Identical.** The usual result is "wheel".                                                              |
 
-**Known gaps:** None. Windows support (Ohai has a WMI SID-544 lookup for
-localized Administrators group name) is out of scope. gohai doesn't target
-Windows yet.
+**Known gaps:** None. Windows support is out of scope. On Windows, Ohai does a
+WMI SID-544 lookup for the localized name of the Administrators group. gohai
+does not support Windows yet.
 
 ## Backing library
 
-- Go stdlib (`os/user`), no third-party dependency.
+- The Go standard library (`os/user`). There is no third-party dependency.

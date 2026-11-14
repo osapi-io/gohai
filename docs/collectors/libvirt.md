@@ -4,42 +4,43 @@
 
 ## Description
 
-Reports libvirt domain information from a KVM/QEMU hypervisor host. Uses the
-`virsh` CLI (part of `libvirt-client` / `libvirt-bin`) rather than the
-`ruby-libvirt` gem used by Ohai, since there is no maintained Go libvirt binding
-with equivalent coverage. When `virsh` is absent or cannot connect to the
-daemon, `Collect` returns `nil` with no error.
+The collector reports the libvirt domain data from a KVM or QEMU hypervisor
+host. It uses the `virsh` CLI, which is part of `libvirt-client` or
+`libvirt-bin`. Ohai uses the `ruby-libvirt` gem. gohai does not use a Go
+binding, because no maintained Go libvirt binding has equivalent coverage. If
+`virsh` is missing or cannot connect to the daemon, `Collect` returns `nil` and
+no error.
 
-Only Linux is implemented. KVM requires Linux and the libvirt daemon
-(`libvirtd`) is a Linux service. macOS always returns `nil`.
+The collector supports only Linux. KVM needs Linux, and the libvirt daemon
+(`libvirtd`) is a Linux service. On macOS, the collector always returns `nil`.
 
 ## Collected fields
 
 ### Top-level `Info`
 
-| Field     | Type     | Description                                     | Schema mapping            |
-| --------- | -------- | ----------------------------------------------- | ------------------------- |
-| `uri`     | string   | libvirt connection URI (e.g. `qemu:///system`). | No direct schema mapping. |
-| `version` | string   | libvirt daemon version (e.g. `10.0.0`).         | No direct schema mapping. |
-| `domains` | []Domain | List of all domains (running and stopped).      | No direct schema mapping. |
+| Field     | Type     | Description                                               | Schema mapping            |
+| --------- | -------- | --------------------------------------------------------- | ------------------------- |
+| `uri`     | string   | The libvirt connection URI, for example `qemu:///system`. | No direct schema mapping. |
+| `version` | string   | The libvirt daemon version, for example `10.0.0`.         | No direct schema mapping. |
+| `domains` | []Domain | The list of all domains, running and stopped.             | No direct schema mapping. |
 
 ### `Domain`
 
-| Field        | Type   | Description                                            | Schema mapping                     |
-| ------------ | ------ | ------------------------------------------------------ | ---------------------------------- |
-| `name`       | string | Domain name.                                           | `process.name` (closest analogue). |
-| `uuid`       | string | Domain UUID.                                           | No direct schema mapping.          |
-| `state`      | string | Domain state (`running`, `shut off`, `paused`, etc.).  | No direct schema mapping.          |
-| `vcpus`      | int    | Number of virtual CPUs.                                | No direct schema mapping.          |
-| `max_memory` | string | Maximum memory allocation (e.g. `2097152 KiB`).        | No direct schema mapping.          |
-| `autostart`  | bool   | Whether the domain autostarts with the libvirt daemon. | No direct schema mapping.          |
+| Field        | Type   | Description                                                      | Schema mapping                      |
+| ------------ | ------ | ---------------------------------------------------------------- | ----------------------------------- |
+| `name`       | string | The domain name.                                                 | `process.name` (the nearest match). |
+| `uuid`       | string | The domain UUID.                                                 | No direct schema mapping.           |
+| `state`      | string | The domain state, for example `running`, `shut off` or `paused`. | No direct schema mapping.           |
+| `vcpus`      | int    | The number of virtual CPUs.                                      | No direct schema mapping.           |
+| `max_memory` | string | The maximum memory allocation, for example `2097152 KiB`.        | No direct schema mapping.           |
+| `autostart`  | bool   | True if the domain starts automatically with the libvirt daemon. | No direct schema mapping.           |
 
 ## Platform support
 
-| Platform | Supported                                                                           |
-| -------- | ----------------------------------------------------------------------------------- |
-| Linux    | ✅ (`virsh version`, `virsh uri`, `virsh list --all`, `virsh dominfo` via executor) |
-| macOS    | `nil` (KVM not supported on Darwin)                                                 |
+| Platform | Supported                                                                                   |
+| -------- | ------------------------------------------------------------------------------------------- |
+| Linux    | ✅ (`virsh version`, `virsh uri`, `virsh list --all`, `virsh dominfo` through the executor) |
+| macOS    | `nil` (Darwin does not support KVM)                                                         |
 
 ## Example output
 
@@ -99,8 +100,8 @@ gohai --collector.libvirt    # enable (opt-in)
 gohai --no-collector.libvirt # disable
 ```
 
-DefaultEnabled: `false`, libvirt is only present on KVM hypervisor hosts;
-callers must opt in explicitly.
+`DefaultEnabled` is `false`, because only KVM hypervisor hosts have libvirt.
+Callers must enable the collector explicitly.
 
 ## Dependencies
 
@@ -108,37 +109,41 @@ None.
 
 ## Data sources
 
-On Linux the collector runs four `virsh` commands in sequence:
+On Linux, the collector runs four `virsh` commands in sequence:
 
-1. **`virsh version`**. Probe and version extraction. If this fails (virsh
-   absent or daemon down), `Collect` returns `nil` immediately. The version is
-   extracted from the "Running against daemon:" line first (daemon version);
-   when absent, falls back to "Using library: libvirt \<ver>" (library version).
-   Matches Ohai's `libvirt_version` reporting.
+1. **`virsh version`**. The probe, and the source of the version. If this
+   command fails, `Collect` returns `nil` immediately. The command fails if
+   `virsh` is missing or the daemon is down. The collector first gets the daemon
+   version from the "Running against daemon:" line. If that line is not there,
+   it uses the library version from the "Using library: libvirt \<ver>" line.
+   This is the same as the `libvirt_version` that Ohai reports.
 
-2. **`virsh uri`**. Connection URI (e.g. `qemu:///system`). Errors are silently
-   ignored; `uri` stays empty rather than failing the whole collection.
+2. **`virsh uri`**. The connection URI, for example `qemu:///system`. The
+   collector ignores errors and gives no message. If an error occurs, `uri`
+   stays empty and the collection continues.
 
-3. **`virsh list --all`**. Enumerates all domains regardless of state. Errors
-   yield an empty domain list, not a failure. The output table is parsed by
-   skipping the header line and separator, then extracting name (column 2) and
-   state (columns 3+, joined with spaces to handle "shut off").
+3. **`virsh list --all`**. The list of all domains, in all states. If an error
+   occurs, the domain list is empty and the collection continues. To parse the
+   output table, the collector skips the header line and the separator. Then it
+   gets the name from column 2 and the state from columns 3 and higher. It joins
+   the state columns with spaces, so that "shut off" stays one value.
 
-4. **`virsh dominfo <name>`**. Enriches each domain with UUID, vCPU count,
-   maximum memory, and autostart status. Per-domain errors are silently ignored;
-   the domain is kept in the list with only name and state populated. Lines
-   without a colon separator are skipped.
+4. **`virsh dominfo <name>`**. The collector adds the UUID, the vCPU count, the
+   maximum memory and the autostart status to each domain. The collector ignores
+   the errors of each domain and gives no message. If an error occurs, the
+   domain stays in the list with only its name and state. The collector skips
+   lines that have no colon separator.
 
-Ohai's libvirt plugin uses the `ruby-libvirt` gem for direct API access. We use
-the `virsh` CLI instead. It is always available when libvirt is installed and
-does not require native bindings. The information surfaced is a subset of Ohai's
-full output (we do not enumerate networks, storage pools, or node hardware
-topology).
+Ohai's libvirt plugin uses the `ruby-libvirt` gem for direct API access. gohai
+uses the `virsh` CLI. `virsh` is always there when libvirt is installed, and it
+does not need native bindings. The collector reports a subset of the full Ohai
+output. It does not list networks, storage pools or the hardware topology of the
+node.
 
-macOS is not covered, `Collect` always returns `nil` on Darwin.
+The collector does not support macOS. On Darwin, `Collect` always returns `nil`.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction for all `virsh` invocations. Tests mock it with
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run all `virsh` commands. Tests mock it with
   `go.uber.org/mock`.

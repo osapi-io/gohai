@@ -4,48 +4,49 @@
 
 ## Description
 
-Reports the status of kernel livepatch modules loaded on a Linux host. Kernel
-livepatching allows security patches to be applied to a running kernel without a
-reboot. Each entry under `/sys/kernel/livepatch/` represents one loaded patch
-module.
+The collector reports the status of the kernel livepatch modules that are loaded
+on a Linux host. With kernel livepatch, you can apply security patches to a
+running kernel without a reboot. Each entry under `/sys/kernel/livepatch/` is
+one loaded patch module.
 
-On macOS the collector returns nil, kernel livepatching is a Linux-only feature
-(requires `CONFIG_LIVEPATCH=y` in the kernel build).
+On macOS, the collector returns `nil`. Kernel livepatch is a Linux feature only.
+It needs `CONFIG_LIVEPATCH=y` in the kernel build.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Verify that a critical CVE patch has been applied and is in `enabled` state
-  (not mid-transition) across a fleet.
-- Detect hosts where a livepatch is transitioning (`transition: true`), the
-  kernel is still patching live tasks and the patch is not yet fully active.
-- Enumerate all loaded livepatch modules for audit trails or change tracking.
+- Make sure that a critical CVE patch is applied on all hosts of a fleet. The
+  patch must be in the `enabled` state and not in a transition.
+- Find hosts where a livepatch is in a transition (`transition: true`). On these
+  hosts, the kernel still patches live tasks, and the patch is not fully active.
+- List all loaded livepatch modules for audit records or to track changes.
 
 ## Signals
 
-- `patches`. Map of patch module names to their status. A **nil** value means
-  the `/sys/kernel/livepatch` directory does not exist, meaning the kernel was
-  compiled without livepatch support or no livepatches have ever been loaded. An
-  **empty map** means the directory exists but no patches are currently loaded.
-- `patches[name].enabled`. `true` when the patch is active. A loaded-but-not-
-  enabled patch is unusual and may indicate a failed or rolled-back application.
-- `patches[name].transition`. `true` when the kernel is mid-transition, meaning
-  it is still patching live tasks. The patch is not fully effective until
+- `patches`. A map of patch module names to their status. A **nil** value shows
+  that the `/sys/kernel/livepatch` directory does not exist. Then the kernel has
+  no livepatch support, or no livepatch was ever loaded. An **empty map** shows
+  that the directory exists, but no patches are loaded now.
+- `patches[name].enabled`. `true` when the patch is active. A patch that is
+  loaded but not enabled is unusual. It can show that the patch failed or that
+  someone rolled it back.
+- `patches[name].transition`. `true` when the kernel is in a transition. Then
+  the kernel still patches live tasks. The patch is not fully active until
   `transition` becomes `false`.
 
 ## Collected fields
 
-| Field                      | Type               | Description                                                        | Schema mapping                                                  |
-| -------------------------- | ------------------ | ------------------------------------------------------------------ | --------------------------------------------------------------- |
-| `patches`                  | `map[string]Patch` | Map of patch module name → status. Nil if livepatch not present.   | No direct OCSF or OTel mapping. gohai convention: `patches`.    |
-| `patches[name].enabled`    | `bool`             | `true` if the patch is active (sysfs `enabled == "1"`).            | No direct OCSF or OTel mapping. gohai convention: `enabled`.    |
-| `patches[name].transition` | `bool`             | `true` if the patch is mid-transition (sysfs `transition == "1"`). | No direct OCSF or OTel mapping. gohai convention: `transition`. |
+| Field                      | Type               | Description                                                                   | Schema mapping                                                  |
+| -------------------------- | ------------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `patches`                  | `map[string]Patch` | A map of patch module name to status. `nil` if there is no livepatch support. | No direct OCSF or OTel mapping. gohai convention: `patches`.    |
+| `patches[name].enabled`    | `bool`             | `true` if the patch is active (sysfs `enabled == "1"`).                       | No direct OCSF or OTel mapping. gohai convention: `enabled`.    |
+| `patches[name].transition` | `bool`             | `true` if the patch is in a transition (sysfs `transition == "1"`).           | No direct OCSF or OTel mapping. gohai convention: `transition`. |
 
 ## Platform support
 
 | Platform | Supported                                                  |
 | -------- | ---------------------------------------------------------- |
 | Linux    | ✅ (requires `CONFIG_LIVEPATCH=y`)                         |
-| macOS    | Returns nil, kernel livepatching is not available on macOS |
+| macOS    | Returns `nil`. Kernel livepatch is not available on macOS. |
 
 ## Example output
 
@@ -111,8 +112,8 @@ gohai --collector.livepatch       # enable (opt-in)
 gohai --no-collector.livepatch    # disable
 ```
 
-This collector is opt-in (`DefaultEnabled: false`) because livepatching is a
-specialized Linux feature not present on most hosts.
+This collector is opt-in (`DefaultEnabled: false`). Livepatch is a special Linux
+feature, and most hosts do not have it.
 
 ## Dependencies
 
@@ -120,28 +121,32 @@ None.
 
 ## Data sources
 
-Ohai's `linux/livepatch.rb` uses the same sysfs approach, `dir_glob` over
-`/sys/kernel/livepatch/*` and reading `enabled`/`transition` files for each
-patch module. gohai follows this methodology exactly via VFS reads.
+Ohai's `linux/livepatch.rb` uses the same sysfs method. It uses `dir_glob` on
+`/sys/kernel/livepatch/*` and reads the `enabled` and `transition` files of each
+patch module. gohai uses the same method, with VFS reads.
 
 On Linux:
 
-1. Attempt to read the directory listing of `/sys/kernel/livepatch/` via the
-   injected `avfs.VFS`. If the directory does not exist (kernel compiled without
-   `CONFIG_LIVEPATCH`, or kernel older than 4.0), return `{patches: nil}`, the
-   nil value signals "no livepatch support" to consumers, distinct from an empty
-   map which means "supported but none loaded".
-2. For each directory entry under `/sys/kernel/livepatch/`:
-   - Skip non-directory entries (sysfs may add regular files at the top level).
-   - Read `<patch>/enabled`, `"1"` → `enabled: true`; `"0"` or absent → `false`.
-   - Read `<patch>/transition`, `"1"` → `transition: true`; `"0"` or absent →
-     `false`.
-3. Return the populated map.
+1. The collector reads the directory list of `/sys/kernel/livepatch/` through
+   the injected `avfs.VFS`. The directory does not exist if the kernel build has
+   no `CONFIG_LIVEPATCH`, or if the kernel is older than 4.0. Then the collector
+   returns `{patches: nil}`. The `nil` value tells consumers that there is no
+   livepatch support. An empty map is different. It means that the kernel has
+   support, but no patch is loaded.
+2. For each directory entry under `/sys/kernel/livepatch/`, the collector does
+   these steps:
+   - It skips entries that are not directories. Sysfs can add regular files at
+     the top level.
+   - It reads `<patch>/enabled`. `"1"` gives `enabled: true`. `"0"` or a missing
+     file gives `false`.
+   - It reads `<patch>/transition`. `"1"` gives `transition: true`. `"0"` or a
+     missing file gives `false`.
+3. The collector returns the map.
 
-Ohai's `linux/livepatch.rb` uses the same sysfs approach, `dir_glob` over
-`/sys/kernel/livepatch/*` and reads `enabled` and `transition` per entry.
+Ohai's `linux/livepatch.rb` uses the same sysfs method. It uses `dir_glob` on
+`/sys/kernel/livepatch/*` and reads `enabled` and `transition` for each entry.
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
-  `memfs` in tests) for `/sys/kernel/livepatch/` reads.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for the
+  `/sys/kernel/livepatch/` reads. Production uses `osfs`. Tests use `memfs`.

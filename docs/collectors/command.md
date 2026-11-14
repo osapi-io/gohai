@@ -4,30 +4,30 @@
 
 ## Description
 
-Provides Ohai `command/ps` parity by running `ps -ef` and capturing its raw
-output lines. Ohai's `command.rb` plugin stores the ps command string; the
-companion `ps.rb` plugin defines that string as `"ps -ef"` on Linux and macOS.
-gohai runs the command and stores the actual output so consumers get the process
-listing without needing to shell out themselves.
+The collector gives the same data as Ohai's `command/ps`. It runs `ps -ef` and
+keeps the raw output lines. Ohai's `command.rb` plugin stores the ps command
+string. The related `ps.rb` plugin sets that string to `"ps -ef"` on Linux and
+macOS. gohai runs the command and stores the output. Thus consumers get the
+process list and do not have to run a shell command.
 
-Both Linux and macOS support `ps -ef` with identical POSIX output format.
+Linux and macOS both support `ps -ef`, with the same POSIX output format.
 
-DefaultEnabled is `false`, the full process table can be large and most
-consumers either use the `process` collector (which provides structured data) or
-don't need it at all.
+DefaultEnabled is `false`. The full process table can be large. Most consumers
+use the `process` collector, which gives structured data, or do not need the
+table.
 
 ## Collected fields
 
 | Field | Type     | Description                                       | Schema mapping    |
 | ----- | -------- | ------------------------------------------------- | ----------------- |
-| `ps`  | []string | Raw lines from `ps -ef` including the header row. | gohai convention. |
+| `ps`  | []string | The raw lines from `ps -ef`, with the header row. | gohai convention. |
 
 ## Platform support
 
-| Platform | Supported                  |
-| -------- | -------------------------- |
-| Linux    | ✅ (`ps -ef` via executor) |
-| macOS    | ✅ (`ps -ef` via executor) |
+| Platform | Supported                      |
+| -------- | ------------------------------ |
+| Linux    | ✅ (`ps -ef` through executor) |
+| macOS    | ✅ (`ps -ef` through executor) |
 
 ## Example output
 
@@ -79,20 +79,21 @@ None.
 
 ## Data sources
 
-On both Linux and macOS the collector runs `ps -ef` through the shared
+On Linux and on macOS, the collector runs `ps -ef` through the shared
 `internal/executor` runner:
 
-1. Each output line has trailing whitespace trimmed.
-2. Blank lines are skipped.
-3. The header row and all process rows are stored as raw strings in `PS`.
-4. When `ps` is absent or returns an error, an empty `PS` slice is returned
-   without error, matches Ohai's no-panic posture.
+1. The collector removes the whitespace at the end of each output line.
+2. The collector skips blank lines.
+3. The collector stores the header row and all process rows as raw strings in
+   `PS`.
+4. If `ps` is missing or returns an error, the collector returns an empty `PS`
+   slice and no error. This is the same as Ohai, which does not panic.
 
-Ohai's `ps.rb` uses `"ps -ef"` on Linux, macOS, AIX, and Solaris, and
-`"ps -axww"` on BSDs. We use `ps -ef` on both Linux and Darwin, macOS `ps` fully
-supports the POSIX `-ef` flag set.
+Ohai's `ps.rb` uses `"ps -ef"` on Linux, macOS, AIX and Solaris, and
+`"ps -axww"` on BSDs. gohai uses `ps -ef` on Linux and on Darwin. macOS `ps`
+fully supports the POSIX `-ef` flags.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `ps -ef`. Tests mock it with `go.uber.org/mock`.
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `ps -ef`. Tests mock it with `go.uber.org/mock`.

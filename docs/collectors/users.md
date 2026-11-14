@@ -4,49 +4,49 @@
 
 ## Description
 
-Enumerates user and group accounts from `/etc/passwd` and `/etc/group`, plus the
-effective current user. Matches Ohai's `passwd` plugin methodology. Logged-in
-session data (who is currently signed in) lives in the separate
-[sessions](sessions.md) collector.
+The collector reports the user and group accounts from `/etc/passwd` and
+`/etc/group`. It also reports the effective current user. The method is the same
+as Ohai's `passwd` plugin. The [sessions](sessions.md) collector reports the
+logged-in sessions, that is, who is signed in now.
 
 Consumers use this to:
 
-- Audit accounts and group membership across a fleet.
-- Check that a specific user / uid / shell exists on the host.
-- Resolve `root_group` or `current_user`-like facts without a second `os/user`
+- Audit the accounts and the group membership of a fleet.
+- Make sure that a specific user, uid or shell is on the host.
+- Get facts like `root_group` or `current_user` without a second `os/user`
   lookup.
 
 ## Collected fields
 
-| Field          | Type                     | Description                                                      | Schema mapping            |
-| -------------- | ------------------------ | ---------------------------------------------------------------- | ------------------------- |
-| `passwd`       | `map[string]PasswdEntry` | Accounts keyed by username. First occurrence wins on duplicates. | No direct schema mapping. |
-| `group`        | `map[string]GroupEntry`  | Groups keyed by group name.                                      | No direct schema mapping. |
-| `current_user` | `string`                 | Username corresponding to the effective UID at collection time.  | OCSF `actor.user.name`    |
+| Field          | Type                     | Description                                                                                        | Schema mapping            |
+| -------------- | ------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------- |
+| `passwd`       | `map[string]PasswdEntry` | The accounts, with the username as the key. If a username occurs two times, the first entry stays. | No direct schema mapping. |
+| `group`        | `map[string]GroupEntry`  | The groups, with the group name as the key.                                                        | No direct schema mapping. |
+| `current_user` | `string`                 | The username of the effective UID at the time of collection.                                       | OCSF `actor.user.name`    |
 
 ### PasswdEntry
 
-| Field   | Type     | Description                                                 |
-| ------- | -------- | ----------------------------------------------------------- |
-| `uid`   | `int`    | Numeric user ID.                                            |
-| `gid`   | `int`    | Primary numeric group ID.                                   |
-| `dir`   | `string` | Home directory path.                                        |
-| `shell` | `string` | Login shell path.                                           |
-| `gecos` | `string` | Comment / display-name field (commonly a full name + info). |
+| Field   | Type     | Description                                                                     |
+| ------- | -------- | ------------------------------------------------------------------------------- |
+| `uid`   | `int`    | The numeric user ID.                                                            |
+| `gid`   | `int`    | The primary numeric group ID.                                                   |
+| `dir`   | `string` | The path of the home directory.                                                 |
+| `shell` | `string` | The path of the login shell.                                                    |
+| `gecos` | `string` | The comment or display-name field. It usually holds a full name and other data. |
 
 ### GroupEntry
 
-| Field     | Type       | Description                                    |
-| --------- | ---------- | ---------------------------------------------- |
-| `gid`     | `int`      | Numeric group ID.                              |
-| `members` | `[]string` | Supplementary members, in file-declared order. |
+| Field     | Type       | Description                                          |
+| --------- | ---------- | ---------------------------------------------------- |
+| `gid`     | `int`      | The numeric group ID.                                |
+| `members` | `[]string` | The supplementary members, in the order of the file. |
 
 ## Platform support
 
-| Platform | Supported                                                 |
-| -------- | --------------------------------------------------------- |
-| Linux    | ✅                                                        |
-| macOS    | ✅ (macOS ships POSIX flat files alongside OpenDirectory) |
+| Platform | Supported                                              |
+| -------- | ------------------------------------------------------ |
+| Linux    | ✅                                                     |
+| macOS    | ✅ (macOS has POSIX flat files and also OpenDirectory) |
 
 ## Example output
 
@@ -102,35 +102,40 @@ None.
 
 ## Data sources
 
-On Linux and macOS (identical, both platforms ship POSIX flat files):
+On Linux and macOS, the method is the same, because the two platforms have POSIX
+flat files:
 
-1. Read `/etc/passwd` through the injected `avfs.VFS` and parse line-by-line
-   into `passwd[<username>]`. Format is seven colon-separated fields:
-   `name:password:uid:gid:gecos:home:shell`. We keep `uid`, `gid`, `dir`,
-   `shell`, and `gecos`; the password hash placeholder is dropped. Duplicate
-   usernames keep the first occurrence, matches `Etc.passwd`'s C-library
-   iteration. Comments (`#`) and malformed lines (< 7 fields) are skipped.
-2. Read `/etc/group` through the same VFS. Format is four colon-separated
-   fields: `name:password:gid:members(comma-separated)`. We keep `gid` and the
-   comma-split `members` slice. Same skip rules.
-3. Resolve `current_user` by calling `os.Geteuid()` (the effective UID) and
-   looking up the matching entry in the parsed `passwd` map. Matches Ohai's
-   `Etc.getpwuid(Process.euid).name`. Missing `/etc/passwd` or an euid with no
-   matching entry leaves `current_user` empty.
+1. The collector reads `/etc/passwd` through the injected `avfs.VFS`. It parses
+   each line into `passwd[<username>]`. Each line has seven fields with colons
+   between them: `name:password:uid:gid:gecos:home:shell`. The collector keeps
+   `uid`, `gid`, `dir`, `shell` and `gecos`. It does not keep the placeholder of
+   the password hash. If a username occurs two times, the first entry stays.
+   This is the same as the C-library loop of `Etc.passwd`. The collector skips
+   comments (`#`) and lines that are not valid (fewer than 7 fields).
+2. The collector reads `/etc/group` through the same VFS. Each line has four
+   fields with colons between them: `name:password:gid:members`, with commas
+   between the members. The collector keeps `gid` and the `members` slice that
+   it splits on the commas. The skip rules are the same.
+3. The collector gets `current_user`. It calls `os.Geteuid()` for the effective
+   UID. Then it finds the entry with that UID in the parsed `passwd` map. This
+   is the same as Ohai's `Etc.getpwuid(Process.euid).name`. If `/etc/passwd` is
+   missing, or if no entry has the euid, `current_user` stays empty.
 
-Mirrors Ohai's `passwd` plugin, same files, same duplicate-drops-second rule,
-same effective-UID lookup for current user. We parse `/etc/passwd` directly
-rather than calling `getpwent(3)` so the collector has no cgo dependency.
+The method is the same as Ohai's `passwd` plugin. It reads the same files. It
+keeps the first entry of a duplicate username. It gets the current user from the
+effective UID. gohai parses `/etc/passwd` directly and does not call
+`getpwent(3)`. Thus the collector has no cgo dependency.
 
-On macOS, local accounts live in Directory Services (`dscl .`). The flat files
-`/etc/passwd` and `/etc/group` carry the well-known system users (`root`,
-`daemon`, etc.) but omit user-created accounts. Those live in OpenDirectory and
-require `dscl` to enumerate. Ohai's `passwd` plugin has the same limitation
-(Ruby's `Etc` wraps POSIX flat files on macOS); a future enhancement could shell
-out to `dscl . -list /Users` for a richer view.
+On macOS, the local accounts are in Directory Services (`dscl .`). The flat
+files `/etc/passwd` and `/etc/group` have the well-known system users (`root`,
+`daemon` and others). They do not have the accounts that a person made. Those
+accounts are in OpenDirectory, and only `dscl` can list them. Ohai's `passwd`
+plugin has the same limit, because Ruby's `Etc` reads the POSIX flat files on
+macOS. A future change can run `dscl . -list /Users` to get all accounts.
 
 ## Backing library
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for `/etc/passwd` and
   `/etc/group` reads.
-- Go stdlib (`os.Geteuid`, `bufio`, `strings`, `strconv`) for parsing.
+- The Go standard library (`os.Geteuid`, `bufio`, `strings`, `strconv`) to parse
+  the files.

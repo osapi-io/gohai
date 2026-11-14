@@ -4,34 +4,35 @@
 
 ## Description
 
-Reports RPM macro definitions from `rpm --showrc`. Macros are the RPM build
-system's configuration primitives, they control build paths (`%_topdir`,
-`%_builddir`), compiler flags (`%optflags`), platform identifiers (`%_arch`),
-and many other aspects of how RPM packages are built and installed.
+The collector reports the RPM macro definitions from `rpm --showrc`. Macros are
+the basic configuration units of the RPM build system. They control the build
+paths (`%_topdir`, `%_builddir`), the compiler flags (`%optflags`), the platform
+identifiers (`%_arch`), and many other parts of how RPM builds and installs
+packages.
 
-On macOS the collector returns nil. RPM is not natively present on macOS.
+On macOS, the collector returns `nil`. macOS does not have RPM.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Audit the RPM macro environment on a build host before triggering a package
-  build (verify `%_topdir`, `%optflags`, `%_arch` are set correctly).
-- Detect macro overrides in `~/.rpmmacros` or `/etc/rpm/macros.d/` that could
-  affect package builds.
-- Inventory RPM version and platform compatibility metadata for fleet-wide build
-  system configuration management.
+- Audit the RPM macro environment on a build host before a package build. Make
+  sure that `%_topdir`, `%optflags` and `%_arch` have the correct values.
+- Find macro overrides in `~/.rpmmacros` or `/etc/rpm/macros.d/` that can change
+  package builds.
+- Record the RPM version and the platform compatibility metadata, to manage the
+  build system configuration of the full fleet.
 
 ## Collected fields
 
-| Field    | Type                | Description                                                             | Schema mapping                                                                              |
-| -------- | ------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `macros` | `map[string]string` | RPM macro name → definition. Macro names as reported by `rpm --showrc`. | No direct OCSF or OTel mapping. gohai convention: `macros` (mirrors Ohai's `rpm[:macros]`). |
+| Field    | Type                | Description                                                                                                    | Schema mapping                                                                                 |
+| -------- | ------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `macros` | `map[string]string` | A map from the RPM macro name to its definition. The macro names are the same as in the `rpm --showrc` output. | No direct OCSF or OTel mapping. gohai convention: `macros`, the same as Ohai's `rpm[:macros]`. |
 
 ## Platform support
 
-| Platform | Supported                                  |
-| -------- | ------------------------------------------ |
-| Linux    | ✅ (requires `rpm` to be installed)        |
-| macOS    | Returns nil, RPM is not available on macOS |
+| Platform | Supported                               |
+| -------- | --------------------------------------- |
+| Linux    | ✅ (`rpm` must be installed)            |
+| macOS    | Returns `nil`. macOS does not have RPM. |
 
 ## Example output
 
@@ -89,8 +90,8 @@ gohai --collector.rpm       # enable (opt-in)
 gohai --no-collector.rpm    # disable
 ```
 
-This collector is opt-in (`DefaultEnabled: false`) because it forks a subprocess
-and is only relevant on RPM-based Linux distributions.
+This collector is opt-in (`DefaultEnabled: false`). It starts a subprocess, and
+it gives data only on Linux distributions that use RPM.
 
 ## Dependencies
 
@@ -100,25 +101,27 @@ None.
 
 On Linux:
 
-1. Run `rpm --showrc` via the injected `executor.Executor`. If the command fails
-   (rpm not installed, permission denied), return `{macros: {}}` with no error,
-   this matches Ohai's "skip if rpm not found" behaviour and avoids erroring on
-   non-RPM systems (Debian, Alpine, etc.).
-2. Locate the two `===...===` marker lines (5 or more `=` signs) in the output.
-   The macro definitions live between these two markers.
-3. Parse each line in the macro section:
-   - Lines starting with `-` introduce a new macro definition. Split the line on
-     spaces into at most 3 parts: the `-` prefix, the macro name, and the
-     remainder as the initial value. A `-` line with no name field is skipped.
-   - Continuation lines (no `-` prefix) append to the current macro's value with
-     a newline separator.
-4. Store the last accumulated macro when the marker section ends.
+1. The collector runs `rpm --showrc` through the injected `executor.Executor`.
+   If the command fails (rpm is not installed, or permission is denied), the
+   collector returns `{macros: {}}` and no error. This is the same as Ohai,
+   which skips the plugin if it does not find rpm. Thus there is no error on
+   systems without RPM, for example Debian and Alpine.
+2. The collector finds the two `===...===` marker lines (5 or more `=` signs) in
+   the output. The macro definitions are between these two markers.
+3. The collector parses each line in the macro section:
+   - A line that starts with `-` starts a new macro definition. The collector
+     splits the line on spaces into a maximum of 3 parts: the `-` prefix, the
+     macro name, and the remainder as the initial value. It skips a `-` line
+     that has no name field.
+   - A continuation line (no `-` prefix) adds to the value of the current macro,
+     after a newline.
+4. When the marker section ends, the collector stores the last macro.
 
-Note: Ohai's `rpm.rb` also parses `ARCHITECTURE AND OS`, `RPMRC VALUES`,
-`Features supported`, and `Macro path` sections from `rpm --showrc`. gohai
-collects only the macros section, the other sections are lower-demand fields.
-Add them via a methodology issue if needed.
+Note: Ohai's `rpm.rb` also parses the `ARCHITECTURE AND OS`, `RPMRC VALUES`,
+`Features supported` and `Macro path` sections of `rpm --showrc`. gohai reads
+only the macros section, because there is less demand for the other sections. If
+you need them, open a methodology issue.
 
 ## Backing library
 
-- `internal/executor` for `rpm --showrc` execution (gomock-backed in tests).
+- `internal/executor` to run `rpm --showrc`. Tests use a gomock mock.

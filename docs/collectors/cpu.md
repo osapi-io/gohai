@@ -4,71 +4,75 @@
 
 ## Description
 
-Reports CPU topology, model, feature flags, cache layout, NUMA layout, and
-hardware vulnerability mitigation status. The vulnerabilities map is the
-canonical per-host signal for Meltdown / Spectre / MDS / Retbleed / SRBDS
-audits. Non-x86 topology (s390x, ppc64le) is sourced from `lscpu` where
-`/proc/cpuinfo` is insufficient. macOS core and frequency facts come from
-`sysctl` rather than gopsutil, which reports logical cores as physical and zero
-frequency on Apple Silicon.
+The collector reports the CPU topology, the model, the feature flags, the cache
+layout, the NUMA layout, and the mitigation status of hardware vulnerabilities.
+The vulnerabilities map is the canonical signal of each host for Meltdown,
+Spectre, MDS, Retbleed and SRBDS audits. For s390x and ppc64le, the topology
+comes from `lscpu`, because `/proc/cpuinfo` does not have all of it. On macOS,
+the core and frequency facts come from `sysctl`, not from gopsutil. On Apple
+Silicon, gopsutil reports logical cores as physical cores and reports a
+frequency of zero.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Pick thread-pool / worker concurrency (`GOMAXPROCS`, task-queue size).
-- Drive licensing / compliance checks that count physical sockets.
-- Gate features on CPU capabilities (`avx2`, `aes`, `sse4_2`) without running
+- Select the concurrency of a thread pool or of workers (`GOMAXPROCS`, the size
+  of a task queue).
+- Do licensing and compliance checks that count physical sockets.
+- Enable features from the CPU capabilities (`avx2`, `aes`, `sse4_2`) without
   probes.
-- Audit Meltdown/Spectre mitigation posture across a fleet.
-- Identify fleet heterogeneity (different model names / core counts within the
-  same tier).
+- Audit the Meltdown and Spectre mitigations of a fleet.
+- Find differences in a fleet, for example different model names or core counts
+  in the same tier.
 
-Assumes homogeneous CPUs across sockets, `model_name`, `vendor_id`, `family`,
-`model`, `stepping`, `cache_size`, and `flags` come from the first logical CPU
-gopsutil returns. True on ~99% of hosts; asymmetric-core SKUs (Apple Silicon's
-P+E cores, Intel Alder Lake's hybrid) report the first core's data.
+The collector assumes that all sockets have the same CPU. `model_name`,
+`vendor_id`, `family`, `model`, `stepping`, `cache_size` and `flags` come from
+the first logical CPU that gopsutil returns. This is correct on approximately
+99% of hosts. On SKUs with different types of cores (the P and E cores of Apple
+Silicon, the hybrid cores of Intel Alder Lake), these fields give the data of
+the first core.
 
 ## Collected fields
 
-| Field                 | Type              | Description                                                                                                                                                                                                                                                                                             | Schema mapping                                                                                     |
-| --------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `count`               | int               | Logical CPU count (threads visible to the scheduler).                                                                                                                                                                                                                                                   | OCSF `device.cpu_count` (leaf stripped: `cpu_` duplicates collector name).                         |
-| `sockets`             | int               | Physical packages. macOS: `hw.packages`. Linux: gopsutil (x86) or `lscpu` (non-x86).                                                                                                                                                                                                                    | No direct schema mapping.                                                                          |
-| `cores`               | int               | Physical cores across all sockets. macOS: `hw.physicalcpu`. Linux: gopsutil or `lscpu`.                                                                                                                                                                                                                 | OCSF `device.cpu_cores` (leaf matches our JSON key).                                               |
-| `model_name`          | string            | Human-readable CPU name from `/proc/cpuinfo` or sysctl.                                                                                                                                                                                                                                                 | OTel `host.cpu.model.name` (OCSF `device.hw_info.cpu_type` means architecture, not product model). |
-| `vendor_id`           | string            | CPU vendor (`"GenuineIntel"`, `"AuthenticAMD"`).                                                                                                                                                                                                                                                        | OTel `host.cpu.vendor.id`.                                                                         |
-| `family`              | string            | CPU family number.                                                                                                                                                                                                                                                                                      | OTel `host.cpu.family`.                                                                            |
-| `model_id`            | string            | Model number within family.                                                                                                                                                                                                                                                                             | No direct schema mapping.                                                                          |
-| `stepping`            | int32             | Revision of the model.                                                                                                                                                                                                                                                                                  | OTel `host.cpu.stepping`.                                                                          |
-| `speed`               | float64           | Current clock in MHz. macOS: `hw.cpufrequency_max` → `hw.cpufrequency`; absent on Apple Silicon.                                                                                                                                                                                                        | No direct schema mapping.                                                                          |
-| `cache_size`          | int32             | Aggregate cache size in KB from `/proc/cpuinfo` (a single value, Linux only).                                                                                                                                                                                                                           | No direct schema mapping.                                                                          |
-| `flags`               | []string          | CPU feature flags.                                                                                                                                                                                                                                                                                      | No direct schema mapping.                                                                          |
-| `caches.l1d`          | string            | L1 data cache size from `lscpu` (Linux).                                                                                                                                                                                                                                                                | No direct schema mapping.                                                                          |
-| `caches.l1i`          | string            | L1 instruction cache size from `lscpu` (Linux).                                                                                                                                                                                                                                                         | No direct schema mapping.                                                                          |
-| `caches.l2`           | string            | L2 cache size from `lscpu` (Linux).                                                                                                                                                                                                                                                                     | No direct schema mapping.                                                                          |
-| `caches.l2d`          | string            | L2 data cache size (architectures that split L2).                                                                                                                                                                                                                                                       | No direct schema mapping.                                                                          |
-| `caches.l2i`          | string            | L2 instruction cache size (architectures that split L2).                                                                                                                                                                                                                                                | No direct schema mapping.                                                                          |
-| `caches.l3`           | string            | L3 cache size from `lscpu` (Linux).                                                                                                                                                                                                                                                                     | No direct schema mapping.                                                                          |
-| `caches.l4`           | string            | L4 cache size from `lscpu` (high-end server CPUs).                                                                                                                                                                                                                                                      | No direct schema mapping.                                                                          |
-| `numa_nodes`          | map[int][]int     | NUMA node id → list of CPU indices, from `lscpu` (Linux).                                                                                                                                                                                                                                               | No direct schema mapping.                                                                          |
-| `numa_nodes_count`    | int               | NUMA node count from `lscpu`'s `NUMA node(s):` line.                                                                                                                                                                                                                                                    | No direct schema mapping.                                                                          |
-| `online`              | int               | Online CPU count from `lscpu`'s `On-line CPU(s) list:` line.                                                                                                                                                                                                                                            | No direct schema mapping.                                                                          |
-| `offline`             | int               | Offline CPU count from `lscpu`'s `Off-line CPU(s) list:` line.                                                                                                                                                                                                                                          | No direct schema mapping.                                                                          |
-| `bios_vendor_id`      | string            | BIOS vendor (e.g. `"Dell Inc."`) from `lscpu`'s `BIOS Vendor ID:` line.                                                                                                                                                                                                                                 | No direct schema mapping.                                                                          |
-| `bios_model_name`     | string            | Machine model from `lscpu`'s `BIOS Model name:` line.                                                                                                                                                                                                                                                   | No direct schema mapping.                                                                          |
-| `machine_type`        | string            | s390x mainframe machine type.                                                                                                                                                                                                                                                                           | No direct schema mapping.                                                                          |
-| `mhz_max`             | string            | Maximum clock frequency from `lscpu`.                                                                                                                                                                                                                                                                   | No direct schema mapping.                                                                          |
-| `mhz_min`             | string            | Minimum clock frequency from `lscpu`.                                                                                                                                                                                                                                                                   | No direct schema mapping.                                                                          |
-| `mhz_dynamic`         | string            | Dynamic (current) clock frequency from `lscpu`.                                                                                                                                                                                                                                                         | No direct schema mapping.                                                                          |
-| `bogomips`            | string            | BogoMIPS value from `lscpu`.                                                                                                                                                                                                                                                                            | No direct schema mapping.                                                                          |
-| `opmodes`             | []string          | Supported operation modes (e.g. `["32-bit", "64-bit"]`).                                                                                                                                                                                                                                                | No direct schema mapping.                                                                          |
-| `byte_order`          | string            | Endianness reported by `lscpu` (lowercased).                                                                                                                                                                                                                                                            | No direct schema mapping.                                                                          |
-| `address_sizes`       | []string          | Physical / virtual address sizes from `lscpu`.                                                                                                                                                                                                                                                          | No direct schema mapping.                                                                          |
-| `virtualization`      | string            | Hardware virtualization capability (`"VT-x"`, `"AMD-V"`).                                                                                                                                                                                                                                               | No direct schema mapping.                                                                          |
-| `virtualization_type` | string            | Virtualization type when a guest (`"full"`, `"para"`).                                                                                                                                                                                                                                                  | No direct schema mapping.                                                                          |
-| `hypervisor_vendor`   | string            | Hypervisor vendor (`"KVM"`, `"VMware"`), signal the virtualization collector can fallback to.                                                                                                                                                                                                           | No direct schema mapping.                                                                          |
-| `dispatching_mode`    | string            | s390x dispatching mode (`"horizontal"` / `"vertical"`).                                                                                                                                                                                                                                                 | No direct schema mapping.                                                                          |
-| `vulnerabilities`     | map[string]string | Mitigation name → status string from `/sys/devices/system/cpu/vulnerabilities/*` (Linux).                                                                                                                                                                                                               | No direct schema mapping.                                                                          |
-| `cpus[]`              | []CPU             | Per-logical-CPU breakdown, `vendor_id`, `family`, `model_id`, `model_name`, `stepping`, `physical_id`, `core_id`, `cores`, `speed`, `cache_size`, `flags`. Matters on hybrid-core CPUs (Alder Lake P+E, Apple Silicon P+E) where per-core values differ. Mirrors Ohai's `cpu["0"]`, `cpu["1"]` entries. | No direct schema mapping.                                                                          |
+| Field                 | Type              | Description                                                                                                                                                                                                                                                                                                                          | Schema mapping                                                                                         |
+| --------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `count`               | int               | The number of logical CPUs (the threads that the scheduler sees).                                                                                                                                                                                                                                                                    | OCSF `device.cpu_count`. The `cpu_` prefix is removed because it repeats the collector name.           |
+| `sockets`             | int               | The physical packages. macOS: `hw.packages`. Linux: gopsutil (x86) or `lscpu` (other architectures).                                                                                                                                                                                                                                 | No direct schema mapping.                                                                              |
+| `cores`               | int               | The physical cores of all sockets. macOS: `hw.physicalcpu`. Linux: gopsutil or `lscpu`.                                                                                                                                                                                                                                              | OCSF `device.cpu_cores`. The leaf is the same as the gohai JSON key.                                   |
+| `model_name`          | string            | The CPU name that a person can read, from `/proc/cpuinfo` or sysctl.                                                                                                                                                                                                                                                                 | OTel `host.cpu.model.name`. OCSF `device.hw_info.cpu_type` is the architecture, not the product model. |
+| `vendor_id`           | string            | The CPU vendor (`"GenuineIntel"`, `"AuthenticAMD"`).                                                                                                                                                                                                                                                                                 | OTel `host.cpu.vendor.id`.                                                                             |
+| `family`              | string            | The CPU family number.                                                                                                                                                                                                                                                                                                               | OTel `host.cpu.family`.                                                                                |
+| `model_id`            | string            | The model number in the family.                                                                                                                                                                                                                                                                                                      | No direct schema mapping.                                                                              |
+| `stepping`            | int32             | The revision of the model.                                                                                                                                                                                                                                                                                                           | OTel `host.cpu.stepping`.                                                                              |
+| `speed`               | float64           | The current clock in MHz. macOS: `hw.cpufrequency_max`, then `hw.cpufrequency`. Missing on Apple Silicon.                                                                                                                                                                                                                            | No direct schema mapping.                                                                              |
+| `cache_size`          | int32             | The total cache size in KB, from `/proc/cpuinfo`. One value, Linux only.                                                                                                                                                                                                                                                             | No direct schema mapping.                                                                              |
+| `flags`               | []string          | The CPU feature flags.                                                                                                                                                                                                                                                                                                               | No direct schema mapping.                                                                              |
+| `caches.l1d`          | string            | The L1 data cache size, from `lscpu` (Linux).                                                                                                                                                                                                                                                                                        | No direct schema mapping.                                                                              |
+| `caches.l1i`          | string            | The L1 instruction cache size, from `lscpu` (Linux).                                                                                                                                                                                                                                                                                 | No direct schema mapping.                                                                              |
+| `caches.l2`           | string            | The L2 cache size, from `lscpu` (Linux).                                                                                                                                                                                                                                                                                             | No direct schema mapping.                                                                              |
+| `caches.l2d`          | string            | The L2 data cache size, on architectures that split L2.                                                                                                                                                                                                                                                                              | No direct schema mapping.                                                                              |
+| `caches.l2i`          | string            | The L2 instruction cache size, on architectures that split L2.                                                                                                                                                                                                                                                                       | No direct schema mapping.                                                                              |
+| `caches.l3`           | string            | The L3 cache size, from `lscpu` (Linux).                                                                                                                                                                                                                                                                                             | No direct schema mapping.                                                                              |
+| `caches.l4`           | string            | The L4 cache size, from `lscpu` (high-end server CPUs).                                                                                                                                                                                                                                                                              | No direct schema mapping.                                                                              |
+| `numa_nodes`          | map[int][]int     | The NUMA node id → the list of CPU indices, from `lscpu` (Linux).                                                                                                                                                                                                                                                                    | No direct schema mapping.                                                                              |
+| `numa_nodes_count`    | int               | The number of NUMA nodes, from the `NUMA node(s):` line of `lscpu`.                                                                                                                                                                                                                                                                  | No direct schema mapping.                                                                              |
+| `online`              | int               | The number of online CPUs, from the `On-line CPU(s) list:` line of `lscpu`.                                                                                                                                                                                                                                                          | No direct schema mapping.                                                                              |
+| `offline`             | int               | The number of offline CPUs, from the `Off-line CPU(s) list:` line of `lscpu`.                                                                                                                                                                                                                                                        | No direct schema mapping.                                                                              |
+| `bios_vendor_id`      | string            | The BIOS vendor, for example `"Dell Inc."`, from the `BIOS Vendor ID:` line of `lscpu`.                                                                                                                                                                                                                                              | No direct schema mapping.                                                                              |
+| `bios_model_name`     | string            | The machine model, from the `BIOS Model name:` line of `lscpu`.                                                                                                                                                                                                                                                                      | No direct schema mapping.                                                                              |
+| `machine_type`        | string            | The s390x mainframe machine type.                                                                                                                                                                                                                                                                                                    | No direct schema mapping.                                                                              |
+| `mhz_max`             | string            | The maximum clock frequency, from `lscpu`.                                                                                                                                                                                                                                                                                           | No direct schema mapping.                                                                              |
+| `mhz_min`             | string            | The minimum clock frequency, from `lscpu`.                                                                                                                                                                                                                                                                                           | No direct schema mapping.                                                                              |
+| `mhz_dynamic`         | string            | The dynamic (current) clock frequency, from `lscpu`.                                                                                                                                                                                                                                                                                 | No direct schema mapping.                                                                              |
+| `bogomips`            | string            | The BogoMIPS value, from `lscpu`.                                                                                                                                                                                                                                                                                                    | No direct schema mapping.                                                                              |
+| `opmodes`             | []string          | The supported operation modes, for example `["32-bit", "64-bit"]`.                                                                                                                                                                                                                                                                   | No direct schema mapping.                                                                              |
+| `byte_order`          | string            | The endianness that `lscpu` reports, in lowercase.                                                                                                                                                                                                                                                                                   | No direct schema mapping.                                                                              |
+| `address_sizes`       | []string          | The physical and virtual address sizes, from `lscpu`.                                                                                                                                                                                                                                                                                | No direct schema mapping.                                                                              |
+| `virtualization`      | string            | The hardware virtualization capability (`"VT-x"`, `"AMD-V"`).                                                                                                                                                                                                                                                                        | No direct schema mapping.                                                                              |
+| `virtualization_type` | string            | The virtualization type, if the host is a guest (`"full"`, `"para"`).                                                                                                                                                                                                                                                                | No direct schema mapping.                                                                              |
+| `hypervisor_vendor`   | string            | The hypervisor vendor (`"KVM"`, `"VMware"`). The virtualization collector can use this signal as a fallback.                                                                                                                                                                                                                         | No direct schema mapping.                                                                              |
+| `dispatching_mode`    | string            | The s390x dispatching mode (`"horizontal"` or `"vertical"`).                                                                                                                                                                                                                                                                         | No direct schema mapping.                                                                              |
+| `vulnerabilities`     | map[string]string | The mitigation name → the status string, from `/sys/devices/system/cpu/vulnerabilities/*` (Linux).                                                                                                                                                                                                                                   | No direct schema mapping.                                                                              |
+| `cpus[]`              | []CPU             | The data of each logical CPU: `vendor_id`, `family`, `model_id`, `model_name`, `stepping`, `physical_id`, `core_id`, `cores`, `speed`, `cache_size`, `flags`. This is important on hybrid-core CPUs (Alder Lake P+E, Apple Silicon P+E), where the values of each core are different. Same as Ohai's `cpu["0"]`, `cpu["1"]` entries. | No direct schema mapping.                                                                              |
 
 ## Platform support
 
@@ -156,53 +160,62 @@ None.
 
 ## Data sources
 
-Ohai's `cpu.rb` uses two sources on Linux: direct `/proc/cpuinfo` parsing for
-per-core identity (model, flags, MHz, vendor, family, stepping) and `lscpu` for
-topology (sockets, NUMA nodes, caches, vulnerabilities, byte order, op-modes).
-gohai follows the same two-source approach, gopsutil wraps `/proc/cpuinfo` for
-the base, and we shell out to `lscpu` via Executor for the extended topology
-fields. On macOS, Ohai reads `sysctl` for CPU info; gohai does the same via
-`sysctl -n` for cores, sockets, and frequency.
+On Linux, Ohai's `cpu.rb` uses two sources. It parses `/proc/cpuinfo` directly
+for the identity of each core (model, flags, MHz, vendor, family, stepping). It
+uses `lscpu` for the topology (sockets, NUMA nodes, caches, vulnerabilities,
+byte order, op-modes). gohai uses the same two sources. gopsutil reads
+`/proc/cpuinfo` for the base fields. gohai runs `lscpu` through Executor for the
+extended topology fields. On macOS, Ohai reads `sysctl` for the CPU data. gohai
+does the same with `sysctl -n` for the cores, the sockets and the frequency.
 
 On Linux:
 
-1. gopsutil's `cpu.Info` parses `/proc/cpuinfo` for per-core model, flags, MHz,
-   aggregate cache size, vendor, family/model/stepping; `cpu.Counts` gives the
-   logical count and the distinct-`PhysicalID` count used for `sockets` on x86.
-   Each `cpu.Info` entry is also projected onto the `cpus[]` slice so
-   per-logical-CPU fields are preserved (matters on hybrid-core CPUs where the
-   homogeneous-CPU assumption breaks down; mirrors Ohai's `cpu["0"]`, `cpu["1"]`
-   entries).
-2. We walk `/sys/devices/system/cpu/vulnerabilities/` via the injected
-   `avfs.VFS` and read each file; the basename becomes the map key, the trimmed
-   contents become the value. Missing directory yields `vulnerabilities` absent
-   from the output.
-3. When `lscpu` is on PATH we run it via the injected `executor.Executor` and
-   merge: per-level cache sizes (`caches.l1d` / `l1i` / `l2` / `l3`), NUMA node
-   → CPU index lists (`numa_nodes`), and, on `s390x` / `ppc64le` only,
-   authoritative socket / core / thread counts overriding gopsutil's x86-biased
-   numbers. An `lscpu` exec error leaves the extension fields empty; the
-   gopsutil-sourced fields remain correct.
+1. gopsutil's `cpu.Info` parses `/proc/cpuinfo`. It gives the model, the flags,
+   the MHz, the total cache size, the vendor, and the family, model and stepping
+   of each core. `cpu.Counts` gives the logical count. It also gives the number
+   of different `PhysicalID` values, which is `sockets` on x86. The collector
+   also puts each `cpu.Info` entry into the `cpus[]` slice. Thus the fields of
+   each logical CPU stay in the output. This is important on hybrid-core CPUs,
+   where the cores are not all the same. It is the same as Ohai's `cpu["0"]`,
+   `cpu["1"]` entries.
+
+2. The collector reads each file in `/sys/devices/system/cpu/vulnerabilities/`
+   through the injected `avfs.VFS`. The basename is the map key. The trimmed
+   contents are the value. If the directory is missing, the output has no
+   `vulnerabilities` field.
+
+3. If `lscpu` is on PATH, the collector runs it through the injected
+   `executor.Executor` and merges these fields:
+
+   - The cache size of each level (`caches.l1d` / `l1i` / `l2` / `l3`).
+   - The NUMA node → CPU index lists (`numa_nodes`).
+   - On `s390x` and `ppc64le` only, the socket, core and thread counts. These
+     replace the gopsutil numbers, which are correct only for x86.
+
+   If `lscpu` fails, the extension fields stay empty. The fields from gopsutil
+   stay correct.
 
 On macOS:
 
-1. gopsutil's `cpu.Info` sources `model_name`, `vendor_id`, `flags`, and the
-   logical thread count (`total`) via the underlying `host_info()` mach call.
-   Each entry is projected onto the `cpus[]` slice in the same way as on Linux,
-   the homogeneous-CPU summary above comes from the first entry.
-2. We override via `sysctl -n <key>` through the injected `executor.Executor`:
-   - `hw.physicalcpu` → `cores` (gopsutil reports logical here).
+1. gopsutil's `cpu.Info` gives `model_name`, `vendor_id`, `flags` and the
+   logical thread count (`total`) through the `host_info()` mach call. The
+   collector puts each entry into the `cpus[]` slice, as on Linux. The summary
+   fields, which assume that all CPUs are the same, come from the first entry.
+2. The collector replaces these values with `sysctl -n <key>` through the
+   injected `executor.Executor`:
+   - `hw.physicalcpu` → `cores`. gopsutil reports logical cores here.
    - `hw.packages` → `sockets`.
-   - `hw.cpufrequency_max`, falling back to `hw.cpufrequency`, divided by 1e6 →
-     `mhz`. Both sysctls are absent on Apple Silicon; `mhz` stays at whatever
-     gopsutil returned (typically 0) rather than reporting a misleading
+   - `hw.cpufrequency_max`, or `hw.cpufrequency` if it is missing, divided by
+     1e6 → `mhz`. Apple Silicon has neither sysctl. Then `mhz` keeps the value
+     from gopsutil (usually 0). The collector does not report an incorrect
      frequency.
 
 ## Backing library
 
 - [`github.com/shirou/gopsutil/v4/cpu`](https://github.com/shirou/gopsutil),
-  BSD-3. Primary source for `/proc/cpuinfo` on Linux and mach sysctls on macOS.
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for the sysfs
-  vulnerabilities walk (production = `osfs`; tests = `memfs`).
-- `internal/executor` for `lscpu` on Linux and `sysctl` on macOS (tests use the
-  generated gomock).
+  BSD-3. The primary source for `/proc/cpuinfo` on Linux and for the mach
+  sysctls on macOS.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read the sysfs
+  vulnerabilities. Production uses `osfs`. Tests use `memfs`.
+- `internal/executor` to run `lscpu` on Linux and `sysctl` on macOS. Tests use
+  the generated gomock.

@@ -4,30 +4,30 @@
 
 ## Description
 
-Reports IRQ statistics parsed from `/proc/interrupts` on Linux. One entry is
-emitted per interrupt line. Each entry includes the IRQ identifier, an optional
-interrupt-controller type, an optional device name, and the per-CPU event
-counts.
+The collector reports the IRQ statistics that it parses from `/proc/interrupts`
+on Linux. It reports one entry for each interrupt line. Each entry has the IRQ
+identifier, an optional interrupt controller type, an optional device name, and
+the event count for each CPU.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Profile interrupt distribution across CPUs for latency and load analysis.
-- Identify hardware devices generating high interrupt rates.
-- Audit IRQ affinity for high-performance tuning.
+- Examine how interrupts go to each CPU, for latency and load analysis.
+- Find the hardware devices that cause high interrupt rates.
+- Audit the IRQ affinity for high-performance tuning.
 
-The collector mirrors Ohai's `interrupts` plugin methodology: it reads
-`/proc/interrupts` and parses the kernel-documented format described in
+The collector uses the same method as Ohai's `interrupts` plugin. It reads
+`/proc/interrupts` and parses the format that the kernel documents in
 [Documentation/filesystems/proc.txt][kernel-proc-txt].
 
 ## Collected fields
 
-| Field                   | Type      | Description                                                                                                            | Schema mapping   |
-| ----------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `irqs`                  | `array`   | List of interrupt lines from `/proc/interrupts`.                                                                       | gohai convention |
-| `irqs[].number`         | `string`  | IRQ identifier, a decimal number for hardware IRQs (`"0"`, `"9"`) or a label for architecture IRQs (`"NMI"`, `"ERR"`). | gohai convention |
-| `irqs[].type`           | `string`  | Interrupt controller type (e.g. `"IO-APIC"`, `"PCI-MSI"`). Empty for non-numeric IRQs that lack this field.            | gohai convention |
-| `irqs[].device`         | `string`  | Driver or device name (e.g. `"timer"`, `"eth0"`). Empty for non-numeric IRQs or when no device is listed.              | gohai convention |
-| `irqs[].counts_per_cpu` | `[]int64` | Per-CPU event count in CPU-index order. Slice length equals the CPU count in the header line.                          | gohai convention |
+| Field                   | Type      | Description                                                                                                                        | Schema mapping   |
+| ----------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `irqs`                  | `array`   | The list of interrupt lines from `/proc/interrupts`.                                                                               | gohai convention |
+| `irqs[].number`         | `string`  | The IRQ identifier. This is a decimal number for hardware IRQs (`"0"`, `"9"`) or a label for architecture IRQs (`"NMI"`, `"ERR"`). | gohai convention |
+| `irqs[].type`           | `string`  | The interrupt controller type, for example `"IO-APIC"` or `"PCI-MSI"`. Empty for non-numeric IRQs that do not have this field.     | gohai convention |
+| `irqs[].device`         | `string`  | The driver or device name, for example `"timer"` or `"eth0"`. Empty for non-numeric IRQs, or if the line shows no device.          | gohai convention |
+| `irqs[].counts_per_cpu` | `[]int64` | The event count for each CPU, in the order of the CPU index. The slice length is the same as the CPU count in the header line.     | gohai convention |
 
 ## Platform support
 
@@ -97,34 +97,38 @@ None.
 
 ## Data sources
 
-Ohai's `linux/interrupts.rb` parses `/proc/interrupts` similarly, reading
-per-CPU counts and the device/type label for each IRQ line. gohai follows the
-same approach but stores results as a structured array rather than Ohai's nested
-hash keyed by IRQ number.
+Ohai's `linux/interrupts.rb` parses `/proc/interrupts` in a similar way. It
+reads the count for each CPU and the device and type label of each IRQ line.
+gohai uses the same method. But gohai keeps the results in a structured array.
+Ohai keeps them in a nested hash with the IRQ number as the key.
 
 On Linux:
 
-1. Read `/proc/interrupts` via the injected `avfs.VFS`. If the file is absent
-   (containers without `/proc` bind-mounted), return an empty IRQ list without
+1. The collector reads `/proc/interrupts` through the injected `avfs.VFS`. If
+   the file is missing, the collector returns an empty IRQ list and no error.
+   This occurs in containers that do not bind-mount `/proc`.
+2. The collector parses the first line as the CPU header to get the CPU count.
+3. For each line after the header, the collector splits the line at `:` to get
+   the IRQ number. Then it parses the next _N_ tokens as decimal event counts.
+   Whitespace separates the tokens, and _N_ is the CPU count. The collector
+   skips lines that have no colon.
+4. For numeric IRQs, the token at index _N_ is the interrupt controller type, if
+   it is there. The token at index _N+1_ is the interrupt vector, and the
+   collector skips it. The collector joins the tokens from index _N+2_ to the
+   end to make the device name.
+5. For non-numeric IRQs, for example `NMI`, `LOC` and `ERR`, the collector joins
+   the tokens after the counts to make the type label. Usually, `ERR` and `MIS`
+   have no tokens after the counts.
+6. If a count token is not a decimal number, the collector returns a parse
    error.
-2. Parse the first line as the CPU header to determine the CPU count.
-3. For each subsequent line: split on `:` to extract the IRQ number, then parse
-   the next _N_ whitespace-delimited tokens (where _N_ = CPU count) as decimal
-   event counts. Lines without a colon are skipped.
-4. For numeric IRQs, the token at index _N_ (if present) is the interrupt
-   controller type, index _N+1_ is the interrupt vector (skipped), and index
-   _N+2_ onward is joined as the device name.
-5. For non-numeric IRQs (e.g. `NMI`, `LOC`, `ERR`), any trailing tokens after
-   the counts are joined as the type label. `ERR` and `MIS` typically have no
-   trailing tokens at all.
-6. Invalid count tokens (non-decimal) propagate as a parse error.
 
-On macOS: returns `nil`.
+On macOS, the collector returns `nil`.
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
-  `memfs` in tests) for the `/proc/interrupts` read.
-- Go stdlib `bufio` and `strconv` for line scanning and count parsing.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read
+  `/proc/interrupts`. Production uses `osfs`. Tests use `memfs`.
+- The Go standard library `bufio` and `strconv` to scan the lines and parse the
+  counts.
 
 [kernel-proc-txt]: https://www.kernel.org/doc/Documentation/filesystems/proc.txt

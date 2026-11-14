@@ -2,30 +2,29 @@
 
 > **Status:** Not a collector
 
-This page documents the SDK pattern for detecting which cloud provider a host is
-running on, and how to branch on that identity to access the right per-provider
-typed fact data.
+This page shows how to use the SDK to find the cloud provider of a host. It also
+shows how to use that identity to get the correct typed facts of each provider.
 
-Unlike the per-provider collector docs in this directory, there is no `cloud`
-collector in gohai. The detection flow is a small API on `gohai.Facts` that
-inspects which per-provider field was populated.
+The other pages in this directory each describe the collector of one provider.
+gohai has no `cloud` collector. The detection is a small API on `gohai.Facts`.
+It examines which provider field has data.
 
 ## Why not an aggregator collector?
 
-Earlier versions of this SDK exposed a `cloud` collector that merged
-per-provider facts into a normalized view. That design had two problems:
+Earlier versions of this SDK had a `cloud` collector. It merged the facts of
+each provider into one normalized view. That design had two problems:
 
-1. **The normalization is lossy.** EC2's `Region` is `"us-east-1"`, Azure's
-   equivalent is `Location: "eastus"`, OCI's is a combined
-   `availabilityDomain: "pPrU:PHX-AD-1"`. Papering them over with a single
-   `Cloud.Region` field throws away shape that consumers care about.
-2. **It duplicates information.** Every provider's typed `Info` struct is
-   already exposed on `Facts` (`Facts.Ec2`, `Facts.Gce`, …). An aggregator is
-   another struct to maintain, synced manually with the per-provider structs on
-   every field change.
+1. **The normalization loses data.** EC2's `Region` is `"us-east-1"`. The Azure
+   equivalent is `Location: "eastus"`. The OCI equivalent is a combined
+   `availabilityDomain: "pPrU:PHX-AD-1"`. One `Cloud.Region` field for all of
+   them removes the shape that consumers need.
+2. **It duplicates data.** `Facts` already has the typed `Info` struct of each
+   provider (`Facts.Ec2`, `Facts.Gce`, …). An aggregator is one more struct to
+   maintain. A person must change it manually each time a field of a provider
+   struct changes.
 
-So gohai takes a different tack: **expose provider identity at the SDK level,
-point consumers to the per-provider field for rich data.**
+Thus gohai uses a different design: **the SDK gives the identity of the
+provider, and the consumer reads the provider field for the full data.**
 
 ## The API
 
@@ -50,10 +49,11 @@ const (
 )
 ```
 
-`Facts.Cloud()` walks `Facts.Ec2`, `Facts.Gce`, `Facts.Azure`, etc. in a fixed
-order and returns a `*Cloud` whose `Name` is set to the first non-nil provider's
-identifier. Returns `nil` when no cloud provider was detected (bare metal,
-unknown infrastructure, or no cloud collector was enabled).
+`Facts.Cloud()` examines `Facts.Ec2`, `Facts.Gce`, `Facts.Azure` and the other
+provider fields in a fixed order. It returns a `*Cloud`. Its `Name` is the
+identifier of the first provider that is not nil. `Facts.Cloud()` returns `nil`
+if gohai found no cloud provider. This occurs on bare metal, on unknown
+infrastructure, or when no cloud collector is enabled.
 
 ## Typical flow
 
@@ -103,16 +103,16 @@ func main() {
 
 ## When to use `Cloud()` vs. the typed field directly
 
-- **Provider-agnostic code** (logging "this host is on \<cloud>", fleet
-  inventory, feature-flag gating), use `Cloud()`.
-- **Provider-specific code** that already knows it cares about AWS, skip
-  `Cloud()` and check `facts.Ec2 != nil` directly. It's shorter, faster, and
-  compile-time checked.
+- **Code for all providers:** use `Cloud()`. Examples are a log line "this host
+  is on \<cloud>", a fleet inventory, or a feature-flag gate.
+- **Code for one provider:** if the code is only for AWS, do not use `Cloud()`.
+  Check `facts.Ec2 != nil` directly. This is shorter and faster, and the
+  compiler checks it.
 
 ## Enabling cloud collectors
 
-Every cloud collector is opt-in (`DefaultEnabled() = false`). Enable them one of
-several ways:
+All cloud collectors are opt-in (`DefaultEnabled() = false`). Use one of these
+methods to enable them:
 
 ```bash
 # CLI
@@ -125,14 +125,14 @@ gohai.New(gohai.WithCollectors("ec2", "gce"))
 gohai.New(gohai.WithEnabled("ec2"))
 ```
 
-`WithCategory("cloud")` pulls every cloud collector plus their `dmi` dependency
-automatically, `dmi` is read once even though multiple cloud collectors declare
-it as a dependency.
+`WithCategory("cloud")` automatically enables all cloud collectors and their
+`dmi` dependency. Many cloud collectors declare `dmi` as a dependency, but gohai
+reads `dmi` only one time.
 
 ## Per-provider docs
 
-Collection methodology, field coverage, and Ohai-parity details live in each
-provider's own doc:
+The page of each provider gives the collection method, the fields, and the
+differences from Ohai:
 
 - [ec2.md](ec2.md). AWS EC2
 - [gce.md](gce.md). Google Compute Engine

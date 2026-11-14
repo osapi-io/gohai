@@ -1,124 +1,127 @@
 # Network
 
 > **Status:** Implemented ✅ (interfaces, structured addresses, routes, default
-> gateway, link details, ARP/ND)
+> gateway, link details, ARP and ND)
 
 ## Description
 
-Enumerates network interfaces with structured per-address data, the routing
-table, and top-level default-gateway facts (v4 + v6). On Linux we additionally
-derive the canonical encapsulation name from sysfs ARPHRD types and merge OpenVZ
-`venet0:N` aliases under the primary `venet0` interface so consumers querying
-the canonical interface name find the addresses.
+The collector lists the network interfaces with structured data for each
+address. It also reports the routing table and the default-gateway facts at the
+top level (IPv4 and IPv6). On Linux, the collector also gets the canonical
+encapsulation name from the sysfs ARPHRD types. It also merges the OpenVZ
+`venet0:N` aliases into the primary `venet0` interface. Thus a consumer that
+queries the canonical interface name finds the addresses.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Discover the public / private addresses for a host.
-- Identify the egress interface and default next-hop.
-- Correlate traffic spikes to specific interfaces.
-- Filter addresses by `scope` (`Global` vs `Link` vs `Host`) without
-  string-parsing CIDRs.
-- Detect MTU mismatches or flapping interfaces (high `errin`/`errout`).
+- Find the public and private addresses of a host.
+- Find the egress interface and the default next hop.
+- Relate traffic spikes to specific interfaces.
+- Filter addresses by `scope` (`Global`, `Link` or `Host`) without parsing CIDR
+  strings.
+- Find MTU mismatches or interfaces that go up and down often (high `errin` and
+  `errout`).
 
-DNS resolver configuration (`/etc/resolv.conf` nameservers + search domains)
-will live in its own `dns` collector, out of scope here.
+The DNS resolver configuration (the nameservers and search domains of
+`/etc/resolv.conf`) will be in its own `dns` collector. This collector does not
+report it.
 
 ## Collected fields
 
 Top level:
 
-| Field                     | Type        | Description                                           | Schema mapping            |
-| ------------------------- | ----------- | ----------------------------------------------------- | ------------------------- |
-| `interfaces`              | []Interface | Interfaces enumerated from gopsutil + extensions.     | —                         |
-| `routes`                  | []Route     | All routes from `ip route show table main` (v4 + v6). | No direct schema mapping. |
-| `default_interface`       | string      | Interface the default IPv4 route exits through.       | No direct schema mapping. |
-| `default_gateway`         | string      | Next-hop IPv4 address for the default route.          | No direct schema mapping. |
-| `default_inet6_interface` | string      | Interface the default IPv6 route exits through.       | No direct schema mapping. |
-| `default_inet6_gateway`   | string      | Next-hop IPv6 address for the default route.          | No direct schema mapping. |
-| `neighbours`              | []Neighbour | Kernel ARP + NDP cache (Linux only, netlink).         | No direct schema mapping. |
+| Field                     | Type        | Description                                                 | Schema mapping            |
+| ------------------------- | ----------- | ----------------------------------------------------------- | ------------------------- |
+| `interfaces`              | []Interface | The interfaces from gopsutil, with the gohai extensions.    | None                      |
+| `routes`                  | []Route     | All routes from `ip route show table main` (IPv4 and IPv6). | No direct schema mapping. |
+| `default_interface`       | string      | The interface that the default IPv4 route goes out through. | No direct schema mapping. |
+| `default_gateway`         | string      | The next-hop IPv4 address of the default route.             | No direct schema mapping. |
+| `default_inet6_interface` | string      | The interface that the default IPv6 route goes out through. | No direct schema mapping. |
+| `default_inet6_gateway`   | string      | The next-hop IPv6 address of the default route.             | No direct schema mapping. |
+| `neighbours`              | []Neighbour | The kernel ARP and NDP cache (Linux only, netlink).         | No direct schema mapping. |
 
 Per interface:
 
-| Field                     | Type              | Description                                                                                                                                                                                                                                                                                                               | Schema mapping            |
-| ------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `name`                    | string            | Interface name (`eth0`, `en0`, `lo`).                                                                                                                                                                                                                                                                                     | `network_interface.name`. |
-| `number`                  | int               | Kernel interface index (`ip link show` column 1). Mirrors Ohai `iface[:number]`.                                                                                                                                                                                                                                          | No direct schema mapping. |
-| `state`                   | string            | Admin state (`"up"` / `"down"`) derived from the `up` flag. Mirrors Ohai `iface["state"]`.                                                                                                                                                                                                                                | No direct schema mapping. |
-| `mtu`                     | int               | Maximum transmission unit (bytes).                                                                                                                                                                                                                                                                                        | No direct schema mapping. |
-| `mac`                     | string            | MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                                                                                                                                                                                                                                  | `network_interface.mac`.  |
-| `encapsulation`           | string            | Canonical encapsulation: `Ethernet` / `Loopback` / `PPP` / `SLIP` / `IPIP` / `6to4` / `VJSLIP`. Linux only.                                                                                                                                                                                                               | No direct schema mapping. |
-| `driver`                  | string            | Kernel driver bound to the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only, sysfs-derived.                                                                                                                                                                                                                              | No direct schema mapping. |
-| `speed`                   | string            | Negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only, ghw-derived.                                                                                                                                                                                                                                                | No direct schema mapping. |
-| `duplex`                  | string            | Link duplex (`Full`, `Half`). Linux only, ghw-derived.                                                                                                                                                                                                                                                                    | No direct schema mapping. |
-| `flags`                   | []string          | Interface flags (`up`, `broadcast`, `multicast`).                                                                                                                                                                                                                                                                         | No direct schema mapping. |
-| `addresses[]`             | []Address         | See below.                                                                                                                                                                                                                                                                                                                | —                         |
-| `routes[]`                | []Route           | Routes whose `dev` matches this interface.                                                                                                                                                                                                                                                                                | No direct schema mapping. |
-| `counters.*`              | Counters          | I/O counters, see below.                                                                                                                                                                                                                                                                                                  | No direct schema mapping. |
-| `ethtool.driver_info`     | map[string]string | `ethtool -i <iface>` output as a map. Common keys: `driver`, `version`, `firmware_version`, `bus_info`, `supports_statistics`, `supports_test`, `supports_eeprom_access`, `supports_register_dump`, `supports_priv_flags`. Linux only; populated only when the `ethtool` binary is on PATH and the interface is Ethernet. | No direct schema mapping. |
-| `ethtool.ring_params`     | map[string]int    | `ethtool -g <iface>`, keys are prefixed `max_` (from "Pre-set maximums") or `current_` (from "Current hardware settings") then the field name snake_cased: `max_rx`, `current_rx`, `current_rx_jumbo`, etc. Values are buffer descriptor counts.                                                                          | No direct schema mapping. |
-| `ethtool.channel_params`  | map[string]int    | `ethtool -l <iface>`, same `max_` / `current_` prefix convention as `ring_params`. Keys: `rx`, `tx`, `other`, `combined`. Values are queue counts.                                                                                                                                                                        | No direct schema mapping. |
-| `ethtool.coalesce_params` | map[string]any    | `ethtool -c <iface>`, most values are integers (microseconds, frame counts). The exception is the `Adaptive RX: on  TX: off` line which becomes two string entries `adaptive_rx` / `adaptive_tx` carrying `"on"`/`"off"`.                                                                                                 | No direct schema mapping. |
-| `ethtool.offload_params`  | map[string]string | `ethtool -k <iface>`, keys are feature names snake_cased (`rx_checksumming`, `generic_receive_offload`, ...). Values are `"on"` / `"off"`; trailing `[fixed]` / `[requested ...]` annotations are stripped.                                                                                                               | No direct schema mapping. |
-| `ethtool.pause_params`    | map[string]bool   | `ethtool -a <iface>`, keys: `autonegotiate`, `rx`, `tx`. Values are booleans (`"on"` → true).                                                                                                                                                                                                                             | No direct schema mapping. |
-| `vlan.id`                 | string            | 802.1Q VLAN tag (decimal). Linux only, parsed from `ip -d link`.                                                                                                                                                                                                                                                          | No direct schema mapping. |
-| `vlan.protocol`           | string            | `802.1Q` / `802.1ad`, present only on the protocol-qualified `ip` form.                                                                                                                                                                                                                                                   | No direct schema mapping. |
-| `vlan.flags`              | []string          | `REORDER_HDR` / `GVRP` / `LOOSE_BINDING` when set.                                                                                                                                                                                                                                                                        | No direct schema mapping. |
-| `tunnel_info.*`           | TunnelInfo        | ip6tnl / ipip tunnel metadata: `proto`, `external`, `remote`, `local`, `encaplimit`, `hoplimit`, `tclass`, `flowlabel`, `addrgenmode`, `numtxqueues`, `numrxqueues`, `gso_max_size`, `gso_max_segs`. Linux only, parsed from `ip -d link`.                                                                                | No direct schema mapping. |
-| `xdp.attached[]`          | []XDPProgram      | Attached XDP (eBPF) programs, each entry carries `mode` (`xdpdrv` / `xdpgeneric` / `xdpoffload` / `xdpmulti`), `id`, and `tag`. Linux only, parsed from `ip -d link`.                                                                                                                                                     | No direct schema mapping. |
+| Field                     | Type              | Description                                                                                                                                                                                                                                                                                                                                 | Schema mapping            |
+| ------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `name`                    | string            | The interface name (`eth0`, `en0`, `lo`).                                                                                                                                                                                                                                                                                                   | `network_interface.name`. |
+| `number`                  | int               | The kernel interface index (column 1 of `ip link show`). The same as Ohai `iface[:number]`.                                                                                                                                                                                                                                                 | No direct schema mapping. |
+| `state`                   | string            | The admin state (`"up"` or `"down"`), from the `up` flag. The same as Ohai `iface["state"]`.                                                                                                                                                                                                                                                | No direct schema mapping. |
+| `mtu`                     | int               | The maximum transmission unit, in bytes.                                                                                                                                                                                                                                                                                                    | No direct schema mapping. |
+| `mac`                     | string            | The MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                                                                                                                                                                                                                                                | `network_interface.mac`.  |
+| `encapsulation`           | string            | The canonical encapsulation: `Ethernet`, `Loopback`, `PPP`, `SLIP`, `IPIP`, `6to4` or `VJSLIP`. Linux only.                                                                                                                                                                                                                                 | No direct schema mapping. |
+| `driver`                  | string            | The kernel driver of the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only, from sysfs.                                                                                                                                                                                                                                                     | No direct schema mapping. |
+| `speed`                   | string            | The negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only, from ghw.                                                                                                                                                                                                                                                                 | No direct schema mapping. |
+| `duplex`                  | string            | The link duplex (`Full`, `Half`). Linux only, from ghw.                                                                                                                                                                                                                                                                                     | No direct schema mapping. |
+| `flags`                   | []string          | The interface flags (`up`, `broadcast`, `multicast`).                                                                                                                                                                                                                                                                                       | No direct schema mapping. |
+| `addresses[]`             | []Address         | Refer to the table below.                                                                                                                                                                                                                                                                                                                   | None                      |
+| `routes[]`                | []Route           | The routes whose `dev` is this interface.                                                                                                                                                                                                                                                                                                   | No direct schema mapping. |
+| `counters.*`              | Counters          | The I/O counters. Refer to the table below.                                                                                                                                                                                                                                                                                                 | No direct schema mapping. |
+| `ethtool.driver_info`     | map[string]string | The output of `ethtool -i <iface>` as a map. Usual keys: `driver`, `version`, `firmware_version`, `bus_info`, `supports_statistics`, `supports_test`, `supports_eeprom_access`, `supports_register_dump`, `supports_priv_flags`. Linux only. The collector sets it only when the `ethtool` binary is on PATH and the interface is Ethernet. | No direct schema mapping. |
+| `ethtool.ring_params`     | map[string]int    | From `ethtool -g <iface>`. Each key has the prefix `max_` (from "Pre-set maximums") or `current_` (from "Current hardware settings"), then the field name in snake case: `max_rx`, `current_rx`, `current_rx_jumbo`, and more. The values are buffer descriptor counts.                                                                     | No direct schema mapping. |
+| `ethtool.channel_params`  | map[string]int    | From `ethtool -l <iface>`. The `max_` and `current_` prefixes are the same as in `ring_params`. Keys: `rx`, `tx`, `other`, `combined`. The values are queue counts.                                                                                                                                                                         | No direct schema mapping. |
+| `ethtool.coalesce_params` | map[string]any    | From `ethtool -c <iface>`. Most values are integers (microseconds, frame counts). The exception is the `Adaptive RX: on  TX: off` line. It becomes two string entries, `adaptive_rx` and `adaptive_tx`, with the value `"on"` or `"off"`.                                                                                                   | No direct schema mapping. |
+| `ethtool.offload_params`  | map[string]string | From `ethtool -k <iface>`. The keys are feature names in snake case (`rx_checksumming`, `generic_receive_offload`, ...). The values are `"on"` or `"off"`. The collector removes the `[fixed]` and `[requested ...]` notes at the end.                                                                                                      | No direct schema mapping. |
+| `ethtool.pause_params`    | map[string]bool   | From `ethtool -a <iface>`. Keys: `autonegotiate`, `rx`, `tx`. The values are booleans (`"on"` gives true).                                                                                                                                                                                                                                  | No direct schema mapping. |
+| `vlan.id`                 | string            | The 802.1Q VLAN tag (decimal). Linux only, parsed from `ip -d link`.                                                                                                                                                                                                                                                                        | No direct schema mapping. |
+| `vlan.protocol`           | string            | `802.1Q` or `802.1ad`. Only in the `ip` form that shows the protocol.                                                                                                                                                                                                                                                                       | No direct schema mapping. |
+| `vlan.flags`              | []string          | `REORDER_HDR`, `GVRP` or `LOOSE_BINDING`, when set.                                                                                                                                                                                                                                                                                         | No direct schema mapping. |
+| `tunnel_info.*`           | TunnelInfo        | The ip6tnl and ipip tunnel metadata: `proto`, `external`, `remote`, `local`, `encaplimit`, `hoplimit`, `tclass`, `flowlabel`, `addrgenmode`, `numtxqueues`, `numrxqueues`, `gso_max_size`, `gso_max_segs`. Linux only, parsed from `ip -d link`.                                                                                            | No direct schema mapping. |
+| `xdp.attached[]`          | []XDPProgram      | The attached XDP (eBPF) programs. Each entry has `mode` (`xdpdrv`, `xdpgeneric`, `xdpoffload` or `xdpmulti`), `id` and `tag`. Linux only, parsed from `ip -d link`.                                                                                                                                                                         | No direct schema mapping. |
 
 Per address:
 
-| Field       | Type   | Description                                                       | Schema mapping            |
-| ----------- | ------ | ----------------------------------------------------------------- | ------------------------- |
-| `addr`      | string | Address literal, no CIDR (`"10.0.0.5"`, `"fe80::1"`).             | `network_interface.ip`.   |
-| `family`    | string | `inet` or `inet6`.                                                | No direct schema mapping. |
-| `prefixlen` | int    | Prefix length (24, 64, …).                                        | No direct schema mapping. |
-| `netmask`   | string | IPv4 netmask derived from prefix (`"255.255.255.0"`); IPv6 omits. | No direct schema mapping. |
-| `broadcast` | string | IPv4 broadcast address derived from address + prefix; IPv6 omits. | No direct schema mapping. |
-| `scope`     | string | `Global`, `Link`, or `Host`, derived from stdlib classification.  | No direct schema mapping. |
+| Field       | Type   | Description                                                                     | Schema mapping            |
+| ----------- | ------ | ------------------------------------------------------------------------------- | ------------------------- |
+| `addr`      | string | The address as text, with no CIDR (`"10.0.0.5"`, `"fe80::1"`).                  | `network_interface.ip`.   |
+| `family`    | string | `inet` or `inet6`.                                                              | No direct schema mapping. |
+| `prefixlen` | int    | The prefix length (24, 64, …).                                                  | No direct schema mapping. |
+| `netmask`   | string | The IPv4 netmask, from the prefix (`"255.255.255.0"`). Not set for IPv6.        | No direct schema mapping. |
+| `broadcast` | string | The IPv4 broadcast address, from the address and the prefix. Not set for IPv6.  | No direct schema mapping. |
+| `scope`     | string | `Global`, `Link` or `Host`, from the classification of the Go standard library. | No direct schema mapping. |
 
 Per route:
 
-| Field         | Type   | Description                                                   | Schema mapping            |
-| ------------- | ------ | ------------------------------------------------------------- | ------------------------- |
-| `destination` | string | Route destination (`"default"`, `"10.0.0.0/24"`, `"::/0"`).   | No direct schema mapping. |
-| `family`      | string | `inet` or `inet6`.                                            | No direct schema mapping. |
-| `gateway`     | string | Next-hop address.                                             | No direct schema mapping. |
-| `interface`   | string | Egress interface (matches an entry in `interfaces[].name`).   | No direct schema mapping. |
-| `source`      | string | Preferred source address.                                     | No direct schema mapping. |
-| `scope`       | string | `global` / `link` / `host` (kernel-reported, lowercase).      | No direct schema mapping. |
-| `proto`       | string | Routing protocol / source (`kernel`, `dhcp`, `static`, `ra`). | No direct schema mapping. |
-| `metric`      | int    | Route metric.                                                 | No direct schema mapping. |
+| Field         | Type   | Description                                                              | Schema mapping            |
+| ------------- | ------ | ------------------------------------------------------------------------ | ------------------------- |
+| `destination` | string | The route destination (`"default"`, `"10.0.0.0/24"`, `"::/0"`).          | No direct schema mapping. |
+| `family`      | string | `inet` or `inet6`.                                                       | No direct schema mapping. |
+| `gateway`     | string | The next-hop address.                                                    | No direct schema mapping. |
+| `interface`   | string | The egress interface. It is the same as an entry in `interfaces[].name`. | No direct schema mapping. |
+| `source`      | string | The preferred source address.                                            | No direct schema mapping. |
+| `scope`       | string | `global`, `link` or `host`, as the kernel reports it, in lowercase.      | No direct schema mapping. |
+| `proto`       | string | The routing protocol or source (`kernel`, `dhcp`, `static`, `ra`).       | No direct schema mapping. |
+| `metric`      | int    | The route metric.                                                        | No direct schema mapping. |
 
 Per neighbour:
 
-| Field       | Type   | Description                                                                                             | Schema mapping            |
-| ----------- | ------ | ------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `address`   | string | IPv4 / IPv6 address of the neighbour.                                                                   | No direct schema mapping. |
-| `family`    | string | `inet` or `inet6`.                                                                                      | No direct schema mapping. |
-| `mac`       | string | Hardware address (MAC) when known.                                                                      | No direct schema mapping. |
-| `interface` | string | Egress interface (resolved from netlink LinkIndex via `net.InterfaceByIndex`).                          | No direct schema mapping. |
-| `state`     | string | NUD state: `INCOMPLETE` / `REACHABLE` / `STALE` / `DELAY` / `PROBE` / `FAILED` / `NOARP` / `PERMANENT`. | No direct schema mapping. |
+| Field       | Type   | Description                                                                                            | Schema mapping            |
+| ----------- | ------ | ------------------------------------------------------------------------------------------------------ | ------------------------- |
+| `address`   | string | The IPv4 or IPv6 address of the neighbour.                                                             | No direct schema mapping. |
+| `family`    | string | `inet` or `inet6`.                                                                                     | No direct schema mapping. |
+| `mac`       | string | The hardware address (MAC), when it is known.                                                          | No direct schema mapping. |
+| `interface` | string | The egress interface, from the netlink LinkIndex through `net.InterfaceByIndex`.                       | No direct schema mapping. |
+| `state`     | string | The NUD state: `INCOMPLETE`, `REACHABLE`, `STALE`, `DELAY`, `PROBE`, `FAILED`, `NOARP` or `PERMANENT`. | No direct schema mapping. |
 
 Per `Counters`:
 
-| Field          | Type   | Description          |
-| -------------- | ------ | -------------------- |
-| `bytes_sent`   | uint64 | Bytes transmitted.   |
-| `bytes_recv`   | uint64 | Bytes received.      |
-| `packets_sent` | uint64 | Packets transmitted. |
-| `packets_recv` | uint64 | Packets received.    |
-| `errin`        | uint64 | Receive errors.      |
-| `errout`       | uint64 | Transmit errors.     |
-| `dropin`       | uint64 | Receive drops.       |
-| `dropout`      | uint64 | Transmit drops.      |
+| Field          | Type   | Description           |
+| -------------- | ------ | --------------------- |
+| `bytes_sent`   | uint64 | The bytes sent.       |
+| `bytes_recv`   | uint64 | The bytes received.   |
+| `packets_sent` | uint64 | The packets sent.     |
+| `packets_recv` | uint64 | The packets received. |
+| `errin`        | uint64 | The receive errors.   |
+| `errout`       | uint64 | The send errors.      |
+| `dropin`       | uint64 | The receive drops.    |
+| `dropout`      | uint64 | The send drops.       |
 
 ## Platform support
 
-| Platform | Supported                                                                                 |
-| -------- | ----------------------------------------------------------------------------------------- |
-| Linux    | ✅ (gopsutil interfaces + counters, sysfs ARPHRD, `ip route` v4/v6, OpenVZ alias merge)   |
-| macOS    | ✅ (gopsutil interfaces + counters; routes/encap/OpenVZ are Linux-only, see Data Sources) |
+| Platform | Supported                                                                                                      |
+| -------- | -------------------------------------------------------------------------------------------------------------- |
+| Linux    | ✅ (gopsutil interfaces and counters, sysfs ARPHRD, `ip route` IPv4 and IPv6, OpenVZ alias merge)              |
+| macOS    | ✅ (gopsutil interfaces and counters. Routes, encapsulation and OpenVZ are Linux only. Refer to Data sources.) |
 
 ## Example output
 
@@ -209,85 +212,107 @@ None.
 
 On Linux:
 
-01. **gopsutil `net.Interfaces`** enumerates interfaces, name, MTU, hardware
-    address, flags, raw address CIDRs, and `Index` (forwarded as the
-    per-interface `number` field to match Ohai's `iface[:number]`). Admin
-    `state` (`"up"` / `"down"`) is derived from gopsutil's `up` flag to match
-    Ohai's `iface[:state]`, which reads `ip link show`.
-02. **gopsutil `net.IOCounters`** per-interface bytes/packets/errors/drops.
-03. **Address structuring**: each gopsutil CIDR is parsed via `net.ParseCIDR`.
-    We populate `family` from address kind, `prefixlen` from the mask, `netmask`
-    (IPv4) from the prefix, `broadcast` (IPv4) by OR-ing host bits with the
-    inverse mask, and `scope` from stdlib classification (`IsLoopback` → `Host`,
-    `IsLinkLocalUnicast` / `IsLinkLocalMulticast` → `Link`, otherwise `Global`).
-04. **Encapsulation**: read `/sys/class/net/<iface>/type` (an ARPHRD\_\*
-    integer) through the injected `avfs.VFS` and map via a static table to
-    Ohai's canonical name (`Ethernet` / `Loopback` / `PPP` / `SLIP` / `VJSLIP` /
-    `IPIP` / `6to4`). Unknown ARPHRD values leave the field empty.
-05. **Routes**: run `ip -o -4 route show table main` and
-    `ip -o -6 route show table main` through the shared `internal/executor`
-    runner. Each line is parsed into a `Route` (`destination`, `gateway`,
-    `interface`, `source`, `scope`, `proto`, `metric`); multipath entries
-    (containing `\`) are collapsed onto a single line via space-rewrite. Routes
-    whose destination is `default`, `0.0.0.0/0`, or `::/0` populate the
-    corresponding top-level `default_*` fields. Each route is also appended to
-    the matching interface's `routes` slice. When `ip` is unavailable (minimal
-    containers without iproute2), routing fields stay empty.
-06. **Link details**: per-interface `Speed` and `Duplex` come from
-    `ghw.Network()` keyed by interface name (ghw reads
-    `/sys/class/net/<iface>/speed` and `/duplex`). `Driver` is the basename of
-    `/sys/class/net/<iface>/device/driver`'s symlink target, read through the
-    injected `avfs.VFS`. Virtual / loopback interfaces typically lack the driver
-    symlink and stay empty.
-07. **Ethtool driver info**: for each Ethernet-like interface we run
-    `ethtool -i <iface>` through the shared `internal/executor` runner and parse
-    the key/value output into `interfaces[].ethtool.driver_info` (`driver`,
-    `version`, `firmware_version`, `bus_info`, `expansion_rom_version`,
-    `supports_statistics`, `supports_test`, `supports_eeprom_access`,
-    `supports_register_dump`, `supports_priv_flags`). Non-Ethernet interfaces
-    (loopback, tunnels) are skipped. Binary missing or per-call failures leave
-    the field empty.
-08. **Ethtool tuning bundle**: for the same interfaces we run five additional
-    ethtool probes via the executor and parse each into a typed sub-record under
-    `interfaces[].ethtool`:
-    - `ethtool -g <iface>` → `ring_params` (rx / rx-mini / rx-jumbo / tx current
-      \+ max values).
-    - `ethtool -l <iface>` → `channel_params` (combined / rx / tx / other
-      current + max).
-    - `ethtool -c <iface>` → `coalesce_params` (adaptive-rx / adaptive-tx,
-      `rx_usecs`, `tx_usecs`, ...).
-    - `ethtool -k <iface>` → `offload_params` (checksumming, TSO, GSO, GRO, LRO
-      on/off with `[fixed]` noted when the kernel won't allow changes).
-    - `ethtool -a <iface>` → `pause_params` (autoneg, rx, tx). Mirrors Ohai's
-      methodology re-audit of `linux/network.rb`; per-probe failures are
-      tolerated and leave only the failing sub-record empty.
-09. **Neighbours**: `vishvananda/netlink.NeighList(0, 0)` returns the kernel ARP
-    \+ NDP cache. Each entry is mapped to a `Neighbour` with address / family /
-    MAC / interface (resolved from LinkIndex) / state (NUD bitmask → ip-neigh
-    canonical string).
-10. **OpenVZ alias merge**: detect OpenVZ guest via `/proc/vz` present AND
-    `/proc/bc/0` absent. When detected, any `<base>:<n>` interface (typically
-    `venet0:0`) has its addresses appended to the primary interface (`venet0`)
-    and the alias is removed from the output. Mirrors Ohai's behaviour so
-    `interfaces[venet0]` is queryable for the container's actual IPs.
+01. **gopsutil `net.Interfaces`** lists the interfaces. For each interface, it
+    gives the name, the MTU, the hardware address, the flags, the raw address
+    CIDRs and `Index`. The collector reports `Index` as the `number` field of
+    the interface, which is the same as Ohai's `iface[:number]`. The collector
+    gets the admin `state` (`"up"` or `"down"`) from the `up` flag of gopsutil.
+    This is the same as Ohai's `iface[:state]`, which reads `ip link show`.
 
-On macOS we use gopsutil's `getifaddrs` + `netstat -i` only, encapsulation,
-routing, and OpenVZ handling are Linux-specific. A future enhancement may add
-`route -n get default` + `netstat -nr` parsing for macOS routes.
+02. **gopsutil `net.IOCounters`** gives the bytes, packets, errors and drops of
+    each interface.
+
+03. **Address structure.** The collector parses each gopsutil CIDR with
+    `net.ParseCIDR`. It sets these fields:
+
+    - `family`, from the address kind.
+    - `prefixlen`, from the mask.
+    - `netmask` (IPv4), from the prefix.
+    - `broadcast` (IPv4). The collector sets the host bits with an OR of the
+      inverse mask.
+    - `scope`, from the classification of the Go standard library. `IsLoopback`
+      gives `Host`. `IsLinkLocalUnicast` or `IsLinkLocalMulticast` gives `Link`.
+      All other addresses give `Global`.
+
+04. **Encapsulation.** The collector reads `/sys/class/net/<iface>/type` (an
+    ARPHRD\_\* integer) through the injected `avfs.VFS`. A static table maps the
+    value to Ohai's canonical name (`Ethernet`, `Loopback`, `PPP`, `SLIP`,
+    `VJSLIP`, `IPIP` or `6to4`). If the ARPHRD value is unknown, the field stays
+    empty.
+
+05. **Routes.** The collector runs `ip -o -4 route show table main` and
+    `ip -o -6 route show table main` through the shared `internal/executor`
+    runner. It parses each line into a `Route` (`destination`, `gateway`,
+    `interface`, `source`, `scope`, `proto`, `metric`). A multipath entry
+    contains `\`. The collector replaces it with a space, so the entry is on one
+    line. A route with the destination `default`, `0.0.0.0/0` or `::/0` sets the
+    related top-level `default_*` fields. The collector also adds each route to
+    the `routes` slice of its interface. If `ip` is not available, the routing
+    fields stay empty. Minimal containers without iproute2 do not have `ip`.
+
+06. **Link details.** The `Speed` and `Duplex` of each interface come from
+    `ghw.Network()`, with the interface name as the key. ghw reads
+    `/sys/class/net/<iface>/speed` and `/duplex`. `Driver` is the basename of
+    the symlink target of `/sys/class/net/<iface>/device/driver`. The collector
+    reads it through the injected `avfs.VFS`. Virtual and loopback interfaces
+    usually have no driver symlink, so the field stays empty.
+
+07. **Ethtool driver info.** For each interface that is similar to Ethernet, the
+    collector runs `ethtool -i <iface>` through the shared `internal/executor`
+    runner. It parses the key and value output into
+    `interfaces[].ethtool.driver_info` (`driver`, `version`, `firmware_version`,
+    `bus_info`, `expansion_rom_version`, `supports_statistics`, `supports_test`,
+    `supports_eeprom_access`, `supports_register_dump`, `supports_priv_flags`).
+    The collector skips interfaces that are not Ethernet (loopback, tunnels). If
+    the binary is missing or a call fails, the field stays empty.
+
+08. **Ethtool tuning set.** For the same interfaces, the collector runs five
+    more ethtool probes through the executor. It parses each probe into a typed
+    sub-record under `interfaces[].ethtool`:
+
+    - `ethtool -g <iface>` gives `ring_params` (the current and max values of
+      rx, rx-mini, rx-jumbo and tx).
+    - `ethtool -l <iface>` gives `channel_params` (the current and max values of
+      combined, rx, tx and other).
+    - `ethtool -c <iface>` gives `coalesce_params` (adaptive-rx, adaptive-tx,
+      `rx_usecs`, `tx_usecs`, ...).
+    - `ethtool -k <iface>` gives `offload_params` (checksumming, TSO, GSO, GRO
+      and LRO on or off, with `[fixed]` when the kernel does not allow changes).
+    - `ethtool -a <iface>` gives `pause_params` (autoneg, rx, tx).
+
+    This is the same as a new audit of the method of Ohai's `linux/network.rb`.
+    If one probe fails, the collector continues. Only the sub-record of that
+    probe stays empty.
+
+09. **Neighbours.** `vishvananda/netlink.NeighList(0, 0)` returns the kernel ARP
+    and NDP cache. The collector maps each entry to a `Neighbour` with these
+    values: address, family, MAC, interface (from LinkIndex), and state. The
+    state is the NUD bitmask as the canonical string of ip-neigh.
+
+10. **OpenVZ alias merge.** The host is an OpenVZ guest if `/proc/vz` is there
+    AND `/proc/bc/0` is missing. On an OpenVZ guest, the collector adds the
+    addresses of each `<base>:<n>` interface (usually `venet0:0`) to the primary
+    interface (`venet0`). Then it removes the alias from the output. This is the
+    same as Ohai, so a query for `interfaces[venet0]` finds the real IPs of the
+    container.
+
+On macOS, the collector uses only gopsutil's `getifaddrs` and `netstat -i`.
+Encapsulation, routing and the OpenVZ merge are Linux only. A future change can
+parse `route -n get default` and `netstat -nr` to get the macOS routes.
 
 ## Backing library
 
 - [`github.com/shirou/gopsutil/v4/net`](https://github.com/shirou/gopsutil),
-  BSD-3. Primary source for interfaces + counters on both platforms.
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs). Virtual filesystem for
-  `/sys/class/net/<iface>/type` and the OpenVZ detection probes (`/proc/vz`,
+  BSD-3. The primary source for interfaces and counters on the two platforms.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual file
+  system for `/sys/class/net/<iface>/type` and the OpenVZ probes (`/proc/vz`,
   `/proc/bc/0`).
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `ip route show` on Linux. Tests mock with
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `ip route show` on Linux. Tests mock it with
   `go.uber.org/mock`.
-- [`github.com/jaypipes/ghw`](https://github.com/jaypipes/ghw). Apache-2. Source
-  for per-interface link `Speed` + `Duplex` on Linux.
+- [`github.com/jaypipes/ghw`](https://github.com/jaypipes/ghw). Apache-2. The
+  source for the link `Speed` and `Duplex` of each interface on Linux.
 - [`github.com/vishvananda/netlink`](https://github.com/vishvananda/netlink),
-  Apache-2. Source for the kernel ARP + NDP cache on Linux. Both libraries
-  compile cross-platform; their darwin paths return errors at runtime, leaving
-  the relevant fields blank.
+  Apache-2. The source for the kernel ARP and NDP cache on Linux. You can
+  compile the two libraries on all platforms. On darwin, they return errors at
+  runtime, and the related fields stay empty.

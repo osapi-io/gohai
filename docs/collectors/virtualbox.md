@@ -4,33 +4,33 @@
 
 ## Description
 
-Reports VirtualBox guest additions data from inside a VirtualBox guest VM.
-Requires VirtualBox Guest Additions to be installed (`VBoxControl` must be on
-PATH). When the host is not a VirtualBox guest, or when Guest Additions are
-absent, `Collect` returns `nil` with no error.
+The collector reports the VirtualBox Guest Additions data from inside a
+VirtualBox guest VM. VirtualBox Guest Additions must be installed, and
+`VBoxControl` must be on PATH. If the host is not a VirtualBox guest, or if
+Guest Additions are missing, `Collect` returns `nil` and no error.
 
-Only the guest role is implemented. Host-side inventory (`VBoxManage list vms`,
-`VBoxManage showvminfo`, etc.) from Ohai's `virtualbox.rb` host branch requires
-`VBoxManage` to be installed alongside the VirtualBox application. That surface
-is not yet implemented, consumers who need host inventory should use the
-VBoxManage API directly.
+gohai has only the guest role. Ohai's `virtualbox.rb` has a host branch that
+gets the host inventory (`VBoxManage list vms`, `VBoxManage showvminfo` and
+others). This branch needs `VBoxManage`, which installs with the VirtualBox
+application. gohai does not have this branch yet. If a consumer needs the host
+inventory, use the VBoxManage API directly.
 
 ## Collected fields
 
-| Field                      | Type   | Description                                          | Schema mapping            |
-| -------------------------- | ------ | ---------------------------------------------------- | ------------------------- |
-| `version`                  | string | VirtualBox host version (`7.0.14`) from `VBoxVer`.   | No direct schema mapping. |
-| `revision`                 | string | VirtualBox host revision (`161095`) from `VBoxRev`.  | No direct schema mapping. |
-| `guest_additions_version`  | string | Guest Additions version from `GuestAdd/VersionExt`.  | No direct schema mapping. |
-| `guest_additions_revision` | string | Guest Additions revision from `GuestAdd/Revision`.   | No direct schema mapping. |
-| `language_id`              | string | Host locale/language ID (`en_US`) from `LanguageID`. | No direct schema mapping. |
+| Field                      | Type   | Description                                                  | Schema mapping            |
+| -------------------------- | ------ | ------------------------------------------------------------ | ------------------------- |
+| `version`                  | string | The VirtualBox host version (`7.0.14`), from `VBoxVer`.      | No direct schema mapping. |
+| `revision`                 | string | The VirtualBox host revision (`161095`), from `VBoxRev`.     | No direct schema mapping. |
+| `guest_additions_version`  | string | The Guest Additions version, from `GuestAdd/VersionExt`.     | No direct schema mapping. |
+| `guest_additions_revision` | string | The Guest Additions revision, from `GuestAdd/Revision`.      | No direct schema mapping. |
+| `language_id`              | string | The host locale or language ID (`en_US`), from `LanguageID`. | No direct schema mapping. |
 
 ## Platform support
 
-| Platform | Supported                                               |
-| -------- | ------------------------------------------------------- |
-| Linux    | ✅ (`VBoxControl guestproperty enumerate` via executor) |
-| macOS    | ✅ (`VBoxControl guestproperty enumerate` via executor) |
+| Platform | Supported                                                       |
+| -------- | --------------------------------------------------------------- |
+| Linux    | ✅ (`VBoxControl guestproperty enumerate` through the executor) |
+| macOS    | ✅ (`VBoxControl guestproperty enumerate` through the executor) |
 
 ## Example output
 
@@ -73,8 +73,8 @@ gohai --collector.virtualbox    # enable (opt-in)
 gohai --no-collector.virtualbox # disable
 ```
 
-DefaultEnabled: `false`. VirtualBox Guest Additions are not present on most
-hosts; callers must opt in explicitly.
+DefaultEnabled: `false`. Most hosts do not have VirtualBox Guest Additions. A
+caller must enable the collector explicitly.
 
 ## Dependencies
 
@@ -82,22 +82,21 @@ None.
 
 ## Data sources
 
-Ohai's `virtualbox.rb` has two modes: host-side (via `VBoxManage`) and
-guest-side (via `VBoxControl`). gohai implements guest-side only, using
-`VBoxControl guestproperty enumerate` and extracting the same five properties
-(VBoxVer, VBoxRev, GuestAdd/VersionExt, GuestAdd/Revision, LanguageID) via regex
-patterns matching Ohai's approach. Host-side `VBoxManage` enumeration is not
-implemented.
+Ohai's `virtualbox.rb` has two modes: the host side (through `VBoxManage`) and
+the guest side (through `VBoxControl`). gohai has only the guest side. It runs
+`VBoxControl guestproperty enumerate` and gets the same five properties as Ohai
+(VBoxVer, VBoxRev, GuestAdd/VersionExt, GuestAdd/Revision, LanguageID). It uses
+the same regex patterns as Ohai. gohai does not have the host-side `VBoxManage`
+list.
 
-On both Linux and macOS the collector runs
-`VBoxControl guestproperty enumerate`. `VBoxControl` is part of the VirtualBox
-Guest Additions package (`virtualbox-guest-utils` on Debian/Ubuntu,
-`virtualbox-guest-additions-iso` on RHEL, the Guest Additions disk image on
-macOS).
+On Linux and on macOS, the collector runs `VBoxControl guestproperty enumerate`.
+`VBoxControl` is part of the VirtualBox Guest Additions package. The package is
+`virtualbox-guest-utils` on Debian/Ubuntu and `virtualbox-guest-additions-iso`
+on RHEL. On macOS, it is the Guest Additions disk image.
 
-The command enumerates all guest properties exposed by the hypervisor. We parse
-five properties using the regex patterns from Ohai's `virtualbox.rb` guest
-branch:
+The command lists all guest properties that the hypervisor gives. gohai parses
+five properties with the regex patterns from the guest branch of Ohai's
+`virtualbox.rb`:
 
 - `LanguageID, value: <val>,` → `language_id`
 - `VBoxVer, value: <val>,` → `version`
@@ -105,12 +104,12 @@ branch:
 - `GuestAdd/VersionExt, value: <val>,` → `guest_additions_version`
 - `GuestAdd/Revision, value: <val>,` → `guest_additions_revision`
 
-If `VBoxControl` is absent (not a VirtualBox guest, or Guest Additions not
-installed) the command fails and `Collect` returns `nil`, not an error. All
-other lines in the output are silently ignored.
+If `VBoxControl` is missing, the command fails and `Collect` returns `nil`, not
+an error. `VBoxControl` is missing if the host is not a VirtualBox guest, or if
+Guest Additions are not installed. The collector ignores all other lines in the
+output and gives no message about them.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction for `VBoxControl` invocations. Tests mock it with
-  `go.uber.org/mock`.
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `VBoxControl`. Tests mock it with `go.uber.org/mock`.

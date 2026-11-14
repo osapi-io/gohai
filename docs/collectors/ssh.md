@@ -4,54 +4,59 @@
 
 ## Description
 
-Reports SSH host public key fingerprints from `/etc/ssh/`. For each key type
-present on the host (RSA, ECDSA, Ed25519), the collector reports the algorithm
-type, SHA-256 fingerprint (OpenSSH format), MD5 fingerprint (colon-hex format),
-and key length in bits.
+The collector reports the fingerprints of the SSH host public keys in
+`/etc/ssh/`. For each key type on the host (RSA, ECDSA, Ed25519), it reports:
 
-Consumers use this to:
+- The algorithm type.
+- The SHA-256 fingerprint, in OpenSSH format.
+- The MD5 fingerprint, in colon-hex format.
+- The key length in bits.
 
-- Inventory host key fingerprints across a fleet for TOFU (trust-on-first-use)
-  or key rotation tracking.
-- Verify that expected key types are present and that deprecated types (e.g.
-  DSA) have been removed.
-- Cross-reference fingerprints against known-host databases or SIEM events.
-- Detect key material drift after OS reinstalls or cloud image baking.
+Consumers use this data to:
 
-DSA keys are intentionally omitted. OpenSSH deprecated DSA in 7.0 (2015) and
-removed support in 9.8. Collecting them would mislead consumers into thinking
-DSA keys are still a valid security signal.
+- Make a list of the host key fingerprints across a fleet, for TOFU
+  (trust-on-first-use) or to track key rotation.
+- Make sure that the expected key types are there, and that deprecated types,
+  for example DSA, are removed.
+- Compare fingerprints with known-host databases or SIEM events.
+- Find changes to the key material after an OS reinstall or after a cloud image
+  is baked.
+
+The collector does not report DSA keys. This is intentional. OpenSSH deprecated
+DSA in 7.0 (2015) and removed support in 9.8. If gohai reported DSA keys,
+consumers could think that DSA keys are still a valid security signal.
 
 ## Signals
 
-The collector reports per-key-type signals:
+The collector reports these signals for each key type:
 
-- `keys[].fingerprint_sha256`. SHA-256 fingerprint in `SHA256:<base64>` format,
-  matching `ssh-keygen -l -E sha256`. Use this for modern key comparisons and
-  SIEM correlation.
-- `keys[].fingerprint_md5`. MD5 fingerprint in `xx:xx:...` colon-hex format,
-  matching `ssh-keygen -l -E md5`. Provided for legacy compatibility with older
-  `known_hosts` tooling; prefer SHA-256 for new work.
-- `keys[].key_length`. Effective key strength in bits. For RSA this is the
-  modulus bit-length; for ECDSA it is the curve size (256/384/521); for Ed25519
-  it is always 256. Use this to flag keys below a minimum strength policy.
+- `keys[].fingerprint_sha256`. The SHA-256 fingerprint in `SHA256:<base64>`
+  format. It is the same as the output of `ssh-keygen -l -E sha256`. Use it to
+  compare keys and to correlate SIEM events.
+- `keys[].fingerprint_md5`. The MD5 fingerprint in `xx:xx:...` colon-hex format.
+  It is the same as the output of `ssh-keygen -l -E md5`. It is there for older
+  `known_hosts` tools. For new work, use SHA-256.
+- `keys[].key_length`. The effective key strength in bits. For RSA, this is the
+  bit length of the modulus. For ECDSA, it is the curve size (256/384/521). For
+  Ed25519, it is always 256. Use it to find keys that are below the minimum
+  strength of a policy.
 
 ## Collected fields
 
-| Field                       | Type     | Description                                                       | Schema mapping                                                                                                                                          |
-| --------------------------- | -------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keys[].type`               | `string` | Key algorithm as reported in the .pub file (e.g. `ssh-rsa`).      | No direct OCSF mapping. OTel has no SSH host key object. gohai convention: verbatim key type field from the public key file.                            |
-| `keys[].fingerprint_sha256` | `string` | SHA-256 fingerprint in `SHA256:<base64>` format.                  | No direct OCSF or OTel mapping. gohai convention: `fingerprint_sha256`, matches OpenSSH `-E sha256` output format.                                      |
-| `keys[].fingerprint_md5`    | `string` | MD5 fingerprint in `xx:xx:...` colon-hex format.                  | No direct OCSF or OTel mapping. gohai convention: `fingerprint_md5`, matches OpenSSH `-E md5` output format.                                            |
-| `keys[].key_length`         | `int`    | Effective key length in bits (RSA modulus; ECDSA curve; Ed25519). | No direct OCSF or OTel mapping. gohai convention: `key_length` with implicit unit bits, consistent with OpenSSH's `-b` flag and `ssh-keygen -l` output. |
+| Field                       | Type     | Description                                                           | Schema mapping                                                                                                                                    |
+| --------------------------- | -------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `keys[].type`               | `string` | The key algorithm as the .pub file gives it, for example `ssh-rsa`.   | No direct OCSF mapping. OTel has no SSH host key object. gohai convention: the key type field, unchanged, from the public key file.               |
+| `keys[].fingerprint_sha256` | `string` | The SHA-256 fingerprint in `SHA256:<base64>` format.                  | No direct OCSF or OTel mapping. gohai convention: `fingerprint_sha256`. It is the same as the output format of OpenSSH `-E sha256`.               |
+| `keys[].fingerprint_md5`    | `string` | The MD5 fingerprint in `xx:xx:...` colon-hex format.                  | No direct OCSF or OTel mapping. gohai convention: `fingerprint_md5`. It is the same as the output format of OpenSSH `-E md5`.                     |
+| `keys[].key_length`         | `int`    | The effective key length in bits (RSA modulus, ECDSA curve, Ed25519). | No direct OCSF or OTel mapping. gohai convention: `key_length`. The unit is bits, the same as OpenSSH's `-b` flag and the `ssh-keygen -l` output. |
 
 ## Platform support
 
-| Platform | Supported                                           |
-| -------- | --------------------------------------------------- |
-| Linux    | ✅                                                  |
-| macOS    | ✅ (same `/etc/ssh/` path, macOS ships OpenSSH)     |
-| Other    | Empty key list (no files found = no keys in output) |
+| Platform | Supported                                                   |
+| -------- | ----------------------------------------------------------- |
+| Linux    | ✅                                                          |
+| macOS    | ✅ (same `/etc/ssh/` path. macOS has OpenSSH)               |
+| Other    | Empty key list (no files found means no keys in the output) |
 
 ## Example output
 
@@ -119,8 +124,8 @@ gohai --collector.ssh       # enable (opt-in)
 gohai --no-collector.ssh    # disable
 ```
 
-This collector is opt-in (`DefaultEnabled: false`) because reading host key
-material is security-sensitive and not needed for general-purpose inventory.
+This collector is opt-in (`DefaultEnabled: false`). Host key material is
+security-sensitive, and a general inventory does not need it.
 
 ## Dependencies
 
@@ -128,42 +133,42 @@ None.
 
 ## Data sources
 
-On Linux and macOS (identical, `/etc/ssh/` is the canonical path on both
-platforms; Ohai's `ssh_host_key.rb` checks `/etc/sshd_config` then falls back to
-well-known paths):
+On Linux and macOS, the steps are the same. `/etc/ssh/` is the standard path on
+both platforms. Ohai's `ssh_host_key.rb` checks `/etc/sshd_config` first, and
+then uses the well-known paths.
 
-1. Check the three well-known host public key files in order:
-   `/etc/ssh/ssh_host_rsa_key.pub`, `/etc/ssh/ssh_host_ecdsa_key.pub`,
-   `/etc/ssh/ssh_host_ed25519_key.pub`. Files that do not exist are silently
-   skipped, a host without a particular key type (e.g. RSA disabled in sshd
-   config) is normal.
-2. For each file found, parse the single-line format:
-   `<type> <base64-wire-blob> [comment]`. Split on whitespace; require at least
-   two fields. A file with fewer fields or non-decodable base64 propagates as an
-   error.
-3. Compute SHA-256 and MD5 fingerprints over the raw wire bytes (RFC 4251 format
-   , the blob decoded from the base64 field). Format SHA-256 as
-   `SHA256:<base64-without-trailing-=>`; format MD5 as colon-separated hex
-   pairs. Both formats match `ssh-keygen -l` output exactly.
-4. Derive key length from the key type:
-   - `ssh-rsa`: parse the wire blob (algorithm name, exponent, modulus) and
-     return `len(modulus) * 8`, stripping any leading zero-byte sign padding.
-   - `ecdsa-sha2-nistp256/384/521`: derive from curve label in the type string
-     (256, 384, or 521).
+1. The collector checks the three well-known host public key files in this
+   order: `/etc/ssh/ssh_host_rsa_key.pub`, `/etc/ssh/ssh_host_ecdsa_key.pub`,
+   `/etc/ssh/ssh_host_ed25519_key.pub`. It skips a file that does not exist, and
+   gives no message. A host without one key type is normal, for example when RSA
+   is disabled in the sshd config.
+2. For each file that it finds, the collector parses the single-line format:
+   `<type> <base64-wire-blob> [comment]`. It splits the line at the whitespace.
+   The line must have at least two fields. If a file has fewer fields, or the
+   base64 does not decode, the collector returns an error.
+3. The collector calculates the SHA-256 and MD5 fingerprints over the raw wire
+   bytes. These bytes are in RFC 4251 format: the blob decoded from the base64
+   field. The SHA-256 format is `SHA256:<base64-without-trailing-=>`. The MD5
+   format is hex pairs with colons between them. Both formats are exactly the
+   same as the `ssh-keygen -l` output.
+4. The collector gets the key length from the key type:
+   - `ssh-rsa`: it parses the wire blob (algorithm name, exponent, modulus). It
+     removes leading zero-byte sign padding and returns `len(modulus) * 8`.
+   - `ecdsa-sha2-nistp256/384/521`: it reads the curve label in the type string
+     (256, 384 or 521).
    - `ssh-ed25519`: always 256.
    - Unknown types: key length 0.
 
-Note: Ohai reads `sshd_config` first to discover which `HostKey` paths are
-configured, then falls back to the well-known paths. gohai reads only the
-well-known paths directly, which covers all standard deployments. Hosts with
-`HostKey` directives pointing to non-standard paths will not have those keys
-reported.
+Note: Ohai reads `sshd_config` first to find the configured `HostKey` paths.
+Then it uses the well-known paths. gohai reads only the well-known paths, which
+is correct for all standard deployments. If a `HostKey` directive points to a
+path that is not standard, gohai does not report that key.
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
-  `memfs` in tests) for the `/etc/ssh/` file reads.
-- Go stdlib `crypto/sha256`, `crypto/md5`, `encoding/binary` for fingerprint
-  computation and wire-format parsing.
-- [`golang.org/x/crypto/ssh`](https://pkg.go.dev/golang.org/x/crypto/ssh) in
-  tests only, for generating real key fixtures.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read the files in
+  `/etc/ssh/`. Production uses `osfs`. Tests use `memfs`.
+- The Go standard library `crypto/sha256`, `crypto/md5` and `encoding/binary` to
+  calculate the fingerprints and parse the wire format.
+- [`golang.org/x/crypto/ssh`](https://pkg.go.dev/golang.org/x/crypto/ssh), in
+  tests only, to make real key fixtures.
