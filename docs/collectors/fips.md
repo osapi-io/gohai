@@ -151,4 +151,5 @@ certificate list. Ohai also does not support macOS.
 
 ## Backing library
 
-- The Go standard library (`os`, `io`). There is no third-party dependency.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for the file reads,
+  through the injected `avfs.VFS`, and the Go standard library.
