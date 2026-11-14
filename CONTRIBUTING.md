@@ -465,7 +465,8 @@ Before you mark a collector as complete, each item below must be true:
     step by step, in OUR voice, not an Ohai parity table), and Backing library.
     **No "Known gaps vs. Ohai" section.** Methodology gaps are GitHub issues
     with the labels `methodology-gap` / `collector:<name>`.
-08. **README.md**: the row of the collector shows `✅ (<backing>)`.
+08. **docs/collectors/README.md**: the row of the collector shows
+    `✅ (<backing>)`.
 09. **Lint clean**: `just go-vet` returns 0 issues.
 10. **The commit message** tells the "why". It names the Ohai and OCSF
     references that gave the implementation, the extensions that we added to the
