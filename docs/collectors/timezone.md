@@ -83,8 +83,8 @@ fmt.Println(tz.Name, tz.Abbrev, tz.Offset)
 ## Enable/disable
 
 ```bash
-gohai --collector.timezone      # enable (default)
-gohai --no-collector.timezone   # disable
+gohai collect --collector.timezone      # enable (default)
+gohai collect --no-collector.timezone   # disable
 ```
 
 ## Dependencies

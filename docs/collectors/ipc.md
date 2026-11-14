@@ -95,8 +95,8 @@ facts, _ := g.Collect(context.Background())
 ## Enable/disable
 
 ```bash
-gohai --collector.ipc      # enable
-gohai --no-collector.ipc   # disable
+gohai collect --collector.ipc      # enable
+gohai collect --no-collector.ipc   # disable
 ```
 
 ## Dependencies

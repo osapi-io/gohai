@@ -85,8 +85,8 @@ if s := facts.Sysconf; s != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.sysconf    # enable (opt-in)
-gohai --no-collector.sysconf # disable
+gohai collect --collector.sysconf    # enable (opt-in)
+gohai collect --no-collector.sysconf # disable
 ```
 
 ## Dependencies

@@ -86,9 +86,9 @@ if facts.DigitalOcean != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.digital_ocean      # enable (opt-in)
-gohai --no-collector.digital_ocean   # disable (default)
-gohai --category=cloud               # pulls this + all cloud collectors
+gohai collect --collector.digital_ocean      # enable (opt-in)
+gohai collect --no-collector.digital_ocean   # disable (default)
+gohai collect --category=cloud               # pulls this + all cloud collectors
 ```
 
 ## Dependencies

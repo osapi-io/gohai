@@ -131,9 +131,9 @@ if facts.OCI != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.oci      # enable (opt-in)
-gohai --no-collector.oci   # disable (default)
-gohai --category=cloud     # pulls this + all cloud collectors
+gohai collect --collector.oci      # enable (opt-in)
+gohai collect --no-collector.oci   # disable (default)
+gohai collect --category=cloud     # pulls this + all cloud collectors
 ```
 
 ## Dependencies

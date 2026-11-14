@@ -77,8 +77,8 @@ Default: **disabled** (opt-in). Docker is not on all hosts. On a host with many
 containers, the commands that list containers can be slow.
 
 ```bash
-gohai --collector.docker          # enable
-gohai --no-collector.docker       # disable
+gohai collect --collector.docker          # enable
+gohai collect --no-collector.docker       # disable
 ```
 
 ## Dependencies

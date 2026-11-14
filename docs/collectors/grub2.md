@@ -81,8 +81,8 @@ if facts.GRUB2 != nil && facts.GRUB2.Environment != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.grub2       # enable (opt-in)
-gohai --no-collector.grub2    # disable
+gohai collect --collector.grub2       # enable (opt-in)
+gohai collect --no-collector.grub2    # disable
 ```
 
 This collector is opt-in (`DefaultEnabled: false`) because not all Linux hosts

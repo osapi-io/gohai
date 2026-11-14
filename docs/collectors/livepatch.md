@@ -108,8 +108,8 @@ if facts.Livepatch != nil && facts.Livepatch.Patches != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.livepatch       # enable (opt-in)
-gohai --no-collector.livepatch    # disable
+gohai collect --collector.livepatch       # enable (opt-in)
+gohai collect --no-collector.livepatch    # disable
 ```
 
 This collector is opt-in (`DefaultEnabled: false`). Livepatch is a special Linux

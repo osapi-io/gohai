@@ -109,8 +109,8 @@ facts, _ := g.Collect(context.Background())
 ## Enable/disable
 
 ```bash
-gohai --collector.block_device      # enable
-gohai --no-collector.block_device   # disable
+gohai collect --collector.block_device      # enable
+gohai collect --no-collector.block_device   # disable
 ```
 
 ## Dependencies

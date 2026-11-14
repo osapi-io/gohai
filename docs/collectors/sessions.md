@@ -97,8 +97,8 @@ for _, s := range facts.Sessions.LoggedIn {
 ## Enable/disable
 
 ```bash
-gohai --collector.sessions      # enable (opt-in)
-gohai --no-collector.sessions   # disable (default)
+gohai collect --collector.sessions      # enable (opt-in)
+gohai collect --no-collector.sessions   # disable (default)
 ```
 
 ## Dependencies

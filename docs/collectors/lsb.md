@@ -66,8 +66,8 @@ if l := facts.LSB; l != nil && l.ID == "Ubuntu" {
 ## Enable/disable
 
 ```bash
-gohai --collector.lsb      # enable (default)
-gohai --no-collector.lsb   # disable
+gohai collect --collector.lsb      # enable (default)
+gohai collect --no-collector.lsb   # disable
 ```
 
 ## Dependencies

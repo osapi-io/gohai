@@ -92,8 +92,8 @@ if entry, ok := facts.Users.Passwd["deploy"]; ok {
 ## Enable/disable
 
 ```bash
-gohai --collector.users      # enable (opt-in)
-gohai --no-collector.users   # disable (default)
+gohai collect --collector.users      # enable (opt-in)
+gohai collect --no-collector.users   # disable (default)
 ```
 
 ## Dependencies

@@ -101,8 +101,8 @@ case "brew":
 ## Enable/disable
 
 ```bash
-gohai --collector.package_mgr      # enable (default)
-gohai --no-collector.package_mgr   # disable
+gohai collect --collector.package_mgr      # enable (default)
+gohai collect --no-collector.package_mgr   # disable
 ```
 
 ## Dependencies

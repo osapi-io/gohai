@@ -82,8 +82,8 @@ fmt.Println(facts.MachineID.ID)
 ## Enable/disable
 
 ```bash
-gohai --collector.machine_id      # enable (default)
-gohai --no-collector.machine_id   # disable
+gohai collect --collector.machine_id      # enable (default)
+gohai collect --no-collector.machine_id   # disable
 ```
 
 ## Dependencies

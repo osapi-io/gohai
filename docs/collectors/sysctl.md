@@ -79,8 +79,8 @@ if s := facts.Sysctl; s != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.sysctl    # enable (opt-in)
-gohai --no-collector.sysctl # disable
+gohai collect --collector.sysctl    # enable (opt-in)
+gohai collect --no-collector.sysctl # disable
 ```
 
 ## Dependencies

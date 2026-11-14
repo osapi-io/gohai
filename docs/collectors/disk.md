@@ -70,8 +70,8 @@ for _, d := range facts.Disk.Devices {
 ## Enable/disable
 
 ```bash
-gohai --collector.disk      # enable (default)
-gohai --no-collector.disk   # disable
+gohai collect --collector.disk      # enable (default)
+gohai collect --no-collector.disk   # disable
 ```
 
 ## Dependencies

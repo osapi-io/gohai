@@ -59,8 +59,8 @@ fmt.Println(info.Name, info.FQDN, info.Domain, info.MachineName)
 ## Enable/disable
 
 ```bash
-gohai --collector.hostname      # enable (default)
-gohai --no-collector.hostname   # disable
+gohai collect --collector.hostname      # enable (default)
+gohai collect --no-collector.hostname   # disable
 ```
 
 ## Dependencies

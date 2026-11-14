@@ -120,8 +120,8 @@ for _, key := range facts.SSH.Keys {
 ## Enable/disable
 
 ```bash
-gohai --collector.ssh       # enable (opt-in)
-gohai --no-collector.ssh    # disable
+gohai collect --collector.ssh       # enable (opt-in)
+gohai collect --no-collector.ssh    # disable
 ```
 
 This collector is opt-in (`DefaultEnabled: false`). Host key material is

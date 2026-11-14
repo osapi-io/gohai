@@ -101,9 +101,9 @@ if _, ok := mods.Modules["suspicious_mod"]; ok {
 ## Enable/disable
 
 ```bash
-gohai --collector.kernel_modules      # enable (opt-in)
-gohai --no-collector.kernel_modules   # disable (default)
-gohai --category=system                # enabling the system category also pulls this in
+gohai collect --collector.kernel_modules      # enable (opt-in)
+gohai collect --no-collector.kernel_modules   # disable (default)
+gohai collect --category=system                # enabling the system category also pulls this in
 ```
 
 ## Dependencies

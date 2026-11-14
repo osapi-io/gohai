@@ -102,9 +102,9 @@ if gpu := facts.GPU; gpu != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.gpu        # enable (opt-in)
-gohai --no-collector.gpu     # disable (default)
-gohai --category=hardware    # pulls in gpu alongside dmi and friends
+gohai collect --collector.gpu        # enable (opt-in)
+gohai collect --no-collector.gpu     # disable (default)
+gohai collect --category=hardware    # pulls in gpu alongside dmi and friends
 ```
 
 ## Dependencies

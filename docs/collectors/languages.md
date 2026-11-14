@@ -59,8 +59,8 @@ Default: **disabled** (opt-in). To find the runtimes, the collector runs six
 commands. This is a large overhead.
 
 ```bash
-gohai --collector.languages       # enable
-gohai --no-collector.languages    # disable
+gohai collect --collector.languages       # enable
+gohai collect --no-collector.languages    # disable
 ```
 
 ## Dependencies

@@ -268,7 +268,7 @@ If the collector status changes, also update `docs/collectors/README.md`.
 go build ./...
 go test ./... -count=1
 just go-vet
-go run . --collector.<name> --pretty
+go run . collect --collector.<name> --pretty
 ```
 
 ## Step 9: commit

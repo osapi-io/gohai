@@ -81,9 +81,9 @@ for addr, d := range facts.SCSI.Devices {
 ## Enable/disable
 
 ```bash
-gohai --collector.scsi      # enable (opt-in)
-gohai --no-collector.scsi   # disable (default)
-gohai --category=hardware   # pulls this + all hardware collectors
+gohai collect --collector.scsi      # enable (opt-in)
+gohai collect --no-collector.scsi   # disable (default)
+gohai collect --category=hardware   # pulls this + all hardware collectors
 ```
 
 ## Dependencies

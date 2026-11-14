@@ -150,8 +150,8 @@ for mitigation, status := range c.Vulnerabilities {
 ## Enable/disable
 
 ```bash
-gohai --collector.cpu      # enable (default)
-gohai --no-collector.cpu   # disable
+gohai collect --collector.cpu      # enable (default)
+gohai collect --no-collector.cpu   # disable
 ```
 
 ## Dependencies

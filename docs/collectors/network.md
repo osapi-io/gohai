@@ -200,8 +200,8 @@ for _, iface := range n.Interfaces {
 ## Enable/disable
 
 ```bash
-gohai --collector.network      # enable (default)
-gohai --no-collector.network   # disable
+gohai collect --collector.network      # enable (default)
+gohai collect --no-collector.network   # disable
 ```
 
 ## Dependencies

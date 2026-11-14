@@ -76,8 +76,8 @@ fmt.Println(facts.RootGroup.Name)
 ## Enable/disable
 
 ```bash
-gohai --collector.root_group      # enable (default)
-gohai --no-collector.root_group   # disable
+gohai collect --collector.root_group      # enable (default)
+gohai collect --no-collector.root_group   # disable
 ```
 
 ## Dependencies

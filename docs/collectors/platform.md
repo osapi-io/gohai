@@ -129,8 +129,8 @@ if p.OS == "darwin" && p.VersionExtra != "" {
 ## Enable/disable
 
 ```bash
-gohai --collector.platform      # enable (default)
-gohai --no-collector.platform   # disable
+gohai collect --collector.platform      # enable (default)
+gohai collect --no-collector.platform   # disable
 ```
 
 ## Dependencies

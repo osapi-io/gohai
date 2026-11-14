@@ -113,9 +113,9 @@ if facts.Azure != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.azure      # enable (opt-in)
-gohai --no-collector.azure   # disable (default)
-gohai --category=cloud       # pulls this + all cloud collectors
+gohai collect --collector.azure      # enable (opt-in)
+gohai collect --no-collector.azure   # disable (default)
+gohai collect --category=cloud       # pulls this + all cloud collectors
 ```
 
 ## Dependencies

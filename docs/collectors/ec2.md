@@ -153,9 +153,9 @@ if facts.Ec2 != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.ec2      # enable (opt-in)
-gohai --no-collector.ec2   # disable (default)
-gohai --category=cloud     # pulls this + all cloud collectors
+gohai collect --collector.ec2      # enable (opt-in)
+gohai collect --no-collector.ec2   # disable (default)
+gohai collect --category=cloud     # pulls this + all cloud collectors
 ```
 
 ## Dependencies

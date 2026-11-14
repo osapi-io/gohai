@@ -63,8 +63,8 @@ Default: **disabled** (opt-in). A full package inventory is slow on hosts with
 thousands of packages.
 
 ```bash
-gohai --collector.packages        # enable
-gohai --no-collector.packages     # disable
+gohai collect --collector.packages        # enable
+gohai collect --no-collector.packages     # disable
 ```
 
 ## Dependencies

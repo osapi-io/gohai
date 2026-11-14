@@ -63,8 +63,8 @@ Default: **disabled** (opt-in). The full list of services can be large, and the
 collector needs systemd.
 
 ```bash
-gohai --collector.services        # enable
-gohai --no-collector.services     # disable
+gohai collect --collector.services        # enable
+gohai collect --no-collector.services     # disable
 ```
 
 ## Dependencies

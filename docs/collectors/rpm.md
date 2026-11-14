@@ -86,8 +86,8 @@ if facts.RPM != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.rpm       # enable (opt-in)
-gohai --no-collector.rpm    # disable
+gohai collect --collector.rpm       # enable (opt-in)
+gohai collect --no-collector.rpm    # disable
 ```
 
 This collector is opt-in (`DefaultEnabled: false`). It starts a subprocess, and

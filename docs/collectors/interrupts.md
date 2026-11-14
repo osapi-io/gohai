@@ -87,8 +87,8 @@ facts, _ := g.Collect(context.Background())
 ## Enable/disable
 
 ```bash
-gohai --collector.interrupts      # enable
-gohai --no-collector.interrupts   # disable
+gohai collect --collector.interrupts      # enable
+gohai collect --no-collector.interrupts   # disable
 ```
 
 ## Dependencies

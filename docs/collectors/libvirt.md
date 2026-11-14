@@ -96,8 +96,8 @@ if lv := facts.Libvirt; lv != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.libvirt    # enable (opt-in)
-gohai --no-collector.libvirt # disable
+gohai collect --collector.libvirt    # enable (opt-in)
+gohai collect --no-collector.libvirt # disable
 ```
 
 `DefaultEnabled` is `false`, because only KVM hypervisor hosts have libvirt.
