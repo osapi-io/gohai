@@ -9,8 +9,8 @@ product identity. On Linux, the data comes from `/sys/class/dmi/id/*` through
 [ghw]. ghw reads the sysfs entries that the kernel makes available. Most fields
 do not need root. `product_serial` and `product_uuid` have mode 0400, so they
 are empty for a caller that is not root. macOS has no equivalent of SMBIOS. On
-macOS, the collector returns an empty Info, and the `hardware` collector
-(planned) gives the macOS hardware identity.
+macOS, the collector returns an empty Info, and the [`hardware`](hardware.md)
+collector gives the macOS hardware identity.
 
 The main consumers are the cloud-provider collectors (`gce`, `ec2`, `azure` and
 others). They use `product.name`, `product.vendor_name`, `bios.manufacturer` and
@@ -173,8 +173,8 @@ On Linux:
 
 macOS does not make SMBIOS or DMI data available. The Linux DMI driver has no
 Darwin equivalent. The collector returns an empty Info, so consumers can check
-`facts.DMI.Product` without a branch for each OS. The planned `hardware`
-collector will give the macOS hardware identity through IOKit, `ioreg` and
+`facts.DMI.Product` without a branch for each OS. The [`hardware`](hardware.md)
+collector gives the macOS hardware identity through IOKit, `ioreg` and
 `system_profiler`.
 
 Ohai's `dmi` plugin runs `dmidecode`. `dmidecode` reads `/dev/mem` and gives the
@@ -183,8 +183,8 @@ method of gohai gives only the four types that sysfs makes available: BIOS,
 baseboard, chassis and product. This is an intentional tradeoff, so that gohai
 operates without root and in containers. Some useful types are not in this
 collector. Other collectors already give some of them: processor details are in
-`cpu`, PCI slots are in the planned `pci`, and DIMMs are partially in `memory`.
-No consumer has asked for the others (cooling devices, PSU, OEM strings). If a
+`cpu`, PCI slots are in [`pci`](pci.md), and DIMMs are partially in `memory`. No
+consumer has asked for the others (cooling devices, PSU, OEM strings). If a
 consumer needs them, an opt-in path through `dmidecode` and `internal/executor`
 is possible.
 
