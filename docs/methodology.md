@@ -130,9 +130,8 @@ Methodology gaps between gohai and Ohai are GitHub issues with the labels
 
 1. Run `gh issue view <N>`. Read all of it, and specially the "Doc after this
    fix lands" block.
-2. Make the code change as the "Proposed fix" tells. If Phase 1 is complete, use
-   the VFS / Executor abstractions. If not, use the `export_test.go` + private
-   var + `Set<X>Fn` pattern.
+2. Make the code change as the "Proposed fix" tells. Use the VFS and Executor
+   abstractions.
 3. Paste the "Doc after this fix lands" block of the issue into the collector
    page. Replace Description / Collected Fields / Data Sources as the block
    tells.
