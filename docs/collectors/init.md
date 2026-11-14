@@ -95,4 +95,4 @@ system. Ohai's `init_package.rb` is for Linux only and returns nothing on macOS.
 ## Backing library
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for the file reads,
-  through then injected `avfs.VFS`, and the Go standard library.
+  through the injected `avfs.VFS`, and the Go standard library.
