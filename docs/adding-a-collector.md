@@ -255,12 +255,10 @@ the labels `methodology-gap` / `collector:<name>`.
 
 Use `docs/collectors/shells.md` as the canonical template.
 
-## Step 7: update `README.md`
+## Step 7: update `docs/collectors/README.md`
 
-Change the "Implemented" column from 🚧 to ✅, with the library in parentheses:
-`✅ (gopsutil)`, `✅ (stdlib)`.
-
-If the collector status changes, also update `docs/collectors/README.md`.
+In `docs/collectors/README.md`, change the "Implemented" column of the collector
+from 🚧 to ✅, with the library in parentheses: `✅ (gopsutil)`, `✅ (stdlib)`.
 
 ## Step 8: verify
 
