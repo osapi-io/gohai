@@ -10,9 +10,9 @@ at the block-device layer. Use it to find saturated disks and unbalanced I/O
 across NVMe devices, and to see the storage workload over time.
 
 Note: this collector reports **I/O counters only**. The physical device metadata
-(model, vendor, serial, rotational, block sizes) will come from a future
-`block_device` collector that wraps `ghw/block`. A separate item tracks that
-collector. Ohai splits these the same way.
+(model, vendor, serial, rotational, block sizes) comes from the
+[`block_device`](block_device.md) collector, which reads sysfs. Ohai splits
+these the same way.
 
 ## Collected fields
 
@@ -93,9 +93,9 @@ On macOS:
    example `disk0`.
 
 This collector does not report the physical device metadata (model, vendor,
-serial, rotational, block sizes). The planned `block_device` collector, which
-uses `ghw/block`, will report it. Ohai splits the two topics the same way. Ohai
-has no `diskstats` data, and `linux/block_device.rb` reads only the sysfs device
+serial, rotational, block sizes). The [`block_device`](block_device.md)
+collector reports it. Ohai splits the two topics the same way. Ohai has no
+`diskstats` data, and `linux/block_device.rb` reads only the sysfs device
 metadata.
 
 ## Backing library
