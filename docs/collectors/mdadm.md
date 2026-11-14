@@ -99,8 +99,9 @@ None.
 Ohai's `linux/mdadm.rb` reads `/proc/mdstat` to find the arrays and parses the
 lists of member and spare disks. gohai uses the same method for `/proc/mdstat`.
 gohai also runs `mdadm --detail`, if it is available, to get the UUID, the state
-and the disk counts. Ohai does not do this. If `mdadm` is not installed, gohai
-still reports the arrays with the data from `/proc/mdstat` only.
+and the disk counts. Ohai does the same (`mdadm --detail /dev/<device>`). If
+`mdadm` is not installed, gohai still reports the arrays with the data from
+`/proc/mdstat` only.
 
 On Linux:
 
