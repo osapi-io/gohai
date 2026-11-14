@@ -117,4 +117,5 @@ different host. The Description section also tells this.
 
 - [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) for
   the primary read of the machine ID and DMI. On Linux, the
-  `/var/lib/dbus/machine-id` fallback is a gohai `os.ReadFile` call.
+  `/var/lib/dbus/machine-id` fallback reads the file through the injected
+  `avfs.VFS` (`FS.ReadFile`).
