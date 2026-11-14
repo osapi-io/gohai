@@ -75,16 +75,14 @@ collector.
 3. **Xen:** `/proc/xen` and `/proc/xen/capabilities`.
 4. ...
 
-````
-
-Name Ohai in the text only when a specific method choice needs attribution
-("we use the same legacy `/etc/*-release` fallback chain as Ohai"). The section
-is a spec of OUR behavior, not a diff against Ohai.
+Name Ohai in the text only when a specific method choice needs attribution ("we
+use the same legacy `/etc/*-release` fallback chain as Ohai"). The section is a
+spec of OUR behavior, not a diff against Ohai.
 
 **`Known gaps vs. Ohai` is NOT a permanent section.** Methodology gaps are
 GitHub issues with the labels `methodology-gap` and `collector:<name>`. Each
-issue has a "Doc after this fix lands" block. This block has the exact text
-that the fix PR pastes into the Data Sources section. When all open methodology
+issue has a "Doc after this fix lands" block. This block has the exact text that
+the fix PR pastes into the Data Sources section. When all open methodology
 issues of a collector close, the page has no Ohai comparisons that remain. For
 the full workflow, refer to the "Methodology work" section below.
 
@@ -101,7 +99,7 @@ The collector reports N related signals:
   for the consumer.
 - `<field>` — same, including when this signal and the one above can disagree
   and what that disagreement tells you.
-````
+```
 
 Signals tell the **meaning** of fields, not the structure. Use them when a
 consumer can ask "which of these fields do I look at for X?". The Signals
