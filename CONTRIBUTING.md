@@ -107,7 +107,8 @@ just deps
     subcommand.
   - `field-mapping.md`. The tier mapping of each field (OCSF/OTel/ convention),
     with citations. It has 950 rows.
-  - `ocsf-gaps.md`. 82 candidates for upstream OCSF PRs.
+  - `ocsf-gaps.md`. The candidates for upstream OCSF PRs, from the audit that
+    the page gives the date of.
 - **`internal/platform/`.** The OS and distribution detection. It wraps
   gopsutil. `Detect()` is a `var` that tests can replace. Thus collector tests
   can force each branch and do not import gopsutil. `hostInfoFn` is private.
