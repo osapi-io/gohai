@@ -7,6 +7,10 @@ now. Each entry is a candidate for an upstream OCSF PR to
 **Source:** an audit of the full codebase, all 1303 JSON fields in 62
 collectors. **OCSF version:** 1.8.0. **Date:** 2026-05-23.
 
+The counts on this page are from that audit. The audit counted each JSON field
+in the source. `field-mapping.md` has one row for each mapped field, 950 rows
+today, and it is the current source.
+
 ______________________________________________________________________
 
 ## Summary
@@ -125,7 +129,7 @@ concept:
 - `chassis_type`. OTel `hw.enclosure.type`
 - `pci.driver`. OTel `hw.driver_version`
 
-### Excluded from candidates (~1006 fields)
+### Excluded from candidates
 
 | Reason                                                | Count |
 | ----------------------------------------------------- | ----- |
