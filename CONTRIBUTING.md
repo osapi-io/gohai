@@ -413,11 +413,10 @@ them. The pinned tool is `go.uber.org/mock`, the maintained fork of the archived
 
 ### Migration status
 
-All new code and new collectors MUST use these abstractions. Some collectors
-still use the legacy `ReadFileFn` / `RunCmdFn` struct-field pattern. They move
-to the new pattern when methodology work changes them. The canonical references
-are `pkg/gohai/collectors/shells/` (VFS only) and
-`pkg/gohai/collectors/platform/` (VFS + Executor).
+All collectors use these abstractions. No Go file has the old `ReadFileFn` or
+`RunCmdFn` struct fields. All new code and new collectors use them too. The
+references are `pkg/gohai/collectors/shells/` (VFS only) and
+`pkg/gohai/collectors/platform/` (VFS and Executor).
 
 ## Adding a new collector
 
