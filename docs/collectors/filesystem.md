@@ -145,7 +145,8 @@ Ohai's `filesystem.rb` combines the output of `mount`, `df` and `lsblk`. It
 makes a view of each device with the mount points, the capacity and the
 filesystem types. gohai uses gopsutil instead. gopsutil reads `/proc/mounts` and
 calls `statfs` directly. The data is the same, but the parse is different. gohai
-also adds btrfs subvolume data and ZFS dataset properties, through VFS reads.
+also adds btrfs allocation data, which it reads through VFS, and ZFS dataset
+properties, which it gets from the `zfs` command.
 
 On Linux:
 
@@ -169,7 +170,7 @@ On Linux:
 5. **Btrfs allocation data**. For each mount with `type == "btrfs"` and a UUID,
    the collector reads `/sys/fs/btrfs/<uuid>/allocation/` through the injected
    `avfs.VFS`. It fills the `btrfs` sub-record of the mount: the byte counters
-   (`total`, `used`, `reserved`) of each block group (`data`, `metadata`,
+   (`total_bytes`, `bytes_used`) of each block group (`data`, `metadata`,
    `system`), and the set of RAID profile flags (`single`, `raid0`, `raid1`,
    `raid10`, `raid5`, `raid6`, `dup`). If the sysfs paths are missing (older
    kernels, containers without a mounted /sys), the collector skips this data
