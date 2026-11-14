@@ -125,7 +125,7 @@ On macOS:
    is rare. Some CI sandboxes have it.
 2. `abbrev` and `offset` come from `time.Now().Zone()`, the same as on Linux.
 
-gohai reports more than Ohai's `time.rb`, which reports only
+gohai reports more than Ohai's `timezone.rb`, which reports only
 `Time.now.getlocal.zone` (the abbreviation). gohai also reports the IANA name
 (`America/Los_Angeles`, not only `PDT`) and the numeric offset.
 
