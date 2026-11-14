@@ -28,7 +28,7 @@ The symptom is a check that fails here but passes in CI, on a file that nobody
 changed. If this occurs, find the version that ran. Do this before you accept
 the failure as real.
 
-## Before writing a collector
+## Before you write a collector
 
 Read [docs/methodology.md](docs/methodology.md) before you write or change a
 collector. These parts of it are mandatory:
