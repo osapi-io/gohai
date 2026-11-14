@@ -581,4 +581,5 @@ Open a [Discussion] on GitHub.
 [just]: https://just.systems
 [mdformat]: https://pypi.org/project/mdformat/
 [mise]: https://mise.jdx.dev
+[otel-semconv]: https://opentelemetry.io/docs/specs/semconv/resource/
 [uv]: https://docs.astral.sh/uv/
