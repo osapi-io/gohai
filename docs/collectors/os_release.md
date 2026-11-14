@@ -84,8 +84,8 @@ if r := facts.OSRelease; r != nil && r.ID == "ubuntu" {
 ## Enable/disable
 
 ```bash
-gohai --collector.os_release      # enable (default)
-gohai --no-collector.os_release   # disable
+gohai collect --collector.os_release      # enable (default)
+gohai collect --no-collector.os_release   # disable
 ```
 
 ## Dependencies

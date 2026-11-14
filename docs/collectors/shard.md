@@ -58,8 +58,8 @@ fmt.Printf("this host runs at minute %d of every hour\n", bucket)
 ## Enable/disable
 
 ```bash
-gohai --collector.shard      # enable (default)
-gohai --no-collector.shard   # disable
+gohai collect --collector.shard      # enable (default)
+gohai collect --no-collector.shard   # disable
 ```
 
 ## Dependencies

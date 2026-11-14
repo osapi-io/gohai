@@ -116,8 +116,8 @@ methods to enable them:
 
 ```bash
 # CLI
-gohai --category=cloud
-gohai --collector.ec2 --collector.gce
+gohai collect --category=cloud
+gohai collect --collector.ec2 --collector.gce
 
 # SDK
 gohai.New(gohai.WithCategory("cloud"))

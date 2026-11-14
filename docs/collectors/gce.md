@@ -198,9 +198,9 @@ if facts.Gce != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.gce      # enable (opt-in)
-gohai --no-collector.gce   # disable (default)
-gohai --category=cloud     # pulls gce + dmi + other cloud collectors as they land
+gohai collect --collector.gce      # enable (opt-in)
+gohai collect --no-collector.gce   # disable (default)
+gohai collect --category=cloud     # pulls gce + dmi + other cloud collectors as they land
 ```
 
 The collector is opt-in. On a host that is not on GCE, a request to the metadata

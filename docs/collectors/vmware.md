@@ -107,8 +107,8 @@ if vm := facts.VMware; vm != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.vmware    # enable (opt-in)
-gohai --no-collector.vmware # disable
+gohai collect --collector.vmware    # enable (opt-in)
+gohai collect --no-collector.vmware # disable
 ```
 
 DefaultEnabled: `false`. Not all hosts have VMware Tools. A caller must enable

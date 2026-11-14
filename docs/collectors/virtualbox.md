@@ -69,8 +69,8 @@ if vb := facts.VirtualBox; vb != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.virtualbox    # enable (opt-in)
-gohai --no-collector.virtualbox # disable
+gohai collect --collector.virtualbox    # enable (opt-in)
+gohai collect --no-collector.virtualbox # disable
 ```
 
 DefaultEnabled: `false`. Most hosts do not have VirtualBox Guest Additions. A

@@ -105,9 +105,9 @@ if facts.Scaleway != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.scaleway      # enable (opt-in)
-gohai --no-collector.scaleway   # disable (default)
-gohai --category=cloud          # pulls this + all cloud collectors
+gohai collect --collector.scaleway      # enable (opt-in)
+gohai collect --no-collector.scaleway   # disable (default)
+gohai collect --category=cloud          # pulls this + all cloud collectors
 ```
 
 ## Dependencies

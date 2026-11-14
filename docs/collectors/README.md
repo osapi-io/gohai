@@ -8,14 +8,14 @@ collector gathers one category of information and returns a typed Go struct.
 You enable or disable each collector with a flag in the node_exporter style:
 
 ```bash
-gohai --collector.platform --no-collector.cloud
+gohai collect --collector.platform --no-collector.cloud
 ```
 
 To enable all collectors of a **category**, use `--category` (CLI) or
 `WithCategory(...)` (SDK):
 
 ```bash
-gohai --category=cloud --category=hardware
+gohai collect --category=cloud --category=hardware
 ```
 
 ```go

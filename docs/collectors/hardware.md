@@ -149,9 +149,9 @@ if h := facts.Hardware; h != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.hardware      # enable (opt-in)
-gohai --no-collector.hardware   # disable (default)
-gohai --category=hardware       # pulls this + all hardware collectors
+gohai collect --collector.hardware      # enable (opt-in)
+gohai collect --no-collector.hardware   # disable (default)
+gohai collect --category=hardware       # pulls this + all hardware collectors
 ```
 
 ## Dependencies

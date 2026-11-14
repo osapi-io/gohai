@@ -82,9 +82,9 @@ if facts.OpenStack != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.openstack      # enable (opt-in)
-gohai --no-collector.openstack   # disable (default)
-gohai --category=cloud           # pulls this + all cloud collectors
+gohai collect --collector.openstack      # enable (opt-in)
+gohai collect --no-collector.openstack   # disable (default)
+gohai collect --category=cloud           # pulls this + all cloud collectors
 ```
 
 ## Dependencies

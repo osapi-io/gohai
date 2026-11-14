@@ -71,8 +71,8 @@ case "launchd":
 ## Enable/disable
 
 ```bash
-gohai --collector.init      # enable (default)
-gohai --no-collector.init   # disable
+gohai collect --collector.init      # enable (default)
+gohai collect --no-collector.init   # disable
 ```
 
 ## Dependencies

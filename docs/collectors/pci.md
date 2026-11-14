@@ -86,9 +86,9 @@ for addr, d := range facts.PCI.Devices {
 ## Enable/disable
 
 ```bash
-gohai --collector.pci      # enable (opt-in)
-gohai --no-collector.pci   # disable (default)
-gohai --category=hardware  # pulls this + all hardware collectors
+gohai collect --collector.pci      # enable (opt-in)
+gohai collect --no-collector.pci   # disable (default)
+gohai collect --category=hardware  # pulls this + all hardware collectors
 ```
 
 ## Dependencies

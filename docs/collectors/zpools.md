@@ -97,8 +97,8 @@ facts, _ := g.Collect(context.Background())
 ## Enable/disable
 
 ```bash
-gohai --collector.zpools      # enable
-gohai --no-collector.zpools   # disable
+gohai collect --collector.zpools      # enable
+gohai collect --no-collector.zpools   # disable
 ```
 
 ## Dependencies

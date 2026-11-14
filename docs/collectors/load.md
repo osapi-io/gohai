@@ -74,8 +74,8 @@ if perCore > 1.0 {
 ## Enable/disable
 
 ```bash
-gohai --collector.load      # enable (default)
-gohai --no-collector.load   # disable
+gohai collect --collector.load      # enable (default)
+gohai collect --no-collector.load   # disable
 ```
 
 ## Dependencies

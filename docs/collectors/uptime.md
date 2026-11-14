@@ -82,8 +82,8 @@ fmt.Printf("up %s since %d\n", u.Human, u.BootTime)
 ## Enable/disable
 
 ```bash
-gohai --collector.uptime      # enable (default)
-gohai --no-collector.uptime   # disable
+gohai collect --collector.uptime      # enable (default)
+gohai collect --no-collector.uptime   # disable
 ```
 
 ## Dependencies

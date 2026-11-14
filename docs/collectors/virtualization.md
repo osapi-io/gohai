@@ -105,8 +105,8 @@ for name, role := range v.Systems {
 ## Enable/disable
 
 ```bash
-gohai --collector.virtualization      # enable (default)
-gohai --no-collector.virtualization   # disable
+gohai collect --collector.virtualization      # enable (default)
+gohai collect --no-collector.virtualization   # disable
 ```
 
 ## Dependencies

@@ -137,9 +137,9 @@ gohai.New(gohai.WithCategory("hardware"))  // pulls dmi + cpu + memory + disk + 
 ## Enable/disable
 
 ```bash
-gohai --collector.dmi      # enable (opt-in)
-gohai --no-collector.dmi   # disable (default)
-gohai --category=hardware  # pulls dmi + other hardware collectors
+gohai collect --collector.dmi      # enable (opt-in)
+gohai collect --no-collector.dmi   # disable (default)
+gohai collect --category=hardware  # pulls dmi + other hardware collectors
 ```
 
 The collector is opt-in because most consumers need DMI only indirectly. When a

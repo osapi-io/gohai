@@ -120,9 +120,9 @@ if facts.Alibaba != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.alibaba      # enable (opt-in)
-gohai --no-collector.alibaba   # disable (default)
-gohai --category=cloud         # pulls this + all cloud collectors
+gohai collect --collector.alibaba      # enable (opt-in)
+gohai collect --no-collector.alibaba   # disable (default)
+gohai collect --category=cloud         # pulls this + all cloud collectors
 ```
 
 ## Dependencies

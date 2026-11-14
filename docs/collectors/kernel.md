@@ -117,8 +117,8 @@ if k.RosettaTranslated {
 ## Enable/disable
 
 ```bash
-gohai --collector.kernel      # enable (default)
-gohai --no-collector.kernel   # disable
+gohai collect --collector.kernel      # enable (default)
+gohai collect --no-collector.kernel   # disable
 ```
 
 ## Dependencies

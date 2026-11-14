@@ -69,8 +69,8 @@ if c := facts.Command; c != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.command    # enable (opt-in)
-gohai --no-collector.command # disable
+gohai collect --collector.command    # enable (opt-in)
+gohai collect --no-collector.command # disable
 ```
 
 ## Dependencies

@@ -113,8 +113,8 @@ if facts.SELinux != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.selinux       # enable (opt-in)
-gohai --no-collector.selinux    # disable
+gohai collect --collector.selinux       # enable (opt-in)
+gohai collect --no-collector.selinux    # disable
 ```
 
 This collector is opt-in (`DefaultEnabled: false`). On some kernel

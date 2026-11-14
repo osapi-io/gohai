@@ -78,8 +78,8 @@ if sp := facts.SystemdPaths; sp != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.systemd_paths    # enable (opt-in)
-gohai --no-collector.systemd_paths # disable
+gohai collect --collector.systemd_paths    # enable (opt-in)
+gohai collect --no-collector.systemd_paths # disable
 ```
 
 ## Dependencies

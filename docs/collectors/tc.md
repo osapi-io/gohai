@@ -67,8 +67,8 @@ Default: **disabled** (opt-in). The collector needs iproute2 (`tc`). Not all
 container images and embedded distributions have iproute2.
 
 ```bash
-gohai --collector.tc              # enable
-gohai --no-collector.tc           # disable
+gohai collect --collector.tc              # enable
+gohai collect --no-collector.tc           # disable
 ```
 
 ## Dependencies

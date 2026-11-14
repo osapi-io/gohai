@@ -119,8 +119,8 @@ if f.Kernel.Enabled && (f.Policy == nil || f.Policy.FIPSEffective) {
 ## Enable/disable
 
 ```bash
-gohai --collector.fips      # enable (default)
-gohai --no-collector.fips   # disable
+gohai collect --collector.fips      # enable (default)
+gohai collect --no-collector.fips   # disable
 ```
 
 ## Dependencies

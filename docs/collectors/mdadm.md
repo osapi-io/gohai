@@ -86,8 +86,8 @@ facts, _ := g.Collect(context.Background())
 ## Enable/disable
 
 ```bash
-gohai --collector.mdadm      # enable
-gohai --no-collector.mdadm   # disable
+gohai collect --collector.mdadm      # enable
+gohai collect --no-collector.mdadm   # disable
 ```
 
 ## Dependencies

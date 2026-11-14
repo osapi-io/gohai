@@ -110,8 +110,8 @@ for _, p := range facts.Shells.Paths {
 ## Enable/disable
 
 ```bash
-gohai --collector.shells      # enable (default)
-gohai --no-collector.shells   # disable
+gohai collect --collector.shells      # enable (default)
+gohai collect --no-collector.shells   # disable
 ```
 
 ## Dependencies

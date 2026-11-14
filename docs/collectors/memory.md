@@ -172,8 +172,8 @@ if m.Compressed > 0 {
 ## Enable/disable
 
 ```bash
-gohai --collector.memory      # enable (default)
-gohai --no-collector.memory   # disable
+gohai collect --collector.memory      # enable (default)
+gohai collect --no-collector.memory   # disable
 ```
 
 ## Dependencies

@@ -63,9 +63,9 @@ if facts.Linode != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.linode      # enable (opt-in)
-gohai --no-collector.linode   # disable (default)
-gohai --category=cloud        # pulls this + all cloud collectors
+gohai collect --collector.linode      # enable (opt-in)
+gohai collect --no-collector.linode   # disable (default)
+gohai collect --category=cloud        # pulls this + all cloud collectors
 ```
 
 ## Dependencies

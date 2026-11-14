@@ -131,8 +131,8 @@ for _, u := range facts.Filesystem.Unmounted {
 ## Enable/disable
 
 ```bash
-gohai --collector.filesystem      # enable (default)
-gohai --no-collector.filesystem   # disable
+gohai collect --collector.filesystem      # enable (default)
+gohai collect --no-collector.filesystem   # disable
 ```
 
 ## Dependencies

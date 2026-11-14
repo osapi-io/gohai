@@ -83,8 +83,8 @@ if h := facts.Hostnamectl; h != nil {
 ## Enable/disable
 
 ```bash
-gohai --collector.hostnamectl    # enable (opt-in)
-gohai --no-collector.hostnamectl # disable
+gohai collect --collector.hostnamectl    # enable (opt-in)
+gohai collect --no-collector.hostnamectl # disable
 ```
 
 ## Dependencies
