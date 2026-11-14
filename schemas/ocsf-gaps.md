@@ -1,11 +1,11 @@
 # OCSF gap report
 
-Fields where gohai collects data that OCSF does not currently model. Each entry
-is a candidate for an upstream OCSF PR to
+This page lists the fields where gohai collects data that OCSF does not model
+now. Each entry is a candidate for an upstream OCSF PR to
 [ocsf/ocsf-schema](https://github.com/ocsf/ocsf-schema).
 
-**Generated from:** full codebase audit of all 1303 JSON fields across 62
-collectors **OCSF version:** 1.8.0 **Date:** 2026-05-23
+**Source:** an audit of the full codebase, all 1303 JSON fields in 62
+collectors. **OCSF version:** 1.8.0. **Date:** 2026-05-23.
 
 ______________________________________________________________________
 
@@ -47,38 +47,38 @@ ______________________________________________________________________
 
 ### Upstream tracking
 
-| #   | Candidate                             | Status                  | OCSF Issue                                               | OCSF PR                                                |
-| --- | ------------------------------------- | ----------------------- | -------------------------------------------------------- | ------------------------------------------------------ |
-| —   | `cpu_info` object (prerequisite)      | ✅ Submitted (not ours) | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
-| 1   | `cpu_info.vulnerabilities`            | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
-| 2   | New `kernel_module` object            | 📋 Ready to submit      | —                                                        | —                                                      |
-| 3   | New `security_posture` object         | 📋 Ready to submit      | —                                                        | —                                                      |
-| 4   | `cpu_info.flags`                      | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
-| 5   | `network_interface.interface_flags`   | ✅ Submitted            | [#1646](https://github.com/ocsf/ocsf-schema/issues/1646) | [#1647](https://github.com/ocsf/ocsf-schema/pull/1647) |
-| 6   | `cloud.security_groups`               | 📋 Ready to submit      | —                                                        | —                                                      |
-| 7   | `cloud.iam_role` / `service_accounts` | 📋 Ready to submit      | —                                                        | —                                                      |
-| 8   | New `ssh_host_key` object             | 📋 Ready to submit      | —                                                        | —                                                      |
-| 9   | New `routing_entry` object            | 📋 Ready to submit      | —                                                        | —                                                      |
-| 10  | New `neighbor_entry` object           | 📋 Ready to submit      | —                                                        | —                                                      |
-| 11  | `cloud.vpc_id` / `subnet_id`          | 📋 Ready to submit      | —                                                        | —                                                      |
-| 12  | `cloud.encryption_at_host`            | 📋 Ready to submit      | —                                                        | —                                                      |
-| 13  | `cpu_info.vendor_id`                  | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
-| 14  | `cpu_info.family`                     | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
-| 15  | `cpu_info.model_id`                   | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
-| 16  | `cpu_info.stepping`                   | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
-| 17  | `os.distribution_id`                  | 📋 Ready to submit      | —                                                        | —                                                      |
-| 18  | `os.distribution_family`              | 📋 Ready to submit      | —                                                        | —                                                      |
-| 19  | `session.terminal`                    | 📋 Ready to submit      | —                                                        | —                                                      |
-| 20  | `session.remote_host`                 | 📋 Ready to submit      | —                                                        | —                                                      |
+| #    | Candidate                             | Status                  | OCSF Issue                                               | OCSF PR                                                |
+| ---- | ------------------------------------- | ----------------------- | -------------------------------------------------------- | ------------------------------------------------------ |
+| None | `cpu_info` object (prerequisite)      | ✅ Submitted (not ours) | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 1    | `cpu_info.vulnerabilities`            | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 2    | New `kernel_module` object            | 📋 Ready to submit      | None                                                     | None                                                   |
+| 3    | New `security_posture` object         | 📋 Ready to submit      | None                                                     | None                                                   |
+| 4    | `cpu_info.flags`                      | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 5    | `network_interface.interface_flags`   | ✅ Submitted            | [#1646](https://github.com/ocsf/ocsf-schema/issues/1646) | [#1647](https://github.com/ocsf/ocsf-schema/pull/1647) |
+| 6    | `cloud.security_groups`               | 📋 Ready to submit      | None                                                     | None                                                   |
+| 7    | `cloud.iam_role` / `service_accounts` | 📋 Ready to submit      | None                                                     | None                                                   |
+| 8    | New `ssh_host_key` object             | 📋 Ready to submit      | None                                                     | None                                                   |
+| 9    | New `routing_entry` object            | 📋 Ready to submit      | None                                                     | None                                                   |
+| 10   | New `neighbor_entry` object           | 📋 Ready to submit      | None                                                     | None                                                   |
+| 11   | `cloud.vpc_id` / `subnet_id`          | 📋 Ready to submit      | None                                                     | None                                                   |
+| 12   | `cloud.encryption_at_host`            | 📋 Ready to submit      | None                                                     | None                                                   |
+| 13   | `cpu_info.vendor_id`                  | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 14   | `cpu_info.family`                     | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 15   | `cpu_info.model_id`                   | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 16   | `cpu_info.stepping`                   | ⏳ Blocked on #1630     | [#1572](https://github.com/ocsf/ocsf-schema/issues/1572) | [#1630](https://github.com/ocsf/ocsf-schema/pull/1630) |
+| 17   | `os.distribution_id`                  | 📋 Ready to submit      | None                                                     | None                                                   |
+| 18   | `os.distribution_family`              | 📋 Ready to submit      | None                                                     | None                                                   |
+| 19   | `session.terminal`                    | 📋 Ready to submit      | None                                                     | None                                                   |
+| 20   | `session.remote_host`                 | 📋 Ready to submit      | None                                                     | None                                                   |
 
 ### Upstream activity to watch
 
 [ocsf/ocsf-schema#1630](https://github.com/ocsf/ocsf-schema/pull/1630) adds a
-new `cpu_info` object to OCSF, deprecating the flat `cpu_*` attributes on
-`device_hw_info`. Once it merges, our CPU gap candidates (#1, #4, #13–16 below)
-should target the new `cpu_info` object rather than the deprecated flat
-attributes. Our OCSF output (`pkg/gohai/ocsf/device.go` `DeviceHWInfo` struct)
-will also need updating to match the new object shape.
+new `cpu_info` object to OCSF. It deprecates the flat `cpu_*` attributes on
+`device_hw_info`. When it merges, the gohai CPU gap candidates (#1, #4 and #13
+to #16 below) must target the new `cpu_info` object, not the deprecated flat
+attributes. The gohai OCSF output (the `DeviceHWInfo` struct in
+`pkg/gohai/ocsf/device.go`) must then change to the new object shape.
 
 ### Top 20 OCSF upstream PR candidates (ranked)
 
@@ -111,13 +111,13 @@ will also need updating to match the new object shape.
 
 ### OTel precedent candidates
 
-These have the highest chance of OCSF acceptance because OTel has already
-established the concept:
+OCSF is most likely to accept these candidates, because OTel already has the
+concept:
 
 - `instance_type`. OTel `host.type`
 - `cpu_vendor_id` / `cpu_family` / `cpu_model_id` / `cpu_stepping`. OTel
   `host.cpu.*`
-- `cpu_caches` L1/L3. OTel has L2 via `host.cpu.cache.l2.size`
+- `cpu_caches` L1/L3. OTel has L2 through `host.cpu.cache.l2.size`
 - `uptime_seconds`. OTel `system.uptime`
 - `process_count`. OTel `system.process.count`
 - `interface_speed`. OTel `hw.network.bandwidth.limit`
@@ -147,99 +147,99 @@ ______________________________________________________________________
 
 ### fqdn (`hostname.fqdn`)
 
-- **What:** Fully qualified domain name
-- **Security relevance:** Primary host identity in configuration management;
-  asset correlation key in SIEMs; DNS-based threat detection
+- **What:** Fully qualified domain name.
+- **Security relevance:** Primary host identity in configuration management.
+  Asset correlation key in SIEMs. DNS-based threat detection.
 - **OCSF object:** `device`
-- **OTel precedent:** `host.name` may contain FQDN but doesn't break it out
+- **OTel precedent:** `host.name` may contain FQDN but does not break it out.
 - **gohai type:** `string` / `"fqdn"`
 
 ### timezone_name (`timezone.name`)
 
-- **What:** IANA timezone name (e.g., "America/New_York")
-- **Security relevance:** Anomaly detection ("login at 3 AM local time?");
-  compliance auditing (all servers UTC?); fleet segmentation
+- **What:** IANA timezone name (for example, "America/New_York").
+- **Security relevance:** Anomaly detection ("login at 3 AM local time?").
+  Compliance auditing (all servers UTC?). Fleet segmentation.
 - **OCSF object:** `device`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"name"`
 
 ### timezone_offset (`timezone.offset`)
 
-- **What:** Current UTC offset in seconds
-- **Security relevance:** Programmatic timezone math for event correlation
+- **What:** Current UTC offset in seconds.
+- **Security relevance:** Programmatic timezone math for event correlation.
 - **OCSF object:** `device`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `int` / `"offset"`
 
 ### init_system (`init.name`)
 
-- **What:** Init system name (systemd, launchd, upstart, sysvinit)
-- **Security relevance:** Determines service management capabilities; CIS
-  benchmark applicability differs by init system
+- **What:** Init system name (systemd, launchd, upstart, sysvinit).
+- **Security relevance:** Determines service management capabilities. CIS
+  benchmark applicability differs by init system.
 - **OCSF object:** `device`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"name"`
 
 ### uptime_seconds (`uptime.seconds`)
 
-- **What:** Seconds since last boot
-- **Security relevance:** Short uptimes may indicate compromise/reboot; long
-  uptimes may indicate missing kernel patches
+- **What:** Seconds since last boot.
+- **Security relevance:** Short uptimes can show compromise/reboot. Long uptimes
+  can show missing kernel patches.
 - **OCSF object:** `device`
-- **OTel precedent:** `system.uptime` metric
+- **OTel precedent:** `system.uptime` metric.
 - **gohai type:** `uint64` / `"seconds"`
 
 ### idle_seconds (`uptime.idle_seconds`)
 
-- **What:** Aggregate CPU idle time since boot
+- **What:** Aggregate CPU idle time since boot.
 - **Security relevance:** Idle ratio reveals crypto-mining or unauthorized CPU
-  consumption
+  consumption.
 - **OCSF object:** `device`
-- **OTel precedent:** `system.cpu.time` with `state=idle`
+- **OTel precedent:** `system.cpu.time` with `state=idle`.
 - **gohai type:** `uint64` / `"idle_seconds"`
 
 ### hypervisor_host (`virtualization.hypervisor_host`)
 
-- **What:** Hostname of the hypervisor (Hyper-V KVP)
-- **Security relevance:** Maps guest to hypervisor for blast-radius analysis
+- **What:** Hostname of the hypervisor (Hyper-V KVP).
+- **Security relevance:** Maps guest to hypervisor for blast-radius analysis.
 - **OCSF object:** `device`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"hypervisor_host"`
 
 ### virtualization_role (`virtualization.role`)
 
-- **What:** "host" or "guest" participation role
+- **What:** "host" or "guest" participation role.
 - **Security relevance:** Role determines patching responsibilities and attack
-  surface
+  surface.
 - **OCSF object:** `device`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"role"`
 
 ### virtualization_systems (`virtualization.systems`)
 
-- **What:** All detected virtualization layers (name→role map)
-- **Security relevance:** Multi-layer detection (container inside VM); each
-  layer has different isolation properties
+- **What:** All detected virtualization layers (name→role map).
+- **Security relevance:** Multi-layer detection (container inside VM). Each
+  layer has different isolation properties.
 - **OCSF object:** `device`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `map[string]string` / `"systems"`
 
 ### machine_model (`hardware.machine_model`)
 
-- **What:** macOS machine model identifier
+- **What:** macOS machine model identifier.
 - **Security relevance:** Hardware model determines firmware vulnerability
-  exposure and applicable security updates
+  exposure and applicable security updates.
 - **OCSF object:** `device`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"machine_model"`
 
 ### machine_id (`machine_id.id`)
 
-- **What:** Stable machine identifier from `/etc/machine-id`
-- **Security relevance:** Unique host identity that persists across reboots;
-  asset tracking key
+- **What:** Stable machine identifier from `/etc/machine-id`.
+- **Security relevance:** Unique host identity that persists across reboots.
+  Asset tracking key.
 - **OCSF object:** `device`
-- **OTel precedent:** `host.id` (related but not identical)
+- **OTel precedent:** `host.id` (related but not identical).
 - **gohai type:** `string` / `"id"`
 
 ______________________________________________________________________
@@ -248,157 +248,157 @@ ______________________________________________________________________
 
 ### cpu_sockets (`cpu.sockets`)
 
-- **What:** Physical CPU socket count
-- **Security relevance:** Licensing compliance; speculative execution
-  vulnerability profiles differ by multi-socket
+- **What:** Physical CPU socket count.
+- **Security relevance:** Licensing compliance. Speculative execution
+  vulnerability profiles differ by multi-socket.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `int` / `"sockets"`
 
 ### cpu_flags (`cpu.flags`)
 
-- **What:** CPU feature flags (avx2, aes, ssse3, etc.)
-- **Security relevance:** AES-NI for FIPS compliance; speculative execution
-  mitigation flags (ibrs, stibp, ssbd)
+- **What:** CPU feature flags (avx2, aes, ssse3 and others).
+- **Security relevance:** AES-NI for FIPS compliance. Speculative execution
+  mitigation flags (ibrs, stibp, ssbd).
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `[]string` / `"flags"`
 
 ### cpu_vulnerabilities (`cpu.vulnerabilities`)
 
-- **What:** CPU vulnerability mitigations from sysfs
+- **What:** CPU vulnerability mitigations from sysfs.
 - **Security relevance:** Directly reports Spectre, Meltdown, MDS mitigation
-  status; essential for fleet security posture
+  status. Essential for fleet security posture.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `map[string]string` / `"vulnerabilities"`
 
 ### cpu_bogomips (`cpu.bogomips`)
 
-- **What:** Linux BogoMIPS calibration value
-- **Security relevance:** Performance baseline for anomaly detection
+- **What:** Linux BogoMIPS calibration value.
+- **Security relevance:** Performance baseline for anomaly detection.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `float64` / `"bogomips"`
 
 ### cpu_byte_order (`cpu.byte_order`)
 
-- **What:** CPU byte order (Little/Big Endian)
-- **Security relevance:** Binary compatibility; data format validation
+- **What:** CPU byte order (Little/Big Endian).
+- **Security relevance:** Binary compatibility. Data format validation.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"byte_order"`
 
 ### cpu_address_sizes (`cpu.address_sizes`)
 
-- **What:** Physical and virtual address width
-- **Security relevance:** Virtual address width determines ASLR entropy
+- **What:** Physical and virtual address width.
+- **Security relevance:** Virtual address width determines ASLR entropy.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"address_sizes"`
 
 ### cpu_numa_nodes_count (`cpu.numa_nodes_count`)
 
-- **What:** NUMA node count
-- **Security relevance:** NUMA topology affects performance; capacity planning
+- **What:** NUMA node count.
+- **Security relevance:** NUMA topology affects performance. Capacity planning.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `int` / `"numa_nodes_count"`
 
 ### cpu_caches L1/L3 (`cpu.caches.l1d`, `l1i`, `l3`)
 
-- **What:** Per-level CPU cache sizes
+- **What:** Per-level CPU cache sizes.
 - **Security relevance:** Cache hierarchy determines microarchitecture
-  generation; L1 sizes relevant to cache side-channel attacks
+  generation. L1 sizes relevant to cache side-channel attacks.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** `host.cpu.cache.l2.size`, a natural extension to L1/L3
+- **OTel precedent:** `host.cpu.cache.l2.size`, a natural extension to L1/L3.
 - **gohai type:** `string` / `"l1d"`, `"l1i"`, `"l3"`
 
 ### cpu_mhz_max / cpu_mhz_min (`cpu.mhz_max`, `cpu.mhz_min`)
 
-- **What:** Maximum and minimum CPU frequency bounds
-- **Security relevance:** Crypto-mining detection; performance envelope
+- **What:** Maximum and minimum CPU frequency bounds.
+- **Security relevance:** Crypto-mining detection. Performance envelope.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"mhz_max"`, `"mhz_min"`
 
 ### cpu_online / cpu_offline (`cpu.online`, `cpu.offline`)
 
-- **What:** Online vs offline logical CPU count
-- **Security relevance:** Mismatch indicates misconfiguration or scaling
+- **What:** Online vs offline logical CPU count.
+- **Security relevance:** Mismatch shows misconfiguration or scaling.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** OTel has `system.cpu.logical.count` total only
+- **OTel precedent:** OTel has `system.cpu.logical.count` total only.
 - **gohai type:** `int` / `"online"`, `"offline"`
 
 ### cpu_virtualization (`cpu.virtualization`)
 
-- **What:** CPU virtualization capability (VT-x, AMD-V)
+- **What:** CPU virtualization capability (VT-x, AMD-V).
 - **Security relevance:** Hardware-assisted virtualization availability for
-  container isolation
+  container isolation.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"virtualization"`
 
 ### dmi_baseboard (`dmi.baseboard.*`)
 
-- **What:** Motherboard vendor, product, version, serial, asset_tag
-- **Security relevance:** Hardware fingerprinting; firmware CVE tracking; asset
-  inventory
+- **What:** Motherboard vendor, product, version, serial, asset_tag.
+- **Security relevance:** Hardware fingerprinting. Firmware CVE tracking. Asset
+  inventory.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** struct with 5 string fields
 
 ### dmi_product_family/version/sku (`dmi.product.*`)
 
-- **What:** System product family, version, SKU from SMBIOS
-- **Security relevance:** Product family for fleet-wide firmware updates; SKU
-  for procurement correlation
+- **What:** System product family, version, SKU from SMBIOS.
+- **Security relevance:** Product family for fleet-wide firmware updates. SKU
+  for procurement correlation.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"family"`, `"version"`, `"sku"`
 
 ### chassis_type (`dmi.chassis.type`, `type_description`)
 
-- **What:** SMBIOS chassis type code and description
-- **Security relevance:** Classifies form factor; laptops require disk
-  encryption, servers different physical access controls
+- **What:** SMBIOS chassis type code and description.
+- **Security relevance:** Classifies form factor. Laptops require disk
+  encryption, servers different physical access controls.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** `hw.enclosure.type`
+- **OTel precedent:** `hw.enclosure.type`.
 - **gohai type:** `string` / `"type"`, `"type_description"`
 
 ### chassis_asset_tag (`dmi.chassis.asset_tag`)
 
-- **What:** Chassis asset tag from SMBIOS
-- **Security relevance:** Links logical to physical inventory; compliance
+- **What:** Chassis asset tag from SMBIOS.
+- **Security relevance:** Links logical to physical inventory. Compliance.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"asset_tag"`
 
 ### boot_rom_version (`hardware.boot_rom_version`)
 
-- **What:** macOS Boot ROM version
-- **Security relevance:** Firmware vulnerability exposure
+- **What:** macOS Boot ROM version.
+- **Security relevance:** Firmware vulnerability exposure.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** `hw.firmware_version`
+- **OTel precedent:** `hw.firmware_version`.
 - **gohai type:** `string` / `"boot_rom_version"`
 
 ### smc_version (`hardware.smc_version_system`)
 
-- **What:** SMC firmware version
+- **What:** SMC firmware version.
 - **Security relevance:** SMC firmware vulnerabilities compromise hardware root
-  of trust
+  of trust.
 - **OCSF object:** `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"smc_version_system"`
 
 ### block_devices (`block_device.devices[].*`)
 
 - **What:** Block device inventory: name, size, removable, rotational, model,
-  vendor
-- **Security relevance:** Removable media detection for DLP; device vendor/model
-  for firmware CVE tracking
+  vendor.
+- **Security relevance:** Removable media detection for DLP. Device vendor/model
+  for firmware CVE tracking.
 - **OCSF object:** `device_hw_info` (new sub-object)
-- **OTel precedent:** `hw.physical_disk.type`, `hw.model`, `hw.vendor`
+- **OTel precedent:** `hw.physical_disk.type`, `hw.model`, `hw.vendor`.
 - **gohai type:** struct with 13 fields
 
 ______________________________________________________________________
@@ -407,62 +407,62 @@ ______________________________________________________________________
 
 ### os_family (`platform.family`)
 
-- **What:** Distribution family (debian, rhel, suse, arch)
+- **What:** Distribution family (debian, rhel, suse, arch).
 - **Security relevance:** Determines patch channels and applicable CIS
-  benchmarks
+  benchmarks.
 - **OCSF object:** `os`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"family"`
 
 ### kernel_name (`kernel.name`)
 
-- **What:** uname -s sysname
-- **Security relevance:** Standard POSIX system identification
+- **What:** Uname -s sysname.
+- **Security relevance:** Standard POSIX system identification.
 - **OCSF object:** `os`
-- **OTel precedent:** `os.type` (normalized enum, not raw)
+- **OTel precedent:** `os.type` (normalized enum, not raw).
 - **gohai type:** `string` / `"name"`
 
 ### kernel_version (`kernel.version`)
 
-- **What:** Full kernel version string from uname -v
-- **Security relevance:** Build configuration, compiler, timestamp; forensics
+- **What:** Full kernel version string from uname -v.
+- **Security relevance:** Build configuration, compiler, timestamp. Forensics.
 - **OCSF object:** `os`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"version"`
 
 ### kernel_machine (`kernel.machine`)
 
-- **What:** uname -m (x86_64, aarch64)
-- **Security relevance:** Package repository selection; binary compatibility
+- **What:** Uname -m (x86_64, aarch64).
+- **Security relevance:** Package repository selection. Binary compatibility.
 - **OCSF object:** `os`
-- **OTel precedent:** `host.arch` (normalized, not raw)
+- **OTel precedent:** `host.arch` (normalized, not raw).
 - **gohai type:** `string` / `"machine"`
 
 ### rosetta_translated (`kernel.rosetta_translated`)
 
-- **What:** macOS Rosetta 2 translation state
-- **Security relevance:** Indicates x86_64 emulation on ARM64
+- **What:** macOS Rosetta 2 translation state.
+- **Security relevance:** Shows x86_64 emulation on ARM64.
 - **OCSF object:** `os`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `bool` / `"rosetta_translated"`
 
 ### os_release fields (`os_release.id`, `id_like`, `version_id`, `version_codename`, `variant_id`)
 
-- **What:** Machine-parseable OS identity from os-release(5)
+- **What:** Machine-parseable OS identity from os-release(5).
 - **Security relevance:** `id` + `version_id` drive programmatic version
-  comparison for patch management; `id_like` enables family queries;
-  `variant_id` distinguishes server/workstation/container
+  comparison for patch management. `id_like` enables family queries.
+  `variant_id` distinguishes server/workstation/container.
 - **OCSF object:** `os`
-- **OTel precedent:** `os.version` (doesn't distinguish human vs machine)
+- **OTel precedent:** `os.version` (does not distinguish human vs machine).
 - **gohai type:** `string` / various keys
 
 ### lsb fields (`lsb.id`, `release`, `codename`)
 
-- **What:** Linux Standard Base distributor identity
+- **What:** Linux Standard Base distributor identity.
 - **Security relevance:** Legacy distro identification still used by enterprise
-  systems
+  systems.
 - **OCSF object:** `os`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / various keys
 
 ______________________________________________________________________
@@ -471,63 +471,63 @@ ______________________________________________________________________
 
 ### mtu (`network.interfaces[].mtu`)
 
-- **What:** Maximum Transmission Unit
-- **Security relevance:** MTU misconfiguration causes fragmentation;
-  fragmentation attacks
+- **What:** Maximum Transmission Unit.
+- **Security relevance:** MTU misconfiguration causes fragmentation.
+  Fragmentation attacks.
 - **OCSF object:** `network_interface`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `int` / `"mtu"`
 
 ### driver (`network.interfaces[].driver`)
 
-- **What:** Kernel driver name (e1000e, virtio_net, mlx5_core)
-- **Security relevance:** Driver identifies hardware for firmware CVE tracking;
-  detects virtual vs physical NICs
+- **What:** Kernel driver name (e1000e, virtio_net, mlx5_core).
+- **Security relevance:** Driver identifies hardware for firmware CVE tracking.
+  Detects virtual vs physical NICs.
 - **OCSF object:** `network_interface`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"driver"`
 
 ### duplex (`network.interfaces[].duplex`)
 
-- **What:** Link duplex mode
-- **Security relevance:** Half-duplex on Gigabit indicates negotiation failure
+- **What:** Link duplex mode.
+- **Security relevance:** Half-duplex on Gigabit shows negotiation failure.
 - **OCSF object:** `network_interface`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"duplex"`
 
 ### flags (`network.interfaces[].flags`)
 
-- **What:** Interface flags (UP, BROADCAST, PROMISC, etc.)
-- **Security relevance:** PROMISC flag indicates packet capture; interface state
-  affects reachability
+- **What:** Interface flags (UP, BROADCAST, PROMISC and others).
+- **Security relevance:** PROMISC flag shows packet capture. Interface state
+  affects reachability.
 - **OCSF object:** `network_interface`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `[]string` / `"flags"`
 
 ### address scope/netmask/broadcast (`network.interfaces[].addresses[].*`)
 
-- **What:** Address scope, netmask, broadcast per address
-- **Security relevance:** Scope determines reachability; netmask determines
-  subnet size and lateral movement blast radius
+- **What:** Address scope, netmask, broadcast per address.
+- **Security relevance:** Scope determines reachability. Netmask determines
+  subnet size and lateral movement blast radius.
 - **OCSF object:** `network_interface`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` fields
 
 ### default_interface / default_gateway (`network.*`)
 
-- **What:** Default route egress interface and gateway (v4 + v6)
-- **Security relevance:** Primary network path; segmentation verification
+- **What:** Default route egress interface and gateway (v4 + v6).
+- **Security relevance:** Primary network path. Segmentation verification.
 - **OCSF object:** `network_interface` or new `network_config`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / 4 fields
 
 ### vlan_id (`network.interfaces[].vlan.id`)
 
-- **What:** 802.1Q VLAN tag
-- **Security relevance:** VLAN assignment determines segmentation; VLAN hopping
-  is a known attack vector
+- **What:** 802.1Q VLAN tag.
+- **Security relevance:** VLAN assignment determines segmentation. VLAN hopping
+  is a known attack vector.
 - **OCSF object:** `network_interface`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `int` / `"id"`
 
 ______________________________________________________________________
@@ -537,11 +537,11 @@ ______________________________________________________________________
 ### routes (`network.routes[].*`)
 
 - **What:** Kernel routing table: destination, gateway, interface, scope, proto,
-  metric, family
-- **Security relevance:** Routes define reachability; essential for network
-  forensics and lateral movement analysis
+  metric, family.
+- **Security relevance:** Routes define reachability. Essential for network
+  forensics and lateral movement analysis.
 - **OCSF object:** New `routing_table`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** struct with 7 fields per entry
 
 ______________________________________________________________________
@@ -550,11 +550,11 @@ ______________________________________________________________________
 
 ### neighbours (`network.neighbours[].*`)
 
-- **What:** ARP/NDP cache: address, mac, interface, state, family
-- **Security relevance:** Reveals broadcast domain members; NUD state indicates
-  recent communication patterns
+- **What:** ARP/NDP cache: address, mac, interface, state, family.
+- **Security relevance:** Reveals broadcast domain members. NUD state shows
+  recent communication patterns.
 - **OCSF object:** New `neighbour_entry`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** struct with 5 fields per entry
 
 ______________________________________________________________________
@@ -563,36 +563,36 @@ ______________________________________________________________________
 
 ### fips_kernel_enabled (`fips.kernel.enabled`)
 
-- **What:** Kernel FIPS 140 mode active
-- **Security relevance:** Hard requirement for FedRAMP, FISMA, DoD
+- **What:** Kernel FIPS 140 mode active.
+- **Security relevance:** Hard requirement for FedRAMP, FISMA, DoD.
 - **OCSF object:** New `security_posture`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `bool` / `"enabled"`
 
 ### fips_crypto_policy (`fips.policy.*`)
 
-- **What:** System crypto policy name and FIPS effectiveness
-- **Security relevance:** Determines allowed algorithms system-wide
+- **What:** System crypto policy name and FIPS effectiveness.
+- **Security relevance:** Determines allowed algorithms system-wide.
 - **OCSF object:** New `security_posture`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` + `bool`
 
 ### selinux (`selinux.*`)
 
-- **What:** SELinux status, mode, policy version, policy name
-- **Security relevance:** MAC framework state; CIS benchmarks require enforcing
-  mode
+- **What:** SELinux status, mode, policy version, policy name.
+- **Security relevance:** MAC framework state. CIS benchmarks require enforcing
+  mode.
 - **OCSF object:** New `security_posture`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** 6 string fields
 
 ### ssh_host_keys (`ssh.keys[].*`)
 
-- **What:** SSH host key algorithm, fingerprint, key length
+- **What:** SSH host key algorithm, fingerprint, key length.
 - **Security relevance:** Key rotation, algorithm deprecation, fingerprint
-  verification
+  verification.
 - **OCSF object:** New `ssh_host_key` (complement existing `tls`)
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** 4 fields per key
 
 ______________________________________________________________________
@@ -601,11 +601,11 @@ ______________________________________________________________________
 
 ### kernel_modules (`kernel_modules.modules.*`)
 
-- **What:** Loaded kernel modules: name, size, refcount, version
-- **Security relevance:** Rootkits load as kernel modules; CIS benchmarks check
-  for specific modules (cramfs, udf, USB storage)
+- **What:** Loaded kernel modules: name, size, refcount, version.
+- **Security relevance:** Rootkits load as kernel modules. CIS benchmarks check
+  for specific modules (cramfs, udf, USB storage).
 - **OCSF object:** New `kernel_module`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** map of structs
 
 ______________________________________________________________________
@@ -614,69 +614,69 @@ ______________________________________________________________________
 
 ### instance_type (cross-provider)
 
-- **What:** Instance size/shape (m5.xlarge, n2-standard-4, etc.)
-- **Security relevance:** Determines capacity; most-queried cloud metadata after
-  instance ID and region
+- **What:** Instance size/shape (m5.xlarge, n2-standard-4 and others).
+- **Security relevance:** Determines capacity. Most-queried cloud metadata after
+  instance ID and region.
 - **OCSF object:** `cloud`
-- **OTel precedent:** `host.type`
+- **OTel precedent:** `host.type`.
 - **gohai type:** `string` (provider-specific key)
 
 ### instance_lifecycle (cross-provider)
 
-- **What:** On-demand, spot/preemptible, or reserved
+- **What:** On-demand, spot/preemptible, or reserved.
 - **Security relevance:** Spot instances can disappear, so IR evidence may be
-  lost
+  lost.
 - **OCSF object:** `cloud`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string`
 
 ### tags (cross-provider)
 
-- **What:** User-defined key/value tags
-- **Security relevance:** Primary mechanism for security policy application
+- **What:** User-defined key/value tags.
+- **Security relevance:** Primary mechanism for security policy application.
 - **OCSF object:** `cloud`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** varies by provider
 
 ### security_groups (`ec2`, `openstack`)
 
-- **What:** Attached security group names/IDs
-- **Security relevance:** Network access control; blast-radius analysis
+- **What:** Attached security group names/IDs.
+- **Security relevance:** Network access control. Blast-radius analysis.
 - **OCSF object:** `cloud`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `[]string`
 
 ### iam_instance_profile (`ec2.iam_info.*`)
 
-- **What:** IAM instance profile ARN
-- **Security relevance:** Determines AWS API permissions; over-privileged
-  profiles are common findings
+- **What:** IAM instance profile ARN.
+- **Security relevance:** Determines AWS API permissions. Over-privileged
+  profiles are common findings.
 - **OCSF object:** `cloud`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string`
 
 ### vpc_id / subnet_id (cross-provider)
 
-- **What:** Virtual network and subnet identifiers
-- **Security relevance:** Network isolation boundary; public vs private subnet
+- **What:** Virtual network and subnet identifiers.
+- **Security relevance:** Network isolation boundary. Public vs private subnet.
 - **OCSF object:** `cloud`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string`
 
 ### azure_security_profile (`azure.security_profile.*`)
 
-- **What:** Secure Boot, Virtual TPM, host encryption
-- **Security relevance:** Directly measures VM security posture
+- **What:** Secure Boot, Virtual TPM, host encryption.
+- **Security relevance:** Directly measures VM security posture.
 - **OCSF object:** `cloud` or new `cloud_security_profile`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** 3 bool fields
 
 ### service_accounts (`gce.service_accounts[].*`)
 
-- **What:** GCE service account email and OAuth scopes
-- **Security relevance:** Determines GCP API permissions
+- **What:** GCE service account email and OAuth scopes.
+- **Security relevance:** Determines GCP API permissions.
 - **OCSF object:** `cloud`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** struct with email + scopes
 
 ______________________________________________________________________
@@ -685,19 +685,19 @@ ______________________________________________________________________
 
 ### users_passwd (`users.passwd.*`)
 
-- **What:** User inventory: UID, GID, home, shell, GECOS
+- **What:** User inventory: UID, GID, home, shell, GECOS.
 - **Security relevance:** UID 0 accounts, accounts without passwords, non-login
-  shells; privilege escalation paths
+  shells. Privilege escalation paths.
 - **OCSF object:** Extend `user`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** per-user struct
 
 ### users_group (`users.group.*`)
 
-- **What:** Group inventory: GID and members
-- **Security relevance:** Group membership determines sudo/privilege paths
+- **What:** Group inventory: GID and members.
+- **Security relevance:** Group membership determines sudo/privilege paths.
 - **OCSF object:** Extend `group`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** per-group struct
 
 ______________________________________________________________________
@@ -706,11 +706,11 @@ ______________________________________________________________________
 
 ### session fields (`sessions.session.terminal`, `host`, `seat`)
 
-- **What:** Terminal name, remote host, systemd seat
+- **What:** Terminal name, remote host, systemd seat.
 - **Security relevance:** "Who is logged in from where?" is the first IR
-  question
+  question.
 - **OCSF object:** Extend `session`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** 3 string fields
 
 ______________________________________________________________________
@@ -719,10 +719,10 @@ ______________________________________________________________________
 
 ### process_count (`process.count`)
 
-- **What:** Total running process count
-- **Security relevance:** Process spike indicates fork bomb or runaway service
+- **What:** Total running process count.
+- **Security relevance:** Process spike shows fork bomb or runaway service.
 - **OCSF object:** `process`
-- **OTel precedent:** `system.process.count`
+- **OTel precedent:** `system.process.count`.
 - **gohai type:** `int` / `"count"`
 
 ______________________________________________________________________
@@ -731,10 +731,10 @@ ______________________________________________________________________
 
 ### package_manager_path (`package_mgr.path`)
 
-- **What:** Absolute path to package manager binary
-- **Security relevance:** Binary path integrity verification
+- **What:** Absolute path to package manager binary.
+- **Security relevance:** Binary path integrity verification.
 - **OCSF object:** `package`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"path"`
 
 ______________________________________________________________________
@@ -743,12 +743,12 @@ ______________________________________________________________________
 
 ### docker (`docker.*`)
 
-- **What:** Container inventory: ID, name, image, state, status
-- **Security relevance:** Workload surface; container image identity for CVE
-  tracking
+- **What:** Container inventory: ID, name, image, state, status.
+- **Security relevance:** Workload surface. Container image identity for CVE
+  tracking.
 - **OCSF object:** Extend `container` profile
 - **OTel precedent:** `container.id`, `container.name`, `container.image.name`
-  (per-container, not inventory)
+  (per-container, not inventory).
 - **gohai type:** 5 fields per container
 
 ______________________________________________________________________
@@ -757,11 +757,11 @@ ______________________________________________________________________
 
 ### sysctl (`sysctl.params`)
 
-- **What:** Kernel parameter table from `sysctl -a`
-- **Security relevance:** Controls ASLR, IP forwarding, ptrace scope, yama LSM;
-  CIS benchmarks check dozens of sysctl values
+- **What:** Kernel parameter table from `sysctl -a`.
+- **Security relevance:** Controls ASLR, IP forwarding, ptrace scope, yama LSM.
+  CIS benchmarks check dozens of sysctl values.
 - **OCSF object:** New `kernel_parameter` or extend `os`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `map[string]string`
 
 ______________________________________________________________________
@@ -770,12 +770,12 @@ ______________________________________________________________________
 
 ### memory subsystem (`memory.active`, `inactive`, `dirty`, `mapped`, `commit_limit`, `committed_as`, `swap.cached`)
 
-- **What:** Detailed memory state from /proc/meminfo
-- **Security relevance:** Resource exhaustion detection; crypto-mining
-  indicators; OOM threshold monitoring
+- **What:** Detailed memory state from /proc/meminfo.
+- **Security relevance:** Resource exhaustion detection. Crypto-mining
+  indicators. OOM threshold monitoring.
 - **OCSF object:** New `memory_info` or extend `device_hw_info`
 - **OTel precedent:** `system.memory.usage` (partial), `system.paging.usage`
-  (partial)
+  (partial).
 - **gohai type:** multiple `uint64` fields
 
 ______________________________________________________________________
@@ -784,18 +784,18 @@ ______________________________________________________________________
 
 ### inodes (`filesystem.mounts[].inodes_*`)
 
-- **What:** Inode allocation and usage per filesystem
-- **Security relevance:** Inode exhaustion is a DoS vector
+- **What:** Inode allocation and usage per filesystem.
+- **Security relevance:** Inode exhaustion is a DoS vector.
 - **OCSF object:** New `filesystem`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `uint64` + `float64`
 
 ### uuid / label (`filesystem.mounts[].uuid`, `label`)
 
-- **What:** Filesystem UUID and label
-- **Security relevance:** Stable forensic identifier; mount validation
+- **What:** Filesystem UUID and label.
+- **Security relevance:** Stable forensic identifier. Mount validation.
 - **OCSF object:** New `filesystem`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string`
 
 ______________________________________________________________________
@@ -804,11 +804,11 @@ ______________________________________________________________________
 
 ### ipc (`ipc.sem.*`, `msg.*`, `shm.*`)
 
-- **What:** Semaphore, message queue, shared memory kernel limits
-- **Security relevance:** IPC limits determine shared memory sizes; DoS vectors;
-  database security
+- **What:** Semaphore, message queue, shared memory kernel limits.
+- **Security relevance:** IPC limits determine shared memory sizes. DoS vectors.
+  Database security.
 - **OCSF object:** New `ipc_limits` or extend `os`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** multiple int fields
 
 ______________________________________________________________________
@@ -817,63 +817,63 @@ ______________________________________________________________________
 
 ### load_averages (`load.one`, `five`, `fifteen`)
 
-- **What:** 1/5/15-minute load averages
-- **Security relevance:** Crypto-mining and DoS detection; universal health
-  metric
+- **What:** 1/5/15-minute load averages.
+- **Security relevance:** Crypto-mining and DoS detection. Universal health
+  metric.
 - **OCSF object:** Extend `device` or new `load_average`
-- **OTel precedent:** None dedicated
+- **OTel precedent:** None dedicated.
 - **gohai type:** `float64` / 3 fields
 
 ### shells_paths (`shells.paths`)
 
-- **What:** Valid login shells from /etc/shells
-- **Security relevance:** Unexpected entries indicate compromise; CIS benchmarks
-  verify this file
+- **What:** Valid login shells from /etc/shells.
+- **Security relevance:** Unexpected entries indicate compromise. CIS benchmarks
+  verify this file.
 - **OCSF object:** Extend `device` or new `shell_config`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `[]string` / `"paths"`
 
 ### root_group_name (`root_group.name`)
 
-- **What:** Root user's primary group name
-- **Security relevance:** Differs between OS families; compliance-relevant for
-  file permission audits
+- **What:** Root user's primary group name.
+- **Security relevance:** Differs between OS families. Compliance-relevant for
+  file permission audits.
 - **OCSF object:** Extend `os`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"name"`
 
 ### pci_iommu_group (`pci.devices[].iommu_group`)
 
-- **What:** IOMMU group assignment for PCI devices
-- **Security relevance:** IOMMU grouping determines DMA isolation boundaries;
-  devices in the same group can DMA attack each other
+- **What:** IOMMU group assignment for PCI devices.
+- **Security relevance:** IOMMU grouping determines DMA isolation boundaries.
+  Devices in the same group can DMA attack each other.
 - **OCSF object:** Extend `device_hw_info`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"iommu_group"`
 
 ### pci_driver (`pci.devices[].driver`)
 
-- **What:** Kernel driver bound to PCI device
-- **Security relevance:** Driver vulnerability targeting; identifies which
-  kernel module manages the hardware
+- **What:** Kernel driver bound to PCI device.
+- **Security relevance:** Driver vulnerability targeting. Identifies which
+  kernel module manages the hardware.
 - **OCSF object:** Extend `device_hw_info`
-- **OTel precedent:** `hw.driver_version`
+- **OTel precedent:** `hw.driver_version`.
 - **gohai type:** `string` / `"driver"`
 
 ### cloud_public_keys (cross-provider)
 
-- **What:** SSH public keys authorized on the instance
-- **Security relevance:** Authorized access enumeration; unauthorized key
-  injection detection
+- **What:** SSH public keys authorized on the instance.
+- **Security relevance:** Authorized access enumeration. Unauthorized key
+  injection detection.
 - **OCSF object:** `cloud` or new `authorized_key`
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `[]string` or `map` / `"public_keys"`
 
 ### cloud_user_data (cross-provider)
 
-- **What:** Instance user data / bootstrap scripts
+- **What:** Instance user data / bootstrap scripts.
 - **Security relevance:** User data often contains secrets, credentials, and
-  bootstrap scripts; sensitive but critical for security assessment
+  bootstrap scripts. Sensitive but critical for security assessment.
 - **OCSF object:** `cloud` (with sensitivity warning)
-- **OTel precedent:** None
+- **OTel precedent:** None.
 - **gohai type:** `string` / `"user_data"`

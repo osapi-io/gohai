@@ -4,45 +4,47 @@
 
 ## Description
 
-Reports the 1/5/15-minute system load averages, the same numbers `uptime(1)`,
-`w(1)`, and `top(1)` show. Load average is the exponentially-weighted moving
-average of the run queue length (runnable + uninterruptible tasks) over each
-window.
+The collector reports the system load averages for 1, 5 and 15 minutes. These
+are the same numbers that `uptime(1)`, `w(1)` and `top(1)` show. The load
+average is the exponentially weighted moving average of the run queue length in
+each time window. The run queue holds the tasks that can run and the tasks that
+cannot be interrupted.
 
-Rule of thumb: a 1-minute load of N on a host with M cores means N tasks were
-ready to run against M execution units. Sustained `one > cores` indicates CPU
-saturation; sustained `fifteen > cores` indicates a systemic backlog rather than
-a short burst.
+A general rule: a 1-minute load of N on a host with M cores means that N tasks
+were ready to run on M execution units. If `one > cores` for a long time, the
+CPU is saturated. If `fifteen > cores` for a long time, there is a backlog in
+the system, not a short burst.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Feed heartbeat / health-probe payloads with a cheap saturation signal (one
-  `getloadavg(3)` call, no heavy process scan).
-- Correlate CPU pressure with incident start times (the 15-min window survives
-  short spikes).
-- Trigger load shedding or autoscaling when `one` crosses a per-fleet threshold.
+- Add a low-cost saturation signal to heartbeat and health-probe payloads. The
+  collector makes one `getloadavg(3)` call and does not scan the processes.
+- Compare CPU pressure with the start times of incidents. The 15-minute window
+  keeps its value through short spikes.
+- Start load shedding or autoscaling when `one` goes above a threshold for the
+  fleet.
 
-Consumers that need per-core saturation should divide by `cpu.total` from the
-`cpu` collector.
+If a consumer needs the saturation of each core, it divides by `cpu.total` from
+the `cpu` collector.
 
 ## Collected fields
 
-| Field     | Type    | Description             | Schema mapping            |
-| --------- | ------- | ----------------------- | ------------------------- |
-| `one`     | float64 | 1-minute load average.  | No direct schema mapping. |
-| `five`    | float64 | 5-minute load average.  | No direct schema mapping. |
-| `fifteen` | float64 | 15-minute load average. | No direct schema mapping. |
+| Field     | Type    | Description                 | Schema mapping            |
+| --------- | ------- | --------------------------- | ------------------------- |
+| `one`     | float64 | The 1-minute load average.  | No direct schema mapping. |
+| `five`    | float64 | The 5-minute load average.  | No direct schema mapping. |
+| `fifteen` | float64 | The 15-minute load average. | No direct schema mapping. |
 
-Field names are a gohai choice: OCSF has no load-average field and Ohai ships no
-loadavg plugin, so `one`/`five`/`fifteen` are picked to match the conceptual
-triple returned by `getloadavg(3)`.
+gohai selected the field names. OCSF has no load-average field, and Ohai has no
+loadavg plugin. The names `one`, `five` and `fifteen` agree with the three
+values that `getloadavg(3)` returns.
 
 ## Platform support
 
-| Platform | Supported                             |
-| -------- | ------------------------------------- |
-| Linux    | ✅ (`/proc/loadavg` via gopsutil)     |
-| macOS    | ✅ (`sysctl vm.loadavg` via gopsutil) |
+| Platform | Supported                                 |
+| -------- | ----------------------------------------- |
+| Linux    | ✅ (`/proc/loadavg` through gopsutil)     |
+| macOS    | ✅ (`sysctl vm.loadavg` through gopsutil) |
 
 ## Example output
 
@@ -78,27 +80,28 @@ gohai --no-collector.load   # disable
 
 ## Dependencies
 
-None. (Consumers that want per-core saturation correlate with `cpu.total`
-themselves. We don't declare a runtime dependency because `Dependencies()` would
-auto-include `cpu` even when the user disabled it.)
+None. A consumer that needs the saturation of each core compares the load with
+`cpu.total` itself. The collector does not declare a runtime dependency. If it
+did, `Dependencies()` would add `cpu` automatically, also when the user disabled
+it.
 
 ## Data sources
 
 On Linux:
 
 1. gopsutil's `load.AvgWithContext` reads `/proc/loadavg` and returns the three
-   conventional floats. We forward them as `one`, `five`, `fifteen`.
+   usual floats. The collector reports them as `one`, `five` and `fifteen`.
 
 On macOS:
 
 1. gopsutil's `load.AvgWithContext` calls `sysctl vm.loadavg` and returns the
-   same three floats. Same field mapping as Linux.
+   same three floats. The field mapping is the same as on Linux.
 
-Ohai does not ship a loadavg plugin in current `main`, so this collector has no
-Ohai counterpart, the field names are a Go-idiomatic rendering of
-`getloadavg(3)`'s conceptual triple. The trailing `/proc/loadavg` fields
-(`runnable_tasks`, `last_pid`) are out of scope because `getloadavg(3)` doesn't
-expose them; deferred until a concrete consumer asks.
+Ohai has no loadavg plugin in its current `main`. Thus this collector has no
+equivalent in Ohai. The field names are the Go form of the three values of
+`getloadavg(3)`. The collector does not report the last fields of
+`/proc/loadavg` (`runnable_tasks`, `last_pid`), because `getloadavg(3)` does not
+give them. gohai will add them when a consumer needs them.
 
 ## Backing library
 

@@ -4,45 +4,45 @@
 
 ## Description
 
-Reports ZFS pool status by running
-`zpool list -H -o name,size,alloc,free,health,altroot`. Both Linux and macOS can
-host ZFS via [OpenZFS], so both variants attempt to run `zpool`. When `zpool` is
-not found or returns a non-zero exit, an empty pool list is returned without
-error.
+The collector reports the ZFS pool status. It runs
+`zpool list -H -o name,size,alloc,free,health,altroot`. Linux and macOS can both
+have ZFS through [OpenZFS]. Thus the two variants try to run `zpool`. If the
+collector does not find `zpool`, or if `zpool` exits with a non-zero code, the
+collector returns an empty pool list and no error.
 
-The `-` sentinel that `zpool` reports for unavailable fields (e.g. `altroot`
-when no alternate root is configured) is normalized to an empty string so
-consumers don't need to special-case it.
+`zpool` reports the `-` sentinel for fields that have no value. An example is
+`altroot` when no alternative root is set. The collector changes `-` to an empty
+string. Thus consumers do not need a special case for it.
 
-The collector mirrors Ohai's `zpools` plugin methodology: the same
-`zpool list -H` invocation is used on Linux, macOS, and BSDs.
+The method is the same as Ohai's `zpools` plugin. The same `zpool list -H`
+command runs on Linux, macOS and the BSDs.
 
 Consumers use this to:
 
-- Monitor ZFS pool health (`ONLINE`, `DEGRADED`, `FAULTED`) across a fleet.
-- Track storage allocation and free space.
-- Detect pools configured with alternate roots (e.g. during rescue operations).
+- Monitor the ZFS pool health (`ONLINE`, `DEGRADED`, `FAULTED`) of a fleet.
+- Monitor the allocated storage and the free space.
+- Find pools that have an alternative root, for example during a rescue.
 
 ## Collected fields
 
-| Field             | Type     | Description                                                                                                                  | Schema mapping   |
-| ----------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| `pools`           | `array`  | List of ZFS pools from `zpool list`.                                                                                         | gohai convention |
-| `pools[].name`    | `string` | Pool name.                                                                                                                   | gohai convention |
-| `pools[].size`    | `string` | Total pool size as reported by `zpool` (e.g. `"1.82T"`). Empty when `zpool` reports `-`.                                     | gohai convention |
-| `pools[].alloc`   | `string` | Allocated storage space (e.g. `"672G"`). Empty when `zpool` reports `-`.                                                     | gohai convention |
-| `pools[].free`    | `string` | Unallocated storage space (e.g. `"1.17T"`). Empty when `zpool` reports `-`.                                                  | gohai convention |
-| `pools[].health`  | `string` | Pool health status: `"ONLINE"`, `"DEGRADED"`, `"FAULTED"`, `"OFFLINE"`, `"REMOVED"`, or `"UNAVAIL"`. Empty when unavailable. | gohai convention |
-| `pools[].altroot` | `string` | Alternate root directory for the pool. Empty when none is configured (`zpool` reports `-`).                                  | gohai convention |
+| Field             | Type     | Description                                                                                                                         | Schema mapping   |
+| ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `pools`           | `array`  | The list of ZFS pools from `zpool list`.                                                                                            | gohai convention |
+| `pools[].name`    | `string` | The pool name.                                                                                                                      | gohai convention |
+| `pools[].size`    | `string` | The total pool size, as `zpool` reports it (for example `"1.82T"`). Empty if `zpool` reports `-`.                                   | gohai convention |
+| `pools[].alloc`   | `string` | The allocated storage space (for example `"672G"`). Empty if `zpool` reports `-`.                                                   | gohai convention |
+| `pools[].free`    | `string` | The storage space that is not allocated (for example `"1.17T"`). Empty if `zpool` reports `-`.                                      | gohai convention |
+| `pools[].health`  | `string` | The pool health status: `"ONLINE"`, `"DEGRADED"`, `"FAULTED"`, `"OFFLINE"`, `"REMOVED"` or `"UNAVAIL"`. Empty if there is no value. | gohai convention |
+| `pools[].altroot` | `string` | The alternative root directory of the pool. Empty if no alternative root is set (`zpool` reports `-`).                              | gohai convention |
 
 ## Platform support
 
-| Platform | Supported                      |
-| -------- | ------------------------------ |
-| Linux    | ✅ (when OpenZFS is installed) |
-| macOS    | ✅ (when OpenZFS is installed) |
+| Platform | Supported                    |
+| -------- | ---------------------------- |
+| Linux    | ✅ (if OpenZFS is installed) |
+| macOS    | ✅ (if OpenZFS is installed) |
 
-Both variants return an empty list, not an error, when `zpool` is absent.
+If `zpool` is missing, the two variants return an empty list, not an error.
 
 ## Example output
 
@@ -107,28 +107,31 @@ None.
 
 ## Data sources
 
-On Linux and macOS (identical procedure):
+On Linux and macOS, the method is the same:
 
-1. Run `zpool list -H -o name,size,alloc,free,health,altroot` via the injected
-   `executor.Executor`. `-H` suppresses the header line; `-o` selects exactly
-   the six fields we want, tab-separated.
-2. If the command fails (exit code non-zero, `zpool` not found in `PATH`, or the
-   executor is `nil`), return an empty pool list without error. ZFS is not
-   installed on this host.
-3. Parse each output line, splitting on tabs. Lines that do not produce exactly
-   six fields are skipped (defensive against unexpected output formats).
-4. For each field, convert the `zpool` sentinel `"-"` to an empty string.
+1. The collector runs `zpool list -H -o name,size,alloc,free,health,altroot`
+   through the injected `executor.Executor`. `-H` removes the header line. `-o`
+   selects the six fields that gohai needs, with tabs between them.
+2. The command can fail. The exit code can be non-zero, `zpool` can be missing
+   from `PATH`, or the executor can be `nil`. In these conditions, the collector
+   returns an empty pool list and no error. This shows that ZFS is not installed
+   on the host.
+3. The collector parses each output line and splits it on tabs. It skips lines
+   that do not have exactly six fields. This prevents errors from an output
+   format that is not expected.
+4. For each field, the collector changes the `zpool` sentinel `"-"` to an empty
+   string.
 
-Ohai's `zpools` plugin uses the same `zpool list -H` invocation. We use a
-slightly narrower field set (`-o name,size,alloc,free,health,altroot` versus
-Ohai's `name,size,alloc,free,cap,dedup,health,version`) because `cap`, `dedup`,
-and `version` are derivable from the core fields or rarely queried in fleet
-inventory.
+Ohai's `zpools` plugin uses the same `zpool list -H` command. gohai uses a
+smaller set of fields: `-o name,size,alloc,free,health,altroot`, not Ohai's
+`name,size,alloc,free,cap,dedup,health,version`. gohai does not read `cap`,
+`dedup` and `version`, because they come from the core fields or fleet inventory
+seldom uses them.
 
 ## Backing library
 
-- `internal/executor` (`executor.New()` in production, gomock mock in tests) for
-  the `zpool list` invocation.
-- Go stdlib `bufio` and `strings` for output parsing.
+- `internal/executor` to run `zpool list`. Production uses `executor.New()`.
+  Tests use a gomock mock.
+- The Go standard library `bufio` and `strings` to parse the output.
 
 [openzfs]: https://openzfs.org/

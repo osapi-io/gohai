@@ -4,34 +4,34 @@
 
 ## Description
 
-Reports the GRUB2 environment block variables from the `grubenv` file. The GRUB2
-environment block is a fixed-size 1024-byte file that persists boot-time
-variables across reboots. It is commonly used by bootloaders and `grub2-editenv`
-to track boot state.
+The collector reports the variables of the GRUB2 environment block from the
+`grubenv` file. The GRUB2 environment block is a 1024-byte file of fixed size.
+It keeps boot-time variables after a reboot. Bootloaders and `grub2-editenv` use
+it to record the boot state.
 
-On macOS the collector returns nil. GRUB2 is a Linux/BSD bootloader not present
-on macOS.
+On macOS, the collector returns `nil`. GRUB2 is a Linux and BSD bootloader. It
+is not on macOS.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Read `saved_entry` to determine which boot entry will be selected on the next
-  boot (useful for verifying a pending kernel upgrade or rollback).
-- Check `boot_success` and `boot_indeterminate` for Atomic Host / ostree /
-  rpm-ostree upgrade state machines.
-- Read `kernelopts` or custom environment variables set by provisioning tooling.
+- Read `saved_entry` to find the boot entry that GRUB2 selects on the next boot.
+  This helps to verify a kernel upgrade or a rollback that is not complete.
+- Examine `boot_success` and `boot_indeterminate` for the upgrade state machines
+  of Atomic Host, ostree and rpm-ostree.
+- Read `kernelopts` or custom environment variables that provisioning tools set.
 
 ## Collected fields
 
-| Field         | Type                | Description                                                                      | Schema mapping                                                                                   |
-| ------------- | ------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `environment` | `map[string]string` | Key=value pairs from the grubenv file. Nil if no grubenv file found on any path. | No direct OCSF or OTel mapping. gohai convention: `environment` (Ohai uses `grub2.environment`). |
+| Field         | Type                | Description                                                                     | Schema mapping                                                                                  |
+| ------------- | ------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `environment` | `map[string]string` | The key=value pairs from the grubenv file. `nil` if no path has a grubenv file. | No direct OCSF or OTel mapping. gohai convention: `environment`. Ohai uses `grub2.environment`. |
 
 ## Platform support
 
-| Platform | Supported                                    |
-| -------- | -------------------------------------------- |
-| Linux    | ✅                                           |
-| macOS    | Returns nil, GRUB2 is not available on macOS |
+| Platform | Supported                            |
+| -------- | ------------------------------------ |
+| Linux    | ✅                                   |
+| macOS    | Returns `nil`. GRUB2 is not on macOS |
 
 ## Example output
 
@@ -85,8 +85,9 @@ gohai --collector.grub2       # enable (opt-in)
 gohai --no-collector.grub2    # disable
 ```
 
-This collector is opt-in (`DefaultEnabled: false`) because GRUB2 is not present
-on all Linux hosts (e.g. containers, UEFI-only systems using systemd-boot).
+This collector is opt-in (`DefaultEnabled: false`) because not all Linux hosts
+have GRUB2. For example, containers and UEFI-only systems that use systemd-boot
+do not have it.
 
 ## Dependencies
 
@@ -96,25 +97,27 @@ None.
 
 On Linux:
 
-1. Try `/boot/grub2/grubenv` first (RHEL, Fedora, CentOS, Rocky, AlmaLinux) via
-   the injected `avfs.VFS`.
-2. If that file does not exist, try `/boot/grub/grubenv` (Debian, Ubuntu).
-3. If neither file exists, return `{environment: nil}`, nil signals "GRUB2 not
-   installed" to consumers.
-4. Parse the file line by line:
-   - Skip lines beginning with `#` (the standard `# GRUB Environment Block`
-     header).
-   - Split on the first `=`; left side is the key, right side is the value.
-   - Lines without `=` are skipped.
-5. Return the populated map.
+1. The collector first reads `/boot/grub2/grubenv` through the injected
+   `avfs.VFS`. RHEL, Fedora, CentOS, Rocky and AlmaLinux use this path.
+2. If that file does not exist, the collector reads `/boot/grub/grubenv`. Debian
+   and Ubuntu use this path.
+3. If neither file exists, the collector returns `{environment: nil}`. The `nil`
+   tells consumers that GRUB2 is not installed.
+4. The collector parses the file one line at a time:
+   - It skips lines that start with `#`, for example the standard
+     `# GRUB Environment Block` header.
+   - It splits each line at the first `=`. The left side is the key. The right
+     side is the value.
+   - It skips lines that have no `=`.
+5. The collector returns the map.
 
-Note: Ohai's `grub2.rb` uses `grub2-editenv list` to read the environment rather
-than parsing the file directly. gohai reads the file directly to avoid forking a
+Note: Ohai's `grub2.rb` runs `grub2-editenv list` to read the environment. It
+does not parse the file. gohai reads the file directly, so it does not start a
 subprocess for a simple key=value parse. The grubenv format is documented and
-stable (the file is intentionally human-readable). Both approaches yield
-identical output for standard deployments.
+stable. The file is human-readable on purpose. For standard deployments, the two
+methods give the same output.
 
 ## Backing library
 
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) (`osfs` in production,
-  `memfs` in tests) for the grubenv file reads.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read the grubenv
+  file. Production uses `osfs`. Tests use `memfs`.

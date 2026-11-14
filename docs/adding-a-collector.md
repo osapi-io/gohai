@@ -1,22 +1,22 @@
 # Adding a new collector
 
-Step-by-step walkthrough for building a new collector. For the rules and
-principles (library-first, OCSF + OpenTelemetry naming, no build tags, etc.) see
+The steps to build a new collector. For the rules and the principles (library
+first, OCSF + OpenTelemetry names, no build tags and others), refer to
 [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 **Reference implementation:** `pkg/gohai/collectors/shells/`. Copy its file
-layout and patterns exactly.
+layout and its patterns exactly.
 
 ## Done-definition
 
-See
+Refer to
 [CONTRIBUTING.md: Done-definition](../CONTRIBUTING.md#done-definition-every-collector-every-time).
-Every item there must be true before marking the collector complete.
+Each item there must be true before you mark the collector as complete.
 
 ## Step 1: create the sub-package
 
-Path: `pkg/gohai/collectors/<name>/` (public, consumers like OSAPI import `Info`
-structs directly).
+Path: `pkg/gohai/collectors/<name>/`. The package is public, because consumers
+such as OSAPI import the `Info` structs directly.
 
 ## Step 2: `<name>.go` (top-level factory + shared surface)
 
@@ -74,8 +74,8 @@ func New() Collector {
 
 ## Step 3: per-OS struct implementations (no build tags)
 
-Each file declares a struct for that OS, embeds `base`, and implements
-`Collect`. Injectable fields make tests independent of the host OS.
+Each file declares a struct for its OS. The struct embeds `base` and implements
+`Collect`. Injectable fields make the tests independent of the host OS.
 
 **`linux.go`:**
 
@@ -107,14 +107,15 @@ func (l *Linux) Collect(ctx context.Context) (any, error) {
 }
 ```
 
-`darwin.go`, same shape with `type Darwin struct`, `NewDarwin()`, and its own
-`Collect`. No build tag. Runtime gracefully handles Linux-only paths.
+`darwin.go` has the same shape, with `type Darwin struct`, `NewDarwin()` and its
+own `Collect`. It has no build tag. At runtime, the code handles the paths that
+exist only on Linux without failure.
 
-`debian.go` / `rhel.go`, add **only** when the distro genuinely diverges from
-generic Linux (e.g. `package_mgr` needs apt vs dnf). Otherwise generic `Linux`
-covers all non-darwin.
+Add `debian.go` / `rhel.go` **only** when the distribution is really different
+from generic Linux. For example, `package_mgr` needs apt or dnf. In all other
+cases, the generic `Linux` struct covers all hosts that are not darwin.
 
-The private gopsutil wrapper lives in `<name>.go`:
+The private gopsutil wrapper is in `<name>.go`:
 
 ```go
 // Private injection seam — not exposed on any public Fn field.
@@ -131,7 +132,7 @@ func readCPU(ctx context.Context) (*Info, error) {
 }
 ```
 
-`export_test.go` exposes it to external tests:
+`export_test.go` gives external tests access to it:
 
 ```go
 package cpu
@@ -162,21 +163,21 @@ func builtinCollectors() []collector.Collector {
 }
 ```
 
-Add matching `Facts` field + `set()` switch case in `pkg/gohai/facts.go`.
+Add the related `Facts` field and `set()` switch case in `pkg/gohai/facts.go`.
 
-**This step fails silently.** `registerBuiltins` discards the error from every
-`Register` call, and no test exercises it, so a duplicate name drops a collector
-with nothing reported. The
+**This step can fail and show no error.** `registerBuiltins` discards the error
+from each `Register` call, and no test examines it. Thus a duplicate name
+removes a collector, and nothing reports it. The
 [registration limitation](https://github.com/osapi-io/specs/blob/main/components/gohai/README.md#known-limitations)
-has the detail. Check `NewRegistry().Names()` contains your collector before you
-open the pull request.
+gives the details. Before you open the pull request, make sure that
+`NewRegistry().Names()` contains your collector.
 
 ## Step 5: tests (100% coverage, one test file)
 
-**One file only**: `<name>_public_test.go`. No `linux_public_test.go` or
-`darwin_public_test.go` split files.
+**One file only**: `<name>_public_test.go`. Do not split into
+`linux_public_test.go` or `darwin_public_test.go` files.
 
-Required contents, in order:
+The file must have these contents, in this order:
 
 1. Compile-time interface asserts at the top:
    ```go
@@ -185,12 +186,13 @@ Required contents, in order:
        _ collector.Collector = (*cpu.Darwin)(nil)
    )
    ```
-2. `TestNew`. Stubs `platform.Detect` (a swappable `var`), asserts the factory
-   returns the right concrete type per OS plus `Name()` / `DefaultEnabled()` /
-   `Dependencies()`. Table-driven.
-3. `TestCollect`. **One** method, table-driven, with a
-   `variant: "linux" | "darwin"` column. Each row sets up its seams, the loop
-   constructs the right per-OS struct:
+2. `TestNew`. It replaces `platform.Detect` (a `var` that tests can replace)
+   with a stub. It asserts that the factory returns the correct concrete type
+   for each OS. It also asserts `Name()` / `DefaultEnabled()` /
+   `Dependencies()`. It is table-driven.
+3. `TestCollect`. **One** table-driven method, with a
+   `variant: "linux" | "darwin"` column. Each row sets its seams. The loop makes
+   the correct struct for each OS:
    ```go
    switch tt.variant {
    case "linux":
@@ -199,19 +201,20 @@ Required contents, in order:
        c = &cpu.Darwin{Exec: tt.exec}
    }
    ```
-4. Optional: separate test methods for genuinely pure, independent public helper
-   functions (`TestHumanDuration`, `TestBytesToString`, `TestNeighFamily`).
-   These are legitimate because the helper has its own contract, **do not**
-   create `TestReadX` methods that shadow bridge code `TestCollect` already
-   exercises.
+4. Optional: separate test methods for public helper functions that are really
+   pure and independent (`TestHumanDuration`, `TestBytesToString`,
+   `TestNeighFamily`). These are permitted because the helper has its own
+   contract. **Do not** make `TestReadX` methods that test bridge code that
+   `TestCollect` already tests.
 
-**Test seams swap at the upstream library boundary.** `export_test.go` exposes
-`Set<X>Fn` setters for the raw gopsutil / ghw / netlink calls (`SetHostInfoFn`,
-`SetPartitionsFn`, `SetInterfacesFn`, etc.). Do NOT add intermediate wrappers
-like `readCPUFn = readCPU`, that is test-only wiring in production code, and the
-consistency rule forbids it.
+**Test seams replace calls at the boundary of the upstream library.**
+`export_test.go` gives `Set<X>Fn` setters for the raw gopsutil / ghw / netlink
+calls (`SetHostInfoFn`, `SetPartitionsFn`, `SetInterfacesFn` and others). Do NOT
+add wrappers in the middle, such as `readCPUFn = readCPU`. That is test-only
+code in production code, and the consistency rule forbids it.
 
-No build tags on any test file. `go test ./...` on any dev OS runs every test.
+No test file has a build tag. `go test ./...` runs all tests on each development
+OS.
 
 **Coverage check:**
 
@@ -220,44 +223,44 @@ go test ./... -coverprofile=/tmp/cov.out
 go tool cover -func=/tmp/cov.out | grep -v '100.0%'
 ```
 
-Expected: empty output (everything at 100%).
+The expected result is empty output. All files are at 100%.
 
 ## Step 6: write the collector doc
 
-`docs/collectors/<name>.md` is a self-contained functional spec. Required
-sections in order:
+`docs/collectors/<name>.md` is a functional spec that is complete in itself. It
+must have these sections, in this order:
 
 - `# <Name>` and **Status:** Implemented ✅
-- **Description**. What the fact is, why consumers want it, typical values on
-  Linux vs macOS. Our voice.
-- **Signals** (only for complex collectors, see `docs/collectors/fips.md` for
-  reference).
-- **Collected fields**. Markdown table with Field / Type / Description /
-  **Schema mapping** columns. Every field cites its OCSF path first
-  (`os.kernel_release`, `device.cpu_count`), OpenTelemetry attribute second
-  (`host.cpu.vendor.id`, `system.load_average.1m`) when OCSF is silent, or
-  explicit "No direct schema" with a one-line reason.
-- **Platform support**. Table.
+- **Description**. What the fact is, why consumers want it, and typical values
+  on Linux and on macOS. Use our voice.
+- **Signals**. Only for complex collectors. Refer to `docs/collectors/fips.md`
+  as an example.
+- **Collected fields**. A Markdown table with the columns Field / Type /
+  Description / **Schema mapping**. Each field gives its OCSF path first
+  (`os.kernel_release`, `device.cpu_count`). If OCSF has no field, it gives the
+  OpenTelemetry attribute (`host.cpu.vendor.id`, `system.load_average.1m`). If
+  neither has a field, it says "No direct schema" with a reason of one line.
+- **Platform support**. A table.
 - **Example output**. Realistic JSON for Linux and macOS.
-- **SDK usage**. Go snippet using `gohai.New(...).Collect(ctx)`.
-- **Enable/disable**. CLI flags.
+- **SDK usage**. A Go snippet that uses `gohai.New(...).Collect(ctx)`.
+- **Enable/disable**. The CLI flags.
 - **Dependencies**. Other collectors.
-- **Data sources**. Step-by-step methodology in OUR voice. Per-OS sections when
-  behavior differs. No "vs. Ohai" parity comparison. Ohai mentioned inline only
-  when a specific methodology choice needs attribution.
-- **Backing library**. The Go library(s) we wrap.
+- **Data sources**. The method, step by step, in OUR voice. Use a section for
+  each OS when the behavior is different. No "vs. Ohai" parity comparison. Name
+  Ohai in the text only when a specific method choice needs attribution.
+- **Backing library**. The Go library or libraries that we wrap.
 
-**No "Known gaps vs. Ohai" section.** Methodology gaps live as GitHub issues
-labeled `methodology-gap` / `collector:<name>`.
+**No "Known gaps vs. Ohai" section.** Methodology gaps are GitHub issues with
+the labels `methodology-gap` / `collector:<name>`.
 
 Use `docs/collectors/shells.md` as the canonical template.
 
 ## Step 7: update `README.md`
 
-Flip the "Implemented" column from 🚧 to ✅ (with the library in parentheses:
-`✅ (gopsutil)`, `✅ (stdlib)`).
+Change the "Implemented" column from 🚧 to ✅, with the library in parentheses:
+`✅ (gopsutil)`, `✅ (stdlib)`.
 
-Also update `docs/collectors/README.md` if the collector status changes.
+If the collector status changes, also update `docs/collectors/README.md`.
 
 ## Step 8: verify
 
@@ -282,6 +285,5 @@ Closes #<N>  (if work closes a methodology issue)
 ```
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/) with the
-50/72 rule. See
-[CONTRIBUTING.md#commit-messages](../CONTRIBUTING.md#commit-messages) for the
-full conventions.
+50/72 rule. For the full conventions, refer to
+[CONTRIBUTING.md#commit-messages](../CONTRIBUTING.md#commit-messages).

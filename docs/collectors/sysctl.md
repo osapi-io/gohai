@@ -4,26 +4,26 @@
 
 ## Description
 
-Collects the complete kernel parameter table by running `sysctl -a`. Returns a
-flat `map[string]string` of all sysctl key/value pairs. Matches Ohai's
-`linux/sysctl` plugin. Both Linux and Darwin are supported, both platforms ship
-`sysctl` with compatible output formats.
+The collector reports the full kernel parameter table. It runs `sysctl -a`. It
+returns a flat `map[string]string` of all the sysctl key/value pairs. The data
+is the same as Ohai's `linux/sysctl` plugin. The collector supports Linux and
+Darwin. Both platforms have `sysctl`, and the output formats are compatible.
 
-DefaultEnabled is `false`, the full sysctl table is large (hundreds to thousands
-of entries) and most consumers only need specific keys.
+DefaultEnabled is `false`. The full sysctl table is large, with hundreds to
+thousands of entries. Most consumers need only some keys.
 
 ## Collected fields
 
-| Field    | Type              | Description                                         | Schema mapping    |
-| -------- | ----------------- | --------------------------------------------------- | ----------------- |
-| `params` | map[string]string | All sysctl key/value pairs returned by `sysctl -a`. | gohai convention. |
+| Field    | Type              | Description                                      | Schema mapping    |
+| -------- | ----------------- | ------------------------------------------------ | ----------------- |
+| `params` | map[string]string | All the sysctl key/value pairs from `sysctl -a`. | gohai convention. |
 
 ## Platform support
 
-| Platform | Supported                     |
-| -------- | ----------------------------- |
-| Linux    | ✅ (`sysctl -a` via executor) |
-| macOS    | ✅ (`sysctl -a` via executor) |
+| Platform | Supported                         |
+| -------- | --------------------------------- |
+| Linux    | ✅ (`sysctl -a` through executor) |
+| macOS    | ✅ (`sysctl -a` through executor) |
 
 ## Example output
 
@@ -89,31 +89,34 @@ None.
 
 ## Data sources
 
-Ohai's `linux/sysctl.rb` runs `sysctl -a` and parses key=value output. gohai
-follows the same approach on both Linux and macOS, running `sysctl -a` through
-the shared Executor. The only difference is separator handling: gohai tries `: `
-before `=` so macOS values containing `=` (e.g. `vm.swapusage`) parse correctly.
+Ohai's `linux/sysctl.rb` runs `sysctl -a` and parses the key=value output. gohai
+does the same on Linux and macOS. It runs `sysctl -a` through the shared
+Executor. The only difference is the separator. gohai tries `: ` before `=`, so
+that it parses macOS values that contain `=` correctly, for example
+`vm.swapusage`.
 
-On both Linux and macOS the collector runs `sysctl -a` through the shared
+On Linux and macOS, the collector runs `sysctl -a` through the shared
 `internal/executor` runner:
 
-1. Each output line is parsed for a separator, `": "` is tried first (macOS
-   native format; also used when values contain `" = "`), then `" = "` (Linux
-   standard format). Lines with neither separator are skipped.
-2. The key portion is trimmed of whitespace. Lines with an empty key are
-   skipped.
-3. Key and value are stored as-is in the `Params` map.
-4. When `sysctl` is absent or returns an error, an empty `Params` map is
-   returned without error, matches Ohai's no-panic stance. Ohai's
-   `linux/sysctl.rb` only populates the mash when `exitstatus == 0`.
+1. The collector looks for a separator in each output line. It tries `": "`
+   first. This is the native macOS format, and it is also used when values
+   contain `" = "`. Then it tries `" = "`, the standard Linux format. It skips
+   lines that have neither separator.
+2. The collector removes the whitespace around the key. It skips lines with an
+   empty key.
+3. The collector keeps the key and the value unchanged in the `Params` map.
+4. When `sysctl` is missing or returns an error, the collector returns an empty
+   `Params` map and no error. This is the same as Ohai, which does not panic.
+   Ohai's `linux/sysctl.rb` fills the mash only when `exitstatus == 0`.
 
-**Separator order rationale:** macOS values like `vm.swapusage` embed `" = "`
-within the value portion (e.g., `vm.swapusage: total = 1024.00M used = ...`).
-Trying `": "` first ensures the correct split on the colon after the key name,
-leaving the full value intact. On Linux, sysctl keys never contain `": "`, so
-the `": "` check returns no match and `" = "` is used correctly.
+**Why the collector tries `": "` first:** macOS values such as `vm.swapusage`
+contain `" = "` in the value, for example
+`vm.swapusage: total = 1024.00M used = ...`. When the collector tries `": "`
+first, it splits at the colon after the key name, and the full value stays
+complete. On Linux, sysctl keys never contain `": "`. Thus the `": "` check
+finds no match, and the collector correctly uses `" = "`.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `sysctl -a`. Tests mock it with `go.uber.org/mock`.
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `sysctl -a`. Tests mock it with `go.uber.org/mock`.

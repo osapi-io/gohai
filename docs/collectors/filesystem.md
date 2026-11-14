@@ -4,79 +4,80 @@
 
 ## Description
 
-Enumerates filesystems known to the host, both mounted and unmounted. Mounted
-filesystems carry capacity, usage, and inode counters; every filesystem (mounted
-or not) carries UUID and label where available so consumers can correlate mounts
-to disks, volumes, or cloud snapshots.
+The collector lists the filesystems that the host knows, mounted and not
+mounted. A mounted filesystem has capacity, usage and inode counters. Each
+filesystem, mounted or not, has a UUID and a label where they are available.
+Consumers use them to relate mounts to disks, volumes or cloud snapshots.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Monitor disk-full conditions per mount (critical for `/var/log`,
-  `/var/lib/docker`, etc.).
-- Detect unexpected mount points (e.g. NFS shares that shouldn't be present).
-- Correlate a mount to its disk UUID, the standard join key across storage,
-  asset-inventory, and cloud-snapshot tooling.
-- Surface block devices that carry a filesystem but aren't mounted. LUKS
-  containers, inactive LVs, btrfs device members.
+- Monitor each mount for a full disk. This is critical for `/var/log`,
+  `/var/lib/docker` and similar mounts.
+- Find unexpected mount points, for example NFS shares that must not be there.
+- Relate a mount to its disk UUID. The UUID is the usual join key for storage,
+  asset-inventory and cloud-snapshot tools.
+- Find block devices that have a filesystem but are not mounted: LUKS
+  containers, inactive LVs and btrfs device members.
 
-Per-mount usage failures (stale NFS, permission denied) skip the usage/inode
-fields but keep the mount in the output.
+If the usage data of one mount fails (stale NFS, permission denied), the
+collector leaves out the usage and inode fields. The mount stays in the output.
 
 ## Collected fields
 
-Top level: `mounts: []Mount`, plus (Linux only) `unmounted: []Filesystem`.
+The top level has `mounts: []Mount`. On Linux only, it also has
+`unmounted: []Filesystem`.
 
-| Field per mount                     | Type     | Description                                                                                                                                                                                                                | Schema mapping                            |
-| ----------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `device`                            | string   | Block-device path (`/dev/sda1`).                                                                                                                                                                                           | OCSF `device.path`.                       |
-| `mountpoint`                        | string   | Mount path (`/`, `/boot`).                                                                                                                                                                                                 | Nearest: OCSF `file.path` (event-scoped). |
-| `type`                              | string   | Filesystem type (`ext4`, `xfs`, `apfs`).                                                                                                                                                                                   | No direct schema mapping.                 |
-| `opts`                              | []string | Mount options (`rw`, `relatime`, `nosuid`).                                                                                                                                                                                | No direct schema mapping.                 |
-| `total`                             | uint64   | Total bytes.                                                                                                                                                                                                               | No direct schema mapping.                 |
-| `used`                              | uint64   | Used bytes.                                                                                                                                                                                                                | No direct schema mapping.                 |
-| `free`                              | uint64   | Free bytes.                                                                                                                                                                                                                | No direct schema mapping.                 |
-| `used_percent`                      | float64  | Percent used (0–100).                                                                                                                                                                                                      | No direct schema mapping.                 |
-| `inodes_total`                      | uint64   | Total inodes.                                                                                                                                                                                                              | No direct schema mapping.                 |
-| `inodes_used`                       | uint64   | Used inodes.                                                                                                                                                                                                               | No direct schema mapping.                 |
-| `inodes_free`                       | uint64   | Free inodes.                                                                                                                                                                                                               | No direct schema mapping.                 |
-| `inodes_used_percent`               | float64  | Inodes used as a percentage (0–100).                                                                                                                                                                                       | No direct schema mapping.                 |
-| `uuid`                              | string   | Filesystem UUID from `lsblk`.                                                                                                                                                                                              | OCSF `device.uid`.                        |
-| `label`                             | string   | Filesystem label from `lsblk`.                                                                                                                                                                                             | No direct schema mapping.                 |
-| `part_uuid`                         | string   | GPT partition UUID from `lsblk`.                                                                                                                                                                                           | No direct schema mapping.                 |
-| `part_label`                        | string   | GPT partition label from `lsblk`.                                                                                                                                                                                          | No direct schema mapping.                 |
-| `btrfs.raid`                        | string   | Btrfs RAID profile (`single`, `dup`, `raid0`, `raid1`, `raid1c3`, `raid1c4`, `raid5`, `raid6`, `raid10`). Linux only; populated only when the mount is btrfs and `/sys/fs/btrfs/<uuid>/allocation/<bg>/<profile>/` exists. | No direct schema mapping.                 |
-| `btrfs.allocation.<bg>.total_bytes` | uint64   | Total bytes allocated to a block-group type (`data`, `metadata`, `system`).                                                                                                                                                | No direct schema mapping.                 |
-| `btrfs.allocation.<bg>.bytes_used`  | uint64   | Bytes currently in use within that block-group type.                                                                                                                                                                       | No direct schema mapping.                 |
+| Field per mount                     | Type     | Description                                                                                                                                                                                                                                | Schema mapping                               |
+| ----------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `device`                            | string   | The block-device path (`/dev/sda1`).                                                                                                                                                                                                       | OCSF `device.path`.                          |
+| `mountpoint`                        | string   | The mount path (`/`, `/boot`).                                                                                                                                                                                                             | Nearest: OCSF `file.path` (for events only). |
+| `type`                              | string   | The filesystem type (`ext4`, `xfs`, `apfs`).                                                                                                                                                                                               | No direct schema mapping.                    |
+| `opts`                              | []string | The mount options (`rw`, `relatime`, `nosuid`).                                                                                                                                                                                            | No direct schema mapping.                    |
+| `total`                             | uint64   | The total bytes.                                                                                                                                                                                                                           | No direct schema mapping.                    |
+| `used`                              | uint64   | The used bytes.                                                                                                                                                                                                                            | No direct schema mapping.                    |
+| `free`                              | uint64   | The free bytes.                                                                                                                                                                                                                            | No direct schema mapping.                    |
+| `used_percent`                      | float64  | The percentage used, 0 to 100.                                                                                                                                                                                                             | No direct schema mapping.                    |
+| `inodes_total`                      | uint64   | The total inodes.                                                                                                                                                                                                                          | No direct schema mapping.                    |
+| `inodes_used`                       | uint64   | The used inodes.                                                                                                                                                                                                                           | No direct schema mapping.                    |
+| `inodes_free`                       | uint64   | The free inodes.                                                                                                                                                                                                                           | No direct schema mapping.                    |
+| `inodes_used_percent`               | float64  | The percentage of inodes used, 0 to 100.                                                                                                                                                                                                   | No direct schema mapping.                    |
+| `uuid`                              | string   | The filesystem UUID, from `lsblk`.                                                                                                                                                                                                         | OCSF `device.uid`.                           |
+| `label`                             | string   | The filesystem label, from `lsblk`.                                                                                                                                                                                                        | No direct schema mapping.                    |
+| `part_uuid`                         | string   | The GPT partition UUID, from `lsblk`.                                                                                                                                                                                                      | No direct schema mapping.                    |
+| `part_label`                        | string   | The GPT partition label, from `lsblk`.                                                                                                                                                                                                     | No direct schema mapping.                    |
+| `btrfs.raid`                        | string   | The Btrfs RAID profile (`single`, `dup`, `raid0`, `raid1`, `raid1c3`, `raid1c4`, `raid5`, `raid6`, `raid10`). Linux only. The field has a value only when the mount is btrfs and `/sys/fs/btrfs/<uuid>/allocation/<bg>/<profile>/` exists. | No direct schema mapping.                    |
+| `btrfs.allocation.<bg>.total_bytes` | uint64   | The total bytes allocated to a block-group type (`data`, `metadata`, `system`).                                                                                                                                                            | No direct schema mapping.                    |
+| `btrfs.allocation.<bg>.bytes_used`  | uint64   | The bytes in use now in that block-group type.                                                                                                                                                                                             | No direct schema mapping.                    |
 
-Top-level `unmounted[]` (Linux only): block devices that `lsblk` reports with a
-non-empty filesystem type and empty mountpoint. Each entry carries `device`,
-`type`, `uuid`, `label`, `part_uuid`, `part_label`, capacity/usage are omitted
-because `statfs` requires a mount.
+The top-level `unmounted[]` (Linux only) has the block devices that `lsblk`
+reports with a filesystem type and no mountpoint. Each entry has `device`,
+`type`, `uuid`, `label`, `part_uuid` and `part_label`. It has no capacity or
+usage, because `statfs` needs a mount.
 
-Top-level `zfs_datasets[]` (Linux only, when `zfs` is on PATH): every ZFS
-dataset the kernel's ZFS module knows about, filesystems, volumes, snapshots,
-bookmarks, reported by `zfs get -p -H all`. Mirrors Ohai's `zfs_properties` /
-`zfs_parents` / `zfs_zpool` keys.
+The top-level `zfs_datasets[]` (Linux only, when `zfs` is on the PATH) has each
+ZFS dataset that the ZFS kernel module knows: filesystems, volumes, snapshots
+and bookmarks. `zfs get -p -H all` reports them. This is the same data as Ohai's
+`zfs_properties`, `zfs_parents` and `zfs_zpool` keys.
 
-| Field per dataset     | Type                | Description                                                                                                                  |
-| --------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `name`                | string              | Full dataset path (`tank`, `tank/home`, `tank/home/john`).                                                                   |
-| `mountpoint`          | string              | Mount path when `mountpoint` property is absolute. Empty when set to `none` / `legacy` / `-`, or for snapshots.              |
-| `is_pool`             | bool                | True when this dataset IS the zpool root (no proper ancestors). Mirrors Ohai's `zfs_zpool`.                                  |
-| `parents`             | []string            | Proper ancestor dataset paths, shallowest first. `tank/home/john` → `["tank", "tank/home"]`. Mirrors Ohai's `zfs_parents`.   |
-| `properties`          | map[string]Property | Every property from `zfs get all`. Keys are property names; each value carries the property value + source annotation below. |
-| `properties.*.value`  | string              | Property value verbatim from zfs.                                                                                            |
-| `properties.*.source` | string              | `"-"` (read-only), `"default"`, `"local"`, `"inherited from <ancestor>"`, `"received"`.                                      |
+| Field per dataset     | Type                | Description                                                                                                                                                    |
+| --------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                | string              | The full dataset path (`tank`, `tank/home`, `tank/home/john`).                                                                                                 |
+| `mountpoint`          | string              | The mount path, when the `mountpoint` property is absolute. Empty when the property is `none`, `legacy` or `-`, and for snapshots.                             |
+| `is_pool`             | bool                | True when this dataset IS the zpool root (it has no proper ancestors). The same as Ohai's `zfs_zpool`.                                                         |
+| `parents`             | []string            | The paths of the proper ancestor datasets, the shallowest first. For `tank/home/john`, the value is `["tank", "tank/home"]`. The same as Ohai's `zfs_parents`. |
+| `properties`          | map[string]Property | All properties from `zfs get all`. The keys are property names. Each value has the property value and the source, as the rows below show.                      |
+| `properties.*.value`  | string              | The property value, exactly as zfs gives it.                                                                                                                   |
+| `properties.*.source` | string              | `"-"` (read-only), `"default"`, `"local"`, `"inherited from <ancestor>"`, `"received"`.                                                                        |
 
-Field-name choices follow node_exporter's `filesystem` collector (`mountpoint`
-over Ohai's `mount`, `type` over Ohai's `fs_type`).
+The field names are the same as in node_exporter's `filesystem` collector. gohai
+uses `mountpoint`, not Ohai's `mount`, and `type`, not Ohai's `fs_type`.
 
 ## Platform support
 
-| Platform | Supported                                       |
-| -------- | ----------------------------------------------- |
-| Linux    | ✅ (gopsutil + `lsblk` enrichment when on PATH) |
-| macOS    | ✅ (`getfsstat` syscall via gopsutil)           |
+| Platform | Supported                                              |
+| -------- | ------------------------------------------------------ |
+| Linux    | ✅ (gopsutil, and `lsblk` data when it is on the PATH) |
+| macOS    | ✅ (the `getfsstat` syscall through gopsutil)          |
 
 ## Example output
 
@@ -140,51 +141,54 @@ None.
 
 ## Data sources
 
-Ohai's `filesystem.rb` combines `mount`, `df`, and `lsblk` output to build a
-per-device view with mount points, capacity, and filesystem types. gohai uses
-gopsutil instead, which reads `/proc/mounts` and `statfs` syscalls directly,
-same underlying data, different parsing path. gohai extends Ohai's surface with
-btrfs subvolume detail and ZFS dataset properties via VFS reads.
+Ohai's `filesystem.rb` combines the output of `mount`, `df` and `lsblk`. It
+makes a view of each device with the mount points, the capacity and the
+filesystem types. gohai uses gopsutil instead. gopsutil reads `/proc/mounts` and
+calls `statfs` directly. The data is the same, but the parse is different. gohai
+also adds btrfs subvolume data and ZFS dataset properties, through VFS reads.
 
 On Linux:
 
-1. gopsutil `disk.Partitions(true)` enumerates the mount table from
-   `/proc/mounts`; gopsutil `disk.Usage(mountpoint)` per row provides
-   capacity/used/available plus inode counts (`inodes_total`, `inodes_used`,
-   `inodes_available`). `inodes_used_percent` is computed from
-   `used / total * 100` when `total > 0` so Ohai's
-   `filesystem[mount][:inodes_percent_used]` field is covered.
-2. When `lsblk` is on PATH we run
-   `lsblk -J -o NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL` via the
-   shared `internal/executor` runner and merge the result into the mount table
-   by device path, populating `uuid`, `label`, `part_uuid`, `part_label`.
-3. Block devices that `lsblk` reports with a non-empty `FSTYPE` and empty
-   `MOUNTPOINT` populate `unmounted[]` so LUKS, inactive LVs, and btrfs devices
+1. gopsutil `disk.Partitions(true)` lists the mount table from `/proc/mounts`.
+   For each row, gopsutil `disk.Usage(mountpoint)` gives the capacity, used and
+   available bytes, and the inode counts (`inodes_total`, `inodes_used`,
+   `inodes_available`). When `total > 0`, the collector calculates
+   `inodes_used_percent` as `used / total * 100`. Thus gohai also has Ohai's
+   `filesystem[mount][:inodes_percent_used]` field.
+2. When `lsblk` is on the PATH, the collector runs
+   `lsblk -J -o NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL` through
+   the shared `internal/executor` runner. It merges the result into the mount
+   table by device path, and fills `uuid`, `label`, `part_uuid` and
+   `part_label`.
+3. The block devices that `lsblk` reports with an `FSTYPE` and no `MOUNTPOINT`
+   go into `unmounted[]`. Thus LUKS containers, inactive LVs and btrfs devices
    are still visible.
-4. When `lsblk` is missing (minimal containers, Alpine without util-linux) or
-   its output is malformed, we skip the enrichment silently; capacity and inode
-   data remain from gopsutil.
-5. **Btrfs allocation enrichment**. For each mount with `type == "btrfs"` and a
-   non-empty UUID we read `/sys/fs/btrfs/<uuid>/allocation/` through the
-   injected `avfs.VFS` and populate the mount's `btrfs` sub-record:
-   per-block-group (`data`, `metadata`, `system`) byte counters (`total`,
-   `used`, `reserved`) plus the RAID profile flag set (`single`, `raid0`,
-   `raid1`, `raid10`, `raid5`, `raid6`, `dup`). Missing sysfs paths (older
-   kernels, containers without /sys mounted) skip the enrichment silently.
-6. **ZFS datasets**. When `zfs` is on PATH we run `zfs get -p -H all` through
-   the shared `internal/executor` runner and parse its tab-separated
-   dataset/property/value/source rows into `ZFSDatasets` keyed by dataset name.
-   `-p` forces machine-readable byte values, `-H` drops the header. Non-ZFS
-   hosts (binary missing or exec error) return zero datasets with no error,
-   independent of `lsblk`.
+4. If `lsblk` is missing (minimal containers, Alpine without util-linux), or if
+   its output is not valid, the collector skips the `lsblk` data and reports no
+   error. The capacity and inode data from gopsutil stay.
+5. **Btrfs allocation data**. For each mount with `type == "btrfs"` and a UUID,
+   the collector reads `/sys/fs/btrfs/<uuid>/allocation/` through the injected
+   `avfs.VFS`. It fills the `btrfs` sub-record of the mount: the byte counters
+   (`total`, `used`, `reserved`) of each block group (`data`, `metadata`,
+   `system`), and the set of RAID profile flags (`single`, `raid0`, `raid1`,
+   `raid10`, `raid5`, `raid6`, `dup`). If the sysfs paths are missing (older
+   kernels, containers without a mounted /sys), the collector skips this data
+   and reports no error.
+6. **ZFS datasets**. When `zfs` is on the PATH, the collector runs
+   `zfs get -p -H all` through the shared `internal/executor` runner. It parses
+   the tab-separated rows (dataset, property, value, source) into `ZFSDatasets`,
+   with the dataset name as the key. `-p` gives byte values as numbers. `-H`
+   removes the header. On a host without ZFS (the binary is missing, or the run
+   fails), the collector returns zero datasets and no error. This does not
+   depend on `lsblk`.
 
-On macOS we use gopsutil's mount enumeration backed by `getfsstat(2)`. Btrfs and
-ZFS enrichment are Linux-only.
+On macOS, the collector uses gopsutil's list of mounts, which comes from
+`getfsstat(2)`. The btrfs and ZFS data are on Linux only.
 
 ## Backing library
 
 - [`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil),
-  BSD-3. Primary source for mounts, capacity, inodes.
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `lsblk` on Linux. Tests mock it with
+  BSD-3. The main source for mounts, capacity and inodes.
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `lsblk` and `zfs` on Linux. Tests mock it with
   `go.uber.org/mock`.

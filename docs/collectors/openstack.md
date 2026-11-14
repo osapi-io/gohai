@@ -4,51 +4,53 @@
 
 ## Description
 
-Collects OpenStack (Nova) instance metadata from the link-local server at
-`http://169.254.169.254/`. OpenStack intentionally emits an EC2-compatible
-metadata service under `/latest/meta-data/...` and a richer Nova-specific
-document at `/openstack/latest/meta_data.json`, gohai fetches both.
-`facts.OpenStack != nil` is the detection signal.
+The collector reads the OpenStack (Nova) instance metadata from the link-local
+server at `http://169.254.169.254/`. OpenStack gives two sources on purpose. One
+is an EC2-compatible metadata service under `/latest/meta-data/...`. The other
+is a Nova document with more data, at `/openstack/latest/meta_data.json`. gohai
+reads both. If `facts.OpenStack != nil`, the host is an OpenStack instance.
 
-Detection is gated on DMI `product.name` containing `"OpenStack"`. Ohai's plugin
-gates on the virtualization plugin's openstack signal, which itself reads DMI;
-we go directly to DMI for the same effect.
+The collector does the detection only if the DMI `product.name` contains
+`"OpenStack"`. Ohai's plugin uses the openstack signal of the virtualization
+plugin, and that signal reads DMI. gohai reads DMI directly, with the same
+result.
 
 ## Collected fields
 
-| Field             | Type                | Description                                                                                                                             | Schema mapping                 |
-| ----------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| `id`              | `string`            | EC2-mirror instance ID.                                                                                                                 | OTel `cloud.resource_id`       |
-| `type`            | `string`            | Instance flavor (e.g. `m1.small`).                                                                                                      | OTel `host.type`               |
-| `hostname`        | `string`            | Hostname.                                                                                                                               | OCSF `device.hostname`         |
-| `local_hostname`  | `string`            | Internal DNS name.                                                                                                                      | No direct schema mapping.      |
-| `public_hostname` | `string`            | Public DNS name.                                                                                                                        | No direct schema mapping.      |
-| `zone`            | `string`            | Nova availability zone.                                                                                                                 | OTel `cloud.availability_zone` |
-| `local_ipv4`      | `string`            | Primary private IPv4.                                                                                                                   | No direct schema mapping.      |
-| `public_ipv4`     | `string`            | Primary public IPv4.                                                                                                                    | No direct schema mapping.      |
-| `security_groups` | `[]string`          | Attached security groups.                                                                                                               | No direct schema mapping.      |
-| `image_id`        | `string`            | EC2-mirror AMI ID.                                                                                                                      | OTel `host.image.id`           |
-| `kernel_id`       | `string`            | Boot kernel image.                                                                                                                      | No direct schema mapping.      |
-| `ramdisk_id`      | `string`            | Boot ramdisk image.                                                                                                                     | No direct schema mapping.      |
-| `reservation_id`  | `string`            | EC2-mirror reservation ID.                                                                                                              | No direct schema mapping.      |
-| `name`            | `string`            | Nova `name` field.                                                                                                                      | OTel `host.name`               |
-| `project_uid`     | `string`            | Nova project ID.                                                                                                                        | OTel `cloud.account.id`        |
-| `uuid`            | `string`            | Nova UUID.                                                                                                                              | No direct schema mapping.      |
-| `meta_data`       | `map[string]string` | Nova `meta` key/values.                                                                                                                 | No direct schema mapping.      |
-| `public_keys`     | `map[string]string` | Name→key map of SSH keys.                                                                                                               | No direct schema mapping.      |
-| `launch_index`    | `int`               | Nova launch_index, position within a multi-instance launch request.                                                                     | No direct schema mapping.      |
-| `devices`         | `[]Device`          | Attached block-device list from meta_data.json (type / bus / serial / path / address / tags).                                           | No direct schema mapping.      |
-| `provider`        | `string`            | `"openstack"` or `"dreamhost"` (legacy Dreamhost OpenStack images shipped a `dhc-user` account). Matches Ohai's `openstack[:provider]`. | No direct schema mapping.      |
+| Field             | Type                | Description                                                                                                                                      | Schema mapping                 |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| `id`              | `string`            | The instance ID from the EC2-compatible tree.                                                                                                    | OTel `cloud.resource_id`       |
+| `type`            | `string`            | The instance flavor, for example `m1.small`.                                                                                                     | OTel `host.type`               |
+| `hostname`        | `string`            | The hostname.                                                                                                                                    | OCSF `device.hostname`         |
+| `local_hostname`  | `string`            | The internal DNS name.                                                                                                                           | No direct schema mapping.      |
+| `public_hostname` | `string`            | The public DNS name.                                                                                                                             | No direct schema mapping.      |
+| `zone`            | `string`            | The Nova availability zone.                                                                                                                      | OTel `cloud.availability_zone` |
+| `local_ipv4`      | `string`            | The primary private IPv4 address.                                                                                                                | No direct schema mapping.      |
+| `public_ipv4`     | `string`            | The primary public IPv4 address.                                                                                                                 | No direct schema mapping.      |
+| `security_groups` | `[]string`          | The attached security groups.                                                                                                                    | No direct schema mapping.      |
+| `image_id`        | `string`            | The AMI ID from the EC2-compatible tree.                                                                                                         | OTel `host.image.id`           |
+| `kernel_id`       | `string`            | The boot kernel image.                                                                                                                           | No direct schema mapping.      |
+| `ramdisk_id`      | `string`            | The boot ramdisk image.                                                                                                                          | No direct schema mapping.      |
+| `reservation_id`  | `string`            | The reservation ID from the EC2-compatible tree.                                                                                                 | No direct schema mapping.      |
+| `name`            | `string`            | The Nova `name` field.                                                                                                                           | OTel `host.name`               |
+| `project_uid`     | `string`            | The Nova project ID.                                                                                                                             | OTel `cloud.account.id`        |
+| `uuid`            | `string`            | The Nova UUID.                                                                                                                                   | No direct schema mapping.      |
+| `meta_data`       | `map[string]string` | The key-value pairs of the Nova `meta` field.                                                                                                    | No direct schema mapping.      |
+| `public_keys`     | `map[string]string` | A map of the SSH keys, from name to key.                                                                                                         | No direct schema mapping.      |
+| `launch_index`    | `int`               | The Nova launch_index. This is the position of the instance in a launch request for many instances.                                              | No direct schema mapping.      |
+| `devices`         | `[]Device`          | The list of attached block devices, from meta_data.json: type, bus, serial, path, address, tags.                                                 | No direct schema mapping.      |
+| `provider`        | `string`            | `"openstack"` or `"dreamhost"`. Old Dreamhost OpenStack images had a `dhc-user` account. The value is the same as Ohai's `openstack[:provider]`. | No direct schema mapping.      |
 
-Still skipped from meta_data.json: `network_info` (deployment-specific Neutron
-data) and `random_seed` (sensitive, no inventory value).
+The collector does not read two fields of meta_data.json. `network_info` holds
+Neutron data that is different for each deployment. `random_seed` is sensitive
+and has no inventory value.
 
 ## Platform support
 
 | Platform | Supported                               |
 | -------- | --------------------------------------- |
 | Linux    | ✅                                      |
-| macOS    | ✅ (only meaningful on an OpenStack VM) |
+| macOS    | ✅ (data only on an OpenStack VM)       |
 | Other    | ✅ (only meaningful on an OpenStack VM) |
 
 ## Example output
@@ -87,40 +89,46 @@ gohai --category=cloud           # pulls this + all cloud collectors
 
 ## Dependencies
 
-`dmi`. OpenStack writes `"OpenStack Nova"` or similar as `product_name`. Fails
-open when dmi wasn't run.
+`dmi`. OpenStack writes `"OpenStack Nova"` or a similar value as `product_name`.
+If `dmi` did not run, the collector fails open and continues.
 
 ## Data sources
 
-1. **DMI gate:** `dmi.Product.Name` contains `"OpenStack"`. Mirrors Ohai's
-   virtualization-plugin gate (which itself reads DMI).
-2. **EC2-mirror walk:** starts at `/latest/meta-data/` and recursively walks the
-   directory listing, entries ending in `/` are subdirectories (recurse), others
-   are leaves. Matches Ohai's `fetch_metadata` style for the EC2-compatible
-   tree. Populates the identity / placement / network fields (`id`, `type`,
+1. **DMI gate.** The collector continues only if `dmi.Product.Name` contains
+   `"OpenStack"`. This is the same as the gate of Ohai's virtualization plugin,
+   which also reads DMI.
+2. **EC2-compatible tree.** The collector starts at `/latest/meta-data/` and
+   reads the directory listings recursively. An entry that ends in `/` is a
+   subdirectory, and the collector reads it too. Other entries are leaves. This
+   is the same as Ohai's `fetch_metadata` method for the EC2-compatible tree.
+   This tree gives the identity, placement and network fields: `id`, `type`,
    `image_id`, `kernel_id`, `ramdisk_id`, `reservation_id`, `local_ipv4`,
-   `public_ipv4`, `zone`, `security_groups`, etc.).
-3. **Nova endpoint:** `GET /openstack/latest/meta_data.json`, the richer
-   Nova-native document. Populates `uuid`, `name`, `project_uid`, `hostname`,
-   `launch_index`, `meta_data`, `public_keys`, and the `devices[]` attached
-   block-device list (type / bus / serial / path / address / tags). Fills `zone`
-   / `hostname` when the EC2-mirror tree didn't supply them. `network_info` and
-   `random_seed` are intentionally skipped. The former is deployment-specific
-   Neutron data. The latter is sensitive and has no inventory value.
-4. **Provider field:** read `/etc/passwd` for a `dhc-user` entry. Present →
-   `"dreamhost"`. Absent → `"openstack"`. Matches Ohai's `openstack_provider`.
-5. **User-Agent:** `gohai` (the cloudmetadata default).
-6. **Timeout:** 2 seconds (Ohai's default; configurable in Ohai but gohai uses
-   the cloudmetadata default).
-7. **Failure handling:** if both the EC2-mirror walk AND the Nova doc fail, we
-   drop with `(nil, nil)`. Either source alone is enough to surface a populated
-   Info.
+   `public_ipv4`, `zone`, `security_groups` and others.
+3. **Nova endpoint.** The collector reads
+   `GET /openstack/latest/meta_data.json`, the Nova document with more data.
+   This document gives `uuid`, `name`, `project_uid`, `hostname`,
+   `launch_index`, `meta_data`, `public_keys`, and the `devices[]` list of
+   attached block devices (type, bus, serial, path, address, tags). If the
+   EC2-compatible tree did not give `zone` or `hostname`, this document gives
+   them. The collector does not read `network_info` and `random_seed`, on
+   purpose. `network_info` is Neutron data that is different for each
+   deployment. `random_seed` is sensitive and has no inventory value.
+4. **Provider field.** The collector reads `/etc/passwd` for a `dhc-user` entry.
+   If the entry is there, the value is `"dreamhost"`. If not, the value is
+   `"openstack"`. This is the same as Ohai's `openstack_provider`.
+5. **User-Agent.** The User-Agent is `gohai`, the cloudmetadata default.
+6. **Timeout.** The timeout is 2 seconds. This is Ohai's default. Ohai lets you
+   change it, but gohai uses the cloudmetadata default.
+7. **Failures.** If the EC2-compatible tree and the Nova document both fail, the
+   collector returns `(nil, nil)`. One source alone is sufficient to give an
+   Info with data.
 
-Mirrors Ohai's `Ohai::Mixin::Ec2Metadata` recursive walk (reused by the
-openstack plugin) plus the Nova-specific document and the provider/dreamhost
-detection.
+The method is the same as the recursive read of Ohai's
+`Ohai::Mixin::Ec2Metadata`, which the openstack plugin also uses. gohai also
+reads the Nova document and does the provider (dreamhost) detection, the same as
+Ohai.
 
 ## Backing library
 
 - [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
-  client used by every cloud-provider collector.
+  client of all cloud-provider collectors.

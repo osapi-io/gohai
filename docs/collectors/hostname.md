@@ -4,33 +4,34 @@
 
 ## Description
 
-Reports the host's short name, fully qualified domain name, and DNS domain. The
-FQDN is canonicalized via a DNS round-trip; the collector tolerates transient
-resolver failures by retrying up to three times before falling back to the short
-hostname. Consumers use this as a stable identity for telemetry, inventory, and
-correlation.
+The collector reports the short name of the host, its fully qualified domain
+name (FQDN) and its DNS domain. A DNS round trip makes the FQDN canonical. If
+the resolver has a temporary failure, the collector tries again, up to three
+times. If all tries fail, it uses the short hostname. Consumers use this data as
+a stable identity for telemetry, inventory and correlation.
 
-On macOS we additionally capture the friendly machine name
-(ComputerName-derived, e.g. "John's MacBook Pro") and prefer `hostname -s` over
-gopsutil so the short name always matches what `$(hostname -s)` reports
-elsewhere on the host, important on MDM-managed Macs where
-`scutil --get HostName` can differ.
+On macOS, the collector also reports the friendly machine name. This name comes
+from `ComputerName`, for example "John's MacBook Pro". The collector uses
+`hostname -s` and not gopsutil. Thus the short name is always the same as the
+value that `$(hostname -s)` gives in other places on the host. This is important
+on Macs that MDM manages, because there `scutil --get HostName` can be
+different.
 
 ## Collected fields
 
-| Field          | Type   | Description                                                                              | Schema mapping                                                       |
-| -------------- | ------ | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `name`         | string | Short hostname (e.g., `web01`).                                                          | OCSF `device.hostname` (leaf stripped: leaf matches collector name). |
-| `fqdn`         | string | Canonical FQDN; falls back to short hostname when DNS canonicalization ultimately fails. | `device.domain` + `.hostname`.                                       |
-| `domain`       | string | DNS domain, everything after the first `.` of the FQDN. Empty when FQDN equals `name`.   | `device.domain`.                                                     |
-| `machine_name` | string | Human-friendly name (macOS `ComputerName`-derived). Linux: same as `name`.               | No direct schema mapping.                                            |
+| Field          | Type   | Description                                                                                          | Schema mapping                                                                            |
+| -------------- | ------ | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `name`         | string | The short hostname, for example `web01`.                                                             | OCSF `device.hostname`. The leaf is removed because it is the same as the collector name. |
+| `fqdn`         | string | The canonical FQDN. If DNS canonicalization fails on all tries, this is the short hostname.          | `device.domain` + `.hostname`.                                                            |
+| `domain`       | string | The DNS domain: all text after the first `.` of the FQDN. Empty if the FQDN is the same as `name`.   | `device.domain`.                                                                          |
+| `machine_name` | string | The human-friendly name. On macOS, it comes from `ComputerName`. On Linux, it is the same as `name`. | No direct schema mapping.                                                                 |
 
 ## Platform support
 
-| Platform | Supported                                                          |
-| -------- | ------------------------------------------------------------------ |
-| Linux    | ✅ (`hostname -s` + `hostname` via executor, DNS canonicalization) |
-| macOS    | ✅ (`hostname -s` + `hostname` via executor, DNS canonicalization) |
+| Platform | Supported                                                                    |
+| -------- | ---------------------------------------------------------------------------- |
+| Linux    | ✅ (`hostname -s` and `hostname` through the executor, DNS canonicalization) |
+| macOS    | ✅ (`hostname -s` and `hostname` through the executor, DNS canonicalization) |
 
 ## Example output
 
@@ -68,37 +69,41 @@ None.
 
 ## Data sources
 
-On Linux and macOS (identical, mirrors Ohai's `hostname.rb` linux and darwin
-branches):
+On Linux and macOS, the steps are the same. They are the same as the linux and
+darwin branches of Ohai's `hostname.rb`:
 
-1. `hostname -s` → `name`. Run through the shared `internal/executor` runner. We
-   prefer this over gopsutil so our short name matches what `$(hostname -s)`
-   reports in any other tool on the host, important on MDM-managed Macs where
-   `scutil --get HostName` can differ, and on Linux hosts where `/etc/hostname`
-   has been manually edited to an FQDN.
-2. `hostname` (no args) → `machine_name`. On stock macOS this is the
-   `ComputerName`-derived friendly name; on Linux it normally matches the short
-   name.
-3. FQDN is canonicalized via `net.LookupHost` followed by `net.LookupAddr`,
-   retried up to 3 times with a 100ms backoff on transient errors, matches
-   Ohai's `canonicalize_hostname_with_retries`. On final failure we use the
-   short hostname as FQDN.
-4. Derive `domain` by splitting FQDN on the first `.`. Empty when FQDN equals
-   `name`.
-5. Fallback chain when the exec runner is unavailable or `hostname -s` /
-   `hostname` fail: short name from gopsutil's `host.Info`, `machine_name` from
-   `os.Hostname()`. Keeps minimal containers without `util-linux-hostname`
-   working.
+1. `hostname -s` gives `name`. The collector runs it through the shared
+   `internal/executor` runner. The collector uses this command and not gopsutil.
+   Thus the short name is the same as the value that `$(hostname -s)` gives in
+   other tools on the host. This is important on Macs that MDM manages, where
+   `scutil --get HostName` can be different. It is also important on Linux hosts
+   where a person changed `/etc/hostname` to an FQDN.
+2. `hostname` with no arguments gives `machine_name`. On stock macOS, this is
+   the friendly name from `ComputerName`. On Linux, it is usually the same as
+   the short name.
+3. The collector makes the FQDN canonical with `net.LookupHost` and then
+   `net.LookupAddr`. On a temporary error, it tries again, up to 3 times, with a
+   100ms backoff. This is the same as Ohai's
+   `canonicalize_hostname_with_retries`. If the last try fails, the collector
+   uses the short hostname as the FQDN.
+4. The collector splits the FQDN at the first `.` to get `domain`. `domain` is
+   empty if the FQDN is the same as `name`.
+5. If the exec runner is not available, or `hostname -s` or `hostname` fails,
+   the collector uses fallbacks. The short name comes from gopsutil's
+   `host.Info`. `machine_name` comes from `os.Hostname()`. Thus the collector
+   also works in minimal containers that do not have `util-linux-hostname`.
 
-Both commands are invoked through the shared `internal/executor` runner; tests
-mock present / absent / empty-output cases via `go.uber.org/mock`.
+The collector runs both commands through the shared `internal/executor` runner.
+Tests use `go.uber.org/mock` to mock the cases where the command is there, is
+missing, or gives empty output.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `hostname -s` and `hostname` on both Linux and
-  macOS. Tests mock it with `go.uber.org/mock`.
-- Go stdlib `net` package for forward/reverse DNS canonicalization.
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `hostname -s` and `hostname` on Linux and macOS.
+  Tests mock it with `go.uber.org/mock`.
+- The Go standard library `net` package for forward and reverse DNS
+  canonicalization.
 - [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil),
-  BSD-3. Fallback source for the short hostname when the exec runner is
-  unavailable.
+  BSD-3. The fallback source of the short hostname if the exec runner is not
+  available.

@@ -4,104 +4,106 @@
 
 ## Description
 
-Collects Google Compute Engine instance and project metadata by hitting the
-link-local metadata server at
-`http://metadata.google.internal./computeMetadata/v1/`. The collector is the
-`facts.Gce != nil` signal, if you can read it, you're running on GCE. On non-GCE
-hosts the metadata endpoint isn't reachable and the `gce` field drops from
-`Facts` silently (no error, no noise).
+The collector reads the Google Compute Engine instance and project metadata from
+the link-local metadata server at
+`http://metadata.google.internal./computeMetadata/v1/`. The collector gives the
+`facts.Gce != nil` signal. If you can read the data, the host is on GCE. On a
+host that is not on GCE, the collector cannot reach the metadata endpoint. Then
+the `gce` field is not in `Facts`, and there is no error or log message.
 
-The shape mirrors every field GCE returns via `?recursive=true`, flattened to
-match the rest of the gohai codebase's single-top-level-struct convention.
-Resource paths (`machineType`, `zone`, `image`, `network`) are normalized to
-their short forms; everything else is surfaced verbatim.
+The output has each field that GCE returns for `?recursive=true`. The collector
+makes the fields flat, the same as the other gohai collectors, which each have
+one top-level struct. The collector changes the resource paths (`machineType`,
+`zone`, `image`, `network`) to their short forms. It reports all other values
+exactly as GCE gives them.
 
 ## Collected fields
 
 ### Top-level
 
-| Field                       | Type                 | Description                                                                                            | Schema mapping                        |
-| --------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
-| `id`                        | `int64`              | GCE numeric instance ID.                                                                               | OTel `cloud.resource_id` / `host.id`  |
-| `name`                      | `string`             | VM instance name.                                                                                      | OTel `host.name`                      |
-| `hostname`                  | `string`             | Fully-qualified internal DNS name.                                                                     | OCSF `device.hostname`                |
-| `cpu_platform`              | `string`             | Underlying CPU platform (e.g. `Intel Broadwell`).                                                      | OTel `host.cpu.model.name`            |
-| `type`                      | `string`             | Short machine type (e.g. `n1-standard-1`).                                                             | OTel `host.type`                      |
-| `image_id`                  | `string`             | Short image name (e.g. `debian-12`).                                                                   | OTel `host.image.name`                |
-| `description`               | `string`             | Free-form description set on the instance.                                                             | No direct schema mapping.             |
-| `tags`                      | `[]string`           | GCE instance tags (firewall-rule targets, not labels).                                                 | No direct schema mapping.             |
-| `preemptible`               | `bool`               | `true` when the VM is preemptible/spot.                                                                | No direct schema mapping.             |
-| `automatic_restart`         | `string`             | `"TRUE"` / `"FALSE"`, restart policy on failure.                                                       | No direct schema mapping.             |
-| `on_host_maintenance`       | `string`             | `MIGRATE` / `TERMINATE`, host-maintenance behavior.                                                    | No direct schema mapping.             |
-| `maintenance_event`         | `string`             | Current maintenance event (`NONE`, `MIGRATE_ON_HOST_MAINTENANCE`, etc.).                               | No direct schema mapping.             |
-| `zone`                      | `string`             | GCE zone (e.g. `us-central1-a`).                                                                       | OTel `cloud.availability_zone`        |
-| `region`                    | `string`             | GCE region, derived from zone (e.g. `us-central1`).                                                    | OTel `cloud.region`                   |
-| `project_uid`               | `string`             | GCP project ID.                                                                                        | OTel `cloud.account.id`               |
-| `numeric_project_id`        | `int64`              | GCP project numeric ID.                                                                                | No direct schema mapping.             |
-| `project_attributes`        | `map[string]string`  | Project-level metadata. Commonly contains `ssh-keys`, `enable-oslogin`, etc.                           | No direct schema mapping.             |
-| `licenses`                  | `[]string`           | GCP license IDs attached to the VM (for BYOL / compliance tracking).                                   | No direct schema mapping.             |
-| `attributes`                | `map[string]string`  | Instance-level metadata. Often contains `ssh-keys`, `startup-script`, user tags.                       | No direct schema mapping.             |
-| `network_interfaces`        | `[]NetworkInterface` | Attached VNICs, see below.                                                                             | OCSF `network_interface` (per entry). |
-| `disks`                     | `[]Disk`             | Attached disks, see below.                                                                             | No direct schema mapping.             |
-| `service_accounts`          | `[]ServiceAccount`   | Service accounts attached to the VM, see below.                                                        | No direct schema mapping.             |
-| `virtual_clock_drift_token` | `string`             | Opaque drift token from `instance.virtualClock`, used by some monitoring tools to detect VM migration. | No direct schema mapping.             |
-| `remaining_cpu_time`        | `int64`              | Remaining CPU seconds before Spot VM preemption. Zero on standard instances.                           | No direct schema mapping.             |
-| `partner_attributes`        | `map[string]string`  | Opaque key/value pairs set by partner images (marketplace product metadata).                           | No direct schema mapping.             |
+| Field                       | Type                 | Description                                                                                             | Schema mapping                        |
+| --------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `id`                        | `int64`              | The numeric GCE instance ID.                                                                            | OTel `cloud.resource_id` / `host.id`  |
+| `name`                      | `string`             | The VM instance name.                                                                                   | OTel `host.name`                      |
+| `hostname`                  | `string`             | The fully qualified internal DNS name.                                                                  | OCSF `device.hostname`                |
+| `cpu_platform`              | `string`             | The CPU platform, for example `Intel Broadwell`.                                                        | OTel `host.cpu.model.name`            |
+| `type`                      | `string`             | The short machine type, for example `n1-standard-1`.                                                    | OTel `host.type`                      |
+| `image_id`                  | `string`             | The short image name, for example `debian-12`.                                                          | OTel `host.image.name`                |
+| `description`               | `string`             | The free-form description of the instance.                                                              | No direct schema mapping.             |
+| `tags`                      | `[]string`           | The GCE instance tags. These are firewall-rule targets, not labels.                                     | No direct schema mapping.             |
+| `preemptible`               | `bool`               | `true` when the VM is preemptible or spot.                                                              | No direct schema mapping.             |
+| `automatic_restart`         | `string`             | `"TRUE"` or `"FALSE"`. The restart policy after a failure.                                              | No direct schema mapping.             |
+| `on_host_maintenance`       | `string`             | `MIGRATE` or `TERMINATE`. What the VM does during host maintenance.                                     | No direct schema mapping.             |
+| `maintenance_event`         | `string`             | The current maintenance event, for example `NONE` or `MIGRATE_ON_HOST_MAINTENANCE`.                     | No direct schema mapping.             |
+| `zone`                      | `string`             | The GCE zone, for example `us-central1-a`.                                                              | OTel `cloud.availability_zone`        |
+| `region`                    | `string`             | The GCE region, from the zone, for example `us-central1`.                                               | OTel `cloud.region`                   |
+| `project_uid`               | `string`             | The GCP project ID.                                                                                     | OTel `cloud.account.id`               |
+| `numeric_project_id`        | `int64`              | The numeric GCP project ID.                                                                             | No direct schema mapping.             |
+| `project_attributes`        | `map[string]string`  | The project metadata. It usually contains `ssh-keys`, `enable-oslogin` and similar keys.                | No direct schema mapping.             |
+| `licenses`                  | `[]string`           | The GCP license IDs of the VM, for BYOL and compliance records.                                         | No direct schema mapping.             |
+| `attributes`                | `map[string]string`  | The instance metadata. It frequently contains `ssh-keys`, `startup-script` and user tags.               | No direct schema mapping.             |
+| `network_interfaces`        | `[]NetworkInterface` | The attached VNICs. Refer to the table below.                                                           | OCSF `network_interface` (per entry). |
+| `disks`                     | `[]Disk`             | The attached disks. Refer to the table below.                                                           | No direct schema mapping.             |
+| `service_accounts`          | `[]ServiceAccount`   | The service accounts of the VM. Refer to the table below.                                               | No direct schema mapping.             |
+| `virtual_clock_drift_token` | `string`             | The opaque drift token from `instance.virtualClock`. Some monitoring tools use it to find VM migration. | No direct schema mapping.             |
+| `remaining_cpu_time`        | `int64`              | The CPU seconds that remain before Spot VM preemption. Zero on standard instances.                      | No direct schema mapping.             |
+| `partner_attributes`        | `map[string]string`  | Opaque key/value pairs that partner images set (marketplace product metadata).                          | No direct schema mapping.             |
 
 ### NetworkInterface
 
-| Field                 | Type             | Description                                      |
-| --------------------- | ---------------- | ------------------------------------------------ |
-| `ip`                  | `string`         | Private IPv4 address.                            |
-| `mac`                 | `string`         | MAC address.                                     |
-| `network`             | `string`         | Short network name (e.g. `default`).             |
-| `subnetmask`          | `string`         | Subnet mask.                                     |
-| `gateway`             | `string`         | Default gateway.                                 |
-| `dns_servers`         | `[]string`       | DNS resolvers.                                   |
-| `ip_aliases`          | `[]string`       | Alias IP ranges attached to this interface.      |
-| `forwarded_ips`       | `[]string`       | Static external IPs forwarded to this interface. |
-| `target_instance_ips` | `[]string`       | Target-instance IPs.                             |
-| `mtu`                 | `int`            | Interface MTU.                                   |
-| `access_configs`      | `[]AccessConfig` | External access configs (NAT / public IPs).      |
+| Field                 | Type             | Description                                                  |
+| --------------------- | ---------------- | ------------------------------------------------------------ |
+| `ip`                  | `string`         | The private IPv4 address.                                    |
+| `mac`                 | `string`         | The MAC address.                                             |
+| `network`             | `string`         | The short network name, for example `default`.               |
+| `subnetmask`          | `string`         | The subnet mask.                                             |
+| `gateway`             | `string`         | The default gateway.                                         |
+| `dns_servers`         | `[]string`       | The DNS resolvers.                                           |
+| `ip_aliases`          | `[]string`       | The alias IP ranges of this interface.                       |
+| `forwarded_ips`       | `[]string`       | The static external IPs that GCE forwards to this interface. |
+| `target_instance_ips` | `[]string`       | The target-instance IPs.                                     |
+| `mtu`                 | `int`            | The interface MTU.                                           |
+| `access_configs`      | `[]AccessConfig` | The external access configs (NAT or public IPs).             |
 
 ### AccessConfig
 
-| Field         | Type     | Description                                                |
-| ------------- | -------- | ---------------------------------------------------------- |
-| `external_ip` | `string` | Public IPv4 address.                                       |
-| `type`        | `string` | Access-config type (`ONE_TO_ONE_NAT`, `DIRECT_IPV6`, ...). |
+| Field         | Type     | Description                                                            |
+| ------------- | -------- | ---------------------------------------------------------------------- |
+| `external_ip` | `string` | The public IPv4 address.                                               |
+| `type`        | `string` | The access-config type, for example `ONE_TO_ONE_NAT` or `DIRECT_IPV6`. |
 
 ### Disk
 
-| Field         | Type     | Description                                     |
-| ------------- | -------- | ----------------------------------------------- |
-| `device_name` | `string` | Device name as seen by the VM (e.g. `boot`).    |
-| `type`        | `string` | `PERSISTENT` or `SCRATCH`.                      |
-| `mode`        | `string` | `READ_WRITE` or `READ_ONLY`.                    |
-| `index`       | `int`    | Attachment index.                               |
-| `interface`   | `string` | Bus interface, `SCSI` or `NVME`.                |
-| `encrypted`   | `bool`   | `true` when GCP customer-managed-key encrypted. |
+| Field         | Type     | Description                                               |
+| ------------- | -------- | --------------------------------------------------------- |
+| `device_name` | `string` | The device name that the VM sees, for example `boot`.     |
+| `type`        | `string` | `PERSISTENT` or `SCRATCH`.                                |
+| `mode`        | `string` | `READ_WRITE` or `READ_ONLY`.                              |
+| `index`       | `int`    | The attachment index.                                     |
+| `interface`   | `string` | The bus interface, `SCSI` or `NVME`.                      |
+| `encrypted`   | `bool`   | `true` when a GCP customer-managed key encrypts the disk. |
 
 ### ServiceAccount
 
-| Field     | Type       | Description                                                             |
-| --------- | ---------- | ----------------------------------------------------------------------- |
-| `key`     | `string`   | Map key from GCE's response (usually `"default"` or the SA full email). |
-| `email`   | `string`   | Service-account identity.                                               |
-| `aliases` | `[]string` | Alias names (rarely populated).                                         |
-| `scopes`  | `[]string` | OAuth scopes granted to the SA (for IAM auditing).                      |
+| Field     | Type       | Description                                                                         |
+| --------- | ---------- | ----------------------------------------------------------------------------------- |
+| `key`     | `string`   | The map key from the GCE response. Usually `"default"` or the full email of the SA. |
+| `email`   | `string`   | The service-account identity.                                                       |
+| `aliases` | `[]string` | The alias names. This field is usually empty.                                       |
+| `scopes`  | `[]string` | The OAuth scopes of the SA, for IAM audits.                                         |
 
 ## Platform support
 
-| Platform | Supported                        |
-| -------- | -------------------------------- |
-| Linux    | ✅                               |
-| macOS    | ✅ (only meaningful on a GCE VM) |
-| Other    | ✅ (only meaningful on a GCE VM) |
+| Platform | Supported                    |
+| -------- | ---------------------------- |
+| Linux    | ✅                           |
+| macOS    | ✅ (useful only on a GCE VM) |
+| Other    | ✅ (useful only on a GCE VM) |
 
-The collector works on any OS, it's an HTTP call, not a file read. It only
-returns data on hosts where `metadata.google.internal` resolves and responds,
-which in practice is GCE VMs.
+The collector operates on all operating systems, because it sends an HTTP
+request. It does not read a file. It returns data only on hosts where
+`metadata.google.internal` resolves and responds. In practice, these are GCE
+VMs.
 
 ## Example output
 
@@ -201,53 +203,57 @@ gohai --no-collector.gce   # disable (default)
 gohai --category=cloud     # pulls gce + dmi + other cloud collectors as they land
 ```
 
-Opt-in because hitting the metadata endpoint on non-GCE hosts eats the
-`cloudmetadata` default timeout (2s).
+The collector is opt-in. On a host that is not on GCE, a request to the metadata
+endpoint waits for the `cloudmetadata` default timeout (2 s).
 
 ## Dependencies
 
-`dmi`. The GCE metadata endpoint is gated by a DMI product-name check, the
-collector skips the HTTP call when `dmi.Product.Name` doesn't contain
-`"Google Compute Engine"`. Mirrors Ohai's `has_gce_dmi?` optimization. Enabling
-`gce` automatically pulls `dmi` via the registry's dependency resolution, so you
-don't have to enable it yourself. When `dmi` is absent from the prior results
-(explicitly disabled by the user) the collector fails open and attempts the HTTP
-probe anyway, slower on non-GCE hosts but still correct.
+`dmi`. A DMI product-name check controls the request to the GCE metadata
+endpoint. The collector skips the HTTP request when `dmi.Product.Name` does not
+contain `"Google Compute Engine"`. This is the same optimization as Ohai's
+`has_gce_dmi?`. When you enable `gce`, the dependency resolution of the registry
+enables `dmi` automatically. You do not have to enable it. If `dmi` is not in
+the prior results (because the user disabled it), the collector fails open and
+sends the HTTP request. This is slower on hosts that are not on GCE, but the
+result is still correct.
 
 ## Data sources
 
-1. **DMI gate** (see [dmi.md](dmi.md)): reads the prior `dmi` collector result
-   and short-circuits with `(nil, nil)` when `product.name` doesn't contain
-   `"Google Compute Engine"`. Saves the 2s metadata-endpoint timeout on non-GCE
-   hosts. Fails open (tries the HTTP call) when `dmi` was not run.
-2. **Endpoint:**
-   `http://metadata.google.internal./computeMetadata/v1/?recursive=true`
-   (trailing dot on the hostname defeats the host's DNS search path).
-3. **Required header:** `Metadata-Flavor: Google`. GCE rejects requests without
-   it, which protects against lateral SSRF-style probes that wouldn't know to
-   set it.
-4. **User-Agent:** `gohai` (the cloudmetadata default).
-5. **Timeout:** 6 seconds, matches Ohai's `read_timeout` in
-   `mixin/gce_metadata.rb`. GCE's link-local endpoint answers in milliseconds
-   when reachable.
-6. **Failure handling:** any fetch failure (transport, non-2xx, body read)
-   returns `(nil, nil)` so the `gce` field drops from Facts silently. Only
-   malformed JSON in the response surfaces as an error.
-7. **Transformation:** resource paths (`machineType`, `zone`, `image`,
-   `network`) are normalized to their short last-segment forms;
-   `scheduling.preemptible` is converted from `"TRUE"`/`"FALSE"` to a real
-   `bool`; `region` is derived by stripping the zone's trailing `-<letter>`
-   suffix. `instance.virtualClock.driftToken` is lifted to the flat
-   `virtual_clock_drift_token`; `instance.remainingCpuTime` and
-   `instance.partnerAttributes` are lifted to `remaining_cpu_time` and
-   `partner_attributes`. The full untransformed tree is not retained, all
-   surfaced fields are typed.
+1. **DMI check** (refer to [dmi.md](dmi.md)). The collector reads the prior
+   result of the `dmi` collector. If `product.name` does not contain
+   `"Google Compute Engine"`, it stops and returns `(nil, nil)`. This prevents
+   the 2 s metadata-endpoint timeout on hosts that are not on GCE. If `dmi` did
+   not run, the check fails open and the collector sends the HTTP request.
+2. **Endpoint.**
+   `http://metadata.google.internal./computeMetadata/v1/?recursive=true`. The
+   dot at the end of the hostname stops the DNS search path of the host.
+3. **Required header.** `Metadata-Flavor: Google`. GCE refuses requests without
+   it. This gives protection against lateral SSRF probes that do not know to set
+   the header.
+4. **User-Agent.** `gohai` (the cloudmetadata default).
+5. **Timeout.** 6 seconds. This is the same as Ohai's `read_timeout` in
+   `mixin/gce_metadata.rb`. When the GCE link-local endpoint is reachable, it
+   answers in milliseconds.
+6. **Failures.** If a read fails (transport, a status that is not 2xx, the body
+   read), the collector returns `(nil, nil)`. Then the `gce` field is not in
+   Facts, and there is no error. Only JSON that is not valid in the response
+   gives an error.
+7. **Changes to the data.** The collector changes the resource paths
+   (`machineType`, `zone`, `image`, `network`) to their last segment. It changes
+   `scheduling.preemptible` from `"TRUE"` or `"FALSE"` to a real `bool`. It gets
+   `region` from the zone: it removes the `-<letter>` suffix at the end of the
+   zone. It moves `instance.virtualClock.driftToken` to the flat
+   `virtual_clock_drift_token`. It moves `instance.remainingCpuTime` and
+   `instance.partnerAttributes` to `remaining_cpu_time` and
+   `partner_attributes`. The collector does not keep the full tree as GCE gives
+   it. All fields in the output are typed.
 
-Mirrors Ohai's `Ohai::Mixin::GCEMetadata` collection approach: same URL, same
-header, same single recursive call, same full-tree coverage.
+The method is the same as Ohai's `Ohai::Mixin::GCEMetadata`: the same URL, the
+same header, the same single recursive request, and the same full tree.
 
 ## Backing library
 
 - [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
-  client used by every cloud-provider collector. Handles short-timeout GETs,
-  `Metadata-Flavor` header injection, and the `ErrNotAvailable` sentinel.
+  client of all cloud-provider collectors. It sends GET requests with a short
+  timeout, adds the `Metadata-Flavor` header, and gives the `ErrNotAvailable`
+  sentinel.

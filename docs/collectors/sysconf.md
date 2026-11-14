@@ -4,44 +4,45 @@
 
 ## Description
 
-Reports four POSIX `sysconf(3)` values: clock tick rate, page size, and
-configured and online CPU counts. Matches Ohai's `sysconf` plugin but uses
-`github.com/tklauser/go-sysconf` (already in the module graph as a transitive
-dependency) instead of shelling out to `getconf -a`, faster, no child process,
-identical semantics. Both Linux and macOS expose the same four `SC_*` constants.
+The collector reports four POSIX `sysconf(3)` values: the clock tick rate, the
+page size, the configured CPU count and the online CPU count. The data is the
+same as Ohai's `sysconf` plugin. But gohai uses `github.com/tklauser/go-sysconf`
+and does not run `getconf -a`. The library is already in the module graph as a
+transitive dependency. It is faster, it starts no child process, and the values
+have the same meaning. Linux and macOS both have the same four `SC_*` constants.
 
-DefaultEnabled is `false`, niche fact most consumers don't need.
+DefaultEnabled is `false`. Most consumers do not need this data.
 
 ## Signals
 
 The collector reports four related signals:
 
-- `clk_tck`. Clock ticks per second (SC_CLK_TCK). Used to convert `/proc/stat`
-  jiffy counts to wall-clock seconds when computing per-process CPU time.
-  Typically 100 on Linux, 128 on macOS.
-- `pagesize`. Memory page size in bytes (SC_PAGESIZE). Needed when converting
+- `clk_tck`. The clock ticks per second (SC_CLK_TCK). Use it to change
+  `/proc/stat` jiffy counts to wall-clock seconds when you calculate the CPU
+  time of a process. It is usually 100 on Linux and 128 on macOS.
+- `pagesize`. The memory page size in bytes (SC_PAGESIZE). You need it to change
   page-count fields from `/proc/meminfo` or `vm_stat` into bytes.
-- `nprocessors_conf`. CPUs configured in the kernel (SC_NPROCESSORS_CONF).
-  Includes offline CPUs; higher than `nprocessors_onln` on hosts with CPU
-  hotplug.
-- `nprocessors_onln`. CPUs currently online (SC_NPROCESSORS_ONLN). The value
-  used for parallelism decisions.
+- `nprocessors_conf`. The CPUs configured in the kernel (SC_NPROCESSORS_CONF).
+  It includes offline CPUs. On hosts with CPU hotplug, it is higher than
+  `nprocessors_onln`.
+- `nprocessors_onln`. The CPUs that are online now (SC_NPROCESSORS_ONLN). Use
+  this value to decide how much work to do in parallel.
 
 ## Collected fields
 
-| Field              | Type  | Description                                                         | Schema mapping                                 |
-| ------------------ | ----- | ------------------------------------------------------------------- | ---------------------------------------------- |
-| `clk_tck`          | int64 | Clock ticks per second (SC_CLK_TCK).                                | `host.cpu.count` family, OTel; no exact match. |
-| `pagesize`         | int64 | Memory page size in bytes (SC_PAGESIZE).                            | `system.memory.page.size`, OTel semconv.       |
-| `nprocessors_conf` | int64 | Total configured CPU count including offline (SC_NPROCESSORS_CONF). | `host.cpu.count` (OTel), total configured.     |
-| `nprocessors_onln` | int64 | Currently online CPU count (SC_NPROCESSORS_ONLN).                   | `host.cpu.count` (OTel), online subset.        |
+| Field              | Type  | Description                                                              | Schema mapping                                 |
+| ------------------ | ----- | ------------------------------------------------------------------------ | ---------------------------------------------- |
+| `clk_tck`          | int64 | The clock ticks per second (SC_CLK_TCK).                                 | `host.cpu.count` family, OTel. No exact match. |
+| `pagesize`         | int64 | The memory page size in bytes (SC_PAGESIZE).                             | `system.memory.page.size`, OTel semconv.       |
+| `nprocessors_conf` | int64 | The total configured CPU count, with offline CPUs (SC_NPROCESSORS_CONF). | `host.cpu.count` (OTel), total configured.     |
+| `nprocessors_onln` | int64 | The count of CPUs that are online now (SC_NPROCESSORS_ONLN).             | `host.cpu.count` (OTel), online subset.        |
 
 ## Platform support
 
-| Platform | Supported                              |
-| -------- | -------------------------------------- |
-| Linux    | ✅ (via `go-sysconf` SC\_\* constants) |
-| macOS    | ✅ (same SC\_\* constants supported)   |
+| Platform | Supported                                      |
+| -------- | ---------------------------------------------- |
+| Linux    | ✅ (through the `go-sysconf` SC\_\* constants) |
+| macOS    | ✅ (the same SC\_\* constants)                 |
 
 ## Example output
 
@@ -94,31 +95,36 @@ None.
 
 ## Data sources
 
-Ohai's `sysconf.rb` shells out to `getconf -a` and parses the key=value output.
-gohai uses `github.com/tklauser/go-sysconf` instead, a pure Go wrapper around
-the POSIX `sysconf(3)` syscall. This avoids the subprocess overhead and gives
-type-safe `int64` values directly. The four constants collected (CLK_TCK,
-PAGESIZE, NPROCESSORS_CONF, NPROCESSORS_ONLN) match Ohai's output.
+Ohai's `sysconf.rb` runs `getconf -a` in a shell and parses the key=value
+output. gohai uses `github.com/tklauser/go-sysconf`, a pure Go wrapper around
+the POSIX `sysconf(3)` syscall. Thus gohai starts no subprocess, and it gets
+type-safe `int64` values directly. The four constants that gohai collects
+(CLK_TCK, PAGESIZE, NPROCESSORS_CONF, NPROCESSORS_ONLN) are the same as Ohai's
+output.
 
-On both Linux and macOS the collector calls `Sysconf(SC_*)` from
-`github.com/tklauser/go-sysconf` directly, no subprocess:
+On Linux and macOS, the collector calls `Sysconf(SC_*)` from
+`github.com/tklauser/go-sysconf` directly. It starts no subprocess:
 
 1. `SC_CLK_TCK` → `clk_tck`
 2. `SC_PAGESIZE` → `pagesize`
 3. `SC_NPROCESSORS_CONF` → `nprocessors_conf`
 4. `SC_NPROCESSORS_ONLN` → `nprocessors_onln`
 
-Any `Sysconf` error is propagated as a wrapped error.
+If `Sysconf` returns an error, the collector wraps it and returns it.
 
-**Why `go-sysconf` instead of `getconf -a`?** Ohai's `sysconf.rb` shells out to
-`getconf -a` and parses its output. We use the Go library because it is already
-present in the module graph (brought in transitively by gopsutil), avoids
-spawning a subprocess, and provides type-safe constants, no string parsing
-needed. The library wraps the same POSIX `sysconf(3)` syscall under the hood, so
-semantics are identical.
+**Why `go-sysconf` and not `getconf -a`?** Ohai's `sysconf.rb` runs `getconf -a`
+in a shell and parses its output. gohai uses the Go library for three reasons:
+
+- The library is already in the module graph. gopsutil brings it in as a
+  transitive dependency.
+- It starts no subprocess.
+- It gives type-safe constants, so no string parse is necessary.
+
+The library wraps the same POSIX `sysconf(3)` syscall, so the values have the
+same meaning.
 
 ## Backing library
 
-- [`github.com/tklauser/go-sysconf`](https://github.com/tklauser/go-sysconf),
-  pure-Go POSIX `sysconf(3)` wrapper. Already in the module graph as a
-  transitive dep of gopsutil.
+- [`github.com/tklauser/go-sysconf`](https://github.com/tklauser/go-sysconf). A
+  pure-Go wrapper of POSIX `sysconf(3)`. It is already in the module graph as a
+  transitive dependency of gopsutil.

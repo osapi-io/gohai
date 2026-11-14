@@ -4,49 +4,49 @@
 
 ## Description
 
-Enumerates graphics / compute devices attached to the host, both integrated
-(Apple Silicon M-series, Intel iGPUs) and discrete (NVIDIA, AMD). Consumers use
-this to:
+The collector lists the graphics and compute devices of the host. It reports
+integrated devices (Apple Silicon M-series, Intel iGPUs) and discrete devices
+(NVIDIA, AMD). Consumers use this data to:
 
-- Correlate workloads with available acceleration (ML training, video encoding).
-- Verify a driver/vendor pair in fleet inventory.
-- Feed CVE databases keyed off GPU firmware/driver versions.
+- Relate workloads to the available acceleration (ML training, video encoding).
+- Verify a driver and vendor pair in the fleet inventory.
+- Give data to CVE databases that use GPU firmware and driver versions as keys.
 
-**No Ohai precedent.** Ohai has no GPU plugin, verified against the full
-`chef/ohai` tree (no `gpu.rb`, no graphics/video/display plugins anywhere under
-`lib/ohai/plugins/`). This collector is therefore native to gohai: there's no
-years-of-distro-quirks methodology to mirror, and no consumers migrating from
-Ohai have an existing `node['gpu']` shape we'd be breaking. Collection follows
-the same shape as every other gohai hardware collector, ghw wraps
-`/sys/class/drm` on Linux, and macOS parses `system_profiler SPDisplaysDataType`
-via the shared Executor.
+**No Ohai precedent.** Ohai has no GPU plugin. The full `chef/ohai` tree has no
+`gpu.rb`, and no graphics, video or display plugins under `lib/ohai/plugins/`.
+Thus this collector is native to gohai. There is no Ohai method, with its years
+of distribution quirks, to copy. No consumer that moves from Ohai has a
+`node['gpu']` shape that this collector can break. The collector has the same
+shape as the other gohai hardware collectors. On Linux, ghw reads
+`/sys/class/drm`. On macOS, the collector parses
+`system_profiler SPDisplaysDataType` through the shared Executor.
 
 ## Collected fields
 
-| Field       | Type   | Description                                                           | Schema mapping            |
-| ----------- | ------ | --------------------------------------------------------------------- | ------------------------- |
-| `cards[]`   | list   | One entry per graphics card / GPU adapter.                            | No direct schema mapping. |
-| `vendor`    | string | Human-readable vendor name (`"Apple"`, `"NVIDIA Corporation"`).       | No direct schema mapping. |
-| `model`     | string | Marketing / device model (`"Apple M1 Pro"`, `"GeForce RTX 4090"`).    | No direct schema mapping. |
-| `address`   | string | Linux: PCI address (`"0000:03:00.0"`). Darwin: sppci_bus descriptor.  | No direct schema mapping. |
-| `vendor_id` | string | Linux: PCI vendor hex (`"10de"`). Empty on macOS.                     | No direct schema mapping. |
-| `device_id` | string | Linux: PCI device hex (`"1c82"`). Empty on macOS.                     | No direct schema mapping. |
-| `cores`     | int    | Darwin only: GPU core count reported by `sppci_cores`. Zero on Linux. | No direct schema mapping. |
-| `bus`       | string | Darwin: `"builtin"` / `"pcie"` (prefix-stripped). Empty on Linux.     | No direct schema mapping. |
+| Field       | Type   | Description                                                                  | Schema mapping            |
+| ----------- | ------ | ---------------------------------------------------------------------------- | ------------------------- |
+| `cards[]`   | list   | One entry for each graphics card or GPU adapter.                             | No direct schema mapping. |
+| `vendor`    | string | The vendor name as text (`"Apple"`, `"NVIDIA Corporation"`).                 | No direct schema mapping. |
+| `model`     | string | The marketing or device model (`"Apple M1 Pro"`, `"GeForce RTX 4090"`).      | No direct schema mapping. |
+| `address`   | string | Linux: the PCI address (`"0000:03:00.0"`). Darwin: the sppci_bus descriptor. | No direct schema mapping. |
+| `vendor_id` | string | Linux: the PCI vendor ID in hex (`"10de"`). Empty on macOS.                  | No direct schema mapping. |
+| `device_id` | string | Linux: the PCI device ID in hex (`"1c82"`). Empty on macOS.                  | No direct schema mapping. |
+| `cores`     | int    | Darwin only: the GPU core count from `sppci_cores`. Zero on Linux.           | No direct schema mapping. |
+| `bus`       | string | Darwin: `"builtin"` or `"pcie"`, without the prefix. Empty on Linux.         | No direct schema mapping. |
 
-Neither OCSF nor OpenTelemetry semantic conventions define a GPU object, so
-field naming is gohai-native. Go-idiomatic snake_case; fields chosen to cover
-both Linux PCI data and darwin's system_profiler shape.
+OCSF and the OpenTelemetry semantic conventions do not define a GPU object. Thus
+the field names are native to gohai. They use snake_case. The fields hold the
+Linux PCI data and the data of the Darwin system_profiler shape.
 
 ## Platform support
 
-| Platform | Supported                                                               |
-| -------- | ----------------------------------------------------------------------- |
-| Linux    | ✅ (ghw/gpu walks `/sys/class/drm` + ghw's bundled pci.ids database)    |
-| macOS    | ✅ (`system_profiler SPDisplaysDataType -json` via the shared Executor) |
+| Platform | Supported                                                                   |
+| -------- | --------------------------------------------------------------------------- |
+| Linux    | ✅ (ghw/gpu reads `/sys/class/drm` and ghw's bundled pci.ids database)      |
+| macOS    | ✅ (`system_profiler SPDisplaysDataType -json` through the shared Executor) |
 
-On Linux, containers and minimal VMs typically lack `/sys/class/drm`, the
-collector returns an empty `cards` slice with no error.
+On Linux, containers and minimal VMs usually have no `/sys/class/drm`. Then the
+collector returns an empty `cards` slice and no error.
 
 ## Example output
 
@@ -113,35 +113,38 @@ None.
 
 ## Data sources
 
-There is no Ohai equivalent for GPU enumeration. Ohai does not ship a GPU
-plugin. This is a gohai-native collector backed by ghw.
+Ohai has no equivalent that lists GPUs. Ohai does not have a GPU plugin. This
+collector is native to gohai, and it uses ghw.
 
 On Linux:
 
-1. ghw/gpu reads `/sys/class/drm` for each `cardN` symlink, follows it to the
-   PCI device's sysfs directory, and resolves vendor/product IDs against ghw's
-   bundled `pci.ids` database. All library-level, no shell-outs.
-2. When `/sys/class/drm` is missing (headless server, stripped container, VM
-   without a virtual display), ghw's `load` logs a warning and returns; we
-   propagate that as an empty `cards` slice with no error.
+1. ghw/gpu reads `/sys/class/drm` and finds each `cardN` symlink. It follows the
+   symlink to the sysfs directory of the PCI device. It finds the vendor and
+   product names for the IDs in ghw's bundled `pci.ids` database. The library
+   does all of this. It does not run a command.
+2. If `/sys/class/drm` is missing (a headless server, a minimal container, a VM
+   without a virtual display), ghw's `load` logs a warning and returns. The
+   collector then returns an empty `cards` slice and no error.
 
 On macOS:
 
-1. `system_profiler SPDisplaysDataType -json` is run through the shared
-   `internal/executor`. Apple returns one object per GPU in the
+1. The collector runs `system_profiler SPDisplaysDataType -json` through the
+   shared `internal/executor`. Apple returns one object for each GPU in the
    `SPDisplaysDataType` array.
-2. `spdisplays_vendor` / `sppci_bus` values carry Apple-ish `sppci_vendor_` /
-   `spdisplays_` prefixes; we strip those so consumers don't have to know
-   Apple's conventions (e.g. `sppci_vendor_Apple` → `Apple`).
-3. `sppci_cores` is parsed as an integer (only meaningful on Apple Silicon
-   integrated GPUs); non-numeric values leave `cores = 0`.
-4. If `sppci_model` is empty the collector falls back to the top-level `_name`
-   field, which is always populated.
+2. The `spdisplays_vendor` and `sppci_bus` values have Apple prefixes,
+   `sppci_vendor_` and `spdisplays_`. The collector removes them, so consumers
+   do not have to know the Apple conventions. For example, `sppci_vendor_Apple`
+   becomes `Apple`.
+3. The collector parses `sppci_cores` as an integer. This value is useful only
+   on integrated Apple Silicon GPUs. If the value is not a number, `cores` is
+   `0`.
+4. If `sppci_model` is empty, the collector uses the top-level `_name` field.
+   `_name` always has a value.
 
 ## Backing library
 
 - [`github.com/jaypipes/ghw/pkg/gpu`](https://pkg.go.dev/github.com/jaypipes/ghw/pkg/gpu)
-  . Linux-only backend; resolves PCI IDs via `ghw/pkg/pci`.
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `system_profiler` on macOS. Tests mock it with
+  . The backend on Linux only. It finds the PCI IDs through `ghw/pkg/pci`.
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `system_profiler` on macOS. Tests mock it with
   `go.uber.org/mock`.

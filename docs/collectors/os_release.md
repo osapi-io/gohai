@@ -4,41 +4,43 @@
 
 ## Description
 
-Parses `/etc/os-release`, the standardized freedesktop.org manifest every modern
-Linux distribution ships to describe itself. This is the authoritative,
-machine-readable source for distro identity, version, codename, and
-upstream-compatibility hints.
+The collector parses `/etc/os-release`. This is the standard freedesktop.org
+file in which each modern Linux distribution describes itself. It is the
+authoritative, machine-readable source for the distribution identity, version,
+codename and upstream compatibility.
 
 Consumers use this to:
 
-- Identify exactly what Linux distribution + version a host is running (e.g.
-  `"ubuntu 24.04 (noble)"`), more reliably than parsing `/etc/issue` or
+Consumers use this data to:
+
+- Find the exact Linux distribution and version of a host, for example
+  `"ubuntu 24.04 (noble)"`. This is more reliable than parsing `/etc/issue` or
   `uname -v`.
-- Pick a compatibility ancestor for distros that derive from a parent
-  (`ID_LIKE=debian` for Ubuntu; `ID_LIKE=rhel` for Amazon Linux).
-- Drive Chef/Ansible/Puppet-style distro logic without invoking an external
+- Select a compatible parent for a distribution that comes from a parent:
+  `ID_LIKE=debian` for Ubuntu, `ID_LIKE=rhel` for Amazon Linux.
+- Run distribution logic of the Chef, Ansible or Puppet type without an external
   tool.
 
-macOS has no equivalent file; the collector returns `nil` there.
+macOS has no equivalent file. On macOS, the collector returns `nil`.
 
 ## Collected fields
 
-| Field              | Type              | Description                                              | Schema mapping                                                          |
-| ------------------ | ----------------- | -------------------------------------------------------- | ----------------------------------------------------------------------- |
-| `id`               | string            | Short identifier (`ubuntu`, `rhel`, `debian`, `alpine`). | `os.name` (OCSF uses `name` for the distro identifier).                 |
-| `id_like`          | []string          | Parent/upstream distros this host is compatible with.    | No direct schema mapping; downstream-compatible with `os.name` aliases. |
-| `name`             | string            | Display name (`"Ubuntu"`).                               | No direct schema mapping, `os.name` is already `id`.                    |
-| `pretty_name`      | string            | Human-readable (`"Ubuntu 24.04 LTS"`).                   | No direct schema mapping (presentation-level).                          |
-| `version`          | string            | Full version string including codename.                  | No OCSF, `os.version` is used for the version number.                   |
-| `version_id`       | string            | Version number only (`"24.04"`).                         | OCSF `os.version`.                                                      |
-| `version_codename` | string            | Codename only (`"noble"`).                               | No direct schema mapping.                                               |
-| `build_id`         | string            | Build identifier (rolling distros).                      | OCSF `os.build` (closest match).                                        |
-| `variant`          | string            | Distro variant (edge, workstation, server, cloud).       | No direct schema mapping.                                               |
-| `variant_id`       | string            | Variant identifier (short form).                         | No direct schema mapping.                                               |
-| `home_url`         | string            | Distro homepage.                                         | No OCSF.                                                                |
-| `support_url`      | string            | Distro support URL.                                      | No OCSF.                                                                |
-| `bug_report_url`   | string            | Where to file bugs upstream.                             | No OCSF.                                                                |
-| `extra`            | map[string]string | Any keys not explicitly parsed (e.g. `UBUNTU_CODENAME`). | No OCSF.                                                                |
+| Field              | Type              | Description                                                                                   | Schema mapping                                                              |
+| ------------------ | ----------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `id`               | string            | The short identifier: `ubuntu`, `rhel`, `debian`, `alpine`.                                   | `os.name`. OCSF uses `name` for the distribution identifier.                |
+| `id_like`          | []string          | The parent or upstream distributions that this host is compatible with.                       | No direct schema mapping. The values are compatible with `os.name` aliases. |
+| `name`             | string            | The display name, for example `"Ubuntu"`.                                                     | No direct schema mapping. `os.name` is already `id`.                        |
+| `pretty_name`      | string            | The name for people to read, for example `"Ubuntu 24.04 LTS"`.                                | No direct schema mapping. The value is only for display.                    |
+| `version`          | string            | The full version string, with the codename.                                                   | No OCSF. `os.version` holds the version number.                             |
+| `version_id`       | string            | Only the version number, for example `"24.04"`.                                               | OCSF `os.version`.                                                          |
+| `version_codename` | string            | Only the codename, for example `"noble"`.                                                     | No direct schema mapping.                                                   |
+| `build_id`         | string            | The build identifier, for rolling distributions.                                              | OCSF `os.build`. This is the nearest match.                                 |
+| `variant`          | string            | The distribution variant: edge, workstation, server, cloud.                                   | No direct schema mapping.                                                   |
+| `variant_id`       | string            | The short identifier of the variant.                                                          | No direct schema mapping.                                                   |
+| `home_url`         | string            | The home page of the distribution.                                                            | No OCSF.                                                                    |
+| `support_url`      | string            | The support URL of the distribution.                                                          | No OCSF.                                                                    |
+| `bug_report_url`   | string            | The upstream URL for bug reports.                                                             | No OCSF.                                                                    |
+| `extra`            | map[string]string | All keys that the collector does not parse into a typed field, for example `UBUNTU_CODENAME`. | No OCSF.                                                                    |
 
 ## Platform support
 
@@ -92,14 +94,15 @@ None.
 
 ## Data sources
 
-| Platform | What we read      | Ohai plugin                                                                                                                                   | Alignment                                                                                                                      |
-| -------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Linux    | `/etc/os-release` | [`linux/os_release.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/os_release.rb), parses the same file into `os_release`. | **Equivalent**: same file, same every-key extraction. We keep known keys as typed fields and bucket unknown keys into `extra`. |
-| macOS    | —                 | No Ohai handler.                                                                                                                              | Parity, we return nil.                                                                                                         |
+| Platform | What we read      | Ohai plugin                                                                                                                                  | Alignment                                                                                                                                      |
+| -------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/etc/os-release` | [`linux/os_release.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/os_release.rb) parses the same file into `os_release`. | **Equivalent.** The file is the same, and both read all keys. gohai keeps the known keys as typed fields and puts the unknown keys in `extra`. |
+| macOS    | None              | Ohai has no handler.                                                                                                                         | Parity. gohai returns `nil`.                                                                                                                   |
 
-**Known gaps:** None. Ohai additionally emits some legacy aliases (e.g. `lsb.id`
-for backward compat); those belong to our `lsb` collector, not this one.
+**Known gaps:** None. Ohai also reports some old aliases for backward
+compatibility, for example `lsb.id`. In gohai, the `lsb` collector reports those
+aliases, not this collector.
 
 ## Backing library
 
-- Go stdlib (`os`, `bufio`), no third-party dependency.
+- The Go standard library (`os`, `bufio`). There is no third-party dependency.

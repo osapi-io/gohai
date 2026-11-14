@@ -4,49 +4,49 @@
 
 ## Description
 
-Reports kernel identity (name, release, version, machine, processor, high-level
-OS). On macOS the collector also reports whether the process is running under
-Rosetta 2 translation; when it is, `machine` reflects the true hardware
-architecture (`arm64`) rather than the translated one (`x86_64`).
+The collector reports the kernel identity: the name, release, version, machine,
+processor and high-level OS. On macOS, the collector also reports if the process
+runs under Rosetta 2 translation. If it does, `machine` shows the real hardware
+architecture (`arm64`), not the translated architecture (`x86_64`).
 
-Loaded-module enumeration was split out into the sibling
-[`kernel_modules`](kernel_modules.md) collector in 2026-04. Rationale:
-enumerating modules shells out to `kextstat -k -l` on macOS (~280ms wall time)
-and walks `/sys/module/<name>/version` on Linux, neither of which most consumers
-need. Keeping `kernel` identity-only lets it stay in the default set and return
-in under a millisecond; callers who need the module list opt into
-`kernel_modules` separately (or via `--category=system`).
+In 2026-04, the list of loaded modules moved to the related
+[`kernel_modules`](kernel_modules.md) collector. The reason is that the module
+list runs `kextstat -k -l` on macOS (about 280ms of wall time). On Linux, it
+reads `/sys/module/<name>/version` for each module. Most consumers do not need
+these. Because `kernel` has only the identity, it stays in the default set and
+returns in less than a millisecond. A caller that needs the module list enables
+`kernel_modules` separately, or with `--category=system`.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Identify the exact kernel for CVE / patch correlation (release ties to the
-  source package version).
-- Distinguish kernel architecture at a finer grain than `runtime.GOARCH` (e.g.
-  `aarch64` vs `arm64` vs `armv7l`).
-- Detect Rosetta-translated processes on Apple Silicon so architecture-sensitive
-  consumers can compensate.
+- Identify the exact kernel for CVE and patch correlation. The release is linked
+  to the version of the source package.
+- Tell kernel architectures apart in more detail than `runtime.GOARCH`, for
+  example `aarch64`, `arm64` and `armv7l`.
+- Find processes that Rosetta translates on Apple Silicon. Thus consumers that
+  depend on the architecture can correct for it.
 
 ## Collected fields
 
-| Field                | Type   | Description                                                         | Schema mapping                                                |
-| -------------------- | ------ | ------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `name`               | string | `uname -s` (`"Linux"`, `"Darwin"`).                                 | `os.name`.                                                    |
-| `release`            | string | `uname -r`, kernel release (`"5.15.0-47-generic"`).                 | OCSF `os.kernel_release` (leaf stripped per CONTRIBUTING.md). |
-| `version`            | string | `uname -v`, build string.                                           | No direct schema mapping.                                     |
-| `machine`            | string | `uname -m`, hardware arch (`"x86_64"`, `"arm64"`).                  | Nearest: `device.hw_info.cpu_bits` (OCSF only stores bits).   |
-| `processor`          | string | `uname -p` synthesis: same as `machine` on Linux and Darwin.        | No direct schema mapping.                                     |
-| `os`                 | string | `uname -o` synthesis: `"GNU/Linux"` on Linux, `"Darwin"` on Darwin. | `os.type`.                                                    |
-| `rosetta_translated` | bool   | macOS only. True when the process is running under Rosetta 2.       | No direct schema mapping.                                     |
+| Field                | Type   | Description                                                         | Schema mapping                                                          |
+| -------------------- | ------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `name`               | string | `uname -s` (`"Linux"`, `"Darwin"`).                                 | `os.name`.                                                              |
+| `release`            | string | `uname -r`, the kernel release (`"5.15.0-47-generic"`).             | OCSF `os.kernel_release`. The leaf is removed as CONTRIBUTING.md tells. |
+| `version`            | string | `uname -v`, the build string.                                       | No direct schema mapping.                                               |
+| `machine`            | string | `uname -m`, the hardware architecture (`"x86_64"`, `"arm64"`).      | Nearest: `device.hw_info.cpu_bits`. OCSF keeps only the bits.           |
+| `processor`          | string | Made like `uname -p`: the same as `machine` on Linux and Darwin.    | No direct schema mapping.                                               |
+| `os`                 | string | Made like `uname -o`: `"GNU/Linux"` on Linux, `"Darwin"` on Darwin. | `os.type`.                                                              |
+| `rosetta_translated` | bool   | macOS only. True if the process runs under Rosetta 2.               | No direct schema mapping.                                               |
 
-Loaded modules are reported by the separate
-[`kernel_modules`](kernel_modules.md) collector.
+The separate [`kernel_modules`](kernel_modules.md) collector reports the loaded
+modules.
 
 ## Platform support
 
-| Platform | Supported                                   |
-| -------- | ------------------------------------------- |
-| Linux    | ✅ (uname syscall)                          |
-| macOS    | ✅ (uname syscall + `sysctl` Rosetta probe) |
+| Platform | Supported                                     |
+| -------- | --------------------------------------------- |
+| Linux    | ✅ (uname syscall)                            |
+| macOS    | ✅ (uname syscall and `sysctl` Rosetta probe) |
 
 ## Example output
 
@@ -127,40 +127,41 @@ None.
 
 ## Data sources
 
-Ohai's `kernel.rb` shells out to `uname -s`, `uname -r`, `uname -v`, `uname -m`,
-`uname -p` individually. gohai calls `unix.Uname()` (the Go syscall wrapper)
-which returns all fields in one call, same data, no subprocess overhead. Both
-produce `name`, `release`, `version`, `machine`. gohai adds `processor` and `os`
-(from `uname -p` and `uname -o` equivalents) and `rosetta_translated` on macOS
-(gohai extension, no Ohai equivalent).
+Ohai's `kernel.rb` runs `uname -s`, `uname -r`, `uname -v`, `uname -m` and
+`uname -p` one at a time. gohai calls `unix.Uname()`, the Go syscall wrapper. It
+returns all fields in one call. The data is the same, and there is no subprocess
+overhead. Both give `name`, `release`, `version` and `machine`. gohai adds
+`processor` and `os`, which are equivalent to `uname -p` and `uname -o`. On
+macOS, gohai also adds `rosetta_translated`. This is a gohai extension, and Ohai
+has no equivalent.
 
 On Linux:
 
-1. `unix.Uname()` provides `name`, `release`, `version`, `machine`.
-2. `processor` is synthesized as a copy of `machine`; `os` is the static string
-   `"GNU/Linux"`. Ohai shells out to `uname -p` / `uname -o` to produce the same
-   values, we skip the extra fork/exec because the syscall already has
-   everything needed (Option A of issue #29).
+1. `unix.Uname()` gives `name`, `release`, `version` and `machine`.
+2. `processor` is a copy of `machine`. `os` is always the string `"GNU/Linux"`.
+   Ohai runs `uname -p` and `uname -o` to get the same values. gohai does not do
+   the extra fork and exec, because the syscall already has all the data (Option
+   A of issue #29).
 
 On macOS:
 
-1. `unix.Uname()` provides `name`, `release`, `version`, `machine`.
-2. `processor` is synthesized as a copy of `machine`; `os` is the static string
-   `"Darwin"`.
-3. `sysctl -n hw.optional.x86_64` is run through the shared `internal/executor`
-   runner, only when uname reports `machine == "x86_64"`. When the trimmed
-   output is `"1"`, the process is running under Rosetta 2, so we overwrite
-   `machine` / `processor` to `arm64` (the real hardware) and set
-   `rosetta_translated = true`. On native Apple Silicon this sysctl is skipped
-   entirely, keeping the collector under a millisecond in the common case.
+1. `unix.Uname()` gives `name`, `release`, `version` and `machine`.
+2. `processor` is a copy of `machine`. `os` is always the string `"Darwin"`.
+3. The collector runs `sysctl -n hw.optional.x86_64` through the shared
+   `internal/executor` runner. It does this only if uname reports
+   `machine == "x86_64"`. If the output without whitespace is `"1"`, the process
+   runs under Rosetta 2. Then the collector sets `machine` and `processor` to
+   `arm64`, the real hardware, and sets `rosetta_translated = true`. On native
+   Apple Silicon, the collector does not run this sysctl. Thus, in the usual
+   case, the collector takes less than a millisecond.
 
-Loaded-module enumeration (`/proc/modules`, `/sys/module/<n>/version`,
-`kextstat`) lives in [`kernel_modules`](kernel_modules.md).
+The list of loaded modules (`/proc/modules`, `/sys/module/<n>/version`,
+`kextstat`) is in [`kernel_modules`](kernel_modules.md).
 
 ## Backing library
 
-- [`golang.org/x/sys/unix`](https://pkg.go.dev/golang.org/x/sys/unix). `Uname`
-  syscall for the top-level identity fields.
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `sysctl` for the Rosetta probe on macOS. Tests mock
+- [`golang.org/x/sys/unix`](https://pkg.go.dev/golang.org/x/sys/unix). The
+  `Uname` syscall for the top-level identity fields.
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `sysctl` for the Rosetta probe on macOS. Tests mock
   it with `go.uber.org/mock`.

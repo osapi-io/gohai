@@ -4,91 +4,94 @@
 
 ## Description
 
-Collects the macOS hardware facts `system_profiler` surfaces, machine identity
-(model, serial, platform UUID), CPU labels (Intel `cpu_type` or Apple Silicon
-`chip_type`), memory, firmware versions, attached storage volumes, battery, and
-AC charger. Mirrors Ohai's `darwin/hardware.rb` methodology: three
-`system_profiler` invocations, `SPHardwareDataType`, `SPStorageDataType`,
-`SPPowerDataType`, run concurrently and merged into a typed Info.
+The collector reports the macOS hardware facts that `system_profiler` gives.
+These are the machine identity (model, serial, platform UUID), the CPU labels
+(Intel `cpu_type` or Apple Silicon `chip_type`), the memory, the firmware
+versions, the attached storage volumes, the battery and the AC charger. The
+collector uses the same method as Ohai's `darwin/hardware.rb`. It runs
+`system_profiler` three times at the same time, with `SPHardwareDataType`,
+`SPStorageDataType` and `SPPowerDataType`. Then it merges the results into a
+typed `Info`.
 
-**This collector is macOS-only by design.** Linux doesn't need it, the
-equivalent identity / CPU / memory / storage facts are already split across
-`dmi`, `cpu`, `memory`, `disk`, `filesystem`, and `pci`. On macOS those
-abstractions don't exist (no SMBIOS, no `/sys`), so every fact funnels through
-`system_profiler`. `hardware` is the Darwin equivalent of Linux's `dmi` plus
-battery / charger. Non-Darwin platforms return an empty Info.
+**This collector is for macOS only, by design.** Linux does not need it. On
+Linux, the `dmi`, `cpu`, `memory`, `disk`, `filesystem` and `pci` collectors
+already report the equivalent identity, CPU, memory and storage facts. macOS
+does not have the sources of those collectors (no SMBIOS, no `/sys`). Thus all
+facts on macOS come from `system_profiler`. `hardware` is the Darwin equivalent
+of the Linux `dmi` collector, with the battery and the charger added. On other
+platforms, the collector returns an empty `Info`.
 
 ## Collected fields
 
-| Field                     | Type        | Description                                                                                                      | Schema mapping                      |
-| ------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `machine_model`           | `string`    | Model identifier (`MacBookPro18,2`, `Macmini9,1`).                                                               | No direct schema mapping.           |
-| `machine_name`            | `string`    | Marketing name (`MacBook Pro`, `Mac mini`).                                                                      | No direct schema mapping.           |
-| `serial_number`           | `string`    | Hardware serial.                                                                                                 | OCSF `device.hw_info.serial_number` |
-| `platform_uuid`           | `string`    | Platform UUID from IOKit.                                                                                        | No direct schema mapping.           |
-| `provisioning_udid`       | `string`    | Apple provisioning UDID.                                                                                         | No direct schema mapping.           |
-| `cpu_type`                | `string`    | CPU label on Intel Macs (`Intel Core i7`).                                                                       | OTel `host.cpu.model.name`          |
-| `chip_type`               | `string`    | CPU label on Apple Silicon (`Apple M1 Pro`). Intel Macs leave this empty; Apple Silicon leaves `cpu_type` empty. | OTel `host.cpu.model.name`          |
-| `current_processor_speed` | `string`    | Clock speed string (Intel only; Apple Silicon omits).                                                            | No direct schema mapping.           |
-| `number_processors`       | `string`    | Intel: `"2"`. Apple Silicon: `"proc 10:8:2"` (total:performance:efficiency).                                     | No direct schema mapping.           |
-| `packages`                | `int`       | Physical CPU sockets (Intel only).                                                                               | No direct schema mapping.           |
-| `l2_cache_core`           | `string`    | Per-core L2 cache (Intel, string with unit).                                                                     | No direct schema mapping.           |
-| `l3_cache`                | `string`    | Shared L3 cache (Intel, string with unit).                                                                       | No direct schema mapping.           |
-| `physical_memory`         | `string`    | RAM size string (`"16 GB"`). Verbatim from `system_profiler`.                                                    | No direct schema mapping.           |
-| `boot_rom_version`        | `string`    | Boot ROM / UEFI version.                                                                                         | No direct schema mapping.           |
-| `os_loader_version`       | `string`    | Apple Silicon OS loader version (absent on Intel).                                                               | No direct schema mapping.           |
-| `smc_version_system`      | `string`    | SMC firmware version (Intel; Apple Silicon has no SMC).                                                          | No direct schema mapping.           |
-| `storage`                 | `[]Storage` | Attached logical volumes. See below.                                                                             | No direct schema mapping.           |
-| `battery`                 | `*Battery`  | Battery details (nil on desktop Macs without a battery). See below.                                              | No direct schema mapping.           |
-| `charger`                 | `*Charger`  | AC charger info when a charger is connected. See below.                                                          | No direct schema mapping.           |
+| Field                     | Type        | Description                                                                                                             | Schema mapping                      |
+| ------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `machine_model`           | `string`    | The model identifier, for example `MacBookPro18,2` or `Macmini9,1`.                                                     | No direct schema mapping.           |
+| `machine_name`            | `string`    | The marketing name, for example `MacBook Pro` or `Mac mini`.                                                            | No direct schema mapping.           |
+| `serial_number`           | `string`    | The hardware serial.                                                                                                    | OCSF `device.hw_info.serial_number` |
+| `platform_uuid`           | `string`    | The platform UUID, from IOKit.                                                                                          | No direct schema mapping.           |
+| `provisioning_udid`       | `string`    | The Apple provisioning UDID.                                                                                            | No direct schema mapping.           |
+| `cpu_type`                | `string`    | The CPU label on Intel Macs, for example `Intel Core i7`.                                                               | OTel `host.cpu.model.name`          |
+| `chip_type`               | `string`    | The CPU label on Apple Silicon, for example `Apple M1 Pro`. Empty on Intel Macs. On Apple Silicon, `cpu_type` is empty. | OTel `host.cpu.model.name`          |
+| `current_processor_speed` | `string`    | The clock speed, as a string. Intel only. Apple Silicon does not have it.                                               | No direct schema mapping.           |
+| `number_processors`       | `string`    | Intel: `"2"`. Apple Silicon: `"proc 10:8:2"` (total:performance:efficiency).                                            | No direct schema mapping.           |
+| `packages`                | `int`       | The number of physical CPU sockets. Intel only.                                                                         | No direct schema mapping.           |
+| `l2_cache_core`           | `string`    | The L2 cache of each core. Intel only. A string with the unit.                                                          | No direct schema mapping.           |
+| `l3_cache`                | `string`    | The shared L3 cache. Intel only. A string with the unit.                                                                | No direct schema mapping.           |
+| `physical_memory`         | `string`    | The RAM size as a string, for example `"16 GB"`. The value is as `system_profiler` gives it.                            | No direct schema mapping.           |
+| `boot_rom_version`        | `string`    | The Boot ROM or UEFI version.                                                                                           | No direct schema mapping.           |
+| `os_loader_version`       | `string`    | The OS loader version on Apple Silicon. Not there on Intel.                                                             | No direct schema mapping.           |
+| `smc_version_system`      | `string`    | The SMC firmware version. Intel only, because Apple Silicon has no SMC.                                                 | No direct schema mapping.           |
+| `storage`                 | `[]Storage` | The attached logical volumes. See below.                                                                                | No direct schema mapping.           |
+| `battery`                 | `*Battery`  | The battery data. `nil` on desktop Macs that have no battery. See below.                                                | No direct schema mapping.           |
+| `charger`                 | `*Charger`  | The AC charger data, if a charger is connected. See below.                                                              | No direct schema mapping.           |
 
 ### Storage
 
-| Field          | Type     | Description                                                  |
-| -------------- | -------- | ------------------------------------------------------------ |
-| `name`         | `string` | Volume name (`Macintosh HD`).                                |
-| `bsd_name`     | `string` | Device node (`disk1s1`).                                     |
-| `capacity`     | `int64`  | Size in bytes.                                               |
-| `file_system`  | `string` | `APFS`, `HFS+`, etc.                                         |
-| `mount_point`  | `string` | Mount path.                                                  |
-| `free_space`   | `int64`  | Free bytes.                                                  |
-| `writable`     | `bool`   | Whether the volume is mounted read-write.                    |
-| `drive_type`   | `string` | `ssd` / `hdd` (CoreStorage only, empty on APFS).             |
-| `smart_status` | `string` | SMART verdict (`Verified`, CoreStorage only, empty on APFS). |
-| `partitions`   | `int`    | Partition count (CoreStorage only, empty on APFS).           |
+| Field          | Type     | Description                                                                |
+| -------------- | -------- | -------------------------------------------------------------------------- |
+| `name`         | `string` | The volume name, for example `Macintosh HD`.                               |
+| `bsd_name`     | `string` | The device node, for example `disk1s1`.                                    |
+| `capacity`     | `int64`  | The size in bytes.                                                         |
+| `file_system`  | `string` | For example `APFS` or `HFS+`.                                              |
+| `mount_point`  | `string` | The mount path.                                                            |
+| `free_space`   | `int64`  | The free space in bytes.                                                   |
+| `writable`     | `bool`   | True if the volume is mounted read-write.                                  |
+| `drive_type`   | `string` | `ssd` or `hdd`. CoreStorage only. Empty on APFS.                           |
+| `smart_status` | `string` | The SMART result, for example `Verified`. CoreStorage only. Empty on APFS. |
+| `partitions`   | `int`    | The number of partitions. CoreStorage only. Empty on APFS.                 |
 
 ### Battery
 
-| Field                | Type     | Description                                                     |
-| -------------------- | -------- | --------------------------------------------------------------- |
-| `current_capacity`   | `int`    | Current charge (mAh).                                           |
-| `max_capacity`       | `int`    | Design capacity (mAh).                                          |
-| `fully_charged`      | `bool`   | True when charger has topped off the battery.                   |
-| `is_charging`        | `bool`   | True when currently drawing from the charger.                   |
-| `charge_cycle_count` | `int`    | Lifetime charge cycles.                                         |
-| `health`             | `string` | Apple's health verdict (`Good`, `Poor`, `Service Recommended`). |
-| `serial`             | `string` | Battery serial number.                                          |
-| `remaining`          | `int`    | Percent remaining, computed as `current / max * 100`.           |
-| `amperage`           | `int`    | Current draw / charge rate in milliamps (positive = charging).  |
-| `voltage`            | `int`    | Terminal voltage in millivolts.                                 |
+| Field                | Type     | Description                                                                                    |
+| -------------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `current_capacity`   | `int`    | The current charge (mAh).                                                                      |
+| `max_capacity`       | `int`    | The design capacity (mAh).                                                                     |
+| `fully_charged`      | `bool`   | True if the charger has fully charged the battery.                                             |
+| `is_charging`        | `bool`   | True if the battery receives current from the charger now.                                     |
+| `charge_cycle_count` | `int`    | The number of charge cycles in the life of the battery.                                        |
+| `health`             | `string` | The health result from Apple, for example `Good`, `Poor` or `Service Recommended`.             |
+| `serial`             | `string` | The battery serial number.                                                                     |
+| `remaining`          | `int`    | The percent of charge that remains. The collector calculates it as `current / max * 100`.      |
+| `amperage`           | `int`    | The current draw or charge rate in milliamps. A positive value shows that the battery charges. |
+| `voltage`            | `int`    | The terminal voltage in millivolts.                                                            |
 
 ### Charger
 
-| Field           | Type     | Description                                             |
-| --------------- | -------- | ------------------------------------------------------- |
-| `id`            | `string` | Charger identifier (manufacturer-specific hex string).  |
-| `family`        | `string` | Charger family identifier.                              |
-| `revision`      | `string` | Charger firmware revision.                              |
-| `serial_number` | `string` | Charger serial.                                         |
-| `watts`         | `string` | Rated wattage (verbatim string from `system_profiler`). |
-| `connected`     | `bool`   | Whether the charger is currently plugged in.            |
+| Field           | Type     | Description                                                                |
+| --------------- | -------- | -------------------------------------------------------------------------- |
+| `id`            | `string` | The charger identifier. A hex string that is specific to the manufacturer. |
+| `family`        | `string` | The charger family identifier.                                             |
+| `revision`      | `string` | The charger firmware revision.                                             |
+| `serial_number` | `string` | The charger serial.                                                        |
+| `watts`         | `string` | The rated wattage. The string is as `system_profiler` gives it.            |
+| `connected`     | `bool`   | True if the charger is connected now.                                      |
 
 ## Platform support
 
-| Platform | Supported                                                                |
-| -------- | ------------------------------------------------------------------------ |
-| Linux    | ❌ (use `dmi`, `cpu`, `memory`, `disk`, `filesystem` collectors instead) |
-| macOS    | ✅                                                                       |
+| Platform | Supported                                                               |
+| -------- | ----------------------------------------------------------------------- |
+| Linux    | ❌ (use the `dmi`, `cpu`, `memory`, `disk` and `filesystem` collectors) |
+| macOS    | ✅                                                                      |
 
 ## Example output
 
@@ -159,48 +162,52 @@ None.
 
 On macOS:
 
-1. Three `system_profiler ... -json` invocations run concurrently through the
-   shared `internal/executor` runner:
-   - `SPHardwareDataType` → machine identity, CPU labels, memory, firmware
-     versions. Fields are merged from `_items[0]` into the top-level Info.
-   - `SPStorageDataType` → one `Storage` entry per logical volume.
-     CoreStorage-era fields (`drive_type`, `smart_status`, `partitions`) come
-     from the `com.apple.corestorage.pv` array when present; on modern APFS
-     volumes that key is absent so those fields stay empty.
-   - `SPPowerDataType` → iterated for `_name == "spbattery_information"`
-     (populates `battery`) and `_name == "sppower_ac_charger_information"`
-     (populates `charger`). Desktop Macs without a battery simply have no
-     matching item, leaving `battery` nil rather than zero-valued.
-2. System_profiler's string-boolean convention (`"TRUE"` / `"FALSE"`) is
-   normalized to real Go bools. Numeric fields that the plist sometimes encodes
-   as strings (e.g. `cycle_count: "201"`) are parsed via a helper that accepts
-   both JSON numbers and numeric strings.
-3. `battery.remaining` is computed as `current_capacity * 100 / max_capacity`
-   when `max_capacity > 0`, matches Ohai's `(current / max * 100).to_i`.
-4. Each of the three calls is tolerated independently: missing binary, exec
-   error, or malformed JSON in one invocation leaves only that section empty.
-   This keeps the collector useful on hosts where one `SP*DataType` mode fails
-   but others succeed.
+1. The collector runs `system_profiler ... -json` three times at the same time,
+   through the shared `internal/executor` runner:
+   - `SPHardwareDataType` gives the machine identity, the CPU labels, the memory
+     and the firmware versions. The collector merges the fields from `_items[0]`
+     into the top-level `Info`.
+   - `SPStorageDataType` gives one `Storage` entry for each logical volume. The
+     fields from the CoreStorage era (`drive_type`, `smart_status`,
+     `partitions`) come from the `com.apple.corestorage.pv` array, if it is
+     there. Modern APFS volumes do not have that key, so those fields stay
+     empty.
+   - `SPPowerDataType`. The collector looks at each item for
+     `_name == "spbattery_information"`, which sets `battery`, and
+     `_name == "sppower_ac_charger_information"`, which sets `charger`. A
+     desktop Mac that has no battery has no item that matches. Thus `battery`
+     stays `nil`, not zero-valued.
+2. `system_profiler` writes booleans as the strings `"TRUE"` and `"FALSE"`. The
+   collector changes them to real Go bools. The plist sometimes writes numeric
+   fields as strings, for example `cycle_count: "201"`. A helper parses these
+   fields. The helper accepts JSON numbers and numeric strings.
+3. If `max_capacity > 0`, the collector calculates `battery.remaining` as
+   `current_capacity * 100 / max_capacity`. This is the same as Ohai's
+   `(current / max * 100).to_i`.
+4. A failure in one of the three calls does not stop the other calls. A missing
+   binary, an exec error or malformed JSON in one call makes only that section
+   empty. Thus the collector stays useful on hosts where one `SP*DataType` mode
+   fails and the others succeed.
 
-On Linux the collector returns an empty Info. Ohai's `darwin/hardware.rb` is
-Darwin-only and Linux gets equivalent coverage from the `dmi`, `cpu`, `memory`,
-`disk`, and `filesystem` collectors.
+On Linux, the collector returns an empty `Info`. Ohai's `darwin/hardware.rb` is
+for Darwin only. On Linux, the `dmi`, `cpu`, `memory`, `disk` and `filesystem`
+collectors give equivalent data.
 
 ### Deviations from Ohai
 
-- **Skip `architecture`, `operating_system`, `operating_system_version`,
-  `build_version`**. Ohai merges these into `hardware{}` too, but they're
-  already collected by gohai's `kernel`, `platform`, and `os_release`
-  collectors. Duplicating them would violate the single-source principle.
-- **Surface AC charger info**. Ohai reads `SPPowerDataType` only for the battery
-  item. We additionally surface the `sppower_ac_charger_information` item
-  because fleet management cares about adapter wattage mismatches.
-- **Surface `amperage` / `voltage`**. Ohai ignores the raw
-  `sppower_current_amperage` and `sppower_current_voltage` fields in the battery
-  item; we expose them for consumers that want charge-rate signals.
+- **No `architecture`, `operating_system`, `operating_system_version` or
+  `build_version`.** Ohai also merges these into `hardware{}`. But gohai's
+  `kernel`, `platform` and `os_release` collectors already report them. A copy
+  here would break the single-source principle.
+- **The AC charger data.** Ohai reads `SPPowerDataType` only for the battery
+  item. gohai also reports the `sppower_ac_charger_information` item, because
+  fleet management must find adapters with the wrong wattage.
+- **`amperage` and `voltage`.** Ohai ignores the raw `sppower_current_amperage`
+  and `sppower_current_voltage` fields in the battery item. gohai reports them
+  for consumers that want charge-rate data.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `system_profiler`. Tests mock it with
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `system_profiler`. Tests mock it with
   `go.uber.org/mock`.

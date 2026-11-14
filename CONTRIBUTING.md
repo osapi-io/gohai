@@ -1,55 +1,55 @@
 # Contributing
 
-Contributions to gohai are very welcome, but we ask that you read this document
-before submitting a PR. It covers everything you need: prerequisites, setup, the
-conventions code follows, and the pull request workflow.
+We welcome contributions to gohai. Read this document before you submit a PR. It
+has all that you need: the prerequisites, the setup, the conventions that the
+code follows, and the pull request workflow.
 
-How a collector is designed is stated in the
-[specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/collectors.md):
-which backing library to wrap and in what order, what an extension may read
-through, why collector code carries no build tag, and how a field is named.
-Three of those rules are short enough that
-[docs/methodology.md](docs/methodology.md) repeats them, and that page is also
-the per-collector reference for which library each one wraps.
+The
+[specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/collectors.md)
+gives the design of a collector. It tells you which backing library to wrap and
+in which order. It tells you what an extension can read through. It tells you
+why collector code has no build tag, and how to name a field. Three of these
+rules are short, so [docs/methodology.md](docs/methodology.md) repeats them.
+That page also tells you which library each collector wraps.
 
-Validating OCSF output against the upstream schema is
+To validate the OCSF output against the upstream schema, refer to
 [docs/ocsf-validation.md](docs/ocsf-validation.md).
 
 ## Before you start
 
-- Read the [Code of Conduct](CODE_OF_CONDUCT.md). It applies to every
-  interaction in this repo.
+- Read the [Code of Conduct](CODE_OF_CONDUCT.md). It applies to all interactions
+  in this repo.
 
-- **Design docs.** How this repository is built is documented in
+- **Design docs.** The design of this repository is in
   [osapi-io/specs](https://github.com/osapi-io/specs) under `components/gohai/`.
-  Read it before changing behaviour, and change it when you do. A design doc
-  kept in this repository goes stale the moment the code moves past it, and
-  nothing catches the drift.
+  Read it before you change the behaviour, and change it when you change the
+  behaviour. A design doc in this repository becomes incorrect when the code
+  changes, and no check finds the difference.
 
-- **Check existing work.** Is there an existing PR? Are there issues discussing
-  the feature/change you want to make? Please make sure you consider/address
-  these discussions in your work.
+- **Check the current work.** Look for a PR that already exists. Look for issues
+  that discuss the change that you want to make. Use what these discussions say
+  in your work.
 
-- **Backwards compatibility.** Will your change break existing consumers of
-  gohai? It is much more likely that your change will be merged if it is
-  backwards compatible. Is there an approach you can take that maintains this
-  compatibility? If not, consider opening an issue first so that API changes can
-  be discussed before you invest your time into a PR.
+- **Backwards compatibility.** Make sure that your change does not break the
+  current consumers of gohai. A change that is backwards compatible is more
+  likely to merge. Look for a method that keeps this compatibility. If you
+  cannot find one, open an issue first. Then we can discuss the API change
+  before you spend time on a PR.
 
 ## Prerequisites
 
-Install tools using [mise](https://mise.jdx.dev):
+Install the tools with [mise](https://mise.jdx.dev):
 
 ```bash
 mise install
 ```
 
-- **[Go].** gohai is written in Go. We always support the latest two major Go
-  versions, so make sure your version is recent enough.
-- **[just].** Task runner used for building, testing, formatting, and other
-  development workflows. Install with `brew install just`.
-- **[uv](https://docs.astral.sh/uv/).** Python package runner. `just md-fmt`
-  formats markdown with mdformat through `uvx`; nothing is installed into the
+- **[Go].** gohai is written in Go. We support the latest two major Go versions.
+  Make sure that your version is one of them.
+- **[just].** The task runner. It builds, tests, formats and runs other
+  development tasks. Install it with `brew install just`.
+- **[uv](https://docs.astral.sh/uv/).** The Python package runner. `just md-fmt`
+  formats markdown with mdformat through `uvx`. It installs nothing into the
   repository.
 
 ### Claude Code
@@ -61,17 +61,18 @@ marketplace:
 /plugin install commit-commands@claude-plugins-official
 ```
 
-- **commit-commands.** provides `/commit` and `/commit-push-pr` slash commands
-  that follow the project's commit conventions automatically.
+- **commit-commands.** Gives the `/commit` and `/commit-push-pr` slash commands.
+  They follow the commit conventions of the project automatically.
 
-**Design happens in the design docs.** Write or change the page in
-[osapi-io/specs](https://github.com/osapi-io/specs) before building, and correct
-it where building proves it wrong. A design document kept in this repository
-goes stale the moment the code moves past it, and nothing catches the drift.
+**The design is in the design docs.** Write or change the page in
+[osapi-io/specs](https://github.com/osapi-io/specs) before you build. If the
+build shows that the page is wrong, correct the page. A design document in this
+repository becomes incorrect when the code changes, and no check finds the
+difference.
 
 ## Setup
 
-Fetch shared justfiles and install all dependencies:
+Fetch the shared justfiles and install all dependencies:
 
 ```bash
 just fetch
@@ -80,73 +81,79 @@ just deps
 
 ## Project structure
 
-- **`main.go`.** repo-root entry point; just calls `cmd.Execute()`
-- **`cmd/`.** Cobra CLI subcommands
-  - `root.go`. Root command, banner, context setup, `AddCommand` wiring
-  - `collect.go`. `gohai collect`, collector flags, SDK wiring, delegates output
-    to `internal/cli/`
-  - `validate.go`. `gohai validate`, JSON Schema validation against embedded
-    schema (stdin or `--file`)
-  - `version.go`. `gohai version`, build-time identity via `caarlos0/go-version`
-- **`internal/cli/`.** CLI output helpers (never imported by `pkg/gohai/`)
-  - `theme.go`. Maxheadroom palette (`#b4a7d6` lavender accent), `Banner()`,
-    role-based color helpers (`Mute`, `Accent`, `OK`, `Err`, `Info`, `Success`,
-    `Failure`)
-  - `output.go`. `WriteOutput`, `WriteJSON`, `WriteFlat`, `WriteCollectorList`
-    for the collect subcommand
-- **`pkg/gohai/`.** Public SDK
-  - `gohai.go`. `Gohai` struct, `New()`, `Collect()`
-  - `facts.go`. `Facts` struct with typed collector fields and JSON/Flat methods
-  - `options.go`. Functional options (`WithEnabled`, `WithDisabled`,
-    `WithCollectors`)
-  - `registry.go`. `PublicRegistry` used by CLI for flag enumeration
-- **`pkg/gohai/collectors/<name>/`.** Public per-collector sub-packages. Use the
-  osapi-style per-OS struct pattern (no build tags). See
-  `pkg/gohai/collectors/shells/` for the canonical reference.
-  - `<name>.go`. `Info` struct, `Collector` interface, `base` struct (holds
-    shared `Name()`/`DefaultEnabled()`/`Dependencies()`), `New()` factory that
-    dispatches on `platform.Detect()`, and any cross-OS helpers (shared parsing,
-    shared constants).
+- **`main.go`.** The entry point at the repo root. It only calls
+  `cmd.Execute()`.
+- **`cmd/`.** The Cobra CLI subcommands.
+  - `root.go`. The root command, the banner, the context setup and the
+    `AddCommand` calls.
+  - `collect.go`. `gohai collect`, the collector flags and the SDK calls. It
+    sends the output to `internal/cli/`.
+  - `validate.go`. `gohai validate`. It validates JSON against the embedded
+    schema, from stdin or from `--file`.
+  - `version.go`. `gohai version`. The build-time identity, through
+    `caarlos0/go-version`.
+- **`internal/cli/`.** The CLI output helpers. `pkg/gohai/` never imports them.
+  - `theme.go`. The Maxheadroom palette (`#b4a7d6` lavender accent), `Banner()`,
+    and the color helpers for each role (`Mute`, `Accent`, `OK`, `Err`, `Info`,
+    `Success`, `Failure`).
+  - `output.go`. `WriteOutput`, `WriteJSON`, `WriteFlat` and
+    `WriteCollectorList` for the collect subcommand.
+- **`pkg/gohai/`.** The public SDK.
+  - `gohai.go`. The `Gohai` struct, `New()` and `Collect()`.
+  - `facts.go`. The `Facts` struct, with typed collector fields and the JSON and
+    Flat methods.
+  - `options.go`. The functional options (`WithEnabled`, `WithDisabled`,
+    `WithCollectors`).
+  - `registry.go`. `PublicRegistry`. The CLI uses it to list the flags.
+- **`pkg/gohai/collectors/<name>/`.** The public sub-package of each collector.
+  Use the osapi pattern of one struct for each OS, with no build tags. The
+  canonical reference is `pkg/gohai/collectors/shells/`.
+  - `<name>.go`. The `Info` struct, the `Collector` interface, and the `base`
+    struct. The `base` struct holds the shared `Name()`/`DefaultEnabled()`/
+    `Dependencies()`. The file also has the `New()` factory, which selects the
+    variant from `platform.Detect()`. It also has the helpers that all OS
+    variants share, such as shared parsing and shared constants.
   - `linux.go`.
-    `type Linux struct { base; FS avfs.VFS; Exec executor.Executor }` (fields
-    only when the collector needs them) with `NewLinux()` and
-    `(l *Linux) Collect(ctx)` method. **No build tag.**
+    `type Linux struct { base; FS avfs.VFS; Exec executor.Executor }`, with
+    `NewLinux()` and the `(l *Linux) Collect(ctx)` method. Add a field only when
+    the collector needs it. **No build tag.**
   - `darwin.go`. `type Darwin struct { base; FS; Exec }` with `NewDarwin()` and
-    `(d *Darwin) Collect(ctx)` method. **No build tag.**
-  - `debian.go` / `rhel.go` (only when distro genuinely diverges). Same pattern,
-    added to the `New()` dispatch switch.
-  - `<name>_public_test.go`. The **only** test file. Contains compile-time
-    `collector.Collector` asserts at the top, `TestNew` for the factory
-    dispatch, a single table-driven `TestCollect` whose rows carry a
-    `variant: "linux" | "darwin"` column and construct the right per-OS struct,
-    and optionally separate test methods for genuinely-pure public helpers (e.g.
-    `TestHumanDuration`, `TestBytesToString`). No `linux_public_test.go` /
-    `darwin_public_test.go` files.
-- **`schemas/`.** JSON Schema and field-naming artifacts
-  - `gen/`. Generator tool (`go run .` reflects `gohai.Facts` into JSON Schema
-    via `invopop/jsonschema`); `//go:generate` directive picked up by
-    `just generate`
-  - `gohai.schema.json`. Generated schema (draft 2020-12), committed
-  - `schema.go`. `//go:embed` of `gohai.schema.json` for the validate subcommand
-  - `field-mapping.md`. 950-row per-field tier mapping (OCSF/OTel/ convention)
-    with citations
-  - `ocsf-gaps.md`. 82 OCSF upstream PR candidates
-- **`internal/platform/`.** OS/distro detection wrapping gopsutil. `Detect()` is
-  a swappable `var` so collector tests can force any branch without importing
-  gopsutil. `hostInfoFn` is private, exposed only to platform's own tests via
-  `export_test.go`.
-- **`internal/collector/`.** Collector interface + registry plumbing
-  - `collector.go`. `Collector` interface
-  - `registry.go`. `Registry` (register, resolve deps, run concurrently)
-  - `mocks/`. Gomock mock generation (`go generate`) and the committed mock
-- **`internal/executor/`.** command execution abstraction
-  - `executor.go`. `Executor` interface (`Execute(ctx, name, args...)`)
-  - `mocks/`. Gomock mock generation (`go generate`) and the committed mock
+    the `(d *Darwin) Collect(ctx)` method. **No build tag.**
+  - `debian.go` / `rhel.go`. Add these only when a distribution is really
+    different. They use the same pattern, and the `New()` switch selects them.
+  - `<name>_public_test.go`. The **only** test file. At the top, it has the
+    compile-time `collector.Collector` asserts. It has `TestNew` for the factory
+    selection. It has one table-driven `TestCollect`. Each row has a
+    `variant: "linux" | "darwin"` column and makes the correct struct for that
+    OS. It can also have separate test methods for public helpers that are
+    really pure, for example `TestHumanDuration` and `TestBytesToString`. There
+    are no `linux_public_test.go` / `darwin_public_test.go` files.
+- **`schemas/`.** The JSON Schema and the field-name artifacts.
+  - `gen/`. The generator tool. `go run .` reflects `gohai.Facts` into JSON
+    Schema through `invopop/jsonschema`. `just generate` runs its
+    `//go:generate` directive.
+  - `gohai.schema.json`. The generated schema (draft 2020-12). It is committed.
+  - `schema.go`. The `//go:embed` of `gohai.schema.json` for the validate
+    subcommand.
+  - `field-mapping.md`. The tier mapping of each field (OCSF/OTel/ convention),
+    with citations. It has 950 rows.
+  - `ocsf-gaps.md`. 82 candidates for upstream OCSF PRs.
+- **`internal/platform/`.** The OS and distribution detection. It wraps
+  gopsutil. `Detect()` is a `var` that tests can replace. Thus collector tests
+  can force each branch and do not import gopsutil. `hostInfoFn` is private.
+  Only the tests of platform can get it, through `export_test.go`.
+- **`internal/collector/`.** The collector interface and the registry code.
+  - `collector.go`. The `Collector` interface.
+  - `registry.go`. `Registry`. It registers collectors, resolves the
+    dependencies and runs the collectors at the same time.
+  - `mocks/`. The gomock generation (`go generate`) and the committed mock.
+- **`internal/executor/`.** The abstraction for command execution.
+  - `executor.go`. The `Executor` interface (`Execute(ctx, name, args...)`).
+  - `mocks/`. The gomock generation (`go generate`) and the committed mock.
 
 ## Code style
 
-Go code is formatted by [gofumpt] and linted using [golangci-lint], enforced by
-CI.
+[gofumpt] formats the Go code and [golangci-lint] lints it. CI enforces both.
 
 ```bash
 just go-fmt-check   # Check formatting
@@ -154,15 +161,13 @@ just go-fmt         # Auto-fix formatting
 just go-vet         # Run linter
 ```
 
-The linters that run are declared in `.golangci.yml`. Read them there rather
-than looking for a list here. A copied list goes stale the first time the
-configuration changes. Generated files (`*.gen.go`, `*.pb.go`) are excluded from
-formatting.
+`.golangci.yml` declares the linters that run. Read them there. Do not look for
+a list here, because a copied list becomes incorrect when the configuration
+changes. Formatting does not apply to generated files (`*.gen.go`, `*.pb.go`).
 
 ### Documentation
 
-Markdown files are formatted with [mdformat] through `uvx`. This style is
-enforced by CI.
+[mdformat] formats the Markdown files through `uvx`. CI enforces this style.
 
 ```bash
 just md-fmt-check   # Check formatting
@@ -173,8 +178,8 @@ just md-fmt         # Auto-fix formatting
 
 ### Function signatures
 
-Functions with parameters use multi-line format, one parameter per line, with
-the closing parenthesis and the return types on a line of their own:
+A function with parameters uses the multi-line format. Put one parameter on each
+line. Put the closing parenthesis and the return types on a line of their own:
 
 ```go
 func FunctionName(
@@ -184,46 +189,47 @@ func FunctionName(
 }
 ```
 
-Functions taking no parameters stay on one line:
+A function with no parameters stays on one line:
 
 ```go
 func Name() string {
 }
 ```
 
-Adding a parameter then shows as one added line rather than a rewritten
+Then a new parameter shows as one added line in the diff, not as a new
 signature.
 
 ### File naming
 
-Name a file for what it holds. Avoid `helpers.go`, `utils.go`, and names of that
-kind: they describe where code was put rather than what it is, and they
-accumulate whatever has no other home.
+Give a file the name of what it holds. Do not use `helpers.go`, `utils.go`, or
+names of that type. These names tell where the code is, not what it is. They
+also collect all code that has no other location.
 
-`types.go` holds only type declarations: structs, interfaces, constants, and
-aliases. A function belongs in a file named for what it does.
+`types.go` holds only type declarations: structs, interfaces, constants and
+aliases. A function goes in a file with the name of what the function does.
 
-A test file is named for the production file it tests. Where tests grow too
-large to read, split the production file first so each test file keeps a
-counterpart, rather than splitting tests away from the file they cover.
+A test file has the name of the production file that it tests. If the tests
+become too large to read, split the production file first. Then each test file
+keeps a related production file. Do not split the tests away from the file that
+they test.
 
 ### Go patterns
 
-- Error wrapping: `fmt.Errorf("context: %w", err)`, so the chain names each
-  layer it passed through and stays inspectable with `errors.Is` and
-  `errors.As`.
-- Early returns rather than nesting the successful path inside conditionals.
-- Unused parameters: rename to `_`.
-- Import order: standard library, third party, then local, separated by blank
-  lines.
+- Error wrapping: `fmt.Errorf("context: %w", err)`. Then the chain names each
+  layer that the error went through, and `errors.Is` and `errors.As` can examine
+  it.
+- Return early. Do not put the successful path inside conditionals.
+- Unused parameters: rename them to `_`.
+- Import order: the standard library, then third party, then local. Put a blank
+  line between the groups.
 
 ### Test doubles
 
-A double for an interface this organization defines is generated with `mockgen`
-and committed. Do not write a struct by hand to satisfy one.
+Use `mockgen` to generate a double for an interface that this organization
+defines, and commit it. Do not write a struct by hand for this interface.
 
-Generated mocks live in a `mocks` package beside the code they mock, produced by
-a `generate.go` holding the directive:
+Generated mocks are in a `mocks` package next to the code that they mock. A
+`generate.go` file holds the directive that makes them:
 
 ```go
 package mocks
@@ -231,16 +237,16 @@ package mocks
 //go:generate go tool go.uber.org/mock/mockgen -source=../types.go -destination=types.gen.go -package=mocks
 ```
 
-The generator is resolved through the module's tool dependencies, so every
-checkout runs the version `go.mod` records. Destination files end in `.gen.go`
-and are committed. Do not use `gen/` for mocks. That name is taken by API code
-generation.
+Go finds the generator through the tool dependencies of the module. Thus each
+checkout runs the version that `go.mod` records. The destination files end in
+`.gen.go`, and you commit them. Do not use `gen/` for mocks. API code generation
+uses that name.
 
-When the interface is **unexported**, a sibling package cannot work: the mock
-has to import the package to name the types in the interface, and the package's
-own tests have to import the mock. Generate it into the package instead, with a
-destination scoped to tests so the mocking library stays out of the dependency
-graph of anything that imports the package:
+If the interface is **unexported**, a sibling package cannot work. The mock must
+import the package to name the types in the interface, and the tests of the
+package must import the mock. Generate the mock into the package. Give it a
+destination that only tests use. Then the mocking library is not in the
+dependency graph of code that imports the package:
 
 ```go
 // generate.go, in the package that declares the interface
@@ -249,34 +255,34 @@ package thispackage
 //go:generate go tool go.uber.org/mock/mockgen -source=thing.go -destination=thing.gen_test.go -package=thispackage
 ```
 
-Either way the directives live in a `generate.go` that holds no code, and the
-generated file carries `.gen` so a reader knows not to edit it.
+In the two cases, the directives are in a `generate.go` that holds no code. The
+name of the generated file has `.gen`, so that a reader knows not to edit it.
 
-Where call sites would otherwise repeat the same expectations, write a
-constructor returning a configured mock rather than introducing a hand-written
-type. The generated mock is still what satisfies the interface.
+If many call sites set the same expectations, write a constructor that returns a
+configured mock. Do not add a hand-written type. The generated mock is still
+what satisfies the interface.
 
-Three doubles are written by hand, because generating them buys nothing:
+You write three types of double by hand, because generation gives no benefit:
 
-- One standing in for a standard library interface: `net.Conn`, `fs.File`,
-  `io.Writer`, `slog.Handler`. Those do not move when our code does.
-- One carrying a real implementation of the behavior under test, such as signing
-  with a genuinely generated key pair.
-- A recorder for a dependency called from a goroutine the test cannot join,
-  where a generated mock would assert a call count at a moment the test cannot
-  establish. State that reason where the recorder is defined.
+- A double for a standard library interface: `net.Conn`, `fs.File`, `io.Writer`,
+  `slog.Handler`. These do not change when our code changes.
+- A double that has a real implementation of the behavior under test, for
+  example signatures with a key pair that is really generated.
+- A recorder for a dependency that a goroutine calls, if the test cannot join
+  that goroutine. A generated mock asserts a call count at a time that the test
+  cannot control. Write this reason where you define the recorder.
 
 ### File headers
 
-Every `.go` file MUST start with the MIT license header. See any existing Go
-file in the repo for the exact format. Build-tagged files put `//go:build` on
-line 1, blank line, then the header.
+Each `.go` file MUST start with the MIT license header. Refer to a Go file in
+the repo for the exact format. In a file with a build tag, put `//go:build` on
+line 1, then a blank line, then the header.
 
 ### Error wrapping at the module boundary
 
-Never expose raw gopsutil, ghw, or procfs error types through the public API.
-Wrap them, so callers do not need those packages in their module graph to handle
-an error.
+Never let raw gopsutil, ghw or procfs error types go out through the public API.
+Wrap them. Then callers do not need these packages in their module graph to
+handle an error.
 
 ## Testing
 
@@ -287,49 +293,50 @@ just go-unit-cov   # Generate coverage report
 go test -run TestName -v ./internal/collector/platform/...  # Run a single test
 ```
 
-Coverage is gated at 100%. `just test` fails if total coverage drops below it,
-so a change that adds untested code fails locally and in CI:
+The coverage gate is 100%. If the total coverage is less than this, `just test`
+fails. Thus a change that adds untested code fails locally and in CI:
 
 ```bash
 just go-unit-cov-check   # Report coverage and fail below the target
 ```
 
-The target is declared in `.github/codecov.yml` and in the shared `go` justfile
-module. Change both together.
+`.github/codecov.yml` and the shared `go` justfile module declare the target.
+Change the two together.
 
 ### Test file conventions
 
-- Public tests: `*_public_test.go` in the package's `_test` package, exercising
-  the exported surface. This is the default.
-- Internal tests: `*_test.go` in the same package, for what the exported surface
-  cannot reach.
-- Suite naming: `*_public_test.go` → `{Name}PublicTestSuite`, `*_test.go` →
+- Public tests: `*_public_test.go` in the `_test` package of the package. They
+  test the exported API. This is the default.
+- Internal tests: `*_test.go` in the same package. They test what the exported
+  API cannot get to.
+- Suite names: `*_public_test.go` → `{Name}PublicTestSuite`, `*_test.go` →
   `{Name}TestSuite`.
 - `testify/suite` with table-driven cases.
-- One suite method per function under test. Success, errors, and edge cases are
-  rows in one table, not separate methods.
-- `export_test.go` exposes unexported symbols to external tests, by alias or by
-  setter. Do not use an alias to re-cover behavior the caller's own test already
-  reaches; a helper with its own contract is what the pattern is for.
+- One suite method for each function under test. Success, errors and edge cases
+  are rows in one table, not separate methods.
+- `export_test.go` gives external tests access to unexported symbols, with an
+  alias or a setter. Do not use an alias to test again the behavior that the
+  test of the caller already gets to. Use the pattern for a helper that has its
+  own contract.
 
-External tests in this repository live in a `_test` package beside the code they
-cover, tables carry `validateFunc` callbacks, and the setter form is
-`SetXFn(fn) func()`, returning a restore func the caller defers.
+External tests in this repository are in a `_test` package next to the code that
+they test. Tables have `validateFunc` callbacks. The setter form is
+`SetXFn(fn) func()`. It returns a restore func, and the caller defers it.
 
-Collector-specific rules on top of that:
+These rules are specific to collectors:
 
-- **One `TestCollect` per collector.** All scenarios, both Linux and Darwin,
-  success and error paths, live as rows in one table keyed by a `variant`
-  column. No `TestCollectLinux` / `TestCollectDarwin` splits.
-- Separate test methods are reserved for genuinely pure public helpers with
-  their own contract (`TestHumanDuration`, `TestBytesToString`), not for bridges
-  `Collect` already exercises.
-- **Swap at the boundary.** `TestCollect` rows swap the raw upstream library
-  call (`hostInfoFn`, `partitionsFn`, ...) so the bridge mapping runs on every
-  row.
-- **No custom assertion messages.** `s.Equal(want, got)`, not
+- **One `TestCollect` for each collector.** All scenarios are rows in one table
+  with a `variant` column: Linux and Darwin, the success paths and the error
+  paths. Do not split into `TestCollectLinux` / `TestCollectDarwin`.
+- Use separate test methods only for public helpers that are really pure and
+  have their own contract (`TestHumanDuration`, `TestBytesToString`). Do not use
+  them for bridge code that `Collect` already tests.
+- **Replace at the boundary.** Each `TestCollect` row replaces the raw call to
+  the upstream library (`hostInfoFn`, `partitionsFn`, ...). Thus the bridge
+  mapping runs on each row.
+- **No custom assertion messages.** Write `s.Equal(want, got)`, not
   `s.Equal(want, got, "expected equal")`.
-- Target 100% test coverage on all packages.
+- The target is 100% test coverage on all packages.
 
 ## Quick reference
 
@@ -343,20 +350,21 @@ gohai version                      # build info
 
 ## VFS and executor abstractions
 
-Collectors that read files or shell out **MUST** use two shared abstractions,
-injected as struct fields on the per-OS variant (same pattern as osapi's Agent
-struct).
+A collector that reads files or runs commands **MUST** use two shared
+abstractions. Inject them as struct fields on the variant for each OS. This is
+the same pattern as the Agent struct of osapi.
 
 ### `avfs.VFS`: filesystem
 
-[`github.com/avfs/avfs`](https://github.com/avfs/avfs) used directly, with no
-custom wrapper. Production wires the real OS FS via `osfs.NewWithNoIdm()`; tests
-wire `memfs.New()` with canned files at real absolute paths (`/proc/meminfo`,
-`/etc/os-release`, etc.). Tests exercise the real `ReadFile` / `Open` / `Stat`
-code path against memory-backed content, a genuine integration test of the
-collector's FS interaction, not a function-stub swap.
+Use [`github.com/avfs/avfs`](https://github.com/avfs/avfs) directly, with no
+custom wrapper. Production uses the real OS filesystem through
+`osfs.NewWithNoIdm()`. Tests use `memfs.New()` with canned files at real
+absolute paths, for example `/proc/meminfo` and `/etc/os-release`. Tests run the
+real `ReadFile` / `Open` / `Stat` code path against content in memory. This is a
+real integration test of how the collector uses the filesystem. It does not
+replace a function with a stub.
 
-**Per-OS struct shape:**
+**Struct shape for each OS:**
 
 ```go
 type Linux struct {
@@ -384,18 +392,18 @@ c := &shells.Linux{FS: f}
 got, err := c.Collect(ctx)
 ```
 
-Reference implementation: `pkg/gohai/collectors/shells/`.
+The reference implementation is `pkg/gohai/collectors/shells/`.
 
 ### `executor.Executor`: command execution
 
-`internal/executor` provides a minimal interface (single method:
-`Execute(ctx, name, args...) ([]byte, error)`) with a gomock mock at
-`internal/executor/mocks/`. Production impl wraps `exec.CommandContext` and
-returns combined stdout+stderr. Collectors that shell out (sysctl, sw_vers,
-lsb_release, loginctl, lscpu, kextstat, etc.) hold the Executor as a struct
-field.
+`internal/executor` gives a minimal interface with one method:
+`Execute(ctx, name, args...) ([]byte, error)`. Its gomock mock is at
+`internal/executor/mocks/`. The production implementation wraps
+`exec.CommandContext` and returns stdout and stderr together. A collector that
+runs commands (sysctl, sw_vers, lsb_release, loginctl, lscpu, kextstat and
+others) holds the Executor as a struct field.
 
-**Per-OS struct with both FS and Executor:**
+**Struct for each OS, with FS and Executor:**
 
 ```go
 type Darwin struct {
@@ -424,77 +432,78 @@ mockExec.EXPECT().
 c := &platform.Darwin{FS: memfs.New(), Exec: mockExec}
 ```
 
-Mocks are regenerated via `go generate ./internal/executor/...` and committed.
-Pinned tool: `go.uber.org/mock`, the maintained fork of the archived
+To make the mocks again, run `go generate ./internal/executor/...`, then commit
+them. The pinned tool is `go.uber.org/mock`, the maintained fork of the archived
 `golang/mock`.
 
 ### Migration status
 
-All new code and new collectors MUST use these abstractions. Existing collectors
-still on the legacy `ReadFileFn` / `RunCmdFn` struct-field pattern migrate as
-methodology work touches them. Canonical reference:
-`pkg/gohai/collectors/shells/` (VFS only), `pkg/gohai/collectors/platform/` (VFS
-\+ Executor).
+All new code and new collectors MUST use these abstractions. Some collectors
+still use the legacy `ReadFileFn` / `RunCmdFn` struct-field pattern. They move
+to the new pattern when methodology work changes them. The canonical references
+are `pkg/gohai/collectors/shells/` (VFS only) and
+`pkg/gohai/collectors/platform/` (VFS + Executor).
 
 ## Adding a new collector
 
-Step-by-step walkthrough lives in
-[docs/adding-a-collector.md](docs/adding-a-collector.md) for code examples, file
-layout, test setup, and the commit template.
+[docs/adding-a-collector.md](docs/adding-a-collector.md) gives the steps. It has
+the code examples, the file layout, the test setup and the commit template.
 
 The **reference implementation** is `pkg/gohai/collectors/shells/`. Copy its
 patterns exactly.
 
 ### Done-definition (every collector, every time)
 
-Before marking a collector complete, every item below must be true:
+Before you mark a collector as complete, each item below must be true:
 
-01. **Analyzed Ohai's plugin + spec** for HOW it collects (data sources, distro
-    edge cases, fallback chains). Our collection logic mirrors theirs. We
-    inherit their years of bug fixes. Deviations are documented and justified.
-02. **Checked OCSF schema** ([schema.ocsf.io](https://schema.ocsf.io/)) and,
-    when OCSF is silent, \[OpenTelemetry Resource Semantic
-    Conventions\][otel-semconv] for canonical field names. Schema mappings
-    recorded in the collector doc's Collected fields table under the **Schema
-    mapping** column. When a schema has a field we could emit but don't, either
-    add it or note why.
-03. **osapi per-OS struct pattern**. No build tags, factory dispatch on
-    `platform.Detect()`, per-OS structs each implementing Collect.
+01. **You analyzed Ohai's plugin and spec** for HOW it collects: the data
+    sources, the special cases of each distribution and the fallback chains. Our
+    collection logic is the same as theirs, so we get their years of bug fixes.
+    Each difference has a documented reason.
+02. **You checked the OCSF schema** ([schema.ocsf.io](https://schema.ocsf.io/))
+    for canonical field names. If OCSF has no field, you checked the
+    [OpenTelemetry Resource Semantic Conventions][otel-semconv]. You recorded
+    the schema mappings in the **Schema mapping** column of the Collected fields
+    table on the collector page. If a schema has a field that we can report but
+    do not, add the field or write why not.
+03. **The osapi pattern of one struct for each OS**. No build tags. The factory
+    selects the variant from `platform.Detect()`. Each struct for an OS
+    implements Collect.
 04. **100% test coverage.**
     `go tool cover -func=/tmp/cov.out | grep -v '100.0%'` returns nothing for
-    the collector's files.
+    the files of the collector.
 05. **One `<name>_public_test.go`, one `TestCollect`.** Linux and Darwin
-    scenarios share the same table, keyed by a `variant` column. No
-    `linux_public_test.go` / `darwin_public_test.go` split files. No `TestReadX`
-    methods shadowing bridge code `TestCollect` already exercises. Pure-helper
-    public-function tests (e.g. `TestHumanDuration`) are the only legitimate
-    extra test methods.
-06. **Seams sit at the boundary.** `export_test.go` swaps the upstream library
-    call (`hostInfoFn`, `partitionsFn`, etc.), so the bridge mapping runs on
-    every row. No `readXFn = readX` wrappers partway through the collector, and
-    no alias used to test a bridge `TestCollect` already exercises.
-07. **`docs/collectors/<name>.md`** is a self-contained functional spec:
-    Description (what + why in our voice), Collected fields with **Schema
-    mapping** column (OCSF path first, OpenTelemetry attribute when OCSF is
-    silent), Platform support, Example output, SDK usage, Enable/disable,
-    Dependencies, Data sources (step-by-step methodology in OUR voice, not a
-    Ohai parity table), Backing library. **No "Known gaps vs. Ohai" section.**
-    methodology gaps live as GitHub issues (labeled `methodology-gap` /
-    `collector:<name>`).
-08. **README.md** row flipped to `✅ (<backing>)`.
-09. **Lint clean**, `just go-vet` returns 0 issues.
-10. **Commit message** explains the "why": what Ohai/OCSF cross-references drove
-    the implementation, what extensions over the upstream library we added, any
-    deliberate deviations.
-11. **Check GitHub issues** for tracked methodology gaps:
+    scenarios are in the same table, with a `variant` column. No separate
+    `linux_public_test.go` / `darwin_public_test.go` files. No `TestReadX`
+    methods that test bridge code that `TestCollect` already tests. The only
+    permitted extra test methods are tests of pure public helpers, for example
+    `TestHumanDuration`.
+06. **The seams are at the boundary.** `export_test.go` replaces the call to the
+    upstream library (`hostInfoFn`, `partitionsFn` and others). Thus the bridge
+    mapping runs on each row. No `readXFn = readX` wrappers in the middle of the
+    collector. No alias that tests a bridge that `TestCollect` already tests.
+07. **`docs/collectors/<name>.md`** is a functional spec that is complete in
+    itself. It has these sections: Description (what and why, in our voice),
+    Collected fields with a **Schema mapping** column (the OCSF path first, the
+    OpenTelemetry attribute if OCSF has no field), Platform support, Example
+    output, SDK usage, Enable/disable, Dependencies, Data sources (the method,
+    step by step, in OUR voice, not an Ohai parity table), and Backing library.
+    **No "Known gaps vs. Ohai" section.** Methodology gaps are GitHub issues
+    with the labels `methodology-gap` / `collector:<name>`.
+08. **README.md**: the row of the collector shows `✅ (<backing>)`.
+09. **Lint clean**: `just go-vet` returns 0 issues.
+10. **The commit message** tells the "why". It names the Ohai and OCSF
+    references that gave the implementation, the extensions that we added to the
+    upstream library, and each intentional difference.
+11. **Check the GitHub issues** for tracked methodology gaps:
     `gh issue list --label methodology-gap --label collector:<name>`. If the
-    work closes a tracked issue, the issue's "Doc after this fix lands" block IS
-    the doc content to paste into Data sources. The PR description must include
-    `Closes #N`.
+    work closes a tracked issue, the "Doc after this fix lands" block of the
+    issue IS the content to paste into Data sources. The PR description must
+    include `Closes #N`.
 
-See [docs/adding-a-collector.md](docs/adding-a-collector.md) for the full
-step-by-step walkthrough (code examples, test setup, doc template, commit
-template).
+For the full steps, refer to
+[docs/adding-a-collector.md](docs/adding-a-collector.md). It has the code
+examples, the test setup, the doc template and the commit template.
 
 ## Color palette (Max Headroom)
 
@@ -505,28 +514,27 @@ template).
 #ff6ec7  pink      errors
 ```
 
-All palette values are defined as named constants in `internal/cli/theme.go`.
-Never pass raw ANSI escape strings in command code. Reference the theme roles
-(`Accent`, `OK`, `Err`, `Info`, `Mute`) instead. `install.sh` uses the same
-`#b4a7d6` hex value as a truecolor escape so the install banner and the running
-CLI paint with the exact same hue.
+`internal/cli/theme.go` defines all palette values as named constants. Never
+pass raw ANSI escape strings in command code. Use the theme roles (`Accent`,
+`OK`, `Err`, `Info`, `Mute`). `install.sh` uses the same `#b4a7d6` hex value as
+a truecolor escape. Thus the install banner and the CLI show the same color.
 
 ## CLI architecture
 
-All CLI output styling and formatting lives in `internal/cli/`:
+All CLI output style and format is in `internal/cli/`:
 
-- **`theme.go`.** maxheadroom palette, `Banner()`, role-based color helpers
-  (`Mute`, `Accent`, `OK`, `Err`, `Info`, `Success`, `Failure`)
-- **`output.go`.** `WriteOutput`, `WriteJSON`, `WriteFlat`, `WriteCollectorList`
-  for the collect subcommand
+- **`theme.go`.** The maxheadroom palette, `Banner()`, and the color helpers for
+  each role (`Mute`, `Accent`, `OK`, `Err`, `Info`, `Success`, `Failure`).
+- **`output.go`.** `WriteOutput`, `WriteJSON`, `WriteFlat` and
+  `WriteCollectorList` for the collect subcommand.
 
-`cmd/` files are thin wiring: they parse flags, call the SDK, and delegate all
-output to `internal/cli/`. No raw `fmt.Fprintf` with color codes in `cmd/`.
+The `cmd/` files are thin. They parse flags, call the SDK, and send all output
+to `internal/cli/`. Do not use raw `fmt.Fprintf` with color codes in `cmd/`.
 
 ## Before committing
 
-Run `just ready` before committing to ensure generated code, package docs,
-formatting, and lint are all up to date:
+Before you commit, run `just ready`. It makes sure that the generated code, the
+package docs, the format and the lint are all current:
 
 ```bash
 just ready
@@ -534,9 +542,8 @@ just ready
 
 ## Branching
 
-All changes should be developed on feature branches. Create a branch from `main`
-using the naming convention `type/short-description`, where `type` matches the
-[Conventional Commits] type:
+Make all changes on feature branches. Create a branch from `main` with the name
+`type/short-description`. The `type` is a [Conventional Commits] type:
 
 - `feat/add-cpu-collector`
 - `fix/memory-parsing-error`
@@ -544,49 +551,50 @@ using the naming convention `type/short-description`, where `type` matches the
 - `refactor/simplify-registry`
 - `chore/update-dependencies`
 
-When using Claude Code's `/commit` command, a branch will be created
-automatically if you are on `main`.
+If you are on `main`, the `/commit` command of Claude Code creates a branch
+automatically.
 
 ## Commit messages
 
 Follow [Conventional Commits] with the 50/72 rule:
 
-- **Subject line**: max 50 characters, imperative mood, capitalized, no period
-- **Body**: wrap at 72 characters, separated from subject by a blank line
+- **Subject line**: 50 characters maximum, imperative mood, capitalized, no
+  period.
+- **Body**: wrap at 72 characters. Put a blank line between the subject and the
+  body.
 - **Format**: `type(scope): description`
 - **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
-- Summarize the "what" and "why", not the "how"
+- Tell the "what" and the "why", not the "how".
 
-Try to write meaningful commit messages and avoid having too many commits on a
-PR. Most PRs should likely have a single commit (although for bigger PRs it may
-be reasonable to split it in a few). Git squash and rebase is your friend!
+Write commit messages that have meaning. Do not put too many commits on a PR.
+Most PRs have one commit. A large PR can have a small number of commits. Use Git
+squash and rebase.
 
 ## Submitting a PR
 
-- **Describe your changes.** Say what changed and why. A reviewer should not
-  have to read the diff to learn the reason for it.
-- **Issue/PR links.** Link any previous work such as related issues or PRs.
-  Please describe how your changes differ to/extend this work.
-- **Examples.** Add any examples or screenshots that you think are useful to
-  demonstrate the effect of your changes.
-- **Draft PRs.** If your changes are incomplete, but you would like to discuss
-  them, open the PR as a draft and add a comment to start a discussion. Using
-  comments rather than the PR description allows the description to be updated
-  later while preserving any discussions.
+- **Describe your changes.** Tell what changed and why. A reviewer must not have
+  to read the diff to know the reason.
+- **Issue/PR links.** Link to related issues or PRs. Tell how your changes are
+  different from this work or add to it.
+- **Examples.** Add examples or screenshots that show the effect of your
+  changes.
+- **Draft PRs.** If your changes are not complete and you want to discuss them,
+  open the PR as a draft. Add a comment to start the discussion. Use comments,
+  not the PR description. Then you can change the description later, and the
+  discussion stays.
 
 ## AI usage
 
-This repo is written with AI assistance. All contributions are subject to the
-[AI Usage Policy](AI_POLICY.md). Disclose the tool you used, and make sure you
-can explain what your change does without the aid of AI tools.
+This repo is written with AI help. The [AI Usage Policy](AI_POLICY.md) applies
+to all contributions. Tell which tool you used. Make sure that you can explain
+what your change does without AI tools.
 
 ## FAQ
 
 > I want to contribute, where do I start?
 
-All kinds of contributions are welcome, whether it's a typo fix or a shiny new
-collector. You can also contribute by upvoting/commenting on issues or helping
-to answer questions.
+We welcome all types of contributions, from a typo fix to a new collector. You
+can also vote on issues, comment on issues, or help to answer questions.
 
 > I'm stuck, where can I get help?
 

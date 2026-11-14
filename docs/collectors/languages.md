@@ -4,24 +4,25 @@
 
 ## Description
 
-Reports installed programming language runtimes on the host. Each supported
-language is probed by running its standard `--version` command. A nil field
-means the runtime was not found on PATH. The set of detected runtimes mirrors
-Ohai's languages plugin (which delegates to per-language sub-plugins; gohai
-consolidates them into a single collector).
+The collector reports the programming language runtimes that are installed on
+the host. For each supported language, the collector runs its standard
+`--version` command. A `nil` field shows that the runtime is not on PATH. The
+collector finds the same set of runtimes as Ohai's languages plugin. Ohai uses a
+sub-plugin for each language. gohai puts them all in one collector.
 
 ## Collected fields
 
-| Field    | Type      | Description                               | Schema mapping                                                    |
-| -------- | --------- | ----------------------------------------- | ----------------------------------------------------------------- |
-| `go`     | `*string` | Go toolchain version, e.g. `1.21.0`       | No direct OCSF/OTel mapping (host inventory, not process runtime) |
-| `python` | `*string` | Python 3 version from `python3 --version` | No direct OCSF/OTel mapping                                       |
-| `ruby`   | `*string` | Ruby version from `ruby --version`        | No direct OCSF/OTel mapping                                       |
-| `node`   | `*string` | Node.js version, leading `v` stripped     | No direct OCSF/OTel mapping                                       |
-| `java`   | `*string` | Java version extracted from quoted string | No direct OCSF/OTel mapping                                       |
-| `perl`   | `*string` | Perl version, `(vX.Y.Z)` form extracted   | No direct OCSF/OTel mapping                                       |
+| Field    | Type      | Description                                    | Schema mapping                                                             |
+| -------- | --------- | ---------------------------------------------- | -------------------------------------------------------------------------- |
+| `go`     | `*string` | The Go toolchain version, for example `1.21.0` | No direct OCSF/OTel mapping. This is host inventory, not a process runtime |
+| `python` | `*string` | The Python 3 version, from `python3 --version` | No direct OCSF/OTel mapping                                                |
+| `ruby`   | `*string` | The Ruby version, from `ruby --version`        | No direct OCSF/OTel mapping                                                |
+| `node`   | `*string` | The Node.js version, without the leading `v`   | No direct OCSF/OTel mapping                                                |
+| `java`   | `*string` | The Java version, from the quoted string       | No direct OCSF/OTel mapping                                                |
+| `perl`   | `*string` | The Perl version, from the `(vX.Y.Z)` form     | No direct OCSF/OTel mapping                                                |
 
-Fields are omitted from JSON output when nil (runtime absent).
+If a field is `nil`, it is not in the JSON output. This shows that the runtime
+is missing.
 
 ## Platform support
 
@@ -54,8 +55,8 @@ facts, _ := g.Collect(ctx)
 
 ## Enable/disable
 
-Default: **disabled** (opt-in). Runtime detection requires shelling out six
-times, which is significant overhead.
+Default: **disabled** (opt-in). To find the runtimes, the collector runs six
+commands. This is a large overhead.
 
 ```bash
 gohai --collector.languages       # enable
@@ -68,34 +69,34 @@ None.
 
 ## Data sources
 
-Ohai's `languages.rb` delegates to per-language sub-plugins (`go.rb`,
-`python.rb`, `ruby.rb`, `nodejs.rb`, `java.rb`, `perl.rb`), each running the
-same `--version` commands. gohai consolidates all six probes into a single
-collector. The version extraction logic mirrors Ohai's per-language parsers, the
-same edge cases are handled (Java's stderr output, Perl's parenthesized version
-form, Node's leading `v`).
+Ohai's `languages.rb` sends the work to a sub-plugin for each language (`go.rb`,
+`python.rb`, `ruby.rb`, `nodejs.rb`, `java.rb`, `perl.rb`). Each sub-plugin runs
+the same `--version` command. gohai puts all six probes in one collector. The
+version parse is the same as in Ohai's parser for each language. gohai handles
+the same edge cases: the stderr output of Java, the version in parentheses of
+Perl, and the leading `v` of Node.
 
-Both Linux and Darwin use identical probe sequences, version flags are the same
-across platforms:
+Linux and Darwin use the same probe sequence. The version flags are the same on
+the two platforms:
 
-1. **Go:** `go version`, extracts the `goX.Y.Z` token and strips the `go`
-   prefix.
-2. **Python:** `python3 --version`, extracts the second whitespace-delimited
-   field (`Python 3.11.4` → `3.11.4`).
-3. **Ruby:** `ruby --version`, extracts the second whitespace-delimited field
-   (`ruby 3.2.2 (...)` → `3.2.2`).
-4. **Node:** `node --version`, strips the leading `v` from the output (`v20.1.0`
-   → `20.1.0`).
-5. **Java:** `java -version`. Java writes to stderr; the executor returns
-   combined output. Extracts the version from the first quoted string
+1. **Go.** `go version`. The collector gets the `goX.Y.Z` token and removes the
+   `go` prefix.
+2. **Python.** `python3 --version`. The collector gets the second field, with
+   whitespace as the separator (`Python 3.11.4` → `3.11.4`).
+3. **Ruby.** `ruby --version`. The collector gets the second field, with
+   whitespace as the separator (`ruby 3.2.2 (...)` → `3.2.2`).
+4. **Node.** `node --version`. The collector removes the leading `v` from the
+   output (`v20.1.0` → `20.1.0`).
+5. **Java.** `java -version`. Java writes to stderr. The executor returns the
+   combined output. The collector gets the version from the first quoted string
    (`"21.0.1"`).
-6. **Perl:** `perl --version`, extracts the `(vX.Y.Z)` parenthesised form from
-   the first line.
+6. **Perl.** `perl --version`. The collector gets the `(vX.Y.Z)` form in
+   parentheses from the first line.
 
-Any probe that fails (command not found, non-zero exit) sets the corresponding
-field to nil. The collector never returns an error, missing runtimes are the
-normal case on minimal hosts.
+If a probe fails, the collector sets its field to `nil`. A probe fails if the
+command is not found or gives a non-zero exit code. The collector never returns
+an error, because missing runtimes are usual on minimal hosts.
 
 ## Backing library
 
-`internal/executor.Executor` for command execution.
+`internal/executor.Executor` to run the commands.

@@ -4,54 +4,54 @@
 
 ## Description
 
-Collects DigitalOcean droplet metadata by hitting the link-local server at
-`http://169.254.169.254/metadata/v1.json`. Returns nil with no error when the
-endpoint isn't reachable or the DMI signature doesn't match,
-`facts.DigitalOcean != nil` is the detection signal.
+The collector reads the DigitalOcean droplet metadata from the link-local server
+at `http://169.254.169.254/metadata/v1.json`. If the collector cannot reach the
+endpoint, or the DMI signature is different, it returns nil and no error. If
+`facts.DigitalOcean != nil`, the host is on DigitalOcean.
 
-Detection is gated on `dmi.BIOS.Manufacturer == "DigitalOcean"` (exact match,
-matches Ohai's `has_do_dmi?`). `vendor_data` is dropped from the response
-because it commonly contains cloud-init user scripts with credentials, matches
-Ohai's explicit scrub.
+The collector runs only if `dmi.BIOS.Manufacturer == "DigitalOcean"`. The match
+must be exact. This check is the same as Ohai's `has_do_dmi?`. The collector
+removes `vendor_data` from the response, because it frequently contains
+cloud-init user scripts with credentials. Ohai also removes it.
 
 ## Collected fields
 
-| Field              | Type          | Description                                     | Schema mapping            |
-| ------------------ | ------------- | ----------------------------------------------- | ------------------------- |
-| `id`               | `int64`       | DigitalOcean droplet numeric ID.                | OTel `cloud.resource_id`  |
-| `hostname`         | `string`      | Droplet hostname.                               | OCSF `device.hostname`    |
-| `region`           | `string`      | DigitalOcean region (e.g. `nyc3`).              | OTel `cloud.region`       |
-| `public_keys`      | `[]string`    | SSH public keys attached to the droplet.        | No direct schema mapping. |
-| `tags`             | `[]string`    | User-defined tags.                              | No direct schema mapping. |
-| `features`         | `[]string`    | DO feature flags enabled on this droplet.       | No direct schema mapping. |
-| `floating_ip`      | `string`      | Floating IPv4 attached to the droplet (if any). | No direct schema mapping. |
-| `reserved_ip`      | `string`      | DO's newer replacement for floating_ip (IPv4).  | No direct schema mapping. |
-| `auth_key`         | `string`      | DO internal auth token; often empty.            | No direct schema mapping. |
-| `user_data`        | `string`      | User-supplied cloud-init data.                  | No direct schema mapping. |
-| `ipv4_nameservers` | `[]string`    | DNS resolvers.                                  | No direct schema mapping. |
-| `interfaces`       | `[]Interface` | Attached VNICs, see below.                      | OCSF `network_interface`  |
+| Field              | Type          | Description                                            | Schema mapping            |
+| ------------------ | ------------- | ------------------------------------------------------ | ------------------------- |
+| `id`               | `int64`       | The numeric ID of the DigitalOcean droplet.            | OTel `cloud.resource_id`  |
+| `hostname`         | `string`      | The droplet hostname.                                  | OCSF `device.hostname`    |
+| `region`           | `string`      | The DigitalOcean region, for example `nyc3`.           | OTel `cloud.region`       |
+| `public_keys`      | `[]string`    | The SSH public keys of the droplet.                    | No direct schema mapping. |
+| `tags`             | `[]string`    | The tags that the user defined.                        | No direct schema mapping. |
+| `features`         | `[]string`    | The DO feature flags that are enabled on this droplet. | No direct schema mapping. |
+| `floating_ip`      | `string`      | The floating IPv4 of the droplet, if it has one.       | No direct schema mapping. |
+| `reserved_ip`      | `string`      | The newer DO replacement for floating_ip (IPv4).       | No direct schema mapping. |
+| `auth_key`         | `string`      | The DO internal auth token. Frequently empty.          | No direct schema mapping. |
+| `user_data`        | `string`      | The cloud-init data that the user gave.                | No direct schema mapping. |
+| `ipv4_nameservers` | `[]string`    | The DNS resolvers.                                     | No direct schema mapping. |
+| `interfaces`       | `[]Interface` | The attached VNICs. Refer to Interface.                | OCSF `network_interface`  |
 
 ### Interface
 
-| Field          | Type     | Description                          |
-| -------------- | -------- | ------------------------------------ |
-| `scope`        | `string` | `"public"` or `"private"`.           |
-| `mac`          | `string` | MAC address.                         |
-| `type`         | `string` | Interface type.                      |
-| `ipv4`         | `string` | Primary IPv4 address.                |
-| `ipv4_netmask` | `string` | IPv4 netmask.                        |
-| `ipv4_gateway` | `string` | IPv4 gateway.                        |
-| `ipv6`         | `string` | Primary IPv6 address.                |
-| `ipv6_cidr`    | `int`    | IPv6 CIDR prefix length.             |
-| `ipv6_gateway` | `string` | IPv6 gateway.                        |
-| `anchor_ipv4`  | `string` | DO anchor IP (inter-droplet fabric). |
+| Field          | Type     | Description                                         |
+| -------------- | -------- | --------------------------------------------------- |
+| `scope`        | `string` | `"public"` or `"private"`.                          |
+| `mac`          | `string` | The MAC address.                                    |
+| `type`         | `string` | The interface type.                                 |
+| `ipv4`         | `string` | The primary IPv4 address.                           |
+| `ipv4_netmask` | `string` | The IPv4 netmask.                                   |
+| `ipv4_gateway` | `string` | The IPv4 gateway.                                   |
+| `ipv6`         | `string` | The primary IPv6 address.                           |
+| `ipv6_cidr`    | `int`    | The IPv6 CIDR prefix length.                        |
+| `ipv6_gateway` | `string` | The IPv6 gateway.                                   |
+| `anchor_ipv4`  | `string` | The DO anchor IP, for the network between droplets. |
 
 ## Platform support
 
 | Platform | Supported                            |
 | -------- | ------------------------------------ |
 | Linux    | ✅                                   |
-| macOS    | ✅ (only meaningful on a DO droplet) |
+| macOS    | ✅ (useful only on a DO droplet)     |
 | Other    | ✅ (only meaningful on a DO droplet) |
 
 ## Example output
@@ -93,33 +93,37 @@ gohai --category=cloud               # pulls this + all cloud collectors
 
 ## Dependencies
 
-`dmi`. DO writes `"DigitalOcean"` as `bios_vendor` (surfaced as
-`BIOS.Manufacturer` by the dmi collector); the collector gates the HTTP call on
-an exact match. When `dmi` is absent from prior (user disabled it), the
-collector fails open and tries the endpoint anyway.
+`dmi`. DO writes `"DigitalOcean"` as `bios_vendor`. The dmi collector reports it
+as `BIOS.Manufacturer`. The collector makes the HTTP call only on an exact
+match. If `dmi` has no data because the user disabled it, the check passes and
+the collector tries the endpoint.
 
 ## Data sources
 
-1. **DMI gate:** `dmi.BIOS.Manufacturer == "DigitalOcean"` (exact). Matches
-   Ohai's `has_do_dmi?`.
-2. **Endpoint:** `http://169.254.169.254/metadata/v1.json`, single JSON.
+1. **DMI gate:** `dmi.BIOS.Manufacturer == "DigitalOcean"` (exact match). This
+   is the same as Ohai's `has_do_dmi?`.
+2. **Endpoint:** `http://169.254.169.254/metadata/v1.json`. It returns one JSON
+   document.
 3. **User-Agent:** `gohai` (the cloudmetadata default).
-4. **Timeout:** 6 seconds, matches Ohai's `read_timeout` in
+4. **Timeout:** 6 seconds. This is the same as Ohai's `read_timeout` in
    `mixin/do_metadata.rb`.
-5. **Failure handling:** transport / 404 / other errors → `(nil, nil)`.
-6. **Security scrub:** `vendor_data` dropped from the output (matches Ohai). May
-   contain cloud-init scripts + credentials. `user_data` and `auth_key` are
-   retained. The former is the droplet owner's own cloud-init payload, the
-   latter is DO's internal token that Ohai also surfaces.
-7. **Transformation:** `reserved_ip` is lifted from the nested
-   `reserved_ip.ipv4.ip_address` path onto the flat top-level field (DO's newer
-   replacement for the legacy `floating_ip`; both fields coexist while older
-   droplets still use `floating_ip`).
+5. **Failure handling:** if the transport fails, or the endpoint returns 404 or
+   an other error, the collector returns `(nil, nil)`.
+6. **Security scrub:** the collector removes `vendor_data` from the output, as
+   Ohai does. It can contain cloud-init scripts and credentials. The collector
+   keeps `user_data` and `auth_key`. `user_data` is the cloud-init payload of
+   the droplet owner. `auth_key` is the DO internal token, which Ohai also
+   reports.
+7. **Transformation:** the collector moves `reserved_ip` from the nested
+   `reserved_ip.ipv4.ip_address` path to the flat top-level field. `reserved_ip`
+   is the newer DO replacement for the legacy `floating_ip`. Both fields are in
+   the output, because older droplets still use `floating_ip`.
 
-Mirrors Ohai's `Ohai::Mixin::DoMetadata` methodology, same endpoint, same DMI
-gate, same `vendor_data` scrub, same 6s timeout.
+The method is the same as Ohai's `Ohai::Mixin::DoMetadata`. It uses the same
+endpoint, the same DMI gate, the same `vendor_data` removal and the same 6s
+timeout.
 
 ## Backing library
 
 - [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
-  client used by every cloud-provider collector.
+  client of all cloud-provider collectors.

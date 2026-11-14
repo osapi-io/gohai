@@ -4,80 +4,82 @@
 
 ## Description
 
-Reports SMBIOS / DMI data. BIOS, baseboard, chassis, and product identity. On
-Linux the data comes from `/sys/class/dmi/id/*` via [ghw], which reads the sysfs
-entries exposed by the kernel (no root needed for most fields, `product_serial`
-and `product_uuid` are 0400 and return empty for non-root callers). macOS has no
-SMBIOS equivalent; the collector returns an empty Info there and the `hardware`
-collector (planned) covers macOS hardware identity.
+The collector reports SMBIOS and DMI data: the BIOS, baseboard, chassis and
+product identity. On Linux, the data comes from `/sys/class/dmi/id/*` through
+[ghw]. ghw reads the sysfs entries that the kernel makes available. Most fields
+do not need root. `product_serial` and `product_uuid` have mode 0400, so they
+are empty for a caller that is not root. macOS has no equivalent of SMBIOS. On
+macOS, the collector returns an empty Info, and the `hardware` collector
+(planned) gives the macOS hardware identity.
 
-Primary consumers are cloud-provider collectors (`gce`, `ec2`, `azure`, ...)
-which use `product.name` / `product.vendor_name` / `bios.manufacturer` /
-`chassis.asset_tag` to detect which cloud a VM is running on before hitting that
-provider's metadata endpoint. Hardware inventory and compliance tooling use the
-full set for fleet audits.
+The main consumers are the cloud-provider collectors (`gce`, `ec2`, `azure` and
+others). They use `product.name`, `product.vendor_name`, `bios.manufacturer` and
+`chassis.asset_tag` to find the cloud of a VM. They do this before they send a
+request to the metadata endpoint of that provider. Hardware inventory and
+compliance tools use all the fields to audit a fleet.
 
 ## Collected fields
 
-Each section is nil when that part of SMBIOS isn't available, virtual machines
-often omit chassis data, minimal containers may have no DMI at all. Consumers
-safely check `facts.DMI.Product != nil` before dereferencing.
+Each section is nil when that part of SMBIOS is not available. Virtual machines
+frequently have no chassis data. Minimal containers can have no DMI data. A
+consumer must check `facts.DMI.Product != nil` before it dereferences the
+section.
 
-| Field       | Type         | Description            | Schema mapping                      |
-| ----------- | ------------ | ---------------------- | ----------------------------------- |
-| `bios`      | `*BIOS`      | Firmware identity.     | OCSF `device.hw_info` (BIOS subset) |
-| `baseboard` | `*Baseboard` | Motherboard identity.  | OCSF `device.hw_info`               |
-| `chassis`   | `*Chassis`   | Enclosure identity.    | OCSF `device.hw_info`               |
-| `product`   | `*Product`   | System-level identity. | OCSF `device.hw_info`               |
+| Field       | Type         | Description               | Schema mapping                      |
+| ----------- | ------------ | ------------------------- | ----------------------------------- |
+| `bios`      | `*BIOS`      | The firmware identity.    | OCSF `device.hw_info` (BIOS subset) |
+| `baseboard` | `*Baseboard` | The motherboard identity. | OCSF `device.hw_info`               |
+| `chassis`   | `*Chassis`   | The enclosure identity.   | OCSF `device.hw_info`               |
+| `product`   | `*Product`   | The system identity.      | OCSF `device.hw_info`               |
 
 ### BIOS
 
-| Field          | Type     | Description        | Schema mapping                          |
-| -------------- | -------- | ------------------ | --------------------------------------- |
-| `manufacturer` | `string` | BIOS vendor.       | OCSF `device.hw_info.bios_manufacturer` |
-| `ver`          | `string` | BIOS version.      | OCSF `device.hw_info.bios_ver`          |
-| `date`         | `string` | BIOS release date. | OCSF `device.hw_info.bios_date`         |
+| Field          | Type     | Description            | Schema mapping                          |
+| -------------- | -------- | ---------------------- | --------------------------------------- |
+| `manufacturer` | `string` | The BIOS vendor.       | OCSF `device.hw_info.bios_manufacturer` |
+| `ver`          | `string` | The BIOS version.      | OCSF `device.hw_info.bios_ver`          |
+| `date`         | `string` | The BIOS release date. | OCSF `device.hw_info.bios_date`         |
 
 ### Baseboard
 
-| Field           | Type     | Description          |
-| --------------- | -------- | -------------------- |
-| `vendor`        | `string` | Motherboard vendor.  |
-| `product`       | `string` | Motherboard model.   |
-| `version`       | `string` | Motherboard version. |
-| `serial_number` | `string` | Motherboard serial.  |
-| `asset_tag`     | `string` | Asset tag.           |
+| Field           | Type     | Description                    |
+| --------------- | -------- | ------------------------------ |
+| `vendor`        | `string` | The motherboard vendor.        |
+| `product`       | `string` | The motherboard model.         |
+| `version`       | `string` | The motherboard version.       |
+| `serial_number` | `string` | The motherboard serial number. |
+| `asset_tag`     | `string` | The asset tag.                 |
 
 ### Chassis
 
-| Field              | Type     | Description                                  |
-| ------------------ | -------- | -------------------------------------------- |
-| `vendor`           | `string` | Chassis vendor.                              |
-| `type`             | `string` | DMI chassis-type numeric code.               |
-| `type_description` | `string` | Human-readable chassis type.                 |
-| `version`          | `string` | Chassis version.                             |
-| `serial_number`    | `string` | Chassis serial.                              |
-| `asset_tag`        | `string` | Asset tag (e.g. `"OracleCloud.com"` on OCI). |
+| Field              | Type     | Description                                            |
+| ------------------ | -------- | ------------------------------------------------------ |
+| `vendor`           | `string` | The chassis vendor.                                    |
+| `type`             | `string` | The numeric DMI code of the chassis type.              |
+| `type_description` | `string` | The chassis type as text.                              |
+| `version`          | `string` | The chassis version.                                   |
+| `serial_number`    | `string` | The chassis serial number.                             |
+| `asset_tag`        | `string` | The asset tag, for example `"OracleCloud.com"` on OCI. |
 
 ### Product
 
-| Field           | Type     | Description                                                      |
-| --------------- | -------- | ---------------------------------------------------------------- |
-| `vendor_name`   | `string` | System vendor (`"Google"`, `"Amazon EC2"`, `"Dell Inc."`, etc.). |
-| `name`          | `string` | Product name, primary cloud-detection signal.                    |
-| `family`        | `string` | Product family.                                                  |
-| `version`       | `string` | Product version.                                                 |
-| `serial_number` | `string` | Product serial (0400 on Linux, root-only, empty for non-root).   |
-| `uuid`          | `string` | System UUID (0400 on Linux, root-only, empty for non-root).      |
-| `sku`           | `string` | Product SKU.                                                     |
+| Field           | Type     | Description                                                                                                  |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `vendor_name`   | `string` | The system vendor, for example `"Google"`, `"Amazon EC2"` or `"Dell Inc."`.                                  |
+| `name`          | `string` | The product name. This is the main signal to find the cloud.                                                 |
+| `family`        | `string` | The product family.                                                                                          |
+| `version`       | `string` | The product version.                                                                                         |
+| `serial_number` | `string` | The product serial number. On Linux it has mode 0400. Only root can read it, so it is empty for other users. |
+| `uuid`          | `string` | The system UUID. On Linux it has mode 0400. Only root can read it, so it is empty for other users.           |
+| `sku`           | `string` | The product SKU.                                                                                             |
 
 ## Platform support
 
-| Platform | Supported                                   |
-| -------- | ------------------------------------------- |
-| Linux    | ✅ via ghw + `/sys/class/dmi/id/*`          |
-| macOS    | ✅ returns empty Info (macOS has no SMBIOS) |
-| Other    | ✅ returns empty Info                       |
+| Platform | Supported                                      |
+| -------- | ---------------------------------------------- |
+| Linux    | ✅ with ghw and `/sys/class/dmi/id/*`          |
+| macOS    | ✅ returns an empty Info (macOS has no SMBIOS) |
+| Other    | ✅ returns an empty Info                       |
 
 ## Example output
 
@@ -126,7 +128,7 @@ if facts.DMI != nil && facts.DMI.Product != nil {
 }
 ```
 
-Or enable by category:
+You can also enable the collector by category:
 
 ```go
 gohai.New(gohai.WithCategory("hardware"))  // pulls dmi + cpu + memory + disk + filesystem
@@ -140,8 +142,8 @@ gohai --no-collector.dmi   # disable (default)
 gohai --category=hardware  # pulls dmi + other hardware collectors
 ```
 
-Opt-in because most consumers only need DMI indirectly, when they enable a cloud
-collector, dmi gets pulled in automatically via `Dependencies()`.
+The collector is opt-in because most consumers need DMI only indirectly. When a
+consumer enables a cloud collector, `Dependencies()` enables dmi automatically.
 
 ## Dependencies
 
@@ -149,45 +151,47 @@ None.
 
 ## Data sources
 
-Ohai's `dmi.rb` shells out to `dmidecode`, which reads `/dev/mem` and requires
-root. gohai uses `ghw` instead, which reads `/sys/class/dmi/id/*`, the sysfs
-entries are world-readable and don't require elevated privileges. This is an
-intentional deviation: sysfs is the modern, unprivileged way to access SMBIOS
-data on Linux. The fields exposed are identical (BIOS vendor/version/date,
-baseboard, chassis, product), but gohai doesn't parse `dmidecode`'s freeform
-text output.
+Ohai's `dmi.rb` runs `dmidecode`. `dmidecode` reads `/dev/mem` and needs root.
+gohai uses `ghw` instead. ghw reads `/sys/class/dmi/id/*`. All users can read
+these sysfs entries, so they do not need more privileges. This difference from
+Ohai is intentional. On Linux, sysfs is the current way to read SMBIOS data
+without privileges. The fields are the same: the BIOS vendor, version and date,
+the baseboard, the chassis and the product. But gohai does not parse the
+free-form text output of `dmidecode`.
 
 On Linux:
 
-1. ghw's `bios.New()`, `baseboard.New()`, `chassis.New()`, and `product.New()`
-   each read the corresponding `/sys/class/dmi/id/*` files (`bios_vendor`,
-   `bios_version`, `bios_date`, `board_*`, `chassis_*`, `product_*`,
-   `sys_vendor`). No root required for fields exposed as 0444; root-only fields
-   (`product_serial`, `product_uuid`) return empty strings for non-root callers
-   rather than erroring.
-2. If ghw errors on any individual section (permission denied, sysfs entry
-   missing) that section stays nil; other sections still populate. A host
-   without `/sys/class/dmi/id/` at all (unprivileged containers) yields an Info
-   with all four sub-structs nil.
+1. ghw's `bios.New()`, `baseboard.New()`, `chassis.New()` and `product.New()`
+   each read their `/sys/class/dmi/id/*` files (`bios_vendor`, `bios_version`,
+   `bios_date`, `board_*`, `chassis_*`, `product_*`, `sys_vendor`). Fields with
+   mode 0444 do not need root. For a caller that is not root, the root-only
+   fields (`product_serial`, `product_uuid`) are empty strings, not errors.
+2. If ghw returns an error for one section, that section stays nil. Examples of
+   errors are "permission denied" and a missing sysfs entry. The other sections
+   still get their data. If a host has no `/sys/class/dmi/id/` (unprivileged
+   containers), the collector returns an Info with all four sub-structs nil.
 
-On macOS SMBIOS/DMI isn't exposed, the Linux DMI driver has no Darwin
-counterpart. We return an empty Info so consumers can check `facts.DMI.Product`
-without a per-OS branch. macOS hardware identity will be covered by the planned
-`hardware` collector via IOKit / `ioreg` / `system_profiler`.
+macOS does not make SMBIOS or DMI data available. The Linux DMI driver has no
+Darwin equivalent. The collector returns an empty Info, so consumers can check
+`facts.DMI.Product` without a branch for each OS. The planned `hardware`
+collector will give the macOS hardware identity through IOKit, `ioreg` and
+`system_profiler`.
 
-Ohai's `dmi` plugin shells out to `dmidecode`, which reads `/dev/mem` and
-exposes the full SMBIOS record set across all 128+ DMI types, but requires root.
-Our sysfs approach covers only the four types sysfs exports (BIOS, baseboard,
-chassis, product), intentional tradeoff for rootless, container-friendly
-operation. Consumer-relevant types we don't cover are either redundant with
-other collectors (processor details → `cpu`, PCI slots → planned `pci`, DIMMs →
-partially in `memory`) or niche enough that no consumer has asked (cooling
-devices, PSU, OEM strings). A dmidecode-based opt-in path can be added via
-`internal/executor` if a consumer needs it.
+Ohai's `dmi` plugin runs `dmidecode`. `dmidecode` reads `/dev/mem` and gives the
+full set of SMBIOS records for all 128+ DMI types, but it needs root. The sysfs
+method of gohai gives only the four types that sysfs makes available: BIOS,
+baseboard, chassis and product. This is an intentional tradeoff, so that gohai
+operates without root and in containers. Some useful types are not in this
+collector. Other collectors already give some of them: processor details are in
+`cpu`, PCI slots are in the planned `pci`, and DIMMs are partially in `memory`.
+No consumer has asked for the others (cooling devices, PSU, OEM strings). If a
+consumer needs them, an opt-in path through `dmidecode` and `internal/executor`
+is possible.
 
 ## Backing library
 
 - [github.com/jaypipes/ghw][ghw]. `pkg/bios`, `pkg/baseboard`, `pkg/chassis`,
-  `pkg/product`. ghw reads `/sys/class/dmi/id/*` directly without shelling out.
+  `pkg/product`. ghw reads `/sys/class/dmi/id/*` directly. It does not run a
+  command.
 
 [ghw]: https://github.com/jaypipes/ghw

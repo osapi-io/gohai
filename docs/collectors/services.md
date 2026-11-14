@@ -4,23 +4,23 @@
 
 ## Description
 
-Reports systemd service states on Linux hosts. Runs
+The collector reports the states of the systemd services on Linux hosts. It runs
 `systemctl list-units --type=service --all --no-pager --plain` and parses the
-output. macOS uses launchd, which has a substantially different service model;
-Darwin returns nil gracefully.
+output. macOS uses launchd, which has a very different service model. On Darwin,
+the collector returns `nil` and no error.
 
-There is no direct Ohai equivalent for this collector. Ohai does not ship a
-service-list plugin. This is a gohai-native addition.
+Ohai has no direct equivalent of this collector. Ohai has no plugin that lists
+services. This collector is a gohai addition.
 
 ## Collected fields
 
-| Field                | Type     | Description                                | Schema mapping              |
-| -------------------- | -------- | ------------------------------------------ | --------------------------- |
-| `services`           | `list`   | List of service objects                    | —                           |
-| `services[].name`    | `string` | Unit name with `.service` suffix stripped  | No direct OCSF/OTel mapping |
-| `services[].state`   | `string` | systemd SUB state: `running`, `dead`, etc. | No direct OCSF/OTel mapping |
-| `services[].enabled` | `bool`   | `true` when ACTIVE state is `active`       | No direct OCSF/OTel mapping |
-| `services[].type`    | `string` | Reserved for future use; currently empty   | No direct OCSF/OTel mapping |
+| Field                | Type     | Description                                            | Schema mapping              |
+| -------------------- | -------- | ------------------------------------------------------ | --------------------------- |
+| `services`           | `list`   | The list of service objects                            | No mapping                  |
+| `services[].name`    | `string` | The unit name without the `.service` suffix            | No direct OCSF/OTel mapping |
+| `services[].state`   | `string` | The systemd SUB state, for example `running` or `dead` | No direct OCSF/OTel mapping |
+| `services[].enabled` | `bool`   | `true` when the ACTIVE state is `active`               | No direct OCSF/OTel mapping |
+| `services[].type`    | `string` | Kept for future use. It is empty now                   | No direct OCSF/OTel mapping |
 
 ## Platform support
 
@@ -59,8 +59,8 @@ facts, _ := g.Collect(ctx)
 
 ## Enable/disable
 
-Default: **disabled** (opt-in). Full service inventory can be large and requires
-systemd to be present.
+Default: **disabled** (opt-in). The full list of services can be large, and the
+collector needs systemd.
 
 ```bash
 gohai --collector.services        # enable
@@ -73,23 +73,27 @@ None.
 
 ## Data sources
 
-There is no Ohai equivalent for this collector. Ohai does not ship a systemd
-service enumeration plugin. This is a gohai-native addition.
+Ohai has no equivalent of this collector. Ohai has no plugin that lists systemd
+services. This collector is a gohai addition.
 
 On Linux:
 
-1. Runs `systemctl list-units --type=service --all --no-pager --plain`.
-2. Parses whitespace-delimited columns: `UNIT LOAD ACTIVE SUB DESCRIPTION`.
-3. Skips the header line (contains `UNIT`), blank lines, and legend/summary
-   lines that do not contain `.service`.
-4. Skips lines with fewer than 4 fields.
-5. ACTIVE state `active` → `enabled: true`; any other ACTIVE value → `false`.
-6. SUB state (e.g. `running`, `dead`, `failed`, `exited`) is stored in `state`.
-7. Returns an empty list (not an error) when systemctl is absent, containers
-   without systemd are common.
+1. The collector runs
+   `systemctl list-units --type=service --all --no-pager --plain`.
+2. It parses the columns, which whitespace separates:
+   `UNIT LOAD ACTIVE SUB DESCRIPTION`.
+3. It skips the header line (the line with `UNIT`), blank lines, and legend or
+   summary lines that do not contain `.service`.
+4. It skips lines with fewer than 4 fields.
+5. The ACTIVE state `active` → `enabled: true`. Any other ACTIVE value →
+   `false`.
+6. The collector keeps the SUB state in `state`, for example `running`, `dead`,
+   `failed` or `exited`.
+7. When systemctl is missing, the collector returns an empty list, not an error.
+   Many containers do not have systemd.
 
-On macOS: returns nil.
+On macOS, the collector returns `nil`.
 
 ## Backing library
 
-`internal/executor.Executor` for command execution.
+`internal/executor.Executor` to run the command.

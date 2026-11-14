@@ -1,12 +1,12 @@
 # OCSF validation
 
-How to validate gohai's OCSF output and vendor extension against the upstream
-OCSF schema.
+How to validate the gohai OCSF output and the vendor extension against the
+upstream OCSF schema.
 
 ## Prerequisites
 
-- [uv](https://docs.astral.sh/uv/). Python package runner
-- A local clone of the [OCSF schema](https://github.com/ocsf/ocsf-schema)
+- [uv](https://docs.astral.sh/uv/). The Python package runner.
+- A local clone of the [OCSF schema](https://github.com/ocsf/ocsf-schema).
 
 ## Step 1: clone the OCSF schema
 
@@ -23,7 +23,7 @@ OCSF schema compiler merges it with the base schema:
 uvx ocsf-schema-compiler /tmp/ocsf-schema -e schemas/ocsf-extension > /tmp/ocsf-compiled.json
 ```
 
-This should print:
+The compiler prints:
 
 ```
 INFO: Read extension "gohai" from directory: schemas/ocsf-extension
@@ -32,9 +32,10 @@ INFO: Extension "gohai" is patching "device" from base schema
 INFO: Extension "gohai" is patching "device_hw_info" from base schema
 ```
 
-If compilation fails with a shadowing error, an attribute in our extension
-conflicts with a base schema attribute. Remove the conflicting attribute from
-`schemas/ocsf-extension/dictionary.json`, it's already defined upstream.
+If the compilation fails with a shadowing error, an attribute in our extension
+has the same name as an attribute in the base schema. Remove that attribute from
+`schemas/ocsf-extension/dictionary.json`. The upstream schema already defines
+it.
 
 ## Step 3: generate OCSF output
 
@@ -42,23 +43,23 @@ conflicts with a base schema attribute. Remove the conflicting attribute from
 gohai collect --format ocsf --pretty > ocsf-output.json
 ```
 
-This produces an OCSF `inventory_info` event (class_uid 5001) with:
+This command makes an OCSF `inventory_info` event (class_uid 5001) with:
 
-- Standard OCSF attributes on `device`, `device.os`, `device.hw_info`,
-  `device.network_interfaces`, and `cloud` objects
-- gohai extension (uid 1337) attributes for fields OCSF doesn't yet cover (e.g.
-  `fqdn`, `cpu_flags`, `cpu_vulnerabilities`, `init_system`)
+- Standard OCSF attributes on the `device`, `device.os`, `device.hw_info`,
+  `device.network_interfaces` and `cloud` objects.
+- gohai extension (uid 1337) attributes for fields that OCSF does not have yet,
+  for example `fqdn`, `cpu_flags`, `cpu_vulnerabilities` and `init_system`.
 
 ## Step 4: validate the schema + extension
 
-Copy our extension into the OCSF schema tree and run the validator:
+Copy our extension into the OCSF schema tree. Then run the validator:
 
 ```bash
 cp -r schemas/ocsf-extension /tmp/ocsf-schema/extensions/gohai
 uvx --from ocsf-validator python -m ocsf_validator /tmp/ocsf-schema
 ```
 
-All 12 tests should PASS:
+All 12 tests must PASS:
 
 ```
 PASSED: Schema definitions can be loaded
@@ -75,9 +76,12 @@ PASSED: Event class categories are defined
 PASSED: JSON files match their metaschema definitions
 ```
 
-This confirms our gohai extension (uid 1337) is a valid OCSF extension,
-dictionary attributes are correctly typed, object extensions reference valid
-attributes, and the metaschema definitions are well-formed.
+This result shows these facts:
+
+- The gohai extension (uid 1337) is a valid OCSF extension.
+- The dictionary attributes have the correct types.
+- The object extensions refer to valid attributes.
+- The metaschema definitions are correctly formed.
 
 ## Extension structure
 
@@ -95,13 +99,13 @@ schemas/ocsf-extension/
 
 | Flag            | Format                    | Schema                      |
 | --------------- | ------------------------- | --------------------------- |
-| `--format ohai` | Collector-centric JSON    | `schemas/gohai.schema.json` |
+| `--format ohai` | JSON grouped by collector | `schemas/gohai.schema.json` |
 | `--format ocsf` | OCSF inventory_info event | OCSF schema + extension     |
 
 ## Future work
 
-- Automate event data validation once OCSF publishes a validator
-- Submit gohai extension to the
+- Validate the event data automatically when OCSF publishes a validator.
+- Send the gohai extension to the
   [OCSF extensions registry](https://github.com/ocsf/ocsf-schema/blob/main/extensions.md)
-  for an official UID assignment
-- Contribute gap candidates from `schemas/ocsf-gaps.md` as upstream OCSF PRs
+  to get an official UID.
+- Send the gap candidates from `schemas/ocsf-gaps.md` as upstream OCSF PRs.

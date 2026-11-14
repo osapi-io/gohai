@@ -4,32 +4,33 @@
 
 ## Description
 
-Detects Linode hosts and reports their public / private IPv4 addresses. Unlike
-every other cloud collector in gohai, Linode **does not** use a metadata HTTP
-endpoint. Ohai's Linode plugin doesn't either. Detection ORs two non-hint
-signals (matches Ohai's `looks_like_linode?`):
+The collector finds Linode hosts and reports their public and private IPv4
+addresses. All other cloud collectors in gohai use a metadata HTTP endpoint. The
+Linode collector **does not**, and Ohai's Linode plugin does not either. The
+collector finds a Linode host if one of two signals is true. Neither signal is a
+hint file. This is the same as Ohai's `looks_like_linode?`:
 
-- `/etc/apt/sources.list` contains `"linode"` (Linode's official images ship a
-  Linode-hosted apt mirror).
-- The host's resolved FQDN or domain contains `"linode"` (e.g.
-  `members.linode.com`. Linode's reverse-DNS suffix).
+- `/etc/apt/sources.list` contains `"linode"`. Linode's official images include
+  an apt mirror that Linode hosts.
+- The resolved FQDN or domain of the host contains `"linode"`, for example
+  `members.linode.com`. This is Linode's reverse-DNS suffix.
 
-Data comes from the host's own network interfaces.
+The data comes from the network interfaces of the host.
 
 ## Collected fields
 
-| Field        | Type     | Description                            | Schema mapping            |
-| ------------ | -------- | -------------------------------------- | ------------------------- |
-| `public_ip`  | `string` | First non-link-local IPv4 on `eth0`.   | No direct schema mapping. |
-| `private_ip` | `string` | First non-link-local IPv4 on `eth0:1`. | No direct schema mapping. |
+| Field        | Type     | Description                                                | Schema mapping            |
+| ------------ | -------- | ---------------------------------------------------------- | ------------------------- |
+| `public_ip`  | `string` | The first IPv4 address on `eth0` that is not link-local.   | No direct schema mapping. |
+| `private_ip` | `string` | The first IPv4 address on `eth0:1` that is not link-local. | No direct schema mapping. |
 
 ## Platform support
 
-| Platform | Supported                             |
-| -------- | ------------------------------------- |
-| Linux    | ✅                                    |
-| macOS    | ✅ (returns nil, no Linode signature) |
-| Other    | ✅ (returns nil, no Linode signature) |
+| Platform | Supported                               |
+| -------- | --------------------------------------- |
+| Linux    | ✅                                      |
+| macOS    | ✅ (returns `nil`, no Linode signature) |
+| Other    | ✅ (returns `nil`, no Linode signature) |
 
 ## Example output
 
@@ -68,24 +69,27 @@ gohai --category=cloud        # pulls this + all cloud collectors
 
 ## Dependencies
 
-`hostname`, needed for the FQDN/Domain detection signal that mirrors Ohai's
-`has_linode_domain?`.
+`hostname`. The FQDN and domain signal needs it. This signal is the same as
+Ohai's `has_linode_domain?`.
 
 ## Data sources
 
-1. **Detection chain** (any signal triggers detection):
-   - **apt:** `/etc/apt/sources.list` contains `"linode"` (case-insensitive).
-     Matches Ohai's `has_linode_apt_repos?`.
-   - **domain:** the prior `hostname` collector's `FQDN` or `Domain` contains
-     `"linode"`. Matches Ohai's `has_linode_domain?`.
-2. **Interface reads:** `net.InterfaceByName("eth0")` / `"eth0:1"` via Go
-   stdlib. First non-link-local IPv4 on each wins. Missing interface → empty
-   string on that field.
+1. The collector checks two signals. If one signal is true, the host is a Linode
+   host:
+   - **apt.** `/etc/apt/sources.list` contains `"linode"`. The match is not
+     case-sensitive. This is the same as Ohai's `has_linode_apt_repos?`.
+   - **domain.** The `FQDN` or `Domain` from the `hostname` collector contains
+     `"linode"`. The `hostname` collector runs first. This is the same as Ohai's
+     `has_linode_domain?`.
+2. The collector reads the interfaces with `net.InterfaceByName("eth0")` and
+   `"eth0:1"` from the Go standard library. For each interface, it uses the
+   first IPv4 address that is not link-local. If an interface is missing, its
+   field is an empty string.
 
-Mirrors Ohai's Linode plugin methodology, same apt + domain detection chain,
-same eth0 / eth0:1 interface scheme. We do not query Linode's
-`metadata.linode.com` API (neither does Ohai).
+The method is the same as Ohai's Linode plugin. It uses the same apt and domain
+signals and the same `eth0` and `eth0:1` interfaces. gohai does not query
+Linode's `metadata.linode.com` API. Ohai does not query it either.
 
 ## Backing library
 
-- Go stdlib `net.InterfaceByName` + `os.ReadFile`.
+- The Go standard library: `net.InterfaceByName` and `os.ReadFile`.

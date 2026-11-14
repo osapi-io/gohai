@@ -4,19 +4,21 @@
 
 ## Description
 
-Reports standard systemd directory paths by running `systemd-path` and parsing
-its `name: /path` output. Matches Ohai's `linux/systemd_paths` plugin. Darwin
-returns `nil`, systemd is Linux-only.
+The collector reports the standard systemd directory paths. It runs
+`systemd-path` and parses its `name: /path` output. It is the same as Ohai's
+`linux/systemd_paths` plugin. Darwin returns `nil` because systemd is only on
+Linux.
 
-DefaultEnabled is `false`, relevant only on systemd-managed Linux hosts.
+DefaultEnabled is `false`. The data is only useful on Linux hosts that systemd
+manages.
 
 ## Collected fields
 
-| Field   | Type              | Description                                                                          | Schema mapping    |
-| ------- | ----------------- | ------------------------------------------------------------------------------------ | ----------------- |
-| `paths` | map[string]string | Map of systemd path names to absolute directory paths as reported by `systemd-path`. | gohai convention. |
+| Field   | Type              | Description                                                                              | Schema mapping    |
+| ------- | ----------------- | ---------------------------------------------------------------------------------------- | ----------------- |
+| `paths` | map[string]string | A map of systemd path names to absolute directory paths, as `systemd-path` reports them. | gohai convention. |
 
-Common keys in `paths` include (but are not limited to):
+Some common keys in `paths` are below. Other keys can also occur.
 
 | Key                          | Typical value                 |
 | ---------------------------- | ----------------------------- |
@@ -26,14 +28,14 @@ Common keys in `paths` include (but are not limited to):
 | `user-configuration`         | `~/.config`                   |
 | `user-runtime`               | `/run/user/<uid>`             |
 
-The exact keys emitted depend on the systemd version installed.
+The keys that the collector reports change with the installed systemd version.
 
 ## Platform support
 
-| Platform | Supported                        |
-| -------- | -------------------------------- |
-| Linux    | ✅ (`systemd-path` via executor) |
-| macOS    | `nil` (systemd is Linux-only)    |
+| Platform | Supported                                |
+| -------- | ---------------------------------------- |
+| Linux    | ✅ (`systemd-path` through the executor) |
+| macOS    | `nil` (systemd is only on Linux)         |
 
 ## Example output
 
@@ -86,21 +88,22 @@ None.
 
 ## Data sources
 
-On Linux the collector runs `systemd-path` (no arguments) through the shared
-`internal/executor` runner and parses its output:
+On Linux, the collector runs `systemd-path` with no arguments through the shared
+`internal/executor` runner. Then it parses the output:
 
-1. Each line is split on the first `": "` separator. Lines without this
-   separator are skipped.
-2. Lines with an empty key are skipped.
-3. Key and path are stored as-is in the `Paths` map.
-4. When `systemd-path` is absent or returns an error, an empty `Paths` map is
-   returned without error, matches Ohai's no-panic behaviour.
+1. The collector splits each line on the first `": "` separator. It skips lines
+   that do not have this separator.
+2. It skips lines that have an empty key.
+3. It stores the key and the path in the `Paths` map with no change.
+4. If `systemd-path` is missing or returns an error, the collector returns an
+   empty `Paths` map and no error. This is the same as Ohai, which does not
+   panic in this condition.
 
-macOS is not covered, `systemd-path` is a Linux systemd utility. Ohai's plugin
-is `collect_data(:linux)` only.
+The collector does not support macOS, because `systemd-path` is a Linux systemd
+utility. Ohai's plugin is only `collect_data(:linux)`.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `systemd-path` on Linux. Tests mock it with
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `systemd-path` on Linux. Tests mock it with
   `go.uber.org/mock`.

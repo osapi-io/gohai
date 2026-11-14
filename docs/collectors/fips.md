@@ -4,48 +4,48 @@
 
 ## Description
 
-Reports whether the system is running in FIPS 140 mode. FIPS 140 is the U.S.
-federal cryptographic module standard (current revision: FIPS 140-3, which
-superseded FIPS 140-2 in 2019). When enabled, the system restricts cryptographic
-primitives to the approved set and fails closed rather than falling back to
-non-compliant algorithms.
+The collector reports if the system runs in FIPS 140 mode. FIPS 140 is the U.S.
+federal standard for cryptographic modules. The current revision is FIPS 140-3.
+It replaced FIPS 140-2 in 2019. In FIPS mode, the system permits only the
+approved cryptographic primitives. If an operation needs an algorithm that is
+not approved, the operation fails. The system does not use the algorithm.
 
 The collector reports two related signals:
 
-- `kernel.enabled`. The kernel-level flag from `/proc/sys/crypto/fips_enabled`,
-  set by the `fips=1` kernel command-line parameter at boot. This is the classic
-  140-2-era signal.
-- `policy`. The user-space crypto policy on hosts that ship the
+- `kernel.enabled`. The kernel flag from `/proc/sys/crypto/fips_enabled`. The
+  `fips=1` kernel command-line parameter sets it at boot. This is the signal
+  from the time of FIPS 140-2.
+- `policy`. The user-space crypto policy, on hosts that have the
   `crypto-policies` framework (RHEL 8+, Fedora 30+, CentOS Stream, Amazon Linux
-  2023). On FIPS 140-3 systems, an operator can flip the policy post-boot with
-  `update-crypto-policies --set DEFAULT` **without** changing the kernel flag,
-  leaving the kernel in FIPS mode while OpenSSL, GnuTLS, etc. no longer enforce
-  FIPS-approved algorithms. This field catches that drift. On hosts without the
-  framework the field is omitted.
+  2023). On FIPS 140-3 systems, an operator can change the policy after boot
+  with `update-crypto-policies --set DEFAULT` **without** a change to the kernel
+  flag. Then the kernel stays in FIPS mode, but OpenSSL, GnuTLS and other
+  libraries do not enforce the FIPS-approved algorithms. This field shows that
+  drift. On hosts without the framework, the field is not in the output.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Confirm FIPS posture across a fleet that is supposed to be compliant (FedRAMP,
-  DoD SRG, HIPAA).
-- Gate features that behave differently under FIPS, for example, TLS libraries
-  and SSH clients that disable non-approved ciphers when the kernel flag is set.
-- Detect drift: a FIPS-provisioned host whose crypto policy got toggled off is a
-  real incident (kernel says "FIPS", user-space says "not really"), and
-  `kernel.enabled=true` + `policy.fips_effective=false` is the signal that flags
-  it.
+- Confirm the FIPS state of a fleet that must be compliant (FedRAMP, DoD SRG,
+  HIPAA).
+- Control features that operate differently in FIPS mode. For example, TLS
+  libraries and SSH clients disable the ciphers that are not approved when the
+  kernel flag is set.
+- Find drift. If someone turns off the crypto policy on a FIPS host, that is a
+  real incident: the kernel is in FIPS mode, but user space is not. The signal
+  for this is `kernel.enabled=true` with `policy.fips_effective=false`.
 
-The runtime flag does **not** distinguish which revision of FIPS 140 the
-kernel's crypto module was validated against, that's a property of the module
-build (RHEL 8 targets 140-2; RHEL 9 targets 140-3). Consumers needing the
-validated revision should correlate with `platform`/`kernel`.
+The runtime flag does **not** show the revision of FIPS 140 that the kernel's
+crypto module is validated against. That is a property of the module build. RHEL
+8 targets 140-2. RHEL 9 targets 140-3. If a consumer needs the validated
+revision, it must compare this data with `platform` and `kernel`.
 
 ## Collected fields
 
-| Field                   | Type   | Description                                                                    | Schema mapping            |
-| ----------------------- | ------ | ------------------------------------------------------------------------------ | ------------------------- |
-| `kernel.enabled`        | `bool` | `true` if the kernel flag `/proc/sys/crypto/fips_enabled` is `1`.              | No direct schema mapping. |
-| `policy.name`           | string | Active crypto policy (e.g. `FIPS`, `FIPS:OSPP`, `DEFAULT`). Omitted if absent. | No direct schema mapping. |
-| `policy.fips_effective` | `bool` | `true` if the policy name starts with `FIPS`.                                  | No direct schema mapping. |
+| Field                   | Type   | Description                                                                                                         | Schema mapping            |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `kernel.enabled`        | `bool` | `true` if the kernel flag `/proc/sys/crypto/fips_enabled` is `1`.                                                   | No direct schema mapping. |
+| `policy.name`           | string | The active crypto policy, for example `FIPS`, `FIPS:OSPP` or `DEFAULT`. Not in the output if the policy is missing. | No direct schema mapping. |
+| `policy.fips_effective` | `bool` | `true` if the policy name starts with `FIPS`.                                                                       | No direct schema mapping. |
 
 ## Platform support
 
@@ -55,9 +55,10 @@ validated revision should correlate with `platform`/`kernel`.
 | macOS    | `nil`     |
 | Other    | `nil`     |
 
-macOS is not covered because Apple's CoreCrypto module has no runtime toggle
-equivalent to Linux's kernel flag; FIPS 140 validation there is a property of
-the module and must be looked up via Apple's certificate list separately.
+The collector does not support macOS. Apple's CoreCrypto module has no runtime
+switch that is equivalent to the Linux kernel flag. On macOS, FIPS 140
+validation is a property of the module. You must find it in Apple's certificate
+list.
 
 ## Example output
 
@@ -130,23 +131,24 @@ None.
 
 On Linux:
 
-1. Read `/proc/sys/crypto/fips_enabled` via the injected `avfs.VFS`. Trimmed
-   content `"1"` → `kernel.enabled = true`; anything else → `false`. Missing
-   file (kernel without the flag) leaves `kernel` nil.
-2. Read `/etc/crypto-policies/config` via the same VFS. The trimmed first line
-   is the policy name. `policy.fips_effective` is set when the name starts with
-   `FIPS` (case-sensitive, matches the file's convention). Missing file leaves
-   `policy` nil.
+1. The collector reads `/proc/sys/crypto/fips_enabled` through the injected
+   `avfs.VFS`. If the trimmed content is `"1"`, `kernel.enabled` is `true`. For
+   all other content, it is `false`. If the file is missing (a kernel without
+   the flag), `kernel` stays nil.
+2. The collector reads `/etc/crypto-policies/config` through the same VFS. The
+   trimmed first line is the policy name. `policy.fips_effective` is `true` when
+   the name starts with `FIPS`. The check is case-sensitive, the same as the
+   convention of the file. If the file is missing, `policy` stays nil.
 
-Mirrors Ohai's `fips.rb` kernel-flag signal and extends it with the
-`crypto-policies` probe, which catches FIPS 140-3 post-boot drift that Ohai's
-OpenSSL-binding approach would miss.
+The kernel-flag signal is the same as in Ohai's `fips.rb`. gohai adds the
+`crypto-policies` check. This check finds the FIPS 140-3 drift after boot. Ohai
+reads the OpenSSL binding, so it does not find this drift.
 
-On macOS the collector returns no data. Apple's CoreCrypto module has no runtime
-FIPS toggle equivalent to Linux's kernel flag; FIPS 140 validation is a property
-of the compiled module and must be looked up via Apple's certificate list
-separately. Matches Ohai's decision to skip macOS.
+On macOS, the collector returns no data. Apple's CoreCrypto module has no
+runtime FIPS switch that is equivalent to the Linux kernel flag. FIPS 140
+validation is a property of the compiled module. You must find it in Apple's
+certificate list. Ohai also does not support macOS.
 
 ## Backing library
 
-- Go stdlib (`os`, `io`), no third-party dependency.
+- The Go standard library (`os`, `io`). There is no third-party dependency.

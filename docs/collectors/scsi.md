@@ -4,38 +4,41 @@
 
 ## Description
 
-Enumerates SCSI devices visible to the host by running `lsscsi` and parsing its
-output. Mirrors Ohai's `linux/scsi.rb` methodology: one entry per SCSI address,
-with transport, type, make+model name, firmware revision, and the backing device
-node. macOS has no equivalent interface and returns an empty Info.
+The collector lists the SCSI devices that the host can see. It runs `lsscsi` and
+parses the output. The method is the same as Ohai's `linux/scsi.rb`. The
+collector reports one entry for each SCSI address. Each entry has the transport,
+the type, the make and model name, the firmware revision and the backing device
+node. macOS has no equivalent interface, so the collector returns an empty
+`Info`.
 
-Consumers use this to inventory attached disks / CD-ROMs / tape drives by SCSI
-address when `lsscsi`'s particular view is the needed abstraction (e.g. matching
-hardware in a server's drive bays to logical device nodes).
+Consumers use this data to make a list of the attached disks, CD-ROM drives and
+tape drives by SCSI address. Use it when you need the `lsscsi` view of the
+hardware. For example, use it to find which logical device node is the drive in
+a given drive bay of a server.
 
 ## Collected fields
 
-| Field     | Type                | Description                    | Schema mapping            |
-| --------- | ------------------- | ------------------------------ | ------------------------- |
-| `devices` | `map[string]Device` | SCSI devices keyed by address. | No direct schema mapping. |
+| Field     | Type                | Description                         | Schema mapping            |
+| --------- | ------------------- | ----------------------------------- | ------------------------- |
+| `devices` | `map[string]Device` | The SCSI devices, keyed by address. | No direct schema mapping. |
 
 ### Device
 
-| Field       | Type     | Description                                                |
-| ----------- | -------- | ---------------------------------------------------------- |
-| `scsi_addr` | `string` | SCSI address (e.g. `0:0:0:0`, `5:0:0:0`).                  |
-| `type`      | `string` | Device type (`disk`, `cd/dvd`, `tape`, etc.).              |
-| `transport` | `string` | Transport / controller (`ATA`, `LSI`, `iSCSI`, etc.).      |
-| `name`      | `string` | Vendor + model string (middle tokens of the `lsscsi` row). |
-| `revision`  | `string` | Firmware revision (second-to-last token).                  |
-| `device`    | `string` | Backing device node (`/dev/sda`, `/dev/sr0`, etc.).        |
+| Field       | Type     | Description                                                       |
+| ----------- | -------- | ----------------------------------------------------------------- |
+| `scsi_addr` | `string` | The SCSI address, for example `0:0:0:0` or `5:0:0:0`.             |
+| `type`      | `string` | The device type, for example `disk`, `cd/dvd` or `tape`.          |
+| `transport` | `string` | The transport or controller, for example `ATA`, `LSI` or `iSCSI`. |
+| `name`      | `string` | The vendor and model, from the middle tokens of the `lsscsi` row. |
+| `revision`  | `string` | The firmware revision, from the second-to-last token.             |
+| `device`    | `string` | The backing device node, for example `/dev/sda` or `/dev/sr0`.    |
 
 ## Platform support
 
-| Platform | Supported                                        |
-| -------- | ------------------------------------------------ |
-| Linux    | ✅ (requires `lsscsi` on PATH)                   |
-| macOS    | ❌ (no `lsscsi` on Darwin; returns empty `Info`) |
+| Platform | Supported                                                          |
+| -------- | ------------------------------------------------------------------ |
+| Linux    | ✅ (`lsscsi` must be on the PATH)                                  |
+| macOS    | ❌ (Darwin has no `lsscsi`. The collector returns an empty `Info`) |
 
 ## Example output
 
@@ -91,35 +94,38 @@ None.
 
 On Linux:
 
-1. Run `lsscsi` through the shared `internal/executor` runner. `lsscsi` parses
-   `/proc/scsi/scsi` and the sysfs SCSI tree and formats one device per row.
-2. Each non-empty row is whitespace-split into tokens. Following Ohai's
-   `linux/scsi.rb` algorithm:
-   - Token 0 (bracketed, e.g. `[0:0:0:0]`) → `scsi_addr` with brackets stripped.
+1. The collector runs `lsscsi` through the shared `internal/executor` runner.
+   `lsscsi` parses `/proc/scsi/scsi` and the sysfs SCSI tree. It writes one
+   device on each row.
+2. The collector splits each row that is not empty into tokens at the
+   whitespace. It uses the algorithm of Ohai's `linux/scsi.rb`:
+   - Token 0 is in brackets, for example `[0:0:0:0]`. It becomes `scsi_addr`
+     without the brackets.
    - Token 1 → `type`.
    - Token 2 → `transport`.
    - Last token → `device`.
    - Second-to-last token → `revision`.
-   - Tokens 3 through `n-3` (inclusive) joined with single spaces → `name`
-     (vendor + model).
-3. Rows with fewer than 5 tokens (the minimum needed to carry address, type,
-   transport, revision, device) are skipped. Rows with an empty bracketed
-   address are also skipped.
-4. Missing binary, exec error, or empty output yield an empty `devices` map with
-   no error, hosts without util-linux's `lsscsi` return cleanly rather than
-   surfacing a missing-binary error.
+   - Tokens 3 to `n-3`, with the two ends included, joined with single spaces →
+     `name` (vendor and model).
+3. The collector skips rows with fewer than 5 tokens. A row must have 5 tokens
+   to hold the address, the type, the transport, the revision and the device.
+   The collector also skips rows with an empty address in the brackets.
+4. If the binary is missing, the command fails, or the output is empty, the
+   collector returns an empty `devices` map and no error. Thus a host without
+   the util-linux `lsscsi` gives a clean result, not a missing-binary error.
 
-On macOS the collector returns an empty `Info{Devices: {}}`. macOS has no
-`lsscsi` equivalent and surfaces storage topology through IOKit, not a
-SCSI-abstraction layer. Ohai's scsi plugin is Linux-only and we match that
+On macOS, the collector returns an empty `Info{Devices: {}}`. macOS has no
+equivalent of `lsscsi`. It shows the storage topology through IOKit, not through
+a SCSI layer. Ohai's scsi plugin is for Linux only, and gohai has the same
 scope.
 
-Mirrors Ohai's `linux/scsi.rb` exactly, same command, same parsing algorithm,
-same field names, same per-address keying. Ohai tolerates a missing `lsscsi` by
-simply skipping (`optional true` plugin); our collector matches that by
-returning empty rather than erroring.
+The collector is the same as Ohai's `linux/scsi.rb`. It uses the same command,
+the same parse algorithm, the same field names and the same key for each
+address. If `lsscsi` is missing, Ohai skips it, because the plugin has
+`optional true`. The gohai collector does the same: it returns an empty result,
+not an error.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). Shared command-runner
-  abstraction used to invoke `lsscsi`. Tests mock it with `go.uber.org/mock`.
+- [`internal/executor`](../../internal/executor). The shared command runner. The
+  collector uses it to run `lsscsi`. Tests mock it with `go.uber.org/mock`.

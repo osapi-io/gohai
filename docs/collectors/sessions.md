@@ -4,46 +4,47 @@
 
 ## Description
 
-Reports currently logged-in user sessions, the same data `who` / `w` /
-`loginctl list-sessions` show. On systemd hosts we prefer `loginctl`, which
-surfaces graphical (GDM/KDE), remote-desktop, and `systemd-run` sessions that
-never reach `utmp`. On non-systemd Linux hosts and macOS we fall back to `utmp`
-/ `utmpx` via gopsutil.
+The collector reports the user sessions that are logged in now. This is the same
+data that `who`, `w` and `loginctl list-sessions` show. On systemd hosts, the
+collector uses `loginctl` first. `loginctl` shows graphical (GDM/KDE),
+remote-desktop and `systemd-run` sessions that do not get to `utmp`. On Linux
+hosts without systemd and on macOS, the collector uses `utmp` or `utmpx` through
+gopsutil.
 
-This collector was split out of the original `users` collector, `users` now
-matches Ohai's `passwd` plugin (enumerate `/etc/passwd` + `/etc/group`) and
-logged-in sessions live here. Ohai does not have a direct equivalent; this is a
-gohai extension driven by the consumer need to detect active interactive
-sessions for audit and security tooling.
+This collector came out of the original `users` collector. `users` is now the
+same as Ohai's `passwd` plugin, which lists `/etc/passwd` and `/etc/group`. The
+logged-in sessions are in this collector. Ohai has no direct equivalent. This
+collector is a gohai extension. Consumers need it to find active interactive
+sessions for audit and security tools.
 
 ## Collected fields
 
-| Field       | Type        | Description                       | Schema mapping             |
-| ----------- | ----------- | --------------------------------- | -------------------------- |
-| `logged_in` | `[]Session` | One entry per active user session | OCSF `session` (per-entry) |
+| Field       | Type        | Description                            | Schema mapping             |
+| ----------- | ----------- | -------------------------------------- | -------------------------- |
+| `logged_in` | `[]Session` | One entry for each active user session | OCSF `session` (per-entry) |
 
 ### Session
 
-| Field        | Type     | Description                                                      |
-| ------------ | -------- | ---------------------------------------------------------------- |
-| `user`       | `string` | Login name.                                                      |
-| `terminal`   | `string` | tty / pts / console (utmp path only).                            |
-| `host`       | `string` | Remote host the session originated from (utmp path only).        |
-| `started`    | `uint64` | Session start time as Unix timestamp (utmp path only).           |
-| `session_id` | `string` | systemd session id (loginctl path only).                         |
-| `uid`        | `string` | Numeric UID of the session owner (loginctl path only).           |
-| `seat`       | `string` | systemd seat identifier, typically `seat0` (loginctl path only). |
+| Field        | Type     | Description                                                        |
+| ------------ | -------- | ------------------------------------------------------------------ |
+| `user`       | `string` | The login name.                                                    |
+| `terminal`   | `string` | The tty, pts or console (utmp path only).                          |
+| `host`       | `string` | The remote host that the session came from (utmp path only).       |
+| `started`    | `uint64` | The session start time as a Unix timestamp (utmp path only).       |
+| `session_id` | `string` | The systemd session ID (loginctl path only).                       |
+| `uid`        | `string` | The numeric UID of the session owner (loginctl path only).         |
+| `seat`       | `string` | The systemd seat identifier, usually `seat0` (loginctl path only). |
 
-Fields present only on one path stay empty on the other. Consumers can detect
-which source fed the data by checking for `session_id` (loginctl) vs.
-`terminal`/`started` (utmp).
+A field that only one path gives stays empty on the other path. To find which
+source gave the data, a consumer checks for `session_id` (loginctl) or for
+`terminal` and `started` (utmp).
 
 ## Platform support
 
-| Platform | Supported                              |
-| -------- | -------------------------------------- |
-| Linux    | ✅ (loginctl preferred, utmp fallback) |
-| macOS    | ✅ (utmpx only, no systemd)            |
+| Platform | Supported                      |
+| -------- | ------------------------------ |
+| Linux    | ✅ (loginctl first, then utmp) |
+| macOS    | ✅ (utmpx only, no systemd)    |
 
 ## Example output
 
@@ -108,29 +109,31 @@ None.
 
 On Linux:
 
-1. If `loginctl` is on PATH, run
+1. If `loginctl` is on the PATH, the collector runs
    `loginctl --no-pager --no-legend --no-ask-password list-sessions` through the
-   shared `internal/executor`. Each non-empty line is whitespace-split into
-   `session_id uid user [seat]` and appended to `logged_in[]`. Empty output (no
-   active sessions) is a valid result. We don't fall back in that case.
-2. If `loginctl` is missing or errors (non-systemd host, minimal container
-   without systemd), fall back to gopsutil's `host.UsersWithContext` which reads
-   `utmp(5)`, the same source `who` / `w` consult. Gopsutil errors propagate as
-   a real failure.
+   shared `internal/executor`. It splits each line that is not empty at the
+   whitespace into `session_id uid user [seat]`. It adds the result to
+   `logged_in[]`. Empty output means that there are no active sessions. This is
+   a valid result, and the collector does not try utmp in that case.
+2. If `loginctl` is missing or fails, the collector uses gopsutil's
+   `host.UsersWithContext`. This occurs on a host without systemd or in a
+   minimal container without systemd. `host.UsersWithContext` reads `utmp(5)`,
+   which is the same source that `who` and `w` use. A gopsutil error goes back
+   to the caller as a real failure.
 
 On macOS:
 
-1. gopsutil's `host.UsersWithContext` reads `utmpx` via the standard C library.
-   That's the only source. Darwin has no systemd. Errors propagate.
+1. gopsutil's `host.UsersWithContext` reads `utmpx` through the standard C
+   library. This is the only source, because Darwin has no systemd. Errors go
+   back to the caller.
 
-Ohai ships no equivalent plugin. This is a gohai-native surface added for
-consumers doing fleet-level session auditing. The loginctl-first ordering
-mirrors what modern Linux distros document as the canonical session-discovery
-path; utmp is retained for pre-systemd and container compatibility.
+Ohai has no equivalent plugin. gohai added this collector for consumers that
+audit sessions across a fleet. Current Linux distributions document `loginctl`
+as the standard way to find sessions, so the collector uses it first. The
+collector keeps utmp for hosts from before systemd and for containers.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) for
-  `utmp` / `utmpx` reads.
-- [`internal/executor`](../../internal/executor) for the `loginctl` call on
-  Linux.
+- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) to
+  read `utmp` and `utmpx`.
+- [`internal/executor`](../../internal/executor) to run `loginctl` on Linux.

@@ -4,39 +4,40 @@
 
 ## Description
 
-Identifies the active package manager the host uses for software installation.
-Surfaces the dispatch decision Ohai bakes inside its `packages` plugin (where it
-picks between `dpkg-query` / `rpm -qa` / `pacman -Qi` based on
-`platform_family`) as an explicit fact.
+The collector finds the active package manager that the host uses to install
+software. Ohai's `packages` plugin selects `dpkg-query`, `rpm -qa` or
+`pacman -Qi` from the `platform_family`, but keeps that decision inside the
+plugin. gohai reports the decision as an explicit fact.
 
-Consumers use this to:
+Consumers use this data to:
 
-- Pick the right install/query/update command without re-detecting the distro
-  themselves.
-- Drive remediation tooling that needs to run `apt-get install X` on one host
-  and `dnf install X` on another.
-- Detect hosts in a managed fleet that don't have the expected manager installed
-  (e.g. a "Debian-family" host missing apt).
+- Select the correct install, query or update command without a second detection
+  of the distribution.
+- Run remediation tools that must run `apt-get install X` on one host and
+  `dnf install X` on a different host.
+- Find hosts in a managed fleet that do not have the expected manager, for
+  example a "Debian-family" host without apt.
 
 ## Collected fields
 
-| Field  | Type   | Description                                                                                                                                               | Schema mapping                                                                                            |
-| ------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `name` | string | Canonical manager name: `apt`, `apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, `xbps-install`, `emerge`, `brew`, `port`. Empty when no manager found. | No direct schema mapping, managed-software inventory has no canonical OCSF "which tool manages it" field. |
-| `path` | string | Absolute path to the manager binary (e.g. `/usr/bin/apt`). Empty when no manager found.                                                                   | No direct schema mapping.                                                                                 |
+| Field  | Type   | Description                                                                                                                                                                     | Schema mapping                                                                                          |
+| ------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `name` | string | The canonical manager name: `apt`, `apt-get`, `dnf`, `yum`, `zypper`, `pacman`, `apk`, `xbps-install`, `emerge`, `brew`, `port`. It is empty if the collector finds no manager. | No direct schema mapping. OCSF has no canonical field for the tool that manages the software inventory. |
+| `path` | string | The absolute path to the manager binary, for example `/usr/bin/apt`. It is empty if the collector finds no manager.                                                             | No direct schema mapping.                                                                               |
 
 ## Platform support
 
-| Platform                                 | Supported                                         |
-| ---------------------------------------- | ------------------------------------------------- |
-| Linux (Debian family)                    | ✅ (`apt` preferred, `apt-get` fallback)          |
-| Linux (RHEL family)                      | ✅ (`dnf` preferred, `yum` fallback)              |
-| Linux (SUSE, Arch, Alpine, Void, Gentoo) | ✅ (zypper/pacman/apk/xbps-install/emerge probed) |
-| macOS                                    | ✅ (`brew` preferred, `port` fallback)            |
+| Platform                                 | Supported                                                              |
+| ---------------------------------------- | ---------------------------------------------------------------------- |
+| Linux (Debian family)                    | ✅ (`apt` first, then `apt-get`)                                       |
+| Linux (RHEL family)                      | ✅ (`dnf` first, then `yum`)                                           |
+| Linux (SUSE, Arch, Alpine, Void, Gentoo) | ✅ (the collector looks for zypper, pacman, apk, xbps-install, emerge) |
+| macOS                                    | ✅ (`brew` first, then `port`)                                         |
 
-Dispatch is driven by `internal/platform.Detect()`, which wraps gopsutil's host
-info and maps `ubuntu`/`debian`/`raspbian` → `debian`,
-`rhel`/`redhat`/`centos`/`fedora`/`rocky`/`alma`/`amazon`/ `oracle` → `rhel`.
+`internal/platform.Detect()` decides which managers the collector looks for. It
+wraps gopsutil's host data. It maps `ubuntu`, `debian` and `raspbian` to
+`debian`. It maps `rhel`, `redhat`, `centos`, `fedora`, `rocky`, `alma`,
+`amazon` and `oracle` to `rhel`.
 
 ## Example output
 
@@ -106,20 +107,21 @@ gohai --no-collector.package_mgr   # disable
 
 ## Dependencies
 
-None at the registry level. Conceptually driven by `platform.Detect()` but uses
-it directly (via `internal/platform`) rather than consuming the `platform`
-collector's output, so the two collectors can be enabled/disabled independently.
+None at the registry level. The collector uses `platform.Detect()` directly,
+through `internal/platform`. It does not read the output of the `platform`
+collector. Thus you can enable or disable the two collectors independently.
 
 ## Data sources
 
-| Platform | What we read                                                                                                              | Ohai plugin                                                                                                                    | Alignment                                                                                                                                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Linux    | `exec.LookPath` for the family-specific manager (`apt` on debian, `dnf`/`yum` on rhel, `zypper`/`pacman`/etc. on others). | [`packages.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/packages.rb) uses the same family dispatch internally. | **Equivalent dispatch; different output**: Ohai hides the dispatch and emits installed-package inventory. We surface the dispatch as a typed fact so consumers can make their own install/query calls. |
-| macOS    | `exec.LookPath brew`, fallback `port`.                                                                                    | Ohai has no macOS package-manager detection.                                                                                   | **Extension**: Ohai doesn't target macOS package managers; we cover brew and MacPorts.                                                                                                                 |
+| Platform | What we read                                                                                                                             | Ohai plugin                                                                                                                     | Alignment                                                                                                                                                                                                                         |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `exec.LookPath` for the manager of the family: `apt` on debian, `dnf` or `yum` on rhel, `zypper`, `pacman` and others on other families. | [`packages.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/packages.rb) uses the same family selection internally. | **Equivalent selection, different output.** Ohai keeps the selection internal and reports the inventory of installed packages. gohai reports the selection as a typed fact. Consumers then make their own install or query calls. |
+| macOS    | `exec.LookPath brew`, then `port`.                                                                                                       | Ohai has no detection of macOS package managers.                                                                                | **Extension.** Ohai does not look for macOS package managers. gohai finds brew and MacPorts.                                                                                                                                      |
 
-**Known gaps:** Windows (Chocolatey / winget / Scoop) is out of scope, gohai
-doesn't target Windows yet.
+**Known gaps:** Windows (Chocolatey, winget, Scoop) is out of scope. gohai does
+not support Windows yet.
 
 ## Backing library
 
-- Go stdlib (`os/exec`, `exec.LookPath`), no third-party dependency.
+- The Go standard library (`os/exec`, `exec.LookPath`). There is no third-party
+  dependency.
