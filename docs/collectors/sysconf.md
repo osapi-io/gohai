@@ -19,7 +19,7 @@ The collector reports four related signals:
 
 - `clk_tck`. The clock ticks per second (SC_CLK_TCK). Use it to change
   `/proc/stat` jiffy counts to wall-clock seconds when you calculate the CPU
-  time of a process. It is usually 100 on Linux and 128 on macOS.
+  time of a process. It is usually 100 on Linux and on macOS.
 - `pagesize`. The memory page size in bytes (SC_PAGESIZE). You need it to change
   page-count fields from `/proc/meminfo` or `vm_stat` into bytes.
 - `nprocessors_conf`. The CPUs configured in the kernel (SC_NPROCESSORS_CONF).
