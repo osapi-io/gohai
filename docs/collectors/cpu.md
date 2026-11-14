@@ -137,7 +137,7 @@ g, _ := gohai.New(gohai.WithCollectors("cpu"))
 facts, _ := g.Collect(context.Background())
 
 c := facts.CPU
-fmt.Printf("%d cores across %d socket(s), %d logical\n", c.Cores, c.Sockets, c.Total)
+fmt.Printf("%d cores across %d socket(s), %d logical\n", c.Cores, c.Sockets, c.Count)
 
 // Security check: any mitigation reporting "Vulnerable"?
 for mitigation, status := range c.Vulnerabilities {
@@ -198,7 +198,7 @@ On Linux:
 On macOS:
 
 1. gopsutil's `cpu.Info` gives `model_name`, `vendor_id`, `flags` and the
-   logical thread count (`total`) through the `host_info()` mach call. The
+   logical thread count (`count`) through the `host_info()` mach call. The
    collector puts each entry into the `cpus[]` slice, as on Linux. The summary
    fields, which assume that all CPUs are the same, come from the first entry.
 2. The collector replaces these values with `sysctl -n <key>` through the
@@ -206,8 +206,8 @@ On macOS:
    - `hw.physicalcpu` → `cores`. gopsutil reports logical cores here.
    - `hw.packages` → `sockets`.
    - `hw.cpufrequency_max`, or `hw.cpufrequency` if it is missing, divided by
-     1e6 → `mhz`. Apple Silicon has neither sysctl. Then `mhz` keeps the value
-     from gopsutil (usually 0). The collector does not report an incorrect
+     1e6 → `speed`. Apple Silicon has neither sysctl. Then `speed` keeps the
+     value from gopsutil (usually 0). The collector does not report an incorrect
      frequency.
 
 ## Backing library
