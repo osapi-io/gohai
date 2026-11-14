@@ -89,12 +89,12 @@ The details of the sub-structs (`Plan`, `StorageProfile`, `Disk`, `ManagedDisk`,
     "region": "eastus",
     "zone": "1",
     "account_uid": "sub-uuid",
-    "interfaces": [
-      {
+    "interfaces": {
+      "000D3A...": {
         "mac_address": "000D3A...",
         "ipv4": { "ip_addresses": [{ "private_ip": "10.0.0.4" }] }
       }
-    ]
+    }
   }
 }
 ```
