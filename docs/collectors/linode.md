@@ -48,6 +48,7 @@ The data comes from the network interfaces of the host.
 ```go
 import (
     "context"
+    "fmt"
     "github.com/osapi-io/gohai/pkg/gohai"
 )
 
