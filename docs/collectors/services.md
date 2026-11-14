@@ -24,10 +24,10 @@ services. This collector is a gohai addition.
 
 ## Platform support
 
-| Platform | Supported |
-| -------- | --------- |
-| Linux    | ✅        |
-| macOS    | ❌        |
+| Platform | Supported                 |
+| -------- | ------------------------- |
+| Linux    | ✅                        |
+| macOS    | nil (launchd is not read) |
 
 ## Example output
 
