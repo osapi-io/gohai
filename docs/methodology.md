@@ -28,35 +28,35 @@ the nine steps, refer to [adding-a-collector.md](adding-a-collector.md).
 The primary library for each collector. To change it, open a PR that updates
 this table and gives the reason.
 
-| Collector              | Primary               | Candidate migration / supplement         |
-| ---------------------- | --------------------- | ---------------------------------------- |
-| cpu                    | gopsutil              | ghw/cpu for NUMA/topology/arch-math      |
-| memory                 | gopsutil              | ghw/memory for hugepages/page-sizes      |
-| filesystem             | gopsutil              | ghw/block for UUID/label/unmounted       |
-| disk                   | gopsutil              | ghw/block for device metadata            |
-| network                | gopsutil              | ghw/net for driver/speed                 |
-| hostname               | gopsutil + stdlib     | None                                     |
-| platform               | gopsutil              | We examined go-sysinfo as an alternative |
-| uptime                 | gopsutil              | None                                     |
-| kernel                 | `x/sys/unix` + stdlib | None                                     |
-| load                   | gopsutil              | None                                     |
-| process                | gopsutil              | None. ghw has no process data            |
-| users (sessions)       | gopsutil (utmp)       | Add loginctl through executor            |
-| virtualization         | gopsutil              | go-sysinfo has some of the data          |
-| fips                   | stdlib                | No library covers it                     |
-| machine_id             | gopsutil + stdlib     | stdlib fallback chain                    |
-| shard                  | stdlib + machine_id   | None                                     |
-| init                   | stdlib                | `/proc/1/comm`                           |
-| os_release             | stdlib                | Our own parser                           |
-| lsb                    | stdlib                | Add `lsb_release` through executor       |
-| shells                 | stdlib                | None                                     |
-| timezone               | stdlib                | None                                     |
-| root_group             | stdlib (`os/user`)    | None                                     |
-| package_mgr            | stdlib exec           | Uses executor                            |
-| dmi                    | **ghw**               | baseboard + BIOS + chassis + product     |
-| gpu                    | **ghw**               | None                                     |
-| pci                    | **ghw**               | None                                     |
-| block_device (planned) | **ghw**               | None                                     |
+| Collector        | Primary               | Candidate migration / supplement         |
+| ---------------- | --------------------- | ---------------------------------------- |
+| cpu              | gopsutil              | ghw/cpu for NUMA/topology/arch-math      |
+| memory           | gopsutil              | ghw/memory for hugepages/page-sizes      |
+| filesystem       | gopsutil              | ghw/block for UUID/label/unmounted       |
+| disk             | gopsutil              | ghw/block for device metadata            |
+| network          | gopsutil              | ghw/net for driver/speed                 |
+| hostname         | gopsutil + stdlib     | None                                     |
+| platform         | gopsutil              | We examined go-sysinfo as an alternative |
+| uptime           | gopsutil              | None                                     |
+| kernel           | `x/sys/unix` + stdlib | None                                     |
+| load             | gopsutil              | None                                     |
+| process          | gopsutil              | None. ghw has no process data            |
+| users (sessions) | gopsutil (utmp)       | Add loginctl through executor            |
+| virtualization   | gopsutil              | go-sysinfo has some of the data          |
+| fips             | stdlib                | No library covers it                     |
+| machine_id       | gopsutil + stdlib     | stdlib fallback chain                    |
+| shard            | stdlib + machine_id   | None                                     |
+| init             | stdlib                | `/proc/1/comm`                           |
+| os_release       | stdlib                | Our own parser                           |
+| lsb              | stdlib                | Add `lsb_release` through executor       |
+| shells           | stdlib                | None                                     |
+| timezone         | stdlib                | None                                     |
+| root_group       | stdlib (`os/user`)    | None                                     |
+| package_mgr      | stdlib exec           | Uses executor                            |
+| dmi              | **ghw**               | baseboard + BIOS + chassis + product     |
+| gpu              | **ghw**               | None                                     |
+| pci              | **ghw**               | None                                     |
+| block_device     | stdlib + **avfs**     | Reads sysfs through the injected VFS     |
 
 The PR of a new collector must give the reason for its library. A migration
 (gopsutil → ghw and others) needs its own issue with the labels
