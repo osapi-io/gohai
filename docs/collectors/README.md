@@ -52,8 +52,8 @@ The "Implemented" column shows the status of the collector:
    gives the names of 107 fields.
 2. [OpenTelemetry Resource Semantic Conventions][otel-semconv] give the name
    when OCSF has no name. This applies to 91 fields.
-3. A documented gohai convention gives the names of the remaining 752 fields.
-   The Tier column of `schemas/field-mapping.md` gives these counts.
+3. A documented gohai convention gives the names of the other 752 fields. The
+   Tier column of `schemas/field-mapping.md` gives these counts.
 
 To see the canonical names, read [schema.ocsf.io][ocsf-schema] and the
 [OpenTelemetry resource attributes][otel-semconv]. The full mapping of each

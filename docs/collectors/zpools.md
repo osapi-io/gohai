@@ -125,8 +125,8 @@ On Linux and macOS, the method is the same:
 Ohai's `zpools` plugin uses the same `zpool list -H` command. gohai uses a
 smaller set of fields: `-o name,size,alloc,free,health,altroot`, not Ohai's
 `name,size,alloc,free,cap,dedup,health,version`. gohai does not read `cap`,
-`dedup` and `version`, because they come from the core fields or fleet inventory
-seldom uses them.
+`dedup` and `version`. They come from the core fields, or fleet inventory seldom
+uses them.
 
 ## Backing library
 

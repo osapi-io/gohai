@@ -140,8 +140,8 @@ On Linux:
 1. `unix.Uname()` gives `name`, `release`, `version` and `machine`.
 2. `processor` is a copy of `machine`. `os` is always the string `"GNU/Linux"`.
    Ohai runs `uname -p` and `uname -o` to get the same values. gohai does not do
-   the extra fork and exec, because the syscall already has all the data (Option
-   A of issue #29).
+   the extra fork and exec, because the syscall already has all the data. This
+   is Option A of issue #29.
 
 On macOS:
 

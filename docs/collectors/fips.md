@@ -31,7 +31,7 @@ Consumers use this data to:
   libraries and SSH clients disable the ciphers that are not approved when the
   kernel flag is set.
 - Find drift. If someone turns off the crypto policy on a FIPS host, that is a
-  real incident: the kernel is in FIPS mode, but user space is not. The signal
+  real incident. The kernel is in FIPS mode, but user space is not. The signal
   for this is `kernel.enabled=true` with `policy.fips_effective=false`.
 
 The runtime flag does **not** show the revision of FIPS 140 that the kernel's

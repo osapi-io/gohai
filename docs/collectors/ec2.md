@@ -251,10 +251,17 @@ request.
     `(nil, nil)`. If a request for a subsequent path fails, the collector
     continues, and that field keeps its zero value.
 
-The method is the same as Ohai's `Ohai::Mixin::Ec2Metadata`: the same change
-from IMDSv2 to IMDSv1, the same version negotiation, the same recursive ENI
-read, the same security filters, and the same 10 s timeout. gohai does not
-implement the Windows signal (`Win32_ComputerSystemProduct.identifyingnumber`).
+The method is the same as Ohai's `Ohai::Mixin::Ec2Metadata`. These parts are the
+same:
+
+- the change from IMDSv2 to IMDSv1
+- the version negotiation
+- the recursive ENI read
+- the security filters
+- the 10 s timeout
+
+gohai does not implement the Windows signal
+(`Win32_ComputerSystemProduct.identifyingnumber`).
 
 ## Backing library
 

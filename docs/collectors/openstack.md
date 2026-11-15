@@ -124,9 +124,8 @@ If `dmi` did not run, the collector fails open and continues.
    Info with data.
 
 The method is the same as the recursive read of Ohai's
-`Ohai::Mixin::Ec2Metadata`, which the openstack plugin also uses. gohai also
-reads the Nova document and does the provider (dreamhost) detection, the same as
-Ohai.
+`Ohai::Mixin::Ec2Metadata`, which the openstack plugin also uses. Like Ohai,
+gohai also reads the Nova document and finds the provider (dreamhost).
 
 ## Backing library
 

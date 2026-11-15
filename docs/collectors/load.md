@@ -81,9 +81,9 @@ gohai collect --no-collector.load   # disable
 ## Dependencies
 
 None. A consumer that needs the saturation of each core compares the load with
-`cpu.total` itself. The collector does not declare a runtime dependency. If it
-did, `Dependencies()` would add `cpu` automatically, also when the user disabled
-it.
+`cpu.total` itself. The collector does not declare a runtime dependency. A
+declared dependency makes `Dependencies()` add `cpu` automatically, also when
+the user disabled it.
 
 ## Data sources
 

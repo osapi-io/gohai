@@ -154,12 +154,16 @@ and DHCP option 245), not DMI.
    `local_ipv4`, `public_ipv6` and `local_ipv6` lists. These lists are in
    addition to the map of interfaces, which has the MAC address as the key.
 
-The method is the same as Ohai's `Ohai::Mixin::AzureMetadata`. It uses the same
-detection chain (the signals for hosts that are not Windows), the same
-version-negotiation handshake, the same 6s timeout and the same structure of
-network interfaces, with the MAC as the key. The collector does not implement
-the detection signals that are specific to Windows (`C:\WindowsAzure`, the
-`DhcpDomain` registry key).
+The method is the same as Ohai's `Ohai::Mixin::AzureMetadata`. These parts are
+the same:
+
+- the detection chain (the signals for hosts that are not Windows)
+- the version-negotiation handshake
+- the 6s timeout
+- the structure of network interfaces, with the MAC as the key
+
+The collector does not implement the detection signals that are specific to
+Windows (`C:\WindowsAzure`, the `DhcpDomain` registry key).
 
 ## Backing library
 

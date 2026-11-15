@@ -27,9 +27,9 @@ Consumers use this data to:
 The collector assumes that all sockets have the same CPU. `model_name`,
 `vendor_id`, `family`, `model`, `stepping`, `cache_size` and `flags` come from
 the first logical CPU that gopsutil returns. This is correct on approximately
-99% of hosts. On SKUs with different types of cores (the P and E cores of Apple
-Silicon, the hybrid cores of Intel Alder Lake), these fields give the data of
-the first core.
+99% of hosts. Some SKUs have different types of cores, for example the P and E
+cores of Apple Silicon or the hybrid cores of Intel Alder Lake. On these SKUs,
+the fields give the data of the first core.
 
 ## Collected fields
 

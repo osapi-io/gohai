@@ -141,12 +141,12 @@ None.
 
 ## Data sources
 
-Ohai's `filesystem.rb` combines the output of `mount`, `df` and `lsblk`. It
-makes a view of each device with the mount points, the capacity and the
-filesystem types. gohai uses gopsutil instead. gopsutil reads `/proc/mounts` and
-calls `statfs` directly. The data is the same, but the parse is different. gohai
-also adds btrfs allocation data, which it reads through VFS, and ZFS dataset
-properties, which it gets from the `zfs` command.
+Ohai's `filesystem.rb` combines the output of `mount`, `df` and `lsblk`. For
+each device, it shows the mount points, the capacity and the filesystem types.
+gohai uses gopsutil instead. gopsutil reads `/proc/mounts` and calls `statfs`
+directly. The data is the same, but the parse is different. gohai also adds
+btrfs allocation data, which it reads through VFS. It also adds ZFS dataset
+properties from the `zfs` command.
 
 On Linux:
 
@@ -164,9 +164,10 @@ On Linux:
 3. The block devices that `lsblk` reports with an `FSTYPE` and no `MOUNTPOINT`
    go into `unmounted[]`. Thus LUKS containers, inactive LVs and btrfs devices
    are still visible.
-4. If `lsblk` is missing (minimal containers, Alpine without util-linux), or if
-   its output is not valid, the collector skips the `lsblk` data and reports no
-   error. The capacity and inode data from gopsutil stay.
+4. `lsblk` can be missing, for example in minimal containers or in Alpine
+   without util-linux. Its output can also be not valid. In these cases, the
+   collector skips the `lsblk` data and reports no error. The capacity and inode
+   data from gopsutil stay.
 5. **Btrfs allocation data**. For each mount with `type == "btrfs"` and a UUID,
    the collector reads `/sys/fs/btrfs/<uuid>/allocation/` through the injected
    `avfs.VFS`. It fills the `btrfs` sub-record of the mount: the byte counters

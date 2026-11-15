@@ -5,10 +5,15 @@ must contain, and where we track methodology gaps.
 
 **The rules are not here.** The
 [specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/collectors.md)
-gives these rules one time: how to select a backing library, what an extension
-can do and what it can read through, why collector code has no build tag, and
-how to name a field. Read it before you add or change a collector. This page
-tells you what the current collectors do.
+gives these rules one time:
+
+- how to select a backing library
+- what an extension can do, and what it can read through
+- why collector code has no build tag
+- how to name a field
+
+Read it before you add or change a collector. This page tells you what the
+current collectors do.
 
 Three rules are short, so this page repeats them. A person who is about to break
 one of them works in this repository:
