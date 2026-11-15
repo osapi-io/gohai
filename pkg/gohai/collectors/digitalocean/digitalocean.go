@@ -22,7 +22,7 @@
 // the link-local metadata server at http://169.254.169.254/metadata/v1.json.
 // The collector returns nil with no error when the endpoint is not
 // reachable — that's the signal that the host isn't a DO droplet.
-package digital_ocean
+package digitalocean
 
 import (
 	"context"

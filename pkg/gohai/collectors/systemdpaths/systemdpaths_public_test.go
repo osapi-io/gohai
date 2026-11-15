@@ -32,7 +32,7 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
-	systemdpaths "github.com/osapi-io/gohai/pkg/gohai/collectors/systemd_paths"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/systemdpaths"
 )
 
 var (

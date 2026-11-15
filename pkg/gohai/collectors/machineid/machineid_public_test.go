@@ -33,7 +33,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
-	machineid "github.com/osapi-io/gohai/pkg/gohai/collectors/machine_id"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/machineid"
 )
 
 var (
