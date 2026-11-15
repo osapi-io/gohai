@@ -199,8 +199,8 @@ On macOS, the checks are the same as Ohai's `darwin/virtualization.rb`:
 A bare-metal Mac with no hypervisor software gives an empty `systems` map and an
 empty `system` and `role`.
 
-All file reads go through the injected `avfs.VFS`. All commands run through the
-shared `internal/executor` runner. Tests mock the two with `memfs` and
+All file reads use the injected `avfs.VFS`. All commands run through the shared
+`internal/executor` runner. Tests mock the two with `memfs` and
 `go.uber.org/mock`.
 
 ## Backing library

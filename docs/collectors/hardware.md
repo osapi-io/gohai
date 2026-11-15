@@ -198,7 +198,7 @@ collectors give equivalent data.
 - **No `architecture`, `operating_system`, `operating_system_version` or
   `build_version`.** Ohai also merges these into `hardware{}`. But gohai's
   `kernel`, `platform` and `os_release` collectors already report them. A copy
-  here would break the single-source principle.
+  here breaks the single-source principle.
 - **The AC charger data.** Ohai reads `SPPowerDataType` only for the battery
   item. gohai also reports the `sppower_ac_charger_information` item, because
   fleet management must find adapters with the wrong wattage.

@@ -23,8 +23,9 @@ Consumers use this data to:
   is baked.
 
 The collector does not report DSA keys. This is intentional. OpenSSH deprecated
-DSA in 7.0 (2015) and removed support in 9.8. If gohai reported DSA keys,
-consumers could think that DSA keys are still a valid security signal.
+DSA in 7.0 (2015) and removed support in 9.8. gohai does not report DSA keys. If
+it reports them, consumers can think that DSA keys are still a valid security
+signal.
 
 ## Signals
 

@@ -302,8 +302,9 @@ they test. Tables have `validateFunc` callbacks. The setter form is
 These rules are specific to collectors:
 
 - **One `TestCollect` for each collector.** All scenarios are rows in one table
-  with a `variant` column: Linux and Darwin, the success paths and the error
-  paths. Do not split into `TestCollectLinux` / `TestCollectDarwin`.
+  with a `variant` column. The rows include Linux and Darwin, and the success
+  paths and the error paths. Do not split into `TestCollectLinux` /
+  `TestCollectDarwin`.
 - Use separate test methods only for public helpers that are really pure and
   have their own contract (`TestHumanDuration`, `TestBytesToString`). Do not use
   them for bridge code that `Collect` already tests.
@@ -435,42 +436,61 @@ Before you mark a collector as complete, each item below must be true:
     sources, the special cases of each distribution and the fallback chains. Our
     collection logic is the same as theirs, so we get their years of bug fixes.
     Each difference has a documented reason.
+
 02. **You checked the OCSF schema** ([schema.ocsf.io](https://schema.ocsf.io/))
     for canonical field names. If OCSF has no field, you checked the
     [OpenTelemetry Resource Semantic Conventions][otel-semconv]. You recorded
     the schema mappings in the **Schema mapping** column of the Collected fields
     table on the collector page. If a schema has a field that we can report but
     do not, add the field or write why not.
+
 03. **The osapi pattern of one struct for each OS**. No build tags. The factory
     selects the variant from `platform.Detect()`. Each struct for an OS
     implements Collect.
+
 04. **100% test coverage.**
     `go tool cover -func=/tmp/cov.out | grep -v '100.0%'` returns nothing for
     the files of the collector.
+
 05. **One `<name>_public_test.go`, one `TestCollect`.** Linux and Darwin
     scenarios are in the same table, with a `variant` column. No separate
     `linux_public_test.go` / `darwin_public_test.go` files. No `TestReadX`
     methods that test bridge code that `TestCollect` already tests. The only
     permitted extra test methods are tests of pure public helpers, for example
     `TestHumanDuration`.
+
 06. **The seams are at the boundary.** `export_test.go` replaces the call to the
     upstream library (`hostInfoFn`, `partitionsFn` and others). Thus the bridge
     mapping runs on each row. No `readXFn = readX` wrappers in the middle of the
     collector. No alias that tests a bridge that `TestCollect` already tests.
+
 07. **`docs/collectors/<name>.md`** is a functional spec that is complete in
-    itself. It has these sections: Description (what and why, in our voice),
-    Collected fields with a **Schema mapping** column (the OCSF path first, the
-    OpenTelemetry attribute if OCSF has no field), Platform support, Example
-    output, SDK usage, Enable/disable, Dependencies, Data sources (the method,
-    step by step, in OUR voice, not an Ohai parity table), and Backing library.
+    itself. It has these sections:
+
+    - Description: what and why, in our voice.
+    - Collected fields, with a **Schema mapping** column. Give the OCSF path
+      first. If OCSF has no field, give the OpenTelemetry attribute.
+    - Platform support.
+    - Example output.
+    - SDK usage.
+    - Enable/disable.
+    - Dependencies.
+    - Data sources: the method, step by step, in OUR voice. Not an Ohai parity
+      table.
+    - Backing library.
+
     **No "Known gaps vs. Ohai" section.** Methodology gaps are GitHub issues
     with the labels `methodology-gap` / `collector:<name>`.
+
 08. **docs/collectors/README.md**: the row of the collector shows
     `✅ (<backing>)`.
+
 09. **Lint clean**: `just go-vet` returns 0 issues.
+
 10. **The commit message** tells the "why". It names the Ohai and OCSF
     references that gave the implementation, the extensions that we added to the
     upstream library, and each intentional difference.
+
 11. **Check the GitHub issues** for tracked methodology gaps:
     `gh issue list --label methodology-gap --label collector:<name>`. If the
     work closes a tracked issue, the "Doc after this fix lands" block of the

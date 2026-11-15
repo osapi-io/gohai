@@ -96,7 +96,7 @@ None.
 
 ## Data sources
 
-Ohai's `linux/mdadm.rb` reads `/proc/mdstat` to find the arrays and parses the
+Ohai's `linux/mdadm.rb` reads `/proc/mdstat` to find the arrays. It parses the
 lists of member and spare disks. gohai uses the same method for `/proc/mdstat`.
 gohai also runs `mdadm --detail`, if it is available, to get the UUID, the state
 and the disk counts. Ohai does the same (`mdadm --detail /dev/<device>`). If

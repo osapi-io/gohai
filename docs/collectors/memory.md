@@ -7,9 +7,12 @@
 On Linux, the collector reports the system memory totals, the usage buckets, the
 kernel allocations, the page-cache state and the hugepages layout. On macOS, it
 adds the `wired`, `speculative` and `compressed` buckets that the Darwin VM
-reports. Consumers use all of this data to size workloads, to debug OOM and
-overcommit events, to find kernel leaks (Slab growth), and to audit the
-hugepages configuration for databases or DPDK workloads.
+reports. Consumers use this data for these tasks:
+
+- to size workloads
+- to debug OOM and overcommit events
+- to find kernel leaks (Slab growth)
+- to audit the hugepages configuration for databases or DPDK workloads
 
 All fields with a byte value are in **native bytes**. Ohai reports strings with
 a kB suffix (`"total": "16384000kB"`). gohai uses bytes because they are easier

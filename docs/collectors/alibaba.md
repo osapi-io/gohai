@@ -168,9 +168,15 @@ the check passes and the collector continues.
     collector returns `(nil, nil)`. If a call for one path fails during the
     walk, the collector continues. Those fields stay empty in the typed output.
 
-The method is the same as Ohai's `Ohai::Mixin::AlibabaMetadata`. It uses the
-same endpoint, the same recursive walk, the same key sanitization, the same
-`/user-data` removal, the same User-Agent pattern and the same 6s timeout.
+The method is the same as Ohai's `Ohai::Mixin::AlibabaMetadata`. These parts are
+the same:
+
+- the endpoint
+- the recursive walk
+- the key sanitization
+- the `/user-data` removal
+- the User-Agent pattern
+- the 6s timeout
 
 ## Backing library
 

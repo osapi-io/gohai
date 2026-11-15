@@ -87,8 +87,8 @@ None.
 
 ## Data sources
 
-Ohai's `docker.rb` plugin gets the total container counts from `docker info`,
-and the Docker version. gohai also lists each container and each image with
+Ohai's `docker.rb` plugin gets the Docker version and the total container counts
+from `docker info`. gohai also lists each container and each image with
 `docker ps` and `docker images`. Thus consumers see the state of each container,
 not only the totals.
 

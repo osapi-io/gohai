@@ -8,7 +8,7 @@ analysis for the 950 JSON fields of gohai.
 | File                | Purpose                                                                                                                                      |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `field-mapping.md`  | **Source of truth.** The tier mapping of each field (950 rows). `Changed? yes/no` shows which fields need a new name to agree with OCSF/OTel |
-| `ocsf-gaps.md`      | Fields that OCSF *should* cover but does not. These are candidates for upstream PRs to the OCSF schema repo                                  |
+| `ocsf-gaps.md`      | Fields that OCSF does not cover, but that it must cover. These are candidates for upstream PRs to the OCSF schema repo                       |
 | `gohai.schema.json` | The generated JSON Schema (draft 2020-12) for `gohai.Facts`. It shows the current Go tags. Generate it again after a rename                  |
 | `schema.go`         | The `//go:embed` of the schema for the `gohai validate` command                                                                              |
 | `gen/`              | The generator tool. It reflects `gohai.Facts` into JSON Schema                                                                               |
@@ -74,9 +74,9 @@ workflows use that data directly:
 - **Asset inventory.** "what's running where, what hardware, what containers,
   what services?"
 
-Ask this question for each gohai field: **does a security analyst, a compliance
-auditor or an incident responder get a benefit from this field in a normalized
-schema?** If yes, the field is an OCSF gap candidate.
+Ask this question for each gohai field: **can an analyst use this field in a
+normalized schema?** An analyst is a security analyst, a compliance auditor or
+an incident responder. If yes, the field is an OCSF gap candidate.
 
 ### Gap candidates
 
@@ -116,8 +116,8 @@ Do these steps for each JSON field in each collector:
 3. **Convention (T3).** Neither OCSF nor OTel covers the field. Use the field
    name of the backing library in `snake_case`. Add a unit suffix when the unit
    is not clear. No rename is necessary, so record the field as T3.
-4. **OCSF gap candidate?** If the field is a concept that OCSF *should* cover
-   but does not, add it to `ocsf-gaps.md`.
+4. **OCSF gap candidate?** If OCSF must cover the concept of the field but does
+   not, add it to `ocsf-gaps.md`.
 
 ### After the audit
 

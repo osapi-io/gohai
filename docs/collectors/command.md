@@ -91,7 +91,7 @@ On Linux and on macOS, the collector runs `ps -ef` through the shared
 
 Ohai's `ps.rb` uses `"ps -ef"` on Linux, macOS, AIX and Solaris, and
 `"ps -axww"` on BSDs. gohai uses `ps -ef` on Linux and on Darwin. macOS `ps`
-fully supports the POSIX `-ef` flags.
+supports all of the POSIX `-ef` flags.
 
 ## Backing library
 
