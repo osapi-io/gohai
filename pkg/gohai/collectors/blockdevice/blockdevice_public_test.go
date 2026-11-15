@@ -30,7 +30,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
-	blockdevice "github.com/osapi-io/gohai/pkg/gohai/collectors/block_device"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/blockdevice"
 )
 
 var (

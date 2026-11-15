@@ -23,7 +23,7 @@ package gohai
 import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
-	digitalocean "github.com/osapi-io/gohai/pkg/gohai/collectors/digital_ocean"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"

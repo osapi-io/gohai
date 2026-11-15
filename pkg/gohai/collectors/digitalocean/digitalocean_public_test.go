@@ -18,7 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package digital_ocean_test
+package digitalocean_test
 
 import (
 	"context"
@@ -30,7 +30,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
-	digitalocean "github.com/osapi-io/gohai/pkg/gohai/collectors/digital_ocean"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 )
 

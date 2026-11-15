@@ -29,7 +29,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
-	packagemgr "github.com/osapi-io/gohai/pkg/gohai/collectors/package_mgr"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/packagemgr"
 )
 
 var (

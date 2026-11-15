@@ -18,7 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package initd_test
+package osrelease_test
 
 import (
 	"context"
@@ -32,11 +32,16 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
-	initd "github.com/osapi-io/gohai/pkg/gohai/collectors/init"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/osrelease"
+)
+
+var (
+	_ collector.Collector = (*osrelease.Linux)(nil)
+	_ collector.Collector = (*osrelease.Darwin)(nil)
 )
 
 // readErrorFS forces ReadFile to return a non-ErrNotExist error so the
-// "read error soft-misses" branch is exercised.
+// "other read error propagated" branch is exercised.
 type readErrorFS struct {
 	avfs.VFS
 }
@@ -44,70 +49,65 @@ type readErrorFS struct {
 func (readErrorFS) ReadFile(
 	string,
 ) ([]byte, error) {
-	return nil, errors.New("no /proc")
+	return nil, errors.New("permission denied")
 }
 
-var (
-	_ collector.Collector = (*initd.Linux)(nil)
-	_ collector.Collector = (*initd.Darwin)(nil)
-)
-
-type InitPublicTestSuite struct {
+type OSReleasePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestInitPublicTestSuite(
+func TestOSReleasePublicTestSuite(
 	t *testing.T,
 ) {
-	suite.Run(t, new(InitPublicTestSuite))
+	suite.Run(t, new(OSReleasePublicTestSuite))
 }
 
-func (s *InitPublicTestSuite) TestNew() {
+func (s *OSReleasePublicTestSuite) TestNew() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
 		name         string
 		detect       string
-		validateFunc func(initd.Collector)
+		validateFunc func(osrelease.Collector)
 	}{
 		{
 			name:   "darwin dispatches to Darwin",
 			detect: "darwin",
-			validateFunc: func(c initd.Collector) {
-				_, ok := c.(*initd.Darwin)
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Darwin)
 				s.True(ok)
 			},
 		},
 		{
 			name:   "debian dispatches to Linux",
 			detect: "debian",
-			validateFunc: func(c initd.Collector) {
-				_, ok := c.(*initd.Linux)
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Linux)
 				s.True(ok)
 			},
 		},
 		{
 			name:   "rhel dispatches to Linux",
 			detect: "rhel",
-			validateFunc: func(c initd.Collector) {
-				_, ok := c.(*initd.Linux)
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Linux)
 				s.True(ok)
 			},
 		},
 		{
 			name:   "arch dispatches to Linux",
 			detect: "arch",
-			validateFunc: func(c initd.Collector) {
-				_, ok := c.(*initd.Linux)
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Linux)
 				s.True(ok)
 			},
 		},
 		{
 			name:   "unknown dispatches to Linux",
 			detect: "",
-			validateFunc: func(c initd.Collector) {
-				_, ok := c.(*initd.Linux)
+			validateFunc: func(c osrelease.Collector) {
+				_, ok := c.(*osrelease.Linux)
 				s.True(ok)
 			},
 		},
@@ -115,8 +115,8 @@ func (s *InitPublicTestSuite) TestNew() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			platform.Detect = func() string { return tt.detect }
-			c := initd.New()
-			s.Equal("init", c.Name())
+			c := osrelease.New()
+			s.Equal("os_release", c.Name())
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
@@ -125,132 +125,133 @@ func (s *InitPublicTestSuite) TestNew() {
 	}
 }
 
-func (s *InitPublicTestSuite) TestCollect() {
+func (s *OSReleasePublicTestSuite) TestCollect() {
+	const ubuntu = `NAME="Ubuntu"
+VERSION="24.04 LTS (Noble Numbat)"
+ID=ubuntu
+ID_LIKE=debian
+PRETTY_NAME="Ubuntu 24.04 LTS"
+VERSION_ID="24.04"
+VERSION_CODENAME=noble
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+UBUNTU_CODENAME=noble
+`
+
 	tests := []struct {
 		name         string
-		variant      string // "linux" | "darwin"
-		comm         string
+		variant      string
+		content      string
+		missing      bool
 		readErr      bool
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "linux: systemd host",
+			name:    "linux: ubuntu 24.04",
 			variant: "linux",
-			comm:    "systemd\n",
+			content: ubuntu,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
+				info, ok := got.(*osrelease.Info)
 				s.Require().True(ok)
-				s.Equal(initd.Info{Name: "systemd"}, *info)
-			},
-		},
-		{
-			name:    "linux: upstart host",
-			variant: "linux",
-			comm:    "upstart\n",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
-				s.Require().True(ok)
-				s.Equal(initd.Info{Name: "upstart"}, *info)
-			},
-		},
-		{
-			name:    "linux: sysvinit (comm=init) normalized",
-			variant: "linux",
-			comm:    "init\n",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
-				s.Require().True(ok)
-				s.Equal(initd.Info{Name: "sysvinit"}, *info)
-			},
-		},
-		{
-			name:    "linux: openrc-init normalized to openrc",
-			variant: "linux",
-			comm:    "openrc-init\n",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
-				s.Require().True(ok)
-				s.Equal(initd.Info{Name: "openrc"}, *info)
-			},
-		},
-		{
-			name:    "linux: runit host",
-			variant: "linux",
-			comm:    "runit\n",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
-				s.Require().True(ok)
-				s.Equal(initd.Info{Name: "runit"}, *info)
-			},
-		},
-		{
-			name:    "linux: unknown comm passed through",
-			variant: "linux",
-			comm:    "exoticinit\n",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
-				s.Require().True(ok)
-				s.Equal(initd.Info{Name: "exoticinit"}, *info)
+				s.Equal(osrelease.Info{
+					ID: "ubuntu", IDLike: []string{"debian"},
+					Name: "Ubuntu", PrettyName: "Ubuntu 24.04 LTS",
+					Version: "24.04 LTS (Noble Numbat)", VersionID: "24.04",
+					VersionCodename: "noble",
+					HomeURL:         "https://www.ubuntu.com/",
+					SupportURL:      "https://help.ubuntu.com/",
+					BugReportURL:    "https://bugs.launchpad.net/ubuntu/",
+					Extra:           map[string]string{"UBUNTU_CODENAME": "noble"},
+				}, *info)
 			},
 		},
 		{
 			name:    "linux: missing file soft-misses",
 			variant: "linux",
+			missing: true,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
+				info, ok := got.(*osrelease.Info)
 				s.Require().True(ok)
-				s.Equal(initd.Info{}, *info)
+				s.Equal(osrelease.Info{}, *info)
 			},
 		},
 		{
-			name:    "linux: read error soft-misses",
+			name:    "linux: other read error propagated",
 			variant: "linux",
 			readErr: true,
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
-				s.Require().True(ok)
-				s.Equal(initd.Info{}, *info)
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
 			},
 		},
 		{
-			name:    "darwin always reports launchd",
+			name:    "linux: comments and blanks and malformed lines",
+			variant: "linux",
+			content: "# some comment\n\nmalformed\nID=\"quoted\"\n",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal(osrelease.Info{ID: "quoted"}, *info)
+			},
+		},
+		{
+			name:    "linux: build/variant fields populated (Fedora-style)",
+			variant: "linux",
+			content: `ID=fedora
+BUILD_ID=40.20240416.0
+VARIANT="Workstation Edition"
+VARIANT_ID=workstation
+`,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal(osrelease.Info{
+					ID:        "fedora",
+					BuildID:   "40.20240416.0",
+					Variant:   "Workstation Edition",
+					VariantID: "workstation",
+				}, *info)
+			},
+		},
+		{
+			name:    "darwin returns nil",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
+				if true {
+					s.Nil(got)
+					return
+				}
+				info, ok := got.(*osrelease.Info)
 				s.Require().True(ok)
-				s.Equal(initd.Info{Name: "launchd"}, *info)
+				s.Equal(osrelease.Info{}, *info)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var c initd.Collector
+			var c osrelease.Collector
 			switch tt.variant {
 			case "linux":
 				var vfs avfs.VFS
 				switch {
 				case tt.readErr:
 					vfs = readErrorFS{VFS: memfs.New()}
-				case tt.comm != "":
-					f := memfs.New()
-					_ = f.MkdirAll("/proc/1", 0o755)
-					_ = f.WriteFile("/proc/1/comm", []byte(tt.comm), fs.FileMode(0o644))
-					vfs = f
-				default:
+				case tt.missing:
 					vfs = memfs.New()
+				default:
+					f := memfs.New()
+					_ = f.MkdirAll("/etc", 0o755)
+					_ = f.WriteFile("/etc/os-release", []byte(tt.content), fs.FileMode(0o644))
+					vfs = f
 				}
-				c = &initd.Linux{FS: vfs}
+				c = &osrelease.Linux{FS: vfs}
 			case "darwin":
-				c = initd.NewDarwin()
+				c = osrelease.NewDarwin()
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

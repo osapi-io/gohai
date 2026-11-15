@@ -34,7 +34,7 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
-	kernelmodules "github.com/osapi-io/gohai/pkg/gohai/collectors/kernel_modules"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernelmodules"
 )
 
 var (
