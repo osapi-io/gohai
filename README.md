@@ -30,7 +30,7 @@ library and does not write the logic again. Each collector returns a typed
 struct. Import the library, or use the CLI with the same collectors.
 </p>
 
-## Install
+## 📦 Install
 
 ```bash
 curl -fsSL https://github.com/osapi-io/gohai/raw/main/install.sh | bash
@@ -66,7 +66,7 @@ go build -o gohai .
 
 </details>
 
-## Features
+## ✨ Features
 
 | Feature                        | Description                                                                                                                                                                              |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -82,10 +82,10 @@ go build -o gohai .
 | 🔄 Native OCSF Output          | `--format ocsf` makes an OCSF `inventory_info` event (class_uid 5001) that follows the standard. You can send it directly to SIEMs and data lakes                                        |
 | 🔌 SDK Integration             | Import it as a Go package into a Go service                                                                                                                                              |
 
-## Collectors
+## 🧰 Collectors
 
 62 collectors in 10 categories. The
-**[Collectors reference](docs/collectors/README.md)** has the full catalog, the
+[Collectors reference](docs/collectors/README.md) has the full catalog, the
 implementation status, the default set, the schema mappings, and a page for each
 collector. It lists 65 entries. The other three entries are deprecated and have
 no implementation.
@@ -95,14 +95,14 @@ You enable or disable each collector with flags in the node_exporter style.
 SDK consumers use `gohai.WithEnabled(...)` / `gohai.WithDisabled(...)` /
 `gohai.WithCollectors(...)`.
 
-**The defaults are optional.** `gohai.New()` returns an empty registry. Pass
+The defaults are optional. `gohai.New()` returns an empty registry. Pass
 `gohai.WithDefaults()` to get the recommended set. This set has collectors that
 are fast and work on almost all hosts: identity, base hardware, network, load
 and virtualization detection. The CLI adds `WithDefaults()` automatically. To
 use only the collectors that you name with `--collector.X` flags, pass
 `--no-defaults`.
 
-## Usage
+## 🚀 Usage
 
 ### CLI
 
@@ -122,7 +122,9 @@ If you import the package, read the
 `Facts` field and `Info` struct. That reference is the authoritative list. The
 examples below show the two ways to use the package.
 
-**Collect facts** (the producer side):
+### Collect facts
+
+The producer side:
 
 ```go
 package main
@@ -160,8 +162,10 @@ func main() {
 }
 ```
 
-**Read stored facts** (the decoder side, for example a server that received a
-blob of facts from an agent):
+### Read stored facts
+
+The decoder side, for example a server that received a blob of facts from an
+agent:
 
 ```go
 var facts gohai.Facts
@@ -179,11 +183,13 @@ To add the timing and the error message of each collector to Facts, add
 it also to see why a collector failed, without a stop of the run. Refer to the
 `Timings` field on [pkg.go.dev][package documentation].
 
-**Find the cloud of the host.** Enable the cloud collectors
-(`WithCategory("cloud")`). Then switch on `Facts.Cloud()`. It returns a `*Cloud`
-with `Name` set to a provider identifier. If gohai found no cloud, it returns
-nil. Use the exported constants `gohai.CloudAWS` / `CloudGCE` / `CloudAzure` and
-the others. Do not use raw strings:
+### Find the cloud of the host
+
+Enable the cloud collectors (`WithCategory("cloud")`). Then switch on
+`Facts.Cloud()`. It returns a `*Cloud` with `Name` set to a provider identifier.
+If gohai found no cloud, it returns nil. Use the exported constants
+`gohai.CloudAWS` / `CloudGCE` / `CloudAzure` and the others. Do not use raw
+strings:
 
 ```go
 g, _ := gohai.New(gohai.WithCategory("cloud"))
@@ -204,7 +210,7 @@ The full data of each provider is in its typed field, for example `Facts.Ec2` or
 `Facts.Gce`. Refer to [docs/collectors/cloud.md](docs/collectors/cloud.md) for
 the full pattern.
 
-## Examples
+## 🧪 Examples
 
 Each example is a standalone Go program that you can read and run.
 
@@ -217,7 +223,7 @@ Each example is a standalone Go program that you can read and run.
 | [timings](examples/timings/main.go)                       | Show the duration and failure of each collector              |
 | [list-collectors](examples/list-collectors/main.go)       | List the collectors without a collection                     |
 
-## Documentation
+## 📚 Documentation
 
 - [Package documentation] on pkg.go.dev. The generated API reference. It
   documents each `Option`, `Facts` field and `Info` struct. This is the
@@ -232,13 +238,13 @@ Each example is a standalone Go program that you can read and run.
 - [Collector methodology](docs/methodology.md). How to select a library, how to
   name fields, and the data sources.
 
-## Related works
+## 🔗 Related works
 
 gohai uses these projects in three ways. Some are methodology references. Some
 are backing libraries that gohai wraps. Some are peers that solve related
 problems.
 
-**Fact collectors (direct peers):**
+### Fact collectors (direct peers)
 
 - [Chef Ohai]. The canonical reference. A fact collector in Ruby, made of
   plugins. Each gohai collector compares with the related Ohai plugin for the
@@ -254,7 +260,7 @@ problems.
 - [Salt Grains](https://docs.saltproject.io/en/latest/topics/grains/). The
   static facts of SaltStack.
 
-**Backing libraries (gohai imports these):**
+### Backing libraries (gohai imports these)
 
 - [gopsutil]. The primary source for the dynamic runtime state: memory, network
   I/O, the process list and virtualization detection.
@@ -268,7 +274,7 @@ problems.
   collector that reads files uses it, so tests can run against in-memory
   fixtures.
 
-**Other Go libraries in the space:**
+### Other Go libraries in the space
 
 - [gosigar](https://github.com/cloudfoundry/gosigar). The Cloud Foundry Go port
   of Hyperic Sigar. An old reference for host metrics in Go.
@@ -277,7 +283,7 @@ problems.
 - [goprocinfo](https://github.com/c9s/goprocinfo). A small `/proc` parser. For
   gohai, gopsutil + procfs do the same work.
 
-**Methodology references (gohai reads them, but does not import them):**
+### Methodology references (gohai reads them, but does not import them)
 
 - [node_exporter](https://github.com/prometheus/node_exporter). The reference
   for difficult parsing of Linux `/proc` and `/sys`. It is Apache-2, but gohai
@@ -286,12 +292,12 @@ problems.
   Python library. It is the original design reference for the dynamic-state
   facts.
 
-## Contributing
+## 🤝 Contributing
 
 Refer to the [Contributing](CONTRIBUTING.md) guide for the prerequisites, the
 setup, the conventions and the PR workflow.
 
-## License
+## 📄 License
 
 The [MIT] License.
 
