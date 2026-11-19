@@ -47,8 +47,9 @@ linters:
 
 formatters:
   enable:
-    - gofmt
+    - gofumpt
     - goimports
+    - golines
 
 issues:
   # Defaults truncate: 50 findings per linter, and one per line.
