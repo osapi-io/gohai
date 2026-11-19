@@ -1,0 +1,21 @@
+---
+name: Set up the repository
+description: >-
+  Go and just, the shared justfiles, and the Go dependencies. Each job of the
+  Go workflow that compiles Go starts with it.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      with:
+        go-version-file: go.mod
+    - name: Install just
+      uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+    - name: Fetch justfiles
+      shell: bash
+      run: just fetch
+    - name: Deps
+      shell: bash
+      run: just deps
