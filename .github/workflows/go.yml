@@ -88,38 +88,14 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Unit tests, shard ${{ matrix.shard }}
         run: just go-unit-shard ${{ matrix.shard }} "${{ matrix.packages }}"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: cover-${{ matrix.shard }}
-          path: .coverage/shard-${{ matrix.shard }}.out
-          retention-days: 1
-
-  coverage:
-    needs: unit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Set up Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - name: Install just
-        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
-      - name: Fetch justfiles
-        run: just fetch
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: cover-*
-          path: .coverage
-          merge-multiple: true
-      - name: Join the shards and check the coverage target
-        run: just go-cover-merge
+      # Each shard checks its own coverage (go-unit-shard), and sends its own
+      # profile. Codecov joins the profiles of one commit into one report, so
+      # no job waits for every shard to join them.
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
-          # Name the profile explicitly. go-cover-merge filters it through
-          # .coverignore; auto-discovery could pick up a shard's unfiltered
-          # one and report a different number for the same commit.
-          files: .coverage/cover.out
+          files: .coverage/shard-${{ matrix.shard }}.out
+          disable_search: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
