@@ -58,12 +58,12 @@ func (base) Dependencies() []string { return nil }
 // New returns the cpu variant appropriate to the host OS.
 func New() Collector {
     switch platform.Detect() {
-    case "darwin":
+    case family.Darwin:
         return NewDarwin()
-    case "debian":
+    case family.Debian:
         return NewDebian() // only if debian diverges; else drop this case
-    case "rhel":
-        return NewRHEL()   // only if rhel diverges; else drop this case
+    case family.RHEL, family.Fedora, family.Amazon:
+        return NewRHEL()   // only if RPM hosts diverge; else drop this case
     default:
         return NewLinux()
     }

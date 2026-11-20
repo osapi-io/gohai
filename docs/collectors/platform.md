@@ -6,8 +6,10 @@
 
 The collector reports the OS identification, canonical name, version, family and
 architecture. On macOS, it also reports the build and the RSR patch suffix.
-Other code reads this data through `internal/platform.Detect()` to select the
-code path for each OS and each family. `package_mgr`, `shard` and the per-OS
+`pkg/gohai/family` names the platform and the family, and other code reads the
+host's family through `family.Detect()`: collectors through
+`internal/platform.Detect()`, to select the code path for each OS and each
+family, and osapi for its behaviors. `package_mgr`, `shard` and the per-OS
 struct factories in all collectors use this data.
 
 The collector reads `/etc/os-release` (the systemd standard) first. If that
@@ -27,33 +29,42 @@ Consumers use this data to:
 
 ## Collected fields
 
-| Field              | Type   | Description                                                                               | Schema mapping                                              |
-| ------------------ | ------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `os`               | string | `runtime.GOOS`: `"linux"`, `"darwin"`, `"windows"`.                                       | `os.type`.                                                  |
-| `name`             | string | The canonical distribution or product ID, for example `"ubuntu"`, `"redhat"`, `"darwin"`. | `os.name`.                                                  |
-| `version`          | string | The distribution version, for example `"24.04"`, `"7.9.2009"`, `"14.4.1"`.                | `os.version`.                                               |
-| `version_extra`    | string | The macOS RSR patch suffix, for example `"(a)"`. It is empty if no RSR is applied.        | No direct schema mapping.                                   |
-| `family`           | string | The family: `"debian"`, `"rhel"`, `"fedora"`, `"suse"`, `"arch"`.                         | No direct schema mapping. Packaging logic uses it as input. |
-| `cpu_architecture` | string | The hardware architecture, for example `"amd64"`, `"arm64"`.                              | `device.hw_info.cpu_bits` is the nearest match.             |
-| `build`            | string | The macOS build identifier, from `sw_vers` `BuildVersion`, for example `"23E224"`.        | `os.build`.                                                 |
+| Field              | Type   | Description                                                                                                | Schema mapping                                              |
+| ------------------ | ------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `os`               | string | `runtime.GOOS`: `"linux"`, `"darwin"`, `"windows"`.                                                        | `os.type`.                                                  |
+| `name`             | string | The canonical distribution or product ID, for example `"ubuntu"`, `"redhat"`, `"darwin"`.                  | `os.name`.                                                  |
+| `version`          | string | The distribution version, for example `"24.04"`, `"7.9.2009"`, `"14.4.1"`.                                 | `os.version`.                                               |
+| `version_extra`    | string | The macOS RSR patch suffix, for example `"(a)"`. It is empty if no RSR is applied.                         | No direct schema mapping.                                   |
+| `family`           | string | The family, as Ohai names it: `"debian"`, `"rhel"`, `"fedora"`, `"amazon"`, `"suse"`; `"darwin"` on macOS. | No direct schema mapping. Packaging logic uses it as input. |
+| `cpu_architecture` | string | The hardware architecture, for example `"amd64"`, `"arm64"`.                                               | `device.hw_info.cpu_bits` is the nearest match.             |
+| `build`            | string | The macOS build identifier, from `sw_vers` `BuildVersion`, for example `"23E224"`.                         | `os.build`.                                                 |
 
-The collector maps each `name` value through the `platformIDRemap` table. This
-table is the same as Ohai's `OS_RELEASE_PLATFORM_REMAP`. It changes common
-variants to the canonical name of their parent distribution: `rhel` → `redhat`,
-`sles` → `suse`, `ol` → `oracle`, `archarm` → `arch`, `cumulus-linux` →
-`cumulus`, `sles_sap` → `suse`, and others. The `os_release` collector gives the
-raw `/etc/os-release` `ID=` value without this mapping.
+The collector maps each `name` value through `family.Platform`, which is Ohai's
+`platform_id_remap`. It changes common variants to the canonical name of their
+parent distribution: `rhel` → `redhat`, `amzn` → `amazon`, `sles` → `suse`, `ol`
+→ `oracle`, `archarm` → `arch`, `cumulus-linux` → `cumulus`, and others. The
+`os_release` collector gives the raw `/etc/os-release` `ID=` value without this
+mapping.
 
-The value of `family` comes from a maintained table that maps each distribution
-to a family. The table has all derivatives that Ohai knows:
+The value of `family` comes from `family.Of`, which is Ohai's
+`platform_family_from_platform`: the first family whose match is part of the
+name. The families and their members:
 
-- RHEL family: alma, rocky, alibabalinux, sangoma, clearos, parallels,
-  virtuozzo, ibm_powerkvm, nexus_centos, bigip, xenserver, xcp-ng, cloudlinux,
-  scientific, enterpriseenterprise, oracle, amazon.
-- Debian family: cumulus, kali, pop, linuxmint, raspbian.
-- Arch: manjaro, antergos.
-- Network OS based on Fedora: arista_eos.
-- WRLinux variants: nexus, ios_xr.
+- `debian`: ubuntu, debian, linuxmint, raspbian, cumulus, kali, pop.
+- `rhel`: only rebuilds that track the versions of RHEL: centos, redhat, oracle,
+  almalinux, rocky, scientific, and others. Ohai keeps this family strict, so
+  another RPM distribution is `fedora`.
+- `amazon`: Amazon Linux, a family of its own.
+- `fedora`: fedora, arista_eos.
+- `suse`, `arch` (with manjaro), `gentoo`, `wrlinux` (nexus, ios_xr), `alpine`,
+  `exherbo`, `clearlinux`, `mandriva`, `slackware`.
+
+A name that no family matches has no family. When an old release file gave the
+name, the file's own family applies, for example `rhel` for
+`/etc/system-release`.
+
+One difference from Ohai is on purpose: on macOS, the name and the family are
+`darwin`, the Go and kernel name, not Ohai's `mac_os_x`.
 
 ## Platform support
 

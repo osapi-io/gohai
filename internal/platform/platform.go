@@ -18,104 +18,39 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package platform provides cross-platform OS/distro detection used by
-// gohai collectors to dispatch to the correct per-OS implementation.
-// Mirrors OSAPI's pkg/sdk/platform so we share the same dispatch vocabulary.
+// Package platform is how a collector picks its variant: Detect is the
+// host's family, as pkg/gohai/family names it, and a test swaps it to force
+// any branch without reading the host.
 package platform
 
-import (
-	"strings"
+import "github.com/osapi-io/gohai/pkg/gohai/family"
 
-	"github.com/shirou/gopsutil/v4/host"
-)
-
-// hostInfoFn is the gopsutil call used to retrieve host information.
-// Private to the package — do not leak gopsutil types into callers.
-// Collector tests that need to force a specific Detect() result should
-// swap platform.Detect directly (a var, see below) rather than stubbing
-// this.
-var hostInfoFn = host.Info
-
-// debianFamily lists distributions that share the debian provider
-// implementations (apt, systemd, netplan). Matches OSAPI's list.
-var debianFamily = map[string]bool{
-	"ubuntu":   true,
-	"debian":   true,
-	"raspbian": true,
-}
-
-// rhelFamily lists distributions that share RHEL-derived tooling (dnf/yum,
-// systemd). Added by gohai for collectors whose Debian variant doesn't
-// cover them (e.g. package_mgr).
-var rhelFamily = map[string]bool{
-	"rhel":   true,
-	"redhat": true,
-	"centos": true,
-	"fedora": true,
-	"rocky":  true,
-	"alma":   true,
-	"amzn":   true,
-	"amazon": true,
-	"oracle": true,
-	"ol":     true,
-}
-
-// Detect returns the OS family name used to pick a collector variant.
-// Swappable in tests so collector unit tests can force any dispatch
-// branch without importing gopsutil.
-//
-// Return values:
-//   - "darwin" on macOS
-//   - "debian" for debian/ubuntu/raspbian
-//   - "rhel"   for rhel/redhat/centos/fedora/rocky/alma/amazon/oracle
-//   - ""       for generic linux (arch, alpine, suse, gentoo, etc.) or
-//     unknown. Collectors treat empty as "use the generic Linux variant".
-//
-// Callers dispatch with a switch statement:
+// Detect returns the host's family: darwin on macOS, a family such as
+// debian, rhel, fedora or amazon on Linux, the platform itself for a Linux
+// host without a family, or "" when the host could not be read. Collectors
+// dispatch on it:
 //
 //	switch platform.Detect() {
-//	case "darwin":  return NewDarwin()
-//	case "debian":  return NewDebian()
-//	case "rhel":    return NewRHEL()
-//	default:        return NewLinux()
+//	case family.Darwin: return NewDarwin()
+//	case family.Debian: return NewDebian()
+//	default:            return NewLinux()
 //	}
 //
-// Tests override with:
+// Tests override it:
 //
 //	orig := platform.Detect
 //	defer func() { platform.Detect = orig }()
 //	platform.Detect = func() string { return "darwin" }
-var Detect = detect
+var Detect = family.Detect
 
-func detect() string {
-	info, _ := hostInfoFn()
-	if info == nil {
-		return ""
-	}
-
-	p := strings.ToLower(info.Platform)
-	if p == "" && strings.ToLower(info.OS) == "darwin" {
-		return "darwin"
-	}
-
-	if debianFamily[p] {
-		return "debian"
-	}
-	if rhelFamily[p] {
-		return "rhel"
-	}
-	return p
-}
-
-// IsLinux reports whether the host is any Linux distribution, including
-// debian- and rhel-family hosts. Convenience for collectors that do the
-// same thing on all Linux variants.
+// IsLinux reports whether the host is any Linux distribution. For
+// collectors that do the same thing on each one.
 func IsLinux() bool {
 	p := Detect()
-	return p != "darwin" && p != ""
+	return p != family.Darwin && p != ""
 }
 
 // IsDarwin reports whether the host is macOS.
 func IsDarwin() bool {
-	return Detect() == "darwin"
+	return Detect() == family.Darwin
 }
