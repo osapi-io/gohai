@@ -80,6 +80,19 @@ func (l *Linux) Collect(
 	return &Info{Count: len(procs), Processes: procs}, nil
 }
 
+// Read is the process pid, from its /proc directory alone.
+func (l *Linux) Read(
+	_ context.Context,
+	pid int32,
+) (*Process, error) {
+	p, ok := l.read(pid, bootTime(l.FS), passwd(l.FS), memTotal(l.FS), l.Now().Unix())
+	if !ok {
+		return nil, fmt.Errorf("no process %d", pid)
+	}
+
+	return &p, nil
+}
+
 // read is the process pid, or false when its stat cannot be read.
 func (l *Linux) read(
 	pid int32,
@@ -112,6 +125,7 @@ func (l *Linux) read(
 		}
 		utime, _ := strconv.ParseInt(f[11], 10, 64)
 		stime, _ := strconv.ParseInt(f[12], 10, 64)
+		p.CPUSeconds = float64(utime+stime) / clockTicks
 		if elapsed := now - p.CreationTime; p.CreationTime > 0 && elapsed > 0 {
 			p.CPUPercent = float64(utime+stime) / clockTicks / float64(elapsed) * 100
 		}
