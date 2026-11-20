@@ -39,6 +39,40 @@ type Info struct {
 	HypervisorHost string            `json:"hypervisor_host,omitempty"` // hostname of the hypervisor, when the guest can see it (Hyper-V KVP pool)
 }
 
+// containers are the systems that are containers, by the names the
+// cascade and systemd-detect-virt --container give them. A virtual machine,
+// such as kvm or wsl, is not one.
+var containers = map[string]bool{
+	"docker":         true,
+	"podman":         true,
+	"lxc":            true,
+	"lxc-libvirt":    true,
+	"lxd":            true,
+	"nspawn":         true,
+	"systemd-nspawn": true,
+	"openvz":         true,
+	"linux-vserver":  true,
+	"rkt":            true,
+	"pouch":          true,
+	"proot":          true,
+}
+
+// InContainer reports whether the host runs as a guest of a container
+// system: docker, podman, lxc, nspawn and the others. A host that only
+// runs containers, such as a Docker host, is not in one.
+func (i *Info) InContainer() bool {
+	if i == nil {
+		return false
+	}
+	for name, role := range i.Systems {
+		if role == "guest" && containers[name] {
+			return true
+		}
+	}
+
+	return false
+}
+
 // Collector is the public interface every variant satisfies.
 type Collector interface {
 	collector.Collector
