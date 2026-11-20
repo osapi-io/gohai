@@ -25,11 +25,11 @@ import (
 	"errors"
 	"testing"
 
-	gpdisk "github.com/shirou/gopsutil/v4/disk"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 )
 
@@ -112,93 +112,76 @@ func (s *DiskPublicTestSuite) TestNew() {
 }
 
 func (s *DiskPublicTestSuite) TestCollect() {
+	const ioregLine = "ioreg -r -c IOBlockStorageDriver -d 2 -l -w0"
+	const ioreg = `+-o IOBlockStorageDriver  <class IOBlockStorageDriver, id 0x1>
+      "Statistics" = {"Operations (Read)"=0,"Bytes (Read)"=0}
++-o IOBlockStorageDriver  <class IOBlockStorageDriver, id 0x2>
+  |   "Statistics" = {"Operations (Write)"=20,"Bytes (Read)"=4096,"Total Time (Read)"=3000000,` +
+		`"Total Time (Write)"=5000000,"Bytes (Write)"=8192,"Operations (Read)"=10}
+  +-o APPLE SSD Media  <class IOMedia, id 0x3>
+        "BSD Name" = "disk0"
+        "BSD Name" = "disk0s1"
+`
 	tests := []struct {
-		name         string
-		variant      string
-		fn           func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error)
-		validateFunc func(any, error)
+		name    string
+		variant string
+		files   map[string]string
+		runner  sourcetest.Runner
+		want    *disk.Info
+		wantErr string
 	}{
 		{
-			name:    "linux: sda snapshot",
+			name:    "linux: /proc/diskstats, in file order",
 			variant: "linux",
-			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
-				return map[string]gpdisk.IOCountersStat{
-					"sda": {
-						Name:       "sda",
-						ReadCount:  100,
-						WriteCount: 50,
-						ReadBytes:  102400,
-						WriteBytes: 51200,
-					},
-				}, nil
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*disk.Info)
-				s.Require().True(ok)
-				s.Len(info.Devices, 1)
-			},
+			files: map[string]string{"/proc/diskstats": "" +
+				"   8       0 sda 100 5 2000 30 50 6 4000 70 0 90 100 0 0 0 0\n" +
+				"   8       1 sda1 1 0 8 1 2 0 16 2 0 3 3\n" +
+				"short line\n"},
+			want: &disk.Info{Devices: []disk.Device{
+				{
+					Name: "sda", ReadCount: 100, ReadBytes: 2000 * 512, ReadTime: 30,
+					WriteCount: 50, WriteBytes: 4000 * 512, WriteTime: 70, IoTime: 90,
+				},
+				{
+					Name: "sda1", ReadCount: 1, ReadBytes: 8 * 512, ReadTime: 1,
+					WriteCount: 2, WriteBytes: 16 * 512, WriteTime: 2, IoTime: 3,
+				},
+			}},
 		},
+		{name: "linux: no /proc/diskstats", variant: "linux", wantErr: "read /proc/diskstats"},
 		{
-			name:    "linux: empty devices",
-			variant: "linux",
-			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
-				return map[string]gpdisk.IOCountersStat{}, nil
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*disk.Info)
-				s.Require().True(ok)
-				s.Len(info.Devices, 0)
-			},
-		},
-		{
-			name:    "linux: gopsutil error propagated",
-			variant: "linux",
-			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
-				return nil, errors.New("boom")
-			},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name:    "darwin: disk0 snapshot",
+			name:    "darwin: drivers with media, times in ms",
 			variant: "darwin",
-			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
-				return map[string]gpdisk.IOCountersStat{
-					"disk0": {Name: "disk0", ReadCount: 200, WriteCount: 100},
-				}, nil
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*disk.Info)
-				s.Require().True(ok)
-				s.Len(info.Devices, 1)
-			},
+			runner:  sourcetest.Runner{Out: map[string]string{ioregLine: ioreg}},
+			want: &disk.Info{Devices: []disk.Device{{
+				Name: "disk0", ReadCount: 10, WriteCount: 20, ReadBytes: 4096, WriteBytes: 8192,
+				ReadTime: 3, WriteTime: 5, IoTime: 8,
+			}}},
 		},
 		{
-			name:    "darwin: iokit error propagated",
+			name:    "darwin: ioreg fails",
 			variant: "darwin",
-			fn: func(context.Context, ...string) (map[string]gpdisk.IOCountersStat, error) {
-				return nil, errors.New("iokit unavailable")
-			},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
+			runner:  sourcetest.Runner{Err: map[string]error{ioregLine: errors.New("boom")}},
+			wantErr: "ioreg IOBlockStorageDriver: boom",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer disk.SetIOCountersFn(tt.fn)()
 			var c disk.Collector
 			switch tt.variant {
 			case "linux":
-				c = &disk.Linux{}
+				c = &disk.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &disk.Darwin{}
+				c = &disk.Darwin{Exec: tt.runner}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

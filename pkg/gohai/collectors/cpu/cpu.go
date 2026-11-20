@@ -23,16 +23,15 @@
 package cpu
 
 import (
-	"context"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/avfs/avfs"
-	"github.com/shirou/gopsutil/v4/cpu"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // vulnerabilitiesDir is the sysfs directory whose files enumerate
@@ -147,71 +146,46 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the cpu variant for the host OS.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
-	}
-	return NewLinux()
+	return NewWith(source.Sources{})
 }
 
-// infoFn is the injection seam for gopsutil's cpu.InfoWithContext.
-// Kept private so importers don't transitively need gopsutil. Swapped
-// in tests via SetInfoFn (export_test.go).
-var infoFn = cpu.InfoWithContext
-
-// countsFn is the injection seam for gopsutil's cpu.CountsWithContext.
-// Kept private alongside infoFn. Swapped via SetCountsFn.
-var countsFn = cpu.CountsWithContext
-
-// readCPU is the production bridge to gopsutil. Returns the base Info
-// populated from `/proc/cpuinfo` (Linux) or sysctl (Darwin). Per-OS
-// Collect wrappers layer extensions on top.
-func readCPU(
-	ctx context.Context,
-) (*Info, error) {
-	stats, err := infoFn(ctx)
-	if err != nil {
-		return nil, err
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	info := &Info{}
-	if logical, err := countsFn(ctx, true); err == nil {
-		info.Count = logical
-	}
+
+	return collector.Wire(NewLinux(), src)
+}
+
+// summarize is the Info of the per-CPU entries cpus and the logical CPU
+// count: a socket for each physical id, the cores summed over the
+// entries, and the model of the first entry. A variant overlays what it
+// knows better, such as lscpu's or sysctl's counts.
+func summarize(
+	count int,
+	cpus []CPU,
+) *Info {
+	info := &Info{Count: count, CPUs: cpus}
 	sockets := map[string]struct{}{}
-	var totalCores int32
-	for _, s := range stats {
-		sockets[s.PhysicalID] = struct{}{}
-		totalCores += s.Cores
+	var cores int32
+	for _, c := range cpus {
+		sockets[c.PhysicalID] = struct{}{}
+		cores += c.Cores
 	}
 	info.Sockets = len(sockets)
-	info.Cores = int(totalCores)
-	if len(stats) > 0 {
-		s := stats[0]
-		info.ModelName = s.ModelName
-		info.VendorID = s.VendorID
-		info.Family = s.Family
-		info.ModelID = s.Model
-		info.Stepping = s.Stepping
-		info.Speed = s.Mhz
-		info.CacheSize = s.CacheSize
-		info.Flags = s.Flags
+	info.Cores = int(cores)
+	if len(cpus) > 0 {
+		c := cpus[0]
+		info.ModelName, info.VendorID = c.ModelName, c.VendorID
+		info.Family, info.ModelID, info.Stepping = c.Family, c.ModelID, c.Stepping
+		info.Speed, info.CacheSize, info.Flags = c.Speed, c.CacheSize, c.Flags
 	}
-	info.CPUs = make([]CPU, 0, len(stats))
-	for _, s := range stats {
-		info.CPUs = append(info.CPUs, CPU{
-			VendorID:   s.VendorID,
-			Family:     s.Family,
-			ModelID:    s.Model,
-			ModelName:  s.ModelName,
-			Stepping:   s.Stepping,
-			PhysicalID: s.PhysicalID,
-			CoreID:     s.CoreID,
-			Cores:      s.Cores,
-			Speed:      s.Mhz,
-			CacheSize:  s.CacheSize,
-			Flags:      s.Flags,
-		})
-	}
-	return info, nil
+
+	return info
 }
 
 // readVulnerabilities walks /sys/devices/system/cpu/vulnerabilities/
@@ -460,10 +434,10 @@ func parseCPURange(
 }
 
 // applyLscpuToInfo merges a parsed lscpu summary into the Info built
-// from gopsutil. Caches and NumaNodes are always surfaced when
-// lscpu provides them. Socket / core / thread counts are only
-// overridden on architectures where /proc/cpuinfo (and therefore
-// gopsutil) is known to mis-count — s390x and ppc64le.
+// from /proc/cpuinfo. Caches and NumaNodes are always surfaced when
+// lscpu provides them. Socket, core and thread counts are only
+// overridden on architectures where /proc/cpuinfo is known to
+// mis-count: s390x and ppc64le.
 func applyLscpuToInfo(
 	info *Info,
 	s lscpuSummary,

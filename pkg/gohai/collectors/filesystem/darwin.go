@@ -22,19 +22,29 @@ package filesystem
 
 import (
 	"context"
+	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects mounted filesystem data on macOS via gopsutil
-// (which uses the BSD getfsstat syscall).
+// mountLineRE is a line of macOS mount: "/dev/disk3s1s1 on / (apfs,
+// sealed, local)". The device and the mountpoint can hold spaces.
+var mountLineRE = regexp.MustCompile(`^(.*) on (.*) \(([^,)]+)(?:, ([^)]*))?\)$`)
+
+// Darwin collects mounted filesystems on macOS: the mount table from
+// mount, and the sizes and inodes from df -ki.
 type Darwin struct {
 	base
+
+	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant.
+// NewDarwin returns a Darwin variant that runs the host's mount and df.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{Exec: executor.New()}
 }
 
 // Collect returns filesystem Info.
@@ -42,9 +52,34 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	mounts, err := listMounts(ctx)
+	out, err := d.Exec.Execute(ctx, "mount")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("mount: %w", err)
 	}
+	mounts := []Mount{}
+	var points []string
+	for _, line := range strings.Split(string(out), "\n") {
+		m := mountLineRE.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		mount := Mount{Device: m[1], Mountpoint: m[2], Type: m[3]}
+		if m[4] != "" {
+			mount.Opts = strings.Split(m[4], ", ")
+		}
+		mounts = append(mounts, mount)
+		points = append(points, mount.Mountpoint)
+	}
+	// df exits non-zero when one mount cannot be read, and still prints
+	// the others.
+	df, _ := d.Exec.Execute(ctx, "df", "-ki")
+	rows := dfRows(df, points, 7)
+	for i := range mounts {
+		if r, ok := rows[mounts[i].Mountpoint]; ok {
+			usage(&mounts[i], r[0], r[1], r[2])
+			inodes(&mounts[i], r[4], r[5])
+		}
+	}
+
 	return &Info{Mounts: mounts}, nil
 }

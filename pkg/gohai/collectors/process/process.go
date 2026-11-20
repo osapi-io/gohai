@@ -22,12 +22,8 @@
 package process
 
 import (
-	"context"
-
-	"github.com/shirou/gopsutil/v4/process"
-
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds a snapshot of running processes.
@@ -65,63 +61,35 @@ func (base) Category() string { return collector.CategoryMisc }
 func (base) DefaultEnabled() bool   { return false }
 func (base) Dependencies() []string { return nil }
 
-// New returns the process variant for the host OS. gopsutil's process
-// package works cross-platform — both variants share listing logic.
+// New returns the process variant for the host OS: Linux reads /proc,
+// and macOS runs ps.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
-	}
-	return NewLinux()
+	return NewWith(source.Sources{})
 }
 
-// processesFn is the injection seam for gopsutil's
-// process.ProcessesWithContext. Kept private so importers don't
-// transitively need gopsutil. Swapped via SetProcessesFn.
-var processesFn = process.ProcessesWithContext
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
+	}
 
-// listProcesses is the production bridge to gopsutil. Factored as a
-// named function so factories can assign it as a plain function
-// reference (no closure body). Tests inject a stub and don't touch
-// this directly.
-func listProcesses(
-	ctx context.Context,
-) ([]Process, error) {
-	ps, err := processesFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Process, 0, len(ps))
-	for _, p := range ps {
-		out = append(out, snapshotFromGopsutil(p))
-	}
-	return out, nil
+	return collector.Wire(NewLinux(), src)
 }
 
-// snapshotFromGopsutil maps a *gopsutil.Process onto our Process
-// struct. Per-field read errors (access denied, zombie state, etc.)
-// leave the corresponding field zero-valued.
-func snapshotFromGopsutil(
-	p *process.Process,
-) Process {
-	out := Process{PID: p.Pid}
-	if ppid, err := p.Ppid(); err == nil {
-		out.ParentPID = ppid
-	}
-	if n, err := p.Name(); err == nil {
-		out.Name = n
-	}
-	if u, err := p.Username(); err == nil {
-		out.Owner = u
-	}
-	if cl, err := p.Cmdline(); err == nil {
-		out.CmdLine = cl
-	}
-	if st, err := p.Status(); err == nil && len(st) > 0 {
-		out.State = st[0]
-	}
-	if ct, err := p.CreateTime(); err == nil && ct > 0 {
-		// gopsutil returns ms since epoch; convert to seconds.
-		out.CreationTime = ct / 1000
-	}
-	return out
+// states are the words for a process state letter, as gopsutil names
+// them: R is running, S is sleep, and so on.
+var states = map[byte]string{
+	'R': "running", 'S': "sleep", 'I': "idle", 'D': "blocked", 'T': "stop",
+	't': "stop", 'W': "wait", 'Z': "zombie", 'L': "lock",
+}
+
+// state is the word for the first letter of s, which is not empty, or ""
+// for a letter that has none.
+func state(
+	s string,
+) string {
+	return states[s[0]]
 }

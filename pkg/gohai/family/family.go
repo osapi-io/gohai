@@ -34,7 +34,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/shirou/gopsutil/v4/host"
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 )
 
 // The families. Each is a value Of and Detect return.
@@ -135,25 +136,47 @@ func Of(
 	return ""
 }
 
-// hostInfoFn reads the host's platform. Swapped in tests.
-var hostInfoFn = host.Info
+// osRelease names the distribution: its ID line is the platform.
+const osRelease = "/etc/os-release"
+
+// hostFS is the filesystem Detect reads. Swapped in tests.
+var hostFS avfs.VFS = osfs.NewWithNoIdm()
 
 // goos is the operating system the binary runs on. Swapped in tests.
 var goos = runtime.GOOS
 
 // Detect is the family of this host: darwin on macOS, else the family of
-// its platform. A Linux host whose platform has no family returns its
-// platform, so a caller can still tell it is Linux, and "" is a host that
-// could not be read.
+// the platform that /etc/os-release names. A Linux host whose platform has
+// no family returns its platform, so a caller can still tell it is Linux,
+// and "" is a host whose /etc/os-release could not be read.
 func Detect() string {
 	if goos == Darwin {
 		return Darwin
 	}
-	info, _ := hostInfoFn()
-	if info == nil || info.Platform == "" {
+
+	return FromOSRelease(hostFS)
+}
+
+// FromOSRelease is the family of the Linux host whose filesystem is fs:
+// the family of the platform its /etc/os-release ID names, the platform
+// itself when it has no family, or "" when the file has no ID.
+func FromOSRelease(
+	fs avfs.VFS,
+) string {
+	data, err := fs.ReadFile(osRelease)
+	if err != nil {
 		return ""
 	}
-	p := Platform(info.Platform)
+	var id string
+	for _, line := range strings.Split(string(data), "\n") {
+		if v, ok := strings.CutPrefix(line, "ID="); ok {
+			id = strings.Trim(strings.TrimSpace(v), `"'`)
+		}
+	}
+	if id == "" {
+		return ""
+	}
+	p := Platform(id)
 	if f := Of(p); f != "" {
 		return f
 	}

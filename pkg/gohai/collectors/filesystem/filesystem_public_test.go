@@ -27,7 +27,6 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
-	gpdisk "github.com/shirou/gopsutil/v4/disk"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -35,6 +34,7 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 )
 
@@ -235,58 +235,36 @@ func (s *FilesystemPublicTestSuite) TestNew() {
 }
 
 func (s *FilesystemPublicTestSuite) TestCollect() {
-	baseParts := []gpdisk.PartitionStat{
-		{Device: "/dev/sda1", Mountpoint: "/", Fstype: "ext4"},
-		{Device: "/dev/sda2", Mountpoint: "/boot", Fstype: "ext4"},
+	const dfHead = "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
+	baseMounts := "/dev/sda1 / ext4 rw,relatime 0 0\n/dev/sda2 /boot ext4 rw 0 0\nshort line\n"
+	baseDF := map[string]string{
+		"df -kP": dfHead + "/dev/sda1 100 50 50 50% /\n/dev/sda2 10 0 10 0% /boot\n",
+		"df -iP": "Filesystem Inodes IUsed IFree IUse% Mounted on\n/dev/sda1 1000 250 750 25% /\n" +
+			"short /\n/dev/sda2 a b c d% /boot\n",
 	}
-	okPartitions := func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-		return baseParts, nil
-	}
-	okUsage := func(_ context.Context, mp string) (*gpdisk.UsageStat, error) {
-		if mp == "/" {
-			return &gpdisk.UsageStat{
-				Total:             100,
-				Used:              50,
-				Free:              50,
-				UsedPercent:       50,
-				InodesTotal:       1000,
-				InodesUsed:        250,
-				InodesFree:        750,
-				InodesUsedPercent: 25,
-			}, nil
-		}
-		return &gpdisk.UsageStat{}, nil
-	}
-	darwinParts := []gpdisk.PartitionStat{
-		{
-			Device:     "/dev/disk3s1",
-			Mountpoint: "/",
-			Fstype:     "apfs",
-			Opts:       []string{"rw"},
-		},
-	}
-	darwinPartitions := func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-		return darwinParts, nil
-	}
-	darwinUsage := func(context.Context, string) (*gpdisk.UsageStat, error) {
-		return &gpdisk.UsageStat{Total: 500, Used: 200, Free: 300, UsedPercent: 40}, nil
+	btrfsMount := "/dev/sda1 / btrfs rw 0 0\n"
+	darwinOut := map[string]string{
+		"mount": "/dev/disk3s1 on / (apfs, local, journaled)\nnot a mount line\n",
+		"df -ki": "Filesystem 1024-blocks Used Available Capacity iused ifree %iused Mounted on\n" +
+			"/dev/disk3s1 500 200 300 40% 10 90 10% /\n",
 	}
 
 	tests := []struct {
 		name         string
 		variant      string
-		partitionsFn func(context.Context, bool) ([]gpdisk.PartitionStat, error)
-		usageFn      func(context.Context, string) (*gpdisk.UsageStat, error)
+		mounts       string            // /proc/mounts on Linux
+		out          map[string]string // df on Linux; mount and df on macOS
+		errs         map[string]error
 		exec         func(*testing.T) executor.Executor
 		fs           avfs.VFS // optional; nil → btrfs sysfs reads short-circuit
 		validateFunc func(any, error)
 	}{
 		{
-			name:         "linux: no lsblk, mounts unchanged no unmounted",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
-			exec:         func(t *testing.T) executor.Executor { return noLsblkExec(t) },
+			name:    "linux: no lsblk, mounts unchanged no unmounted",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
+			exec:    func(t *testing.T) executor.Executor { return noLsblkExec(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -299,10 +277,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: lsblk merges uuid/label into matching mounts",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
+			name:    "linux: lsblk merges uuid/label into matching mounts",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda","fstype":null,"children":[
@@ -325,10 +303,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: lsblk unmounted entry surfaces as Unmounted",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
+			name:    "linux: lsblk unmounted entry surfaces as Unmounted",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda","fstype":null,"children":[
@@ -351,10 +329,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: lsblk node with empty fstype ignored (raw disk)",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
+			name:    "linux: lsblk node with empty fstype ignored (raw disk)",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda","fstype":"","children":[
@@ -371,10 +349,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: lsblk entry with mountpoint but not in gopsutil mounts is ignored",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
+			name:    "linux: lsblk entry with mountpoint but not in /proc/mounts is ignored",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sdc1","fstype":"ext4","uuid":"u","label":"","mountpoint":"/mnt/foo","partuuid":"","partlabel":""}
@@ -388,11 +366,11 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: malformed lsblk json, extension silently skipped",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
-			exec:         func(t *testing.T) executor.Executor { return lsblkExec(t, `not json`) },
+			name:    "linux: malformed lsblk json, extension silently skipped",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
+			exec:    func(t *testing.T) executor.Executor { return lsblkExec(t, `not json`) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -403,11 +381,11 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: nil Exec, extension skipped cleanly",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
-			exec:         func(*testing.T) executor.Executor { return nil },
+			name:    "linux: nil Exec, extension skipped cleanly",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
+			exec:    func(*testing.T) executor.Executor { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -417,25 +395,19 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: gopsutil partitions error propagated",
+			name:    "linux: no /proc/mounts",
 			variant: "linux",
-			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-				return nil, errors.New("partitions error")
-			},
-			usageFn: okUsage,
+			out:     baseDF,
 			exec:    func(t *testing.T) executor.Executor { return noLsblkExec(t) },
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
 			},
 		},
 		{
-			name:         "linux: usage error keeps mount without usage",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
-				return nil, errors.New("usage failed")
-			},
-			exec: func(t *testing.T) executor.Executor { return noLsblkExec(t) },
+			name:    "linux: df fails, mounts kept without usage",
+			variant: "linux",
+			mounts:  baseMounts,
+			exec:    func(t *testing.T) executor.Executor { return noLsblkExec(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -445,10 +417,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: ZFS datasets parsed with pool + nested + mountpoints",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
+			name:    "linux: ZFS datasets parsed with pool + nested + mountpoints",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
 			exec: func(t *testing.T) executor.Executor {
 				// tab-separated `zfs get -p -H all` — realistic subset
 				// covering pool root + nested fs + snapshot (mountpoint
@@ -508,10 +480,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: zfs binary present but empty output yields no datasets",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
+			name:    "linux: zfs binary present but empty output yields no datasets",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkZFSExec(t, "", "")
 			},
@@ -523,10 +495,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "linux: zfs malformed line skipped, well-formed line parsed",
-			variant:      "linux",
-			partitionsFn: okPartitions,
-			usageFn:      okUsage,
+			name:    "linux: zfs malformed line skipped, well-formed line parsed",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkZFSExec(
 					t,
@@ -546,14 +518,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: btrfs mount enriched with allocation + raid profile",
 			variant: "linux",
-			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
-				}, nil
-			},
-			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
-				return &gpdisk.UsageStat{Total: 1, Used: 0}, nil
-			},
+			mounts:  btrfsMount,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"abc-123","mountpoint":"/"}
@@ -583,14 +548,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: btrfs single profile recognised + zero-byte file tolerated",
 			variant: "linux",
-			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
-				}, nil
-			},
-			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
-				return &gpdisk.UsageStat{}, nil
-			},
+			mounts:  btrfsMount,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"single-fs","mountpoint":"/"}
@@ -614,14 +572,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: btrfs mount without /sys/fs/btrfs entry leaves Btrfs nil",
 			variant: "linux",
-			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
-				}, nil
-			},
-			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
-				return &gpdisk.UsageStat{}, nil
-			},
+			mounts:  btrfsMount,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"missing","mountpoint":"/"}
@@ -638,14 +589,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: btrfs bg dirs exist but with no profile + missing files",
 			variant: "linux",
-			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
-				}, nil
-			},
-			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
-				return &gpdisk.UsageStat{}, nil
-			},
+			mounts:  btrfsMount,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"empty-files","mountpoint":"/"}
@@ -674,14 +618,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: btrfs allocation root exists but no bg subdirs yields nil Btrfs",
 			variant: "linux",
-			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "btrfs"},
-				}, nil
-			},
-			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
-				return &gpdisk.UsageStat{}, nil
-			},
+			mounts:  btrfsMount,
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"empty-bg","mountpoint":"/"}
@@ -702,14 +639,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: non-btrfs mount left alone even with FS configured",
 			variant: "linux",
-			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-				return []gpdisk.PartitionStat{
-					{Device: "/dev/sda1", Mountpoint: "/", Fstype: "ext4"},
-				}, nil
-			},
-			usageFn: func(context.Context, string) (*gpdisk.UsageStat, error) {
-				return &gpdisk.UsageStat{}, nil
-			},
+			mounts:  "/dev/sda1 / ext4 rw 0 0\n",
 			exec: func(t *testing.T) executor.Executor {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"ext4","uuid":"ext-uuid","mountpoint":"/"}
@@ -724,10 +654,9 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:         "darwin: APFS root populated",
-			variant:      "darwin",
-			partitionsFn: darwinPartitions,
-			usageFn:      darwinUsage,
+			name:    "darwin: APFS root populated",
+			variant: "darwin",
+			out:     darwinOut,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -735,16 +664,15 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Mounts, 1)
 				s.Equal("/dev/disk3s1", i.Mounts[0].Device)
 				s.Equal("apfs", i.Mounts[0].Type)
-				s.Equal(uint64(500), i.Mounts[0].Total)
+				s.Equal(uint64(500*1024), i.Mounts[0].Total)
+				s.Equal([]string{"local", "journaled"}, i.Mounts[0].Opts)
+				s.Equal(uint64(100), i.Mounts[0].InodesTotal)
 			},
 		},
 		{
-			name:    "darwin: gopsutil error wrapped and returned",
+			name:    "darwin: mount fails",
 			variant: "darwin",
-			partitionsFn: func(context.Context, bool) ([]gpdisk.PartitionStat, error) {
-				return nil, errors.New("getfsstat failed")
-			},
-			usageFn: darwinUsage,
+			errs:    map[string]error{"mount": errors.New("mount failed")},
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
 			},
@@ -752,16 +680,50 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer filesystem.SetPartitionsFn(tt.partitionsFn)()
-			defer filesystem.SetUsageFn(tt.usageFn)()
 			var c filesystem.Collector
 			switch tt.variant {
 			case "linux":
-				c = &filesystem.Linux{FS: tt.fs, Exec: tt.exec(s.T())}
+				fs := tt.fs
+				if fs == nil {
+					fs = memfs.New()
+				}
+				if tt.mounts != "" {
+					s.Require().NoError(fs.MkdirAll("/proc", 0o755))
+					s.Require().NoError(fs.WriteFile("/proc/mounts", []byte(tt.mounts), 0o644))
+				}
+				var exec executor.Executor
+				if tt.exec != nil {
+					if mock := tt.exec(s.T()); mock != nil {
+						exec = dfRunner{
+							Executor: mock,
+							df:       sourcetest.Runner{Out: tt.out, Err: tt.errs},
+						}
+					}
+				}
+				c = &filesystem.Linux{FS: fs, Exec: exec}
 			case "darwin":
-				c = &filesystem.Darwin{}
+				c = &filesystem.Darwin{Exec: sourcetest.Runner{Out: tt.out, Err: tt.errs}}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
+}
+
+// dfRunner answers df from df, and passes each other command to the
+// Executor, the lsblk and zfs mock of a row.
+type dfRunner struct {
+	executor.Executor
+	df sourcetest.Runner
+}
+
+func (r dfRunner) Execute(
+	ctx context.Context,
+	name string,
+	args ...string,
+) ([]byte, error) {
+	if name == "df" {
+		return r.df.Execute(ctx, name, args...)
+	}
+
+	return r.Executor.Execute(ctx, name, args...)
 }

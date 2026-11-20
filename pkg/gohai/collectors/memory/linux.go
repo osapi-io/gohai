@@ -23,6 +23,7 @@ package memory
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -33,14 +34,8 @@ import (
 
 const procMeminfoPath = "/proc/meminfo"
 
-// Linux collects memory usage on Linux. gopsutil's mem.VirtualMemory
-// parses /proc/meminfo and exposes 27+ fields on its cross-platform
-// struct; we forward every relevant field. Fields gopsutil hides
-// behind its linux-only ExLinux type (Active(anon/file),
-// Inactive(anon/file), Unevictable, KernelStack, Percpu) and fields
-// it doesn't parse at all (Hugetlb, DirectMap4k/2M/1G, AnonPages,
-// KReclaimable, Shmem) come from our own /proc/meminfo pass read
-// through the injected avfs.VFS.
+// Linux collects memory usage on Linux: every field of /proc/meminfo,
+// read through the injected avfs.VFS, as Ohai reads it.
 type Linux struct {
 	base
 
@@ -52,84 +47,110 @@ func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns the memory Info. gopsutil provides the base; our
-// /proc/meminfo extension fills the gaps.
+// Collect returns the memory Info, from /proc/meminfo.
 func (l *Linux) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info, err := readMemory(ctx)
+	b, err := l.FS.ReadFile(procMeminfoPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read %s: %w", procMeminfoPath, err)
 	}
-	if l.FS != nil {
-		if b, err := l.FS.ReadFile(procMeminfoPath); err == nil {
-			applyMeminfoExtension(info, b)
-		}
-	}
-	return info, nil
+
+	return readMeminfo(b), nil
 }
 
-// applyMeminfoExtension parses /proc/meminfo for the fields gopsutil
-// doesn't expose on its cross-platform VirtualMemoryStat struct. Keys
-// we already populate from gopsutil are ignored to avoid double-work.
-// All values are reported in kB by the kernel; we multiply by 1024.
-func applyMeminfoExtension(
-	info *Info,
+// readMeminfo is the Info of /proc/meminfo. The kernel reports kB, and
+// Info holds bytes. Available, Used and Cached follow gopsutil: Cached
+// includes SReclaimable, Available is Cached + Free on a kernel without
+// MemAvailable, and Used is Total less Available.
+func readMeminfo(
 	raw []byte,
-) {
+) *Info {
+	kv := map[string]uint64{}
 	sc := bufio.NewScanner(strings.NewReader(string(raw)))
 	for sc.Scan() {
-		key, val, ok := parseMeminfoLine(sc.Text())
-		if !ok {
-			continue
-		}
-		switch key {
-		case "Active(anon)":
-			info.ActiveAnon = val
-		case "Inactive(anon)":
-			info.InactiveAnon = val
-		case "Active(file)":
-			info.ActiveFile = val
-		case "Inactive(file)":
-			info.InactiveFile = val
-		case "Unevictable":
-			info.Unevictable = val
-		case "KernelStack":
-			info.KernelStack = val
-		case "Percpu":
-			info.PerCPU = val
-		case "KReclaimable":
-			info.KReclaimable = val
-		case "AnonPages":
-			info.AnonPages = val
-		case "Shmem":
-			info.Shmem = val
-		case "HighTotal":
-			info.HighTotal = val
-		case "HighFree":
-			info.HighFree = val
-		case "LowTotal":
-			info.LowTotal = val
-		case "LowFree":
-			info.LowFree = val
-		case "NFS_Unstable":
-			info.NFSUnstable = val
-		case "Bounce":
-			info.Bounce = val
-		case "Hugetlb":
-			if info.HugePages == nil {
-				info.HugePages = &Hugepages{}
-			}
-			info.HugePages.Hugetlb = val
-		case "DirectMap4k":
-			ensureDirectMap(info).Map4k = val
-		case "DirectMap2M":
-			ensureDirectMap(info).Map2M = val
-		case "DirectMap1G":
-			ensureDirectMap(info).Map1G = val
+		if key, val, ok := parseMeminfoLine(sc.Text()); ok {
+			kv[key] = val
 		}
 	}
+	info := &Info{
+		Total:        kv["MemTotal"],
+		Free:         kv["MemFree"],
+		Available:    kv["MemAvailable"],
+		Buffers:      kv["Buffers"],
+		Cached:       kv["Cached"] + kv["SReclaimable"],
+		Active:       kv["Active"],
+		Inactive:     kv["Inactive"],
+		ActiveAnon:   kv["Active(anon)"],
+		InactiveAnon: kv["Inactive(anon)"],
+		ActiveFile:   kv["Active(file)"],
+		InactiveFile: kv["Inactive(file)"],
+		Unevictable:  kv["Unevictable"],
+		Dirty:        kv["Dirty"],
+		WriteBack:    kv["Writeback"],
+		WriteBackTmp: kv["WritebackTmp"],
+		Shared:       kv["Shmem"],
+		Shmem:        kv["Shmem"],
+		Mapped:       kv["Mapped"],
+		AnonPages:    kv["AnonPages"],
+		Slab:         kv["Slab"],
+		SReclaimable: kv["SReclaimable"],
+		SUnreclaim:   kv["SUnreclaim"],
+		KReclaimable: kv["KReclaimable"],
+		PageTables:   kv["PageTables"],
+		KernelStack:  kv["KernelStack"],
+		PerCPU:       kv["Percpu"],
+		HighTotal:    kv["HighTotal"],
+		HighFree:     kv["HighFree"],
+		LowTotal:     kv["LowTotal"],
+		LowFree:      kv["LowFree"],
+		NFSUnstable:  kv["NFS_Unstable"],
+		Bounce:       kv["Bounce"],
+		CommitLimit:  kv["CommitLimit"],
+		CommittedAS:  kv["Committed_AS"],
+		VmallocTotal: kv["VmallocTotal"],
+		VmallocUsed:  kv["VmallocUsed"],
+		VmallocChunk: kv["VmallocChunk"],
+	}
+	if _, ok := kv["MemAvailable"]; !ok {
+		info.Available = info.Cached + info.Free
+	}
+	if info.Total > 0 && info.Available <= info.Total {
+		info.Used = info.Total - info.Available
+		info.UsedPercent = float64(info.Used) / float64(info.Total) * 100
+	}
+	_, hugetlb := kv["Hugetlb"]
+	if kv["HugePages_Total"] > 0 || kv["Hugepagesize"] > 0 || kv["AnonHugePages"] > 0 || hugetlb {
+		info.HugePages = &Hugepages{
+			Total:         kv["HugePages_Total"],
+			Free:          kv["HugePages_Free"],
+			Reserved:      kv["HugePages_Rsvd"],
+			Surplus:       kv["HugePages_Surp"],
+			Size:          kv["Hugepagesize"],
+			AnonHugePages: kv["AnonHugePages"],
+			Hugetlb:       kv["Hugetlb"],
+		}
+	}
+	for key, set := range map[string]func(*DirectMap, uint64){
+		"DirectMap4k": func(d *DirectMap, v uint64) { d.Map4k = v },
+		"DirectMap2M": func(d *DirectMap, v uint64) { d.Map2M = v },
+		"DirectMap1G": func(d *DirectMap, v uint64) { d.Map1G = v },
+	} {
+		if v, ok := kv[key]; ok {
+			set(ensureDirectMap(info), v)
+		}
+	}
+	if total := kv["SwapTotal"]; total > 0 {
+		free := kv["SwapFree"]
+		info.Swap = &Swap{
+			Total: total, Free: free, Used: total - free,
+			UsedPercent: float64(total-free) / float64(total) * 100,
+			Cached:      kv["SwapCached"],
+		}
+	}
+
+	return info
 }
 
 // ensureDirectMap lazy-allocates the DirectMap sub-struct.

@@ -22,10 +22,10 @@ package sessions_test
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -33,6 +33,7 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 )
 
@@ -143,22 +144,23 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			"\n" +
 			"  bad-line\n",
 	)
-	utmpUsers := []host.UserStat{
-		{User: "fallback", Terminal: "pts/0", Host: "10.0.0.1", Started: 1712908800},
-	}
+	utmp := map[string]string{"/var/run/utmp": string(linuxUtmp(
+		utmpRecord{typ: 8, user: "gone"},
+		utmpRecord{typ: 7, user: "fallback", line: "pts/0", host: "10.0.0.1", sec: 1712908800},
+	))}
 
 	tests := []struct {
 		name         string
 		variant      string
 		exec         func(*testing.T) executor.Executor
-		usersFn      func(context.Context) ([]host.UserStat, error)
+		files        map[string]string
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: loginctl present, parses sessions ignores utmp",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, loginctlOutput, nil) },
-			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
+			files:   utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
@@ -174,12 +176,12 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: loginctl missing, falls back to utmp via gopsutil",
+			name:    "linux: loginctl missing, falls back to utmp",
 			variant: "linux",
 			exec: func(t *testing.T) executor.Executor {
 				return loginctlExec(t, nil, errors.New("not found"))
 			},
-			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
+			files: utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
@@ -194,7 +196,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			name:    "linux: nil Exec, utmp path direct",
 			variant: "linux",
 			exec:    func(*testing.T) executor.Executor { return nil },
-			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
+			files:   utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
@@ -207,7 +209,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			name:    "linux: loginctl returns empty output, empty session list not fallback",
 			variant: "linux",
 			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, []byte(""), nil) },
-			usersFn: func(context.Context) ([]host.UserStat, error) { return utmpUsers, nil },
+			files:   utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
@@ -216,13 +218,10 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: loginctl missing AND gopsutil errors propagate",
+			name:    "linux: loginctl missing AND no utmp file",
 			variant: "linux",
 			exec: func(t *testing.T) executor.Executor {
 				return loginctlExec(t, nil, errors.New("not found"))
-			},
-			usersFn: func(context.Context) ([]host.UserStat, error) {
-				return nil, errors.New("utmp boom")
 			},
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
@@ -231,11 +230,10 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: console session",
 			variant: "darwin",
-			usersFn: func(context.Context) ([]host.UserStat, error) {
-				return []host.UserStat{
-					{User: "john", Terminal: "console", Started: 1712908800},
-				}, nil
-			},
+			files: map[string]string{"/var/run/utmpx": string(darwinUtmpx(
+				utmpRecord{typ: 2},
+				utmpRecord{typ: 7, user: "john", line: "console", sec: 1712908800},
+			))},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
@@ -247,11 +245,8 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: gopsutil error wrapped and returned",
+			name:    "darwin: no utmpx file",
 			variant: "darwin",
-			usersFn: func(context.Context) ([]host.UserStat, error) {
-				return nil, errors.New("utmpx error")
-			},
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
 			},
@@ -259,15 +254,61 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer sessions.SetUsersFn(tt.usersFn)()
+			fs := sourcetest.FS(s.T(), tt.files)
 			var c sessions.Collector
 			switch tt.variant {
 			case "linux":
-				c = &sessions.Linux{Exec: tt.exec(s.T())}
+				c = &sessions.Linux{Exec: tt.exec(s.T()), FS: fs}
 			case "darwin":
-				c = &sessions.Darwin{}
+				c = &sessions.Darwin{FS: fs}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
+}
+
+// utmpRecord is one session record to write into a test utmp file.
+type utmpRecord struct {
+	typ              uint16
+	user, line, host string
+	sec              uint32
+}
+
+// record lays r out in size bytes at the given offsets.
+func record(
+	r utmpRecord,
+	size, typ, line, user, host, sec int,
+) []byte {
+	b := make([]byte, size)
+	binary.LittleEndian.PutUint16(b[typ:], r.typ)
+	copy(b[line:], r.line)
+	copy(b[user:], r.user)
+	copy(b[host:], r.host)
+	binary.LittleEndian.PutUint32(b[sec:], r.sec)
+
+	return b
+}
+
+// linuxUtmp is a glibc utmp file of rs.
+func linuxUtmp(
+	rs ...utmpRecord,
+) []byte {
+	b := make([]byte, 0, 384*len(rs))
+	for _, r := range rs {
+		b = append(b, record(r, 384, 0, 8, 44, 76, 340)...)
+	}
+
+	return b
+}
+
+// darwinUtmpx is a Darwin utmpx file of rs: a header record, then rs.
+func darwinUtmpx(
+	rs ...utmpRecord,
+) []byte {
+	b := make([]byte, 628, 628*(len(rs)+1))
+	for _, r := range rs {
+		b = append(b, record(r, 628, 296, 260, 0, 308, 300)...)
+	}
+
+	return b
 }

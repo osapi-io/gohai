@@ -22,6 +22,7 @@ package timezone
 
 import (
 	"context"
+	"time"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -41,12 +42,13 @@ const timezonePath = "/etc/timezone"
 type Linux struct {
 	base
 
-	FS avfs.VFS
+	FS  avfs.VFS
+	Now func() time.Time
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Now: time.Now}
 }
 
 // Collect returns the timezone Info. Never errors — missing sources
@@ -55,7 +57,7 @@ func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	abbrev, offset := clockZone()
+	abbrev, offset := clockZone(l.Now)
 	name := resolveName(
 		l.FS.Readlink,
 		func() (string, error) {

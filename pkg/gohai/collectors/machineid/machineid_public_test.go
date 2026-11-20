@@ -23,16 +23,13 @@ package machineid_test
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"testing"
 
-	"github.com/avfs/avfs"
-	"github.com/avfs/avfs/vfs/memfs"
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/machineid"
 )
 
@@ -115,132 +112,74 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 }
 
 func (s *MachineIDPublicTestSuite) TestCollect() {
-	const dbusPath = "/var/lib/dbus/machine-id"
+	const ioregLine = "ioreg -rd1 -c IOPlatformExpertDevice"
 	tests := []struct {
-		name         string
-		variant      string
-		hostFn       func(context.Context) (*host.InfoStat, error)
-		dbus         string // empty → file absent
-		validateFunc func(any, error)
+		name    string
+		variant string
+		files   map[string]string
+		runner  sourcetest.Runner
+		want    *machineid.Info
+		wantErr string
 	}{
 		{
-			name:    "linux: gopsutil returns /etc/machine-id → use it",
-			variant: "linux",
-			hostFn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{HostID: "gopsutil-id"}, nil
+			name: "linux: /etc/machine-id first", variant: "linux",
+			files: map[string]string{
+				"/etc/machine-id":          "abc123\n",
+				"/var/lib/dbus/machine-id": "dbus456\n",
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*machineid.Info)
-				s.Require().True(ok)
-				s.Equal("gopsutil-id", info.ID)
-			},
+			want: &machineid.Info{ID: "abc123"},
 		},
 		{
-			name:    "linux: gopsutil empty, dbus fallback wins",
-			variant: "linux",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
-			dbus:    "dbus-id\n",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*machineid.Info)
-				s.Require().True(ok)
-				s.Equal("dbus-id", info.ID)
+			name: "linux: an empty /etc/machine-id falls to dbus", variant: "linux",
+			files: map[string]string{
+				"/etc/machine-id":          "\n",
+				"/var/lib/dbus/machine-id": "dbus456\n",
 			},
+			want: &machineid.Info{ID: "dbus456"},
 		},
 		{
-			name:    "linux: gopsutil empty, dbus missing → empty ID (no error)",
-			variant: "linux",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*machineid.Info)
-				s.Require().True(ok)
-				s.Equal("", info.ID)
-			},
+			name: "linux: the DMI product UUID, in lower case", variant: "linux",
+			files: map[string]string{"/sys/class/dmi/id/product_uuid": "4C4C4544-0042\n"},
+			want:  &machineid.Info{ID: "4c4c4544-0042"},
 		},
+		{name: "linux: no ID anywhere", variant: "linux", want: &machineid.Info{}},
 		{
-			name:    "linux: gopsutil empty, dbus whitespace-only → empty ID",
-			variant: "linux",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return &host.InfoStat{}, nil },
-			dbus:    "   \n",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*machineid.Info)
-				s.Require().True(ok)
-				s.Equal("", info.ID)
-			},
-		},
-		{
-			name:    "linux: gopsutil nil info returns empty",
-			variant: "linux",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, nil },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*machineid.Info)
-				s.Require().True(ok)
-				s.Equal("", info.ID)
-			},
-		},
-		{
-			name:    "linux: gopsutil error wrapped and returned",
-			variant: "linux",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name:    "darwin: gopsutil returns IOPlatformUUID",
+			name:    "darwin: IOPlatformUUID",
 			variant: "darwin",
-			hostFn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{HostID: "iokit-uuid-1234"}, nil
+			runner: sourcetest.Runner{
+				Out: map[string]string{ioregLine: "+-o J316sAP  <class IOPlatformExpertDevice>\n" +
+					"    {\n      \"IOPlatformUUID\" = \"052A2E50-1749-5FAA-0000-000000000000\"\n    }\n"},
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*machineid.Info)
-				s.Require().True(ok)
-				s.Equal("iokit-uuid-1234", info.ID)
-			},
+			want: &machineid.Info{ID: "052A2E50-1749-5FAA-0000-000000000000"},
 		},
 		{
-			name:    "darwin: nil info returns empty",
-			variant: "darwin",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, nil },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*machineid.Info)
-				s.Require().True(ok)
-				s.Equal("", info.ID)
-			},
+			name: "darwin: no UUID in the output", variant: "darwin",
+			runner: sourcetest.Runner{Out: map[string]string{ioregLine: "{}\n"}},
+			want:   &machineid.Info{},
 		},
 		{
-			name:    "darwin: gopsutil error wrapped and returned",
-			variant: "darwin",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
+			name: "darwin: ioreg fails", variant: "darwin",
+			runner:  sourcetest.Runner{Err: map[string]error{ioregLine: errors.New("boom")}},
+			wantErr: "ioreg IOPlatformExpertDevice: boom",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer machineid.SetHostInfoFn(tt.hostFn)()
 			var c machineid.Collector
 			switch tt.variant {
 			case "linux":
-				var vfs avfs.VFS = memfs.New()
-				if tt.dbus != "" {
-					f := memfs.New()
-					_ = f.MkdirAll("/var/lib/dbus", 0o755)
-					_ = f.WriteFile(dbusPath, []byte(tt.dbus), fs.FileMode(0o644))
-					vfs = f
-				}
-				c = &machineid.Linux{FS: vfs}
+				c = &machineid.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &machineid.Darwin{}
+				c = &machineid.Darwin{Exec: tt.runner}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

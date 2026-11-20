@@ -23,27 +23,31 @@ package sessions
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin collects logged-in sessions on macOS via gopsutil (utmpx).
-// loginctl does not exist on Darwin so there's no exec path; gopsutil
-// reads utmpx directly through the package-level usersFn seam.
+// Darwin collects logged-in sessions on macOS from /var/run/utmpx. macOS
+// has no loginctl.
 type Darwin struct {
 	base
+
+	FS avfs.VFS
 }
 
-// NewDarwin returns a Darwin variant.
+// NewDarwin returns a Darwin variant that reads the host's filesystem.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect returns logged-in session Info.
 func (d *Darwin) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	ss, err := listSessions(ctx)
+	ss, err := readUtmp(d.FS, utmpxPath, darwinUtmpx)
 	if err != nil {
 		return nil, err
 	}

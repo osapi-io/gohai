@@ -31,7 +31,7 @@ package hardware
 
 import (
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info is the hardware view. Top-level fields mirror the
@@ -47,7 +47,7 @@ type Info struct {
 
 	// CPU identity strings from system_profiler. Not a replacement for
 	// the cpu collector — these carry Apple's marketing labels
-	// ("Intel Core i7", "Apple M1 Pro") that aren't in gopsutil.
+	// ("Intel Core i7", "Apple M1 Pro") that sysctl doesn't give.
 	CPUType               string `json:"cpu_type,omitempty"`                // Intel Macs
 	ChipType              string `json:"chip_type,omitempty"`               // Apple Silicon
 	CurrentProcessorSpeed string `json:"current_processor_speed,omitempty"` // Intel only
@@ -133,8 +133,17 @@ func (base) Dependencies() []string { return nil }
 // New returns the hardware variant for the host OS. Linux returns an
 // empty Info — this collector is Darwin-only, matching Ohai.
 func New() Collector {
-	if platform.IsDarwin() {
-		return NewDarwin()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	return NewLinux()
+
+	return collector.Wire(NewLinux(), src)
 }

@@ -25,17 +25,19 @@
 package ssh
 
 import (
-	"crypto/md5" //nolint:gosec // MD5 is standard for SSH key fingerprints (RFC 4716)
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"strings"
 
+	"crypto/md5" //nolint:gosec // MD5 is standard for SSH key fingerprints (RFC 4716)
+
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // sshDir is the standard directory containing SSH host public keys.
@@ -95,12 +97,19 @@ func (base) Dependencies() []string { return nil }
 // New returns the ssh collector variant appropriate to the detected
 // host OS.
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
-		return NewDarwin()
-	default:
-		return NewLinux()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // collectHostKeys reads the well-known SSH host public key files from

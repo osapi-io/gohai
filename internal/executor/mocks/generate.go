@@ -23,4 +23,4 @@
 // `go generate ./internal/executor/...`.
 package mocks
 
-//go:generate go tool go.uber.org/mock/mockgen -source=../executor.go -destination=executor.gen.go -package=mocks
+//go:generate go tool go.uber.org/mock/mockgen -destination=executor.gen.go -package=mocks -mock_names=Runner=MockExecutor github.com/osapi-io/gohai/pkg/gohai/source Runner

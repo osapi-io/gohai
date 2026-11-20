@@ -23,23 +23,26 @@ package platform
 import (
 	"bufio"
 	"context"
+	"runtime"
 	"strings"
+
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects platform identification on macOS. gopsutil's
-// host.Info provides Name/Version/Family; we additionally run
-// `sw_vers` through the shared Executor and parse:
+// Darwin collects platform identification on macOS. The name and the
+// family are darwin, and it runs `sw_vers` through the Executor and
+// parses:
 //
+//   - ProductVersion → Version (e.g., "14.4.1").
 //   - ProductVersionExtra → VersionExtra (Apple Rapid Security
 //     Response patch suffix, e.g., "(a)" — empty when no RSR is
 //     applied).
-//   - BuildVersion → Build (e.g., "23E224") — preferred over
-//     gopsutil's KernelVersion field as the macOS-canonical build id.
+//   - BuildVersion → Build (e.g., "23E224").
 //
-// Falls back to gopsutil's KernelVersion for Build when sw_vers fails.
+// When sw_vers fails, the version and the build are empty.
 type Darwin struct {
 	base
 
@@ -56,11 +59,10 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info, kernelVer, err := readPlatform(ctx)
-	if err != nil {
-		return nil, err
+	info := &Info{
+		OS: family.Darwin, Name: family.Darwin, Family: family.Darwin,
+		CPUArchitecture: runtime.GOARCH,
 	}
-	info.Build = kernelVer
 	if d.Exec != nil {
 		applySwVers(ctx, d.Exec, info)
 	}
@@ -88,6 +90,8 @@ func applySwVers(
 		key := strings.TrimSpace(line[:i])
 		val := strings.TrimSpace(line[i+1:])
 		switch key {
+		case "ProductVersion":
+			info.Version = val
 		case "BuildVersion":
 			if val != "" {
 				info.Build = val

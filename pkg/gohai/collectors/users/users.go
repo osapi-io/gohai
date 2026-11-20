@@ -31,10 +31,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // passwdPath / groupPath are the standard POSIX flat-file locations
@@ -52,10 +53,19 @@ var geteuidFn = os.Geteuid
 // Darwin read the same /etc/passwd and /etc/group files — separate
 // structs preserve the per-OS dispatch pattern for consistency.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	return NewLinux()
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // collectPOSIX is the shared implementation used by both Linux and

@@ -22,26 +22,38 @@ package load
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Linux collects load averages on Linux. gopsutil's load.AvgWithContext
-// is swapped via the package-level avgFn seam (see SetAvgFn in
-// export_test.go).
+// procLoadavg is the kernel's load averages.
+const procLoadavg = "/proc/loadavg"
+
+// Linux collects load averages from /proc/loadavg.
 type Linux struct {
 	base
+
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant.
+// NewLinux returns a Linux variant that reads the host's filesystem.
 func NewLinux() *Linux {
-	return &Linux{}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect returns the load averages.
 func (l *Linux) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return readAverages(ctx)
+	b, err := l.FS.ReadFile(procLoadavg)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", procLoadavg, err)
+	}
+
+	return parse(string(b))
 }

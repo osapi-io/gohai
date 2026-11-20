@@ -21,20 +21,8 @@
 package hostname
 
 import (
-	"context"
 	"time"
-
-	"github.com/shirou/gopsutil/v4/host"
 )
-
-// SetHostInfoFn swaps the private gopsutil host.InfoWithContext call.
-func SetHostInfoFn(
-	fn func(context.Context) (*host.InfoStat, error),
-) (restore func()) {
-	orig := hostInfoFn
-	hostInfoFn = fn
-	return func() { hostInfoFn = orig }
-}
 
 // SetLookupHostFn swaps the private net.LookupHost seam.
 func SetLookupHostFn(
@@ -52,15 +40,6 @@ func SetLookupAddrFn(
 	orig := lookupAddrFn
 	lookupAddrFn = fn
 	return func() { lookupAddrFn = orig }
-}
-
-// SetOSHostnameFn swaps the private os.Hostname seam.
-func SetOSHostnameFn(
-	fn func() (string, error),
-) (restore func()) {
-	orig := osHostnameFn
-	osHostnameFn = fn
-	return func() { osHostnameFn = orig }
 }
 
 // SetResolverRetries swaps the retry count used by canonicalFQDN.

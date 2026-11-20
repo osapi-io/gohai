@@ -20,6 +20,8 @@
 
 package gohai
 
+import "github.com/osapi-io/gohai/pkg/gohai/source"
+
 // Option configures a Gohai instance.
 type Option func(*config)
 
@@ -30,6 +32,21 @@ type config struct {
 	only        []string
 	categories  []string
 	withTimings bool
+	sources     source.Sources
+}
+
+// WithSources makes each collector read the host through src: its
+// filesystem, its commands, its clock and its family. A zero field is the
+// real host's. Without it, collectors read the real host. A caller with a
+// fake host, such as osapi in its tests, gets the same collectors reading
+// that host. The cloud collectors read their metadata service, which src
+// does not cover.
+func WithSources(
+	src source.Sources,
+) Option {
+	return func(c *config) {
+		c.sources = src
+	}
 }
 
 // WithDefaults opts in to the recommended default collector set —

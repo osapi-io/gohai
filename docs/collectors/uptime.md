@@ -94,9 +94,8 @@ None.
 
 On Linux:
 
-1. gopsutil's `host.InfoWithContext` reads field 1 of `/proc/uptime` for
-   `seconds`. It calculates `boot_time` as `now - uptime`. gohai reports the two
-   values with no change. It makes `human` with `HumanDuration(seconds)`.
+1. Field 1 of `/proc/uptime` gives `seconds`. The `btime` line of `/proc/stat`
+   gives `boot_time`. The collector makes `human` with `HumanDuration(seconds)`.
 2. gohai also reads `/proc/uptime` through the injected `avfs.VFS`. It parses
    field 2 into `idle_seconds`. Field 2 is the total idle time of all CPUs. On
    multi-core systems, it can be more than the wall-clock uptime. The same
@@ -105,10 +104,11 @@ On Linux:
 
 On macOS:
 
-1. gopsutil's `host.InfoWithContext` reads `kern.boottime` through sysctl. It
-   calculates `seconds` as `now - boot_epoch`. The mapping to `seconds`,
-   `boot_time` and `human` is the same as on Linux. macOS has no total idle
-   counter. Thus the output does not have `idle_seconds` and `idle_human`.
+1. `sysctl -n kern.boottime` gives the boot time. The collector calculates
+   `seconds` as `now - boot_time`, with the clock of its sources. The mapping to
+   `seconds`, `boot_time` and `human` is the same as on Linux. macOS has no
+   total idle counter. Thus the output does not have `idle_seconds` and
+   `idle_human`.
 
 The method is the same as Ohai's `uptime.rb`. On Linux, it parses `/proc/uptime`
 in the same way. On Darwin, it gets the uptime from `kern.boottime` in the same
@@ -118,6 +118,5 @@ format is short (`1d 2h 3m 4s`). Ohai uses a long plural form
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) for
-  the uptime and the boot time. gohai parses `/proc/uptime` itself for the Linux
-  idle seconds, because gopsutil does not give the idle field.
+None. The collector reads `/proc` through its filesystem, and runs `sysctl`
+through its command runner.

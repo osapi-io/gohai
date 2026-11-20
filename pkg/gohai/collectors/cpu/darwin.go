@@ -22,6 +22,10 @@ package cpu
 
 import (
 	"context"
+	"encoding/binary"
+	"encoding/hex"
+	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -29,50 +33,116 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects CPU facts on macOS. gopsutil's cpu.Info (via the
-// readCPU bridge) sources model / vendor / flags and the logical
-// thread count correctly but gets physical cores
-// (reports logical) and frequency (zero on Apple Silicon) wrong. We
-// override those via direct sysctl reads through the injected Exec.
+// Darwin collects CPU facts on macOS from sysctl: the model, the vendor,
+// the family and the flags from machdep.cpu, the counts from hw. The speed
+// is hw.cpufrequency_max or hw.cpufrequency, which Intel Macs have; Apple
+// Silicon has neither, so the speed is the top of the performance cores'
+// frequency table that IOKit holds, read with ioreg.
 type Darwin struct {
 	base
 
 	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant wired to production dependencies.
+// NewDarwin returns a Darwin variant that runs the host's sysctl and
+// ioreg.
 func NewDarwin() *Darwin {
 	return &Darwin{Exec: executor.New()}
 }
 
-// Collect returns the CPU Info with macOS-specific sysctl overrides
-// merged on top of the gopsutil base:
-//
-//   - hw.physicalcpu   → Cores (gopsutil reports logical here).
-//   - hw.packages      → Sockets.
-//   - hw.cpufrequency_max / hw.cpufrequency → Mhz (both absent on
-//     Apple Silicon; Mhz left as whatever gopsutil returned — usually 0
-//     there).
+// Collect returns the CPU Info: one entry, for the package, as gopsutil
+// gave it on macOS.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info, err := readCPU(ctx)
-	if err != nil {
-		return nil, err
+	count, ok := sysctlInt(ctx, d.Exec, "hw.logicalcpu")
+	if !ok {
+		return nil, fmt.Errorf("sysctl hw.logicalcpu failed")
 	}
+	c := CPU{
+		ModelName: sysctlString(ctx, d.Exec, "machdep.cpu.brand_string"),
+		VendorID:  sysctlString(ctx, d.Exec, "machdep.cpu.vendor"),
+		Family:    "0",
+		ModelID:   "0",
+	}
+	if v := sysctlString(ctx, d.Exec, "machdep.cpu.family"); v != "" {
+		c.Family = v
+	}
+	if v := sysctlString(ctx, d.Exec, "machdep.cpu.model"); v != "" {
+		c.ModelID = v
+	}
+	if n, ok := sysctlInt(ctx, d.Exec, "machdep.cpu.stepping"); ok {
+		c.Stepping = int32(n)
+	}
+	for _, key := range []string{"machdep.cpu.features", "machdep.cpu.leaf7_features"} {
+		c.Flags = append(
+			c.Flags,
+			strings.Fields(strings.ToLower(sysctlString(ctx, d.Exec, key)))...)
+	}
+	c.Cores = int32(count)
 	if n, ok := sysctlInt(ctx, d.Exec, "hw.physicalcpu"); ok {
-		info.Cores = n
+		c.Cores = int32(n)
 	}
+	if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency_max"); ok {
+		c.Speed = float64(n) / 1_000_000
+	} else if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency"); ok {
+		c.Speed = float64(n) / 1_000_000
+	} else {
+		c.Speed = maxPmgrFrequency(ctx, d.Exec)
+	}
+	info := summarize(count, []CPU{c})
 	if n, ok := sysctlInt(ctx, d.Exec, "hw.packages"); ok {
 		info.Sockets = n
 	}
-	if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency_max"); ok {
-		info.Speed = float64(n) / 1_000_000
-	} else if n, ok := sysctlInt64(ctx, d.Exec, "hw.cpufrequency"); ok {
-		info.Speed = float64(n) / 1_000_000
-	}
+
 	return info, nil
+}
+
+// voltageStatesRE is the performance cores' frequency table of the pmgr
+// device in ioreg: pairs of little-endian uint32, a frequency in Hz and a
+// voltage.
+var voltageStatesRE = regexp.MustCompile(`"voltage-states5-sram" = <([0-9a-f]+)>`)
+
+// maxPmgrFrequency is the highest frequency of the table, in MHz, or 0
+// when ioreg fails or has no table.
+func maxPmgrFrequency(
+	ctx context.Context,
+	exec executor.Executor,
+) float64 {
+	out, err := exec.Execute(ctx, "ioreg", "-l", "-w0", "-c", "AppleARMIODevice", "-n", "pmgr")
+	if err != nil {
+		return 0
+	}
+	m := voltageStatesRE.FindSubmatch(out)
+	if m == nil {
+		return 0
+	}
+	b, err := hex.DecodeString(string(m[1]))
+	if err != nil {
+		return 0
+	}
+	var top uint32
+	for i := 0; i+8 <= len(b); i += 8 {
+		top = max(top, binary.LittleEndian.Uint32(b[i:]))
+	}
+
+	return float64(top) / 1_000_000
+}
+
+// sysctlString runs `sysctl -n <key>`, and is its output, or "" when it
+// fails.
+func sysctlString(
+	ctx context.Context,
+	exec executor.Executor,
+	key string,
+) string {
+	out, err := exec.Execute(ctx, "sysctl", "-n", key)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(string(out))
 }
 
 // sysctlInt runs `sysctl -n <key>` and parses the output as int.

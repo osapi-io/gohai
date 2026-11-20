@@ -22,6 +22,7 @@ package gohai
 
 import (
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // PublicRegistry exposes registered collector metadata for CLI use.
@@ -32,7 +33,7 @@ type PublicRegistry struct {
 // NewRegistry returns a PublicRegistry pre-populated with built-in collectors.
 func NewRegistry() *PublicRegistry {
 	r := collector.NewRegistry()
-	registerBuiltins(r)
+	registerBuiltins(r, source.Sources{})
 	return &PublicRegistry{reg: r}
 }
 

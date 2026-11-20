@@ -22,13 +22,13 @@
 package load
 
 import (
-	"context"
 	"fmt"
+	"strconv"
+	"strings"
 
-	"github.com/shirou/gopsutil/v4/load"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds the 1/5/15-minute load averages. Matches `uptime(1)` /
@@ -52,35 +52,41 @@ func (base) Category() string       { return collector.CategoryMisc }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 
-// New returns the load collector variant for the host OS. Both variants
-// are thin wrappers around gopsutil's load.AvgWithContext (which calls
-// getloadavg(3) on both Linux and macOS); the per-OS split exists for
-// consistency with the rest of the codebase, not because the collection
-// logic differs.
+// New returns the load collector variant for the host OS: Linux reads
+// /proc/loadavg, and macOS runs sysctl -n vm.loadavg, as Ohai does.
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
-		return NewDarwin()
-	default:
-		return NewLinux()
-	}
+	return NewWith(source.Sources{})
 }
 
-// avgFn is the injection seam for gopsutil's load.AvgWithContext.
-// Kept private — never exposed on the public SDK surface so callers
-// don't transitively need to depend on gopsutil types. Swapped in
-// tests via SetAvgFn (export_test.go).
-var avgFn = load.AvgWithContext
-
-// readAverages is the production bridge. Wraps the private gopsutil
-// call and maps its result onto our Info type — callers of the
-// collector never see gopsutil types.
-func readAverages(
-	ctx context.Context,
-) (*Info, error) {
-	a, err := avgFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("load.Avg: %w", err)
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	return &Info{One: a.Load1, Five: a.Load5, Fifteen: a.Load15}, nil
+
+	return collector.Wire(NewLinux(), src)
+}
+
+// parse is the first three numbers of text, such as /proc/loadavg's
+// "0.32 0.28 0.25 1/412 12345" or vm.loadavg's "{ 0.32 0.28 0.25 }".
+func parse(
+	text string,
+) (*Info, error) {
+	fields := strings.Fields(strings.Trim(strings.TrimSpace(text), "{}"))
+	if len(fields) < 3 {
+		return nil, fmt.Errorf("no load averages in %q", text)
+	}
+	var v [3]float64
+	for i := range v {
+		n, err := strconv.ParseFloat(fields[i], 64)
+		if err != nil {
+			return nil, fmt.Errorf("load average %q: %w", fields[i], err)
+		}
+		v[i] = n
+	}
+
+	return &Info{One: v[0], Five: v[1], Fifteen: v[2]}, nil
 }

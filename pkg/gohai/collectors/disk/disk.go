@@ -25,12 +25,8 @@
 package disk
 
 import (
-	"context"
-
-	"github.com/shirou/gopsutil/v4/disk"
-
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds per-device disk I/O counters.
@@ -64,38 +60,17 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the disk variant for the host OS.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
-	}
-	return NewLinux()
+	return NewWith(source.Sources{})
 }
 
-// ioCountersFn is the injection seam for gopsutil's
-// disk.IOCountersWithContext. Kept private so importers don't
-// transitively need gopsutil. Swapped via SetIOCountersFn.
-var ioCountersFn = disk.IOCountersWithContext
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
+	}
 
-// listIOCounters is the production bridge to gopsutil. Named function
-// so factories can assign by reference (no closure body to cover).
-func listIOCounters(
-	ctx context.Context,
-) ([]Device, error) {
-	m, err := ioCountersFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := make([]Device, 0, len(m))
-	for _, s := range m {
-		out = append(out, Device{
-			Name:       s.Name,
-			ReadCount:  s.ReadCount,
-			WriteCount: s.WriteCount,
-			ReadBytes:  s.ReadBytes,
-			WriteBytes: s.WriteBytes,
-			ReadTime:   s.ReadTime,
-			WriteTime:  s.WriteTime,
-			IoTime:     s.IoTime,
-		})
-	}
-	return out, nil
+	return collector.Wire(NewLinux(), src)
 }

@@ -31,44 +31,43 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/shirou/gopsutil/v4/host"
+	"github.com/avfs/avfs"
+
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Package-level injection seams. Kept private so importers don't
-// transitively need gopsutil; swapped via the SetXFn helpers in
+// transitively need them; swapped via the SetXFn helpers in
 // export_test.go. Stdlib calls are swapped the same way so tests avoid
 // real DNS traffic and don't sleep.
 var (
-	hostInfoFn      = host.InfoWithContext
 	lookupHostFn    = net.LookupHost
 	lookupAddrFn    = net.LookupAddr
-	osHostnameFn    = os.Hostname
 	resolverRetries = 3
 	resolverBackoff = 100 * time.Millisecond
 )
 
-// readShortHostname returns just the short hostname from gopsutil's
-// host.Info, stripped of the gopsutil types so callers never see them.
-// Used as a fallback when the `hostname -s` exec fails.
+// kernelHostname is the name the kernel holds, on Linux.
+const kernelHostname = "/proc/sys/kernel/hostname"
+
+// readShortHostname is the kernel's hostname up to its first dot, the
+// fallback when `hostname -s` fails.
 func readShortHostname(
-	ctx context.Context,
+	fs avfs.VFS,
 ) (string, error) {
-	h, err := hostInfoFn(ctx)
+	b, err := fs.ReadFile(kernelHostname)
 	if err != nil {
-		return "", fmt.Errorf("host.Info: %w", err)
+		return "", fmt.Errorf("no hostname: hostname -s failed, and %w", err)
 	}
-	if h == nil {
-		return "", nil
-	}
-	return h.Hostname, nil
+	short, _, _ := strings.Cut(strings.TrimSpace(string(b)), ".")
+
+	return short, nil
 }
 
 // Info holds hostname identification data.
@@ -93,12 +92,19 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the hostname variant for the host OS.
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
-		return NewDarwin()
-	default:
-		return NewLinux()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // collectWithExec is the shared Collect body — Linux and Darwin run
@@ -108,6 +114,7 @@ func New() Collector {
 func collectWithExec(
 	ctx context.Context,
 	exec executor.Executor,
+	fs avfs.VFS,
 ) (*Info, error) {
 	short, shortOK := "", false
 	machine, machineOK := "", false
@@ -126,18 +133,14 @@ func collectWithExec(
 	}
 
 	if !shortOK {
-		gpShort, err := readShortHostname(ctx)
+		kernelShort, err := readShortHostname(fs)
 		if err != nil {
 			return nil, err
 		}
-		short = gpShort
+		short = kernelShort
 	}
 	if !machineOK {
-		if raw, err := osHostnameFn(); err == nil {
-			machine = raw
-		} else {
-			machine = short
-		}
+		machine = short
 	}
 
 	info := &Info{Name: short, MachineName: machine}

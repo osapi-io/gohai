@@ -67,8 +67,8 @@ gohai collect --no-collector.shard   # disable
 `hostname`, `dmi`. The collector calculates the shard seed from
 `hostname.Info.MachineName` and from the DMI serial number and UUID in
 `dmi.Info`. On macOS, DMI is empty. There, the serial comes from
-`system_profiler SPHardwareDataType`, and the UUID comes from IOPlatformUUID
-through gopsutil.
+`system_profiler SPHardwareDataType`, and the UUID is the IOPlatformUUID from
+`ioreg`.
 
 ## Data sources
 
@@ -94,9 +94,9 @@ On macOS:
    shared `internal/executor` runner. This is the same source as Ohai's
    `hardware["serial_number"]`. If there is an error or no data, serial stays
    empty.
-3. `uuid` comes from gopsutil's `host.InfoWithContext` → `HostID`
-   (IOPlatformUUID). This is the same as Ohai's `hardware["platform_UUID"]`. If
-   there is an error, uuid stays empty.
+3. `uuid` is the `IOPlatformUUID` line of
+   `ioreg -rd1 -c IOPlatformExpertDevice`. This is the same as Ohai's
+   `hardware["platform_UUID"]`. If there is an error, uuid stays empty.
 4. The collector does the same MD5 → 7 hex characters → integer calculation as
    on Linux.
 
@@ -110,7 +110,5 @@ add them if a consumer needs them.
 
 - The Go standard library (`crypto/md5`, `fmt`, `strconv`) to calculate the
   hash.
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) to
-  read IOPlatformUUID on macOS.
-- [`internal/executor`](../../internal/executor) to run `system_profiler` on
-  macOS.
+- [`internal/executor`](../../internal/executor) to run `system_profiler` and
+  `ioreg` on macOS.

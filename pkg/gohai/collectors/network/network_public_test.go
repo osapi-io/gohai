@@ -23,22 +23,22 @@ package network_test
 import (
 	"context"
 	"errors"
-	"net"
+	"fmt"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
-	"github.com/jaypipes/ghw"
-	gpnet "github.com/shirou/gopsutil/v4/net"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"github.com/vishvananda/netlink"
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 )
 
@@ -323,28 +323,121 @@ func ipRouteAndEthtoolExec(
 	return m
 }
 
+// TestSources covers the reads that the TestCollect fixtures do not
+// reach: the edges of sysfs, /proc/net/dev, ip and the macOS commands.
+func (s *NetworkPublicTestSuite) TestSources() {
+	tests := []struct {
+		name    string
+		variant string
+		files   map[string]string
+		runner  sourcetest.Runner
+		check   func(*network.Info)
+	}{
+		{
+			name:    "linux: an unknown speed and duplex, a peer address, odd counters and neighbours",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/tun0/ifindex": "4\n",
+				"/sys/class/net/tun0/speed":   "-1\n",
+				"/sys/class/net/tun0/duplex":  "unknown\n",
+				"/proc/net/dev": "Inter-|   Receive\n face |bytes\n" +
+					"  tun0: 1 2\n" +
+					"  tun0: 10 20 0 0 0 0 0 0 30 40 0 0 0 0 0 0\n",
+			},
+			runner: sourcetest.Runner{Out: map[string]string{
+				"ip -o addr show": "4: tun0    inet 10.8.0.1 peer 10.8.0.2/32 scope global tun0\n" +
+					"4: tun0    link/none\n",
+				"ip neigh show": "\nnot-an-ip dev eth0\n10.0.0.9 dev tun0 FAILED\n",
+			}},
+			check: func(i *network.Info) {
+				s.Require().Len(i.Interfaces, 1)
+				tun := i.Interfaces[0]
+				s.Equal("Unknown!", tun.Speed)
+				s.Equal("Unknown!", tun.Duplex)
+				s.Require().Len(tun.Addresses, 1)
+				s.Equal("10.8.0.1", tun.Addresses[0].Addr)
+				s.Equal(32, tun.Addresses[0].Prefixlen)
+				s.Require().NotNil(tun.Counters)
+				s.Equal(uint64(30), tun.Counters.BytesSent)
+				s.Equal(uint64(10), tun.Counters.BytesRecv)
+				s.Require().Len(i.Neighbours, 1)
+				s.Equal("FAILED", i.Neighbours[0].State)
+				s.Empty(i.Neighbours[0].MAC)
+			},
+		},
+		{
+			name:    "darwin: ifconfig and netstat on a Mac",
+			variant: "darwin",
+			runner: sourcetest.Runner{Out: map[string]string{
+				"ifconfig -a -v": "\tbefore any interface\n" +
+					"lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384 index 1\n" +
+					"\tinet 127.0.0.1 netmask 0xff000000\n" +
+					"\tinet6 ::1 prefixlen 128\n" +
+					"\tinet6 fe80::1%lo0 prefixlen 64 scopeid 0x1\n" +
+					"gif0: flags=8010<POINTOPOINT,MULTICAST> mtu 1280 index 2\n" +
+					"\tinet 10.1.1.1 --> 10.1.1.2\n" +
+					"\tinet6 fe80::2\n" +
+					"\tinet bogus netmask 0xff000000\n" +
+					"\tinet6 bogus prefixlen 64\n" +
+					"\tstatus: active\n",
+				"netstat -ibdnW": "Name  Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll Drop\n" +
+					"lo0   16384 <Link#1>                        869107     0  169411755   869107     0  169411755     0   0\n" +
+					"lo0   16384 127           127.0.0.1         869107     -  169411755   869107     -  169411755     -   -\n" +
+					"gif0* 1280  <Link#2>                             1     2          3        4     5          6     0   7\n",
+			}},
+			check: func(i *network.Info) {
+				s.Require().Len(i.Interfaces, 2)
+				lo, gif := i.Interfaces[0], i.Interfaces[1]
+				s.Equal(1, lo.Number)
+				s.Equal([]string{"up", "loopback", "multicast"}, lo.Flags)
+				s.Require().Len(lo.Addresses, 3)
+				s.Equal(8, lo.Addresses[0].Prefixlen)
+				s.Equal("fe80::1", lo.Addresses[2].Addr)
+				s.Equal(uint64(169411755), lo.Counters.BytesSent)
+				s.Equal(2, gif.Number)
+				s.Equal("down", gif.State)
+				s.Equal([]string{"pointtopoint", "multicast"}, gif.Flags)
+				s.Require().Len(gif.Addresses, 2)
+				s.Equal(32, gif.Addresses[0].Prefixlen, "no netmask")
+				s.Equal(128, gif.Addresses[1].Prefixlen, "no prefixlen")
+				s.Equal(uint64(3), gif.Counters.BytesRecv)
+				s.Equal(uint64(7), gif.Counters.Dropout)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			var c network.Collector = &network.Darwin{Exec: tt.runner}
+			if tt.variant == "linux" {
+				c = &network.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: tt.runner}
+			}
+			got, err := c.Collect(context.Background(), nil)
+			s.Require().NoError(err)
+			info, ok := got.(*network.Info)
+			s.Require().True(ok)
+			tt.check(info)
+		})
+	}
+}
+
 func (s *NetworkPublicTestSuite) TestCollect() {
-	canonicalInterfaces := func(context.Context) (gpnet.InterfaceStatList, error) {
-		return gpnet.InterfaceStatList{
+	canonicalInterfaces := func() ([]tIface, error) {
+		return []tIface{
 			{
 				Index: 1,
 				Name:  "lo", MTU: 65536, Flags: []string{"up", "loopback"},
-				Addrs: gpnet.InterfaceAddrList{{Addr: "127.0.0.1/8"}, {Addr: "::1/128"}},
+				Addrs: []string{"127.0.0.1/8", "::1/128"},
 			},
 			{
 				Index: 2,
-				Name:  "eth0", MTU: 1500, HardwareAddr: "02:42:ac:11:00:02",
+				Name:  "eth0", MTU: 1500, MAC: "02:42:ac:11:00:02",
 				Flags: []string{"up", "broadcast", "multicast"},
-				Addrs: gpnet.InterfaceAddrList{
-					{Addr: "10.0.0.5/24"},
-					{Addr: "fe80::1/64"},
-					{Addr: "not-a-cidr"},
-				},
+				Addrs: []string{"10.0.0.5/24", "fe80::1/64", "not-a-cidr"},
 			},
 		}, nil
 	}
-	adminDownInterfaces := func(context.Context) (gpnet.InterfaceStatList, error) {
-		return gpnet.InterfaceStatList{
+	adminDownInterfaces := func() ([]tIface, error) {
+		return []tIface{
 			{
 				Index: 7,
 				Name:  "eth7",
@@ -353,15 +446,15 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			}, // no "up" → admin-down
 		}, nil
 	}
-	zeroCounters := func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
+	zeroCounters := func() ([]tCounters, error) {
 		return nil, nil
 	}
 
 	tests := []struct {
 		name         string
 		variant      string
-		ifsFn        func(context.Context) (gpnet.InterfaceStatList, error)
-		countersFn   func(context.Context, bool) ([]gpnet.IOCountersStat, error)
+		ifsFn        func() ([]tIface, error)
+		countersFn   func() ([]tCounters, error)
 		fs           avfs.VFS
 		exec         executor.Executor
 		validateFunc func(any, error)
@@ -659,9 +752,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name: "linux: ip -d link annotates eth0 vlan + ip6tun0 tunnel when present in gopsutil list",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
+			name: "linux: ip -d link annotates eth0 vlan + ip6tun0 tunnel when present in sysfs",
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
 					{Index: 1, Name: "eth0.100", MTU: 1500, Flags: []string{"up"}},
 					{Index: 2, Name: "ip6tun0", MTU: 1452, Flags: []string{}},
 				}, nil
@@ -761,8 +854,8 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "linux: ip -d link vlan protocol-qualified form + tunnel trailing key",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
 					{Index: 1, Name: "vlan10", MTU: 1500, Flags: []string{"up"}},
 					{Index: 2, Name: "tun0", MTU: 1452, Flags: []string{}},
 				}, nil
@@ -819,8 +912,8 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "linux: ip -d link malformed vlan + tunnel + xdp lines silently skipped",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
 					{Index: 1, Name: "weird", MTU: 1500, Flags: []string{"up"}},
 				}, nil
 			},
@@ -957,12 +1050,12 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "openvz guest: venet0:0 addresses merge under venet0",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
 					{Name: "venet0", MTU: 1500},
 					{
 						Name: "venet0:0", MTU: 1500,
-						Addrs: gpnet.InterfaceAddrList{{Addr: "203.0.113.5/32"}},
+						Addrs: []string{"203.0.113.5/32"},
 					},
 				}, nil
 			},
@@ -983,9 +1076,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "openvz host (/proc/bc/0 present): no merge",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
-					{Name: "venet0:0", Addrs: gpnet.InterfaceAddrList{{Addr: "1.2.3.4/32"}}},
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
+					{Name: "venet0:0", Addrs: []string{"1.2.3.4/32"}},
 				}, nil
 			},
 			countersFn: zeroCounters,
@@ -1004,9 +1097,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "openvz alias without matching base: kept as-is",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
-					{Name: "venet0:0", Addrs: gpnet.InterfaceAddrList{{Addr: "1.2.3.4/32"}}},
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
+					{Name: "venet0:0", Addrs: []string{"1.2.3.4/32"}},
 				}, nil
 			},
 			countersFn: zeroCounters,
@@ -1041,9 +1134,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "ip route line with metric, src, scope, proto: all parsed",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
-					{Name: "eth0", Addrs: gpnet.InterfaceAddrList{{Addr: "10.0.0.5/24"}}},
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
+					{Name: "eth0", Addrs: []string{"10.0.0.5/24"}},
 				}, nil
 			},
 			countersFn: zeroCounters,
@@ -1112,21 +1205,17 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "nil FS and nil Exec: gopsutil base only",
+			name:       "nil FS: an error",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs:         nil,
 			exec:       nil,
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				i, ok := got.(*network.Info)
-				s.Require().True(ok)
-				s.Len(i.Interfaces, 2)
-				s.Empty(i.Routes)
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "no filesystem")
 			},
 		},
 		{
-			name:       "ghw NIC + sysfs driver populate Speed/Duplex/Driver per interface",
+			name:       "sysfs speed, duplex and driver per interface",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: fsWithSymlinks(s.T(), nil, map[string]string{
@@ -1144,7 +1233,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "nicFn errors: Speed/Duplex stay empty, Driver from sysfs still works",
+			name:       "no sysfs speed or duplex: both empty, Driver from sysfs still works",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: fsWithSymlinks(s.T(), nil, map[string]string{
@@ -1193,8 +1282,8 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name: "linux: gopsutil error propagated",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
+			name: "linux: no /sys/class/net",
+			ifsFn: func() ([]tIface, error) {
 				return nil, errors.New("interfaces failed")
 			},
 			countersFn: zeroCounters,
@@ -1207,12 +1296,12 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: en0 with MAC and global IPv4",
 			variant: "darwin",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
 					{
-						Name: "en0", MTU: 1500, HardwareAddr: "aa:bb:cc:dd:ee:ff",
+						Name: "en0", MTU: 1500, MAC: "aa:bb:cc:dd:ee:ff",
 						Flags: []string{"up"},
-						Addrs: gpnet.InterfaceAddrList{{Addr: "192.168.1.5/24"}},
+						Addrs: []string{"192.168.1.5/24"},
 					},
 				}, nil
 			},
@@ -1226,9 +1315,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: gopsutil error propagated",
+			name:    "darwin: ifconfig fails",
 			variant: "darwin",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
+			ifsFn: func() ([]tIface, error) {
 				return nil, errors.New("net error")
 			},
 			countersFn: zeroCounters,
@@ -1237,418 +1326,167 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 	}
-	defer network.SetNICFn(func() (map[string]network.NICStat, error) {
-		return map[string]network.NICStat{
-			"eth0": {Speed: "1000Mb/s", Duplex: "Full"},
-		}, nil
-	})()
-	defer network.SetNeighListFn(func() ([]network.Neighbour, error) {
-		return []network.Neighbour{
-			{
-				Address:   "10.0.0.1",
-				Family:    "inet",
-				MAC:       "aa:bb:cc:dd:ee:01",
-				Interface: "eth0",
-				State:     "REACHABLE",
-			},
-			{
-				Address:   "fe80::1",
-				Family:    "inet6",
-				MAC:       "aa:bb:cc:dd:ee:02",
-				Interface: "eth0",
-				State:     "STALE",
-			},
-		}, nil
-	})()
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.name == "nicFn errors: Speed/Duplex stay empty, Driver from sysfs still works" {
-				defer network.SetNICFn(func() (map[string]network.NICStat, error) {
-					return nil, errors.New("ghw failed")
-				})()
-			}
-			defer network.SetInterfacesFn(tt.ifsFn)()
-			defer network.SetIOCountersFn(tt.countersFn)()
+			ifs, ifsErr := tt.ifsFn()
+			counters, _ := tt.countersFn()
 			var c network.Collector
 			switch tt.variant {
 			case "darwin":
-				c = &network.Darwin{}
+				r := sourcetest.Runner{Out: map[string]string{"ifconfig -a -v": ifconfigOf(ifs)}}
+				if ifsErr != nil {
+					r.Err = map[string]error{"ifconfig -a -v": ifsErr}
+				}
+				c = &network.Darwin{Exec: r}
 			default:
-				c = &network.Linux{FS: tt.fs, Exec: tt.exec}
+				if tt.fs != nil && ifsErr == nil {
+					writeSysfs(
+						s.T(),
+						tt.fs,
+						ifs,
+						counters,
+						tt.name != "no sysfs speed or duplex: both empty, Driver from sysfs still works",
+					)
+				}
+				var exec executor.Executor
+				if tt.exec != nil {
+					exec = withIP{inner: tt.exec, out: map[string]string{
+						"ip -o addr show": ipAddrOf(ifs),
+						"ip neigh show": "10.0.0.1 dev eth0 lladdr aa:bb:cc:dd:ee:01 REACHABLE\n" +
+							"fe80::1 dev eth0 lladdr aa:bb:cc:dd:ee:02 STALE\n",
+					}}
+				}
+				c = &network.Linux{FS: tt.fs, Exec: exec}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }
 
-func (s *NetworkPublicTestSuite) TestReadNIC() {
-	tests := []struct {
-		name         string
-		fn           func(...any) (*ghw.NetworkInfo, error)
-		validateFunc func(any, error)
-	}{
-		{
-			name: "ghw success returns mapped NICStats",
-			fn: func(...any) (*ghw.NetworkInfo, error) {
-				return &ghw.NetworkInfo{NICs: []*ghw.NIC{
-					{Name: "eth0", Speed: "1Gb/s", Duplex: "Full"},
-				}}, nil
-			},
-			validateFunc: func(out any, err error) {
-				s.Require().NoError(err)
-				s.Len(out, 1)
-			},
-		},
-		{
-			name: "ghw error propagated",
-			fn: func(...any) (*ghw.NetworkInfo, error) {
-				return nil, errors.New("ghw failed")
-			},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			defer network.SetGHWNetworkFn(tt.fn)()
-			tt.validateFunc(network.ReadNIC())
-		})
-	}
+// tIface is an interface as a test row gives it; writeSysfs, ipAddrOf
+// and ifconfigOf turn it into what each host shows.
+type tIface struct {
+	Index int
+	Name  string
+	MTU   int
+	MAC   string
+	Flags []string
+	Addrs []string
 }
 
-func (s *NetworkPublicTestSuite) TestReadNeighbours() {
-	tests := []struct {
-		name         string
-		fn           func(int, int) ([]netlink.Neigh, error)
-		validateFunc func(any, error)
-	}{
-		{
-			name: "netlink success returns mapped neighbours",
-			fn: func(int, int) ([]netlink.Neigh, error) {
-				return []netlink.Neigh{
-					{IP: net.ParseIP("10.0.0.1"), Family: 2, State: 0x02},
-				}, nil
-			},
-			validateFunc: func(out any, err error) {
-				s.Require().NoError(err)
-				s.Len(out, 1)
-			},
-		},
-		{
-			name: "netlink error propagated",
-			fn:   func(int, int) ([]netlink.Neigh, error) { return nil, errors.New("netlink failed") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			defer network.SetNetlinkNeighListFn(tt.fn)()
-			tt.validateFunc(network.ReadNeighbours())
-		})
-	}
+// tCounters is an interface's row of /proc/net/dev.
+type tCounters struct {
+	Name                     string
+	BytesSent, BytesRecv     uint64
+	PacketsSent, PacketsRecv uint64
 }
 
-func (s *NetworkPublicTestSuite) TestIndexToInterfaceName() {
-	tests := []struct {
-		name         string
-		fn           func(int) (*net.Interface, error)
-		validateFunc func(string)
-	}{
-		{
-			name: "lookup success returns name",
-			fn:   func(int) (*net.Interface, error) { return &net.Interface{Name: "eth0"}, nil },
-			validateFunc: func(got string) {
-				s.Equal("eth0", got)
-			},
-		},
-		{
-			name: "lookup error returns empty",
-			fn:   func(int) (*net.Interface, error) { return nil, errors.New("no such index") },
-			validateFunc: func(got string) {
-				s.Equal("", got)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			defer network.SetNetInterfaceByIndex(tt.fn)()
-			tt.validateFunc(network.IndexToIfaceName(1))
-		})
-	}
+// iff is the IFF_* bit of each flag.
+var iff = map[string]uint64{
+	"up":           0x1,
+	"broadcast":    0x2,
+	"loopback":     0x8,
+	"pointtopoint": 0x10,
+	"multicast":    0x1000,
 }
 
-func (s *NetworkPublicTestSuite) TestNICMapFromGHW() {
-	tests := []struct {
-		name         string
-		nics         []*ghw.NIC
-		validateFunc func(map[string]network.NICStat)
-	}{
-		{
-			name: "two NICs mapped",
-			nics: []*ghw.NIC{
-				{Name: "eth0", Speed: "1000Mb/s", Duplex: "Full"},
-				{Name: "wlan0", Speed: "300Mb/s", Duplex: "Half"},
-			},
-			validateFunc: func(got map[string]network.NICStat) {
-				s.Equal(map[string]network.NICStat{
-					"eth0":  {Speed: "1000Mb/s", Duplex: "Full"},
-					"wlan0": {Speed: "300Mb/s", Duplex: "Half"},
-				}, got)
-			},
-		},
-		{
-			name: "nil NIC entries skipped",
-			nics: []*ghw.NIC{nil, {Name: "eth0", Speed: "10Gb/s", Duplex: "Full"}},
-			validateFunc: func(got map[string]network.NICStat) {
-				s.Equal(map[string]network.NICStat{
-					"eth0": {Speed: "10Gb/s", Duplex: "Full"},
-				}, got)
-			},
-		},
-		{
-			name: "empty input",
-			nics: nil,
-			validateFunc: func(got map[string]network.NICStat) {
-				s.Equal(map[string]network.NICStat{}, got)
-			},
-		},
+// writeSysfs writes each interface's directory under /sys/class/net, an
+// eth0 speed and duplex when nic is true, and /proc/net/dev.
+func writeSysfs(
+	t *testing.T,
+	fs avfs.VFS,
+	ifs []tIface,
+	counters []tCounters,
+	nic bool,
+) {
+	write := func(path, content string) {
+		require.NoError(t, fs.MkdirAll(dirOf(path), 0o755))
+		require.NoError(t, fs.WriteFile(path, []byte(content), 0o644))
 	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			tt.validateFunc(network.NICMapFromGHW(tt.nics))
-		})
-	}
-}
-
-func (s *NetworkPublicTestSuite) TestNeighboursFromNetlink() {
-	indexToName := func(idx int) string {
-		switch idx {
-		case 1:
-			return "lo"
-		case 2:
-			return "eth0"
+	require.NoError(t, fs.MkdirAll("/sys/class/net", 0o755))
+	for _, i := range ifs {
+		var bits uint64
+		for _, f := range i.Flags {
+			bits |= iff[f]
 		}
-		return ""
+		dir := "/sys/class/net/" + i.Name + "/"
+		write(dir+"ifindex", fmt.Sprintf("%d\n", i.Index))
+		write(dir+"mtu", fmt.Sprintf("%d\n", i.MTU))
+		write(dir+"flags", fmt.Sprintf("0x%x\n", bits))
+		write(dir+"address", i.MAC+"\n")
+		if nic && i.Name == "eth0" {
+			write(dir+"speed", "1000\n")
+			write(dir+"duplex", "full\n")
+		}
 	}
-	tests := []struct {
-		name         string
-		entries      []netlink.Neigh
-		validateFunc func([]network.Neighbour)
-	}{
-		{
-			name: "v4 + v6 neighbours mapped",
-			entries: []netlink.Neigh{
-				{
-					IP: net.ParseIP("10.0.0.1"), Family: 2, State: 0x02, LinkIndex: 2,
-					HardwareAddr: parseMAC(s.T(), "aa:bb:cc:dd:ee:01"),
-				},
-				{
-					IP: net.ParseIP("fe80::1"), Family: 10, State: 0x04, LinkIndex: 2,
-					HardwareAddr: parseMAC(s.T(), "aa:bb:cc:dd:ee:02"),
-				},
-			},
-			validateFunc: func(got []network.Neighbour) {
-				s.Equal([]network.Neighbour{
-					{
-						Address:   "10.0.0.1",
-						Family:    "inet",
-						MAC:       "aa:bb:cc:dd:ee:01",
-						Interface: "eth0",
-						State:     "REACHABLE",
-					},
-					{
-						Address:   "fe80::1",
-						Family:    "inet6",
-						MAC:       "aa:bb:cc:dd:ee:02",
-						Interface: "eth0",
-						State:     "STALE",
-					},
-				}, got)
-			},
-		},
-		{
-			name: "neigh without HardwareAddr leaves MAC empty",
-			entries: []netlink.Neigh{
-				{IP: net.ParseIP("10.0.0.2"), Family: 2, State: 0x02, LinkIndex: 1},
-			},
-			validateFunc: func(got []network.Neighbour) {
-				s.Equal([]network.Neighbour{
-					{Address: "10.0.0.2", Family: "inet", Interface: "lo", State: "REACHABLE"},
-				}, got)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			tt.validateFunc(network.NeighboursFromNetlink(tt.entries, indexToName))
-		})
+	if len(counters) > 0 {
+		dev := "Inter-|   Receive\n face |bytes\n"
+		for _, c := range counters {
+			dev += fmt.Sprintf("%s: %d %d 0 0 0 0 0 0 %d %d 0 0 0 0 0 0\n",
+				c.Name, c.BytesRecv, c.PacketsRecv, c.BytesSent, c.PacketsSent)
+		}
+		write("/proc/net/dev", dev)
 	}
 }
 
-func parseMAC(
-	t require.TestingT,
-	s string,
-) net.HardwareAddr {
-	mac, err := net.ParseMAC(s)
-	require.NoError(t, err)
-	return mac
+// ipAddrOf is `ip -o addr show` for the interfaces.
+func ipAddrOf(
+	ifs []tIface,
+) string {
+	var out string
+	for _, i := range ifs {
+		for _, a := range i.Addrs {
+			fam := "inet"
+			if strings.Contains(a, ":") {
+				fam = "inet6"
+			}
+			out += fmt.Sprintf("%d: %s    %s %s scope global %s\n", i.Index, i.Name, fam, a, i.Name)
+		}
+	}
+
+	return out
 }
 
-func (s *NetworkPublicTestSuite) TestNeighFamily() {
-	tests := []struct {
-		name         string
-		in           int
-		validateFunc func(string)
-	}{
-		{
-			name: "AF_INET → inet",
-			in:   2,
-			validateFunc: func(got string) {
-				s.Equal("inet", got)
-			},
-		},
-		{
-			name: "AF_INET6 → inet6",
-			in:   10,
-			validateFunc: func(got string) {
-				s.Equal("inet6", got)
-			},
-		},
-		{
-			name: "unknown → empty",
-			in:   99,
-			validateFunc: func(got string) {
-				s.Equal("", got)
-			},
-		},
+// ifconfigOf is `ifconfig -a -v` for the interfaces.
+func ifconfigOf(
+	ifs []tIface,
+) string {
+	var out string
+	for _, i := range ifs {
+		out += fmt.Sprintf("%s: flags=8863<%s> mtu %d index %d\n",
+			i.Name, strings.ToUpper(strings.Join(i.Flags, ",")), i.MTU, i.Index)
+		if i.MAC != "" {
+			out += "\tether " + i.MAC + "\n"
+		}
+		for _, a := range i.Addrs {
+			ip, prefix, _ := strings.Cut(a, "/")
+			if strings.Contains(ip, ":") {
+				out += "\tinet6 " + ip + " prefixlen " + prefix + "\n"
+				continue
+			}
+			n, _ := strconv.Atoi(prefix)
+			out += fmt.Sprintf("\tinet %s netmask 0x%08x\n", ip, ^uint32(0)<<(32-n))
+		}
 	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			tt.validateFunc(network.NeighFamily(tt.in))
-		})
-	}
+
+	return out
 }
 
-func (s *NetworkPublicTestSuite) TestNeighState() {
-	tests := []struct {
-		name         string
-		in           int
-		validateFunc func(string)
-	}{
-		{
-			name: "INCOMPLETE",
-			in:   0x01,
-			validateFunc: func(got string) {
-				s.Equal("INCOMPLETE", got)
-			},
-		},
-		{
-			name: "REACHABLE",
-			in:   0x02,
-			validateFunc: func(got string) {
-				s.Equal("REACHABLE", got)
-			},
-		},
-		{
-			name: "STALE",
-			in:   0x04,
-			validateFunc: func(got string) {
-				s.Equal("STALE", got)
-			},
-		},
-		{
-			name: "DELAY",
-			in:   0x08,
-			validateFunc: func(got string) {
-				s.Equal("DELAY", got)
-			},
-		},
-		{
-			name: "PROBE",
-			in:   0x10,
-			validateFunc: func(got string) {
-				s.Equal("PROBE", got)
-			},
-		},
-		{
-			name: "FAILED",
-			in:   0x20,
-			validateFunc: func(got string) {
-				s.Equal("FAILED", got)
-			},
-		},
-		{
-			name: "NOARP",
-			in:   0x40,
-			validateFunc: func(got string) {
-				s.Equal("NOARP", got)
-			},
-		},
-		{
-			name: "PERMANENT",
-			in:   0x80,
-			validateFunc: func(got string) {
-				s.Equal("PERMANENT", got)
-			},
-		},
-		{
-			name: "unknown bitmask returns empty",
-			in:   0x100,
-			validateFunc: func(got string) {
-				s.Equal("", got)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			tt.validateFunc(network.NeighState(tt.in))
-		})
-	}
+// withIP answers the `ip` commands that each row shares, and sends the
+// rest to the row's executor.
+type withIP struct {
+	inner executor.Executor
+	out   map[string]string
 }
 
-func (s *NetworkPublicTestSuite) TestReadInterfaces() {
-	tests := []struct {
-		name         string
-		ifsFn        func(context.Context) (gpnet.InterfaceStatList, error)
-		countersFn   func(context.Context, bool) ([]gpnet.IOCountersStat, error)
-		validateFunc func(any, error)
-	}{
-		{
-			name: "interfaces + counters merged",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return gpnet.InterfaceStatList{
-					{Name: "eth0", MTU: 1500, HardwareAddr: "02:42:ac:11:00:02"},
-				}, nil
-			},
-			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
-				return []gpnet.IOCountersStat{{Name: "eth0", BytesSent: 100}}, nil
-			},
-			validateFunc: func(ifs any, err error) {
-				s.Require().NoError(err)
-				s.Len(ifs, 1)
-			},
-		},
-		{
-			name: "gopsutil error wrapped and returned",
-			ifsFn: func(context.Context) (gpnet.InterfaceStatList, error) {
-				return nil, errors.New("interfaces failed")
-			},
-			countersFn: func(context.Context, bool) ([]gpnet.IOCountersStat, error) {
-				return nil, nil
-			},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
+func (w withIP) Execute(
+	ctx context.Context,
+	name string,
+	args ...string,
+) ([]byte, error) {
+	if out, ok := w.out[strings.Join(append([]string{name}, args...), " ")]; ok {
+		return []byte(out), nil
 	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			defer network.SetInterfacesFn(tt.ifsFn)()
-			defer network.SetIOCountersFn(tt.countersFn)()
-			tt.validateFunc(network.ReadInterfaces(context.Background()))
-		})
-	}
+
+	return w.inner.Execute(ctx, name, args...)
 }

@@ -115,8 +115,7 @@ If `Sysconf` returns an error, the collector wraps it and returns it.
 **Why `go-sysconf` and not `getconf -a`?** Ohai's `sysconf.rb` runs `getconf -a`
 in a shell and parses its output. gohai uses the Go library for three reasons:
 
-- The library is already in the module graph. gopsutil brings it in as a
-  transitive dependency.
+- The library is small, and it has no dependencies of its own.
 - It starts no subprocess.
 - It gives type-safe constants, so no string parse is necessary.
 
@@ -126,5 +125,4 @@ same meaning.
 ## Backing library
 
 - [`github.com/tklauser/go-sysconf`](https://github.com/tklauser/go-sysconf). A
-  pure-Go wrapper of POSIX `sysconf(3)`. It is already in the module graph as a
-  transitive dependency of gopsutil.
+  pure-Go wrapper of POSIX `sysconf(3)`.

@@ -23,6 +23,9 @@ package sessions
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
@@ -30,18 +33,19 @@ import (
 // Linux collects logged-in sessions on Linux. Prefers
 // `loginctl list-sessions` on systemd hosts (catches GDM/KDE
 // graphical sessions, remote desktop, systemd-run sessions that
-// never reach utmp). Falls back to gopsutil's utmp read when
+// never reach utmp). Falls back to reading utmp when
 // loginctl is absent or errors (non-systemd hosts, minimized
 // containers).
 type Linux struct {
 	base
 
 	Exec executor.Executor
+	FS   avfs.VFS
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{Exec: executor.New(), FS: osfs.NewWithNoIdm()}
 }
 
 // Collect returns logged-in session Info.
@@ -56,7 +60,7 @@ func (l *Linux) Collect(
 			return &Info{LoggedIn: parseLoginctlSessions(out)}, nil
 		}
 	}
-	ss, err := listSessions(ctx)
+	ss, err := readUtmp(l.FS, utmpPath, linuxUtmp)
 	if err != nil {
 		return nil, err
 	}

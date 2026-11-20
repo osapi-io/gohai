@@ -23,6 +23,7 @@ package timezone
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -38,12 +39,13 @@ const darwinZoneinfoPrefix = "/var/db/timezone/zoneinfo/"
 type Darwin struct {
 	base
 
-	FS avfs.VFS
+	FS  avfs.VFS
+	Now func() time.Time
 }
 
 // NewDarwin returns a Darwin variant wired to the real OS filesystem.
 func NewDarwin() *Darwin {
-	return &Darwin{FS: osfs.NewWithNoIdm()}
+	return &Darwin{FS: osfs.NewWithNoIdm(), Now: time.Now}
 }
 
 // Collect returns the timezone Info. macOS has no /etc/timezone
@@ -53,7 +55,7 @@ func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	abbrev, offset := clockZone()
+	abbrev, offset := clockZone(d.Now)
 	name := resolveName(
 		d.FS.Readlink,
 		func() (string, error) { return "", errors.New("no fallback on darwin") },

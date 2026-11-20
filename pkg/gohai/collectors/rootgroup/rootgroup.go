@@ -25,8 +25,9 @@ import (
 	"fmt"
 	"os/user"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // lookupUserFn and lookupGroupFn are the package-level seams wrapping
@@ -65,12 +66,19 @@ func (base) Dependencies() []string { return nil }
 // os/user-backed lookups work identically on Linux and macOS, but the
 // expected result differs (Linux → "root", macOS → "wheel").
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
-		return NewDarwin()
-	default:
-		return NewLinux()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // resolveRootGroup performs the two-hop lookup Ohai uses: look up user

@@ -23,14 +23,14 @@ package process_test
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
+	"time"
 
-	gpprocess "github.com/shirou/gopsutil/v4/process"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/process"
 )
 
@@ -113,81 +113,130 @@ func (s *ProcessPublicTestSuite) TestNew() {
 }
 
 func (s *ProcessPublicTestSuite) TestCollect() {
-	ownPID := int32(os.Getpid())
+	started, err := time.ParseInLocation(
+		"Mon Jan 2 15:04:05 2006",
+		"Thu Nov 20 12:04:00 2026",
+		time.Local,
+	)
+	s.Require().NoError(err)
+	const psMain = "ps -axo pid=,ppid=,user=,state=,lstart="
+	const psName = "ps -axo pid=,ucomm="
+	const psArgs = "ps -axww -o pid=,args="
+
 	tests := []struct {
-		name         string
-		variant      string
-		fn           func(context.Context) ([]*gpprocess.Process, error)
-		validateFunc func(any, error)
+		name    string
+		variant string
+		files   map[string]string
+		runner  sourcetest.Runner
+		want    *process.Info
+		wantErr string
 	}{
 		{
-			name:    "linux: snapshot wraps gopsutil processes",
+			name:    "linux: /proc, with owners and start times",
 			variant: "linux",
-			fn: func(context.Context) ([]*gpprocess.Process, error) {
-				p, _ := gpprocess.NewProcess(ownPID)
-				return []*gpprocess.Process{p}, nil
+			files: map[string]string{
+				"/proc/stat":      "cpu 1 2 3\nbtime 1700000000\n",
+				"/etc/passwd":     "root:x:0:0::/root:/bin/sh\nbad line\n",
+				"/proc/1/stat":    "1 (my (proc)) S 0 1 1 0 -1 4194560 1 2 3 4 5 6 7 8 20 0 1 0 500 9 10\n",
+				"/proc/1/status":  "Name:\tmy (proc)\nUid:\t0\t0\t0\t0\n",
+				"/proc/1/cmdline": "/sbin/init\x00splash\x00",
+				"/proc/42/stat":   "42 (kworker) R\n",
+				"/proc/42/status": "Uid:\t1000\t1000\t1000\t1000\n",
+				"/proc/99/status": "Uid:\t0\n",
+				"/proc/77/stat":   "no parens here\n",
+				"/proc/self/stat": "not a pid\n",
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*process.Info)
-				s.Require().True(ok)
-				s.Equal(1, info.Count)
-			},
+			want: &process.Info{Count: 2, Processes: []process.Process{
+				{
+					PID: 1, Name: "my (proc)", State: "sleep", Owner: "root",
+					CmdLine: "/sbin/init splash", CreationTime: 1700000005,
+				},
+				{PID: 42, Name: "kworker"},
+			}},
 		},
 		{
-			name:    "linux: empty process list",
+			name:    "linux: no boot time, and no passwd",
 			variant: "linux",
-			fn: func(context.Context) ([]*gpprocess.Process, error) {
-				return []*gpprocess.Process{}, nil
+			files: map[string]string{
+				"/proc/stat":   "cpu 1 2 3\n",
+				"/proc/1/stat": "1 (init) Z 0 1 1 0 -1 4194560 1 2 3 4 5 6 7 8 20 0 1 0 500 9 10\n",
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*process.Info)
-				s.Require().True(ok)
-				s.Equal(0, info.Count)
-			},
+			want: &process.Info{Count: 1, Processes: []process.Process{
+				{PID: 1, Name: "init", State: "zombie"},
+			}},
 		},
 		{
-			name:    "linux: gopsutil error propagated",
+			name:    "linux: no /proc/stat",
 			variant: "linux",
-			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("boom") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
+			files:   map[string]string{"/proc/5/stat": "5 (x) S 1\n"},
+			want: &process.Info{Count: 1, Processes: []process.Process{
+				{PID: 5, Name: "x", State: "sleep", ParentPID: 1},
+			}},
 		},
+		{name: "linux: no /proc", variant: "linux", wantErr: "read /proc"},
 		{
-			name:    "darwin: macOS snapshot",
+			name:    "darwin: ps, joined by pid",
 			variant: "darwin",
-			fn: func(context.Context) ([]*gpprocess.Process, error) {
-				return []*gpprocess.Process{}, nil
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*process.Info)
-				s.Require().True(ok)
-				s.Equal(0, info.Count)
-			},
+			runner: sourcetest.Runner{Out: map[string]string{
+				psMain: "    1     0 root     Ss   Thu Nov 20 12:04:00 2026\n" +
+					"  500     1 john     R+   not a date at all\n" +
+					"  x 1 bad R\n" +
+					"short\n",
+				psName: "    1 launchd\n  500 Google Chrome Helper\nnospace\n",
+				psArgs: "    1 /sbin/launchd\n  500 /Applications/Google Chrome.app/x --type=gpu\n",
+			}},
+			want: &process.Info{Count: 2, Processes: []process.Process{
+				{
+					PID: 1, Name: "launchd", Owner: "root", State: "sleep",
+					CmdLine: "/sbin/launchd", CreationTime: started.Unix(),
+				},
+				{
+					PID:       500,
+					ParentPID: 1,
+					Name:      "Google Chrome Helper",
+					Owner:     "john",
+					State:     "running",
+					CmdLine:   "/Applications/Google Chrome.app/x --type=gpu",
+				},
+			}},
 		},
 		{
-			name:    "darwin: processes error propagated",
+			name:    "darwin: the name and the args fail",
 			variant: "darwin",
-			fn:      func(context.Context) ([]*gpprocess.Process, error) { return nil, errors.New("kauth denied") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			runner: sourcetest.Runner{
+				Out: map[string]string{
+					psMain: "    7     1 john     U    Thu Nov 20 12:04:00 2026\n",
+				},
+				Err: map[string]error{psName: errors.New("boom"), psArgs: errors.New("boom")},
 			},
+			want: &process.Info{Count: 1, Processes: []process.Process{
+				{PID: 7, ParentPID: 1, Owner: "john", CreationTime: started.Unix()},
+			}},
+		},
+		{
+			name:    "darwin: ps fails",
+			variant: "darwin",
+			runner:  sourcetest.Runner{Err: map[string]error{psMain: errors.New("boom")}},
+			wantErr: "ps: boom",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer process.SetProcessesFn(tt.fn)()
 			var c process.Collector
 			switch tt.variant {
 			case "linux":
-				c = &process.Linux{}
+				c = &process.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &process.Darwin{}
+				c = &process.Darwin{Exec: tt.runner}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

@@ -73,24 +73,32 @@ just deps
   - `facts.go`. The `Facts` struct, with typed collector fields and the JSON and
     Flat methods.
   - `options.go`. The functional options (`WithEnabled`, `WithDisabled`,
-    `WithCollectors`).
+    `WithCollectors`, `WithSources`).
+  - `source/`. `Sources`: the filesystem, the command runner, the clock and the
+    platform family that a collector reads. A zero field is the real host.
+    `Host()` gives the real host, and `Runner` is the interface of the command
+    runner.
   - `registry.go`. `PublicRegistry`. The CLI uses it to list the flags.
 - **`pkg/gohai/collectors/<name>/`.** The public sub-package of each collector.
   Use the osapi pattern of one struct for each OS, with no build tags. The
   canonical reference is `pkg/gohai/collectors/shells/`.
   - `<name>.go`. The `Info` struct, the `Collector` interface, and the `base`
     struct. The `base` struct holds the shared `Name()`/`DefaultEnabled()`/
-    `Dependencies()`. The file also has the `New()` factory, which selects the
-    variant from `platform.Detect()`. It also has the helpers that all OS
-    variants share, such as shared parsing and shared constants.
+    `Dependencies()`. The file also has `NewWith(src)`, which selects the
+    variant from the family of `src` and gives the variant the sources of `src`
+    through `collector.Wire`. `New()` is `NewWith(source.Sources{})`. The file
+    also has the helpers that all OS variants share, such as shared parsing and
+    shared constants.
   - `linux.go`.
     `type Linux struct { base; FS avfs.VFS; Exec executor.Executor }`, with
-    `NewLinux()` and the `(l *Linux) Collect(ctx)` method. Add a field only when
-    the collector needs it. **No build tag.**
+    `NewLinux()` and the `(l *Linux) Collect(ctx)` method. A collector that
+    reads the clock also has `Now func() time.Time`. Add a field only when the
+    collector needs it. Each read of the host goes through these fields. **No
+    build tag.**
   - `darwin.go`. `type Darwin struct { base; FS; Exec }` with `NewDarwin()` and
     the `(d *Darwin) Collect(ctx)` method. **No build tag.**
   - `debian.go` / `rhel.go`. Add these only when a distribution is really
-    different. They use the same pattern, and the `New()` switch selects them.
+    different. They use the same pattern, and the `NewWith` switch selects them.
   - `<name>_public_test.go`. The **only** test file. At the top, it has the
     compile-time `collector.Collector` asserts. It has `TestNew` for the factory
     selection. It has one table-driven `TestCollect`. Each row has a
@@ -111,18 +119,23 @@ just deps
     with citations. It has 950 rows.
   - `ocsf-gaps.md`. The candidates for upstream OCSF PRs, from the audit that
     the page gives the date of.
-- **`internal/platform/`.** The OS and distribution detection. It wraps
-  gopsutil. `Detect()` is a `var` that tests can replace. Thus collector tests
-  can force each branch and do not import gopsutil. `hostInfoFn` is private.
-  Only the tests of platform can get it, through `export_test.go`.
+- **`internal/platform/`.** `Detect()`, a `var` that tests can replace, which is
+  `family.Detect` on a real host. `NewWith` uses it only when `src` has no
+  family.
 - **`internal/collector/`.** The collector interface and the registry code.
   - `collector.go`. The `Collector` interface.
+  - `sources.go`. `IsDarwin(src)` and `Family(src)` select a variant. `Wire`
+    sets the `FS`, `Exec` and `Now` fields of a variant from the sources.
   - `registry.go`. `Registry`. It registers collectors, resolves the
     dependencies and runs the collectors at the same time.
   - `mocks/`. The gomock generation (`go generate`) and the committed mock.
 - **`internal/executor/`.** The abstraction for command execution.
-  - `executor.go`. The `Executor` interface (`Execute(ctx, name, args...)`).
+  - `executor.go`. `Executor`, which is `source.Runner`
+    (`Execute(ctx, name, args...)`).
   - `mocks/`. The gomock generation (`go generate`) and the committed mock.
+- **`internal/sourcetest/`.** The sources of a collector test. `FS` gives a
+  memory filesystem that holds the given files. `Runner` answers the given
+  command lines.
 
 ## Code style
 
@@ -273,9 +286,9 @@ then a blank line, then the header.
 
 ### Error wrapping at the module boundary
 
-Never let raw gopsutil, ghw or procfs error types go out through the public API.
-Wrap them. Then callers do not need these packages in their module graph to
-handle an error.
+Never let raw ghw or procfs error types go out through the public API. Wrap
+them. Then callers do not need these packages in their module graph to handle an
+error.
 
 ## Tests
 
@@ -461,9 +474,10 @@ Before you mark a collector as complete, each item below must be true:
     table on the collector page. If a schema has a field that we can report but
     do not, add the field or write why not.
 
-03. **The osapi pattern of one struct for each OS**. No build tags. The factory
-    selects the variant from `platform.Detect()`. Each struct for an OS
-    implements Collect.
+03. **The osapi pattern of one struct for each OS**. No build tags. `NewWith`
+    selects the variant from the family of its sources. Each struct for an OS
+    implements Collect, and reads the host only through its `FS`, `Exec` and
+    `Now` fields.
 
 04. **100% test coverage.**
     `go tool cover -func=/tmp/cov.out | grep -v '100.0%'` returns nothing for
@@ -476,10 +490,11 @@ Before you mark a collector as complete, each item below must be true:
     permitted extra test methods are tests of pure public helpers, for example
     `TestHumanDuration`.
 
-06. **The seams are at the boundary.** `export_test.go` replaces the call to the
-    upstream library (`hostInfoFn`, `partitionsFn` and others). Thus the bridge
-    mapping runs on each row. No `readXFn = readX` wrappers in the middle of the
-    collector. No alias that tests a bridge that `TestCollect` already tests.
+06. **The seams are the sources.** A test row gives the files, the command
+    output and the clock, through `internal/sourcetest`. Thus the parse runs on
+    each row. A package `var` that a test replaces is only for a read that is
+    not a source, such as a DNS lookup. No `readXFn = readX` wrappers in the
+    middle of the collector.
 
 07. **`docs/collectors/<name>.md`** is a functional spec that is complete in
     itself. It has these sections:

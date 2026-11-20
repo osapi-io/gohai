@@ -22,19 +22,20 @@ package platform
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Linux collects platform identification on Linux. gopsutil reads
-// /etc/os-release for the modern systemd path; we then layer two
+// Linux collects platform identification on Linux. It reads the ID and
+// VERSION_ID of /etc/os-release, as Ohai does, and then layers two
 // extensions:
 //
 //   - /etc/redhat-release (or /etc/debian_version) supplements
-//     `Version` when gopsutil reports a major-only or empty value.
-//   - When gopsutil produces no name at all (legacy / appliance
+//     `Version` when os-release has a major-only or empty value.
+//   - When os-release gives no name at all (legacy / appliance
 //     distros without /etc/os-release), we cascade through the Ohai
 //     legacy_platform_detection chain (redhat-release, SuSE-release,
 //     f5-release, system-release, debian_version, arch-release,
@@ -53,14 +54,12 @@ func NewLinux() *Linux {
 
 // Collect returns platform Info.
 func (l *Linux) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info, _, err := readPlatform(ctx)
-	if err != nil {
-		return nil, err
-	}
+	info := &Info{OS: "linux", CPUArchitecture: runtime.GOARCH}
 	if l.FS != nil {
+		readOSRelease(l.FS, info)
 		applyRedhatReleaseSupplement(l.FS, info)
 		applyLegacyReleaseFallback(l.FS, info)
 	}

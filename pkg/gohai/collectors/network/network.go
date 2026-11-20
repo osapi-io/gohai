@@ -27,18 +27,15 @@
 package network
 
 import (
-	"context"
 	"net"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/jaypipes/ghw"
-	gpnet "github.com/shirou/gopsutil/v4/net"
-	"github.com/vishvananda/netlink"
+	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds network interfaces plus top-level routing + neighbour
@@ -228,64 +225,56 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the network variant for the host OS.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
-	}
-	return NewLinux()
+	return NewWith(source.Sources{})
 }
 
-// Package-level injection seams for gopsutil (kept private so
-// importers don't transitively need gopsutil).
-var (
-	interfacesFn = gpnet.InterfacesWithContext
-	ioCountersFn = gpnet.IOCountersWithContext
-)
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
+	}
 
-// readInterfaces is the production bridge to gopsutil. Enumerates
-// interfaces, structures each address, and merges per-interface I/O
-// counters (matched by name).
-func readInterfaces(
-	ctx context.Context,
-) ([]Interface, error) {
-	ifs, err := interfacesFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	counts, _ := ioCountersFn(ctx, true)
-	countersByName := map[string]*Counters{}
-	for _, c := range counts {
-		countersByName[c.Name] = &Counters{
-			BytesSent: c.BytesSent, BytesRecv: c.BytesRecv,
-			PacketsSent: c.PacketsSent, PacketsRecv: c.PacketsRecv,
-			Errin: c.Errin, Errout: c.Errout,
-			Dropin: c.Dropin, Dropout: c.Dropout,
+	return collector.Wire(NewLinux(), src)
+}
+
+// goFlags are the interface flags that gopsutil gave, as Go's net.Flags
+// names them, in its order.
+var goFlags = []string{"up", "broadcast", "loopback", "pointtopoint", "multicast"}
+
+// orderFlags is the flags of set that Go names, in Go's order.
+func orderFlags(
+	set map[string]bool,
+) []string {
+	var out []string
+	for _, f := range goFlags {
+		if set[f] {
+			out = append(out, f)
 		}
 	}
-	out := make([]Interface, 0, len(ifs))
-	for _, i := range ifs {
-		item := Interface{
-			Name:   i.Name,
-			Number: i.Index,
-			State:  stateFromFlags(i.Flags),
-			MTU:    i.MTU,
-			MAC:    i.HardwareAddr,
-			Flags:  i.Flags,
-		}
-		for _, a := range i.Addrs {
-			if addr, ok := parseAddress(a.Addr); ok {
-				item.Addresses = append(item.Addresses, addr)
-			}
-		}
-		if c, ok := countersByName[i.Name]; ok {
-			item.Counters = c
-		}
-		out = append(out, item)
+
+	return out
+}
+
+// withPrefix is cidr with a prefix: a host prefix when it has none, as
+// a point-to-point address prints.
+func withPrefix(
+	cidr string,
+) string {
+	if strings.Contains(cidr, "/") {
+		return cidr
 	}
-	return out, nil
+	if strings.Contains(cidr, ":") {
+		return cidr + "/128"
+	}
+
+	return cidr + "/32"
 }
 
 // parseAddress turns a CIDR string into a structured Address.
-// gopsutil emits everything as `<ip>/<prefix>`; non-parseable input
+// Each source gives `<ip>/<prefix>`; non-parseable input
 // (defensive) returns ok=false and is skipped by the caller.
 func parseAddress(
 	cidr string,
@@ -810,7 +799,7 @@ func parseXDPLine(
 
 // stateFromFlags returns the admin state label (`"up"` / `"down"`)
 // mirroring Ohai's `iface["state"]` (which reads from `ip link show`).
-// gopsutil lowercases the `up` flag, so a simple membership check is
+// The flags are lower case, so a simple membership check is
 // enough; absence means the kernel has the interface admin-down.
 func stateFromFlags(
 	flags []string,
@@ -862,134 +851,62 @@ type NICStat struct {
 	Duplex string
 }
 
-// Package-level seams. Production uses ghw/net for Speed + Duplex
-// and a sysfs read for Driver; vishvananda/netlink for the kernel
-// ARP+NDP cache. Both libraries compile cross-platform; their darwin
-// code paths return errors at runtime, leaving the relevant fields
-// blank.
-//
-// nicFn / neighListFn are the high-level seams collectors use. The
-// inner upstream calls (ghwNetworkFn / netlinkNeighListFn /
-// netInterfaceByIndex) are also private vars so tests can swap them
-// in isolation when exercising readNIC / readNeighbours directly.
-var (
-	nicFn               = readNIC
-	neighListFn         = readNeighbours
-	ghwNetworkFn        = ghw.Network
-	netlinkNeighListFn  = netlink.NeighList
-	netInterfaceByIndex = net.InterfaceByIndex
-)
-
-// readNIC asks ghw for the link layer's Speed + Duplex per
-// interface name. Driver comes from a separate sysfs read in
-// applyNICStats (it's avfs-injectable so tests cover it without
-// touching ghw). Returns a name → NICStat map so a single ghw call
-// services every interface.
-func readNIC() (map[string]NICStat, error) {
-	info, err := ghwNetworkFn()
-	if err != nil {
-		return nil, err
+// readNIC is the link speed and duplex of the interface name, from
+// /sys/class/net, written as ethtool writes them: "1000Mb/s" and "Full".
+// A link that is down, or a virtual interface, has neither file or a
+// negative speed, and gets "Unknown!".
+func readNIC(
+	fs avfs.VFS,
+	name string,
+) NICStat {
+	var st NICStat
+	if b, err := fs.ReadFile("/sys/class/net/" + name + "/speed"); err == nil {
+		st.Speed = "Unknown!"
+		if n, err := strconv.Atoi(strings.TrimSpace(string(b))); err == nil && n > 0 {
+			st.Speed = strconv.Itoa(n) + "Mb/s"
+		}
 	}
-	return nicMapFromGHW(info.NICs), nil
+	if b, err := fs.ReadFile("/sys/class/net/" + name + "/duplex"); err == nil {
+		switch d := strings.TrimSpace(string(b)); d {
+		case "full", "half":
+			st.Duplex = strings.ToUpper(d[:1]) + d[1:]
+		default:
+			st.Duplex = "Unknown!"
+		}
+	}
+
+	return st
 }
 
-// nicMapFromGHW is the pure conversion from ghw's []*NIC to our
-// name → NICStat map. Extracted so tests cover the mapping without
-// touching the host (readNIC itself stays trivial).
-func nicMapFromGHW(
-	nics []*ghw.NIC,
-) map[string]NICStat {
-	out := map[string]NICStat{}
-	for _, n := range nics {
-		if n == nil {
+// parseIPNeigh is the neighbours of `ip neigh show`: "10.0.0.1 dev eth0
+// lladdr aa:bb:cc:dd:ee:ff REACHABLE", the state last.
+func parseIPNeigh(
+	out []byte,
+) []Neighbour {
+	entries := []Neighbour{}
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 2 {
 			continue
 		}
-		out[n.Name] = NICStat{Speed: n.Speed, Duplex: n.Duplex}
-	}
-	return out
-}
-
-// readNeighbours queries the kernel ARP + NDP cache via netlink and
-// returns one Neighbour per entry. The pure conversion lives in
-// neighboursFromNetlink so tests can drive it without netlink.
-func readNeighbours() ([]Neighbour, error) {
-	entries, err := netlinkNeighListFn(0, 0)
-	if err != nil {
-		return nil, err
-	}
-	return neighboursFromNetlink(entries, indexToInterfaceName), nil
-}
-
-// indexToInterfaceName resolves an interface index via stdlib's
-// net.InterfaceByIndex (swappable as netInterfaceByIndex).
-func indexToInterfaceName(
-	idx int,
-) string {
-	if iface, err := netInterfaceByIndex(idx); err == nil {
-		return iface.Name
-	}
-	return ""
-}
-
-// neighboursFromNetlink is the pure conversion from netlink.Neigh
-// to our Neighbour. Takes an indexToName resolver so tests can
-// avoid touching the host.
-func neighboursFromNetlink(
-	entries []netlink.Neigh,
-	indexToName func(int) string,
-) []Neighbour {
-	out := make([]Neighbour, 0, len(entries))
-	for _, e := range entries {
-		nb := Neighbour{
-			Address:   e.IP.String(),
-			Family:    neighFamily(e.Family),
-			Interface: indexToName(e.LinkIndex),
-			State:     neighState(e.State),
+		ip := net.ParseIP(f[0])
+		if ip == nil {
+			continue
 		}
-		if e.HardwareAddr != nil {
-			nb.MAC = e.HardwareAddr.String()
+		n := Neighbour{Address: ip.String(), Family: "inet6", State: f[len(f)-1]}
+		if ip.To4() != nil {
+			n.Family = "inet"
 		}
-		out = append(out, nb)
+		for i := 1; i+1 < len(f); i++ {
+			switch f[i] {
+			case "dev":
+				n.Interface = f[i+1]
+			case "lladdr":
+				n.MAC = f[i+1]
+			}
+		}
+		entries = append(entries, n)
 	}
-	return out
-}
 
-// neighFamily turns the netlink AF_* integer into our string label.
-func neighFamily(
-	fam int,
-) string {
-	switch fam {
-	case 2: // AF_INET
-		return "inet"
-	case 10: // AF_INET6
-		return "inet6"
-	}
-	return ""
-}
-
-// neighState turns netlink's NUD_* bitmask into the canonical
-// ip-neigh string. Mirrors `ip neigh show`'s human output. Unknown
-// values fall through to a hex-formatted string.
-func neighState(
-	state int,
-) string {
-	switch state {
-	case 0x01:
-		return "INCOMPLETE"
-	case 0x02:
-		return "REACHABLE"
-	case 0x04:
-		return "STALE"
-	case 0x08:
-		return "DELAY"
-	case 0x10:
-		return "PROBE"
-	case 0x20:
-		return "FAILED"
-	case 0x40:
-		return "NOARP"
-	case 0x80:
-		return "PERMANENT"
-	}
-	return ""
+	return entries
 }

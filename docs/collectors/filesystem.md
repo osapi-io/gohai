@@ -74,10 +74,10 @@ uses `mountpoint`, not Ohai's `mount`, and `type`, not Ohai's `fs_type`.
 
 ## Platform support
 
-| Platform | Supported                                              |
-| -------- | ------------------------------------------------------ |
-| Linux    | ✅ (gopsutil, and `lsblk` data when it is on the PATH) |
-| macOS    | ✅ (the `getfsstat` syscall through gopsutil)          |
+| Platform | Supported                                               |
+| -------- | ------------------------------------------------------- |
+| Linux    | ✅ (`/proc/mounts`, `df`, and `lsblk` when it is there) |
+| macOS    | ✅ (`mount` and `df`)                                   |
 
 ## Example output
 
@@ -143,19 +143,19 @@ None.
 
 Ohai's `filesystem.rb` combines the output of `mount`, `df` and `lsblk`. For
 each device, it shows the mount points, the capacity and the filesystem types.
-gohai uses gopsutil instead. gopsutil reads `/proc/mounts` and calls `statfs`
-directly. The data is the same, but the parse is different. gohai also adds
+gohai reads `/proc/mounts` and runs `df`. The data is the same. gohai also adds
 btrfs allocation data, which it reads through VFS. It also adds ZFS dataset
 properties from the `zfs` command.
 
 On Linux:
 
-1. gopsutil `disk.Partitions(true)` lists the mount table from `/proc/mounts`.
-   For each row, gopsutil `disk.Usage(mountpoint)` gives the capacity, used and
-   available bytes, and the inode counts (`inodes_total`, `inodes_used`,
-   `inodes_available`). When `total > 0`, the collector calculates
-   `inodes_used_percent` as `used / total * 100`. Thus gohai also has Ohai's
-   `filesystem[mount][:inodes_percent_used]` field.
+1. `/proc/mounts`, read through the filesystem of the collector, is the mount
+   table. The collector changes the octal escapes of the file, such as `\040`
+   for a space, back to characters. `df -kP` gives the capacity, used and
+   available bytes of each mount. `df -iP` gives the inode counts
+   (`inodes_total`, `inodes_used`, `inodes_available`). When `total > 0`, the
+   collector calculates `inodes_used_percent` as `used / total * 100`. Thus
+   gohai also has Ohai's `filesystem[mount][:inodes_percent_used]` field.
 2. When `lsblk` is on the PATH, the collector runs
    `lsblk -J -o NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL` through
    the shared `internal/executor` runner. It merges the result into the mount
@@ -167,7 +167,7 @@ On Linux:
 4. `lsblk` can be missing, for example in minimal containers or in Alpine
    without util-linux. Its output can also be not valid. In these cases, the
    collector skips the `lsblk` data and reports no error. The capacity and inode
-   data from gopsutil stay.
+   data from `df` stay.
 5. **Btrfs allocation data**. For each mount with `type == "btrfs"` and a UUID,
    the collector reads `/sys/fs/btrfs/<uuid>/allocation/` through the injected
    `avfs.VFS`. It fills the `btrfs` sub-record of the mount: the byte counters
@@ -184,13 +184,12 @@ On Linux:
    fails), the collector returns zero datasets and no error. This does not
    depend on `lsblk`.
 
-On macOS, the collector uses gopsutil's list of mounts, which comes from
-`getfsstat(2)`. The btrfs and ZFS data are on Linux only.
+On macOS, `mount` gives the mount table: the device, the mount point, the type
+and the options. `df -ki` gives the capacity and the inode counts of each mount
+in one run. The btrfs and ZFS data are on Linux only.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil),
-  BSD-3. The main source for mounts, capacity and inodes.
 - [`internal/executor`](../../internal/executor). The shared command runner. The
-  collector uses it to run `lsblk` and `zfs` on Linux. Tests mock it with
-  `go.uber.org/mock`.
+  collector uses it to run `df` on the two platforms, `mount` on macOS, and
+  `lsblk` and `zfs` on Linux. Tests mock it with `go.uber.org/mock`.

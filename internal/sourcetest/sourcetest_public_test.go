@@ -18,20 +18,48 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package machineid
+package sourcetest_test
 
 import (
 	"context"
+	"errors"
+	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/osapi-io/gohai/internal/sourcetest"
 )
 
-// SetHostInfoFn swaps the private gopsutil host.InfoWithContext call
-// backing readHostID. Returns a restore func the caller must defer.
-func SetHostInfoFn(
-	fn func(context.Context) (*host.InfoStat, error),
-) (restore func()) {
-	orig := hostInfoFn
-	hostInfoFn = fn
-	return func() { hostInfoFn = orig }
+type SourcetestPublicTestSuite struct {
+	suite.Suite
+}
+
+func (s *SourcetestPublicTestSuite) TestFS() {
+	fs := sourcetest.FS(s.T(), map[string]string{"/proc/loadavg": "0.1 0.2 0.3"})
+	b, err := fs.ReadFile("/proc/loadavg")
+	s.Require().NoError(err)
+	s.Equal("0.1 0.2 0.3", string(b))
+}
+
+func (s *SourcetestPublicTestSuite) TestRunner() {
+	r := sourcetest.Runner{
+		Out: map[string]string{"sysctl -n vm.loadavg": "{ 1 2 3 }", "df -kP": "partial"},
+		Err: map[string]error{"df -kP": errors.New("exit status 1")},
+	}
+	out, err := r.Execute(context.Background(), "sysctl", "-n", "vm.loadavg")
+	s.Require().NoError(err)
+	s.Equal("{ 1 2 3 }", string(out))
+
+	out, err = r.Execute(context.Background(), "df", "-kP")
+	s.EqualError(err, "exit status 1")
+	s.Equal("partial", string(out))
+
+	_, err = r.Execute(context.Background(), "nope")
+	s.ErrorContains(err, "exec nope")
+}
+
+func TestSourcetestPublicTestSuite(
+	t *testing.T,
+) {
+	suite.Run(t, new(SourcetestPublicTestSuite))
 }

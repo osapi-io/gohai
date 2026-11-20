@@ -22,64 +22,87 @@ package uptime
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// procUptimePath is /proc/uptime. Two fields: uptime seconds and
-// aggregate idle seconds across all CPUs.
-const procUptimePath = "/proc/uptime"
+const (
+	// procUptimePath has two fields: the seconds since boot, and the idle
+	// seconds summed over the CPUs.
+	procUptimePath = "/proc/uptime"
+	// procStatPath has btime, the boot time as a unix timestamp.
+	procStatPath = "/proc/stat"
+)
 
-// Linux collects uptime + idle on Linux.
+// Linux collects uptime and idle time from /proc/uptime, and the boot time
+// from /proc/stat.
 type Linux struct {
 	base
 
 	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to the real OS filesystem.
+// NewLinux returns a Linux variant that reads the host's filesystem.
 func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns uptime facts. Uses readBaseFn for Seconds/BootTime
-// and layers idle on top via /proc/uptime.
+// Collect returns uptime facts.
 func (l *Linux) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	out, err := readBase(ctx)
+	b, err := l.FS.ReadFile(procUptimePath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read %s: %w", procUptimePath, err)
 	}
-	if idle, ok := readIdleSeconds(l.FS); ok {
-		out.IdleSeconds = idle
-		out.IdleHuman = HumanDuration(idle)
+	fields := strings.Fields(string(b))
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("%s is empty", procUptimePath)
 	}
+	up, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil || up < 0 {
+		return nil, fmt.Errorf(
+			"%s: uptime %q is not a number of seconds",
+			procUptimePath,
+			fields[0],
+		)
+	}
+	out := &Info{Seconds: uint64(up), Human: HumanDuration(uint64(up))}
+	out.BootTime = readBootTime(l.FS)
+	if len(fields) > 1 {
+		if idle, err := strconv.ParseFloat(fields[1], 64); err == nil && idle >= 0 {
+			out.IdleSeconds = uint64(idle)
+			out.IdleHuman = HumanDuration(out.IdleSeconds)
+		}
+	}
+
 	return out, nil
 }
 
-// readIdleSeconds parses the second field of /proc/uptime (aggregate
-// idle seconds across all CPU cores). Returns (0, false) on any failure
-// — idle is best-effort.
-func readIdleSeconds(
+// readBootTime is the btime line of /proc/stat, or 0 when it cannot be
+// read.
+func readBootTime(
 	fs avfs.VFS,
-) (uint64, bool) {
-	b, err := fs.ReadFile(procUptimePath)
+) uint64 {
+	b, err := fs.ReadFile(procStatPath)
 	if err != nil {
-		return 0, false
+		return 0
 	}
-	fields := strings.Fields(string(b))
-	if len(fields) < 2 {
-		return 0, false
+	for _, line := range strings.Split(string(b), "\n") {
+		if v, ok := strings.CutPrefix(line, "btime "); ok {
+			n, err := strconv.ParseUint(strings.TrimSpace(v), 10, 64)
+			if err == nil {
+				return n
+			}
+		}
 	}
-	f, err := strconv.ParseFloat(fields[1], 64)
-	if err != nil || f < 0 {
-		return 0, false
-	}
-	return uint64(f), true
+
+	return 0
 }

@@ -25,11 +25,11 @@ import (
 	"errors"
 	"testing"
 
-	gpload "github.com/shirou/gopsutil/v4/load"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
 )
 
@@ -113,65 +113,62 @@ func (s *LoadPublicTestSuite) TestNew() {
 
 func (s *LoadPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name         string
-		variant      string
-		fn           func(context.Context) (*gpload.AvgStat, error)
-		validateFunc func(any, error)
+		name    string
+		variant string
+		files   map[string]string
+		runner  sourcetest.Runner
+		want    *load.Info
+		wantErr string
 	}{
 		{
-			name:    "linux: averages returned",
+			name:    "linux: /proc/loadavg",
 			variant: "linux",
-			fn: func(context.Context) (*gpload.AvgStat, error) {
-				return &gpload.AvgStat{Load1: 0.25, Load5: 0.5, Load15: 1.0}, nil
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*load.Info)
-				s.Require().True(ok)
-				s.Equal(load.Info{One: 0.25, Five: 0.5, Fifteen: 1.0}, *info)
-			},
+			files:   map[string]string{"/proc/loadavg": "0.25 0.50 1.00 1/412 12345\n"},
+			want:    &load.Info{One: 0.25, Five: 0.5, Fifteen: 1.0},
+		},
+		{name: "linux: no /proc/loadavg", variant: "linux", wantErr: "read /proc/loadavg"},
+		{
+			name: "linux: too few fields", variant: "linux",
+			files: map[string]string{"/proc/loadavg": "0.25 0.50"}, wantErr: "no load averages",
 		},
 		{
-			name:    "linux: gopsutil error propagated",
-			variant: "linux",
-			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
+			name: "linux: a field that is not a number", variant: "linux",
+			files: map[string]string{"/proc/loadavg": "0.25 x 1.00"}, wantErr: `load average "x"`,
 		},
 		{
-			name:    "darwin: averages returned",
+			name:    "darwin: vm.loadavg",
 			variant: "darwin",
-			fn: func(context.Context) (*gpload.AvgStat, error) {
-				return &gpload.AvgStat{Load1: 1.5, Load5: 2.0, Load15: 2.5}, nil
+			runner: sourcetest.Runner{
+				Out: map[string]string{"sysctl -n vm.loadavg": "{ 1.50 2.00 2.50 }\n"},
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*load.Info)
-				s.Require().True(ok)
-				s.Equal(load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5}, *info)
-			},
+			want: &load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
 		},
 		{
-			name:    "darwin: gopsutil error propagated",
+			name:    "darwin: sysctl fails",
 			variant: "darwin",
-			fn:      func(context.Context) (*gpload.AvgStat, error) { return nil, errors.New("boom") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			runner: sourcetest.Runner{
+				Err: map[string]error{"sysctl -n vm.loadavg": errors.New("boom")},
 			},
+			wantErr: "sysctl vm.loadavg: boom",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer load.SetAvgFn(tt.fn)()
 			var c load.Collector
 			switch tt.variant {
 			case "linux":
-				c = &load.Linux{}
+				c = &load.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &load.Darwin{}
+				c = &load.Darwin{Exec: tt.runner}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

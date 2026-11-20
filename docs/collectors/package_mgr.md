@@ -34,10 +34,11 @@ Consumers use this data to:
 | Linux (SUSE, Arch, Alpine, Void, Gentoo) | ✅ (the collector looks for zypper, pacman, apk, xbps-install, emerge) |
 | macOS                                    | ✅ (`brew` first, then `port`)                                         |
 
-`internal/platform.Detect()` decides which managers the collector looks for. It
-wraps gopsutil's host data. It maps `ubuntu`, `debian` and `raspbian` to
-`debian`. It maps `rhel`, `redhat`, `centos`, `fedora`, `rocky`, `alma`,
-`amazon` and `oracle` to `rhel`.
+The platform family decides which managers the collector looks for. The family
+comes from the caller's sources. If the sources have no family,
+`family.Detect()` reads `/etc/os-release`. It maps `ubuntu`, `debian` and
+`raspbian` to `debian`. It maps `rhel`, `redhat`, `centos`, `fedora`, `rocky`,
+`alma`, `amazon` and `oracle` to `rhel`.
 
 ## Example output
 

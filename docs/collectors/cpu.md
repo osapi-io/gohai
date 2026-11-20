@@ -9,9 +9,8 @@ layout, the NUMA layout, and the mitigation status of hardware vulnerabilities.
 The vulnerabilities map is the canonical signal of each host for Meltdown,
 Spectre, MDS, Retbleed and SRBDS audits. For s390x and ppc64le, the topology
 comes from `lscpu`, because `/proc/cpuinfo` does not have all of it. On macOS,
-the core and frequency facts come from `sysctl`, not from gopsutil. On Apple
-Silicon, gopsutil reports logical cores as physical cores and reports a
-frequency of zero.
+the facts come from `sysctl`, and on Apple Silicon the frequency comes from the
+frequency table that `ioreg` shows.
 
 Consumers use this data to:
 
@@ -26,18 +25,18 @@ Consumers use this data to:
 
 The collector assumes that all sockets have the same CPU. `model_name`,
 `vendor_id`, `family`, `model`, `stepping`, `cache_size` and `flags` come from
-the first logical CPU that gopsutil returns. This is correct on approximately
-99% of hosts. Some SKUs have different types of cores, for example the P and E
-cores of Apple Silicon or the hybrid cores of Intel Alder Lake. On these SKUs,
-the fields give the data of the first core.
+the first logical CPU. This is correct on approximately 99% of hosts. Some SKUs
+have different types of cores, for example the P and E cores of Apple Silicon or
+the hybrid cores of Intel Alder Lake. On these SKUs, the fields give the data of
+the first core.
 
 ## Collected fields
 
 | Field                 | Type              | Description                                                                                                                                                                                                                                                                                                                          | Schema mapping                                                                                         |
 | --------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | `count`               | int               | The number of logical CPUs (the threads that the scheduler sees).                                                                                                                                                                                                                                                                    | OCSF `device.cpu_count`. The `cpu_` prefix is removed because it repeats the collector name.           |
-| `sockets`             | int               | The physical packages. macOS: `hw.packages`. Linux: gopsutil (x86) or `lscpu` (other architectures).                                                                                                                                                                                                                                 | No direct schema mapping.                                                                              |
-| `cores`               | int               | The physical cores of all sockets. macOS: `hw.physicalcpu`. Linux: gopsutil or `lscpu`.                                                                                                                                                                                                                                              | OCSF `device.cpu_cores`. The leaf is the same as the gohai JSON key.                                   |
+| `sockets`             | int               | The physical packages. macOS: `hw.packages`. Linux: `physical id` (x86) or `lscpu` (other architectures).                                                                                                                                                                                                                            | No direct schema mapping.                                                                              |
+| `cores`               | int               | The physical cores of all sockets. macOS: `hw.physicalcpu`. Linux: `/proc/cpuinfo` or `lscpu`.                                                                                                                                                                                                                                       | OCSF `device.cpu_cores`. The leaf is the same as the gohai JSON key.                                   |
 | `model_name`          | string            | The CPU name that a person can read, from `/proc/cpuinfo` or sysctl.                                                                                                                                                                                                                                                                 | OTel `host.cpu.model.name`. OCSF `device.hw_info.cpu_type` is the architecture, not the product model. |
 | `vendor_id`           | string            | The CPU vendor (`"GenuineIntel"`, `"AuthenticAMD"`).                                                                                                                                                                                                                                                                                 | OTel `host.cpu.vendor.id`.                                                                             |
 | `family`              | string            | The CPU family number.                                                                                                                                                                                                                                                                                                               | OTel `host.cpu.family`.                                                                                |
@@ -76,10 +75,10 @@ the fields give the data of the first core.
 
 ## Platform support
 
-| Platform | Supported                                                                                 |
-| -------- | ----------------------------------------------------------------------------------------- |
-| Linux    | ✅ (gopsutil `/proc/cpuinfo` + sysfs vulnerabilities + optional `lscpu`)                  |
-| macOS    | ✅ (gopsutil sysctl + `hw.physicalcpu` / `hw.packages` / `hw.cpufrequency_max` overrides) |
+| Platform | Supported                                                                   |
+| -------- | --------------------------------------------------------------------------- |
+| Linux    | ✅ (`/proc/cpuinfo` + sysfs cpufreq and vulnerabilities + optional `lscpu`) |
+| macOS    | ✅ (`sysctl`, and `ioreg` for the Apple Silicon frequency)                  |
 
 ## Example output
 
@@ -163,21 +162,26 @@ None.
 On Linux, Ohai's `cpu.rb` uses two sources. It parses `/proc/cpuinfo` directly
 for the identity of each core (model, flags, MHz, vendor, family, stepping). It
 uses `lscpu` for the topology (sockets, NUMA nodes, caches, vulnerabilities,
-byte order, op-modes). gohai uses the same two sources. gopsutil reads
-`/proc/cpuinfo` for the base fields. gohai runs `lscpu` through Executor for the
+byte order, op-modes). gohai uses the same two sources. gohai reads
+`/proc/cpuinfo` for the base fields, and runs `lscpu` through Executor for the
 extended topology fields. On macOS, Ohai reads `sysctl` for the CPU data. gohai
 does the same with `sysctl -n` for the cores, the sockets and the frequency.
 
 On Linux:
 
-1. gopsutil's `cpu.Info` parses `/proc/cpuinfo`. It gives the model, the flags,
-   the MHz, the total cache size, the vendor, and the family, model and stepping
-   of each core. `cpu.Counts` gives the logical count. It also gives the number
-   of different `PhysicalID` values, which is `sockets` on x86. The collector
-   also puts each `cpu.Info` entry into the `cpus[]` slice. Thus the fields of
-   each logical CPU stay in the output. This is important on hybrid-core CPUs,
-   where the cores are not all the same. It is the same as Ohai's `cpu["0"]`,
-   `cpu["1"]` entries.
+1. The collector reads `/proc/cpuinfo` through its filesystem. Each numbered
+   `processor` line starts the entry of one logical CPU. The entry gives the
+   model, the flags, the MHz, the total cache size, the vendor, and the family,
+   model and stepping. On ARM, `CPU implementer`, `CPU part` and `CPU revision`
+   give the vendor, the model and the stepping. If
+   `/sys/devices/system/cpu/cpuN/cpufreq/cpuinfo_max_freq` is there, it gives
+   the speed, and `topology/core_id` gives the core. The number of entries is
+   `count`. If the file has no `processor` lines, the `cpuN` lines of
+   `/proc/stat` give `count`. The number of different `physical id` values is
+   `sockets` on x86. The collector puts each entry into the `cpus[]` slice. Thus
+   the fields of each logical CPU stay in the output. This is important on
+   hybrid-core CPUs, where the cores are not all the same. It is the same as
+   Ohai's `cpu["0"]`, `cpu["1"]` entries.
 
 2. The collector reads each file in `/sys/devices/system/cpu/vulnerabilities/`
    through the injected `avfs.VFS`. The basename is the map key. The trimmed
@@ -190,32 +194,36 @@ On Linux:
    - The cache size of each level (`caches.l1d` / `l1i` / `l2` / `l3`).
    - The NUMA node → CPU index lists (`numa_nodes`).
    - On `s390x` and `ppc64le` only, the socket, core and thread counts. These
-     replace the gopsutil numbers, which are correct only for x86.
+     replace the numbers from `/proc/cpuinfo`, which are correct only for x86.
 
-   If `lscpu` fails, the extension fields stay empty. The fields from gopsutil
-   stay correct.
+   If `lscpu` fails, the extension fields stay empty. The fields from
+   `/proc/cpuinfo` stay correct.
 
 On macOS:
 
-1. gopsutil's `cpu.Info` gives `model_name`, `vendor_id`, `flags` and the
-   logical thread count (`count`) through the `host_info()` mach call. The
-   collector puts each entry into the `cpus[]` slice, as on Linux. The summary
-   fields, which assume that all CPUs are the same, come from the first entry.
-2. The collector replaces these values with `sysctl -n <key>` through the
-   injected `executor.Executor`:
-   - `hw.physicalcpu` → `cores`. gopsutil reports logical cores here.
+1. The collector runs `sysctl -n` through its command runner for each key:
+   - `hw.logicalcpu` → `count`. If it fails, the collector gives an error.
+   - `machdep.cpu.brand_string`, `machdep.cpu.vendor`, `machdep.cpu.family`,
+     `machdep.cpu.model` and `machdep.cpu.stepping` → the model, vendor, family,
+     model and stepping. Apple Silicon has no family or model, and they are
+     `"0"`.
+   - `machdep.cpu.features` and `machdep.cpu.leaf7_features`, in lower case →
+     `flags`. Apple Silicon has neither.
+   - `hw.physicalcpu` → `cores`. If it fails, `cores` is `count`.
    - `hw.packages` → `sockets`.
    - `hw.cpufrequency_max`, or `hw.cpufrequency` if it is missing, divided by
-     1e6 → `speed`. Apple Silicon has neither sysctl. Then `speed` keeps the
-     value from gopsutil (usually 0). The collector does not report an incorrect
-     frequency.
+     1e6 → `speed`.
+2. Apple Silicon has neither frequency sysctl. Then the collector runs
+   `ioreg -l -w0 -c AppleARMIODevice -n pmgr`. The `voltage-states5-sram`
+   property is the frequency table of the performance cores: pairs of
+   little-endian 32-bit numbers, a frequency in Hz and a voltage. The highest
+   frequency, divided by 1e6, is `speed`. If there is no table, `speed` is 0.
+3. The collector puts the one entry into the `cpus[]` slice, as on Linux.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/cpu`](https://github.com/shirou/gopsutil),
-  BSD-3. The primary source for `/proc/cpuinfo` on Linux and for the mach
-  sysctls on macOS.
-- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read the sysfs
-  vulnerabilities. Production uses `osfs`. Tests use `memfs`.
-- `internal/executor` to run `lscpu` on Linux and `sysctl` on macOS. Tests use
-  the generated gomock.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read
+  `/proc/cpuinfo`, `/proc/stat` and sysfs. Production uses `osfs`. Tests use
+  `memfs`.
+- `internal/executor` to run `lscpu` on Linux, and `sysctl` and `ioreg` on
+  macOS. Tests use the generated gomock.
