@@ -33,8 +33,9 @@ import (
 )
 
 // Darwin collects network facts on macOS: each interface of `ifconfig
-// -a -v`, with its index, flags, MTU, MAC and addresses, and its
-// counters from the link rows of `netstat -ibdnW`. Encapsulation, routes and
+// -a -v`, with its index, flags, MTU, MAC and addresses; its counters
+// from the link rows of `netstat -ibdnW`; and the routes, with the
+// default interface and gateway, from `netstat -rn`. Encapsulation and
 // OpenVZ alias merging are Linux only.
 type Darwin struct {
 	base
@@ -67,8 +68,12 @@ func (d *Darwin) Collect(
 		}
 	}
 	sort.SliceStable(ifs, func(i, j int) bool { return ifs[i].Number < ifs[j].Number })
+	info := &Info{Interfaces: ifs}
+	if out, err := d.Exec.Execute(ctx, "netstat", "-rn"); err == nil {
+		applyNetstatRoutes(info, out)
+	}
 
-	return &Info{Interfaces: ifs}, nil
+	return info, nil
 }
 
 // ifconfigHeadRE is the first line of an interface in `ifconfig -a`:
@@ -186,4 +191,43 @@ func parseNetstatLinks(
 	}
 
 	return links
+}
+
+// applyNetstatRoutes adds the routes of `netstat -rn`: the rows of its
+// "Internet:" and "Internet6:" tables, "Destination Gateway Flags Netif".
+// The first default route with a gateway (flag G) of each family is the
+// default interface and gateway, as Ohai reads it from the same table.
+// A gateway's "%en0" zone is dropped, as `ip route` prints none.
+func applyNetstatRoutes(
+	info *Info,
+	out []byte,
+) {
+	family := ""
+	for _, line := range strings.Split(string(out), "\n") {
+		switch strings.TrimSpace(line) {
+		case "Internet:":
+			family = "inet"
+			continue
+		case "Internet6:":
+			family = "inet6"
+			continue
+		}
+		f := strings.Fields(line)
+		if family == "" || len(f) < 4 || f[0] == "Destination" {
+			continue
+		}
+		gateway, _, _ := strings.Cut(f[1], "%")
+		r := Route{Destination: f[0], Family: family, Gateway: gateway, Interface: f[3]}
+		info.Routes = append(info.Routes, r)
+		attachToInterface(info, r)
+		if r.Destination != "default" || !strings.Contains(f[2], "G") {
+			continue
+		}
+		if family == "inet" && info.DefaultInterface == "" {
+			info.DefaultInterface, info.DefaultGateway = r.Interface, r.Gateway
+		}
+		if family == "inet6" && info.DefaultInet6Interface == "" {
+			info.DefaultInet6Interface, info.DefaultInet6Gateway = r.Interface, r.Gateway
+		}
+	}
 }
