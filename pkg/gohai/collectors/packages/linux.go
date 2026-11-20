@@ -23,26 +23,29 @@ package packages
 import (
 	"bufio"
 	"context"
+	"strconv"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Linux collects installed packages on Linux hosts. On Debian-family
 // systems it uses dpkg-query; on RHEL-family systems it uses rpm.
-// Detection is based on platform.Detect() result. Embeds base for the
+// The database is Manager, which NewWith picks from the family. Embeds base for the
 // static Name / DefaultEnabled / Dependencies methods.
 type Linux struct {
 	base
 
 	Exec executor.Executor
+	// Manager is the package database: dpkg, or rpm. NewWith picks it
+	// from the family of its sources.
+	Manager string
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{Exec: executor.New(), Manager: "dpkg"}
 }
 
 // Collect queries the installed-package database and returns the
@@ -55,12 +58,11 @@ func (l *Linux) Collect(
 	if l.Exec == nil {
 		return &Info{Packages: []Package{}}, nil
 	}
-	switch platform.Detect() {
-	case "debian":
-		return collectDpkg(ctx, l.Exec)
-	default:
+	if l.Manager == "rpm" {
 		return collectRPM(ctx, l.Exec)
 	}
+
+	return collectDpkg(ctx, l.Exec)
 }
 
 // collectDpkg queries dpkg-query on Debian/Ubuntu hosts. Format
@@ -71,7 +73,7 @@ func collectDpkg(
 	ctx context.Context,
 	exec executor.Executor,
 ) (*Info, error) {
-	format := "${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n"
+	format := "${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n"
 	out, err := exec.Execute(ctx, "dpkg-query", "-W", "-f="+format)
 	if err != nil {
 		return &Info{Packages: []Package{}}, nil
@@ -87,12 +89,13 @@ func collectDpkg(
 		if name == "" || status != "installed" {
 			continue
 		}
-		info.Packages = append(info.Packages, Package{
-			Name:           name,
-			Version:        version,
-			Architecture:   arch,
-			PackageManager: "dpkg",
-		})
+		p := Package{Name: name, Version: version, Architecture: arch, PackageManager: "dpkg"}
+		if len(parts) >= 6 {
+			p.Description = parts[4]
+			kb, _ := strconv.ParseInt(strings.TrimSpace(parts[5]), 10, 64)
+			p.Size = kb * 1024
+		}
+		info.Packages = append(info.Packages, p)
 	}
 	return info, nil
 }
@@ -103,7 +106,7 @@ func collectRPM(
 	ctx context.Context,
 	exec executor.Executor,
 ) (*Info, error) {
-	format := "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"
+	format := "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n"
 	out, err := exec.Execute(ctx, "rpm", "-qa", "--qf", format)
 	if err != nil {
 		return &Info{Packages: []Package{}}, nil
@@ -119,12 +122,12 @@ func collectRPM(
 		if name == "" {
 			continue
 		}
-		info.Packages = append(info.Packages, Package{
-			Name:           name,
-			Version:        version,
-			Architecture:   arch,
-			PackageManager: "rpm",
-		})
+		p := Package{Name: name, Version: version, Architecture: arch, PackageManager: "rpm"}
+		if len(parts) >= 5 {
+			p.Description = parts[3]
+			p.Size, _ = strconv.ParseInt(strings.TrimSpace(parts[4]), 10, 64)
+		}
+		info.Packages = append(info.Packages, p)
 	}
 	return info, nil
 }

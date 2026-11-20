@@ -136,6 +136,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		id           string // output of `id -u`; "" uses euid
 		idErr        error
 		nilExec      bool
+		dscl         string // dscl output; "" is a dscl that fails
 		validateFunc func(any, error)
 	}{
 		{
@@ -239,6 +240,51 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: locked from /etc/shadow",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0:root:/root:/bin/sh\ndaemon:x:1:1::/:/usr/sbin/nologin\njohn:x:1000:1000::/home/john:/bin/bash\nnoshadow:x:2:2::/:/bin/sh\n",
+				"/etc/shadow": "root:!$6$abc:19000::::::\ndaemon:*:19000::::::\njohn:$6$xyz:19000::::::\nghost:!:1::::::\nshort\n",
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info.Passwd["root"].Locked)
+				s.True(*info.Passwd["root"].Locked, "!")
+				s.True(*info.Passwd["daemon"].Locked, "*")
+				s.False(*info.Passwd["john"].Locked)
+				s.Nil(info.Passwd["noshadow"].Locked, "no shadow line")
+			},
+		},
+		{
+			name:    "darwin: locked from dscl's DisabledUser",
+			variant: "darwin",
+			files: map[string]string{
+				"/etc/passwd": "root:*:0:0::/var/root:/bin/sh\nguest:*:201:201::/Users/Guest:/bin/bash\n",
+			},
+			dscl: "root ;ShadowHash;\nguest ;DisabledUser; ;ShadowHash;\nnobody-in-passwd ;ShadowHash;\n",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.False(*info.Passwd["root"].Locked)
+				s.True(*info.Passwd["guest"].Locked)
+			},
+		},
+		{
+			name:    "darwin: nil Exec",
+			variant: "darwin",
+			files:   map[string]string{"/etc/passwd": "root:*:0:0::/var/root:/bin/sh\n"},
+			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Nil(info.Passwd["root"].Locked)
+			},
+		},
+		{
 			name:    "darwin: same POSIX parsing",
 			variant: "darwin",
 			files: map[string]string{
@@ -263,9 +309,15 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			if id == "" {
 				id = strconv.Itoa(tt.euid) + "\n"
 			}
-			r := sourcetest.Runner{Out: map[string]string{"id -u": id}}
+			r := sourcetest.Runner{Out: map[string]string{"id -u": id}, Err: map[string]error{}}
 			if tt.idErr != nil {
-				r.Err = map[string]error{"id -u": tt.idErr}
+				r.Err["id -u"] = tt.idErr
+			}
+			const dscl = "dscl . -list /Users AuthenticationAuthority"
+			if tt.dscl != "" {
+				r.Out[dscl] = tt.dscl
+			} else {
+				r.Err[dscl] = errors.New("exec dscl: not found")
 			}
 			var exec executor.Executor = r
 			if tt.nilExec {

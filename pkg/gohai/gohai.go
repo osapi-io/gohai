@@ -37,6 +37,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dns"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/docker"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
@@ -254,6 +255,7 @@ func builtinCollectors(
 		users.NewWith(src),
 		sessions.NewWith(src),
 		timezone.NewWith(src),
+		dns.NewWith(src),
 		rootgroup.NewWith(src),
 		shells.NewWith(src),
 		fips.NewWith(src),

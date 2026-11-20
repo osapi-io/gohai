@@ -84,7 +84,7 @@ go build -o gohai .
 
 ## 🧰 Collectors
 
-62 collectors in 10 categories. The
+63 collectors in 10 categories. The
 [Collectors reference](docs/collectors/README.md) has the full catalog, the
 implementation status, the default set, the schema mappings, and a page for each
 collector. It lists 65 entries. The other three entries are deprecated and have

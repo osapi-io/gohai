@@ -29,6 +29,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/command"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dns"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/docker"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
@@ -90,6 +91,7 @@ func networkInfoPtr() *network.Info           { return &network.Info{} }
 func processInfoPtr() *process.Info           { return &process.Info{} }
 func usersInfoPtr() *users.Info               { return &users.Info{} }
 func timezoneInfoPtr() *timezone.Info         { return &timezone.Info{} }
+func dnsInfoPtr() *dns.Info                   { return &dns.Info{} }
 func rootGroupInfoPtr() *rootgroup.Info       { return &rootgroup.Info{} }
 func shellsInfoPtr() *shells.Info             { return &shells.Info{} }
 func fipsInfoPtr() *fips.Info                 { return &fips.Info{} }
@@ -280,6 +282,12 @@ func (s *FactsTestSuite) TestSet() {
 			collName: "timezone",
 			result:   timezoneInfoPtr(),
 			check:    func(f *Facts) bool { return f.Timezone != nil },
+		},
+		{
+			name:     "dns",
+			collName: "dns",
+			result:   dnsInfoPtr(),
+			check:    func(f *Facts) bool { return f.DNS != nil },
 		},
 		{
 			name:     "root_group",
@@ -526,6 +534,7 @@ func (s *FactsTestSuite) TestCountPopulated() {
 				Process:        processInfoPtr(),
 				Users:          usersInfoPtr(),
 				Timezone:       timezoneInfoPtr(),
+				DNS:            dnsInfoPtr(),
 				RootGroup:      rootGroupInfoPtr(),
 				Shells:         shellsInfoPtr(),
 				Fips:           fipsInfoPtr(),

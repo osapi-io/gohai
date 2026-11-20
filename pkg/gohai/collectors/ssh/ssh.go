@@ -55,6 +55,21 @@ var hostKeyFiles = []string{
 // Info holds the SSH host keys found on this host.
 type Info struct {
 	Keys []HostKey `json:"keys"`
+	// AuthorizedKeys is the keys of each user's ~/.ssh/authorized_keys,
+	// by user name. A user with no file is not in it.
+	AuthorizedKeys map[string][]AuthorizedKey `json:"authorized_keys,omitempty"`
+}
+
+// AuthorizedKey is one line of an authorized_keys file.
+type AuthorizedKey struct {
+	Type              string `json:"type"`
+	FingerprintSHA256 string `json:"fingerprint_sha256"`
+	Comment           string `json:"comment,omitempty"`
+	// Options are the options before the key, such as
+	// `no-pty,from="10.0.0.0/8"`.
+	Options string `json:"options,omitempty"`
+	// Line is the line as the file has it.
+	Line string `json:"line"`
 }
 
 // HostKey describes a single SSH host public key.
@@ -258,4 +273,81 @@ func readWireString(
 		return nil
 	}
 	return b[4 : 4+n]
+}
+
+// collectAuthorizedKeys is the keys of <home>/.ssh/authorized_keys for
+// each user of /etc/passwd that has a home. A line that is not a key is
+// left out.
+func collectAuthorizedKeys(
+	fs avfs.VFS,
+) map[string][]AuthorizedKey {
+	b, err := fs.ReadFile("/etc/passwd")
+	if err != nil {
+		return nil
+	}
+	out := map[string][]AuthorizedKey{}
+	for _, line := range strings.Split(string(b), "\n") {
+		f := strings.Split(line, ":")
+		if len(f) < 6 || f[5] == "" || f[5] == "/" {
+			continue
+		}
+		keys, err := fs.ReadFile(strings.TrimRight(f[5], "/") + "/.ssh/authorized_keys")
+		if err != nil {
+			continue
+		}
+		for _, l := range strings.Split(string(keys), "\n") {
+			if k, ok := parseAuthorizedKey(strings.TrimSpace(l)); ok {
+				out[f[0]] = append(out[f[0]], k)
+			}
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+
+	return out
+}
+
+// parseAuthorizedKey is one authorized_keys line: options, then the key
+// type and the key, then a comment. The key type is the first field that
+// names one, so options may come before it.
+func parseAuthorizedKey(
+	line string,
+) (AuthorizedKey, bool) {
+	if line == "" || strings.HasPrefix(line, "#") {
+		return AuthorizedKey{}, false
+	}
+	f := strings.Fields(line)
+	for i := 0; i+1 < len(f); i++ {
+		if !isKeyType(f[i]) {
+			continue
+		}
+		hk, err := parseHostKeyPub([]byte(f[i] + " " + f[i+1]))
+		if err != nil {
+			return AuthorizedKey{}, false
+		}
+
+		return AuthorizedKey{
+			Type:              hk.Type,
+			FingerprintSHA256: hk.FingerprintSHA256,
+			Comment:           strings.Join(f[i+2:], " "),
+			Options:           strings.Join(f[:i], " "),
+			Line:              line,
+		}, true
+	}
+
+	return AuthorizedKey{}, false
+}
+
+// isKeyType reports whether s names an OpenSSH public key type.
+func isKeyType(
+	s string,
+) bool {
+	for _, p := range []string{"ssh-", "ecdsa-", "sk-"} {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+
+	return false
 }

@@ -7,7 +7,7 @@ analysis for the 950 JSON fields of gohai.
 
 | File                | Purpose                                                                                                                                      |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `field-mapping.md`  | **Source of truth.** The tier mapping of each field (954 rows). `Changed? yes/no` shows which fields need a new name to agree with OCSF/OTel |
+| `field-mapping.md`  | **Source of truth.** The tier mapping of each field (969 rows). `Changed? yes/no` shows which fields need a new name to agree with OCSF/OTel |
 | `ocsf-gaps.md`      | Fields that OCSF does not cover, but that it must cover. These are candidates for upstream PRs to the OCSF schema repo                       |
 | `gohai.schema.json` | The generated JSON Schema (draft 2020-12) for `gohai.Facts`. It shows the current Go tags. Generate it again after a rename                  |
 | `schema.go`         | The `//go:embed` of the schema for the `gohai validate` command                                                                              |
@@ -35,7 +35,7 @@ that OCSF has no name for, as candidates for upstream contributions.
 
 [`invopop/jsonschema`](https://github.com/invopop/jsonschema) generates
 `gohai.schema.json` from `gohai.Facts`. It contains 157 `$defs`. They cover the
-`Info` types of all 62 collectors and their nested structs.
+`Info` types of all 63 collectors and their nested structs.
 
 To generate the schema again:
 

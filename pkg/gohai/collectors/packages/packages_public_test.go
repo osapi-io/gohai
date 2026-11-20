@@ -135,11 +135,15 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 	origDetect := platform.Detect
 	defer func() { platform.Detect = origDetect }()
 
-	dpkgOut := []byte("bash\t5.1-6\tamd64\tinstalled\nlibc6\t2.35-0\tamd64\tinstalled\n")
+	dpkgOut := []byte(
+		"bash\t5.1-6\tamd64\tinstalled\tGNU Bourne Again SHell\t7164\nlibc6\t2.35-0\tamd64\tinstalled\n",
+	)
 	dpkgWithSkipped := []byte(
 		"bash\t5.1-6\tamd64\tinstalled\npartial-pkg\t1.0\tamd64\thalf-installed\n\t\t\t\n",
 	)
-	rpmOut := []byte("bash\t5.1-6.fc36\tx86_64\nlibc\t2.35-1.fc36\tx86_64\n")
+	rpmOut := []byte(
+		"bash\t5.1-6.fc36\tx86_64\tThe GNU Bourne Again shell\t8204000\nlibc\t2.35-1.fc36\tx86_64\n",
+	)
 	brewOut := []byte("git 2.40.0\nzsh 5.9\ncurl 8.1.2 8.1.1\n")
 
 	tests := []struct {
@@ -159,7 +163,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					"dpkg-query",
 					[]string{
 						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
+						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
 					},
 					dpkgOut,
 					nil,
@@ -170,7 +174,14 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				info, ok := got.(*packages.Info)
 				s.Require().True(ok)
 				s.Equal([]packages.Package{
-					{Name: "bash", Version: "5.1-6", Architecture: "amd64", PackageManager: "dpkg"},
+					{
+						Name:           "bash",
+						Version:        "5.1-6",
+						Architecture:   "amd64",
+						PackageManager: "dpkg",
+						Description:    "GNU Bourne Again SHell",
+						Size:           7164 * 1024,
+					},
 					{
 						Name:           "libc6",
 						Version:        "2.35-0",
@@ -190,7 +201,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					"dpkg-query",
 					[]string{
 						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
+						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
 					},
 					dpkgWithSkipped,
 					nil,
@@ -215,7 +226,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					"dpkg-query",
 					[]string{
 						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
+						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
 					},
 					[]byte("bash\t5.1\n"),
 					nil,
@@ -238,7 +249,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					"dpkg-query",
 					[]string{
 						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
+						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
 					},
 					[]byte("\t1.0\tamd64\tinstalled\nbash\t5.1\tamd64\tinstalled\n"),
 					nil,
@@ -263,7 +274,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					"dpkg-query",
 					[]string{
 						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\n",
+						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
 					},
 					nil,
 					errors.New("not found"),
@@ -284,7 +295,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				return mockExec(
 					t,
 					"rpm",
-					[]string{"-qa", "--qf", "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"},
+					[]string{
+						"-qa",
+						"--qf",
+						"%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+					},
 					rpmOut,
 					nil,
 				)
@@ -299,6 +314,8 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "5.1-6.fc36",
 						Architecture:   "x86_64",
 						PackageManager: "rpm",
+						Description:    "The GNU Bourne Again shell",
+						Size:           8204000,
 					},
 					{
 						Name:           "libc",
@@ -317,7 +334,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				return mockExec(
 					t,
 					"rpm",
-					[]string{"-qa", "--qf", "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"},
+					[]string{
+						"-qa",
+						"--qf",
+						"%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+					},
 					nil,
 					errors.New("not found"),
 				)
@@ -337,7 +358,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				return mockExec(
 					t,
 					"rpm",
-					[]string{"-qa", "--qf", "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"},
+					[]string{
+						"-qa",
+						"--qf",
+						"%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+					},
 					[]byte("bash\n"),
 					nil,
 				)
@@ -357,7 +382,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				return mockExec(
 					t,
 					"rpm",
-					[]string{"-qa", "--qf", "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\n"},
+					[]string{
+						"-qa",
+						"--qf",
+						"%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+					},
 					[]byte("\t1.0-1.fc36\tx86_64\nbash\t5.1-6.fc36\tx86_64\n"),
 					nil,
 				)
@@ -480,7 +509,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			var c packages.Collector
 			switch tt.variant {
 			case "linux":
-				c = &packages.Linux{Exec: tt.exec(s.T())}
+				l := &packages.Linux{Exec: tt.exec(s.T()), Manager: "dpkg"}
+				if tt.detect != "debian" {
+					l.Manager = "rpm"
+				}
+				c = l
 			case "darwin":
 				c = &packages.Darwin{Exec: tt.exec(s.T())}
 			}

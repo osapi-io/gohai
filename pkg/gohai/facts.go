@@ -34,6 +34,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dns"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/docker"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
@@ -112,6 +113,7 @@ type Facts struct {
 	Users          *users.Info          `json:"users,omitempty"`
 	Sessions       *sessions.Info       `json:"sessions,omitempty"`
 	Timezone       *timezone.Info       `json:"timezone,omitempty"`
+	DNS            *dns.Info            `json:"dns,omitempty"`
 	RootGroup      *rootgroup.Info      `json:"root_group,omitempty"`
 	Shells         *shells.Info         `json:"shells,omitempty"`
 	Fips           *fips.Info           `json:"fips,omitempty"`
@@ -471,6 +473,10 @@ func (f *Facts) set(
 	case "timezone":
 		if v, ok := result.(*timezone.Info); ok {
 			f.Timezone = v
+		}
+	case "dns":
+		if v, ok := result.(*dns.Info); ok {
+			f.DNS = v
 		}
 	case "root_group":
 		if v, ok := result.(*rootgroup.Info); ok {

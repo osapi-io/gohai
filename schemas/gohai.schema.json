@@ -1146,6 +1146,54 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "DnsInfo": {
+      "properties": {
+        "nameservers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "search": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "options": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "interfaces": {
+          "additionalProperties": {
+            "$ref": "#/$defs/DnsResolver"
+          },
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DnsResolver": {
+      "properties": {
+        "nameservers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "domains": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "DockerContainer": {
       "properties": {
         "id": {
@@ -1519,6 +1567,9 @@
         },
         "timezone": {
           "$ref": "#/$defs/TimezoneInfo"
+        },
+        "dns": {
+          "$ref": "#/$defs/DnsInfo"
         },
         "root_group": {
           "$ref": "#/$defs/RootgroupInfo"
@@ -3942,6 +3993,12 @@
         },
         "package_manager": {
           "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,
@@ -4453,6 +4510,32 @@
         "paths"
       ]
     },
+    "SshAuthorizedKey": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "fingerprint_sha256": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string"
+        },
+        "options": {
+          "type": "string"
+        },
+        "line": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "fingerprint_sha256",
+        "line"
+      ]
+    },
     "SshHostKey": {
       "properties": {
         "type": {
@@ -4484,6 +4567,15 @@
             "$ref": "#/$defs/SshHostKey"
           },
           "type": "array"
+        },
+        "authorized_keys": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/SshAuthorizedKey"
+            },
+            "type": "array"
+          },
+          "type": "object"
         }
       },
       "additionalProperties": false,
@@ -4717,6 +4809,9 @@
         },
         "gecos": {
           "type": "string"
+        },
+        "locked": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,

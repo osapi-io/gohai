@@ -53,5 +53,5 @@ func (d *Darwin) Collect(
 	if err != nil {
 		return nil, err
 	}
-	return &Info{Keys: keys}, nil
+	return &Info{Keys: keys, AuthorizedKeys: collectAuthorizedKeys(d.FS)}, nil
 }

@@ -44,6 +44,7 @@ import (
 const (
 	passwdPath = "/etc/passwd"
 	groupPath  = "/etc/group"
+	shadowPath = "/etc/shadow"
 )
 
 // New returns the users variant for the host OS. Both Linux and
@@ -83,6 +84,9 @@ func collectPOSIX(
 	if b, err := fs.ReadFile(groupPath); err == nil {
 		info.Group = parseGroup(b)
 	}
+	if b, err := fs.ReadFile(shadowPath); err == nil {
+		applyShadow(info.Passwd, b)
+	}
 	if exec == nil {
 		return info, nil
 	}
@@ -118,6 +122,11 @@ type PasswdEntry struct {
 	Dir   string `json:"dir,omitempty"`
 	Shell string `json:"shell,omitempty"`
 	GECOS string `json:"gecos,omitempty"`
+	// Locked is whether the account cannot log in with a password: a
+	// shadow password that starts with "!" or "*", as `passwd -S` reports
+	// L, or DisabledUser on macOS. It is unset when the host does not let
+	// the caller read it.
+	Locked *bool `json:"locked,omitempty"`
 }
 
 // GroupEntry mirrors etc[:group][<groupname>].
@@ -205,4 +214,44 @@ func parseGroup(
 		out[fields[0]] = GroupEntry{GID: gid, Members: members}
 	}
 	return out
+}
+
+// applyShadow sets Locked from the password field of each /etc/shadow
+// line, "name:password:...".
+func applyShadow(
+	users map[string]PasswdEntry,
+	b []byte,
+) {
+	for _, line := range strings.Split(string(b), "\n") {
+		f := strings.Split(line, ":")
+		if len(f) < 2 {
+			continue
+		}
+		e, ok := users[f[0]]
+		if !ok {
+			continue
+		}
+		locked := strings.HasPrefix(f[1], "!") || strings.HasPrefix(f[1], "*")
+		e.Locked = &locked
+		users[f[0]] = e
+	}
+}
+
+// applyDisabled sets Locked from `dscl . -list /Users
+// AuthenticationAuthority`: a user whose authority has DisabledUser is
+// locked, and the others are not.
+func applyDisabled(
+	users map[string]PasswdEntry,
+	out []byte,
+) {
+	for _, line := range strings.Split(string(out), "\n") {
+		name, authority, _ := strings.Cut(strings.TrimSpace(line), " ")
+		e, ok := users[name]
+		if !ok {
+			continue
+		}
+		locked := strings.Contains(authority, "DisabledUser")
+		e.Locked = &locked
+		users[name] = e
+	}
 }

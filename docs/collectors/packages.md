@@ -19,6 +19,8 @@ no package manager.
 | `packages[].version`         | `string` | The installed version.                               | OCSF `package.version`         |
 | `packages[].architecture`    | `string` | The CPU architecture. It is empty for brew packages. | OCSF `package.architecture`    |
 | `packages[].package_manager` | `string` | The package manager: `dpkg`, `rpm` or `brew`.        | OCSF `package.package_manager` |
+| `packages[].description`     | `string` | The one-line summary of the package.                 | OCSF `package.description`     |
+| `packages[].size`            | `int64`  | The installed size, in bytes.                        | No direct schema mapping       |
 
 ## Platform support
 
@@ -108,6 +110,11 @@ finds:
 **Errors:** If a command fails (command not found, exit error), the collector
 returns an empty package list and no error. This is the same as Ohai's
 `packages.rb`, which also continues after errors.
+
+`description` and `size` come from the same run: `${binary:Summary}` and
+`${Installed-Size}` (KiB) of `dpkg-query`, or `%{SUMMARY}` and `%{SIZE}` (bytes)
+of `rpm`. The family of the collector's sources picks the database: `debian`
+reads dpkg, and the other Linux families read rpm.
 
 ## Backing library
 

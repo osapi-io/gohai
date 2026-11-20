@@ -30,7 +30,10 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"io/fs"
+	"strings"
 	"testing"
+
+	"github.com/osapi-io/gohai/internal/sourcetest"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
@@ -233,6 +236,61 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		setupFS      func() avfs.VFS
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: authorized keys of each user with a home",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd": "root:x:0:0::/root:/bin/sh\n" +
+						"john:x:1000:1000::/home/john/:/bin/bash\n" +
+						"nobody:x:65534:65534::/:/usr/sbin/nologin\n" +
+						"nohome:x:2:2:::/bin/sh\n" +
+						"jane:x:1001:1001::/home/jane:/bin/bash\n" +
+						"short\n",
+					"/root/.ssh/authorized_keys": "# a comment\n\n" +
+						"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 admin@lab\n",
+					"/home/john/.ssh/authorized_keys": "no-pty,from=\"10.0.0.0/8\" ecdsa-sha2-nistp256 AAAAE2VjZHNh john laptop\n" +
+						"ssh-rsa !!!not-base64 bad\n" +
+						"just some words\n",
+					"/home/jane/.ssh/authorized_keys": "# empty but for a comment\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Require().
+					Len(info.AuthorizedKeys, 2, "jane has no key, nobody and nohome are skipped")
+				root := info.AuthorizedKeys["root"]
+				s.Require().Len(root, 1)
+				s.Equal("ssh-ed25519", root[0].Type)
+				s.Equal("admin@lab", root[0].Comment)
+				s.Empty(root[0].Options)
+				s.True(strings.HasPrefix(root[0].FingerprintSHA256, "SHA256:"))
+				john := info.AuthorizedKeys["john"]
+				s.Require().
+					Len(john, 1, "the bad base64 line and the line with no key are left out")
+				s.Equal("ecdsa-sha2-nistp256", john[0].Type)
+				s.Equal(`no-pty,from="10.0.0.0/8"`, john[0].Options)
+				s.Equal("john laptop", john[0].Comment)
+			},
+		},
+		{
+			name:    "darwin: users with no authorized_keys file",
+			variant: "darwin",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(
+					s.T(),
+					map[string]string{"/etc/passwd": "root:*:0:0::/var/root:/bin/sh\n"},
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Nil(info.AuthorizedKeys)
+			},
+		},
 		{
 			name:    "linux: no key files",
 			variant: "linux",

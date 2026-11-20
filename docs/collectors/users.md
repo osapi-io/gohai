@@ -25,13 +25,14 @@ Consumers use this to:
 
 ### PasswdEntry
 
-| Field   | Type     | Description                                                                     |
-| ------- | -------- | ------------------------------------------------------------------------------- |
-| `uid`   | `int`    | The numeric user ID.                                                            |
-| `gid`   | `int`    | The primary numeric group ID.                                                   |
-| `dir`   | `string` | The path of the home directory.                                                 |
-| `shell` | `string` | The path of the login shell.                                                    |
-| `gecos` | `string` | The comment or display-name field. It usually holds a full name and other data. |
+| Field    | Type     | Description                                                                              |
+| -------- | -------- | ---------------------------------------------------------------------------------------- |
+| `uid`    | `int`    | The numeric user ID.                                                                     |
+| `gid`    | `int`    | The primary numeric group ID.                                                            |
+| `dir`    | `string` | The path of the home directory.                                                          |
+| `shell`  | `string` | The path of the login shell.                                                             |
+| `gecos`  | `string` | The comment or display-name field. It usually holds a full name and other data.          |
+| `locked` | `bool`   | Whether the account cannot log in with a password. Unset when the caller cannot read it. |
 
 ### GroupEntry
 
@@ -132,6 +133,11 @@ files `/etc/passwd` and `/etc/group` have the well-known system users (`root`,
 accounts are in OpenDirectory, and only `dscl` can list them. Ohai's `passwd`
 plugin has the same limit, because Ruby's `Etc` reads the POSIX flat files on
 macOS. A future change can run `dscl . -list /Users` to get all accounts.
+
+The collector also reads `/etc/shadow` when the caller can (root). An account
+whose password field starts with `!` or `*` is `locked`, as `passwd -S` reports
+`L`. On macOS, one `dscl . -list /Users AuthenticationAuthority` run gives each
+account: `DisabledUser` is locked. When neither is readable, `locked` is unset.
 
 ## Backing library
 
