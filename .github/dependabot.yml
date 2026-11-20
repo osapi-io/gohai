@@ -10,12 +10,16 @@ updates:
     commit-message:
       prefix: chore
 
-  # One module: the examples under examples/ are packages of the root module,
-  # so a bump of the root moves them too. They were modules of their own, with
-  # a replace of the root, and a dependency only in their go.sum was not bumped
-  # (osapi-io/gohai#286).
+  # The modules under examples/ have their own go.mod and replace this
+  # repository with a relative path, so a dependency the root moves, moves in
+  # each of them too. Listed with the root and grouped by dependency name, one
+  # pull request bumps every module at once and leaves them all tidy. As two
+  # entries, the root was bumped alone and `just go-mod-check` failed on the
+  # examples.
   - package-ecosystem: "gomod"
-    directory: "/"
+    directories:
+      - "/"
+      - "/examples/*"
     schedule:
       interval: "daily"
     cooldown:
