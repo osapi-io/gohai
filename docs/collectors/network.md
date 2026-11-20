@@ -30,15 +30,15 @@ report it.
 
 Top level:
 
-| Field                     | Type        | Description                                                 | Schema mapping            |
-| ------------------------- | ----------- | ----------------------------------------------------------- | ------------------------- |
-| `interfaces`              | []Interface | Each interface of the host, with the gohai extensions.      | None                      |
-| `routes`                  | []Route     | All routes from `ip route show table main` (IPv4 and IPv6). | No direct schema mapping. |
-| `default_interface`       | string      | The interface that the default IPv4 route goes out through. | No direct schema mapping. |
-| `default_gateway`         | string      | The next-hop IPv4 address of the default route.             | No direct schema mapping. |
-| `default_inet6_interface` | string      | The interface that the default IPv6 route goes out through. | No direct schema mapping. |
-| `default_inet6_gateway`   | string      | The next-hop IPv6 address of the default route.             | No direct schema mapping. |
-| `neighbours`              | []Neighbour | The kernel ARP and NDP cache (Linux only, `ip neigh`).      | No direct schema mapping. |
+| Field                     | Type        | Description                                                                              | Schema mapping            |
+| ------------------------- | ----------- | ---------------------------------------------------------------------------------------- | ------------------------- |
+| `interfaces`              | []Interface | Each interface of the host, with the gohai extensions.                                   | None                      |
+| `routes`                  | []Route     | All routes: `ip route show table main` on Linux, `netstat -rn` on macOS (IPv4 and IPv6). | No direct schema mapping. |
+| `default_interface`       | string      | The interface that the default IPv4 route goes out through.                              | No direct schema mapping. |
+| `default_gateway`         | string      | The next-hop IPv4 address of the default route.                                          | No direct schema mapping. |
+| `default_inet6_interface` | string      | The interface that the default IPv6 route goes out through.                              | No direct schema mapping. |
+| `default_inet6_gateway`   | string      | The next-hop IPv6 address of the default route.                                          | No direct schema mapping. |
+| `neighbours`              | []Neighbour | The kernel ARP and NDP cache (Linux only, `ip neigh`).                                   | No direct schema mapping. |
 
 Per interface:
 
@@ -121,7 +121,7 @@ Per `Counters`:
 | Platform | Supported                                                                                                              |
 | -------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Linux    | ✅ (sysfs interfaces, `ip addr`, `/proc/net/dev` counters, sysfs ARPHRD, `ip route` IPv4 and IPv6, OpenVZ alias merge) |
-| macOS    | ✅ (`ifconfig` and `netstat`. Routes, encapsulation and OpenVZ are Linux only. Refer to Data sources.)                 |
+| macOS    | ✅ (`ifconfig` and `netstat`, with routes. Encapsulation and OpenVZ are Linux only. Refer to Data sources.)            |
 
 ## Example output
 
@@ -303,9 +303,10 @@ On Linux:
 On macOS, `ifconfig -a -v` gives each interface: its index, flags, MTU, MAC
 (`ether`) and addresses. An IPv4 netmask is hex, such as `0xffffff00`. The link
 rows of `netstat -ibdnW` give the counters. A down interface has a `*` after its
-name there. Encapsulation, routing and the OpenVZ merge are Linux only. A future
-change can parse `route -n get default` and `netstat -nr` to get the macOS
-routes.
+name there. The rows of the `Internet:` and `Internet6:` tables of `netstat -rn`
+are the routes. The first `default` row with a gateway (flag `G`) of each family
+gives the default interface and gateway, without the `%en0` zone of an IPv6
+gateway. Encapsulation and the OpenVZ merge are Linux only.
 
 ## Backing library
 

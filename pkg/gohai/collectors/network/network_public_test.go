@@ -366,6 +366,38 @@ func (s *NetworkPublicTestSuite) TestSources() {
 			},
 		},
 		{
+			name:    "darwin: routes and defaults from netstat -rn",
+			variant: "darwin",
+			runner: sourcetest.Runner{Out: map[string]string{
+				"ifconfig -a -v": "en0: flags=8863<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 index 14\n" +
+					"\tinet 192.168.0.40 netmask 0xffff0000\n",
+				"netstat -rn": "Routing tables\n\nnot a table row before any table\n" +
+					"Internet:\n" +
+					"Destination        Gateway            Flags               Netif Expire\n" +
+					"default            link#24            UCSIg               utun6\n" +
+					"default            192.168.0.1        UGScg                 en0\n" +
+					"default            192.168.0.254      UGScIg                en0\n" +
+					"127                127.0.0.1          UCS                   lo0\n" +
+					"short\n\n" +
+					"Internet6:\n" +
+					"Destination                             Gateway                                 Flags               Netif Expire\n" +
+					"default                                 fe80::1a90:88ff:fe6b:f272%en0           UGcg                  en0\n" +
+					"default                                 fe80::%utun0                            UGcIg               utun0\n",
+			}},
+			check: func(i *network.Info) {
+				s.Equal("en0", i.DefaultInterface, "the first default with a gateway")
+				s.Equal("192.168.0.1", i.DefaultGateway)
+				s.Equal("en0", i.DefaultInet6Interface)
+				s.Equal("fe80::1a90:88ff:fe6b:f272", i.DefaultInet6Gateway, "no zone")
+				s.Require().Len(i.Routes, 6)
+				s.Equal(network.Route{
+					Destination: "127", Family: "inet", Gateway: "127.0.0.1", Interface: "lo0",
+				}, i.Routes[3])
+				s.Require().Len(i.Interfaces, 1)
+				s.Len(i.Interfaces[0].Routes, 3, "the routes of en0 attach to it")
+			},
+		},
+		{
 			name:    "darwin: ifconfig and netstat on a Mac",
 			variant: "darwin",
 			runner: sourcetest.Runner{Out: map[string]string{
