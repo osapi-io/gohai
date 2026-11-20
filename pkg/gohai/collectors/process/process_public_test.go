@@ -119,9 +119,9 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		time.Local,
 	)
 	s.Require().NoError(err)
-	const psMain = "ps -axo pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,lstart="
-	const psName = "ps -axo pid=,ucomm="
-	const psArgs = "ps -axww -o pid=,args="
+	const psMain = "ps -ax -o pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,time=,lstart="
+	const psName = "ps -ax -o pid=,ucomm="
+	const psArgs = "ps -ax -ww -o pid=,args="
 
 	tests := []struct {
 		name    string
@@ -151,7 +151,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 				{
 					PID: 1, Name: "my (proc)", State: "sleep", Owner: "root",
 					CmdLine: "/sbin/init splash", CreationTime: 1700000005,
-					CPUPercent: 1, RSS: 1024 * 1024, MemPercent: 25,
+					CPUPercent: 1, RSS: 1024 * 1024, MemPercent: 25, CPUSeconds: 0.11,
 				},
 				{PID: 42, Name: "kworker"},
 			}},
@@ -181,8 +181,8 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			name:    "darwin: ps, joined by pid",
 			variant: "darwin",
 			runner: sourcetest.Runner{Out: map[string]string{
-				psMain: "    1     0 root     Ss    0.0  0.1   1024 Thu Nov 20 12:04:00 2026\n" +
-					"  500     1 john     R+   12.5  3.0   2048 not a date at all\n" +
+				psMain: "    1     0 root     Ss    0.0  0.1   1024 1-02:03:04.50 Thu Nov 20 12:04:00 2026\n" +
+					"  500     1 john     R+   12.5  3.0   2048 0:01.25 not a date at all\n" +
 					"  x 1 bad R\n" +
 					"short\n",
 				psName: "    1 launchd\n  500 Google Chrome Helper\nnospace\n",
@@ -192,7 +192,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 				{
 					PID: 1, Name: "launchd", Owner: "root", State: "sleep",
 					CmdLine: "/sbin/launchd", CreationTime: started.Unix(),
-					MemPercent: 0.1, RSS: 1024 * 1024,
+					MemPercent: 0.1, RSS: 1024 * 1024, CPUSeconds: 86400 + 2*3600 + 3*60 + 4.5,
 				},
 				{
 					PID:        500,
@@ -204,6 +204,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 					CPUPercent: 12.5,
 					MemPercent: 3,
 					RSS:        2048 * 1024,
+					CPUSeconds: 1.25,
 				},
 			}},
 		},
@@ -212,7 +213,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			runner: sourcetest.Runner{
 				Out: map[string]string{
-					psMain: "    7     1 john     U     0.0  0.0      0 Thu Nov 20 12:04:00 2026\n",
+					psMain: "    7     1 john     U     0.0  0.0      0 x-1:00 Thu Nov 20 12:04:00 2026\n",
 				},
 				Err: map[string]error{psName: errors.New("boom"), psArgs: errors.New("boom")},
 			},
@@ -240,6 +241,90 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 				c = &process.Darwin{Exec: tt.runner}
 			}
 			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
+		})
+	}
+}
+
+func (s *ProcessPublicTestSuite) TestRead() {
+	const one = "ps -p 7 -o pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,time=,lstart="
+	tests := []struct {
+		name    string
+		variant string
+		files   map[string]string
+		runner  sourcetest.Runner
+		want    *process.Process
+		wantErr string
+	}{
+		{
+			name:    "linux: one /proc directory",
+			variant: "linux",
+			files: map[string]string{
+				"/proc/stat":     "btime 1700000000\n",
+				"/proc/7/stat":   "7 (agent) S 1 7 7 0 -1 4194560 1 2 3 4 300 200 7 8 20 0 1 0 1000 9 10\n",
+				"/proc/7/status": "VmRSS:\t2048 kB\n",
+				"/proc/8/stat":   "8 (other) S 1\n",
+			},
+			want: &process.Process{
+				PID: 7, ParentPID: 1, Name: "agent", State: "sleep",
+				CreationTime: 1700000010, CPUPercent: 50, RSS: 2048 * 1024, CPUSeconds: 5,
+			},
+		},
+		{name: "linux: no such process", variant: "linux", wantErr: "no process 7"},
+		{
+			name:    "darwin: ps -p",
+			variant: "darwin",
+			runner: sourcetest.Runner{Out: map[string]string{
+				one:                         "    7     1 john     S     2.5  0.4   4096 0:03.00 not a date at all\n",
+				"ps -p 7 -o pid=,ucomm=":    "    7 osapi\n",
+				"ps -p 7 -ww -o pid=,args=": "    7 /usr/local/bin/osapi agent start\n",
+			}},
+			want: &process.Process{
+				PID: 7, ParentPID: 1, Name: "osapi", Owner: "john", State: "sleep",
+				CmdLine: "/usr/local/bin/osapi agent start", CPUPercent: 2.5, MemPercent: 0.4,
+				RSS: 4096 * 1024, CPUSeconds: 3,
+			},
+		},
+		{
+			name:    "darwin: a time that is not a time",
+			variant: "darwin",
+			runner: sourcetest.Runner{Out: map[string]string{
+				one: "    7     1 john     S     0.0  0.0      0 n/a\n",
+			}},
+			want: &process.Process{PID: 7, ParentPID: 1, Owner: "john", State: "sleep"},
+		},
+		{
+			name:    "darwin: ps prints nothing",
+			variant: "darwin",
+			runner:  sourcetest.Runner{Out: map[string]string{one: ""}},
+			wantErr: "no process 7",
+		},
+		{
+			name:    "darwin: ps fails",
+			variant: "darwin",
+			runner:  sourcetest.Runner{Err: map[string]error{one: errors.New("exit status 1")}},
+			wantErr: "ps: exit status 1",
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			var c process.Collector
+			switch tt.variant {
+			case "linux":
+				c = &process.Linux{
+					FS:  sourcetest.FS(s.T(), tt.files),
+					Now: func() time.Time { return time.Unix(1700000020, 0) },
+				}
+			case "darwin":
+				c = &process.Darwin{Exec: tt.runner}
+			}
+			got, err := c.Read(context.Background(), 7)
 			if tt.wantErr != "" {
 				s.ErrorContains(err, tt.wantErr)
 

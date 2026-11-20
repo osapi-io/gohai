@@ -53,17 +53,46 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	procs, err := d.list(ctx, "-ax")
+	if err != nil {
+		return nil, err
+	}
+
+	return &Info{Count: len(procs), Processes: procs}, nil
+}
+
+// Read is the process pid, from `ps -p <pid>` alone.
+func (d *Darwin) Read(
+	ctx context.Context,
+	pid int32,
+) (*Process, error) {
+	procs, err := d.list(ctx, "-p", strconv.Itoa(int(pid)))
+	if err != nil {
+		return nil, err
+	}
+	if len(procs) == 0 {
+		return nil, fmt.Errorf("no process %d", pid)
+	}
+
+	return &procs[0], nil
+}
+
+// list is the processes that the ps selector picks: "-ax" for each
+// process, "-p <pid>" for one.
+func (d *Darwin) list(
+	ctx context.Context,
+	selector ...string,
+) ([]Process, error) {
+	ps := func(args ...string) []string { return append(append([]string{}, selector...), args...) }
 	out, err := d.Exec.Execute(
 		ctx,
 		"ps",
-		"-axo",
-		"pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,lstart=",
-	)
+		ps("-o", "pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,time=,lstart=")...)
 	if err != nil {
 		return nil, fmt.Errorf("ps: %w", err)
 	}
-	names := d.column(ctx, "-axo", "pid=,ucomm=")
-	args := d.column(ctx, "-axww", "-o", "pid=,args=")
+	names := d.column(ctx, ps("-o", "pid=,ucomm=")...)
+	args := d.column(ctx, ps("-ww", "-o", "pid=,args=")...)
 	procs := []Process{}
 	for _, line := range strings.Split(string(out), "\n") {
 		f := strings.Fields(line)
@@ -79,16 +108,17 @@ func (d *Darwin) Collect(
 			PID: int32(pid), ParentPID: int32(ppid), Owner: f[2], State: state(f[3]),
 			Name: names[f[0]], CmdLine: args[f[0]],
 		}
-		if len(f) >= 7 {
+		if len(f) >= 8 {
 			p.CPUPercent, _ = strconv.ParseFloat(f[4], 64)
 			p.MemPercent, _ = strconv.ParseFloat(f[5], 64)
 			kb, _ := strconv.ParseInt(f[6], 10, 64)
 			p.RSS = kb * 1024
+			p.CPUSeconds = cpuTime(f[7])
 		}
-		if len(f) >= 12 {
+		if len(f) >= 13 {
 			if t, err := time.ParseInLocation(
 				lstartLayout,
-				strings.Join(f[7:12], " "),
+				strings.Join(f[8:13], " "),
 				time.Local,
 			); err == nil {
 				p.CreationTime = t.Unix()
@@ -97,7 +127,32 @@ func (d *Darwin) Collect(
 		procs = append(procs, p)
 	}
 
-	return &Info{Count: len(procs), Processes: procs}, nil
+	return procs, nil
+}
+
+// cpuTime is the seconds of ps's time column: "[[dd-]hh:]mm:ss.ss".
+// A value that is not a time is 0.
+func cpuTime(
+	v string,
+) float64 {
+	days := 0.0
+	if d, rest, ok := strings.Cut(v, "-"); ok {
+		n, err := strconv.ParseFloat(d, 64)
+		if err != nil {
+			return 0
+		}
+		days, v = n, rest
+	}
+	total := 0.0
+	for _, part := range strings.Split(v, ":") {
+		n, err := strconv.ParseFloat(part, 64)
+		if err != nil {
+			return 0
+		}
+		total = total*60 + n
+	}
+
+	return days*86400 + total
 }
 
 // column is the rest of each line of ps with args, after the pid, by pid.

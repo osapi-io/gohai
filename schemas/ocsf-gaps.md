@@ -8,7 +8,7 @@ now. Each entry is a candidate for an upstream OCSF PR to
 collectors. **OCSF version:** 1.8.0. **Date:** 2026-05-23.
 
 The counts on this page are from that audit. The audit counted each JSON field
-in the source. `field-mapping.md` has one row for each mapped field, 953 rows
+in the source. `field-mapping.md` has one row for each mapped field, 954 rows
 today, and it is the current source.
 
 ______________________________________________________________________

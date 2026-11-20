@@ -22,6 +22,8 @@
 package process
 
 import (
+	"context"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
@@ -51,11 +53,20 @@ type Process struct {
 	MemPercent float64 `json:"mem_percent,omitempty"`
 	// RSS is the resident set size, in bytes.
 	RSS int64 `json:"rss,omitempty"`
+	// CPUSeconds is the user and system CPU time the process used. The
+	// difference between two samples, over the time between them, is the
+	// CPU share in that time.
+	CPUSeconds float64 `json:"cpu_seconds,omitempty"`
 }
 
 // Collector is the public interface every process variant satisfies.
 type Collector interface {
 	collector.Collector
+
+	// Read is the one process pid, through the same sources as Collect,
+	// without reading the others. It is an error when there is no such
+	// process.
+	Read(ctx context.Context, pid int32) (*Process, error)
 }
 
 type base struct{}
