@@ -30,8 +30,9 @@ import (
 	"bytes"
 	"strings"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds the enumerated SCSI devices keyed by address.
@@ -65,10 +66,19 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the scsi variant appropriate for the host OS.
 func New() Collector {
-	if platform.IsDarwin() {
-		return NewDarwin()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	return NewLinux()
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // parseLsscsi parses `lsscsi` output into a map keyed by SCSI address.

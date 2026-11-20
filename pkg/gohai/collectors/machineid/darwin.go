@@ -22,32 +22,42 @@ package machineid
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin resolves the machine ID on macOS. Wraps readHostID
-// (gopsutil.host.Info internally, which on darwin reads
-// `IOPlatformUUID` from IOKit — the correct, stable hardware
-// identifier Apple intends for this purpose).
+// platformUUIDRE is the IOPlatformUUID line of ioreg's output.
+var platformUUIDRE = regexp.MustCompile(`"IOPlatformUUID" = "([^"]+)"`)
+
+// Darwin reads the machine ID on macOS: IOPlatformUUID, the stable
+// hardware identifier Apple gives for this, from ioreg.
 type Darwin struct {
 	base
+
+	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant.
+// NewDarwin returns a Darwin variant that runs the host's ioreg.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{Exec: executor.New()}
 }
 
-// Collect returns the machine ID. gopsutil's darwin path is
-// correct — no extension needed.
+// Collect returns the machine ID.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	id, err := readHostID(ctx)
+	out, err := d.Exec.Execute(ctx, "ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ioreg IOPlatformExpertDevice: %w", err)
 	}
-	return &Info{ID: id}, nil
+	m := platformUUIDRE.FindSubmatch(out)
+	if m == nil {
+		return &Info{}, nil
+	}
+
+	return &Info{ID: string(m[1])}, nil
 }

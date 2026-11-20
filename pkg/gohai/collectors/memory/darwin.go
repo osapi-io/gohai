@@ -23,6 +23,7 @@ package memory
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,42 +32,69 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects memory usage on macOS. gopsutil's mem.VirtualMemory
-// (mach `host_statistics64`) provides Total / Available / Used / Free
-// / Active / Inactive / Wired. We additionally run `vm_stat` through
-// the shared Executor to populate Speculative and Compressed — the
-// mach syscall doesn't expose either and they're essential for Apple
-// Silicon performance diagnostics (aggressive compressor use).
+// Darwin collects memory usage on macOS: the total from sysctl
+// hw.memsize, the page counts from vm_stat, and swap from sysctl
+// vm.swapusage. Available and Used follow gopsutil: Available is the
+// free and inactive pages, and Used is Total less Available.
 type Darwin struct {
 	base
 
 	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant wired to the production Executor.
+// NewDarwin returns a Darwin variant that runs the host's sysctl and
+// vm_stat.
 func NewDarwin() *Darwin {
 	return &Darwin{Exec: executor.New()}
 }
 
-// Collect returns the memory Info with vm_stat extensions layered on
-// top of gopsutil's totals.
+// Collect returns the memory Info.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info, err := readMemory(ctx)
+	out, err := d.Exec.Execute(ctx, "sysctl", "-n", "hw.memsize")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("sysctl hw.memsize: %w", err)
 	}
-	if d.Exec == nil {
-		return info, nil
-	}
-	out, err := d.Exec.Execute(ctx, "vm_stat")
+	total, err := strconv.ParseUint(strings.TrimSpace(string(out)), 10, 64)
 	if err != nil {
-		return info, nil
+		return nil, fmt.Errorf("sysctl hw.memsize: %w", err)
 	}
-	applyVMStat(info, out)
+	info := &Info{Total: total}
+	if out, err := d.Exec.Execute(ctx, "vm_stat"); err == nil {
+		applyVMStat(info, out)
+	}
+	if out, err := d.Exec.Execute(ctx, "sysctl", "-n", "vm.swapusage"); err == nil {
+		info.Swap = parseSwapUsage(string(out))
+	}
+
 	return info, nil
+}
+
+// swapUsageRE is one figure of sysctl vm.swapusage:
+// "total = 3072.00M  used = 1818.81M  free = 1253.19M  (encrypted)".
+var swapUsageRE = regexp.MustCompile(`(total|used|free) = ([\d.]+)([KMG])`)
+
+// parseSwapUsage is the swap of vm.swapusage, or nil when it has no
+// total.
+func parseSwapUsage(
+	out string,
+) *Swap {
+	unit := map[string]float64{"K": 1 << 10, "M": 1 << 20, "G": 1 << 30}
+	v := map[string]uint64{}
+	for _, m := range swapUsageRE.FindAllStringSubmatch(out, -1) {
+		n, _ := strconv.ParseFloat(m[2], 64)
+		v[m[1]] = uint64(n * unit[m[3]])
+	}
+	if v["total"] == 0 {
+		return nil
+	}
+
+	return &Swap{
+		Total: v["total"], Used: v["used"], Free: v["free"],
+		UsedPercent: float64(v["total"]-v["free"]) / float64(v["total"]) * 100,
+	}
 }
 
 // vmStatPageSize matches the first line's page-size declaration.
@@ -74,10 +102,8 @@ func (d *Darwin) Collect(
 // Apple Silicon; 4096 on Intel.
 var vmStatPageSize = regexp.MustCompile(`page size of (\d+) bytes`)
 
-// applyVMStat parses `vm_stat` output and populates Darwin-specific
-// buckets (Speculative, Compressed) on the existing Info. Active /
-// Inactive / Wired are left to gopsutil (they're already populated
-// via the mach syscall and match vm_stat's numbers anyway).
+// applyVMStat parses `vm_stat` output into info's page buckets, and
+// derives Available, Used and UsedPercent from them and info.Total.
 func applyVMStat(
 	info *Info,
 	out []byte,
@@ -104,10 +130,23 @@ func applyVMStat(
 		}
 		bytes := pages * pageSize
 		switch key {
+		case "Pages free":
+			info.Free = bytes
+		case "Pages active":
+			info.Active = bytes
+		case "Pages inactive":
+			info.Inactive = bytes
+		case "Pages wired down":
+			info.Wired = bytes
 		case "Pages speculative":
 			info.Speculative = bytes
 		case "Pages stored in compressor":
 			info.Compressed = bytes
 		}
+	}
+	info.Available = info.Free + info.Inactive
+	if info.Total > 0 && info.Available <= info.Total {
+		info.Used = info.Total - info.Available
+		info.UsedPercent = float64(info.Used) / float64(info.Total) * 100
 	}
 }

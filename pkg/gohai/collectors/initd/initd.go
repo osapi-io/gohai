@@ -26,8 +26,9 @@ package initd
 import (
 	"strings"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // proc1CommPath is the file whose contents are the name of PID 1.
@@ -52,10 +53,19 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the init variant for the host OS.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	return NewLinux()
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // classify normalizes the raw PID-1 comm string. Known init systems

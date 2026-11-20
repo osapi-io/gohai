@@ -23,6 +23,9 @@ package hostname
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
@@ -31,17 +34,18 @@ import (
 // `hostname -s` for the short name, bare `hostname` for machine_name,
 // plus DNS canonicalization for FQDN. When the exec runner is
 // unavailable (or any hostname command fails) we fall back to
-// gopsutil's host.Info + os.Hostname so minimal containers without
+// the kernel's hostname in /proc so minimal containers without
 // util-linux-hostname still produce output.
 type Linux struct {
 	base
 
 	Exec executor.Executor
+	FS   avfs.VFS
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{Exec: executor.New(), FS: osfs.NewWithNoIdm()}
 }
 
 // Collect returns hostname facts.
@@ -49,5 +53,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectWithExec(ctx, l.Exec)
+	return collectWithExec(ctx, l.Exec, l.FS)
 }

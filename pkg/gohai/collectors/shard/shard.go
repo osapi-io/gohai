@@ -25,14 +25,15 @@
 package shard
 
 import (
-	//nolint:gosec // MD5 is not used for security — it's Ohai's hash for shard distribution.
-	"crypto/md5"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	//nolint:gosec // MD5 is not used for security — it's Ohai's hash for shard distribution.
+	"crypto/md5"
+
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 )
@@ -58,10 +59,19 @@ func (base) Dependencies() []string { return []string{"hostname", "dmi"} }
 
 // New returns the shard variant for the host OS.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	return NewLinux()
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // getMachineName extracts the raw hostname from the hostname prior.

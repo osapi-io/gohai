@@ -22,18 +22,33 @@ package uptime
 
 import (
 	"context"
+	"fmt"
+	"regexp"
+	"strconv"
+	"time"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects uptime on macOS. No idle-time equivalent.
+// bootSecRE is the seconds of sysctl kern.boottime:
+// "{ sec = 1767229145, usec = 0 } Thu Jan  1 00:59:05 2026".
+var bootSecRE = regexp.MustCompile(`sec = (\d+)`)
+
+// Darwin collects uptime on macOS: the boot time from sysctl
+// kern.boottime, and the seconds since it by the clock. It has no idle
+// time.
 type Darwin struct {
 	base
+
+	Exec executor.Executor
+	Now  func() time.Time
 }
 
-// NewDarwin returns a Darwin variant.
+// NewDarwin returns a Darwin variant that runs the host's sysctl and reads
+// its clock.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{Exec: executor.New(), Now: time.Now}
 }
 
 // Collect returns uptime facts.
@@ -41,5 +56,19 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return readBase(ctx)
+	out, err := d.Exec.Execute(ctx, "sysctl", "-n", "kern.boottime")
+	if err != nil {
+		return nil, fmt.Errorf("sysctl kern.boottime: %w", err)
+	}
+	m := bootSecRE.FindSubmatch(out)
+	if m == nil {
+		return nil, fmt.Errorf("sysctl kern.boottime: no seconds in %q", out)
+	}
+	boot, _ := strconv.ParseInt(string(m[1]), 10, 64)
+	up := d.Now().Unix() - boot
+	if up < 0 {
+		up = 0
+	}
+
+	return &Info{Seconds: uint64(up), BootTime: uint64(boot), Human: HumanDuration(uint64(up))}, nil
 }

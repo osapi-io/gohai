@@ -27,8 +27,9 @@ package packagemgr
 import (
 	"os/exec"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
@@ -54,15 +55,23 @@ func (base) Dependencies() []string { return nil }
 // family drives the variant: Debian → apt; RHEL, Fedora and Amazon →
 // dnf/yum; macOS → brew. Generic linux tries each manager in order.
 func New() Collector {
-	switch platform.Detect() {
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src.
+func NewWith(
+	src source.Sources,
+) Collector {
+	switch collector.Family(src) {
 	case family.Darwin:
-		return NewDarwin()
+		return collector.Wire(NewDarwin(), src)
 	case family.Debian:
-		return NewDebian()
+		return collector.Wire(NewDebian(), src)
 	case family.RHEL, family.Fedora, family.Amazon:
-		return NewRHEL()
+		return collector.Wire(NewRHEL(), src)
 	default:
-		return NewLinux()
+		return collector.Wire(NewLinux(), src)
 	}
 }
 

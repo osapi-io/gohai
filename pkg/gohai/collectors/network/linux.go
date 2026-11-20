@@ -22,6 +22,8 @@ package network
 
 import (
 	"context"
+	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -32,8 +34,11 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Linux collects network facts on Linux. gopsutil enumerates
-// interfaces and I/O counters; we additionally:
+// Linux collects network facts on Linux: each interface of
+// /sys/class/net, with its index, MTU, MAC and flags; its addresses from
+// `ip -o addr show`; its counters from /proc/net/dev; its speed, duplex
+// and driver from sysfs; and the neighbours from `ip neigh show`. It
+// also:
 //
 //   - Read /sys/class/net/<iface>/type to derive the canonical
 //     encapsulation name (Ethernet / Loopback / PPP / SLIP / IPIP /
@@ -62,14 +67,12 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	ifs, err := readInterfaces(ctx)
+	ifs, err := l.interfaces(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if l.FS != nil {
-		applyEncapsulation(l.FS, ifs)
-		ifs = applyOpenVZAliasMerge(l.FS, ifs)
-	}
+	applyEncapsulation(l.FS, ifs)
+	ifs = applyOpenVZAliasMerge(l.FS, ifs)
 	applyNICStats(l.FS, ifs)
 	info := &Info{Interfaces: ifs}
 	if l.Exec != nil {
@@ -78,8 +81,10 @@ func (l *Linux) Collect(
 		applyEthtoolTuning(ctx, l.Exec, info)
 		applyIPLinkExtras(ctx, l.Exec, info)
 	}
-	if entries, err := neighListFn(); err == nil {
-		info.Neighbours = entries
+	if l.Exec != nil {
+		if out, err := l.Exec.Execute(ctx, "ip", "neigh", "show"); err == nil {
+			info.Neighbours = parseIPNeigh(out)
+		}
 	}
 	return info, nil
 }
@@ -119,7 +124,7 @@ func applyEthtoolDriverInfo(
 // applyIPLinkExtras runs `ip -d link` once and merges per-interface
 // VLAN, tunnel, and XDP annotations onto the matching Interface
 // entries. Mirrors the relevant subset of Ohai's link_statistics:
-// the three signals neither gopsutil nor the ethtool family covers.
+// the three signals that neither sysfs nor the ethtool family covers.
 //
 // `ip` failures (binary missing, permission denied) silently leave
 // the three fields nil for every interface — same behaviour as the
@@ -199,26 +204,16 @@ func applyEthtoolTuning(
 	}
 }
 
-// applyNICStats merges per-interface link-layer detail. Speed +
-// Duplex come from ghw via the nicFn seam; Driver comes from a
-// sysfs read of `/sys/class/net/<iface>/device/driver` symlink
-// target via the avfs.VFS so tests don't need ghw.
+// applyNICStats fills each interface's speed and duplex, and its driver,
+// from sysfs.
 func applyNICStats(
 	fs avfs.VFS,
 	ifs []Interface,
 ) {
-	stats, err := nicFn()
-	if err != nil {
-		stats = nil
-	}
 	for i := range ifs {
-		if s, ok := stats[ifs[i].Name]; ok {
-			ifs[i].Speed = s.Speed
-			ifs[i].Duplex = s.Duplex
-		}
-		if fs != nil {
-			ifs[i].Driver = readSysfsDriver(fs, ifs[i].Name)
-		}
+		st := readNIC(fs, ifs[i].Name)
+		ifs[i].Speed, ifs[i].Duplex = st.Speed, st.Duplex
+		ifs[i].Driver = readSysfsDriver(fs, ifs[i].Name)
 	}
 }
 
@@ -523,4 +518,111 @@ func isDefaultDestination(
 		return true
 	}
 	return false
+}
+
+// sysClassNet has a directory for each interface.
+const sysClassNet = "/sys/class/net"
+
+// The IFF_* bits of /sys/class/net/<iface>/flags that Go names.
+var iffFlags = map[string]uint64{
+	"up": 0x1, "broadcast": 0x2, "loopback": 0x8, "pointtopoint": 0x10,
+	"multicast": 0x1000,
+}
+
+// interfaces is each interface of /sys/class/net, in index order, with
+// its addresses from `ip -o addr show` and its counters from
+// /proc/net/dev.
+func (l *Linux) interfaces(
+	ctx context.Context,
+) ([]Interface, error) {
+	if l.FS == nil {
+		return nil, fmt.Errorf("network: no filesystem")
+	}
+	entries, err := l.FS.ReadDir(sysClassNet)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", sysClassNet, err)
+	}
+	read := func(name, file string) string {
+		b, _ := l.FS.ReadFile(sysClassNet + "/" + name + "/" + file)
+		return strings.TrimSpace(string(b))
+	}
+	addrs := map[string][]Address{}
+	if l.Exec != nil {
+		if out, err := l.Exec.Execute(ctx, "ip", "-o", "addr", "show"); err == nil {
+			addrs = parseIPAddr(out)
+		}
+	}
+	counters := readNetDev(l.FS)
+	ifs := []Interface{}
+	for _, e := range entries {
+		name := e.Name()
+		item := Interface{Name: name, Addresses: addrs[name], Counters: counters[name]}
+		item.Number, _ = strconv.Atoi(read(name, "ifindex"))
+		item.MTU, _ = strconv.Atoi(read(name, "mtu"))
+		if mac := read(name, "address"); strings.Trim(mac, "0:") != "" {
+			item.MAC = mac
+		}
+		bits, _ := strconv.ParseUint(read(name, "flags"), 0, 64)
+		set := map[string]bool{}
+		for f, bit := range iffFlags {
+			set[f] = bits&bit != 0
+		}
+		item.Flags = orderFlags(set)
+		item.State = stateFromFlags(item.Flags)
+		ifs = append(ifs, item)
+	}
+	sort.SliceStable(ifs, func(i, j int) bool { return ifs[i].Number < ifs[j].Number })
+
+	return ifs, nil
+}
+
+// parseIPAddr is the addresses of `ip -o addr show`, by interface:
+// "2: eth0    inet 10.0.0.5/24 brd 10.0.0.255 scope global eth0".
+func parseIPAddr(
+	out []byte,
+) map[string][]Address {
+	addrs := map[string][]Address{}
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 4 || (f[2] != "inet" && f[2] != "inet6") {
+			continue
+		}
+		if a, ok := parseAddress(withPrefix(f[3])); ok {
+			addrs[f[1]] = append(addrs[f[1]], a)
+		}
+	}
+
+	return addrs
+}
+
+// readNetDev is the counters of /proc/net/dev, by interface: received
+// bytes, packets, errors and drops, then the same sent.
+func readNetDev(
+	fs avfs.VFS,
+) map[string]*Counters {
+	counters := map[string]*Counters{}
+	b, err := fs.ReadFile("/proc/net/dev")
+	if err != nil {
+		return counters
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		name, rest, ok := strings.Cut(line, ":")
+		if !ok {
+			continue
+		}
+		f := strings.Fields(rest)
+		if len(f) < 12 {
+			continue
+		}
+		n := func(i int) uint64 {
+			v, _ := strconv.ParseUint(f[i], 10, 64)
+			return v
+		}
+		counters[strings.TrimSpace(name)] = &Counters{
+			BytesRecv: n(0), PacketsRecv: n(1), Errin: n(2), Dropin: n(3),
+			BytesSent: n(8), PacketsSent: n(9), Errout: n(10), Dropout: n(11),
+		}
+	}
+
+	return counters
 }

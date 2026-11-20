@@ -25,16 +25,15 @@
 package filesystem
 
 import (
-	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/avfs/avfs"
-	"github.com/shirou/gopsutil/v4/disk"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds filesystem data: the active mount table plus (Linux only)
@@ -159,53 +158,86 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the filesystem variant for the host OS.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
-	}
-	return NewLinux()
+	return NewWith(source.Sources{})
 }
 
-// partitionsFn is the injection seam for gopsutil's
-// disk.PartitionsWithContext. Kept private so importers don't
-// transitively need gopsutil. Swapped via SetPartitionsFn.
-var partitionsFn = disk.PartitionsWithContext
-
-// usageFn is the injection seam for gopsutil's disk.UsageWithContext.
-// Kept private alongside partitionsFn. Swapped via SetUsageFn.
-var usageFn = disk.UsageWithContext
-
-// listMounts is the production bridge to gopsutil. Enumerates
-// partitions and fetches usage (capacity + inodes) for each. Per-mount
-// usage failures (permission denied, stale NFS, etc.) skip usage
-// fields but keep the mount in the output.
-func listMounts(
-	ctx context.Context,
-) ([]Mount, error) {
-	parts, err := partitionsFn(ctx, true)
-	if err != nil {
-		return nil, err
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	out := make([]Mount, 0, len(parts))
-	for _, p := range parts {
-		m := Mount{
-			Device:     p.Device,
-			Mountpoint: p.Mountpoint,
-			Type:       p.Fstype,
-			Opts:       p.Opts,
-		}
-		if u, err := usageFn(ctx, p.Mountpoint); err == nil {
-			m.Total = u.Total
-			m.Used = u.Used
-			m.Free = u.Free
-			m.UsedPercent = u.UsedPercent
-			m.InodesTotal = u.InodesTotal
-			m.InodesUsed = u.InodesUsed
-			m.InodesFree = u.InodesFree
-			m.InodesUsedPercent = u.InodesUsedPercent
-		}
-		out = append(out, m)
+
+	return collector.Wire(NewLinux(), src)
+}
+
+// usage fills m's sizes from a df line's sizes in kB: total, used and
+// available. Used is what the filesystem holds, Free is what a user can
+// still write, and UsedPercent is Used of Used and Free, as statfs gives
+// them.
+func usage(
+	m *Mount,
+	total, used, avail uint64,
+) {
+	m.Total, m.Used, m.Free = total*1024, used*1024, avail*1024
+	if m.Used+m.Free > 0 {
+		m.UsedPercent = float64(m.Used) / float64(m.Used+m.Free) * 100
 	}
-	return out, nil
+}
+
+// inodes fills m's inode counts from df's used and free inodes.
+func inodes(
+	m *Mount,
+	used, free uint64,
+) {
+	m.InodesUsed, m.InodesFree, m.InodesTotal = used, free, used+free
+	if m.InodesTotal > 0 {
+		m.InodesUsedPercent = float64(used) / float64(m.InodesTotal) * 100
+	}
+}
+
+// dfRows is the numbers of each line of df output, by mountpoint: the n
+// fields before the mountpoint, with % signs dropped. A line belongs to
+// the longest of mountpoints it ends with, because a device or a
+// mountpoint can hold spaces. A line that ends with none, or has a field
+// that is not a number, is left out.
+func dfRows(
+	out []byte,
+	mountpoints []string,
+	n int,
+) map[string][]uint64 {
+	rows := map[string][]uint64{}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimRight(line, " ")
+		mp := ""
+		for _, m := range mountpoints {
+			if strings.HasSuffix(line, " "+m) && len(m) > len(mp) {
+				mp = m
+			}
+		}
+		if mp == "" {
+			continue
+		}
+		f := strings.Fields(strings.TrimSuffix(line, " "+mp))
+		if len(f) < n {
+			continue
+		}
+		nums := make([]uint64, 0, n)
+		for _, v := range f[len(f)-n:] {
+			x, err := strconv.ParseUint(strings.TrimSuffix(v, "%"), 10, 64)
+			if err != nil {
+				break
+			}
+			nums = append(nums, x)
+		}
+		if len(nums) == n {
+			rows[mp] = nums
+		}
+	}
+
+	return rows
 }
 
 // lsblkJSON mirrors `lsblk -J` output. Only the subset of fields we
@@ -462,7 +494,7 @@ func mergeLsblkIntoMounts(
 			continue
 		}
 		if e.Mountpoint != "" {
-			// mountpoint exists in lsblk but not in gopsutil's view;
+			// mountpoint exists in lsblk but not in the mount table;
 			// treat as mounted-but-unobserved rather than unmounted.
 			continue
 		}

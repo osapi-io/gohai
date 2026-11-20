@@ -27,12 +27,8 @@
 package memory
 
 import (
-	"context"
-
-	"github.com/shirou/gopsutil/v4/mem"
-
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds memory usage data. Values are native bytes; Ohai emits
@@ -46,11 +42,9 @@ type Info struct {
 	UsedPercent float64 `json:"used_percent,omitempty"`
 	Free        uint64  `json:"free,omitempty"`
 
-	// LRU buckets. macOS populates Active / Inactive / Wired via the
-	// mach syscall; Linux populates Active / Inactive from
-	// /proc/meminfo via gopsutil, and the finer anon/file splits from
-	// our own /proc/meminfo extension (gopsutil hides those behind a
-	// linux-only ExLinux type we can't reference cross-platform).
+	// LRU buckets. macOS populates Active / Inactive / Wired from
+	// vm_stat; Linux populates them, and the finer anon/file splits,
+	// from /proc/meminfo.
 	Active       uint64 `json:"active,omitempty"`
 	Inactive     uint64 `json:"inactive,omitempty"`
 	ActiveAnon   uint64 `json:"active_anon,omitempty"`
@@ -59,8 +53,7 @@ type Info struct {
 	InactiveFile uint64 `json:"inactive_file,omitempty"`
 	Unevictable  uint64 `json:"unevictable,omitempty"`
 
-	// macOS-specific buckets (Speculative + Compressed parsed from
-	// vm_stat; Wired comes from gopsutil via the mach syscall).
+	// macOS-specific buckets, parsed from vm_stat.
 	Wired       uint64 `json:"wired,omitempty"`
 	Speculative uint64 `json:"speculative,omitempty"`
 	Compressed  uint64 `json:"compressed,omitempty"`
@@ -95,8 +88,7 @@ type Info struct {
 	NFSUnstable uint64 `json:"nfs_unstable,omitempty"`
 	Bounce      uint64 `json:"bounce,omitempty"`
 
-	// Anonymous + shared (Linux-specific splits from /proc/meminfo
-	// that gopsutil doesn't expose on its cross-platform struct).
+	// Anonymous + shared (Linux-specific splits from /proc/meminfo).
 	AnonPages uint64 `json:"anon_pages,omitempty"`
 	Shmem     uint64 `json:"shmem,omitempty"`
 
@@ -164,84 +156,17 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the memory variant for the host OS.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
-	}
-	return NewLinux()
+	return NewWith(source.Sources{})
 }
 
-// Package-level injection seams. Kept private so importers don't
-// transitively need gopsutil; swapped via the SetXFn helpers in
-// export_test.go.
-//
-// NOTE: gopsutil also ships an ExLinux struct exposing
-// Active(anon/file), Inactive(anon/file), Unevictable, Percpu,
-// KernelStack — but it lives behind a `//go:build linux` tag, so
-// referencing its type from our no-build-tags package breaks the
-// darwin build. We surface the 27 fields that live on the
-// cross-platform VirtualMemoryStat and leave the ex-only fields as a
-// future follow-up (requires either build-tagged shim files or a
-// procfs migration).
-var (
-	virtualMemoryFn = mem.VirtualMemoryWithContext
-	swapMemoryFn    = mem.SwapMemoryWithContext
-)
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
+	}
 
-// readMemory is the production bridge to gopsutil. Combines
-// VirtualMemory + SwapMemory + (Linux only) ExLinux.VirtualMemory into
-// our Info. gopsutil parses /proc/meminfo once — we forward every
-// field it exposes rather than reparse (library-first principle).
-func readMemory(
-	ctx context.Context,
-) (*Info, error) {
-	vm, err := virtualMemoryFn(ctx)
-	if err != nil {
-		return nil, err
-	}
-	info := &Info{
-		Total:        vm.Total,
-		Available:    vm.Available,
-		Used:         vm.Used,
-		UsedPercent:  vm.UsedPercent,
-		Free:         vm.Free,
-		Active:       vm.Active,
-		Inactive:     vm.Inactive,
-		Wired:        vm.Wired,
-		Buffers:      vm.Buffers,
-		Cached:       vm.Cached,
-		Dirty:        vm.Dirty,
-		WriteBack:    vm.WriteBack,
-		WriteBackTmp: vm.WriteBackTmp,
-		Shared:       vm.Shared,
-		Mapped:       vm.Mapped,
-		Slab:         vm.Slab,
-		SReclaimable: vm.Sreclaimable,
-		SUnreclaim:   vm.Sunreclaim,
-		PageTables:   vm.PageTables,
-		CommitLimit:  vm.CommitLimit,
-		CommittedAS:  vm.CommittedAS,
-		VmallocTotal: vm.VmallocTotal,
-		VmallocUsed:  vm.VmallocUsed,
-		VmallocChunk: vm.VmallocChunk,
-	}
-	if vm.HugePagesTotal > 0 || vm.HugePageSize > 0 || vm.AnonHugePages > 0 {
-		info.HugePages = &Hugepages{
-			Total:         vm.HugePagesTotal,
-			Free:          vm.HugePagesFree,
-			Reserved:      vm.HugePagesRsvd,
-			Surplus:       vm.HugePagesSurp,
-			Size:          vm.HugePageSize,
-			AnonHugePages: vm.AnonHugePages,
-		}
-	}
-	if sm, err := swapMemoryFn(ctx); err == nil && sm.Total > 0 {
-		info.Swap = &Swap{
-			Total:       sm.Total,
-			Used:        sm.Used,
-			Free:        sm.Free,
-			UsedPercent: sm.UsedPercent,
-			Cached:      vm.SwapCached,
-		}
-	}
-	return info, nil
+	return collector.Wire(NewLinux(), src)
 }

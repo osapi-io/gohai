@@ -28,7 +28,6 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -174,38 +173,30 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		hostInfo     func(context.Context) (*host.InfoStat, error)
+		osRelease    string
 		fs           avfs.VFS
 		exec         func(*testing.T) executor.Executor
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "linux: ubuntu happy path, gopsutil populates everything",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "ubuntu", PlatformVersion: "24.04", PlatformFamily: "debian",
-				}, nil
-			},
-			fs: fsWith(s.T(), nil),
+			name:      "linux: ubuntu happy path, os-release populates everything",
+			variant:   "linux",
+			osRelease: "ID=ubuntu\nVERSION_ID=24.04\n",
+			fs:        fsWith(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "ubuntu", Version: "24.04",
+					OS: "linux", Name: "ubuntu", Version: "24.04",
 					Family: "debian", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: centos 7 supplements minor version from /etc/redhat-release",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "centos", PlatformVersion: "7", PlatformFamily: "rhel",
-				}, nil
-			},
+			name:      "linux: centos 7 supplements minor version from /etc/redhat-release",
+			variant:   "linux",
+			osRelease: "ID=centos\nVERSION_ID=7\n",
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/redhat-release": "CentOS Linux release 7.9.2009 (Core)\n",
 			}),
@@ -214,19 +205,15 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "centos", Version: "7.9.2009",
+					OS: "linux", Name: "centos", Version: "7.9.2009",
 					Family: "rhel", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: rhel 9.3 already dotted, no supplement",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "rhel", PlatformVersion: "9.3", PlatformFamily: "rhel",
-				}, nil
-			},
+			name:      "linux: rhel 9.3 already dotted, no supplement",
+			variant:   "linux",
+			osRelease: "ID=rhel\nVERSION_ID=9.3\n",
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/redhat-release": "Red Hat Enterprise Linux release 9.99 (Plow)\n",
 			}),
@@ -235,38 +222,30 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "redhat", Version: "9.3",
+					OS: "linux", Name: "redhat", Version: "9.3",
 					Family: "rhel", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: centos 7 missing /etc/redhat-release version stays 7",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "centos", PlatformVersion: "7", PlatformFamily: "rhel",
-				}, nil
-			},
-			fs: fsWith(s.T(), nil),
+			name:      "linux: centos 7 missing /etc/redhat-release version stays 7",
+			variant:   "linux",
+			osRelease: "ID=centos\nVERSION_ID=7\n",
+			fs:        fsWith(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "centos", Version: "7",
+					OS: "linux", Name: "centos", Version: "7",
 					Family: "rhel", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: debian testing empty version supplemented from /etc/debian_version",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "debian", PlatformVersion: "", PlatformFamily: "debian",
-				}, nil
-			},
+			name:      "linux: debian testing empty version supplemented from /etc/debian_version",
+			variant:   "linux",
+			osRelease: "ID=debian\n",
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/debian_version": "trixie/sid\n",
 			}),
@@ -275,7 +254,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "debian", Version: "trixie/sid",
+					OS: "linux", Name: "debian", Version: "trixie/sid",
 					Family: "debian", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -283,9 +262,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy /etc/redhat-release from Red Hat",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/redhat-release": "Red Hat Enterprise Linux Server release 7.9 (Maipo)\n",
 			}),
@@ -294,7 +270,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "redhat", Version: "7.9",
+					OS: "linux", Name: "redhat", Version: "7.9",
 					Family: "rhel", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -302,9 +278,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy /etc/system-release, a name Ohai has no family for",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/system-release": "Foo Linux release 1.0\n",
 			}),
@@ -318,9 +291,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy /etc/redhat-release",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/redhat-release": "CentOS release 6.10 (Final)\n",
 			}),
@@ -329,7 +299,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "centos", Version: "6.10",
+					OS: "linux", Name: "centos", Version: "6.10",
 					Family: "rhel", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -337,9 +307,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy /etc/SuSE-release with PATCHLEVEL",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/SuSE-release": "SUSE Linux Enterprise Server 11\nVERSION = 11\nPATCHLEVEL = 4\n",
 			}),
@@ -348,7 +315,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "suse", Version: "11.4",
+					OS: "linux", Name: "suse", Version: "11.4",
 					Family: "suse", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -356,9 +323,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy SuSE without PATCHLEVEL",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/SuSE-release": "VERSION = 12\n",
 			}),
@@ -367,7 +331,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "suse", Version: "12",
+					OS: "linux", Name: "suse", Version: "12",
 					Family: "suse", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -375,9 +339,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy /etc/debian_version",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/debian_version": "11.7\n",
 			}),
@@ -386,7 +347,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "debian", Version: "11.7",
+					OS: "linux", Name: "debian", Version: "11.7",
 					Family: "debian", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -394,9 +355,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy /etc/arch-release rolling no version",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/arch-release": "",
 			}),
@@ -405,7 +363,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "arch", Version: "",
+					OS: "linux", Name: "arch", Version: "",
 					Family: "arch", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -413,9 +371,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy /etc/system-release Amazon",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/system-release": "Amazon Linux release 2 (Karoo)\n",
 			}),
@@ -424,7 +379,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "amazon", Version: "2",
+					OS: "linux", Name: "amazon", Version: "2",
 					Family: "amazon", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -432,9 +387,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, legacy /etc/gentoo-release",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/gentoo-release": "Gentoo Base System release 2.13\n",
 			}),
@@ -443,7 +395,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "gentoo", Version: "2.13",
+					OS: "linux", Name: "gentoo", Version: "2.13",
 					Family: "gentoo", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -451,9 +403,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, malformed legacy file skipped next succeeds",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/redhat-release": "garbage with no version\n",
 				"/etc/debian_version": "12\n",
@@ -463,7 +412,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "debian", Version: "12",
+					OS: "linux", Name: "debian", Version: "12",
 					Family: "debian", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -471,9 +420,6 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release, SuSE-release without VERSION line falls through",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
 			fs: fsWith(s.T(), map[string]string{
 				"/etc/SuSE-release":   "SUSE Linux Enterprise Server\n",
 				"/etc/debian_version": "12\n",
@@ -483,7 +429,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "debian", Version: "12",
+					OS: "linux", Name: "debian", Version: "12",
 					Family: "debian", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
@@ -491,166 +437,108 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no os-release + no legacy files, empty Info no error",
 			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{}, nil
-			},
-			fs: fsWith(s.T(), nil),
+			fs:      fsWith(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, CPUArchitecture: runtime.GOARCH,
+					OS: "linux", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: family fallback rocky → rhel (empty PlatformFamily)",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "rocky", PlatformVersion: "9.3",
-				}, nil
-			},
-			fs: fsWith(s.T(), nil),
+			name:      "linux: family fallback rocky → rhel (empty PlatformFamily)",
+			variant:   "linux",
+			osRelease: "ID=rocky\nVERSION_ID=9.3\n",
+			fs:        fsWith(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "rocky", Version: "9.3",
+					OS: "linux", Name: "rocky", Version: "9.3",
 					Family: "rhel", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: family fallback kali → debian",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "kali", PlatformVersion: "2023",
-				}, nil
-			},
-			fs: fsWith(s.T(), nil),
+			name:      "linux: family fallback kali → debian",
+			variant:   "linux",
+			osRelease: "ID=kali\nVERSION_ID=2023\n",
+			fs:        fsWith(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "kali", Version: "2023",
+					OS: "linux", Name: "kali", Version: "2023",
 					Family: "debian", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: remap archarm → arch",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "archarm", PlatformVersion: "rolling",
-				}, nil
-			},
-			fs: fsWith(s.T(), nil),
+			name:      "linux: remap archarm → arch",
+			variant:   "linux",
+			osRelease: "ID=archarm\nVERSION_ID=rolling\n",
+			fs:        fsWith(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "arch", Version: "rolling",
+					OS: "linux", Name: "arch", Version: "rolling",
 					Family: "arch", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: remap cumulus-linux → cumulus",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "cumulus-linux", PlatformVersion: "5.0",
-				}, nil
-			},
-			fs: fsWith(s.T(), nil),
+			name:      "linux: remap cumulus-linux → cumulus",
+			variant:   "linux",
+			osRelease: "ID=cumulus-linux\nVERSION_ID=5.0\n",
+			fs:        fsWith(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "cumulus", Version: "5.0",
+					OS: "linux", Name: "cumulus", Version: "5.0",
 					Family: "debian", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: remap sles_sap → suse",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "sles_sap", PlatformVersion: "15-SP5",
-				}, nil
-			},
-			fs: fsWith(s.T(), nil),
+			name:      "linux: remap sles_sap → suse",
+			variant:   "linux",
+			osRelease: "ID=sles_sap\nVERSION_ID=15-SP5\n",
+			fs:        fsWith(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "suse", Version: "15-SP5",
+					OS: "linux", Name: "suse", Version: "15-SP5",
 					Family: "suse", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
-			name:    "linux: nil FS skips supplement and legacy, gopsutil + family fallback only",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "almalinux", PlatformVersion: "9.3",
-				}, nil
-			},
-			fs: nil,
+			name:      "linux: nil FS reads nothing",
+			variant:   "linux",
+			osRelease: "ID=almalinux\nVERSION_ID=9.3\n",
+			fs:        nil,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "almalinux", Version: "9.3",
-					Family: "rhel", CPUArchitecture: runtime.GOARCH,
+					OS: "linux", CPUArchitecture: runtime.GOARCH,
 				}, *info)
-			},
-		},
-		{
-			name:     "linux: nil info yields minimal Info (no gopsutil data)",
-			variant:  "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) { return nil, nil },
-			fs:       fsWith(s.T(), nil),
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*platform.Info)
-				s.Require().True(ok)
-				s.Equal(platform.Info{OS: runtime.GOOS, CPUArchitecture: runtime.GOARCH}, *info)
-			},
-		},
-		{
-			name:    "linux: gopsutil error propagated",
-			variant: "linux",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return nil, errors.New("host.Info failed")
-			},
-			fs: fsWith(s.T(), nil),
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
 			},
 		},
 		{
 			name:    "darwin: macOS with RSR patch, BuildVersion + ProductVersionExtra populate",
 			variant: "darwin",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "darwin", PlatformVersion: "14.4.1",
-					PlatformFamily: "Standalone Workstation",
-					KernelVersion:  "fallback-kernel",
-				}, nil
-			},
 			exec: func(t *testing.T) executor.Executor {
 				return swVersExec(t, []byte(swVersWithRSR), nil)
 			},
@@ -659,7 +547,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "darwin", Version: "14.4.1",
+					OS: "darwin", Name: "darwin", Version: "14.4.1",
 					VersionExtra: "(a)", Family: "darwin",
 					CPUArchitecture: runtime.GOARCH, Build: "23E224",
 				}, *info)
@@ -668,49 +556,34 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: macOS without RSR, BuildVersion populates VersionExtra empty",
 			variant: "darwin",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "darwin", PlatformVersion: "13.5",
-					KernelVersion: "fallback-kernel",
-				}, nil
-			},
-			exec: func(t *testing.T) executor.Executor { return swVersExec(t, []byte(swVersNoRSR), nil) },
+			exec:    func(t *testing.T) executor.Executor { return swVersExec(t, []byte(swVersNoRSR), nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "darwin", Version: "13.5",
+					OS: "darwin", Name: "darwin", Version: "13.5",
 					Family: "darwin", CPUArchitecture: runtime.GOARCH, Build: "22G74",
 				}, *info)
 			},
 		},
 		{
-			name:    "darwin: sw_vers error, Build falls back to gopsutil KernelVersion",
+			name:    "darwin: sw_vers error, no version or build",
 			variant: "darwin",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "darwin", PlatformVersion: "12.6",
-					KernelVersion: "21G115",
-				}, nil
-			},
-			exec: func(t *testing.T) executor.Executor { return swVersExec(t, nil, errors.New("not found")) },
+			exec:    func(t *testing.T) executor.Executor { return swVersExec(t, nil, errors.New("not found")) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "darwin", Version: "12.6",
-					Family: "darwin", CPUArchitecture: runtime.GOARCH, Build: "21G115",
+					OS: "darwin", Name: "darwin",
+					Family: "darwin", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
 		{
 			name:    "darwin: sw_vers output with no-colon line, skipped valid lines parsed",
 			variant: "darwin",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{Platform: "darwin", PlatformVersion: "14.0"}, nil
-			},
 			exec: func(t *testing.T) executor.Executor {
 				return swVersExec(t,
 					[]byte("no colon line\nBuildVersion:\t23A344\nProductVersionExtra:\n"),
@@ -721,46 +594,32 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "darwin", Version: "14.0",
+					OS: "darwin", Name: "darwin",
 					Family: "darwin", CPUArchitecture: runtime.GOARCH, Build: "23A344",
 				}, *info)
 			},
 		},
 		{
-			name:    "darwin: nil Exec, extension skipped Build from KernelVersion fallback",
+			name:    "darwin: nil Exec, no version or build",
 			variant: "darwin",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{
-					Platform: "darwin", PlatformVersion: "14.0",
-					KernelVersion: "23A344",
-				}, nil
-			},
-			exec: func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) executor.Executor { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
 				s.Equal(platform.Info{
-					OS: runtime.GOOS, Name: "darwin", Version: "14.0",
-					Family: "darwin", CPUArchitecture: runtime.GOARCH, Build: "23A344",
+					OS: "darwin", Name: "darwin",
+					Family: "darwin", CPUArchitecture: runtime.GOARCH,
 				}, *info)
-			},
-		},
-		{
-			name:    "darwin: gopsutil error propagated",
-			variant: "darwin",
-			hostInfo: func(context.Context) (*host.InfoStat, error) {
-				return nil, errors.New("boom")
-			},
-			exec: func(t *testing.T) executor.Executor { return swVersExec(t, nil, nil) },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer platform.SetHostInfoFn(tt.hostInfo)()
+			if tt.osRelease != "" && tt.fs != nil {
+				s.Require().NoError(tt.fs.MkdirAll("/etc", 0o755))
+				s.Require().NoError(tt.fs.WriteFile("/etc/os-release", []byte(tt.osRelease), 0o644))
+			}
 			var c platform.Collector
 			switch tt.variant {
 			case "linux":

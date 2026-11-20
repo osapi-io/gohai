@@ -25,6 +25,10 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector/mocks"
@@ -62,6 +66,26 @@ func TestGohaiPublicTestSuite(
 	t *testing.T,
 ) {
 	suite.Run(t, new(GohaiPublicTestSuite))
+}
+
+// TestWithSources: a collector reads the host that WithSources gives, not
+// the machine the test runs on.
+func (s *GohaiPublicTestSuite) TestWithSources() {
+	fs := memfs.New()
+	s.Require().NoError(fs.MkdirAll("/etc", 0o755))
+	s.Require().NoError(fs.WriteFile("/etc/os-release",
+		[]byte("ID=gohaitest\nNAME=\"Gohai Test\"\nVERSION_ID=\"1.0\"\n"), 0o644))
+
+	g, err := gohai.New(
+		gohai.WithSources(source.Sources{FS: fs, Family: family.Debian}),
+		gohai.WithCollectors("os_release"),
+	)
+	s.Require().NoError(err)
+	facts, err := g.Collect(context.Background())
+	s.Require().NoError(err)
+	s.Require().NotNil(facts.OSRelease)
+	s.Equal("gohaitest", facts.OSRelease.ID)
+	s.Equal("1.0", facts.OSRelease.VersionID)
 }
 
 func (s *GohaiPublicTestSuite) TestCollect() {

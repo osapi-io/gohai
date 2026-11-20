@@ -29,7 +29,8 @@ import (
     "context"
 
     "github.com/osapi-io/gohai/internal/collector"
-    "github.com/osapi-io/gohai/internal/platform"
+    "github.com/osapi-io/gohai/pkg/gohai/family"
+    "github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds CPU information. Field names follow OCSF first, then
@@ -55,17 +56,23 @@ func (base) Name() string           { return "cpu" }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 
-// New returns the cpu variant appropriate to the host OS.
+// New returns the cpu variant for the real host.
 func New() Collector {
-    switch platform.Detect() {
+    return NewWith(source.Sources{})
+}
+
+// NewWith returns the cpu variant for the family of src, which reads
+// through the sources of src. A zero field of src is the real host's.
+func NewWith(src source.Sources) Collector {
+    switch collector.Family(src) {
     case family.Darwin:
-        return NewDarwin()
-    case family.Debian:
-        return NewDebian() // only if debian diverges; else drop this case
-    case family.RHEL, family.Fedora, family.Amazon:
-        return NewRHEL()   // only if RPM hosts diverge; else drop this case
+        return collector.Wire(NewDarwin(), src)
+    case family.Debian: // only if debian diverges; else drop this case
+        return collector.Wire(NewDebian(), src)
+    case family.RHEL, family.Fedora, family.Amazon: // only if RPM hosts diverge
+        return collector.Wire(NewRHEL(), src)
     default:
-        return NewLinux()
+        return collector.Wire(NewLinux(), src)
     }
 }
 
@@ -75,7 +82,11 @@ func New() Collector {
 ## Step 3: per-OS struct implementations (no build tags)
 
 Each file declares a struct for its OS. The struct embeds `base` and implements
-`Collect`. Injectable fields make the tests independent of the host OS.
+`Collect`. The struct reads the host only through its source fields: `FS` for
+files, `Exec` for commands, and `Now` for the clock. `collector.Wire` sets these
+fields from the caller's sources. Thus a test, or osapi's fake host, gives the
+files and the command output, and the collector reads them as it reads a real
+host.
 
 **`linux.go`:**
 
@@ -85,80 +96,57 @@ package cpu
 
 import (
     "context"
+    "fmt"
 
-    "github.com/shirou/gopsutil/v4/cpu"
+    "github.com/avfs/avfs"
+    "github.com/avfs/avfs/vfs/osfs"
+
+    "github.com/osapi-io/gohai/internal/collector"
+    "github.com/osapi-io/gohai/internal/executor"
 )
 
 type Linux struct {
     base
 
-    // Fn fields are typed in OUR *Info / []OurType, never gopsutil types.
-    // The gopsutil call lives in a private package var swapped via
-    // export_test.go — see pkg/gohai/collectors/uptime/ for the pattern.
-    ReadFn func(context.Context) (*Info, error)
+    FS   avfs.VFS          // files: /proc, /sys, /etc
+    Exec executor.Executor // commands: lscpu, ip, df
 }
 
 func NewLinux() *Linux {
-    return &Linux{ReadFn: readCPU}
+    return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
 
-func (l *Linux) Collect(ctx context.Context) (any, error) {
-    return l.ReadFn(ctx)
+func (l *Linux) Collect(
+    ctx context.Context,
+    _ collector.PriorResults,
+) (any, error) {
+    b, err := l.FS.ReadFile("/proc/cpuinfo")
+    if err != nil {
+        return nil, fmt.Errorf("read /proc/cpuinfo: %w", err)
+    }
+
+    return parseCPUInfo(b), nil
 }
 ```
 
 `darwin.go` has the same shape, with `type Darwin struct`, `NewDarwin()` and its
-own `Collect`. It has no build tag. At runtime, the code handles the paths that
-exist only on Linux without failure.
+own `Collect`. Darwin reads through `sysctl`, `ioreg` and other commands, run
+through `Exec`. It has no build tag.
 
 Add `debian.go` / `rhel.go` **only** when the distribution is really different
 from generic Linux. For example, `package_mgr` needs apt or dnf. In all other
 cases, the generic `Linux` struct covers all hosts that are not darwin.
 
-The private gopsutil wrapper is in `<name>.go`:
-
-```go
-// Private injection seam — not exposed on any public Fn field.
-var infoFn = cpu.InfoWithContext
-
-func readCPU(ctx context.Context) (*Info, error) {
-    stats, err := infoFn(ctx)
-    if err != nil {
-        return nil, fmt.Errorf("cpu.Info: %w", err)
-    }
-    // Map gopsutil stats → our Info.
-    // Layer extensions for fields the library doesn't expose.
-    return &Info{ /* mapped */ }, nil
-}
-```
-
-`export_test.go` gives external tests access to it:
-
-```go
-package cpu
-
-import (
-    "context"
-
-    "github.com/shirou/gopsutil/v4/cpu"
-)
-
-var ReadCPU = readCPU
-
-func SetInfoFn(fn func(context.Context) ([]cpu.InfoStat, error)) (restore func()) {
-    orig := infoFn
-    infoFn = fn
-    return func() { infoFn = orig }
-}
-```
+Read the source the way Ohai reads it. When a fact has a value today, keep the
+arithmetic that gives that value.
 
 ## Step 4: register in `pkg/gohai/gohai.go`
 
 ```go
-func builtinCollectors() []collector.Collector {
+func builtinCollectors(src source.Sources) []collector.Collector {
     return []collector.Collector{
-        platform.New(),
-        cpu.New(), // <-- add here
+        platform.NewWith(src),
+        cpu.NewWith(src), // <-- add here
     }
 }
 ```
@@ -186,32 +174,34 @@ The file must have these contents, in this order:
        _ collector.Collector = (*cpu.Darwin)(nil)
    )
    ```
-2. `TestNew`. It replaces `platform.Detect` (a `var` that tests can replace)
-   with a stub. It asserts that the factory returns the correct concrete type
-   for each OS. It also asserts `Name()` / `DefaultEnabled()` /
-   `Dependencies()`. It is table-driven.
+2. `TestNew`. It gives `NewWith` a `source.Sources` with a `Family`, or replaces
+   `platform.Detect` (a `var` that tests can replace) for `New`. It asserts that
+   the factory returns the correct concrete type for each OS. It also asserts
+   `Name()` / `DefaultEnabled()` / `Dependencies()`. It is table-driven.
 3. `TestCollect`. **One** table-driven method, with a
-   `variant: "linux" | "darwin"` column. Each row sets its seams. The loop makes
-   the correct struct for each OS:
+   `variant: "linux" | "darwin"` column. Each row gives its files and its
+   command output. The loop makes the correct struct for each OS:
    ```go
    switch tt.variant {
    case "linux":
-       c = &cpu.Linux{FS: tt.fs, Exec: tt.exec}
+       c = &cpu.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: tt.runner}
    case "darwin":
-       c = &cpu.Darwin{Exec: tt.exec}
+       c = &cpu.Darwin{Exec: tt.runner}
    }
    ```
+   `tt.runner` is a `sourcetest.Runner`. Its `Out` and `Err` maps answer a
+   command line, such as `"sysctl -n hw.logicalcpu"`.
 4. Optional: separate test methods for public helper functions that are really
    pure and independent (`TestHumanDuration`, `TestBytesToString`,
    `TestNeighFamily`). These are permitted because the helper has its own
    contract. **Do not** make `TestReadX` methods that test bridge code that
    `TestCollect` already tests.
 
-**Test seams replace calls at the boundary of the upstream library.**
-`export_test.go` gives `Set<X>Fn` setters for the raw gopsutil / ghw / netlink
-calls (`SetHostInfoFn`, `SetPartitionsFn`, `SetInterfacesFn` and others). Do NOT
-add wrappers in the middle, such as `readCPUFn = readCPU`. That is test-only
-code in production code, and the consistency rule forbids it.
+**The test seams are the sources.** A row gives files, command output and a
+clock. Use a package `var` that a test replaces only for a read that is not a
+source, such as a DNS lookup or a ghw call. Do NOT add wrappers in the middle,
+such as `readCPUFn = readCPU`. That is test-only code in production code, and
+the consistency rule forbids it.
 
 No test file has a build tag. `go test ./...` runs all tests on each development
 OS.
@@ -258,7 +248,8 @@ Use `docs/collectors/shells.md` as the canonical template.
 ## Step 7: update `docs/collectors/README.md`
 
 In `docs/collectors/README.md`, change the "Implemented" column of the collector
-from 🚧 to ✅, with the library in parentheses: `✅ (gopsutil)`, `✅ (stdlib)`.
+from 🚧 to ✅, with the source in parentheses: `✅ (procfs + sysctl)`,
+`✅ (stdlib)`.
 
 ## Step 8: verify
 
@@ -274,10 +265,10 @@ go run . collect --collector.<name> --pretty
 ```
 feat(<name>): add <name> collector
 
-Wraps <library> for the core collection, extending with <X> that the
-library doesn't expose (mirrors Ohai's <Y> behavior). Field names
-follow OCSF / OpenTelemetry conventions where applicable (<list>). Supports Linux and
-macOS with platform.Detect() dispatch.
+Reads <files / commands> through the collector's sources, as Ohai's
+<Y> does. Field names follow OCSF / OpenTelemetry conventions where
+applicable (<list>). Supports Linux and macOS; NewWith selects the
+variant from the family of its sources.
 
 Closes #<N>  (if work closes a methodology issue)
 ```

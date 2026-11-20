@@ -1,7 +1,7 @@
 # Collector methodology
 
-This page tells which library each collector wraps, what the page of a collector
-must contain, and where we track methodology gaps.
+This page tells what each collector reads, what the page of a collector must
+contain, and where we track methodology gaps.
 
 **The rules are not here.** The
 [specifications repository](https://github.com/osapi-io/specs/blob/main/components/gohai/collectors.md)
@@ -18,53 +18,51 @@ current collectors do.
 Three rules are short, so this page repeats them. A person who is about to break
 one of them works in this repository:
 
-- Wrap a maintained library for what it covers, and add an extension on top.
-  Never replace all of a library because one field is missing.
-- An extension reads files through `avfs.VFS` and runs commands through
-  `executor.Executor`. Never use `os.ReadFile` or `exec.Command` in a `Collect`
-  method.
+- A collector reads the host only through its sources: files through `avfs.VFS`,
+  commands through `executor.Executor`, and the clock through `Now`. Never use
+  `os.ReadFile`, `exec.Command` or a library that reads the host itself in a
+  `Collect` method. Read the files and the commands that Ohai reads.
 - Collector code compiles on all platforms. No file has a `//go:build` tag.
 
 For the setup and the workflow, refer to [CONTRIBUTING](../CONTRIBUTING.md). For
 the nine steps, refer to [adding-a-collector.md](adding-a-collector.md).
 
-## Which library each collector wraps
+## What each collector reads
 
-The primary library for each collector. To change it, open a PR that updates
-this table and gives the reason.
+The primary source of each collector, through its sources. To change it, open a
+PR that updates this table and gives the reason.
 
-| Collector        | Primary               | Candidate migration / supplement         |
-| ---------------- | --------------------- | ---------------------------------------- |
-| cpu              | gopsutil              | ghw/cpu for NUMA/topology/arch-math      |
-| memory           | gopsutil              | ghw/memory for hugepages/page-sizes      |
-| filesystem       | gopsutil              | ghw/block for UUID/label/unmounted       |
-| disk             | gopsutil              | ghw/block for device metadata            |
-| network          | gopsutil              | ghw/net for driver/speed                 |
-| hostname         | gopsutil + stdlib     | None                                     |
-| platform         | gopsutil              | We examined go-sysinfo as an alternative |
-| uptime           | gopsutil              | None                                     |
-| kernel           | `x/sys/unix` + stdlib | None                                     |
-| load             | gopsutil              | None                                     |
-| process          | gopsutil              | None. ghw has no process data            |
-| users (sessions) | gopsutil (utmp)       | Add loginctl through executor            |
-| virtualization   | gopsutil              | go-sysinfo has some of the data          |
-| fips             | stdlib                | No library covers it                     |
-| machine_id       | gopsutil + stdlib     | stdlib fallback chain                    |
-| shard            | stdlib + machine_id   | None                                     |
-| init             | stdlib                | `/proc/1/comm`                           |
-| os_release       | stdlib                | Our own parser                           |
-| lsb              | stdlib                | Add `lsb_release` through executor       |
-| shells           | stdlib                | None                                     |
-| timezone         | stdlib                | None                                     |
-| root_group       | stdlib (`os/user`)    | None                                     |
-| package_mgr      | stdlib exec           | Uses executor                            |
-| dmi              | **ghw**               | baseboard + BIOS + chassis + product     |
-| gpu              | **ghw**               | None                                     |
-| pci              | **ghw**               | None                                     |
-| block_device     | stdlib + **avfs**     | Reads sysfs through the injected VFS     |
+| Collector        | Primary source                                                    |
+| ---------------- | ----------------------------------------------------------------- |
+| cpu              | Linux: `/proc/cpuinfo`, sysfs, `lscpu`. macOS: `sysctl`, `ioreg`  |
+| memory           | Linux: `/proc/meminfo`. macOS: `sysctl`, `vm_stat`                |
+| filesystem       | Linux: `/proc/mounts`, `df`, `lsblk`. macOS: `mount`, `df`        |
+| disk             | Linux: `/proc/diskstats`. macOS: `ioreg`                          |
+| network          | Linux: sysfs, `/proc/net/dev`, `ip`. macOS: `ifconfig`, `netstat` |
+| hostname         | `hostname`. Linux fallback: `/proc/sys/kernel/hostname`           |
+| platform         | Linux: `/etc/os-release`, release files. macOS: `sw_vers`         |
+| uptime           | Linux: `/proc/uptime`, `/proc/stat`. macOS: `sysctl`              |
+| kernel           | `x/sys/unix` + stdlib                                             |
+| load             | Linux: `/proc/loadavg`. macOS: `sysctl`                           |
+| process          | Linux: `/proc/<pid>`, `/etc/passwd`. macOS: `ps`                  |
+| users (sessions) | Linux: `loginctl`, `/var/run/utmp`. macOS: `/var/run/utmpx`       |
+| fips             | stdlib                                                            |
+| machine_id       | Linux: `/etc/machine-id`, dbus, DMI. macOS: `ioreg`               |
+| shard            | stdlib + machine_id                                               |
+| init             | `/proc/1/comm`                                                    |
+| os_release       | Our own parser                                                    |
+| lsb              | stdlib                                                            |
+| shells           | stdlib                                                            |
+| timezone         | `/etc/localtime` and the clock                                    |
+| root_group       | stdlib (`os/user`)                                                |
+| package_mgr      | executor                                                          |
+| dmi              | **ghw**                                                           |
+| gpu              | **ghw**                                                           |
+| pci              | **ghw**                                                           |
+| block_device     | sysfs, through the injected VFS                                   |
 
-The PR of a new collector must give the reason for its library. A migration
-(gopsutil → ghw and others) needs its own issue with the labels
+The PR of a new collector must give the reason for its source. A migration (for
+example from ghw to sysfs) needs its own issue with the labels
 `library-migration` + `collector:<name>`. The issue gives the current coverage,
 the coverage of the candidate, and the migration plan.
 

@@ -261,13 +261,12 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer timezone.SetNowFn(tt.now)()
 			var c timezone.Collector
 			switch tt.variant {
 			case "linux":
-				c = &timezone.Linux{FS: tt.setupFS()}
+				c = &timezone.Linux{FS: tt.setupFS(), Now: tt.now}
 			case "darwin":
-				c = &timezone.Darwin{FS: tt.setupFS()}
+				c = &timezone.Darwin{FS: tt.setupFS(), Now: tt.now}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

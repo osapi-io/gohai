@@ -25,7 +25,7 @@ package packages
 
 import (
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Package holds metadata for a single installed package.
@@ -63,10 +63,17 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the packages collector variant for the detected host OS.
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
-		return NewDarwin()
-	default:
-		return NewLinux()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
+
+	return collector.Wire(NewLinux(), src)
 }

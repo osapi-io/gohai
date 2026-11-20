@@ -20,16 +20,16 @@
 
 package family
 
-import "github.com/shirou/gopsutil/v4/host"
+import "github.com/avfs/avfs"
 
-// SetHostInfoFn swaps the host read of Detect for a test.
-func SetHostInfoFn(
-	fn func() (*host.InfoStat, error),
+// SetFS swaps the filesystem Detect reads for a test.
+func SetFS(
+	fs avfs.VFS,
 ) (restore func()) {
-	orig := hostInfoFn
-	hostInfoFn = fn
+	orig := hostFS
+	hostFS = fs
 
-	return func() { hostInfoFn = orig }
+	return func() { hostFS = orig }
 }
 
 // SetGOOS swaps the operating system Detect sees for a test.

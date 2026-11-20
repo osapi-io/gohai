@@ -22,20 +22,22 @@ package load
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects load averages on macOS. gopsutil's
-// load.AvgWithContext (vm.loadavg sysctl) is swapped via the
-// package-level avgFn seam.
+// Darwin collects load averages with sysctl -n vm.loadavg.
 type Darwin struct {
 	base
+
+	Exec executor.Executor
 }
 
-// NewDarwin returns a Darwin variant.
+// NewDarwin returns a Darwin variant that runs the host's sysctl.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{Exec: executor.New()}
 }
 
 // Collect returns the load averages.
@@ -43,5 +45,10 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return readAverages(ctx)
+	out, err := d.Exec.Execute(ctx, "sysctl", "-n", "vm.loadavg")
+	if err != nil {
+		return nil, fmt.Errorf("sysctl vm.loadavg: %w", err)
+	}
+
+	return parse(string(out))
 }

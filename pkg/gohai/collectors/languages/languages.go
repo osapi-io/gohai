@@ -28,9 +28,10 @@ import (
 	"context"
 	"strings"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds the detected runtime versions. A nil pointer for a
@@ -66,12 +67,19 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the languages collector variant for the detected host OS.
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
-		return NewDarwin()
-	default:
-		return NewLinux()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // collectLanguages probes each well-known language runtime and returns

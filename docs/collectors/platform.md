@@ -16,8 +16,8 @@ The collector reads `/etc/os-release` (the systemd standard) first. If that
 gives no result, it tries old release files in sequence, for example
 `redhat-release`, `SuSE-release` and `debian_version`. Thus it also identifies
 distributions from before systemd and appliance distributions. On macOS,
-`sw_vers` adds the build identifier and the Rapid Security Response patch suffix
-to the gopsutil data.
+`sw_vers` gives the version, the build identifier and the Rapid Security
+Response patch suffix.
 
 Consumers use this data to:
 
@@ -68,10 +68,10 @@ One difference from Ohai is on purpose: on macOS, the name and the family are
 
 ## Platform support
 
-| Platform | Supported                                                                                              |
-| -------- | ------------------------------------------------------------------------------------------------------ |
-| Linux    | ✅ (gopsutil `/etc/os-release`, the redhat-release supplement, and a sequence of 10 old release files) |
-| macOS    | ✅ (gopsutil, and `sw_vers` for `BuildVersion` and `ProductVersionExtra`)                              |
+| Platform | Supported                                                                                     |
+| -------- | --------------------------------------------------------------------------------------------- |
+| Linux    | ✅ (`/etc/os-release`, the redhat-release supplement, and a sequence of 10 old release files) |
+| macOS    | ✅ (`sw_vers` for `ProductVersion`, `BuildVersion` and `ProductVersionExtra`)                 |
 
 ## Example output
 
@@ -151,13 +151,12 @@ None. Other collectors read the `platform` data through
 
 ## Data sources
 
-On Linux, the collector uses gopsutil and then its own extensions, in this
+On Linux, the collector reads these files through its filesystem, in this
 sequence:
 
-1. **gopsutil `host.Info`** reads `/etc/os-release`, the modern systemd path. It
-   gives `Platform` (the raw distribution ID), `PlatformVersion` and
-   `PlatformFamily`.
-2. **`platformIDRemap`** changes the raw ID to its canonical form, with Ohai's
+1. **`/etc/os-release`**, the modern systemd path. `ID` gives the raw
+   distribution ID, and `VERSION_ID` gives the version.
+2. **`family.Platform`** changes the raw ID to its canonical form, with Ohai's
    `OS_RELEASE_PLATFORM_REMAP` table. gohai adds `archarm` → `arch`,
    `cumulus-linux` → `cumulus` and `sles_sap` → `suse` to the entries that Ohai
    has.
@@ -168,10 +167,10 @@ sequence:
    `release\s+(\d[\d.]*)`. For `debian` with an empty `VERSION_ID` (testing or
    unstable), the collector reads `/etc/debian_version` as it is. If a
    supplementary file is missing, the original version does not change.
-4. **Old `/etc/*-release` files.** If gopsutil gives no name, the collector
-   reads these files in sequence. This occurs on distributions from before
-   systemd and on appliance distributions. The first file that gives a name
-   decides the result:
+4. **Old `/etc/*-release` files.** If `/etc/os-release` gives no name, the
+   collector reads these files in sequence. This occurs on distributions from
+   before systemd and on appliance distributions. The first file that gives a
+   name decides the result:
    - `/etc/redhat-release` → family `rhel`. A regex gets the name and the dotted
      version.
    - `/etc/SuSE-release` → family `suse` (`VERSION` + `PATCHLEVEL`).
@@ -181,34 +180,27 @@ sequence:
    - `/etc/arch-release` → name `arch`, with an empty version (rolling).
    - `/etc/gentoo-release`, `/etc/slackware-version`, `/etc/enterprise-release`,
      `/etc/exherbo-release`. The collector gets the family from the file name.
-5. **Family fallback.** If gopsutil's `PlatformFamily` is empty, the collector
-   gets the family from the maintained table. This occurs for less common
-   distributions that gopsutil does not know, for example alma, rocky, kali,
-   raspbian and cloudlinux.
+5. **Family.** `family.Of` gets the family of the name from the maintained
+   table, for example `rhel` for alma and rocky, and `debian` for kali and
+   raspbian.
 6. **CPU architecture.** The value comes from `runtime.GOARCH`.
 
 On macOS:
 
-1. **gopsutil `host.Info`** gives `Name`, `Version` and `Family`, and also
-   `KernelVersion`. The collector uses `KernelVersion` as `Build` if `sw_vers`
-   gives no build.
-2. **`sw_vers`.** The collector runs `sw_vers` through the shared
-   `internal/executor` runner. It parses each `Key: Value` line and gets:
-   - `BuildVersion` → `Build`. This value replaces gopsutil's KernelVersion as
-     the canonical macOS build ID.
+1. `os`, `name` and `family` are `darwin`.
+2. **`sw_vers`.** The collector runs `sw_vers` through its command runner. It
+   parses each `Key: Value` line and gets:
+   - `ProductVersion` → `Version`.
+   - `BuildVersion` → `Build`, the canonical macOS build ID.
    - `ProductVersionExtra` → `VersionExtra`. This is the Apple Rapid Security
      Response suffix, for example `"(a)"`. Most macOS versions do not have it.
-3. If `sw_vers` fails, or its output does not have a key, the field keeps the
-   gopsutil value (`Build`) or stays empty (`VersionExtra`).
+3. If `sw_vers` fails, or its output does not have a key, the field stays empty.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil),
-  BSD-3. The primary source. It parses `/etc/os-release` and gives the macOS
-  `host.Info`.
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual filesystem
-  for the redhat-release and debian_version supplements, and for the sequence of
-  10 old `/etc/*-release` files.
+  for `/etc/os-release`, the redhat-release and debian_version supplements, and
+  the sequence of 10 old `/etc/*-release` files.
 - [`internal/executor`](../../internal/executor). The shared command runner. The
   collector uses it to run `sw_vers` on macOS. Tests mock it with
   `go.uber.org/mock`.

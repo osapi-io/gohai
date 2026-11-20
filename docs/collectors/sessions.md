@@ -8,8 +8,8 @@ The collector reports the user sessions that are logged in now. This is the same
 data that `who`, `w` and `loginctl list-sessions` show. On systemd hosts, the
 collector uses `loginctl` first. `loginctl` shows graphical (GDM/KDE),
 remote-desktop and `systemd-run` sessions that do not get to `utmp`. On Linux
-hosts without systemd and on macOS, the collector uses `utmp` or `utmpx` through
-gopsutil.
+hosts without systemd and on macOS, the collector reads the `utmp` or `utmpx`
+file.
 
 This collector came out of the original `users` collector. `users` is now the
 same as Ohai's `passwd` plugin, which lists `/etc/passwd` and `/etc/group`. The
@@ -115,17 +115,17 @@ On Linux:
    whitespace into `session_id uid user [seat]`. It adds the result to
    `logged_in[]`. Empty output means that there are no active sessions. This is
    a valid result, and the collector does not try utmp in that case.
-2. If `loginctl` is missing or fails, the collector uses gopsutil's
-   `host.UsersWithContext`. This occurs on a host without systemd or in a
-   minimal container without systemd. `host.UsersWithContext` reads `utmp(5)`,
-   which is the same source that `who` and `w` use. A gopsutil error goes back
-   to the caller as a real failure.
+2. If `loginctl` is missing or fails, the collector reads `/var/run/utmp`. This
+   occurs on a host without systemd or in a minimal container without systemd.
+   The file is glibc's `utmp(5)`: 384-byte records, of which the collector keeps
+   the user processes. `who` and `w` read the same file. An error goes back to
+   the caller as a real failure.
 
 On macOS:
 
-1. gopsutil's `host.UsersWithContext` reads `utmpx` through the standard C
-   library. This is the only source, because Darwin has no systemd. Errors go
-   back to the caller.
+1. The collector reads `/var/run/utmpx`: 628-byte records after a header record,
+   of which it keeps the user processes. This is the only source, because Darwin
+   has no systemd. Errors go back to the caller.
 
 Ohai has no equivalent plugin. gohai added this collector for consumers that
 audit sessions across a fleet. Current Linux distributions document `loginctl`
@@ -134,6 +134,4 @@ collector keeps utmp for hosts from before systemd and for containers.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil) to
-  read `utmp` and `utmpx`.
 - [`internal/executor`](../../internal/executor) to run `loginctl` on Linux.

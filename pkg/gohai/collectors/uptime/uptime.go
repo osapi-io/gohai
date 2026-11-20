@@ -23,13 +23,11 @@
 package uptime
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/shirou/gopsutil/v4/host"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 )
 
 // Info holds uptime and boot time data.
@@ -55,33 +53,19 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the uptime collector variant for the host OS.
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
-		return NewDarwin()
-	default:
-		return NewLinux()
-	}
+	return NewWith(source.Sources{})
 }
 
-// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
-// Private — never leaked through a public Fn field. Swapped in tests
-// via SetHostInfoFn (export_test.go).
-var hostInfoFn = host.InfoWithContext
-
-// readBase wraps the private gopsutil call and maps the result onto
-// our *Info so consumers of the collector never see gopsutil types.
-func readBase(
-	ctx context.Context,
-) (*Info, error) {
-	h, err := hostInfoFn(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("host.Info: %w", err)
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	return &Info{
-		Seconds:  h.Uptime,
-		BootTime: h.BootTime,
-		Human:    HumanDuration(h.Uptime),
-	}, nil
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // HumanDuration formats a second count as "Xd Yh Zm Ws" (omitting zero

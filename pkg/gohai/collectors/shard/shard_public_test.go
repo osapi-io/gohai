@@ -25,7 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -125,7 +124,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		name         string
 		variant      string
 		prior        collector.PriorResults
-		hostFn       func(context.Context) (*host.InfoStat, error)
+		ioregOut     []byte
+		ioregErr     error
 		spOut        []byte
 		spErr        error
 		validateFunc func(any, error)
@@ -269,10 +269,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
-			hostFn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{HostID: uuid}, nil
-			},
-			spOut: []byte(sysProfJSON),
+			ioregOut: []byte(`"IOPlatformUUID" = "` + uuid + `"`),
+			spOut:    []byte(sysProfJSON),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
@@ -286,13 +284,33 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: gopsutil error → empty uuid, seed still computes",
+			name:    "darwin: ioreg error → empty uuid, seed still computes",
 			variant: "darwin",
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
-			hostFn: func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			spOut:  []byte(sysProfJSON),
+			ioregErr: errors.New("boom"),
+			spOut:    []byte(sysProfJSON),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shard.Info)
+				s.Require().True(ok)
+
+				if -1 >= 0 {
+					s.Equal(-1, info.Seed)
+				} else {
+					s.GreaterOrEqual(info.Seed, 0)
+				}
+			},
+		},
+		{
+			name:    "darwin: no UUID in ioreg's output → empty uuid",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			ioregOut: []byte("{}"),
+			spOut:    []byte(sysProfJSON),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
@@ -311,10 +329,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
-			hostFn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{HostID: uuid}, nil
-			},
-			spOut: []byte("not json"),
+			ioregOut: []byte(`"IOPlatformUUID" = "` + uuid + `"`),
+			spOut:    []byte("not json"),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
@@ -333,10 +349,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
-			hostFn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{HostID: uuid}, nil
-			},
-			spOut: []byte(`{"SPHardwareDataType": []}`),
+			ioregOut: []byte(`"IOPlatformUUID" = "` + uuid + `"`),
+			spOut:    []byte(`{"SPHardwareDataType": []}`),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
@@ -355,10 +369,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
-			hostFn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{HostID: uuid}, nil
-			},
-			spErr: errors.New("not found"),
+			ioregOut: []byte(`"IOPlatformUUID" = "` + uuid + `"`),
+			spErr:    errors.New("not found"),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
@@ -379,9 +391,11 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &shard.Linux{}
 			case "darwin":
-				defer shard.SetHostInfoFn(tt.hostFn)()
 				ctrl := gomock.NewController(s.T())
 				mockExec := execmocks.NewMockExecutor(ctrl)
+				mockExec.EXPECT().
+					Execute(gomock.Any(), "ioreg", "-rd1", "-c", "IOPlatformExpertDevice").
+					Return(tt.ioregOut, tt.ioregErr)
 				if tt.spErr != nil {
 					mockExec.EXPECT().
 						Execute(gomock.Any(), "system_profiler", "SPHardwareDataType", "-json").

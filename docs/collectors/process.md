@@ -39,10 +39,10 @@ The field name `cmd_line` comes from OCSF (`process.cmd_line`), not from Ohai's
 
 ## Platform support
 
-| Platform | Supported                                                 |
-| -------- | --------------------------------------------------------- |
-| Linux    | ✅ (`/proc/<pid>/{stat,status,cmdline}` through gopsutil) |
-| macOS    | ✅ (`kinfo_proc` through gopsutil)                        |
+| Platform | Supported                                |
+| -------- | ---------------------------------------- |
+| Linux    | ✅ (`/proc/<pid>/{stat,status,cmdline}`) |
+| macOS    | ✅ (`ps -axo`)                           |
 
 ## Example output
 
@@ -100,10 +100,10 @@ None.
 
 ## Data sources
 
-| Platform | What we read                                                                    | Ohai plugin                                                                                                                                                          | Alignment                                                                                                                                                                                                                                                                                                                                      |
-| -------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | gopsutil `process.Processes` (reads `/proc/<pid>/stat`, `/proc/<pid>/cmdline`). | [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb) sets `command[:ps] = "ps -ef"`. The `command` plugin runs it and reports the raw `ps` text. | **Different shape, same source data.** Ohai reports the raw `ps -ef` output as one text block through its companion `command` collector (refer to `docs/collectors/command.md`). gohai parses `/proc` into typed records, one for each process. Ohai's `ps -ef` columns include `%cpu`, `%mem`, `tty` and `stime`. gohai does not report them. |
-| macOS    | gopsutil `process.Processes` (the kinfo_proc syscall).                          | The same top-level [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb), with `ps -ef` in the `:darwin` branch.                                  | **Same source data, different shape.** This is the same as the Linux row.                                                                                                                                                                                                                                                                      |
+| Platform | What we read                                                          | Ohai plugin                                                                                                                                                          | Alignment                                                                                                                                                                                                                                                                                                                                      |
+| -------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/proc/<pid>/stat`, `/proc/<pid>/status` and `/proc/<pid>/cmdline`.   | [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb) sets `command[:ps] = "ps -ef"`. The `command` plugin runs it and reports the raw `ps` text. | **Different shape, same source data.** Ohai reports the raw `ps -ef` output as one text block through its companion `command` collector (refer to `docs/collectors/command.md`). gohai parses `/proc` into typed records, one for each process. Ohai's `ps -ef` columns include `%cpu`, `%mem`, `tty` and `stime`. gohai does not report them. |
+| macOS    | `ps -axo pid=,ppid=,user=,state=,lstart=`, then `ucomm=` and `args=`. | The same top-level [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb), with `ps -ef` in the `:darwin` branch.                                  | **Same source data, different shape.** This is the same as the Linux row.                                                                                                                                                                                                                                                                      |
 
 **Known gaps vs. Ohai:** gohai does not report the `%cpu`, `%mem`, `tty` and
 `stime` columns of `ps`. It also does not report threads, the file descriptor
@@ -113,5 +113,5 @@ the raw `ps -ef` text block separately.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/process`](https://github.com/shirou/gopsutil),
-  BSD-3.
+None. The collector reads `/proc` and `/etc/passwd` through its filesystem, and
+runs `ps` through its command runner.

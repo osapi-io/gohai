@@ -23,6 +23,9 @@ package hostname
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
@@ -36,11 +39,12 @@ type Darwin struct {
 	base
 
 	Exec executor.Executor
+	FS   avfs.VFS
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: executor.New(), FS: osfs.NewWithNoIdm()}
 }
 
 // Collect returns hostname facts.
@@ -48,5 +52,5 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectWithExec(ctx, d.Exec)
+	return collectWithExec(ctx, d.Exec, d.FS)
 }

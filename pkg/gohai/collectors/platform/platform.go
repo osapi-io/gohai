@@ -23,46 +23,50 @@
 // `/etc/os-release` (systemd standard) and falls back through legacy
 // release files (redhat-release, SuSE-release, debian_version, etc.)
 // so pre-systemd and appliance distributions are still identified.
-// On macOS, `sw_vers` supplements gopsutil with the build identifier
-// and the Rapid Security Response patch suffix.
+// On macOS, `sw_vers` gives the version, the build identifier and the
+// Rapid Security Response patch suffix.
 package platform
 
 import (
-	"context"
 	"regexp"
-	"runtime"
 	"strings"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/avfs/avfs"
-	"github.com/shirou/gopsutil/v4/host"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	plat "github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
-// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
-// Kept private so importers don't transitively need gopsutil.
-var hostInfoFn = host.InfoWithContext
+// osRelease names the distribution: its ID and VERSION_ID.
+const osRelease = "/etc/os-release"
 
-// readPlatform is the production bridge to gopsutil. Returns
-// pre-populated *Info plus the raw KernelVersion that Darwin
-// optionally consumes as Build.
-func readPlatform(
-	ctx context.Context,
-) (*Info, string, error) {
-	info := &Info{OS: runtime.GOOS, CPUArchitecture: runtime.GOARCH}
-	h, err := hostInfoFn(ctx)
+// readOSRelease fills info's name, version and family from
+// /etc/os-release, as Ohai does. It leaves them empty when fs has no such
+// file, for the old release files to fill.
+func readOSRelease(
+	fs avfs.VFS,
+	info *Info,
+) {
+	b, err := fs.ReadFile(osRelease)
 	if err != nil {
-		return nil, "", err
+		return
 	}
-	if h == nil {
-		return info, "", nil
+	for _, line := range strings.Split(string(b), "\n") {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		value = strings.Trim(strings.TrimSpace(value), `"'`)
+		switch key {
+		case "ID":
+			info.Name = family.Platform(value)
+		case "VERSION_ID":
+			info.Version = value
+		}
 	}
-	info.Name = family.Platform(h.Platform)
-	info.Version = h.PlatformVersion
 	info.Family = family.Of(info.Name)
-	return info, h.KernelVersion, nil
 }
 
 // Info holds platform identification data.
@@ -90,10 +94,19 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the platform variant for the host OS.
 func New() Collector {
-	if plat.Detect() == "darwin" {
-		return NewDarwin()
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	return NewLinux()
+
+	return collector.Wire(NewLinux(), src)
 }
 
 // minorVersionDistros are RHEL-family IDs (post-canonicalization)
@@ -122,7 +135,7 @@ var redhatReleaseVersionRE = regexp.MustCompile(`release\s+(\d[\d.]*)`)
 
 // applyRedhatReleaseSupplement inspects info.Name + info.Version and
 // supplements with /etc/redhat-release or /etc/debian_version when
-// gopsutil's VERSION_ID is incomplete.
+// the VERSION_ID of os-release is incomplete.
 func applyRedhatReleaseSupplement(
 	fs avfs.VFS,
 	info *Info,
@@ -221,7 +234,7 @@ var legacyReleaseFiles = []legacyReleaseFile{
 }
 
 // applyLegacyReleaseFallback walks the legacy /etc/*-release cascade
-// when info.Name is empty (i.e., gopsutil + os-release produced
+// when info.Name is empty (i.e., os-release produced
 // nothing). First file that yields a name wins; the canonical
 // family.Platform is applied to the result.
 func applyLegacyReleaseFallback(

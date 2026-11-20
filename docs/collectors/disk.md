@@ -34,7 +34,7 @@ The top level is `devices: []Device`.
 | Platform | Supported                    |
 | -------- | ---------------------------- |
 | Linux    | ✅ (reads `/proc/diskstats`) |
-| macOS    | ✅ (IOKit through gopsutil)  |
+| macOS    | ✅ (IOKit through `ioreg`)   |
 
 ## Example output
 
@@ -82,15 +82,17 @@ None.
 
 On Linux:
 
-1. gopsutil's `disk.IOCountersWithContext` reads `/proc/diskstats`. For each
-   device, it returns the read and write counts, the bytes and the time. The
-   collector gives each device as a `Device` row and does not change it.
+1. The collector reads `/proc/diskstats`. For each device, it gives the read and
+   write counts, the bytes (sectors × 512) and the time in milliseconds as a
+   `Device` row.
 
 On macOS:
 
-1. gopsutil's `disk.IOCountersWithContext` calls IOKit and returns the same
-   shape. The device names are the same as the names that `iostat` reports, for
-   example `disk0`.
+1. The collector runs `ioreg -r -c IOBlockStorageDriver -d 2 -l -w0`. Each
+   driver gives its `Statistics` and the `BSD Name` of its media. The times
+   change from nanoseconds to milliseconds. A driver with no media is left out.
+   The device names are the same as the names that `iostat` reports, for example
+   `disk0`.
 
 This collector does not report the physical device metadata (model, vendor,
 serial, rotational, block sizes). The [`block_device`](block_device.md)
@@ -100,5 +102,5 @@ metadata.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/disk`](https://github.com/shirou/gopsutil),
-  BSD-3.
+None. The collector reads `/proc` through its filesystem, and runs `ioreg`
+through its command runner.

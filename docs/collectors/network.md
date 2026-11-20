@@ -32,13 +32,13 @@ Top level:
 
 | Field                     | Type        | Description                                                 | Schema mapping            |
 | ------------------------- | ----------- | ----------------------------------------------------------- | ------------------------- |
-| `interfaces`              | []Interface | The interfaces from gopsutil, with the gohai extensions.    | None                      |
+| `interfaces`              | []Interface | Each interface of the host, with the gohai extensions.      | None                      |
 | `routes`                  | []Route     | All routes from `ip route show table main` (IPv4 and IPv6). | No direct schema mapping. |
 | `default_interface`       | string      | The interface that the default IPv4 route goes out through. | No direct schema mapping. |
 | `default_gateway`         | string      | The next-hop IPv4 address of the default route.             | No direct schema mapping. |
 | `default_inet6_interface` | string      | The interface that the default IPv6 route goes out through. | No direct schema mapping. |
 | `default_inet6_gateway`   | string      | The next-hop IPv6 address of the default route.             | No direct schema mapping. |
-| `neighbours`              | []Neighbour | The kernel ARP and NDP cache (Linux only, netlink).         | No direct schema mapping. |
+| `neighbours`              | []Neighbour | The kernel ARP and NDP cache (Linux only, `ip neigh`).      | No direct schema mapping. |
 
 Per interface:
 
@@ -51,8 +51,8 @@ Per interface:
 | `mac`                     | string            | The MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                                                                                                                                                                                                                                                | `network_interface.mac`.  |
 | `encapsulation`           | string            | The canonical encapsulation: `Ethernet`, `Loopback`, `PPP`, `SLIP`, `IPIP`, `6to4` or `VJSLIP`. Linux only.                                                                                                                                                                                                                                 | No direct schema mapping. |
 | `driver`                  | string            | The kernel driver of the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only, from sysfs.                                                                                                                                                                                                                                                     | No direct schema mapping. |
-| `speed`                   | string            | The negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only, from ghw.                                                                                                                                                                                                                                                                 | No direct schema mapping. |
-| `duplex`                  | string            | The link duplex (`Full`, `Half`). Linux only, from ghw.                                                                                                                                                                                                                                                                                     | No direct schema mapping. |
+| `speed`                   | string            | The negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only, from sysfs.                                                                                                                                                                                                                                                               | No direct schema mapping. |
+| `duplex`                  | string            | The link duplex (`Full`, `Half`). Linux only, from sysfs.                                                                                                                                                                                                                                                                                   | No direct schema mapping. |
 | `flags`                   | []string          | The interface flags (`up`, `broadcast`, `multicast`).                                                                                                                                                                                                                                                                                       | No direct schema mapping. |
 | `addresses[]`             | []Address         | Refer to the table below.                                                                                                                                                                                                                                                                                                                   | None                      |
 | `routes[]`                | []Route           | The routes whose `dev` is this interface.                                                                                                                                                                                                                                                                                                   | No direct schema mapping. |
@@ -100,7 +100,7 @@ Per neighbour:
 | `address`   | string | The IPv4 or IPv6 address of the neighbour.                                                             | No direct schema mapping. |
 | `family`    | string | `inet` or `inet6`.                                                                                     | No direct schema mapping. |
 | `mac`       | string | The hardware address (MAC), when it is known.                                                          | No direct schema mapping. |
-| `interface` | string | The egress interface, from the netlink LinkIndex through `net.InterfaceByIndex`.                       | No direct schema mapping. |
+| `interface` | string | The egress interface, the `dev` of `ip neigh show`.                                                    | No direct schema mapping. |
 | `state`     | string | The NUD state: `INCOMPLETE`, `REACHABLE`, `STALE`, `DELAY`, `PROBE`, `FAILED`, `NOARP` or `PERMANENT`. | No direct schema mapping. |
 
 Per `Counters`:
@@ -118,10 +118,10 @@ Per `Counters`:
 
 ## Platform support
 
-| Platform | Supported                                                                                                      |
-| -------- | -------------------------------------------------------------------------------------------------------------- |
-| Linux    | ✅ (gopsutil interfaces and counters, sysfs ARPHRD, `ip route` IPv4 and IPv6, OpenVZ alias merge)              |
-| macOS    | ✅ (gopsutil interfaces and counters. Routes, encapsulation and OpenVZ are Linux only. Refer to Data sources.) |
+| Platform | Supported                                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Linux    | ✅ (sysfs interfaces, `ip addr`, `/proc/net/dev` counters, sysfs ARPHRD, `ip route` IPv4 and IPv6, OpenVZ alias merge) |
+| macOS    | ✅ (`ifconfig` and `netstat`. Routes, encapsulation and OpenVZ are Linux only. Refer to Data sources.)                 |
 
 ## Example output
 
@@ -212,17 +212,20 @@ None.
 
 On Linux:
 
-01. **gopsutil `net.Interfaces`** lists the interfaces. For each interface, it
-    gives the name, the MTU, the hardware address, the flags, the raw address
-    CIDRs and `Index`. The collector reports `Index` as the `number` field of
-    the interface, which is the same as Ohai's `iface[:number]`. The collector
-    gets the admin `state` (`"up"` or `"down"`) from the `up` flag of gopsutil.
-    This is the same as Ohai's `iface[:state]`, which reads `ip link show`.
+01. **Interfaces.** Each directory of `/sys/class/net` is an interface. Its
+    `ifindex`, `mtu`, `address` and `flags` files give the `number`, the MTU,
+    the MAC and the flags. `number` is the same as Ohai's `iface[:number]`. The
+    flags are the `IFF_*` bits that Go names: up, broadcast, loopback,
+    pointtopoint and multicast. The admin `state` (`"up"` or `"down"`) comes
+    from the `up` flag. This is the same as Ohai's `iface[:state]`, which reads
+    `ip link show`. The interfaces are in `number` order.
 
-02. **gopsutil `net.IOCounters`** gives the bytes, packets, errors and drops of
+02. **Counters.** `/proc/net/dev` gives the bytes, packets, errors and drops of
     each interface.
 
-03. **Address structure.** The collector parses each gopsutil CIDR with
+03. **Address structure.** `ip -o addr show` gives the address CIDRs of each
+    interface. An address with no prefix, such as the local end of a
+    point-to-point link, gets a host prefix. The collector parses each CIDR with
     `net.ParseCIDR`. It sets these fields:
 
     - `family`, from the address kind.
@@ -250,12 +253,13 @@ On Linux:
     the `routes` slice of its interface. If `ip` is not available, the routing
     fields stay empty. Minimal containers without iproute2 do not have `ip`.
 
-06. **Link details.** The `Speed` and `Duplex` of each interface come from
-    `ghw.Network()`, with the interface name as the key. ghw reads
-    `/sys/class/net/<iface>/speed` and `/duplex`. `Driver` is the basename of
-    the symlink target of `/sys/class/net/<iface>/device/driver`. The collector
-    reads it through the injected `avfs.VFS`. Virtual and loopback interfaces
-    usually have no driver symlink, so the field stays empty.
+06. **Link details.** `/sys/class/net/<iface>/speed` and `/duplex` give the
+    `Speed` and `Duplex` of each interface, written as ethtool writes them:
+    `"1000Mb/s"` and `"Full"`. A link that is down has a negative speed or no
+    file, and gets `"Unknown!"`. `Driver` is the basename of the symlink target
+    of `/sys/class/net/<iface>/device/driver`. The collector reads it through
+    the injected `avfs.VFS`. Virtual and loopback interfaces usually have no
+    driver symlink, so the field stays empty.
 
 07. **Ethtool driver info.** For each interface that is similar to Ethernet, the
     collector runs `ethtool -i <iface>` through the shared `internal/executor`
@@ -284,10 +288,10 @@ On Linux:
     If one probe fails, the collector continues. Only the sub-record of that
     probe stays empty.
 
-09. **Neighbours.** `vishvananda/netlink.NeighList(0, 0)` returns the kernel ARP
-    and NDP cache. The collector maps each entry to a `Neighbour` with these
-    values: address, family, MAC, interface (from LinkIndex), and state. The
-    state is the NUD bitmask as the canonical string of ip-neigh.
+09. **Neighbours.** `ip neigh show` gives the kernel ARP and NDP cache. The
+    collector maps each line to a `Neighbour` with these values: address,
+    family, MAC (`lladdr`), interface (`dev`), and state (the last word, such as
+    `REACHABLE`).
 
 10. **OpenVZ alias merge.** The host is an OpenVZ guest if `/proc/vz` is there
     AND `/proc/bc/0` is missing. On an OpenVZ guest, the collector adds the
@@ -296,23 +300,18 @@ On Linux:
     same as Ohai, so a query for `interfaces[venet0]` finds the real IPs of the
     container.
 
-On macOS, the collector uses only gopsutil's `getifaddrs` and `netstat -i`.
-Encapsulation, routing and the OpenVZ merge are Linux only. A future change can
-parse `route -n get default` and `netstat -nr` to get the macOS routes.
+On macOS, `ifconfig -a -v` gives each interface: its index, flags, MTU, MAC
+(`ether`) and addresses. An IPv4 netmask is hex, such as `0xffffff00`. The link
+rows of `netstat -ibdnW` give the counters. A down interface has a `*` after its
+name there. Encapsulation, routing and the OpenVZ merge are Linux only. A future
+change can parse `route -n get default` and `netstat -nr` to get the macOS
+routes.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/net`](https://github.com/shirou/gopsutil),
-  BSD-3. The primary source for interfaces and counters on the two platforms.
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual file
-  system for `/sys/class/net/<iface>/type` and the OpenVZ probes (`/proc/vz`,
-  `/proc/bc/0`).
+  system for `/sys/class/net`, `/proc/net/dev` and the OpenVZ probes
+  (`/proc/vz`, `/proc/bc/0`).
 - [`internal/executor`](../../internal/executor). The shared command runner. The
-  collector uses it to run `ip route show` on Linux. Tests mock it with
-  `go.uber.org/mock`.
-- [`github.com/jaypipes/ghw`](https://github.com/jaypipes/ghw). Apache-2. The
-  source for the link `Speed` and `Duplex` of each interface on Linux.
-- [`github.com/vishvananda/netlink`](https://github.com/vishvananda/netlink),
-  Apache-2. The source for the kernel ARP and NDP cache on Linux. You can
-  compile the two libraries on all platforms. On darwin, they return errors at
-  runtime, and the related fields stay empty.
+  collector uses it to run `ip` and `ethtool` on Linux, and `ifconfig` and
+  `netstat` on macOS. Tests mock it with `go.uber.org/mock`.

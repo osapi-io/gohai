@@ -22,30 +22,138 @@ package process
 
 import (
 	"context"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Linux collects a process snapshot on Linux hosts via gopsutil.
-// gopsutil's process.Processes is swapped via the package-level
-// processesFn seam (see SetProcessesFn in export_test.go).
+// clockTicks is USER_HZ, the unit of /proc/<pid>/stat's start time. It is
+// 100 on each architecture Linux runs osapi on.
+const clockTicks = 100
+
+// Linux collects processes from /proc: each /proc/<pid>/stat, status and
+// cmdline, with the boot time from /proc/stat and the owner's name from
+// /etc/passwd.
 type Linux struct {
 	base
+
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant.
+// NewLinux returns a Linux variant that reads the host's filesystem.
 func NewLinux() *Linux {
-	return &Linux{}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns a process snapshot.
+// Collect returns a process snapshot. A process that ends while it is
+// read is left out.
 func (l *Linux) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	procs, err := listProcesses(ctx)
+	entries, err := l.FS.ReadDir("/proc")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read /proc: %w", err)
 	}
+	boot := bootTime(l.FS)
+	users := passwd(l.FS)
+	procs := []Process{}
+	for _, e := range entries {
+		pid, err := strconv.ParseInt(e.Name(), 10, 32)
+		if err != nil {
+			continue
+		}
+		if p, ok := l.read(int32(pid), boot, users); ok {
+			procs = append(procs, p)
+		}
+	}
+
 	return &Info{Count: len(procs), Processes: procs}, nil
+}
+
+// read is the process pid, or false when its stat cannot be read.
+func (l *Linux) read(
+	pid int32,
+	boot int64,
+	users map[string]string,
+) (Process, bool) {
+	dir := "/proc/" + strconv.Itoa(int(pid))
+	stat, err := l.FS.ReadFile(dir + "/stat")
+	if err != nil {
+		return Process{}, false
+	}
+	text := string(stat)
+	open, closing := strings.IndexByte(text, '('), strings.LastIndexByte(text, ')')
+	if open < 0 || closing < open {
+		return Process{}, false
+	}
+	p := Process{PID: pid, Name: text[open+1 : closing]}
+	// After the name: state, ppid, and the start time 19 fields on.
+	f := strings.Fields(text[closing+1:])
+	if len(f) > 1 {
+		p.State = state(f[0])
+		ppid, _ := strconv.ParseInt(f[1], 10, 32)
+		p.ParentPID = int32(ppid)
+	}
+	if len(f) > 19 && boot > 0 {
+		if ticks, err := strconv.ParseInt(f[19], 10, 64); err == nil {
+			p.CreationTime = boot + ticks/clockTicks
+		}
+	}
+	if status, err := l.FS.ReadFile(dir + "/status"); err == nil {
+		for _, line := range strings.Split(string(status), "\n") {
+			if v, ok := strings.CutPrefix(line, "Uid:"); ok {
+				if uid := strings.Fields(v); len(uid) > 0 {
+					p.Owner = users[uid[0]]
+				}
+			}
+		}
+	}
+	if cmd, err := l.FS.ReadFile(dir + "/cmdline"); err == nil {
+		p.CmdLine = strings.TrimSpace(strings.ReplaceAll(string(cmd), "\x00", " "))
+	}
+
+	return p, true
+}
+
+// bootTime is the btime line of /proc/stat, or 0.
+func bootTime(
+	fs avfs.VFS,
+) int64 {
+	b, err := fs.ReadFile("/proc/stat")
+	if err != nil {
+		return 0
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if v, ok := strings.CutPrefix(line, "btime "); ok {
+			n, _ := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+			return n
+		}
+	}
+
+	return 0
+}
+
+// passwd is the user name of each uid in /etc/passwd.
+func passwd(
+	fs avfs.VFS,
+) map[string]string {
+	users := map[string]string{}
+	b, err := fs.ReadFile("/etc/passwd")
+	if err != nil {
+		return users
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		f := strings.Split(line, ":")
+		if len(f) > 2 {
+			users[f[2]] = f[0]
+		}
+	}
+
+	return users
 }

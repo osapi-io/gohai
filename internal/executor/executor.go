@@ -18,57 +18,17 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package executor abstracts OS command execution. Collectors that need
-// to shell out (sysctl, sw_vers, lsb_release, loginctl, lscpu, etc.)
-// accept an Executor so tests can assert the command + args and return
-// canned stdout via a gomock-generated mock.
+// Package executor is the command runner collectors take. It is
+// source.Runner, the type a caller of gohai gives, so a collector's Exec
+// field takes either.
 package executor
 
-import (
-	"context"
-	"fmt"
-	"os/exec"
-)
+import "github.com/osapi-io/gohai/pkg/gohai/source"
 
-// Executor runs OS commands and returns their combined stdout+stderr.
-// Context cancellation propagates to the underlying process via
-// exec.CommandContext — collectors can honor deadlines and SIGINT.
-//
-// Shape is intentionally minimal (single method, combined output).
-// Matches osapi's CommandExecutor with one addition: we thread
-// context for cancellation, osapi passes timeout as an integer.
-type Executor interface {
-	Execute(
-		ctx context.Context,
-		name string,
-		args ...string,
-	) ([]byte, error)
-}
+// Executor runs a command and returns its combined stdout and stderr.
+type Executor = source.Runner
 
-// defaultExecutor is the production implementation wrapping
-// exec.CommandContext. Returns combined output so both stdout and
-// stderr are visible to parsers — most of our collectors want stdout
-// only and ignore stderr noise, which combined output naturally
-// accommodates since stderr is rare on the success path.
-type defaultExecutor struct{}
-
-// New returns the production Executor implementation.
+// New returns the runner of the real host.
 func New() Executor {
-	return &defaultExecutor{}
-}
-
-// Execute runs the command and returns its combined stdout+stderr.
-// On non-zero exit, returns the captured output plus a wrapped error
-// carrying the exit status via errors.As(*exec.ExitError).
-func (d *defaultExecutor) Execute(
-	ctx context.Context,
-	name string,
-	args ...string,
-) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, fmt.Errorf("exec %s: %w", name, err)
-	}
-	return out, nil
+	return source.Commands()
 }

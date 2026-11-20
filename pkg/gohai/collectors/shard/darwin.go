@@ -23,19 +23,18 @@ package shard
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"strings"
-
-	"github.com/shirou/gopsutil/v4/host"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
-var hostInfoFn = host.InfoWithContext
+// platformUUIDRE is the IOPlatformUUID line of ioreg's output.
+var platformUUIDRE = regexp.MustCompile(`"IOPlatformUUID" = "([^"]+)"`)
 
 // Darwin computes a shard seed on macOS from machinename +
-// serial (system_profiler) + IOPlatformUUID (gopsutil).
+// serial (system_profiler) + IOPlatformUUID (ioreg).
 // DMI is empty on macOS so we source serial/uuid directly.
 type Darwin struct {
 	base
@@ -49,14 +48,14 @@ func NewDarwin() *Darwin {
 
 // Collect derives the shard seed. On macOS, Ohai uses
 // hardware["serial_number"] and hardware["platform_UUID"] — we read
-// the same sources via system_profiler and gopsutil respectively.
+// the same sources via system_profiler and ioreg.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
 	machinename := getMachineName(prior)
 	serial := readDarwinSerial(ctx, d.Exec)
-	uuid := readDarwinUUID(ctx)
+	uuid := readDarwinUUID(ctx, d.Exec)
 	return &Info{Seed: computeSeed(machinename, serial, uuid)}, nil
 }
 
@@ -81,14 +80,19 @@ func readDarwinSerial(
 	return strings.TrimSpace(sp.Items[0].SerialNumber)
 }
 
-// readDarwinUUID reads IOPlatformUUID via gopsutil, matching Ohai's
-// hardware["platform_UUID"] source.
+// readDarwinUUID reads IOPlatformUUID from ioreg, matching Ohai's
+// hardware["platform_UUID"] source. It is "" when ioreg fails.
 func readDarwinUUID(
 	ctx context.Context,
+	exec executor.Executor,
 ) string {
-	h, err := hostInfoFn(ctx)
-	if err != nil || h == nil {
+	out, err := exec.Execute(ctx, "ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
+	if err != nil {
 		return ""
 	}
-	return h.HostID
+	if m := platformUUIDRE.FindSubmatch(out); m != nil {
+		return string(m[1])
+	}
+
+	return ""
 }

@@ -26,6 +26,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
@@ -102,13 +104,13 @@ type Gohai struct {
 func New(
 	opts ...Option,
 ) (*Gohai, error) {
-	g := &Gohai{registry: collector.NewRegistry()}
-	registerBuiltins(g.registry)
-
 	var cfg config
 	for _, opt := range opts {
 		opt(&cfg)
 	}
+
+	g := &Gohai{registry: collector.NewRegistry()}
+	registerBuiltins(g.registry, cfg.sources)
 
 	sel, err := selectCollectors(g.registry, cfg)
 	if err != nil {
@@ -221,40 +223,45 @@ func selectCollectors(
 // which are caught by tests — callers can rely on registration succeeding.
 func registerBuiltins(
 	reg *collector.Registry,
+	src source.Sources,
 ) {
-	for _, c := range builtinCollectors() {
+	for _, c := range builtinCollectors(src) {
 		_ = reg.Register(c)
 	}
 }
 
-// builtinCollectors returns the list of built-in collectors to register.
-func builtinCollectors() []collector.Collector {
+// builtinCollectors returns the built-in collectors to register, each
+// reading the host through src. The cloud collectors read their provider's
+// metadata service, which src does not cover.
+func builtinCollectors(
+	src source.Sources,
+) []collector.Collector {
 	return []collector.Collector{
-		platform.New(),
-		hostname.New(),
-		kernel.New(),
-		kernelmodules.New(),
-		uptime.New(),
-		virtualization.New(),
-		machineid.New(),
-		cpu.New(),
-		load.New(),
-		memory.New(),
-		filesystem.New(),
-		disk.New(),
-		network.New(),
-		process.New(),
-		users.New(),
-		sessions.New(),
-		timezone.New(),
-		rootgroup.New(),
-		shells.New(),
-		fips.New(),
-		osrelease.New(),
-		lsb.New(),
-		initd.New(),
-		shard.New(),
-		packagemgr.New(),
+		platform.NewWith(src),
+		hostname.NewWith(src),
+		kernel.NewWith(src),
+		kernelmodules.NewWith(src),
+		uptime.NewWith(src),
+		virtualization.NewWith(src),
+		machineid.NewWith(src),
+		cpu.NewWith(src),
+		load.NewWith(src),
+		memory.NewWith(src),
+		filesystem.NewWith(src),
+		disk.NewWith(src),
+		network.NewWith(src),
+		process.NewWith(src),
+		users.NewWith(src),
+		sessions.NewWith(src),
+		timezone.NewWith(src),
+		rootgroup.NewWith(src),
+		shells.NewWith(src),
+		fips.NewWith(src),
+		osrelease.NewWith(src),
+		lsb.NewWith(src),
+		initd.NewWith(src),
+		shard.NewWith(src),
+		packagemgr.NewWith(src),
 		gce.New(),
 		ec2.New(),
 		azure.New(),
@@ -264,33 +271,33 @@ func builtinCollectors() []collector.Collector {
 		linode.New(),
 		openstack.New(),
 		scaleway.New(),
-		dmi.New(),
-		gpu.New(),
-		pci.New(),
-		scsi.New(),
-		hardware.New(),
-		blockdevice.New(),
-		command.New(),
-		docker.New(),
-		grub2.New(),
-		hostnamectl.New(),
-		interrupts.New(),
-		ipc.New(),
-		languages.New(),
-		libvirt.New(),
-		livepatch.New(),
-		mdadm.New(),
-		packages.New(),
-		rpm.New(),
-		selinux.New(),
-		services.New(),
-		ssh.New(),
-		sysconf.New(),
-		sysctl.New(),
-		systemdpaths.New(),
-		tc.New(),
-		virtualbox.New(),
-		vmware.New(),
-		zpools.New(),
+		dmi.NewWith(src),
+		gpu.NewWith(src),
+		pci.NewWith(src),
+		scsi.NewWith(src),
+		hardware.NewWith(src),
+		blockdevice.NewWith(src),
+		command.NewWith(src),
+		docker.NewWith(src),
+		grub2.NewWith(src),
+		hostnamectl.NewWith(src),
+		interrupts.NewWith(src),
+		ipc.NewWith(src),
+		languages.NewWith(src),
+		libvirt.NewWith(src),
+		livepatch.NewWith(src),
+		mdadm.NewWith(src),
+		packages.NewWith(src),
+		rpm.NewWith(src),
+		selinux.NewWith(src),
+		services.NewWith(src),
+		ssh.NewWith(src),
+		sysconf.NewWith(src),
+		sysctl.NewWith(src),
+		systemdpaths.NewWith(src),
+		tc.NewWith(src),
+		virtualbox.NewWith(src),
+		vmware.NewWith(src),
+		zpools.NewWith(src),
 	}
 }

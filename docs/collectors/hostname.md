@@ -12,10 +12,9 @@ a stable identity for telemetry, inventory and correlation.
 
 On macOS, the collector also reports the friendly machine name. This name comes
 from `ComputerName`, for example "John's MacBook Pro". The collector uses
-`hostname -s` and not gopsutil. Thus the short name is always the same as the
-value that `$(hostname -s)` gives in other places on the host. This is important
-on Macs that MDM manages, because there `scutil --get HostName` can be
-different.
+`hostname -s`. Thus the short name is always the same as the value that
+`$(hostname -s)` gives in other places on the host. This is important on Macs
+that MDM manages, because there `scutil --get HostName` can be different.
 
 ## Collected fields
 
@@ -73,11 +72,10 @@ On Linux and macOS, the steps are the same. They are the same as the linux and
 darwin branches of Ohai's `hostname.rb`:
 
 1. `hostname -s` gives `name`. The collector runs it through the shared
-   `internal/executor` runner. The collector uses this command and not gopsutil.
-   Thus the short name is the same as the value that `$(hostname -s)` gives in
-   other tools on the host. This is important on Macs that MDM manages, where
-   `scutil --get HostName` can be different. It is also important on Linux hosts
-   where a person changed `/etc/hostname` to an FQDN.
+   `internal/executor` runner. Thus the short name is the same as the value that
+   `$(hostname -s)` gives in other tools on the host. This is important on Macs
+   that MDM manages, where `scutil --get HostName` can be different. It is also
+   important on Linux hosts where a person changed `/etc/hostname` to an FQDN.
 2. `hostname` with no arguments gives `machine_name`. On stock macOS, this is
    the friendly name from `ComputerName`. On Linux, it is usually the same as
    the short name.
@@ -89,9 +87,11 @@ darwin branches of Ohai's `hostname.rb`:
 4. The collector splits the FQDN at the first `.` to get `domain`. `domain` is
    empty if the FQDN is the same as `name`.
 5. If the exec runner is not available, or `hostname -s` or `hostname` fails,
-   the collector uses fallbacks. The short name comes from gopsutil's
-   `host.Info`. `machine_name` comes from `os.Hostname()`. Thus the collector
-   also works in minimal containers that do not have `util-linux-hostname`.
+   the collector uses fallbacks. On Linux, the short name is the kernel's name
+   in `/proc/sys/kernel/hostname`, up to the first `.`. `machine_name` is the
+   short name. Thus the collector also works in minimal containers that do not
+   have `util-linux-hostname`. On macOS, there is no fallback for the short
+   name, and the collector gives an error.
 
 The collector runs both commands through the shared `internal/executor` runner.
 Tests use `go.uber.org/mock` to mock the cases where the command is there, is
@@ -104,6 +104,3 @@ missing, or gives empty output.
   Tests mock it with `go.uber.org/mock`.
 - The Go standard library `net` package for forward and reverse DNS
   canonicalization.
-- [`github.com/shirou/gopsutil/v4/host`](https://github.com/shirou/gopsutil),
-  BSD-3. The fallback source of the short hostname if the exec runner is not
-  available.

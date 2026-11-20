@@ -22,8 +22,8 @@
 // hosts we prefer `loginctl list-sessions` — the same data loginctl
 // itself shows — which surfaces graphical (GDM/KDE), remote-desktop,
 // and `systemd-run` sessions that never reach utmp. On non-systemd
-// hosts and macOS we fall back to utmp / utmpx via gopsutil, which
-// matches what `who` / `w` print.
+// hosts and macOS we read utmp / utmpx, which is what `who` / `w`
+// print.
 //
 // This collector used to live under `users` but was split out: `users`
 // now matches Ohai's passwd plugin (enumerate /etc/passwd + /etc/group
@@ -32,13 +32,15 @@ package sessions
 
 import (
 	"bufio"
-	"context"
+	"bytes"
+	"encoding/binary"
+	"fmt"
 	"strings"
 
-	"github.com/shirou/gopsutil/v4/host"
+	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds the set of logged-in sessions.
@@ -74,36 +76,91 @@ func (base) Dependencies() []string { return nil }
 
 // New returns the sessions variant for the host OS.
 func New() Collector {
-	if platform.Detect() == "darwin" {
-		return NewDarwin()
-	}
-	return NewLinux()
+	return NewWith(source.Sources{})
 }
 
-// usersFn is the injection seam for gopsutil's host.UsersWithContext.
-// Kept private so importers don't transitively need gopsutil. Swapped
-// via SetUsersFn (export_test.go).
-var usersFn = host.UsersWithContext
-
-// listSessions is the production bridge to gopsutil (which reads
-// utmp on Linux / utmpx on macOS).
-func listSessions(
-	ctx context.Context,
-) ([]Session, error) {
-	us, err := usersFn(ctx)
-	if err != nil {
-		return nil, err
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
 	}
-	out := make([]Session, 0, len(us))
-	for _, u := range us {
+
+	return collector.Wire(NewLinux(), src)
+}
+
+// The records of utmp (Linux) and utmpx (macOS), as glibc and Darwin lay
+// them out, little-endian. A record of type userProcess is a logged-in
+// user.
+const (
+	utmpPath    = "/var/run/utmp"
+	utmpxPath   = "/var/run/utmpx"
+	userProcess = 7
+)
+
+// utmpLayout is where each field of one record is.
+type utmpLayout struct {
+	size, typ, line, lineLen, user, userLen, host, hostLen, sec int
+	// header is a record at the start of the file that is not a session.
+	header bool
+}
+
+var (
+	// linuxUtmp is glibc's struct utmp: 384 bytes.
+	linuxUtmp = utmpLayout{
+		size: 384, typ: 0, line: 8, lineLen: 32, user: 44, userLen: 32,
+		host: 76, hostLen: 256, sec: 340,
+	}
+	// darwinUtmpx is Darwin's struct utmpx: 628 bytes, after a header
+	// record.
+	darwinUtmpx = utmpLayout{
+		size: 628, user: 0, userLen: 256, line: 260, lineLen: 32, typ: 296,
+		sec: 300, host: 308, hostLen: 256, header: true,
+	}
+)
+
+// readUtmp is each logged-in user of the utmp file at path, read with
+// layout l, as who prints them.
+func readUtmp(
+	fs avfs.VFS,
+	path string,
+	l utmpLayout,
+) ([]Session, error) {
+	buf, err := fs.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	if l.header && len(buf) >= l.size {
+		buf = buf[l.size:]
+	}
+	out := []Session{}
+	for ; len(buf) >= l.size; buf = buf[l.size:] {
+		r := buf[:l.size]
+		if binary.LittleEndian.Uint16(r[l.typ:]) != userProcess {
+			continue
+		}
 		out = append(out, Session{
-			User:     u.User,
-			Terminal: u.Terminal,
-			Host:     u.Host,
-			Started:  uint64(u.Started),
+			User:     cString(r[l.user : l.user+l.userLen]),
+			Terminal: cString(r[l.line : l.line+l.lineLen]),
+			Host:     cString(r[l.host : l.host+l.hostLen]),
+			Started:  uint64(binary.LittleEndian.Uint32(r[l.sec:])),
 		})
 	}
+
 	return out, nil
+}
+
+// cString is b up to its first NUL.
+func cString(
+	b []byte,
+) string {
+	if i := bytes.IndexByte(b, 0); i >= 0 {
+		b = b[:i]
+	}
+
+	return string(b)
 }
 
 // parseLoginctlSessions parses `loginctl --no-pager --no-legend

@@ -93,10 +93,10 @@ Consumers use this data to:
 
 ## Platform support
 
-| Platform | Supported                                               |
-| -------- | ------------------------------------------------------- |
-| Linux    | ✅ (`/proc/meminfo` through gopsutil, 27+ fields)       |
-| macOS    | ✅ (`host_statistics64` and `vm_stat` through executor) |
+| Platform | Supported                        |
+| -------- | -------------------------------- |
+| Linux    | ✅ (`/proc/meminfo`, 40+ fields) |
+| macOS    | ✅ (`sysctl` and `vm_stat`)      |
 
 ## Example output
 
@@ -186,56 +186,45 @@ None.
 ## Data sources
 
 Ohai's `linux/memory.rb` reads `/proc/meminfo` line by line and reports each
-field. gohai uses gopsutil, which reads the same `/proc/meminfo` file and gives
-the same fields as typed Go values. The two report the same fields: total, free,
-available, buffers, cached, active, inactive, swap, hugepages, directmap, and
-all detail fields of `/proc/meminfo`.
+field. gohai reads the same file in the same way. The two report the same
+fields: total, free, available, buffers, cached, active, inactive, swap,
+hugepages, directmap, and all detail fields of `/proc/meminfo`.
 
 On Linux:
 
-1. gopsutil `mem.VirtualMemory` reads `/proc/meminfo` and gives 27+ fields in
-   its `VirtualMemoryStat` struct (Total, Available, Used, Free, Active,
-   Inactive, Buffers, Cached, Dirty, WriteBack, WriteBackTmp, Shared, Mapped,
-   Slab, Sreclaimable, Sunreclaim, PageTables, SwapCached, CommitLimit,
-   CommittedAS, VmallocTotal, VmallocUsed, VmallocChunk, HugePagesTotal,
-   HugePagesFree, HugePagesRsvd, HugePagesSurp, HugePageSize, AnonHugePages).
-   The collector reports each relevant field. It uses the library first and does
-   not parse `/proc/meminfo` separately for these fields.
-2. gopsutil `mem.SwapMemory` gives the `swap.*` totals. `swap.cached` comes from
-   the `SwapCached` field of the virtual memory stat.
-3. The collector sets `hugepages.*` only when one or more hugepage fields are
+1. The collector reads each line of `/proc/meminfo` through its filesystem. The
+   kernel reports the values in kB. The collector multiplies them by 1024 to
+   report bytes.
+2. Some fields are calculated, with the arithmetic that gohai had before it read
+   the file itself:
+   - `cached` is `Cached` plus `SReclaimable`.
+   - `available` is `MemAvailable`. On a kernel older than 3.14, which has no
+     `MemAvailable`, it is `cached` plus `free`.
+   - `used` is `total` minus `available`.
+3. `SwapTotal`, `SwapFree` and `SwapCached` give the `swap.*` fields.
+4. The collector sets `hugepages.*` only when one or more hugepage fields are
    there. On kernels without hugepages support, the collector skips it with no
    error.
-4. The collector also reads `/proc/meminfo` through the injected `avfs.VFS` to
-   get the fields that the cross-platform struct of gopsutil does not give:
-   `Active(anon)`, `Active(file)`, `Inactive(anon)`, `Inactive(file)`,
-   `Unevictable`, `KernelStack`, `Percpu`, `KReclaimable`, `AnonPages`, `Shmem`,
-   `Hugetlb`, and `DirectMap4k`, `DirectMap2M` and `DirectMap1G`. The kernel
-   reports all values in kB. The collector multiplies them by 1024 to report
-   bytes. This removes the difference from the Ohai method. It does not add a
-   separate parser for the 27 fields that gopsutil already reads. It extends the
-   library, as the library-first principle of CONTRIBUTING.md tells.
 
 On macOS:
 
-1. gopsutil `mem.VirtualMemory` calls `host_statistics64` for Total, Available,
-   Used, Free, Active, Inactive and Wired.
-2. The collector also runs `vm_stat` through the shared `internal/executor`
-   runner. It parses the `page size of N bytes` header on the first line. The
-   page size is 4096 on Intel and 16384 on Apple Silicon. Each line after it has
-   the form `Pages <label>: <int>.`. The collector multiplies the pages by the
-   page size to get a byte count. It sets these fields:
+1. `sysctl -n hw.memsize` gives `total`. If it fails, the collector gives an
+   error.
+2. `vm_stat` gives the page counts. The collector parses the
+   `page size of N bytes` header on the first line. The page size is 4096 on
+   Intel and 16384 on Apple Silicon. Each line after it has the form
+   `Pages <label>: <int>.`. The collector multiplies the pages by the page size
+   to get a byte count:
+   - `free`, `active`, `inactive` and `wired`.
+   - `available` is free plus inactive, and `used` is `total` minus `available`.
    - `speculative`, from `Pages speculative`. This cache class is specific to
      macOS. Linux has no equivalent.
    - `compressed`, from `Pages stored in compressor`. Apple Silicon uses the
      compressor much.
-3. If `vm_stat` is missing or fails, the extra fields stay at zero. The totals
-   from gopsutil stay correct.
+3. `sysctl -n vm.swapusage` gives the `swap.*` fields.
+4. If `vm_stat` or `vm.swapusage` fails, its fields stay at zero.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/mem`](https://github.com/shirou/gopsutil),
-  BSD-3. The primary source on the two platforms.
-- [`internal/executor`](../../internal/executor). The shared command runner. The
-  collector uses it to run `vm_stat` on macOS. Tests mock it with
-  `go.uber.org/mock`.
+None. The collector reads `/proc` through its filesystem, and runs `sysctl` and
+`vm_stat` through its command runner.

@@ -26,13 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
-)
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 
-// nowFn is the package-level seam for time.Now. Tests swap it via
-// SetNowFn to pin deterministic zone/offset values.
-var nowFn = time.Now
+	"github.com/osapi-io/gohai/internal/collector"
+)
 
 // localtimePath is the standard symlink path on both Linux and macOS.
 const localtimePath = "/etc/localtime"
@@ -60,18 +57,27 @@ func (base) Dependencies() []string { return nil }
 // macOS use different zoneinfo prefixes; the per-OS structs carry their
 // own.
 func New() Collector {
-	switch platform.Detect() {
-	case "darwin":
-		return NewDarwin()
-	default:
-		return NewLinux()
-	}
+	return NewWith(source.Sources{})
 }
 
-// clockZone extracts the abbreviation and offset from the Go runtime's
-// local clock. Shared by both variants — identical across OSes.
-func clockZone() (string, int) {
-	return nowFn().Zone()
+// NewWith returns the variant for src's family, reading the host through
+// src: its filesystem, its commands and its clock.
+func NewWith(
+	src source.Sources,
+) Collector {
+	if collector.IsDarwin(src) {
+		return collector.Wire(NewDarwin(), src)
+	}
+
+	return collector.Wire(NewLinux(), src)
+}
+
+// clockZone is the abbreviation and offset of the clock's time. Shared
+// by both variants.
+func clockZone(
+	now func() time.Time,
+) (string, int) {
+	return now().Zone()
 }
 
 // resolveName tries readlink(localtimePath) first; on hosts where

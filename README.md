@@ -262,8 +262,6 @@ problems.
 
 ### Backing libraries (gohai imports these)
 
-- [gopsutil]. The primary source for the dynamic runtime state: memory, network
-  I/O, the process list and virtualization detection.
 - [ghw]. The canonical source for the physical hardware topology: CPU NUMA,
   DIMMs, block devices, DMI, GPU and PCI.
 - [procfs]. It parses Linux `/proc` and `/sys` when no other library has a
@@ -279,18 +277,17 @@ problems.
 - [gosigar](https://github.com/cloudfoundry/gosigar). The Cloud Foundry Go port
   of Hyperic Sigar. An old reference for host metrics in Go.
 - [go-ps](https://github.com/mitchellh/go-ps). A small library that lists
-  processes. For gohai, gopsutil replaces it.
+  processes. gohai reads `/proc` and `ps` itself.
 - [goprocinfo](https://github.com/c9s/goprocinfo). A small `/proc` parser. For
-  gohai, gopsutil + procfs do the same work.
+  gohai, its own parsers of `/proc` do the same work.
 
 ### Methodology references (gohai reads them, but does not import them)
 
 - [node_exporter](https://github.com/prometheus/node_exporter). The reference
   for difficult parsing of Linux `/proc` and `/sys`. It is Apache-2, but gohai
   writes the code again in its own style and does not import it.
-- [psutil](https://github.com/giampaolo/psutil). gopsutil is a port of this
-  Python library. It is the original design reference for the dynamic-state
-  facts.
+- [psutil](https://github.com/giampaolo/psutil). The original design reference
+  for the dynamic-state facts.
 
 ## 🤝 Contributing
 
@@ -303,7 +300,6 @@ The [MIT] License.
 
 [chef ohai]: https://docs.chef.io/ohai/
 [ghw]: https://github.com/jaypipes/ghw
-[gopsutil]: https://github.com/shirou/gopsutil
 [mit]: LICENSE
 [package documentation]: https://pkg.go.dev/github.com/osapi-io/gohai/pkg/gohai
 [procfs]: https://github.com/prometheus/procfs

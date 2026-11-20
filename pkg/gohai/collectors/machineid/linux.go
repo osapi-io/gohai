@@ -26,52 +26,43 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// dbusMachineIDPath is the pre-systemd machine-id location Ohai reads
-// that gopsutil's HostID doesn't check. Present on older Debian/Ubuntu
-// hosts that ship dbus without systemd.
-const dbusMachineIDPath = "/var/lib/dbus/machine-id"
+// idPaths are where Linux keeps a stable machine ID, in the order Ohai reads
+// them: systemd's, then the dbus one of hosts before systemd, then the DMI
+// product UUID, which only root can read on most hosts.
+var idPaths = []string{
+	"/etc/machine-id",
+	"/var/lib/dbus/machine-id",
+	"/sys/class/dmi/id/product_uuid",
+}
 
-// Linux resolves the machine ID on Linux hosts. Wraps readHostID
-// (gopsutil's host.Info internally, which reads /etc/machine-id →
-// /sys/class/dmi/id/product_uuid → /proc/sys/kernel/random/boot_id)
-// and extends with a /var/lib/dbus/machine-id fallback so pre-systemd
-// Debian hosts without DMI still get a stable ID.
+// Linux reads the machine ID from the first of idPaths that has one.
 type Linux struct {
 	base
 
 	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant wired to the real OS filesystem.
+// NewLinux returns a Linux variant that reads the host's filesystem.
 func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns the machine ID. Extends gopsutil — if gopsutil
-// returns an empty ID (no /etc/machine-id, no DMI product_uuid),
-// fall back to /var/lib/dbus/machine-id before giving up. This
-// mirrors Ohai's fallback chain without re-implementing gopsutil's
-// existing work.
+// Collect returns the machine ID, or an empty one when no file has it.
 func (l *Linux) Collect(
-	ctx context.Context,
+	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	id, err := readHostID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if id != "" {
-		return &Info{ID: id}, nil
-	}
-	// gopsutil returned empty — try the pre-systemd dbus location
-	// before reporting unknown.
-	if b, err := l.FS.ReadFile(dbusMachineIDPath); err == nil {
-		if id := strings.TrimSpace(string(b)); id != "" {
-			return &Info{ID: id}, nil
+	for _, p := range idPaths {
+		if b, err := l.FS.ReadFile(p); err == nil {
+			if id := strings.ToLower(strings.TrimSpace(string(b))); id != "" {
+				return &Info{ID: id}, nil
+			}
 		}
 	}
+
 	return &Info{}, nil
 }

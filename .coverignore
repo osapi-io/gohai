@@ -3,3 +3,4 @@
 /gen/
 main.go
 /mocks/
+/sourcetest/

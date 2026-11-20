@@ -23,16 +23,14 @@ package uptime_test
 import (
 	"context"
 	"errors"
-	"io/fs"
 	"testing"
+	"time"
 
-	"github.com/avfs/avfs"
-	"github.com/avfs/avfs/vfs/memfs"
-	"github.com/shirou/gopsutil/v4/host"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 )
 
@@ -115,141 +113,98 @@ func (s *UptimePublicTestSuite) TestNew() {
 }
 
 func (s *UptimePublicTestSuite) TestCollect() {
-	okHost := func(context.Context) (*host.InfoStat, error) {
-		return &host.InfoStat{Uptime: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000}, nil
-	}
-	buildFS := func(content string, writeFile bool) avfs.VFS {
-		f := memfs.New()
-		if writeFile {
-			_ = f.MkdirAll("/proc", 0o755)
-			_ = f.WriteFile("/proc/uptime", []byte(content), fs.FileMode(0o644))
-		}
-		return f
-	}
-
+	now := func() time.Time { return time.Unix(1767322845, 0) }
 	tests := []struct {
-		name         string
-		variant      string
-		hostFn       func(context.Context) (*host.InfoStat, error)
-		setupFS      func() avfs.VFS
-		validateFunc func(any, error)
+		name    string
+		variant string
+		files   map[string]string
+		runner  sourcetest.Runner
+		want    *uptime.Info
+		wantErr string
 	}{
 		{
-			name:    "linux: 3h up + idle parsed",
+			name:    "linux: uptime, idle and boot time",
 			variant: "linux",
-			hostFn:  okHost,
-			setupFS: func() avfs.VFS { return buildFS("12345.67 9876.54\n", true) },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*uptime.Info)
-				s.Require().True(ok)
-				s.Equal(uptime.Info{
-					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
-					IdleSeconds: 9876, IdleHuman: "2h 44m 36s",
-				}, *info)
+			files: map[string]string{
+				"/proc/uptime": "93900.42 180001.15\n",
+				"/proc/stat":   "cpu  1 2 3\nbtime 1767229145\nprocesses 9\n",
+			},
+			want: &uptime.Info{
+				Seconds: 93900, BootTime: 1767229145, Human: "1d 2h 5m 0s",
+				IdleSeconds: 180001, IdleHuman: "2d 2h 0m 1s",
 			},
 		},
 		{
-			name:    "linux: missing /proc/uptime omits idle",
+			name:    "linux: no idle field, and no /proc/stat",
 			variant: "linux",
-			hostFn:  okHost,
-			setupFS: func() avfs.VFS { return buildFS("", false) },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*uptime.Info)
-				s.Require().True(ok)
-				s.Equal(uptime.Info{
-					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
-				}, *info)
-			},
+			files:   map[string]string{"/proc/uptime": "65\n"},
+			want:    &uptime.Info{Seconds: 65, Human: "1m 5s"},
 		},
 		{
-			name:    "linux: malformed /proc/uptime omits idle",
+			name:    "linux: an idle field and a btime that are not numbers",
 			variant: "linux",
-			hostFn:  okHost,
-			setupFS: func() avfs.VFS { return buildFS("12345.67\n", true) },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*uptime.Info)
-				s.Require().True(ok)
-				s.Equal(uptime.Info{
-					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
-				}, *info)
+			files: map[string]string{
+				"/proc/uptime": "65 x\n",
+				"/proc/stat":   "btime soon\n",
 			},
+			want: &uptime.Info{Seconds: 65, Human: "1m 5s"},
+		},
+		{name: "linux: no /proc/uptime", variant: "linux", wantErr: "read /proc/uptime"},
+		{
+			name: "linux: empty /proc/uptime", variant: "linux",
+			files: map[string]string{"/proc/uptime": ""}, wantErr: "is empty",
 		},
 		{
-			name:    "linux: unparseable idle field omits",
-			variant: "linux",
-			hostFn:  okHost,
-			setupFS: func() avfs.VFS { return buildFS("12345.67 xyz\n", true) },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*uptime.Info)
-				s.Require().True(ok)
-				s.Equal(uptime.Info{
-					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
-				}, *info)
-			},
+			name: "linux: uptime not a number", variant: "linux",
+			files: map[string]string{"/proc/uptime": "x 1"}, wantErr: "is not a number",
 		},
 		{
-			name:    "linux: negative idle omits",
-			variant: "linux",
-			hostFn:  okHost,
-			setupFS: func() avfs.VFS { return buildFS("12345.67 -1.0\n", true) },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*uptime.Info)
-				s.Require().True(ok)
-				s.Equal(uptime.Info{
-					Seconds: 3*3600 + 12*60 + 5, BootTime: 1_700_000_000, Human: "3h 12m 5s",
-				}, *info)
-			},
-		},
-		{
-			name:    "linux: gopsutil error wrapped and returned",
-			variant: "linux",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			setupFS: func() avfs.VFS { return buildFS("1 1\n", true) },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name:    "darwin: uptime returned",
+			name:    "darwin: boot time and the clock",
 			variant: "darwin",
-			hostFn: func(context.Context) (*host.InfoStat, error) {
-				return &host.InfoStat{Uptime: 7200, BootTime: 1_700_000_000}, nil
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*uptime.Info)
-				s.Require().True(ok)
-				s.Equal(
-					uptime.Info{Seconds: 7200, BootTime: 1_700_000_000, Human: "2h 0m 0s"},
-					*info,
-				)
-			},
+			runner: sourcetest.Runner{Out: map[string]string{
+				"sysctl -n kern.boottime": "{ sec = 1767229145, usec = 0 } Thu Jan  1 00:59:05 2026\n",
+			}},
+			want: &uptime.Info{Seconds: 93700, BootTime: 1767229145, Human: "1d 2h 1m 40s"},
 		},
 		{
-			name:    "darwin: gopsutil error propagated",
+			name:    "darwin: a boot time after the clock",
 			variant: "darwin",
-			hostFn:  func(context.Context) (*host.InfoStat, error) { return nil, errors.New("boom") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			runner: sourcetest.Runner{Out: map[string]string{
+				"sysctl -n kern.boottime": "{ sec = 1999999999, usec = 0 }\n",
+			}},
+			want: &uptime.Info{Seconds: 0, BootTime: 1999999999, Human: "0s"},
+		},
+		{
+			name:    "darwin: sysctl fails",
+			variant: "darwin",
+			runner: sourcetest.Runner{
+				Err: map[string]error{"sysctl -n kern.boottime": errors.New("boom")},
 			},
+			wantErr: "sysctl kern.boottime: boom",
+		},
+		{
+			name: "darwin: no seconds", variant: "darwin",
+			runner:  sourcetest.Runner{Out: map[string]string{"sysctl -n kern.boottime": "nope"}},
+			wantErr: "no seconds",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer uptime.SetHostInfoFn(tt.hostFn)()
 			var c uptime.Collector
 			switch tt.variant {
 			case "linux":
-				c = &uptime.Linux{FS: tt.setupFS()}
+				c = &uptime.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &uptime.Darwin{}
+				c = &uptime.Darwin{Exec: tt.runner, Now: now}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

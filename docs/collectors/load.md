@@ -41,10 +41,10 @@ values that `getloadavg(3)` returns.
 
 ## Platform support
 
-| Platform | Supported                                 |
-| -------- | ----------------------------------------- |
-| Linux    | ✅ (`/proc/loadavg` through gopsutil)     |
-| macOS    | ✅ (`sysctl vm.loadavg` through gopsutil) |
+| Platform | Supported                   |
+| -------- | --------------------------- |
+| Linux    | ✅ (`/proc/loadavg`)        |
+| macOS    | ✅ (`sysctl -n vm.loadavg`) |
 
 ## Example output
 
@@ -89,13 +89,13 @@ the user disabled it.
 
 On Linux:
 
-1. gopsutil's `load.AvgWithContext` reads `/proc/loadavg` and returns the three
-   usual floats. The collector reports them as `one`, `five` and `fifteen`.
+1. The collector reads the first three fields of `/proc/loadavg`. It reports
+   them as `one`, `five` and `fifteen`.
 
 On macOS:
 
-1. gopsutil's `load.AvgWithContext` calls `sysctl vm.loadavg` and returns the
-   same three floats. The field mapping is the same as on Linux.
+1. The collector runs `sysctl -n vm.loadavg`, which prints `{ 1.23 1.45 1.67 }`.
+   The field mapping is the same as on Linux.
 
 Ohai has no loadavg plugin in its current `main`. Thus this collector has no
 equivalent in Ohai. The field names are the Go form of the three values of
@@ -105,5 +105,5 @@ give them. gohai will add them when a consumer needs them.
 
 ## Backing library
 
-- [`github.com/shirou/gopsutil/v4/load`](https://github.com/shirou/gopsutil),
-  BSD-3.
+None. The collector reads `/proc` through its filesystem, and runs `sysctl`
+through its command runner.

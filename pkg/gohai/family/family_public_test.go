@@ -21,10 +21,9 @@
 package family_test
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/shirou/gopsutil/v4/host"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/family"
@@ -92,36 +91,41 @@ func (s *FamilyPublicTestSuite) TestOf() {
 
 func (s *FamilyPublicTestSuite) TestDetect() {
 	tests := []struct {
-		name string
-		goos string
-		info *host.InfoStat
-		err  error
-		want string
+		name      string
+		goos      string
+		osRelease string
+		want      string
 	}{
 		{name: "when the host is macOS", goos: "darwin", want: family.Darwin},
 		{
-			name: "when the platform has a family", goos: "linux",
-			info: &host.InfoStat{Platform: "amzn"}, want: family.Amazon,
+			name:      "when the platform has a family",
+			goos:      "linux",
+			osRelease: "NAME=\"Amazon Linux\"\nID=\"amzn\"\nVERSION_ID=\"2023\"\n",
+			want:      family.Amazon,
+		},
+		{
+			name: "when the ID is not quoted", goos: "linux",
+			osRelease: "ID=ubuntu\nID_LIKE=debian\n", want: family.Debian,
 		},
 		{
 			name: "when the platform has no family", goos: "linux",
-			info: &host.InfoStat{Platform: "NixOS"}, want: "nixos",
+			osRelease: "ID=NixOS\n", want: "nixos",
 		},
 		{
-			name: "when the platform is empty", goos: "linux",
-			info: &host.InfoStat{}, want: "",
+			name: "when the file has no ID", goos: "linux",
+			osRelease: "NAME=Something\n", want: "",
 		},
-		{
-			name: "when the host cannot be read", goos: "linux",
-			err: errors.New("boom"), want: "",
-		},
+		{name: "when there is no file", goos: "linux", want: ""},
 	}
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
+			fs := memfs.New()
+			if tc.osRelease != "" {
+				s.Require().NoError(fs.MkdirAll("/etc", 0o755))
+				s.Require().NoError(fs.WriteFile("/etc/os-release", []byte(tc.osRelease), 0o644))
+			}
 			defer family.SetGOOS(tc.goos)()
-			defer family.SetHostInfoFn(func() (*host.InfoStat, error) {
-				return tc.info, tc.err
-			})()
+			defer family.SetFS(fs)()
 			s.Equal(tc.want, family.Detect())
 		})
 	}
