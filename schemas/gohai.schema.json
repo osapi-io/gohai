@@ -1536,7 +1536,7 @@
           "$ref": "#/$defs/LsbInfo"
         },
         "init": {
-          "$ref": "#/$defs/InitInfo"
+          "$ref": "#/$defs/InitdInfo"
         },
         "shard": {
           "$ref": "#/$defs/ShardInfo"
@@ -2442,7 +2442,7 @@
       "additionalProperties": false,
       "type": "object"
     },
-    "InitInfo": {
+    "InitdInfo": {
       "properties": {
         "name": {
           "type": "string"

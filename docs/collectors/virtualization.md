@@ -102,6 +102,17 @@ for name, role := range v.Systems {
 }
 ```
 
+`InContainer()` reports whether the host runs as a guest of a container system:
+docker, podman, lxc, lxd, nspawn, openvz and the others. A Docker host, or a
+virtual machine such as a KVM guest, is not in a container. osapi uses it to
+leave out what an agent in a container cannot do.
+
+```go
+if v.InContainer() {
+    // the runtime owns the hostname, the clock and the kernel parameters
+}
+```
+
 ## Enable/disable
 
 ```bash

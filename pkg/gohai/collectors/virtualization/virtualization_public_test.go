@@ -124,6 +124,41 @@ const sysProfilerAppleVM = `Hardware Overview:
       Model Identifier: VirtualMac2,1
 `
 
+func (s *VirtualizationPublicTestSuite) TestInContainer() {
+	tests := []struct {
+		name string
+		info *virtualization.Info
+		want bool
+	}{
+		{
+			name: "when the host is a docker guest",
+			info: &virtualization.Info{Systems: map[string]string{"docker": "guest"}}, want: true,
+		},
+		{
+			name: "when the host is an nspawn guest in a kvm guest",
+			info: &virtualization.Info{
+				Systems: map[string]string{"kvm": "guest", "nspawn": "guest"},
+			},
+			want: true,
+		},
+		{
+			name: "when the host only runs docker",
+			info: &virtualization.Info{Systems: map[string]string{"docker": "host"}}, want: false,
+		},
+		{
+			name: "when the host is a virtual machine",
+			info: &virtualization.Info{Systems: map[string]string{"kvm": "guest"}}, want: false,
+		},
+		{name: "when nothing was detected", info: &virtualization.Info{}, want: false},
+		{name: "when there is no result", info: nil, want: false},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			s.Equal(tc.want, tc.info.InContainer())
+		})
+	}
+}
+
 func (s *VirtualizationPublicTestSuite) TestNew() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()

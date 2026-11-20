@@ -103,6 +103,8 @@ just deps
     Schema through `invopop/jsonschema`. `just generate` runs its
     `//go:generate` directive.
   - `gohai.schema.json`. The generated schema (draft 2020-12). It is committed.
+    `just go-generate-check` fails when it, or a mock, differs from what
+    `go generate` writes.
   - `schema.go`. The `//go:embed` of `gohai.schema.json` for the validate
     subcommand.
   - `field-mapping.md`. The tier mapping of each field (OCSF/OTel/ convention),
