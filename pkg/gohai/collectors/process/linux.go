@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -42,12 +43,13 @@ const clockTicks = 100
 type Linux struct {
 	base
 
-	FS avfs.VFS
+	FS  avfs.VFS
+	Now func() time.Time
 }
 
 // NewLinux returns a Linux variant that reads the host's filesystem.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Now: time.Now}
 }
 
 // Collect returns a process snapshot. A process that ends while it is
@@ -62,13 +64,15 @@ func (l *Linux) Collect(
 	}
 	boot := bootTime(l.FS)
 	users := passwd(l.FS)
+	total := memTotal(l.FS)
+	now := l.Now().Unix()
 	procs := []Process{}
 	for _, e := range entries {
 		pid, err := strconv.ParseInt(e.Name(), 10, 32)
 		if err != nil {
 			continue
 		}
-		if p, ok := l.read(int32(pid), boot, users); ok {
+		if p, ok := l.read(int32(pid), boot, users, total, now); ok {
 			procs = append(procs, p)
 		}
 	}
@@ -81,6 +85,8 @@ func (l *Linux) read(
 	pid int32,
 	boot int64,
 	users map[string]string,
+	total int64,
+	now int64,
 ) (Process, bool) {
 	dir := "/proc/" + strconv.Itoa(int(pid))
 	stat, err := l.FS.ReadFile(dir + "/stat")
@@ -104,6 +110,11 @@ func (l *Linux) read(
 		if ticks, err := strconv.ParseInt(f[19], 10, 64); err == nil {
 			p.CreationTime = boot + ticks/clockTicks
 		}
+		utime, _ := strconv.ParseInt(f[11], 10, 64)
+		stime, _ := strconv.ParseInt(f[12], 10, 64)
+		if elapsed := now - p.CreationTime; p.CreationTime > 0 && elapsed > 0 {
+			p.CPUPercent = float64(utime+stime) / clockTicks / float64(elapsed) * 100
+		}
 	}
 	if status, err := l.FS.ReadFile(dir + "/status"); err == nil {
 		for _, line := range strings.Split(string(status), "\n") {
@@ -112,7 +123,14 @@ func (l *Linux) read(
 					p.Owner = users[uid[0]]
 				}
 			}
+			if v, ok := strings.CutPrefix(line, "VmRSS:"); ok {
+				kb, _ := strconv.ParseInt(strings.TrimSuffix(strings.TrimSpace(v), " kB"), 10, 64)
+				p.RSS = kb * 1024
+			}
 		}
+	}
+	if total > 0 {
+		p.MemPercent = float64(p.RSS) / float64(total) * 100
 	}
 	if cmd, err := l.FS.ReadFile(dir + "/cmdline"); err == nil {
 		p.CmdLine = strings.TrimSpace(strings.ReplaceAll(string(cmd), "\x00", " "))
@@ -156,4 +174,22 @@ func passwd(
 	}
 
 	return users
+}
+
+// memTotal is MemTotal of /proc/meminfo, in bytes, or 0.
+func memTotal(
+	fs avfs.VFS,
+) int64 {
+	b, err := fs.ReadFile("/proc/meminfo")
+	if err != nil {
+		return 0
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if v, ok := strings.CutPrefix(line, "MemTotal:"); ok {
+			kb, _ := strconv.ParseInt(strings.TrimSuffix(strings.TrimSpace(v), " kB"), 10, 64)
+			return kb * 1024
+		}
+	}
+
+	return 0
 }
