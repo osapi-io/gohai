@@ -23,18 +23,13 @@ package rootgroup
 
 import (
 	"fmt"
-	"os/user"
+	"strings"
+
+	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
-)
-
-// lookupUserFn and lookupGroupFn are the package-level seams wrapping
-// os/user. Tests swap them via SetLookupUserFn / SetLookupGroupFn.
-var (
-	lookupUserFn  = user.Lookup
-	lookupGroupFn = user.LookupGroupId
 )
 
 // Info holds the root group data.
@@ -63,8 +58,8 @@ func (base) DefaultEnabled() bool { return true }
 func (base) Dependencies() []string { return nil }
 
 // New returns the root_group collector variant appropriate to the host.
-// os/user-backed lookups work identically on Linux and macOS, but the
-// expected result differs (Linux → "root", macOS → "wheel").
+// The files are the same on Linux and macOS, but the expected result
+// differs (Linux → "root", macOS → "wheel").
 func New() Collector {
 	return NewWith(source.Sources{})
 }
@@ -81,18 +76,44 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// resolveRootGroup performs the two-hop lookup Ohai uses: look up user
-// "root" to get its primary GID, then look up that GID to get the group
-// name. Correct even on systems where root's primary GID isn't 0.
-// Shared by both Linux and Darwin variants.
-func resolveRootGroup() (*Info, error) {
-	u, err := lookupUserFn("root")
+// resolveRootGroup is the name of root's primary group: the gid of root
+// in /etc/passwd, and the name of that gid in /etc/group. Ohai asks
+// Etc.getgrgid(Etc.getpwnam("root").gid), which reads the same files on
+// Linux, and on macOS finds root and wheel there too.
+func resolveRootGroup(
+	fs avfs.VFS,
+) (*Info, error) {
+	gid, err := field(fs, "/etc/passwd", 0, "root", 3)
 	if err != nil {
 		return nil, fmt.Errorf("lookup user root: %w", err)
 	}
-	g, err := lookupGroupFn(u.Gid)
+	name, err := field(fs, "/etc/group", 2, gid, 0)
 	if err != nil {
-		return nil, fmt.Errorf("lookup gid %s: %w", u.Gid, err)
+		return nil, fmt.Errorf("lookup gid %s: %w", gid, err)
 	}
-	return &Info{Name: g.Name}, nil
+
+	return &Info{Name: name}, nil
+}
+
+// field is field want of the first line of the colon-separated file path
+// whose field key is value.
+func field(
+	fs avfs.VFS,
+	path string,
+	key int,
+	value string,
+	want int,
+) (string, error) {
+	b, err := fs.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		f := strings.Split(line, ":")
+		if len(f) > max(key, want) && f[key] == value {
+			return f[want], nil
+		}
+	}
+
+	return "", fmt.Errorf("%s has no %q", path, value)
 }

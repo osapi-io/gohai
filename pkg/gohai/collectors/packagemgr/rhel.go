@@ -24,6 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // RHEL covers rhel / redhat / centos / fedora / rocky / alma /
@@ -31,18 +32,20 @@ import (
 // falls back to yum (RHEL 7 and earlier, Amazon Linux 2).
 type RHEL struct {
 	base
+
+	Exec executor.Executor
 }
 
 // NewRHEL returns an RHEL variant.
 func NewRHEL() *RHEL {
-	return &RHEL{}
+	return &RHEL{Exec: executor.New()}
 }
 
 // Collect returns dnf if present, else yum.
 func (r *RHEL) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, path := firstFound("dnf", "yum")
+	name, path := firstFound(ctx, r.Exec, "dnf", "yum")
 	return &Info{Name: name, Path: path}, nil
 }

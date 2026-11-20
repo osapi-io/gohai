@@ -22,16 +22,12 @@ package dmi_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	"github.com/jaypipes/ghw/pkg/baseboard"
-	"github.com/jaypipes/ghw/pkg/bios"
-	"github.com/jaypipes/ghw/pkg/chassis"
-	"github.com/jaypipes/ghw/pkg/product"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 )
 
@@ -86,141 +82,117 @@ func (s *DmiPublicTestSuite) TestNew() {
 }
 
 func (s *DmiPublicTestSuite) TestCollect() {
+	dmiFiles := map[string]string{
+		"/sys/class/dmi/id/bios_vendor":       "LENOVO\n",
+		"/sys/class/dmi/id/bios_version":      "N2VET36W\n",
+		"/sys/class/dmi/id/bios_date":         "01/01/2024\n",
+		"/sys/class/dmi/id/board_vendor":      "LENOVO\n",
+		"/sys/class/dmi/id/board_name":        "21DC\n",
+		"/sys/class/dmi/id/board_version":     "SDK0\n",
+		"/sys/class/dmi/id/board_serial":      "L1HF\n",
+		"/sys/class/dmi/id/board_asset_tag":   "Not Available\n",
+		"/sys/class/dmi/id/chassis_vendor":    "LENOVO\n",
+		"/sys/class/dmi/id/chassis_type":      "10\n",
+		"/sys/class/dmi/id/chassis_version":   "None\n",
+		"/sys/class/dmi/id/chassis_serial":    "PF3X\n",
+		"/sys/class/dmi/id/chassis_asset_tag": "No Asset\n",
+		"/sys/class/dmi/id/sys_vendor":        "LENOVO\n",
+		"/sys/class/dmi/id/product_name":      "21DC0040US\n",
+		"/sys/class/dmi/id/product_family":    "ThinkPad X1\n",
+		"/sys/class/dmi/id/product_version":   "ThinkPad X1 Carbon Gen 10\n",
+		"/sys/class/dmi/id/product_uuid":      "4c4c4544-0042\n",
+		"/sys/class/dmi/id/product_sku":       "LENOVO_MT_21DC\n",
+	}
 	tests := []struct {
-		name         string
-		variant      string
-		biosFn       func(...any) (*bios.Info, error)
-		bbFn         func(...any) (*baseboard.Info, error)
-		chFn         func(...any) (*chassis.Info, error)
-		prodFn       func(...any) (*product.Info, error)
-		validateFunc func(any, error)
+		name    string
+		variant string
+		files   map[string]string
+		want    *dmi.Info
 	}{
 		{
-			name:    "linux populates all sections when ghw succeeds",
+			name:    "linux: each DMI string; an unreadable one is unknown",
 			variant: "linux",
-			biosFn: func(...any) (*bios.Info, error) {
-				return &bios.Info{Vendor: "SeaBIOS", Version: "1.16.2", Date: "04/01/2014"}, nil
-			},
-			bbFn: func(...any) (*baseboard.Info, error) {
-				return &baseboard.Info{
-					Vendor: "Google", Product: "Google Compute Engine",
-					Version: "", SerialNumber: "Board-GoogleCloud", AssetTag: "",
-				}, nil
-			},
-			chFn: func(...any) (*chassis.Info, error) {
-				return &chassis.Info{
-					Vendor: "Google", Type: "1", TypeDescription: "Other",
-					Version: "", SerialNumber: "GoogleCloud-1234", AssetTag: "",
-				}, nil
-			},
-			prodFn: func(...any) (*product.Info, error) {
-				return &product.Info{
-					Vendor: "Google", Name: "Google Compute Engine",
-					Family: "", Version: "",
-					SerialNumber: "GoogleCloud-1234",
-					UUID:         "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-					SKU:          "",
-				}, nil
-			},
-			validateFunc: func(out any, err error) {
-				s.Require().NoError(err)
-				info, ok := out.(*dmi.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Require().NotNil(info.BIOS)
-				s.Equal("SeaBIOS", info.BIOS.Manufacturer)
-				s.Equal("1.16.2", info.BIOS.Ver)
-				s.Equal("04/01/2014", info.BIOS.Date)
-
-				s.Require().NotNil(info.Baseboard)
-				s.Equal("Google", info.Baseboard.Vendor)
-				s.Equal("Google Compute Engine", info.Baseboard.Product)
-
-				s.Require().NotNil(info.Chassis)
-				s.Equal("Google", info.Chassis.Vendor)
-				s.Equal("Other", info.Chassis.TypeDescription)
-
-				s.Require().NotNil(info.Product)
-				s.Equal("Google", info.Product.VendorName)
-				s.Equal("Google Compute Engine", info.Product.Name)
-				s.Equal("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", info.Product.UUID)
+			files:   dmiFiles,
+			want: &dmi.Info{
+				BIOS: &dmi.BIOS{Manufacturer: "LENOVO", Ver: "N2VET36W", Date: "01/01/2024"},
+				Baseboard: &dmi.Baseboard{
+					Vendor: "LENOVO", Product: "21DC", Version: "SDK0",
+					SerialNumber: "L1HF", AssetTag: "Not Available",
+				},
+				Chassis: &dmi.Chassis{
+					Vendor: "LENOVO", Type: "10", TypeDescription: "Notebook",
+					Version: "None", SerialNumber: "PF3X", AssetTag: "No Asset",
+				},
+				Product: &dmi.Product{
+					VendorName: "LENOVO", Name: "21DC0040US", Family: "ThinkPad X1",
+					Version: "ThinkPad X1 Carbon Gen 10", SerialNumber: "unknown",
+					UUID: "4c4c4544-0042", SKU: "LENOVO_MT_21DC",
+				},
 			},
 		},
 		{
-			name:    "linux drops sections whose ghw call errors",
+			name:    "linux: a device tree board with U-Boot",
 			variant: "linux",
-			biosFn: func(...any) (*bios.Info, error) {
-				return nil, errors.New("permission denied")
+			files: map[string]string{
+				"/sys/firmware/devicetree/base/model":                 "Raspberry Pi 4 Model B Rev 1.4\x00",
+				"/sys/firmware/devicetree/base/serial-number":         "10000000abcd\x00",
+				"/sys/firmware/devicetree/base/compatible":            "raspberrypi,4-model-b\x00brcm,bcm2711\x00",
+				"/sys/firmware/devicetree/base/chassis-type":          "embedded\x00",
+				"/sys/firmware/devicetree/base/chosen/u-boot,version": "U-Boot 2024.01\x00",
 			},
-			bbFn: func(...any) (*baseboard.Info, error) {
-				return &baseboard.Info{Vendor: "Dell Inc."}, nil
-			},
-			chFn: func(...any) (*chassis.Info, error) { return nil, errors.New("nope") },
-			prodFn: func(...any) (*product.Info, error) {
-				return &product.Info{Name: "OptiPlex 3070"}, nil
-			},
-			validateFunc: func(out any, err error) {
-				s.Require().NoError(err)
-				info, ok := out.(*dmi.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Nil(info.BIOS)
-				s.Nil(info.Chassis)
-				s.Require().NotNil(info.Baseboard)
-				s.Equal("Dell Inc.", info.Baseboard.Vendor)
-				s.Require().NotNil(info.Product)
-				s.Equal("OptiPlex 3070", info.Product.Name)
+			want: &dmi.Info{
+				BIOS: &dmi.BIOS{Manufacturer: "U-Boot", Ver: "U-Boot 2024.01", Date: "unknown"},
+				Baseboard: &dmi.Baseboard{
+					Vendor: "raspberrypi", Product: "Raspberry Pi 4 Model B Rev 1.4",
+					Version: "unknown", SerialNumber: "10000000abcd", AssetTag: "unknown",
+				},
+				Chassis: &dmi.Chassis{
+					Vendor: "raspberrypi", Type: "34", TypeDescription: "Embedded PC",
+					Version: "Raspberry Pi 4 Model B Rev 1.4", SerialNumber: "10000000abcd",
+					AssetTag: "unknown",
+				},
+				Product: &dmi.Product{
+					VendorName: "raspberrypi", Name: "Raspberry Pi 4 Model B Rev 1.4",
+					Family: "unknown", Version: "unknown", SerialNumber: "10000000abcd",
+					UUID: "unknown", SKU: "unknown",
+				},
 			},
 		},
 		{
-			name:    "linux drops sections when ghw returns nil",
+			name:    "linux: a device tree with nothing but its directory",
 			variant: "linux",
-			biosFn:  func(...any) (*bios.Info, error) { return nil, nil },
-			bbFn:    func(...any) (*baseboard.Info, error) { return nil, nil },
-			chFn:    func(...any) (*chassis.Info, error) { return nil, nil },
-			prodFn:  func(...any) (*product.Info, error) { return nil, nil },
-			validateFunc: func(out any, err error) {
-				s.Require().NoError(err)
-				info, ok := out.(*dmi.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Nil(info.BIOS)
-				s.Nil(info.Baseboard)
-				s.Nil(info.Chassis)
-				s.Nil(info.Product)
+			files:   map[string]string{"/sys/firmware/devicetree/base/.keep": ""},
+			want: &dmi.Info{
+				BIOS: &dmi.BIOS{Manufacturer: "unknown", Ver: "unknown", Date: "unknown"},
+				Baseboard: &dmi.Baseboard{
+					Vendor: "unknown", Product: "unknown", Version: "unknown",
+					SerialNumber: "unknown", AssetTag: "unknown",
+				},
+				Chassis: &dmi.Chassis{
+					Vendor: "unknown", Type: "unknown", TypeDescription: "unknown",
+					Version: "unknown", SerialNumber: "unknown", AssetTag: "unknown",
+				},
+				Product: &dmi.Product{
+					VendorName: "unknown", Name: "unknown", Family: "unknown", Version: "unknown",
+					SerialNumber: "unknown", UUID: "unknown", SKU: "unknown",
+				},
 			},
 		},
 		{
-			name:    "darwin returns empty info",
+			name:    "darwin: no DMI",
 			variant: "darwin",
-			validateFunc: func(out any, err error) {
-				s.Require().NoError(err)
-				info, ok := out.(*dmi.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Nil(info.BIOS)
-				s.Nil(info.Baseboard)
-				s.Nil(info.Chassis)
-				s.Nil(info.Product)
-			},
+			want:    &dmi.Info{},
 		},
 	}
-
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var c dmi.Collector
-			switch tt.variant {
-			case "linux":
-				defer dmi.SetBIOSFn(tt.biosFn)()
-				defer dmi.SetBaseboardFn(tt.bbFn)()
-				defer dmi.SetChassisFn(tt.chFn)()
-				defer dmi.SetProductFn(tt.prodFn)()
-				c = dmi.NewLinux()
-			case "darwin":
-				c = dmi.NewDarwin()
+			var c dmi.Collector = &dmi.Darwin{}
+			if tt.variant == "linux" {
+				c = &dmi.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			}
-
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			s.Require().NoError(err)
+			s.Equal(tt.want, got)
 		})
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Darwin collects POSIX sysconf values on macOS. macOS fully supports
@@ -32,17 +33,19 @@ import (
 // shared collectSysconf helper which uses the same sysconfFn seam.
 type Darwin struct {
 	base
+
+	Exec executor.Executor
 }
 
 // NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{Exec: executor.New()}
 }
 
 // Collect returns the POSIX sysconf values on macOS.
 func (d *Darwin) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectSysconf()
+	return collectSysconf(ctx, d.Exec)
 }

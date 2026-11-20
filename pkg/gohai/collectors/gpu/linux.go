@@ -22,52 +22,76 @@ package gpu
 
 import (
 	"context"
+	"path"
+	"regexp"
+	"strings"
 
-	ghwgpu "github.com/jaypipes/ghw/pkg/gpu"
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pcidev"
 )
 
-// ghwGPUFn is the seam for ghw/gpu.New. Kept private so tests don't
-// transitively need ghw; swapped via SetGHWGPUFn (export_test.go).
-var ghwGPUFn = ghwgpu.New
+// drmDir has a link for each DRM device; cardN links to its PCI device.
+const drmDir = "/sys/class/drm"
 
-// Linux reads /sys/class/drm via ghw/gpu and resolves each card's
-// PCI vendor/product via ghw's bundled pci.ids database. No shell-out.
+// pciAddressRE is a PCI address in the path of a card's link.
+var pciAddressRE = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]$`)
+
+// Linux lists the graphics cards of /sys/class/drm through FS: each
+// cardN, its PCI address from where its link goes, and the vendor and
+// model of that PCI device.
 type Linux struct {
 	base
+
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant.
+// NewLinux returns a Linux variant that reads the host's sysfs.
 func NewLinux() *Linux {
-	return &Linux{}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect enumerates graphics cards. A ghw load error yields an empty
-// Info with no error — containers and minimal VMs routinely lack
-// /sys/class/drm and we shouldn't noisily fail for that.
+// Collect returns the GPU Info.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{}
-	gi, err := ghwGPUFn()
-	if err != nil || gi == nil {
+	entries, err := l.FS.ReadDir(drmDir)
+	if err != nil {
 		return info, nil
 	}
-	for _, c := range gi.GraphicsCards {
-		card := Card{Address: c.Address}
-		if c.DeviceInfo != nil {
-			if c.DeviceInfo.Vendor != nil {
-				card.Vendor = c.DeviceInfo.Vendor.Name
-				card.VendorID = c.DeviceInfo.Vendor.ID
+	var db *pcidev.DB
+	for _, e := range entries {
+		n := e.Name()
+		if !strings.HasPrefix(n, "card") || strings.Contains(n, "-") {
+			continue
+		}
+		target, err := l.FS.Readlink(drmDir + "/" + n)
+		if err != nil {
+			continue
+		}
+		address := ""
+		for _, part := range strings.Split(path.Clean(target), "/") {
+			if pciAddressRE.MatchString(part) {
+				address = part
 			}
-			if c.DeviceInfo.Product != nil {
-				card.Model = c.DeviceInfo.Product.Name
-				card.DeviceID = c.DeviceInfo.Product.ID
-			}
+		}
+		if address == "" {
+			continue
+		}
+		if db == nil {
+			db = pcidev.LoadDB(l.FS)
+		}
+		card := Card{Address: address}
+		if d, ok := pcidev.Read(l.FS, db, address); ok {
+			card.Vendor, card.VendorID = d.VendorName, d.VendorID
+			card.Model, card.DeviceID = d.ProductName, d.ProductID
 		}
 		info.Cards = append(info.Cards, card)
 	}
+
 	return info, nil
 }

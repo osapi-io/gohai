@@ -260,20 +260,21 @@ problems.
 - [Salt Grains](https://docs.saltproject.io/en/latest/topics/grains/). The
   static facts of SaltStack.
 
-### Backing libraries (gohai imports these)
+### Libraries gohai reads through
 
-- [ghw]. The canonical source for the physical hardware topology: CPU NUMA,
-  DIMMs, block devices, DMI, GPU and PCI.
-- [procfs]. It parses Linux `/proc` and `/sys` when no other library has a
-  field.
-- [go-sysinfo](https://github.com/elastic/go-sysinfo). The Elastic alternative
-  for host, platform and kernel facts.
 - [avfs](https://github.com/avfs/avfs). A virtual filesystem abstraction. Each
-  collector that reads files uses it, so tests can run against in-memory
-  fixtures.
+  collector reads files through it, so a caller can give a fake host and tests
+  can run against in-memory fixtures. gohai reads `/proc`, `/sys` and the
+  commands of a host itself, as Ohai does.
 
 ### Other Go libraries in the space
 
+- [ghw]. A library for the physical hardware topology: CPU NUMA, DIMMs, block
+  devices, DMI, GPU and PCI. gohai used it for dmi, gpu and pci, until those
+  collectors read sysfs through their sources.
+- [procfs]. A parser of Linux `/proc` and `/sys`.
+- [go-sysinfo](https://github.com/elastic/go-sysinfo). The Elastic library for
+  host, platform and kernel facts.
 - [gosigar](https://github.com/cloudfoundry/gosigar). The Cloud Foundry Go port
   of Hyperic Sigar. An old reference for host metrics in Go.
 - [go-ps](https://github.com/mitchellh/go-ps). A small library that lists

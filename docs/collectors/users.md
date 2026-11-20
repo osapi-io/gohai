@@ -13,8 +13,7 @@ Consumers use this to:
 
 - Audit the accounts and the group membership of a fleet.
 - Make sure that a specific user, uid or shell is on the host.
-- Get facts like `root_group` or `current_user` without a second `os/user`
-  lookup.
+- Get facts like `root_group` or `current_user` without a second lookup.
 
 ## Collected fields
 
@@ -116,10 +115,11 @@ flat files:
    fields with colons between them: `name:password:gid:members`, with commas
    between the members. The collector keeps `gid` and the `members` slice that
    it splits on the commas. The skip rules are the same.
-3. The collector gets `current_user`. It calls `os.Geteuid()` for the effective
-   UID. Then it finds the entry with that UID in the parsed `passwd` map. This
-   is the same as Ohai's `Etc.getpwuid(Process.euid).name`. If `/etc/passwd` is
-   missing, or if no entry has the euid, `current_user` stays empty.
+3. The collector gets `current_user`. It runs `id -u` through its command runner
+   for the effective UID. Then it finds the entry with that UID in the parsed
+   `passwd` map. This is the same as Ohai's `Etc.getpwuid(Process.euid).name`.
+   If `id` fails, if `/etc/passwd` is missing, or if no entry has the euid,
+   `current_user` stays empty.
 
 The method is the same as Ohai's `passwd` plugin. It reads the same files. It
 keeps the first entry of a duplicate username. It gets the current user from the
@@ -137,5 +137,4 @@ macOS. A future change can run `dscl . -list /Users` to get all accounts.
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for `/etc/passwd` and
   `/etc/group` reads.
-- The Go standard library (`os.Geteuid`, `bufio`, `strings`, `strconv`) to parse
-  the files.
+- `internal/executor` to run `id -u`.

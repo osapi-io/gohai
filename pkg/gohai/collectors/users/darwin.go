@@ -27,6 +27,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Darwin enumerates users/groups from /etc/passwd and /etc/group.
@@ -35,19 +36,21 @@ import (
 // `Etc.passwd` iteration (which also consults the flat files first).
 type Darwin struct {
 	base
-	FS avfs.VFS
+
+	FS   avfs.VFS
+	Exec executor.Executor
 }
 
 // NewDarwin returns a Darwin variant wired to the real OS filesystem.
 func NewDarwin() *Darwin {
-	return &Darwin{FS: osfs.NewWithNoIdm()}
+	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
 
 // Collect reads /etc/passwd + /etc/group and resolves the effective
 // current user.
 func (d *Darwin) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectPOSIX(d.FS)
+	return collectPOSIX(ctx, d.FS, d.Exec)
 }

@@ -22,9 +22,9 @@ package rootgroup_test
 
 import (
 	"context"
-	"errors"
-	"os/user"
 	"testing"
+
+	"github.com/osapi-io/gohai/internal/sourcetest"
 
 	"github.com/stretchr/testify/suite"
 
@@ -112,104 +112,68 @@ func (s *RootGroupPublicTestSuite) TestNew() {
 }
 
 func (s *RootGroupPublicTestSuite) TestCollect() {
-	rootUser := &user.User{Username: "root", Uid: "0", Gid: "0"}
-	rootGroup := &user.Group{Gid: "0", Name: "root"}
-	customRootUser := &user.User{Username: "root", Uid: "0", Gid: "1000"}
-	customGroup := &user.Group{Gid: "1000", Name: "wheel"}
-	wheelGroup := &user.Group{Gid: "0", Name: "wheel"}
-
 	tests := []struct {
-		name          string
-		variant       string
-		lookupUserFn  func(string) (*user.User, error)
-		lookupGroupFn func(string) (*user.Group, error)
-		validateFunc  func(any, error)
+		name    string
+		variant string
+		files   map[string]string
+		want    string
+		wantErr string
 	}{
 		{
-			name:          "linux: root user → root group (standard Linux)",
-			variant:       "linux",
-			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
-			lookupGroupFn: func(string) (*user.Group, error) { return rootGroup, nil },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*rootgroup.Info)
-				s.Require().True(ok)
-				s.Equal("root", info.Name)
+			name:    "linux: root's gid 0 is root",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "# users\nroot:x:0:0:root:/root:/bin/bash\n",
+				"/etc/group":  "bad\nroot:x:0:\n",
 			},
+			want: "root",
 		},
 		{
-			name:          "linux: root primary gid customized to non-zero",
-			variant:       "linux",
-			lookupUserFn:  func(string) (*user.User, error) { return customRootUser, nil },
-			lookupGroupFn: func(string) (*user.Group, error) { return customGroup, nil },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*rootgroup.Info)
-				s.Require().True(ok)
-				s.Equal("wheel", info.Name)
+			name:    "darwin: root's gid 0 is wheel",
+			variant: "darwin",
+			files: map[string]string{
+				"/etc/passwd": "root:*:0:0:System Administrator:/var/root:/bin/sh\n",
+				"/etc/group":  "wheel:*:0:root\n",
 			},
+			want: "wheel",
 		},
 		{
-			name:          "linux: user lookup error propagated",
-			variant:       "linux",
-			lookupUserFn:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
-			lookupGroupFn: func(string) (*user.Group, error) { return rootGroup, nil },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
+			name:    "linux: no /etc/passwd",
+			variant: "linux",
+			files:   map[string]string{"/etc/group": "root:x:0:\n"},
+			wantErr: "lookup user root",
 		},
 		{
-			name:          "linux: group lookup error propagated",
-			variant:       "linux",
-			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
-			lookupGroupFn: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
+			name:    "linux: no root in /etc/passwd",
+			variant: "linux",
+			files:   map[string]string{"/etc/passwd": "nobody:x:65534:65534::/:/bin/false\n"},
+			wantErr: "lookup user root",
 		},
 		{
-			name:          "darwin: root user → wheel group on macOS",
-			variant:       "darwin",
-			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
-			lookupGroupFn: func(string) (*user.Group, error) { return wheelGroup, nil },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*rootgroup.Info)
-				s.Require().True(ok)
-				s.Equal("wheel", info.Name)
+			name:    "linux: no group with root's gid",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0:root:/root:/bin/bash\n",
+				"/etc/group":  "users:x:100:\n",
 			},
-		},
-		{
-			name:          "darwin: user lookup error propagated",
-			variant:       "darwin",
-			lookupUserFn:  func(string) (*user.User, error) { return nil, errors.New("no root user") },
-			lookupGroupFn: func(string) (*user.Group, error) { return wheelGroup, nil },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name:          "darwin: group lookup error propagated",
-			variant:       "darwin",
-			lookupUserFn:  func(string) (*user.User, error) { return rootUser, nil },
-			lookupGroupFn: func(string) (*user.Group, error) { return nil, errors.New("no such group") },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
+			wantErr: "lookup gid 0",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer rootgroup.SetLookupUserFn(tt.lookupUserFn)()
-			defer rootgroup.SetLookupGroupFn(tt.lookupGroupFn)()
-			var c rootgroup.Collector
-			switch tt.variant {
-			case "linux":
-				c = &rootgroup.Linux{}
-			case "darwin":
-				c = &rootgroup.Darwin{}
+			fs := sourcetest.FS(s.T(), tt.files)
+			var c rootgroup.Collector = &rootgroup.Linux{FS: fs}
+			if tt.variant == "darwin" {
+				c = &rootgroup.Darwin{FS: fs}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(&rootgroup.Info{Name: tt.want}, got)
 		})
 	}
 }

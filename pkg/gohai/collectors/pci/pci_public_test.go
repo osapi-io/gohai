@@ -22,15 +22,13 @@ package pci_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	ghwpci "github.com/jaypipes/ghw/pkg/pci"
-	"github.com/jaypipes/pcidb"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/pci"
 )
 
@@ -97,133 +95,68 @@ func (s *PCIPublicTestSuite) TestNew() {
 }
 
 func (s *PCIPublicTestSuite) TestCollect() {
+	const ids = "10de  NVIDIA Corporation\n\t1c82  GP107\nC 03  Display controller\n\t00  VGA compatible controller\n"
+	dev := "/sys/bus/pci/devices/"
 	tests := []struct {
-		name         string
-		variant      string
-		pciFn        func(...any) (*ghwpci.Info, error)
-		validateFunc func(any, error)
+		name    string
+		variant string
+		files   map[string]string
+		links   map[string]string
+		want    map[string]pci.Device
 	}{
 		{
-			name:    "linux: happy path maps ghw devices",
+			name:    "linux: each device by address; a driver named unknown is empty",
 			variant: "linux",
-			pciFn: func(...any) (*ghwpci.Info, error) {
-				return &ghwpci.Info{
-					Devices: []*ghwpci.Device{
-						{
-							Address:       "0000:03:00.0",
-							ParentAddress: "0000:00:1c.0",
-							Revision:      "0x01",
-							Driver:        "iwlwifi",
-							IOMMUGroup:    "12",
-							Vendor:        &pcidb.Vendor{ID: "8086", Name: "Intel Corporation"},
-							Product:       &pcidb.Product{ID: "24fd", Name: "Wireless 8265 / 8275"},
-							Class:         &pcidb.Class{ID: "02", Name: "Network controller"},
-							Subclass:      &pcidb.Subclass{ID: "80", Name: "Network controller"},
-							Subsystem: &pcidb.Product{
-								ID:   "0130",
-								Name: "Dual Band Wireless-AC 8265",
-							},
-						},
-					},
-				}, nil
+			files: map[string]string{
+				"/usr/share/hwdata/pci.ids":   ids,
+				dev + "0000:01:00.0/modalias": "pci:v000010DEd00001C82sv00001458sd00003764bc03sc00i00\n",
+				dev + "0000:01:00.0/revision": "0xa1\n",
+				dev + "0000:02:00.0/modalias": "pci:v000010DEd00001C82sv00001458sd00003764bc03sc00i00\n",
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*pci.Info)
-				s.Require().True(ok)
-				s.Require().Len(info.Devices, 1)
-				d := info.Devices["0000:03:00.0"]
-				s.Equal("8086", d.VendorID)
-				s.Equal("Intel Corporation", d.VendorName)
-				s.Equal("24fd", d.DeviceID)
-				s.Equal("Wireless 8265 / 8275", d.DeviceName)
-				s.Equal("02", d.ClassID)
-				s.Equal("Network controller", d.ClassName)
-				s.Equal("80", d.SubclassID)
-				s.Equal("0130", d.SubsystemID)
-				s.Equal("Dual Band Wireless-AC 8265", d.SubsystemName)
-				s.Equal("0x01", d.Revision)
-				s.Equal("iwlwifi", d.Driver)
-				s.Equal("12", d.IOMMUGroup)
-				s.Equal("0000:00:1c.0", d.ParentAddress)
+			links: map[string]string{
+				dev + "0000:01:00.0/driver": "../../../bus/pci/drivers/nvidia",
+				dev + "0000:02:00.0/driver": "../../../bus/pci/drivers/unknown",
+			},
+			want: map[string]pci.Device{
+				"0000:01:00.0": {
+					VendorID: "10de", VendorName: "NVIDIA Corporation",
+					DeviceID: "1c82", DeviceName: "GP107",
+					ClassID: "03", ClassName: "Display controller",
+					SubclassID: "00", SubclassName: "VGA compatible controller",
+					SubsystemID: "3764", SubsystemName: "unknown",
+					Revision: "0xa1", Driver: "nvidia",
+				},
+				"0000:02:00.0": {
+					VendorID: "10de", VendorName: "NVIDIA Corporation",
+					DeviceID: "1c82", DeviceName: "GP107",
+					ClassID: "03", ClassName: "Display controller",
+					SubclassID: "00", SubclassName: "VGA compatible controller",
+					SubsystemID: "3764", SubsystemName: "unknown",
+				},
 			},
 		},
 		{
-			name:    "linux: ghw error yields empty info, no error",
+			name:    "linux: no /sys/bus/pci",
 			variant: "linux",
-			pciFn: func(...any) (*ghwpci.Info, error) {
-				return nil, errors.New("no /sys/bus/pci")
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*pci.Info)
-				s.Require().True(ok)
-				s.Empty(info.Devices)
-			},
+			want:    map[string]pci.Device{},
 		},
 		{
-			name:    "linux: ghw nil info yields empty",
-			variant: "linux",
-			pciFn: func(...any) (*ghwpci.Info, error) {
-				return nil, nil
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*pci.Info)
-				s.Require().True(ok)
-				s.Empty(info.Devices)
-			},
-		},
-		{
-			name:    "linux: devices with nil/empty fields tolerated",
-			variant: "linux",
-			pciFn: func(...any) (*ghwpci.Info, error) {
-				return &ghwpci.Info{
-					Devices: []*ghwpci.Device{
-						nil,           // skipped
-						{Address: ""}, // skipped
-						{Address: "0000:00:00.0", Driver: "unknown"}, // driver normalized to empty
-						{
-							Address: "0000:01:00.0",
-							Vendor:  &pcidb.Vendor{ID: "10de", Name: "NVIDIA Corporation"},
-						},
-					},
-				}, nil
-			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*pci.Info)
-				s.Require().True(ok)
-				s.Require().Len(info.Devices, 2)
-				s.Equal("", info.Devices["0000:00:00.0"].Driver)
-				s.Equal("10de", info.Devices["0000:01:00.0"].VendorID)
-				s.Empty(info.Devices["0000:01:00.0"].DeviceID)
-				s.Empty(info.Devices["0000:01:00.0"].ClassID)
-			},
-		},
-		{
-			name:    "darwin: returns empty",
+			name:    "darwin: no PCI",
 			variant: "darwin",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*pci.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Empty(info.Devices)
-			},
+			want:    map[string]pci.Device{},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var c pci.Collector
-			switch tt.variant {
-			case "linux":
-				defer pci.SetGHWPCIFn(tt.pciFn)()
-				c = &pci.Linux{}
-			case "darwin":
-				c = &pci.Darwin{}
+			var c pci.Collector = &pci.Darwin{}
+			if tt.variant == "linux" {
+				c = &pci.Linux{
+					FS: sourcetest.Links(s.T(), sourcetest.FS(s.T(), tt.files), tt.links),
+				}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			s.Require().NoError(err)
+			s.Equal(&pci.Info{Devices: tt.want}, got)
 		})
 	}
 }

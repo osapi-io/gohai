@@ -23,6 +23,9 @@ package rootgroup
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
@@ -30,11 +33,13 @@ import (
 // Embeds base for Name/DefaultEnabled/Dependencies.
 type Darwin struct {
 	base
+
+	FS avfs.VFS
 }
 
 // NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect performs the two-hop lookup. macOS and BSD set root's primary
@@ -44,5 +49,5 @@ func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return resolveRootGroup()
+	return resolveRootGroup(d.FS)
 }

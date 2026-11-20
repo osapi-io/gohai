@@ -114,15 +114,18 @@ collector. Thus you can enable or disable the two collectors independently.
 
 ## Data sources
 
-| Platform | What we read                                                                                                                             | Ohai plugin                                                                                                                     | Alignment                                                                                                                                                                                                                         |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `exec.LookPath` for the manager of the family: `apt` on debian, `dnf` or `yum` on rhel, `zypper`, `pacman` and others on other families. | [`packages.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/packages.rb) uses the same family selection internally. | **Equivalent selection, different output.** Ohai keeps the selection internal and reports the inventory of installed packages. gohai reports the selection as a typed fact. Consumers then make their own install or query calls. |
-| macOS    | `exec.LookPath brew`, then `port`.                                                                                                       | Ohai has no detection of macOS package managers.                                                                                | **Extension.** Ohai does not look for macOS package managers. gohai finds brew and MacPorts.                                                                                                                                      |
+| Platform | What we read                                                                                                                       | Ohai plugin                                                                                                                     | Alignment                                                                                                                                                                                                                         |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `sh -c 'command -v <name>'` for the manager of the family: `apt` on debian, `dnf` or `yum` on rhel, `zypper`, `pacman` and others. | [`packages.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/packages.rb) uses the same family selection internally. | **Equivalent selection, different output.** Ohai keeps the selection internal and reports the inventory of installed packages. gohai reports the selection as a typed fact. Consumers then make their own install or query calls. |
+| macOS    | `sh -c 'command -v brew'`, then `port`.                                                                                            | Ohai has no detection of macOS package managers.                                                                                | **Extension.** Ohai does not look for macOS package managers. gohai finds brew and MacPorts.                                                                                                                                      |
 
 **Known gaps:** Windows (Chocolatey, winget, Scoop) is out of scope. gohai does
 not support Windows yet.
 
 ## Backing library
 
-- The Go standard library (`os/exec`, `exec.LookPath`). There is no third-party
-  dependency.
+None. The collector runs `sh -c 'command -v <name>'` through its command runner.
+`command -v` is the POSIX form of Ohai's `which`. The host's shell finds the
+name on its own `PATH`, so a manager in a home directory, such as
+`~/.homebrew/bin/brew`, is found. Output that is not a path, such as an alias,
+does not count.

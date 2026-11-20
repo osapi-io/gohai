@@ -24,74 +24,54 @@ import (
 	"context"
 	"strings"
 
-	ghwpci "github.com/jaypipes/ghw/pkg/pci"
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pcidev"
 )
 
-// ghwPCIFn is the seam for ghw/pci.New. Kept private so tests don't
-// transitively need ghw; swapped via SetGHWPCIFn (export_test.go).
-var ghwPCIFn = ghwpci.New
-
-// Linux reads /sys/bus/pci/devices via ghw/pci and resolves each
-// device's vendor/product/class via ghw's bundled pci.ids database.
-// No shell-out to lspci required.
+// Linux lists the PCI devices of /sys/bus/pci/devices through FS, and
+// names them from the host's pci.ids, which it also reads through FS.
 type Linux struct {
 	base
+
+	FS avfs.VFS
 }
 
-// NewLinux returns a Linux variant.
+// NewLinux returns a Linux variant that reads the host's sysfs.
 func NewLinux() *Linux {
-	return &Linux{}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect enumerates PCI devices. A ghw load error yields an empty
-// Info with no error — containers and minimal VMs routinely lack
-// /sys/bus/pci/devices and we shouldn't noisily fail for that.
+// Collect returns the PCI Info, keyed by address.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{Devices: map[string]Device{}}
-	pi, err := ghwPCIFn()
-	if err != nil || pi == nil {
-		return info, nil
-	}
-	for _, d := range pi.Devices {
-		if d == nil || d.Address == "" {
-			continue
-		}
+	for _, d := range pcidev.List(l.FS, pcidev.LoadDB(l.FS)) {
 		entry := Device{
+			VendorID:      d.VendorID,
+			VendorName:    d.VendorName,
+			DeviceID:      d.ProductID,
+			DeviceName:    d.ProductName,
+			ClassID:       d.ClassID,
+			ClassName:     d.ClassName,
+			SubclassID:    d.SubclassID,
+			SubclassName:  d.SubclassName,
+			SubsystemID:   d.SubsystemID,
+			SubsystemName: d.SubsystemName,
 			Revision:      d.Revision,
 			Driver:        d.Driver,
 			IOMMUGroup:    d.IOMMUGroup,
 			ParentAddress: d.ParentAddress,
 		}
-		if d.Vendor != nil {
-			entry.VendorID = d.Vendor.ID
-			entry.VendorName = d.Vendor.Name
-		}
-		if d.Product != nil {
-			entry.DeviceID = d.Product.ID
-			entry.DeviceName = d.Product.Name
-		}
-		if d.Class != nil {
-			entry.ClassID = d.Class.ID
-			entry.ClassName = d.Class.Name
-		}
-		if d.Subclass != nil {
-			entry.SubclassID = d.Subclass.ID
-			entry.SubclassName = d.Subclass.Name
-		}
-		if d.Subsystem != nil {
-			entry.SubsystemID = d.Subsystem.ID
-			entry.SubsystemName = d.Subsystem.Name
-		}
-		// ghw returns "unknown" for unresolved driver; normalize to empty.
 		if strings.EqualFold(entry.Driver, "unknown") {
 			entry.Driver = ""
 		}
 		info.Devices[d.Address] = entry
 	}
+
 	return info, nil
 }

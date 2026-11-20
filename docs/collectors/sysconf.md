@@ -6,10 +6,8 @@
 
 The collector reports four POSIX `sysconf(3)` values: the clock tick rate, the
 page size, the configured CPU count and the online CPU count. The data is the
-same as Ohai's `sysconf` plugin. But gohai uses `github.com/tklauser/go-sysconf`
-and does not run `getconf -a`. The library is already in the module graph as a
-transitive dependency. It is faster, it starts no child process, and the values
-have the same meaning. Linux and macOS both have the same four `SC_*` constants.
+same as Ohai's `sysconf` plugin, and gohai gets it the same way: with `getconf`.
+Linux and macOS both have the four names.
 
 DefaultEnabled is `false`. Most consumers do not need this data.
 
@@ -39,10 +37,10 @@ The collector reports four related signals:
 
 ## Platform support
 
-| Platform | Supported                                      |
-| -------- | ---------------------------------------------- |
-| Linux    | ✅ (through the `go-sysconf` SC\_\* constants) |
-| macOS    | ✅ (the same SC\_\* constants)                 |
+| Platform | Supported      |
+| -------- | -------------- |
+| Linux    | ✅ (`getconf`) |
+| macOS    | ✅ (`getconf`) |
 
 ## Example output
 
@@ -95,34 +93,18 @@ None.
 
 ## Data sources
 
-Ohai's `sysconf.rb` runs `getconf -a` in a shell and parses the key=value
-output. gohai uses `github.com/tklauser/go-sysconf`, a pure Go wrapper around
-the POSIX `sysconf(3)` syscall. Thus gohai starts no subprocess, and it gets
-type-safe `int64` values directly. The four constants that gohai collects
-(CLK_TCK, PAGESIZE, NPROCESSORS_CONF, NPROCESSORS_ONLN) are the same as Ohai's
-output.
+Ohai's `sysconf.rb` runs `getconf -a` and parses its output. gohai runs
+`getconf` for each of the four names, through the command runner of its sources.
+One name for each run gives the same command on Linux and macOS, and a fake host
+answers each one:
 
-On Linux and macOS, the collector calls `Sysconf(SC_*)` from
-`github.com/tklauser/go-sysconf` directly. It starts no subprocess:
+1. `getconf CLK_TCK` → `clk_tck`
+2. `getconf PAGESIZE` → `pagesize`
+3. `getconf _NPROCESSORS_CONF` → `nprocessors_conf`
+4. `getconf _NPROCESSORS_ONLN` → `nprocessors_onln`
 
-1. `SC_CLK_TCK` → `clk_tck`
-2. `SC_PAGESIZE` → `pagesize`
-3. `SC_NPROCESSORS_CONF` → `nprocessors_conf`
-4. `SC_NPROCESSORS_ONLN` → `nprocessors_onln`
-
-If `Sysconf` returns an error, the collector wraps it and returns it.
-
-**Why `go-sysconf` and not `getconf -a`?** Ohai's `sysconf.rb` runs `getconf -a`
-in a shell and parses its output. gohai uses the Go library for three reasons:
-
-- The library is small, and it has no dependencies of its own.
-- It starts no subprocess.
-- It gives type-safe constants, so no string parse is necessary.
-
-The library wraps the same POSIX `sysconf(3)` syscall, so the values have the
-same meaning.
+If a run fails, or its output is not a number, the collector returns the error.
 
 ## Backing library
 
-- [`github.com/tklauser/go-sysconf`](https://github.com/tklauser/go-sysconf). A
-  pure-Go wrapper of POSIX `sysconf(3)`.
+None. The collector runs `getconf` through its command runner.

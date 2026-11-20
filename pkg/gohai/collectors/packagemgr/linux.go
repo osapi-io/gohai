@@ -24,6 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Linux covers generic Linux hosts where we don't know the family —
@@ -31,11 +32,13 @@ import (
 // likelihood.
 type Linux struct {
 	base
+
+	Exec executor.Executor
 }
 
 // NewLinux returns a Linux variant.
 func NewLinux() *Linux {
-	return &Linux{}
+	return &Linux{Exec: executor.New()}
 }
 
 // Collect identifies the package manager. Checks distros whose
@@ -47,9 +50,9 @@ func NewLinux() *Linux {
 // apt/dnf/yum are intentionally NOT probed here — those hosts dispatch
 // to the Debian or RHEL variant before ever reaching this one.
 func (l *Linux) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, path := firstFound("zypper", "pacman", "apk", "xbps-install", "emerge")
+	name, path := firstFound(ctx, l.Exec, "zypper", "pacman", "apk", "xbps-install", "emerge")
 	return &Info{Name: name, Path: path}, nil
 }

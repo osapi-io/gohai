@@ -86,10 +86,10 @@ None.
 
 ## Data sources
 
-| Platform | What we read                                         | Ohai plugin ([`root_group.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/root_group.rb)) | Alignment                                                                                                |
-| -------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| Linux    | `os/user.Lookup("root")` → `LookupGroupId(user.Gid)` | `Etc.getgrgid(Etc.getpwnam("root").gid).name`, same two-hop pattern.                                   | **Identical.** The lookup in two steps gives the correct name, also if the primary GID of root is not 0. |
-| macOS    | The same Go standard library calls                   | The same Ruby `Etc` call                                                                               | **Identical.** The usual result is "wheel".                                                              |
+| Platform | What we read                                           | Ohai plugin ([`root_group.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/root_group.rb)) | Alignment                                                                                                |
+| -------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Linux    | `/etc/passwd` gid of `root` → its name in `/etc/group` | `Etc.getgrgid(Etc.getpwnam("root").gid).name`, same two-hop pattern.                                   | **Identical.** The lookup in two steps gives the correct name, also if the primary GID of root is not 0. |
+| macOS    | The same two files                                     | The same Ruby `Etc` call                                                                               | **Identical.** The usual result is "wheel".                                                              |
 
 **Known gaps:** None. Windows support is out of scope. On Windows, Ohai does a
 WMI SID-544 lookup for the localized name of the Administrators group. gohai
@@ -97,4 +97,6 @@ does not support Windows yet.
 
 ## Backing library
 
-- The Go standard library (`os/user`). There is no third-party dependency.
+None. The collector reads `/etc/passwd` and `/etc/group` through its filesystem.
+On macOS, the two files have `root` and `wheel`, which Directory Services also
+has.

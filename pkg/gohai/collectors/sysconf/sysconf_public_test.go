@@ -22,10 +22,9 @@ package sysconf_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	gosysconf "github.com/tklauser/go-sysconf"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 
 	"github.com/stretchr/testify/suite"
 
@@ -113,133 +112,64 @@ func (s *SysconfPublicTestSuite) TestNew() {
 }
 
 func (s *SysconfPublicTestSuite) TestCollect() {
-	// stubFn returns a func(int)(int64,error) that maps SC_* constants
-	// to the provided values in order: CLK_TCK, PAGESIZE, NPROCESSORS_CONF,
-	// NPROCESSORS_ONLN.
-	stubFn := func(
-		clkTck, pagesize, nconf, nonln int64,
-	) func(int) (int64, error) {
-		return func(name int) (int64, error) {
-			switch name {
-			case gosysconf.SC_CLK_TCK:
-				return clkTck, nil
-			case gosysconf.SC_PAGESIZE:
-				return pagesize, nil
-			case gosysconf.SC_NPROCESSORS_CONF:
-				return nconf, nil
-			case gosysconf.SC_NPROCESSORS_ONLN:
-				return nonln, nil
-			default:
-				return 0, errors.New("unknown constant")
-			}
-		}
+	all := map[string]string{
+		"getconf CLK_TCK":           "100\n",
+		"getconf PAGESIZE":          "4096\n",
+		"getconf _NPROCESSORS_CONF": "8\n",
+		"getconf _NPROCESSORS_ONLN": "6\n",
 	}
-
-	// errorAt returns a func that errors on the n-th call (0-indexed by SC_* order).
-	errorAt := func(failOn int) func(int) (int64, error) {
-		calls := 0
-		return func(_ int) (int64, error) {
-			result := calls
-			calls++
-			if result == failOn {
-				return 0, errors.New("sysconf error")
-			}
-			return 100, nil
+	with := func(key, value string) map[string]string {
+		out := map[string]string{}
+		for k, v := range all {
+			out[k] = v
 		}
+		if value == "" {
+			delete(out, key)
+		} else {
+			out[key] = value
+		}
+		return out
 	}
-
 	tests := []struct {
-		name         string
-		variant      string
-		stub         func(int) (int64, error)
-		validateFunc func(any, error)
+		name    string
+		variant string
+		out     map[string]string
+		wantErr string
 	}{
+		{name: "linux: the four values", variant: "linux", out: all},
+		{name: "darwin: the four values", variant: "darwin", out: all},
 		{
-			name:    "linux: all values returned",
+			name: "linux: getconf fails", variant: "linux",
+			out: with("getconf PAGESIZE", ""), wantErr: "getconf PAGESIZE",
+		},
+		{
+			name:    "linux: not a number",
 			variant: "linux",
-			stub:    stubFn(100, 4096, 4, 4),
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*sysconf.Info)
-				s.Require().True(ok)
-				s.Equal(sysconf.Info{
-					ClkTck:          100,
-					Pagesize:        4096,
-					NprocessorsConf: 4,
-					NprocessorsOnln: 4,
-				}, *info)
-			},
-		},
-		{
-			name:    "linux: CLK_TCK error propagated",
-			variant: "linux",
-			stub:    errorAt(0),
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name:    "linux: PAGESIZE error propagated",
-			variant: "linux",
-			stub:    errorAt(1),
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name:    "linux: NPROCESSORS_CONF error propagated",
-			variant: "linux",
-			stub:    errorAt(2),
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name:    "linux: NPROCESSORS_ONLN error propagated",
-			variant: "linux",
-			stub:    errorAt(3),
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name:    "darwin: all values returned",
-			variant: "darwin",
-			stub:    stubFn(100, 16384, 8, 8),
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*sysconf.Info)
-				s.Require().True(ok)
-				s.Equal(sysconf.Info{
-					ClkTck:          100,
-					Pagesize:        16384,
-					NprocessorsConf: 8,
-					NprocessorsOnln: 8,
-				}, *info)
-			},
-		},
-		{
-			name:    "darwin: CLK_TCK error propagated",
-			variant: "darwin",
-			stub:    errorAt(0),
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
+			out: with(
+				"getconf _NPROCESSORS_ONLN",
+				"undefined\n",
+			),
+			wantErr: "getconf _NPROCESSORS_ONLN",
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			restore := sysconf.SetSysconfFn(tt.stub)
-			defer restore()
-
-			var c sysconf.Collector
-			switch tt.variant {
-			case "linux":
-				c = sysconf.NewLinux()
-			case "darwin":
-				c = sysconf.NewDarwin()
+			r := sourcetest.Runner{Out: tt.out}
+			var c sysconf.Collector = &sysconf.Linux{Exec: r}
+			if tt.variant == "darwin" {
+				c = &sysconf.Darwin{Exec: r}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+
+				return
+			}
+			s.Require().NoError(err)
+			s.Equal(
+				&sysconf.Info{ClkTck: 100, Pagesize: 4096, NprocessorsConf: 8, NprocessorsOnln: 6},
+				got,
+			)
 		})
 	}
 }

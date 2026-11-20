@@ -5,12 +5,12 @@
 ## Description
 
 The collector reports SMBIOS and DMI data: the BIOS, baseboard, chassis and
-product identity. On Linux, the data comes from `/sys/class/dmi/id/*` through
-[ghw]. ghw reads the sysfs entries that the kernel makes available. Most fields
-do not need root. `product_serial` and `product_uuid` have mode 0400, so they
-are empty for a caller that is not root. macOS has no equivalent of SMBIOS. On
-macOS, the collector returns an empty Info, and the [`hardware`](hardware.md)
-collector gives the macOS hardware identity.
+product identity. On Linux, the collector reads `/sys/class/dmi/id/*` through
+its filesystem. Most fields do not need root. `product_serial` and
+`product_uuid` have mode 0400, so they are `"unknown"` for a caller that is not
+root. macOS has no equivalent of SMBIOS. On macOS, the collector returns an
+empty Info, and the [`hardware`](hardware.md) collector gives the macOS hardware
+identity.
 
 The main consumers are the cloud-provider collectors (`gce`, `ec2`, `azure` and
 others). They use `product.name`, `product.vendor_name`, `bios.manufacturer` and
@@ -77,7 +77,7 @@ section.
 
 | Platform | Supported                                      |
 | -------- | ---------------------------------------------- |
-| Linux    | ✅ with ghw and `/sys/class/dmi/id/*`          |
+| Linux    | ✅ with `/sys/class/dmi/id/*`                  |
 | macOS    | ✅ returns an empty Info (macOS has no SMBIOS) |
 | Other    | ✅ returns an empty Info                       |
 
@@ -152,24 +152,26 @@ None.
 ## Data sources
 
 Ohai's `dmi.rb` runs `dmidecode`. `dmidecode` reads `/dev/mem` and needs root.
-gohai uses `ghw` instead. ghw reads `/sys/class/dmi/id/*`. All users can read
-these sysfs entries, so they do not need more privileges. This difference from
-Ohai is intentional. On Linux, sysfs is the current way to read SMBIOS data
-without privileges. The fields are the same: the BIOS vendor, version and date,
-the baseboard, the chassis and the product. But gohai does not parse the
-free-form text output of `dmidecode`.
+gohai reads `/sys/class/dmi/id/*` instead. All users can read these sysfs
+entries, so they do not need more privileges. This difference from Ohai is
+intentional. On Linux, sysfs is the current way to read SMBIOS data without
+privileges. The fields are the same: the BIOS vendor, version and date, the
+baseboard, the chassis and the product. But gohai does not parse the free-form
+text output of `dmidecode`.
 
 On Linux:
 
-1. ghw's `bios.New()`, `baseboard.New()`, `chassis.New()` and `product.New()`
-   each read their `/sys/class/dmi/id/*` files (`bios_vendor`, `bios_version`,
-   `bios_date`, `board_*`, `chassis_*`, `product_*`, `sys_vendor`). Fields with
-   mode 0444 do not need root. For a caller that is not root, the root-only
-   fields (`product_serial`, `product_uuid`) are empty strings, not errors.
-2. If ghw returns an error for one section, that section stays nil. Examples of
-   errors are "permission denied" and a missing sysfs entry. The other sections
-   still get their data. If a host has no `/sys/class/dmi/id/` (unprivileged
-   containers), the collector returns an Info with all four sub-structs nil.
+1. The collector reads each `/sys/class/dmi/id/*` file (`bios_vendor`,
+   `bios_version`, `bios_date`, `board_*`, `chassis_*`, `product_*`,
+   `sys_vendor`) through its filesystem. A file it cannot read, for example a
+   root-only field (`product_serial`, `product_uuid`) for a caller that is not
+   root, gives `"unknown"`. `chassis_type` is an SMBIOS code, and the SMBIOS
+   table gives its `type_description`, for example `10` → `Notebook`.
+2. A board with no `/sys/class/dmi/id` but a device tree under
+   `/sys/firmware/devicetree/base`, such as a Raspberry Pi, gets what the tree
+   has: `model`, `serial-number`, the vendor of the first `compatible` entry,
+   `chassis-type`, and U-Boot as the BIOS when `chosen/u-boot,version` is there.
+   The other fields are `"unknown"`.
 
 macOS does not make SMBIOS or DMI data available. The Linux DMI driver has no
 Darwin equivalent. The collector returns an empty Info, so consumers can check
@@ -190,8 +192,4 @@ is possible.
 
 ## Backing library
 
-- [github.com/jaypipes/ghw][ghw]. `pkg/bios`, `pkg/baseboard`, `pkg/chassis`,
-  `pkg/product`. ghw reads `/sys/class/dmi/id/*` directly. It does not run a
-  command.
-
-[ghw]: https://github.com/jaypipes/ghw
+None. The collector reads sysfs through its filesystem.

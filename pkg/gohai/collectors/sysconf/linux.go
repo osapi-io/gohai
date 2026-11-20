@@ -23,62 +23,60 @@ package sysconf
 import (
 	"context"
 	"fmt"
-
-	gosysconf "github.com/tklauser/go-sysconf"
+	"strconv"
+	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// sysconfFn is the injection seam for go-sysconf's Sysconf call.
-// Tests swap this via SetSysconfFn in export_test.go to avoid
-// syscall dependency.
-var sysconfFn = gosysconf.Sysconf
-
-// Linux collects POSIX sysconf values on Linux using
-// github.com/tklauser/go-sysconf — a pure Go wrapper around the
-// POSIX sysconf(3) syscall. Covers the same four constants as Ohai's
-// sysconf plugin (CLK_TCK, PAGESIZE, NPROCESSORS_CONF, NPROCESSORS_ONLN).
+// Linux reads the sysconf values with getconf, as Ohai's sysconf plugin
+// does.
 type Linux struct {
 	base
+
+	Exec executor.Executor
 }
 
-// NewLinux returns a Linux variant.
+// NewLinux returns a Linux variant that runs the host's getconf.
 func NewLinux() *Linux {
-	return &Linux{}
+	return &Linux{Exec: executor.New()}
 }
 
-// Collect calls sysconf for four constants and returns an Info.
-// Individual lookup failures are reported as errors.
+// Collect returns the sysconf Info.
 func (l *Linux) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectSysconf()
+	return collectSysconf(ctx, l.Exec)
 }
 
-// collectSysconf is the shared implementation for both Linux and Darwin.
-// Both platforms expose the same four SC_* constants via POSIX sysconf(3).
-func collectSysconf() (*Info, error) {
-	clkTck, err := sysconfFn(gosysconf.SC_CLK_TCK)
-	if err != nil {
-		return nil, fmt.Errorf("sysconf SC_CLK_TCK: %w", err)
+// collectSysconf runs `getconf <name>` for each value. Linux and macOS
+// both have the four names.
+func collectSysconf(
+	ctx context.Context,
+	exec executor.Executor,
+) (*Info, error) {
+	info := &Info{}
+	for _, v := range []struct {
+		name string
+		dst  *int64
+	}{
+		{"CLK_TCK", &info.ClkTck},
+		{"PAGESIZE", &info.Pagesize},
+		{"_NPROCESSORS_CONF", &info.NprocessorsConf},
+		{"_NPROCESSORS_ONLN", &info.NprocessorsOnln},
+	} {
+		out, err := exec.Execute(ctx, "getconf", v.name)
+		if err != nil {
+			return nil, fmt.Errorf("getconf %s: %w", v.name, err)
+		}
+		n, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("getconf %s: %w", v.name, err)
+		}
+		*v.dst = n
 	}
-	pagesize, err := sysconfFn(gosysconf.SC_PAGESIZE)
-	if err != nil {
-		return nil, fmt.Errorf("sysconf SC_PAGESIZE: %w", err)
-	}
-	nconf, err := sysconfFn(gosysconf.SC_NPROCESSORS_CONF)
-	if err != nil {
-		return nil, fmt.Errorf("sysconf SC_NPROCESSORS_CONF: %w", err)
-	}
-	nonln, err := sysconfFn(gosysconf.SC_NPROCESSORS_ONLN)
-	if err != nil {
-		return nil, fmt.Errorf("sysconf SC_NPROCESSORS_ONLN: %w", err)
-	}
-	return &Info{
-		ClkTck:          clkTck,
-		Pagesize:        pagesize,
-		NprocessorsConf: nconf,
-		NprocessorsOnln: nonln,
-	}, nil
+
+	return info, nil
 }
