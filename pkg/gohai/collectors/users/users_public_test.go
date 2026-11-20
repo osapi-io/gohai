@@ -22,7 +22,9 @@ package users_test
 
 import (
 	"context"
+	"errors"
 	"io/fs"
+	"strconv"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -30,7 +32,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
 )
 
@@ -129,6 +133,9 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		variant      string
 		files        map[string]string
 		euid         int
+		id           string // output of `id -u`; "" uses euid
+		idErr        error
+		nilExec      bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -196,6 +203,42 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: id fails: no current user",
+			variant: "linux",
+			files:   map[string]string{"/etc/passwd": "root:x:0:0:root:/root:/bin/sh\n"},
+			idErr:   errors.New("exec id: not found"),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Empty(info.CurrentUser)
+			},
+		},
+		{
+			name:    "linux: nil Exec: no current user",
+			variant: "linux",
+			files:   map[string]string{"/etc/passwd": "root:x:0:0:root:/root:/bin/sh\n"},
+			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Empty(info.CurrentUser)
+			},
+		},
+		{
+			name:    "linux: id output not a number: no current user",
+			variant: "linux",
+			files:   map[string]string{"/etc/passwd": "root:x:0:0:root:/root:/bin/sh\n"},
+			id:      "root\n",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Empty(info.CurrentUser)
+			},
+		},
+		{
 			name:    "darwin: same POSIX parsing",
 			variant: "darwin",
 			files: map[string]string{
@@ -216,13 +259,24 @@ func (s *UsersPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer users.SetGeteuidFn(func() int { return tt.euid })()
+			id := tt.id
+			if id == "" {
+				id = strconv.Itoa(tt.euid) + "\n"
+			}
+			r := sourcetest.Runner{Out: map[string]string{"id -u": id}}
+			if tt.idErr != nil {
+				r.Err = map[string]error{"id -u": tt.idErr}
+			}
+			var exec executor.Executor = r
+			if tt.nilExec {
+				exec = nil
+			}
 			var c users.Collector
 			switch tt.variant {
 			case "linux":
-				c = &users.Linux{FS: newFS(tt.files)}
+				c = &users.Linux{FS: newFS(tt.files), Exec: exec}
 			case "darwin":
-				c = &users.Darwin{FS: newFS(tt.files)}
+				c = &users.Darwin{FS: newFS(tt.files), Exec: exec}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

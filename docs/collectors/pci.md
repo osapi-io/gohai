@@ -16,8 +16,9 @@ The collector lists the PCI devices of the host. For each device, it reports:
 
 The output shape is the same as Ohai's `linux/lspci.rb`: a map with the PCI
 address as the key. But gohai reads the data from `/sys/bus/pci/devices` through
-ghw. It does not run `lspci`. ghw finds the vendor, product and class names in
-its bundled pci.ids database.
+its filesystem. It does not run `lspci`. It finds the vendor, product and class
+names in the host's pci.ids database, which it also reads through its
+filesystem.
 
 ## Collected fields
 
@@ -99,18 +100,20 @@ None.
 
 On Linux:
 
-1. ghw's `pci.New()` reads `/sys/bus/pci/devices`. For each device, it reads the
-   sysfs files `vendor`, `device`, `class`, `revision`, `subsystem_vendor`,
-   `subsystem_device`, `iommu_group` and the `driver` symlink.
-2. ghw finds the vendor, product, class and subclass names in its bundled
-   pci.ids database. It does no network lookup. If a pcidb entry is missing, the
-   ID has a value but the name is empty.
-3. ghw sets `Driver: "unknown"` if no kernel driver is bound to the device. The
-   collector changes this value to an empty string, so that consumers get a
-   clearer contract.
-4. If ghw cannot load the data (sysfs is missing, or a container has no
-   `/sys/bus/pci`), the collector returns an empty `devices` map and no error.
-   The other hardware collectors also fail quietly in this way.
+1. The collector reads `/sys/bus/pci/devices` through its filesystem. For each
+   PCI address, the `modalias` file gives the vendor, device, subsystem, class
+   and subclass IDs. An entry with no modalias is left out. The `revision` file
+   gives the revision. The `driver` and `iommu_group` links give the bound
+   driver and the IOMMU group. The directory that the device's link goes into
+   gives `parent_address`, when it is a PCI address.
+2. The first of `/usr/share/hwdata/pci.ids`, `/usr/share/misc/pci.ids` and their
+   `.gz` forms gives the vendor, product, subsystem, class and subclass names.
+   It does no network lookup. A name that the file does not have, or every name
+   on a host with no file, is `"unknown"`.
+3. If no kernel driver is bound to the device, `driver` is empty.
+4. If `/sys/bus/pci` is missing (a container), the collector returns an empty
+   `devices` map and no error. The other hardware collectors also fail quietly
+   in this way.
 
 On macOS, the collector returns an empty `Info{Devices: {}}`. macOS gives the
 PCI topology through IOKit (`ioreg -p IODeviceTree -c IOPCIDevice`). But Ohai's
@@ -120,12 +123,13 @@ lspci model. gohai has the same scope.
 gohai reports the same fields as Ohai's `linux/lspci.rb`: `vendor_id`,
 `vendor_name`, `device_id`, `device_name`, `class_id`, `class_name`,
 `sdevice_id`, `sdevice_name`, `driver` and `revision`. gohai also reports some
-fields that ghw gives and Ohai does not: `subclass_id`, `subclass_name`,
-`iommu_group` and `parent_address`. gohai does not report Ohai's `module` array,
-which lists the kernel modules that _can_ bind. `driver` reports only the kernel
-module that is bound now. Inventory consumers usually need only that value.
+fields that Ohai does not: `subclass_id`, `subclass_name`, `iommu_group` and
+`parent_address`. gohai does not report Ohai's `module` array, which lists the
+kernel modules that _can_ bind. `driver` reports only the kernel module that is
+bound now. Inventory consumers usually need only that value.
 
 ## Backing library
 
-- [`github.com/jaypipes/ghw/pkg/pci`](https://github.com/jaypipes/ghw). The
-  canonical sysfs PCI reader. It finds names in its bundled pci.ids database.
+- `internal/pcidev`. The PCI devices of sysfs and the names of `pci.ids`, which
+  it reads through the filesystem of the collector. The `gpu` collector uses it
+  too.

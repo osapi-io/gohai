@@ -25,11 +25,13 @@
 package packagemgr
 
 import (
-	"os/exec"
+	"context"
+	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
@@ -75,32 +77,23 @@ func NewWith(
 	}
 }
 
-// lookPathFn is the package-level injection seam for exec.LookPath.
-// Kept private; swapped in tests via SetLookPathFn.
-var lookPathFn = exec.LookPath
-
-// probe looks up a binary via exec.LookPath. Returns the empty string
-// for missing binaries — no error distinction needed.
-func probe(
-	name string,
-) string {
-	p, err := lookPathFn(name)
-	if err != nil {
-		return ""
-	}
-	return p
-}
-
-// firstFound returns the first (name, path) pair from the ordered
-// list where the binary is present on the host. Empty name + path if
-// none found.
+// firstFound is the first of names that the host's shell finds on its
+// PATH, and its path: `sh -c "command -v <name>"`, the POSIX form of
+// Ohai's `which`. Both are "" when exec is nil or none is found.
 func firstFound(
+	ctx context.Context,
+	exec executor.Executor,
 	names ...string,
 ) (string, string) {
+	if exec == nil {
+		return "", ""
+	}
 	for _, n := range names {
-		if p := probe(n); p != "" {
+		out, err := exec.Execute(ctx, "sh", "-c", "command -v "+n)
+		if p := strings.TrimSpace(string(out)); err == nil && strings.HasPrefix(p, "/") {
 			return n, p
 		}
 	}
+
 	return "", ""
 }

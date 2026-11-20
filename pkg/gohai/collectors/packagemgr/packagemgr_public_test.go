@@ -22,8 +22,10 @@ package packagemgr_test
 
 import (
 	"context"
-	"errors"
 	"testing"
+
+	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 
 	"github.com/stretchr/testify/suite"
 
@@ -113,128 +115,84 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 }
 
 func (s *PackageMgrPublicTestSuite) TestCollect() {
+	found := func(paths map[string]string) sourcetest.Runner {
+		out := map[string]string{}
+		for name, p := range paths {
+			out["sh -c command -v "+name] = p + "\n"
+		}
+		return sourcetest.Runner{Out: out}
+	}
 	tests := []struct {
-		name         string
-		variant      string // "linux" | "darwin" | "debian" | "rhel"
-		probed       map[string]string
-		validateFunc func(*packagemgr.Info)
+		name     string
+		c        func(executor.Executor) packagemgr.Collector
+		runner   sourcetest.Runner
+		nilExec  bool
+		wantName string
+		wantPath string
 	}{
 		{
-			name:    "debian with apt",
-			variant: "debian",
-			probed:  map[string]string{"apt": "/usr/bin/apt"},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("apt", info.Name)
-				got := info.Path
-				s.Equal("/usr/bin/apt", got)
-			},
+			name: "debian: apt",
+			c:    func(e executor.Executor) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
+			runner: found(
+				map[string]string{"apt": "/usr/bin/apt", "apt-get": "/usr/bin/apt-get"},
+			),
+			wantName: "apt",
+			wantPath: "/usr/bin/apt",
 		},
 		{
-			name:    "debian with apt-get only",
-			variant: "debian",
-			probed:  map[string]string{"apt-get": "/usr/bin/apt-get"},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("apt-get", info.Name)
-				got := info.Path
-				s.Equal("/usr/bin/apt-get", got)
-			},
+			name:     "debian: apt-get when apt is missing",
+			c:        func(e executor.Executor) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
+			runner:   found(map[string]string{"apt-get": "/usr/bin/apt-get"}),
+			wantName: "apt-get",
+			wantPath: "/usr/bin/apt-get",
 		},
 		{
-			name:    "rhel with dnf wins over yum",
-			variant: "rhel",
-			probed:  map[string]string{"dnf": "/usr/bin/dnf", "yum": "/usr/bin/yum"},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("dnf", info.Name)
-				got := info.Path
-				s.Equal("/usr/bin/dnf", got)
-			},
+			name:     "rhel: dnf",
+			c:        func(e executor.Executor) packagemgr.Collector { return &packagemgr.RHEL{Exec: e} },
+			runner:   found(map[string]string{"dnf": "/usr/bin/dnf"}),
+			wantName: "dnf",
+			wantPath: "/usr/bin/dnf",
 		},
 		{
-			name:    "rhel yum fallback",
-			variant: "rhel",
-			probed:  map[string]string{"yum": "/usr/bin/yum"},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("yum", info.Name)
-				got := info.Path
-				s.Equal("/usr/bin/yum", got)
-			},
+			name:     "linux: apk",
+			c:        func(e executor.Executor) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			runner:   found(map[string]string{"apk": "/sbin/apk"}),
+			wantName: "apk",
+			wantPath: "/sbin/apk",
 		},
 		{
-			name:    "darwin brew",
-			variant: "darwin",
-			probed:  map[string]string{"brew": "/opt/homebrew/bin/brew"},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("brew", info.Name)
-				got := info.Path
-				s.Equal("/opt/homebrew/bin/brew", got)
-			},
+			name:     "darwin: brew on the PATH",
+			c:        func(e executor.Executor) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
+			runner:   found(map[string]string{"brew": "/opt/homebrew/bin/brew"}),
+			wantName: "brew",
+			wantPath: "/opt/homebrew/bin/brew",
 		},
 		{
-			name:    "darwin port fallback",
-			variant: "darwin",
-			probed:  map[string]string{"port": "/opt/local/bin/port"},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("port", info.Name)
-				got := info.Path
-				s.Equal("/opt/local/bin/port", got)
-			},
+			name: "darwin: an alias is not a path",
+			c:    func(e executor.Executor) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
+			runner: sourcetest.Runner{Out: map[string]string{
+				"sh -c command -v brew": "alias brew='echo'\n",
+			}},
 		},
 		{
-			name:    "linux arch with pacman",
-			variant: "linux",
-			probed:  map[string]string{"pacman": "/usr/bin/pacman"},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("pacman", info.Name)
-				got := info.Path
-				s.Equal("/usr/bin/pacman", got)
-			},
+			name: "linux: none found",
+			c:    func(e executor.Executor) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
 		},
 		{
-			name:    "linux alpine with apk",
-			variant: "linux",
-			probed:  map[string]string{"apk": "/sbin/apk"},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("apk", info.Name)
-				got := info.Path
-				s.Equal("/sbin/apk", got)
-			},
-		},
-		{
-			name:    "none found returns empty",
-			variant: "linux",
-			probed:  map[string]string{},
-			validateFunc: func(info *packagemgr.Info) {
-				s.Equal("", info.Name)
-				got := info.Path
-				s.Equal("", got)
-			},
+			name:    "linux: nil Exec",
+			c:       func(e executor.Executor) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			nilExec: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer packagemgr.SetLookPathFn(func(name string) (string, error) {
-				if p, ok := tt.probed[name]; ok {
-					return p, nil
-				}
-				return "", errors.New("not found")
-			})()
-			var got any
-			var err error
-			switch tt.variant {
-			case "debian":
-				got, err = (&packagemgr.Debian{}).Collect(context.Background(), nil)
-			case "rhel":
-				got, err = (&packagemgr.RHEL{}).Collect(context.Background(), nil)
-			case "darwin":
-				got, err = (&packagemgr.Darwin{}).Collect(context.Background(), nil)
-			case "linux":
-				got, err = (&packagemgr.Linux{}).Collect(context.Background(), nil)
+			var exec executor.Executor = tt.runner
+			if tt.nilExec {
+				exec = nil
 			}
+			got, err := tt.c(exec).Collect(context.Background(), nil)
 			s.Require().NoError(err)
-			info, ok := got.(*packagemgr.Info)
-			s.Require().True(ok)
-
-			tt.validateFunc(info)
+			s.Equal(&packagemgr.Info{Name: tt.wantName, Path: tt.wantPath}, got)
 		})
 	}
 }

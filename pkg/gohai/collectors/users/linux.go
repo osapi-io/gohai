@@ -27,24 +27,27 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Linux enumerates users/groups from /etc/passwd and /etc/group.
 type Linux struct {
 	base
-	FS avfs.VFS
+
+	FS   avfs.VFS
+	Exec executor.Executor
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
 
 // Collect reads /etc/passwd + /etc/group and resolves the effective
 // current user. Matches Ohai's passwd plugin methodology.
 func (l *Linux) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectPOSIX(l.FS)
+	return collectPOSIX(ctx, l.FS, l.Exec)
 }

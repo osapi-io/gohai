@@ -25,9 +25,6 @@ import (
 	"errors"
 	"testing"
 
-	ghwgpu "github.com/jaypipes/ghw/pkg/gpu"
-	"github.com/jaypipes/ghw/pkg/pci"
-	"github.com/jaypipes/pcidb"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -35,6 +32,7 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
 )
 
@@ -137,52 +135,51 @@ const darwinJSON = `{
 }`
 
 func (s *GPUPublicTestSuite) TestCollect() {
-	ghwPopulated := func(...any) (*ghwgpu.Info, error) {
-		return &ghwgpu.Info{
-			GraphicsCards: []*ghwgpu.GraphicsCard{
-				{
-					Address: "0000:03:00.0",
-					DeviceInfo: &pci.Device{
-						Vendor:  &pcidb.Vendor{ID: "10de", Name: "NVIDIA Corporation"},
-						Product: &pcidb.Product{ID: "1c82", Name: "GP107 [GeForce GTX 1050 Ti]"},
-					},
-				},
-				{Address: "0000:04:00.0"}, // no DeviceInfo
-			},
-		}, nil
+	const ids = "10de  NVIDIA Corporation\n\t1c82  GP107 [GeForce GTX 1050 Ti]\n"
+	drm := "/sys/class/drm/"
+	linuxFiles := map[string]string{
+		"/usr/share/hwdata/pci.ids":                  ids,
+		"/sys/bus/pci/devices/0000:03:00.0/modalias": "pci:v000010DEd00001C82sv00001458sd00003764bc03sc00i00\n",
+		drm + "version":                              "drm 1.1.0\n",
 	}
-	ghwErr := func(...any) (*ghwgpu.Info, error) { return nil, errors.New("no drm") }
-	ghwNil := func(...any) (*ghwgpu.Info, error) { return nil, nil }
+	linuxLinks := map[string]string{
+		drm + "card0":          "../../devices/pci0000:00/0000:00:01.0/0000:03:00.0/drm/card0",
+		drm + "card0-HDMI-A-1": "../../devices/pci0000:00/0000:00:01.0/0000:03:00.0/drm/card0/card0-HDMI-A-1",
+		drm + "card1":          "../../devices/pci0000:00/0000:00:02.0/0000:04:00.0/drm/card1",
+		drm + "card2":          "../../devices/platform/vc4/drm/card2",
+		drm + "renderD128":     "../../devices/pci0000:00/0000:00:01.0/0000:03:00.0/drm/renderD128",
+	}
 
 	tests := []struct {
 		name         string
 		variant      string
-		ghw          func(...any) (*ghwgpu.Info, error)
+		files        map[string]string
+		links        map[string]string
 		exec         func(*testing.T) executor.Executor
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "linux: ghw returns cards with + without DeviceInfo",
+			name:    "linux: each cardN with its PCI device; a card PCI has no record of is bare",
 			variant: "linux",
-			ghw:     ghwPopulated,
+			files:   linuxFiles,
+			links:   linuxLinks,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*gpu.Info)
 				s.Require().True(ok)
-				s.Require().Len(i.Cards, 2)
-				s.Equal("NVIDIA Corporation", i.Cards[0].Vendor)
-				s.Equal("10de", i.Cards[0].VendorID)
-				s.Equal("1c82", i.Cards[0].DeviceID)
-				s.Equal("GP107 [GeForce GTX 1050 Ti]", i.Cards[0].Model)
-				s.Equal("0000:03:00.0", i.Cards[0].Address)
-				s.Empty(i.Cards[1].Vendor)
-				s.Equal("0000:04:00.0", i.Cards[1].Address)
+				s.Equal([]gpu.Card{
+					{
+						Vendor: "NVIDIA Corporation", Model: "GP107 [GeForce GTX 1050 Ti]",
+						Address: "0000:03:00.0", VendorID: "10de", DeviceID: "1c82",
+					},
+					{Address: "0000:04:00.0"},
+				}, i.Cards)
 			},
 		},
 		{
-			name:    "linux: ghw error yields empty Info",
+			name:    "linux: a cardN that is not a link is skipped",
 			variant: "linux",
-			ghw:     ghwErr,
+			files:   map[string]string{drm + "card0/dev": "226:0\n"},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*gpu.Info)
@@ -191,9 +188,8 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: ghw nil Info yields empty",
+			name:    "linux: no /sys/class/drm yields empty Info",
 			variant: "linux",
-			ghw:     ghwNil,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*gpu.Info)
@@ -286,8 +282,9 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			var c gpu.Collector
 			switch tt.variant {
 			case "linux":
-				defer gpu.SetGHWGPUFn(tt.ghw)()
-				c = &gpu.Linux{}
+				c = &gpu.Linux{
+					FS: sourcetest.Links(s.T(), sourcetest.FS(s.T(), tt.files), tt.links),
+				}
 			case "darwin":
 				d := &gpu.Darwin{}
 				if tt.exec != nil {

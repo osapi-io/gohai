@@ -133,8 +133,9 @@ the check passes and the collector continues.
 ## Data sources
 
 01. **DMI gate:** the collector continues only if `dmi.Product.VendorName`
-    contains `"Alibaba"`. ghw reads `/sys/class/dmi/id/sys_vendor` into
-    `Product.VendorName`. Thus this check is the same as Ohai's `has_ali_dmi?`.
+    contains `"Alibaba"`. The dmi collector reads `/sys/class/dmi/id/sys_vendor`
+    into `Product.VendorName`. Thus this check is the same as Ohai's
+    `has_ali_dmi?`.
 02. **Endpoint:** `http://100.100.100.200/2016-01-01/`. This link-local address
     is not standard. It is `100.100.100.200`, not `169.254.169.254`.
 03. **Recursive walk:** the collector starts at `/` and gets each directory

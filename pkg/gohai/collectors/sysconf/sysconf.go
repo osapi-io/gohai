@@ -19,11 +19,9 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package sysconf reports POSIX sysconf(3) values for clock tick rate,
-// page size, and processor counts. Mirrors Ohai's sysconf plugin but
-// uses github.com/tklauser/go-sysconf (already in the module graph as
-// a transitive dep) instead of shelling out to getconf — faster, no
-// child process, identical semantics. DefaultEnabled is false — niche
-// fact most consumers don't need.
+// page size, and processor counts. As Ohai's sysconf plugin does, it
+// runs getconf, through the command runner of its sources.
+// DefaultEnabled is false: a niche fact most consumers don't need.
 package sysconf
 
 import (

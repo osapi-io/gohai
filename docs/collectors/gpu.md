@@ -17,7 +17,7 @@ integrated devices (Apple Silicon M-series, Intel iGPUs) and discrete devices
 Thus this collector is native to gohai. There is no Ohai method, with its years
 of distribution quirks, to copy. No consumer that moves from Ohai has a
 `node['gpu']` shape that this collector can break. The collector has the same
-shape as the other gohai hardware collectors. On Linux, ghw reads
+shape as the other gohai hardware collectors. On Linux, the collector reads
 `/sys/class/drm`. On macOS, the collector parses
 `system_profiler SPDisplaysDataType` through the shared Executor.
 
@@ -42,7 +42,7 @@ Linux PCI data and the data of the Darwin system_profiler shape.
 
 | Platform | Supported                                                                   |
 | -------- | --------------------------------------------------------------------------- |
-| Linux    | ✅ (ghw/gpu reads `/sys/class/drm` and ghw's bundled pci.ids database)      |
+| Linux    | ✅ (`/sys/class/drm`, the PCI device in sysfs, and the host's pci.ids)      |
 | macOS    | ✅ (`system_profiler SPDisplaysDataType -json` through the shared Executor) |
 
 On Linux, containers and minimal VMs usually have no `/sys/class/drm`. Then the
@@ -114,17 +114,20 @@ None.
 ## Data sources
 
 Ohai has no equivalent that lists GPUs. Ohai does not have a GPU plugin. This
-collector is native to gohai, and it uses ghw.
+collector is native to gohai.
 
 On Linux:
 
-1. ghw/gpu reads `/sys/class/drm` and finds each `cardN` symlink. It follows the
-   symlink to the sysfs directory of the PCI device. It finds the vendor and
-   product names for the IDs in ghw's bundled `pci.ids` database. The library
-   does all of this. It does not run a command.
-2. If `/sys/class/drm` is missing (a headless server, a minimal container, a VM
-   without a virtual display), ghw's `load` logs a warning and returns. The
-   collector then returns an empty `cards` slice and no error.
+1. The collector reads `/sys/class/drm` through its filesystem, and finds each
+   `cardN` link. A connector such as `card0-HDMI-A-1` is not a card. The last
+   PCI address in the target of the link is the card's `address`. A card with no
+   PCI address, such as a platform GPU, is left out.
+2. The modalias of that PCI device gives the vendor and device IDs, and the
+   host's `pci.ids` gives their names, as the [`pci`](pci.md) collector reads
+   them.
+3. If `/sys/class/drm` is missing (a headless server, a minimal container, a VM
+   without a virtual display), the collector returns an empty `cards` slice and
+   no error.
 
 On macOS:
 
@@ -143,8 +146,9 @@ On macOS:
 
 ## Backing library
 
-- [`github.com/jaypipes/ghw/pkg/gpu`](https://pkg.go.dev/github.com/jaypipes/ghw/pkg/gpu)
-  . The backend on Linux only. It finds the PCI IDs through `ghw/pkg/pci`.
+- `internal/pcidev`. The PCI devices of sysfs and the names of `pci.ids`, which
+  it reads through the filesystem of the collector. The `pci` collector uses it
+  too.
 - [`internal/executor`](../../internal/executor). The shared command runner. The
   collector uses it to run `system_profiler` on macOS. Tests mock it with
   `go.uber.org/mock`.

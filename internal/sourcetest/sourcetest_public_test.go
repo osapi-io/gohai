@@ -41,6 +41,15 @@ func (s *SourcetestPublicTestSuite) TestFS() {
 	s.Equal("0.1 0.2 0.3", string(b))
 }
 
+func (s *SourcetestPublicTestSuite) TestLinks() {
+	fs := sourcetest.Links(s.T(), sourcetest.FS(s.T(), nil), map[string]string{
+		"/sys/bus/pci/devices/0000:00:02.0/driver": "../../../bus/pci/drivers/i915",
+	})
+	target, err := fs.Readlink("/sys/bus/pci/devices/0000:00:02.0/driver")
+	s.Require().NoError(err)
+	s.Equal("../../../bus/pci/drivers/i915", target)
+}
+
 func (s *SourcetestPublicTestSuite) TestRunner() {
 	r := sourcetest.Runner{
 		Out: map[string]string{"sysctl -n vm.loadavg": "{ 1 2 3 }", "df -kP": "partial"},

@@ -286,8 +286,8 @@ then a blank line, then the header.
 
 ### Error wrapping at the module boundary
 
-Never let raw ghw or procfs error types go out through the public API. Wrap
-them. Then callers do not need these packages in their module graph to handle an
+Never let raw error types of a library go out through the public API. Wrap them.
+Then callers do not need these packages in their module graph to handle an
 error.
 
 ## Tests

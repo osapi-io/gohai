@@ -54,15 +54,15 @@ PR that updates this table and gives the reason.
 | lsb              | stdlib                                                            |
 | shells           | stdlib                                                            |
 | timezone         | `/etc/localtime` and the clock                                    |
-| root_group       | stdlib (`os/user`)                                                |
-| package_mgr      | executor                                                          |
-| dmi              | **ghw**                                                           |
-| gpu              | **ghw**                                                           |
-| pci              | **ghw**                                                           |
+| root_group       | `/etc/passwd`, `/etc/group`                                       |
+| package_mgr      | `sh -c 'command -v <name>'`                                       |
+| dmi              | Linux: `/sys/class/dmi/id`, device tree                           |
+| gpu              | Linux: `/sys/class/drm`, pci.ids. macOS: `system_profiler`        |
+| pci              | Linux: `/sys/bus/pci`, pci.ids                                    |
 | block_device     | sysfs, through the injected VFS                                   |
 
 The PR of a new collector must give the reason for its source. A migration (for
-example from ghw to sysfs) needs its own issue with the labels
+example from a file to a command) needs its own issue with the labels
 `library-migration` + `collector:<name>`. The issue gives the current coverage,
 the coverage of the candidate, and the migration plan.
 

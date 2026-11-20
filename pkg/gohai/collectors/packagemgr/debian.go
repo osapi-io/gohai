@@ -24,23 +24,26 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Debian covers debian / ubuntu / raspbian — apt-based hosts.
 type Debian struct {
 	base
+
+	Exec executor.Executor
 }
 
 // NewDebian returns a Debian variant.
 func NewDebian() *Debian {
-	return &Debian{}
+	return &Debian{Exec: executor.New()}
 }
 
 // Collect returns apt if present.
 func (d *Debian) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, path := firstFound("apt", "apt-get")
+	name, path := firstFound(ctx, d.Exec, "apt", "apt-get")
 	return &Info{Name: name, Path: path}, nil
 }

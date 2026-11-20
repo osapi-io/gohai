@@ -23,6 +23,9 @@ package rootgroup
 import (
 	"context"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
@@ -30,11 +33,13 @@ import (
 // returns "root". Embeds base for Name/DefaultEnabled/Dependencies.
 type Linux struct {
 	base
+
+	FS avfs.VFS
 }
 
 // NewLinux returns a Linux variant.
 func NewLinux() *Linux {
-	return &Linux{}
+	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
 // Collect performs the two-hop lookup (root → gid → group name).
@@ -42,5 +47,5 @@ func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return resolveRootGroup()
+	return resolveRootGroup(l.FS)
 }

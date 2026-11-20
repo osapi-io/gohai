@@ -27,7 +27,7 @@ package users
 import (
 	"bufio"
 	"bytes"
-	"os"
+	"context"
 	"strconv"
 	"strings"
 
@@ -36,6 +36,7 @@ import (
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // passwdPath / groupPath are the standard POSIX flat-file locations
@@ -44,10 +45,6 @@ const (
 	passwdPath = "/etc/passwd"
 	groupPath  = "/etc/group"
 )
-
-// geteuidFn is the injection seam for os.Geteuid — tests swap it to
-// pin a deterministic current user.
-var geteuidFn = os.Geteuid
 
 // New returns the users variant for the host OS. Both Linux and
 // Darwin read the same /etc/passwd and /etc/group files — separate
@@ -72,7 +69,9 @@ func NewWith(
 // Darwin: read /etc/passwd + /etc/group from the injected VFS and
 // look up the effective current user in the parsed passwd map.
 func collectPOSIX(
+	ctx context.Context,
 	fs avfs.VFS,
+	exec executor.Executor,
 ) (*Info, error) {
 	info := &Info{
 		Passwd: map[string]PasswdEntry{},
@@ -84,7 +83,17 @@ func collectPOSIX(
 	if b, err := fs.ReadFile(groupPath); err == nil {
 		info.Group = parseGroup(b)
 	}
-	euid := geteuidFn()
+	if exec == nil {
+		return info, nil
+	}
+	out, err := exec.Execute(ctx, "id", "-u")
+	if err != nil {
+		return info, nil
+	}
+	euid, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return info, nil
+	}
 	for name, entry := range info.Passwd {
 		if entry.UID == euid {
 			info.CurrentUser = name

@@ -27,6 +27,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -76,4 +77,32 @@ func (r Runner) Execute(
 	}
 
 	return nil, fmt.Errorf("exec %s: executable file not found", name)
+}
+
+// Links adds symbolic links to fs, each path to its target, as sysfs
+// links a device to its driver, a link's directory before the link. It
+// returns fs.
+func Links(
+	t testing.TB,
+	fs avfs.VFS,
+	links map[string]string,
+) avfs.VFS {
+	t.Helper()
+	paths := make([]string, 0, len(links))
+	for path := range links {
+		paths = append(paths, path)
+	}
+	// A link inside a linked directory comes after the directory's link.
+	sort.Strings(paths)
+	for _, path := range paths {
+		target := links[path]
+		if err := fs.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := fs.Symlink(target, path); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return fs
 }

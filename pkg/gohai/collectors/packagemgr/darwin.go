@@ -24,24 +24,27 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Darwin covers macOS hosts. Prefers brew (community-standard),
 // falls back to port (MacPorts) if brew isn't installed.
 type Darwin struct {
 	base
+
+	Exec executor.Executor
 }
 
 // NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{}
+	return &Darwin{Exec: executor.New()}
 }
 
 // Collect returns brew if present, else port.
 func (d *Darwin) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, path := firstFound("brew", "port")
+	name, path := firstFound(ctx, d.Exec, "brew", "port")
 	return &Info{Name: name, Path: path}, nil
 }
