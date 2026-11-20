@@ -71,6 +71,11 @@ func (l *Linux) Collect(
 			v, _ := strconv.ParseUint(f[i], 10, 64)
 			return v
 		}
+		// A device that has never read or written, such as an unused
+		// loop device, is left out, as gopsutil left it out.
+		if n(3) == 0 && n(7) == 0 {
+			continue
+		}
 		devs = append(devs, Device{
 			Name:       f[2],
 			ReadCount:  n(3),

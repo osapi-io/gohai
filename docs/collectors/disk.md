@@ -84,7 +84,8 @@ On Linux:
 
 1. The collector reads `/proc/diskstats`. For each device, it gives the read and
    write counts, the bytes (sectors × 512) and the time in milliseconds as a
-   `Device` row.
+   `Device` row. A device with no reads and no writes, such as an unused loop
+   device, is left out.
 
 On macOS:
 
