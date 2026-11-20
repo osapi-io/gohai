@@ -18,17 +18,26 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package platform
+package family
 
 import "github.com/shirou/gopsutil/v4/host"
 
-// SetHostInfoFn swaps the private gopsutil call used by detect() for
-// the duration of a test. Only this package's own tests — which live in
-// platform_test — use this; collector tests should swap Detect instead.
+// SetHostInfoFn swaps the host read of Detect for a test.
 func SetHostInfoFn(
 	fn func() (*host.InfoStat, error),
 ) (restore func()) {
 	orig := hostInfoFn
 	hostInfoFn = fn
+
 	return func() { hostInfoFn = orig }
+}
+
+// SetGOOS swaps the operating system Detect sees for a test.
+func SetGOOS(
+	os string,
+) (restore func()) {
+	orig := goos
+	goos = os
+
+	return func() { goos = orig }
 }

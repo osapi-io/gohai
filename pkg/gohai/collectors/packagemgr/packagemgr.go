@@ -29,6 +29,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
 // Info holds package manager identification.
@@ -49,16 +50,16 @@ func (base) Category() string       { return collector.CategorySoftware }
 func (base) DefaultEnabled() bool   { return true }
 func (base) Dependencies() []string { return nil }
 
-// New returns the package_mgr variant for the host OS. Distro
-// family drives the variant: Debian → apt, RHEL → dnf/yum, macOS →
-// brew. Generic linux tries each manager in order.
+// New returns the package_mgr variant for the host OS. The distro
+// family drives the variant: Debian → apt; RHEL, Fedora and Amazon →
+// dnf/yum; macOS → brew. Generic linux tries each manager in order.
 func New() Collector {
 	switch platform.Detect() {
-	case "darwin":
+	case family.Darwin:
 		return NewDarwin()
-	case "debian":
+	case family.Debian:
 		return NewDebian()
-	case "rhel":
+	case family.RHEL, family.Fedora, family.Amazon:
 		return NewRHEL()
 	default:
 		return NewLinux()

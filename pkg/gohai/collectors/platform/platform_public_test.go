@@ -281,6 +281,41 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: no os-release, legacy /etc/redhat-release from Red Hat",
+			variant: "linux",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/redhat-release": "Red Hat Enterprise Linux Server release 7.9 (Maipo)\n",
+			}),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal(platform.Info{
+					OS: runtime.GOOS, Name: "redhat", Version: "7.9",
+					Family: "rhel", CPUArchitecture: runtime.GOARCH,
+				}, *info)
+			},
+		},
+		{
+			name:    "linux: no os-release, legacy /etc/system-release, a name Ohai has no family for",
+			variant: "linux",
+			hostInfo: func(context.Context) (*host.InfoStat, error) {
+				return &host.InfoStat{}, nil
+			},
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/system-release": "Foo Linux release 1.0\n",
+			}),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal("rhel", info.Family, "the legacy file's own family")
+			},
+		},
+		{
 			name:    "linux: no os-release, legacy /etc/redhat-release",
 			variant: "linux",
 			hostInfo: func(context.Context) (*host.InfoStat, error) {
@@ -390,7 +425,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal(platform.Info{
 					OS: runtime.GOOS, Name: "amazon", Version: "2",
-					Family: "rhel", CPUArchitecture: runtime.GOARCH,
+					Family: "amazon", CPUArchitecture: runtime.GOARCH,
 				}, *info)
 			},
 		},
@@ -625,7 +660,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal(platform.Info{
 					OS: runtime.GOOS, Name: "darwin", Version: "14.4.1",
-					VersionExtra: "(a)", Family: "Standalone Workstation",
+					VersionExtra: "(a)", Family: "darwin",
 					CPUArchitecture: runtime.GOARCH, Build: "23E224",
 				}, *info)
 			},
@@ -646,7 +681,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal(platform.Info{
 					OS: runtime.GOOS, Name: "darwin", Version: "13.5",
-					CPUArchitecture: runtime.GOARCH, Build: "22G74",
+					Family: "darwin", CPUArchitecture: runtime.GOARCH, Build: "22G74",
 				}, *info)
 			},
 		},
@@ -666,7 +701,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal(platform.Info{
 					OS: runtime.GOOS, Name: "darwin", Version: "12.6",
-					CPUArchitecture: runtime.GOARCH, Build: "21G115",
+					Family: "darwin", CPUArchitecture: runtime.GOARCH, Build: "21G115",
 				}, *info)
 			},
 		},
@@ -687,7 +722,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal(platform.Info{
 					OS: runtime.GOOS, Name: "darwin", Version: "14.0",
-					CPUArchitecture: runtime.GOARCH, Build: "23A344",
+					Family: "darwin", CPUArchitecture: runtime.GOARCH, Build: "23A344",
 				}, *info)
 			},
 		},
@@ -707,7 +742,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal(platform.Info{
 					OS: runtime.GOOS, Name: "darwin", Version: "14.0",
-					CPUArchitecture: runtime.GOARCH, Build: "23A344",
+					Family: "darwin", CPUArchitecture: runtime.GOARCH, Build: "23A344",
 				}, *info)
 			},
 		},

@@ -64,6 +64,5 @@ func (l *Linux) Collect(
 		applyRedhatReleaseSupplement(l.FS, info)
 		applyLegacyReleaseFallback(l.FS, info)
 	}
-	applyFamilyFallback(info)
 	return info, nil
 }

@@ -38,6 +38,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	plat "github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
 // hostInfoFn is the injection seam for gopsutil's host.InfoWithContext.
@@ -58,9 +59,9 @@ func readPlatform(
 	if h == nil {
 		return info, "", nil
 	}
-	info.Name = canonicalizePlatform(h.Platform)
+	info.Name = family.Platform(h.Platform)
 	info.Version = h.PlatformVersion
-	info.Family = h.PlatformFamily
+	info.Family = family.Of(info.Name)
 	return info, h.KernelVersion, nil
 }
 
@@ -70,7 +71,7 @@ type Info struct {
 	Name            string `json:"name"`                    // distro/product: "ubuntu", "redhat", "darwin"
 	Version         string `json:"version"`                 // "24.04", "14.4.1"
 	VersionExtra    string `json:"version_extra,omitempty"` // extra version info (macOS RSR patches)
-	Family          string `json:"family"`                  // "debian", "rhel", "mac_os_x"
+	Family          string `json:"family"`                  // "debian", "rhel", "darwin"
 	CPUArchitecture string `json:"cpu_architecture"`        // "amd64", "arm64"
 	Build           string `json:"build,omitempty"`         // OS build identifier (macOS BuildVersion)
 }
@@ -93,75 +94,6 @@ func New() Collector {
 		return NewDarwin()
 	}
 	return NewLinux()
-}
-
-// platformIDRemap normalizes distro IDs into a canonical form so
-// consumers don't have to special-case per-distro quirks. Matches
-// Ohai's OS_RELEASE_PLATFORM_REMAP table.
-//
-// Source: https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/platform.rb
-var platformIDRemap = map[string]string{
-	"alinux":        "alibabalinux",
-	"amzn":          "amazon",
-	"archarm":       "arch",    // ArchLinux ARM (Pi, Pinebook)
-	"cumulus-linux": "cumulus", // Cumulus Networks
-	"ol":            "oracle",
-	"opensuse-leap": "opensuseleap",
-	"rhel":          "redhat",
-	"rocky":         "rocky",
-	"sles":          "suse",
-	"sles_sap":      "suse", // SLES for SAP
-	"xenenterprise": "xenserver",
-}
-
-// canonicalizePlatform applies platformIDRemap; returns input
-// unchanged if no entry exists.
-func canonicalizePlatform(
-	p string,
-) string {
-	if m, ok := platformIDRemap[p]; ok {
-		return m
-	}
-	return p
-}
-
-// platformFamilyTable is Ohai's exhaustive distro → family mapping
-// (linux/platform.rb platform_family_from_platform). Used to fill in
-// `family` when gopsutil's value is empty or unknown.
-//
-// Source: https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/platform.rb
-var platformFamilyTable = map[string]string{
-	// debian
-	"debian": "debian", "ubuntu": "debian", "cumulus": "debian",
-	"kali": "debian", "pop": "debian", "linuxmint": "debian", "raspbian": "debian",
-	// rhel
-	"rhel": "rhel", "redhat": "rhel", "centos": "rhel",
-	"almalinux": "rhel", "rocky": "rhel",
-	"alibabalinux": "rhel", "sangoma": "rhel", "clearos": "rhel",
-	"parallels": "rhel", "virtuozzo": "rhel", "ibm_powerkvm": "rhel",
-	"nexus_centos": "rhel", "bigip": "rhel", "xenserver": "rhel",
-	"xcp-ng": "rhel", "cloudlinux": "rhel", "scientific": "rhel",
-	"enterpriseenterprise": "rhel", "oracle": "rhel", "amazon": "rhel",
-	// fedora
-	"fedora": "fedora", "arista_eos": "fedora",
-	// suse
-	"suse": "suse", "sles": "suse", "opensuse": "suse",
-	"opensuseleap": "suse", "sled": "suse",
-	// arch
-	"arch": "arch", "manjaro": "arch", "antergos": "arch",
-	// gentoo
-	"gentoo": "gentoo",
-	// wrlinux
-	"wrlinux": "wrlinux", "nexus": "wrlinux", "ios_xr": "wrlinux",
-}
-
-// familyFromPlatform looks up the canonical family for a distro ID.
-// Returns "" when the ID is unknown — caller can fall back to
-// gopsutil's value.
-func familyFromPlatform(
-	id string,
-) string {
-	return platformFamilyTable[id]
 }
 
 // minorVersionDistros are RHEL-family IDs (post-canonicalization)
@@ -209,17 +141,6 @@ func applyRedhatReleaseSupplement(
 	}
 }
 
-// applyFamilyFallback fills info.Family from our table when gopsutil
-// returned an empty family (long-tail distros gopsutil doesn't
-// recognize).
-func applyFamilyFallback(
-	info *Info,
-) {
-	if info.Family == "" {
-		info.Family = familyFromPlatform(info.Name)
-	}
-}
-
 // legacyReleaseFile describes a /etc/*-release fallback parser.
 type legacyReleaseFile struct {
 	path   string
@@ -250,6 +171,11 @@ func parseGenericRelease(
 	m := genericReleaseRE.FindStringSubmatch(content)
 	if m == nil {
 		return "", ""
+	}
+	// Ohai's get_redhatish_platform: Red Hat's own file names redhat, not
+	// its first word.
+	if strings.HasPrefix(strings.ToLower(m[1]), "red hat") {
+		return "redhat", m[2]
 	}
 	// genericReleaseRE requires `[A-Za-z]+` so m[1] always has at
 	// least one whitespace-separated token after Fields.
@@ -297,7 +223,7 @@ var legacyReleaseFiles = []legacyReleaseFile{
 // applyLegacyReleaseFallback walks the legacy /etc/*-release cascade
 // when info.Name is empty (i.e., gopsutil + os-release produced
 // nothing). First file that yields a name wins; the canonical
-// platformIDRemap is applied to the result.
+// family.Platform is applied to the result.
 func applyLegacyReleaseFallback(
 	fs avfs.VFS,
 	info *Info,
@@ -314,9 +240,12 @@ func applyLegacyReleaseFallback(
 		if name == "" {
 			continue
 		}
-		info.Name = canonicalizePlatform(name)
+		info.Name = family.Platform(name)
 		info.Version = version
-		info.Family = f.family
+		info.Family = family.Of(info.Name)
+		if info.Family == "" {
+			info.Family = f.family
+		}
 		return
 	}
 }
