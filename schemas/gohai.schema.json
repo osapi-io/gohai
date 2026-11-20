@@ -4089,6 +4089,15 @@
         },
         "creation_time": {
           "type": "integer"
+        },
+        "cpu_percent": {
+          "type": "number"
+        },
+        "mem_percent": {
+          "type": "number"
+        },
+        "rss": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,

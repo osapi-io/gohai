@@ -53,7 +53,12 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	out, err := d.Exec.Execute(ctx, "ps", "-axo", "pid=,ppid=,user=,state=,lstart=")
+	out, err := d.Exec.Execute(
+		ctx,
+		"ps",
+		"-axo",
+		"pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,lstart=",
+	)
 	if err != nil {
 		return nil, fmt.Errorf("ps: %w", err)
 	}
@@ -74,10 +79,16 @@ func (d *Darwin) Collect(
 			PID: int32(pid), ParentPID: int32(ppid), Owner: f[2], State: state(f[3]),
 			Name: names[f[0]], CmdLine: args[f[0]],
 		}
-		if len(f) >= 9 {
+		if len(f) >= 7 {
+			p.CPUPercent, _ = strconv.ParseFloat(f[4], 64)
+			p.MemPercent, _ = strconv.ParseFloat(f[5], 64)
+			kb, _ := strconv.ParseInt(f[6], 10, 64)
+			p.RSS = kb * 1024
+		}
+		if len(f) >= 12 {
 			if t, err := time.ParseInLocation(
 				lstartLayout,
-				strings.Join(f[4:9], " "),
+				strings.Join(f[7:12], " "),
 				time.Local,
 			); err == nil {
 				p.CreationTime = t.Unix()

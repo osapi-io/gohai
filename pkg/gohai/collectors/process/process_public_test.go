@@ -119,7 +119,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		time.Local,
 	)
 	s.Require().NoError(err)
-	const psMain = "ps -axo pid=,ppid=,user=,state=,lstart="
+	const psMain = "ps -axo pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,lstart="
 	const psName = "ps -axo pid=,ucomm="
 	const psArgs = "ps -axww -o pid=,args="
 
@@ -136,9 +136,10 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			variant: "linux",
 			files: map[string]string{
 				"/proc/stat":      "cpu 1 2 3\nbtime 1700000000\n",
+				"/proc/meminfo":   "MemFree: 1 kB\nMemTotal:        4096 kB\n",
 				"/etc/passwd":     "root:x:0:0::/root:/bin/sh\nbad line\n",
 				"/proc/1/stat":    "1 (my (proc)) S 0 1 1 0 -1 4194560 1 2 3 4 5 6 7 8 20 0 1 0 500 9 10\n",
-				"/proc/1/status":  "Name:\tmy (proc)\nUid:\t0\t0\t0\t0\n",
+				"/proc/1/status":  "Name:\tmy (proc)\nUid:\t0\t0\t0\t0\nVmRSS:\t    1024 kB\n",
 				"/proc/1/cmdline": "/sbin/init\x00splash\x00",
 				"/proc/42/stat":   "42 (kworker) R\n",
 				"/proc/42/status": "Uid:\t1000\t1000\t1000\t1000\n",
@@ -150,16 +151,18 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 				{
 					PID: 1, Name: "my (proc)", State: "sleep", Owner: "root",
 					CmdLine: "/sbin/init splash", CreationTime: 1700000005,
+					CPUPercent: 1, RSS: 1024 * 1024, MemPercent: 25,
 				},
 				{PID: 42, Name: "kworker"},
 			}},
 		},
 		{
-			name:    "linux: no boot time, and no passwd",
+			name:    "linux: no boot time, no passwd, and no MemTotal",
 			variant: "linux",
 			files: map[string]string{
-				"/proc/stat":   "cpu 1 2 3\n",
-				"/proc/1/stat": "1 (init) Z 0 1 1 0 -1 4194560 1 2 3 4 5 6 7 8 20 0 1 0 500 9 10\n",
+				"/proc/stat":    "cpu 1 2 3\n",
+				"/proc/meminfo": "MemFree: 1 kB\n",
+				"/proc/1/stat":  "1 (init) Z 0 1 1 0 -1 4194560 1 2 3 4 5 6 7 8 20 0 1 0 500 9 10\n",
 			},
 			want: &process.Info{Count: 1, Processes: []process.Process{
 				{PID: 1, Name: "init", State: "zombie"},
@@ -178,8 +181,8 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			name:    "darwin: ps, joined by pid",
 			variant: "darwin",
 			runner: sourcetest.Runner{Out: map[string]string{
-				psMain: "    1     0 root     Ss   Thu Nov 20 12:04:00 2026\n" +
-					"  500     1 john     R+   not a date at all\n" +
+				psMain: "    1     0 root     Ss    0.0  0.1   1024 Thu Nov 20 12:04:00 2026\n" +
+					"  500     1 john     R+   12.5  3.0   2048 not a date at all\n" +
 					"  x 1 bad R\n" +
 					"short\n",
 				psName: "    1 launchd\n  500 Google Chrome Helper\nnospace\n",
@@ -189,14 +192,18 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 				{
 					PID: 1, Name: "launchd", Owner: "root", State: "sleep",
 					CmdLine: "/sbin/launchd", CreationTime: started.Unix(),
+					MemPercent: 0.1, RSS: 1024 * 1024,
 				},
 				{
-					PID:       500,
-					ParentPID: 1,
-					Name:      "Google Chrome Helper",
-					Owner:     "john",
-					State:     "running",
-					CmdLine:   "/Applications/Google Chrome.app/x --type=gpu",
+					PID:        500,
+					ParentPID:  1,
+					Name:       "Google Chrome Helper",
+					Owner:      "john",
+					State:      "running",
+					CmdLine:    "/Applications/Google Chrome.app/x --type=gpu",
+					CPUPercent: 12.5,
+					MemPercent: 3,
+					RSS:        2048 * 1024,
 				},
 			}},
 		},
@@ -205,7 +212,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			runner: sourcetest.Runner{
 				Out: map[string]string{
-					psMain: "    7     1 john     U    Thu Nov 20 12:04:00 2026\n",
+					psMain: "    7     1 john     U     0.0  0.0      0 Thu Nov 20 12:04:00 2026\n",
 				},
 				Err: map[string]error{psName: errors.New("boom"), psArgs: errors.New("boom")},
 			},
@@ -225,7 +232,10 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			var c process.Collector
 			switch tt.variant {
 			case "linux":
-				c = &process.Linux{FS: sourcetest.FS(s.T(), tt.files)}
+				c = &process.Linux{
+					FS:  sourcetest.FS(s.T(), tt.files),
+					Now: func() time.Time { return time.Unix(1700000016, 0) },
+				}
 			case "darwin":
 				c = &process.Darwin{Exec: tt.runner}
 			}

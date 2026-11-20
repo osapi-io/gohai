@@ -43,6 +43,14 @@ type Process struct {
 	CmdLine      string `json:"cmd_line,omitempty"`      // OCSF-style: process.cmd_line
 	State        string `json:"state,omitempty"`         // R/S/D/Z/T/I (Linux proc/status)
 	CreationTime int64  `json:"creation_time,omitempty"` // unix timestamp (seconds)
+
+	// CPUPercent is the CPU time the process used since it started, as a
+	// share of the time since it started. 100 is one full CPU.
+	CPUPercent float64 `json:"cpu_percent,omitempty"`
+	// MemPercent is RSS as a share of the host's physical memory.
+	MemPercent float64 `json:"mem_percent,omitempty"`
+	// RSS is the resident set size, in bytes.
+	RSS int64 `json:"rss,omitempty"`
 }
 
 // Collector is the public interface every process variant satisfies.
