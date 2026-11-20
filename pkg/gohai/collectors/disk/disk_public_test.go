@@ -131,11 +131,12 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		wantErr string
 	}{
 		{
-			name:    "linux: /proc/diskstats, in file order",
+			name:    "linux: /proc/diskstats, in file order; a device with no reads or writes is left out",
 			variant: "linux",
 			files: map[string]string{"/proc/diskstats": "" +
 				"   8       0 sda 100 5 2000 30 50 6 4000 70 0 90 100 0 0 0 0\n" +
 				"   8       1 sda1 1 0 8 1 2 0 16 2 0 3 3\n" +
+				"   7       1 loop1 0 0 0 0 0 0 0 0 0 0 0\n" +
 				"short line\n"},
 			want: &disk.Info{Devices: []disk.Device{
 				{

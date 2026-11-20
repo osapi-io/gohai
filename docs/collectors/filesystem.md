@@ -151,8 +151,8 @@ On Linux:
 
 1. `/proc/mounts`, read through the filesystem of the collector, is the mount
    table. The collector changes the octal escapes of the file, such as `\040`
-   for a space, back to characters. `df -kP` gives the capacity, used and
-   available bytes of each mount. `df -iP` gives the inode counts
+   for a space, back to characters. `df -akP` gives the capacity, used and
+   available bytes of each mount. `df -aiP` gives the inode counts
    (`inodes_total`, `inodes_used`, `inodes_available`). When `total > 0`, the
    collector calculates `inodes_used_percent` as `used / total * 100`. Thus
    gohai also has Ohai's `filesystem[mount][:inodes_percent_used]` field.

@@ -238,8 +238,8 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 	const dfHead = "Filesystem 1024-blocks Used Available Capacity Mounted on\n"
 	baseMounts := "/dev/sda1 / ext4 rw,relatime 0 0\n/dev/sda2 /boot ext4 rw 0 0\nshort line\n"
 	baseDF := map[string]string{
-		"df -kP": dfHead + "/dev/sda1 100 50 50 50% /\n/dev/sda2 10 0 10 0% /boot\n",
-		"df -iP": "Filesystem Inodes IUsed IFree IUse% Mounted on\n/dev/sda1 1000 250 750 25% /\n" +
+		"df -akP": dfHead + "/dev/sda1 100 50 50 50% /\n/dev/sda2 10 0 10 0% /boot\n",
+		"df -aiP": "Filesystem Inodes IUsed IFree IUse% Mounted on\n/dev/sda1 1000 250 750 25% /\n" +
 			"short /\n/dev/sda2 a b c d% /boot\n",
 	}
 	btrfsMount := "/dev/sda1 / btrfs rw 0 0\n"
