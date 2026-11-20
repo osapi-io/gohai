@@ -34,6 +34,8 @@ type Package struct {
 	Version        string `json:"version"`
 	Architecture   string `json:"architecture,omitempty"`
 	PackageManager string `json:"package_manager"`
+	Description    string `json:"description,omitempty"` // one-line summary
+	Size           int64  `json:"size,omitempty"`        // installed size, bytes
 }
 
 // Info holds the list of installed packages.
@@ -75,5 +77,10 @@ func NewWith(
 		return collector.Wire(NewDarwin(), src)
 	}
 
-	return collector.Wire(NewLinux(), src)
+	l := NewLinux()
+	if collector.Family(src) != "debian" {
+		l.Manager = "rpm"
+	}
+
+	return collector.Wire(l, src)
 }

@@ -1,7 +1,7 @@
 # Collectors
 
-gohai collects system facts with 62 collectors in 10 categories. You can enable
-or disable each collector. This catalogue has 65 entries. The other three are
+gohai collects system facts with 63 collectors in 10 categories. You can enable
+or disable each collector. This catalogue has 66 entries. The other three are
 deprecated and gohai will not implement them. The tables mark them with 🪦. Each
 collector gathers one category of information and returns a typed Go struct.
 
@@ -99,9 +99,10 @@ to read and which special cases of each distribution to handle.
 
 ## Network
 
-| Collector             | Key       | Description                                  | Default | Implemented | Depends On |
-| --------------------- | --------- | -------------------------------------------- | ------- | ----------- | ---------- |
-| [network](network.md) | `network` | Interfaces, IPs, MACs, routes, DNS, counters | ✅      | ✅          | None       |
+| Collector             | Key       | Description                               | Default | Implemented | Depends On |
+| --------------------- | --------- | ----------------------------------------- | ------- | ----------- | ---------- |
+| [network](network.md) | `network` | Interfaces, IPs, MACs, routes, counters   | ✅      | ✅          | None       |
+| [dns](dns.md)         | `dns`     | Resolver servers, search domains, options | ❌      | ✅          | None       |
 
 ## Cloud
 

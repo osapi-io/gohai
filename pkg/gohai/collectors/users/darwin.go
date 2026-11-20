@@ -52,5 +52,20 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectPOSIX(ctx, d.FS, d.Exec)
+	info, err := collectPOSIX(ctx, d.FS, d.Exec)
+	if err != nil || d.Exec == nil {
+		return info, err
+	}
+	if out, err := d.Exec.Execute(
+		ctx,
+		"dscl",
+		".",
+		"-list",
+		"/Users",
+		"AuthenticationAuthority",
+	); err == nil {
+		applyDisabled(info.Passwd, out)
+	}
+
+	return info, nil
 }
