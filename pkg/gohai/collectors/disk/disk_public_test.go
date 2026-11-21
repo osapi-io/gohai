@@ -126,7 +126,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		want    *disk.Info
 		wantErr string
 	}{
@@ -153,7 +153,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: drivers with media, times in ms",
 			variant: "darwin",
-			runner:  sourcetest.Runner{Out: map[string]string{ioregLine: ioreg}},
+			runner:  sourcetest.Commands{Out: map[string]string{ioregLine: ioreg}},
 			want: &disk.Info{Devices: []disk.Device{{
 				Name: "disk0", ReadCount: 10, WriteCount: 20, ReadBytes: 4096, WriteBytes: 8192,
 				ReadTime: 3, WriteTime: 5, IoTime: 8,
@@ -162,7 +162,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: ioreg fails",
 			variant: "darwin",
-			runner:  sourcetest.Runner{Err: map[string]error{ioregLine: errors.New("boom")}},
+			runner:  sourcetest.Commands{Err: map[string]error{ioregLine: errors.New("boom")}},
 			wantErr: "ioreg IOBlockStorageDriver: boom",
 		},
 	}
@@ -173,7 +173,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &disk.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &disk.Darwin{Exec: tt.runner}
+				c = &disk.Darwin{Exec: tt.runner.Mock(s.T())}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {

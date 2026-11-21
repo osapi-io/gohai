@@ -693,37 +693,24 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				}
 				var exec executor.Executor
 				if tt.exec != nil {
-					if mock := tt.exec(s.T()); mock != nil {
-						exec = dfRunner{
-							Executor: mock,
-							df:       sourcetest.Runner{Out: tt.out, Err: tt.errs},
-						}
+					if mock, ok := tt.exec(s.T()).(*execmocks.MockExecutor); ok && mock != nil {
+						// The row's mock answers lsblk and zfs; df answers
+						// come from the row's out and errs.
+						df := sourcetest.Commands{Out: tt.out, Err: tt.errs}.Mock(s.T())
+						mock.EXPECT().
+							Execute(gomock.Any(), "df", gomock.Any()).
+							DoAndReturn(df.Execute).
+							AnyTimes()
+						exec = mock
 					}
 				}
 				c = &filesystem.Linux{FS: fs, Exec: exec}
 			case "darwin":
-				c = &filesystem.Darwin{Exec: sourcetest.Runner{Out: tt.out, Err: tt.errs}}
+				c = &filesystem.Darwin{
+					Exec: sourcetest.Commands{Out: tt.out, Err: tt.errs}.Mock(s.T()),
+				}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
-}
-
-// dfRunner answers df from df, and passes each other command to the
-// Executor, the lsblk and zfs mock of a row.
-type dfRunner struct {
-	executor.Executor
-	df sourcetest.Runner
-}
-
-func (r dfRunner) Execute(
-	ctx context.Context,
-	name string,
-	args ...string,
-) ([]byte, error) {
-	if name == "df" {
-		return r.df.Execute(ctx, name, args...)
-	}
-
-	return r.Executor.Execute(ctx, name, args...)
 }

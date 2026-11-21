@@ -78,6 +78,8 @@ just deps
     platform family that a collector reads. A zero field is the real host.
     `Host()` gives the real host, and `Runner` is the interface of the command
     runner.
+  - `source/mocks/`. `MockRunner`, the generated double of `source.Runner`, for
+    gohai's tests and for a caller that gives gohai its sources.
   - `registry.go`. `PublicRegistry`. The CLI uses it to list the flags.
 - **`pkg/gohai/collectors/<name>/`.** The public sub-package of each collector.
   Use the osapi pattern of one struct for each OS, with no build tags. The
@@ -134,8 +136,9 @@ just deps
     (`Execute(ctx, name, args...)`).
   - `mocks/`. The gomock generation (`go generate`) and the committed mock.
 - **`internal/sourcetest/`.** The sources of a collector test. `FS` gives a
-  memory filesystem that holds the given files. `Runner` answers the given
-  command lines.
+  memory filesystem that holds the given files. `Commands` holds the command
+  output of a table row, and its `Mock` is the generated `MockRunner` that
+  answers it.
 
 ## Code style
 

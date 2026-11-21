@@ -330,7 +330,7 @@ func (s *NetworkPublicTestSuite) TestSources() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		check   func(*network.Info)
 	}{
 		{
@@ -344,7 +344,7 @@ func (s *NetworkPublicTestSuite) TestSources() {
 					"  tun0: 1 2\n" +
 					"  tun0: 10 20 0 0 0 0 0 0 30 40 0 0 0 0 0 0\n",
 			},
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"ip -o addr show": "4: tun0    inet 10.8.0.1 peer 10.8.0.2/32 scope global tun0\n" +
 					"4: tun0    link/none\n",
 				"ip neigh show": "\nnot-an-ip dev eth0\n10.0.0.9 dev tun0 FAILED\n",
@@ -368,7 +368,7 @@ func (s *NetworkPublicTestSuite) TestSources() {
 		{
 			name:    "darwin: routes and defaults from netstat -rn",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"ifconfig -a -v": "en0: flags=8863<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 index 14\n" +
 					"\tinet 192.168.0.40 netmask 0xffff0000\n",
 				"netstat -rn": "Routing tables\n\nnot a table row before any table\n" +
@@ -400,7 +400,7 @@ func (s *NetworkPublicTestSuite) TestSources() {
 		{
 			name:    "darwin: ifconfig and netstat on a Mac",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"ifconfig -a -v": "\tbefore any interface\n" +
 					"lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384 index 1\n" +
 					"\tinet 127.0.0.1 netmask 0xff000000\n" +
@@ -439,9 +439,9 @@ func (s *NetworkPublicTestSuite) TestSources() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var c network.Collector = &network.Darwin{Exec: tt.runner}
+			var c network.Collector = &network.Darwin{Exec: tt.runner.Mock(s.T())}
 			if tt.variant == "linux" {
-				c = &network.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: tt.runner}
+				c = &network.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: tt.runner.Mock(s.T())}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
@@ -1365,11 +1365,11 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			var c network.Collector
 			switch tt.variant {
 			case "darwin":
-				r := sourcetest.Runner{Out: map[string]string{"ifconfig -a -v": ifconfigOf(ifs)}}
+				r := sourcetest.Commands{Out: map[string]string{"ifconfig -a -v": ifconfigOf(ifs)}}
 				if ifsErr != nil {
 					r.Err = map[string]error{"ifconfig -a -v": ifsErr}
 				}
-				c = &network.Darwin{Exec: r}
+				c = &network.Darwin{Exec: r.Mock(s.T())}
 			default:
 				if tt.fs != nil && ifsErr == nil {
 					writeSysfs(
@@ -1382,11 +1382,20 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}
 				var exec executor.Executor
 				if tt.exec != nil {
-					exec = withIP{inner: tt.exec, out: map[string]string{
-						"ip -o addr show": ipAddrOf(ifs),
-						"ip neigh show": "10.0.0.1 dev eth0 lladdr aa:bb:cc:dd:ee:01 REACHABLE\n" +
-							"fe80::1 dev eth0 lladdr aa:bb:cc:dd:ee:02 STALE\n",
-					}}
+					// The row's mock answers route, link and ethtool; the
+					// address and neighbour reads come from the row's
+					// interfaces.
+					mock := tt.exec.(*execmocks.MockExecutor)
+					mock.EXPECT().
+						Execute(gomock.Any(), "ip", "-o", "addr", "show").
+						Return([]byte(ipAddrOf(ifs)), nil).
+						AnyTimes()
+					mock.EXPECT().
+						Execute(gomock.Any(), "ip", "neigh", "show").
+						Return([]byte("10.0.0.1 dev eth0 lladdr aa:bb:cc:dd:ee:01 REACHABLE\n"+
+							"fe80::1 dev eth0 lladdr aa:bb:cc:dd:ee:02 STALE\n"), nil).
+						AnyTimes()
+					exec = mock
 				}
 				c = &network.Linux{FS: tt.fs, Exec: exec}
 			}
@@ -1502,23 +1511,4 @@ func ifconfigOf(
 	}
 
 	return out
-}
-
-// withIP answers the `ip` commands that each row shares, and sends the
-// rest to the row's executor.
-type withIP struct {
-	inner executor.Executor
-	out   map[string]string
-}
-
-func (w withIP) Execute(
-	ctx context.Context,
-	name string,
-	args ...string,
-) ([]byte, error) {
-	if out, ok := w.out[strings.Join(append([]string{name}, args...), " ")]; ok {
-		return []byte(out), nil
-	}
-
-	return w.inner.Execute(ctx, name, args...)
 }

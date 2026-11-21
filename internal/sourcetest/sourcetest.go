@@ -33,6 +33,9 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
+	"go.uber.org/mock/gomock"
+
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 // FS is an in-memory filesystem that holds files, by path.
@@ -54,29 +57,38 @@ func FS(
 	return fs
 }
 
-// Runner answers each command line, its name and arguments joined by
-// spaces, with Out, or fails it with Err. A line it does not know fails,
-// as a program that is not installed does.
-type Runner struct {
+// Commands is the output of each command line of a fake host, "name arg
+// arg", and the error of each line that fails. A test table holds it as
+// data; Mock makes the runner.
+type Commands struct {
 	Out map[string]string
 	Err map[string]error
 }
 
-// Execute is the answer for name and args.
-func (r Runner) Execute(
-	_ context.Context,
-	name string,
-	args ...string,
-) ([]byte, error) {
-	line := strings.Join(append([]string{name}, args...), " ")
-	if err, ok := r.Err[line]; ok {
-		return []byte(r.Out[line]), err
-	}
-	if out, ok := r.Out[line]; ok {
-		return []byte(out), nil
-	}
+// Mock is a generated source.Runner that answers each line of c: the
+// output, or the error with the output. Any other line fails, as a
+// command the host does not have.
+func (c Commands) Mock(
+	t testing.TB,
+) *mocks.MockRunner {
+	t.Helper()
+	m := mocks.NewMockRunner(gomock.NewController(t))
+	m.EXPECT().
+		Execute(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, name string, args ...string) ([]byte, error) {
+			line := strings.Join(append([]string{name}, args...), " ")
+			if err, ok := c.Err[line]; ok {
+				return []byte(c.Out[line]), err
+			}
+			if out, ok := c.Out[line]; ok {
+				return []byte(out), nil
+			}
 
-	return nil, fmt.Errorf("exec %s: executable file not found", name)
+			return nil, fmt.Errorf("exec %s: not found", line)
+		}).
+		AnyTimes()
+
+	return m
 }
 
 // Links adds symbolic links to fs, each path to its target, as sysfs

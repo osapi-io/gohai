@@ -309,7 +309,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			if id == "" {
 				id = strconv.Itoa(tt.euid) + "\n"
 			}
-			r := sourcetest.Runner{Out: map[string]string{"id -u": id}, Err: map[string]error{}}
+			r := sourcetest.Commands{Out: map[string]string{"id -u": id}, Err: map[string]error{}}
 			if tt.idErr != nil {
 				r.Err["id -u"] = tt.idErr
 			}
@@ -319,7 +319,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			} else {
 				r.Err[dscl] = errors.New("exec dscl: not found")
 			}
-			var exec executor.Executor = r
+			var exec executor.Executor = r.Mock(s.T())
 			if tt.nilExec {
 				exec = nil
 			}

@@ -115,17 +115,17 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 }
 
 func (s *PackageMgrPublicTestSuite) TestCollect() {
-	found := func(paths map[string]string) sourcetest.Runner {
+	found := func(paths map[string]string) sourcetest.Commands {
 		out := map[string]string{}
 		for name, p := range paths {
 			out["sh -c command -v "+name] = p + "\n"
 		}
-		return sourcetest.Runner{Out: out}
+		return sourcetest.Commands{Out: out}
 	}
 	tests := []struct {
 		name     string
 		c        func(executor.Executor) packagemgr.Collector
-		runner   sourcetest.Runner
+		runner   sourcetest.Commands
 		nilExec  bool
 		wantName string
 		wantPath string
@@ -170,7 +170,7 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 		{
 			name: "darwin: an alias is not a path",
 			c:    func(e executor.Executor) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"sh -c command -v brew": "alias brew='echo'\n",
 			}},
 		},
@@ -186,7 +186,7 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var exec executor.Executor = tt.runner
+			var exec executor.Executor = tt.runner.Mock(s.T())
 			if tt.nilExec {
 				exec = nil
 			}

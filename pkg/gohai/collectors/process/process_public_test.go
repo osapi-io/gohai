@@ -127,7 +127,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		want    *process.Info
 		wantErr string
 	}{
@@ -180,7 +180,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: ps, joined by pid",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				psMain: "    1     0 root     Ss    0.0  0.1   1024 1-02:03:04.50 Thu Nov 20 12:04:00 2026\n" +
 					"  500     1 john     R+   12.5  3.0   2048 0:01.25 not a date at all\n" +
 					"  x 1 bad R\n" +
@@ -211,7 +211,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: the name and the args fail",
 			variant: "darwin",
-			runner: sourcetest.Runner{
+			runner: sourcetest.Commands{
 				Out: map[string]string{
 					psMain: "    7     1 john     U     0.0  0.0      0 x-1:00 Thu Nov 20 12:04:00 2026\n",
 				},
@@ -224,7 +224,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: ps fails",
 			variant: "darwin",
-			runner:  sourcetest.Runner{Err: map[string]error{psMain: errors.New("boom")}},
+			runner:  sourcetest.Commands{Err: map[string]error{psMain: errors.New("boom")}},
 			wantErr: "ps: boom",
 		},
 	}
@@ -238,7 +238,7 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 					Now: func() time.Time { return time.Unix(1700000016, 0) },
 				}
 			case "darwin":
-				c = &process.Darwin{Exec: tt.runner}
+				c = &process.Darwin{Exec: tt.runner.Mock(s.T())}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
@@ -258,7 +258,7 @@ func (s *ProcessPublicTestSuite) TestRead() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		want    *process.Process
 		wantErr string
 	}{
@@ -280,7 +280,7 @@ func (s *ProcessPublicTestSuite) TestRead() {
 		{
 			name:    "darwin: ps -p",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				one:                         "    7     1 john     S     2.5  0.4   4096 0:03.00 not a date at all\n",
 				"ps -p 7 -o pid=,ucomm=":    "    7 osapi\n",
 				"ps -p 7 -ww -o pid=,args=": "    7 /usr/local/bin/osapi agent start\n",
@@ -294,7 +294,7 @@ func (s *ProcessPublicTestSuite) TestRead() {
 		{
 			name:    "darwin: a time that is not a time",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				one: "    7     1 john     S     0.0  0.0      0 n/a\n",
 			}},
 			want: &process.Process{PID: 7, ParentPID: 1, Owner: "john", State: "sleep"},
@@ -302,13 +302,13 @@ func (s *ProcessPublicTestSuite) TestRead() {
 		{
 			name:    "darwin: ps prints nothing",
 			variant: "darwin",
-			runner:  sourcetest.Runner{Out: map[string]string{one: ""}},
+			runner:  sourcetest.Commands{Out: map[string]string{one: ""}},
 			wantErr: "no process 7",
 		},
 		{
 			name:    "darwin: ps fails",
 			variant: "darwin",
-			runner:  sourcetest.Runner{Err: map[string]error{one: errors.New("exit status 1")}},
+			runner:  sourcetest.Commands{Err: map[string]error{one: errors.New("exit status 1")}},
 			wantErr: "ps: exit status 1",
 		},
 	}
@@ -322,7 +322,7 @@ func (s *ProcessPublicTestSuite) TestRead() {
 					Now: func() time.Time { return time.Unix(1700000020, 0) },
 				}
 			case "darwin":
-				c = &process.Darwin{Exec: tt.runner}
+				c = &process.Darwin{Exec: tt.runner.Mock(s.T())}
 			}
 			got, err := c.Read(context.Background(), 7)
 			if tt.wantErr != "" {

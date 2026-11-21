@@ -154,10 +154,10 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			r := sourcetest.Runner{Out: tt.out}
-			var c sysconf.Collector = &sysconf.Linux{Exec: r}
+			r := sourcetest.Commands{Out: tt.out}
+			var c sysconf.Collector = &sysconf.Linux{Exec: r.Mock(s.T())}
 			if tt.variant == "darwin" {
-				c = &sysconf.Darwin{Exec: r}
+				c = &sysconf.Darwin{Exec: r.Mock(s.T())}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
