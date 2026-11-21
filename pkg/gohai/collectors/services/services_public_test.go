@@ -50,6 +50,15 @@ NetworkManager.service      loaded inactive dead    Network Manager
 LOAD   = Reflects whether the unit definition was properly loaded.
 `
 
+// unitFilesOut is list-unit-files: ssh starts at boot, cron is enabled at
+// runtime only, and NetworkManager is disabled although it is installed.
+const unitFilesOut = `ssh.service                 enabled         enabled
+cron.service                enabled-runtime enabled
+NetworkManager.service      disabled        enabled
+getty@.service              static          -
+not-a-unit
+`
+
 type ServicesPublicTestSuite struct {
 	suite.Suite
 }
@@ -65,6 +74,18 @@ func systemctlExec(
 	out []byte,
 	err error,
 ) executor.Executor {
+	return systemctlExecWith(t, out, err, []byte(unitFilesOut), nil)
+}
+
+// systemctlExecWith answers list-units with out and err, and
+// list-unit-files with files and filesErr.
+func systemctlExecWith(
+	t *testing.T,
+	out []byte,
+	err error,
+	files []byte,
+	filesErr error,
+) executor.Executor {
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	m := execmocks.NewMockExecutor(ctrl)
@@ -77,6 +98,14 @@ func systemctlExec(
 		"--no-pager",
 		"--plain",
 	).Return(out, err).AnyTimes()
+	m.EXPECT().Execute(
+		gomock.Any(),
+		"systemctl",
+		"list-unit-files",
+		"--type=service",
+		"--no-legend",
+		"--no-pager",
+	).Return(files, filesErr).AnyTimes()
 	return m
 }
 
@@ -159,10 +188,52 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				info, ok := got.(*services.Info)
 				s.Require().True(ok)
 				s.Equal([]services.Service{
-					{Name: "ssh", State: "running", Enabled: true},
-					{Name: "cron", State: "running", Enabled: true},
-					{Name: "NetworkManager", State: "dead", Enabled: false},
+					{
+						Name:        "ssh",
+						State:       "running",
+						Enabled:     true,
+						Description: "OpenSSH server daemon",
+					},
+					{
+						Name:        "cron",
+						State:       "running",
+						Enabled:     true,
+						Description: "Regular background program",
+					},
+					{
+						Name:        "NetworkManager",
+						State:       "dead",
+						Enabled:     false,
+						Description: "Network Manager",
+					},
 				}, info.Services)
+			},
+		},
+		{
+			name:    "linux: a unit that runs is not enabled unless its unit file is",
+			variant: "linux",
+			exec: systemctlExecWith(s.T(), []byte(systemctlOut), nil,
+				[]byte("ssh.service disabled enabled\n"), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.False(info.Services[0].Enabled, "ssh runs but is disabled")
+			},
+		},
+		{
+			name:    "linux: list-unit-files fails, no unit is enabled",
+			variant: "linux",
+			exec: systemctlExecWith(s.T(), []byte(systemctlOut), nil,
+				nil, errors.New("boom")),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				for _, svc := range info.Services {
+					s.False(svc.Enabled, svc.Name)
+				}
+				s.Equal("OpenSSH server daemon", info.Services[0].Description)
 			},
 		},
 		{
@@ -211,7 +282,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				info, ok := got.(*services.Info)
 				s.Require().True(ok)
 				s.Equal([]services.Service{
-					{Name: "ssh", State: "running", Enabled: true},
+					{Name: "ssh", State: "running", Enabled: true, Description: "OpenSSH"},
 				}, info.Services)
 			},
 		},

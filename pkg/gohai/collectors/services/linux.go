@@ -28,7 +28,9 @@ import (
 )
 
 // Linux collects systemd service states on Linux hosts by running
-// `systemctl list-units --type=service --all --no-pager --plain`.
+// `systemctl list-units --type=service --all --no-pager --plain` for each
+// unit's state and description, and `systemctl list-unit-files` for
+// whether it is enabled.
 type Linux struct {
 	base
 
@@ -62,5 +64,15 @@ func (l *Linux) Collect(
 	if err != nil {
 		return &Info{Services: []Service{}}, nil
 	}
-	return parseSystemctlOutput(string(out)), nil
+	// Enabled is the unit-file state, not whether the unit runs now. When
+	// list-unit-files fails, no unit is reported enabled.
+	files, _ := l.Exec.Execute(
+		ctx,
+		"systemctl",
+		"list-unit-files",
+		"--type=service",
+		"--no-legend",
+		"--no-pager",
+	)
+	return parseSystemctlOutput(string(out), parseUnitFiles(string(files))), nil
 }
