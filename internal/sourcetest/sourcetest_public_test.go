@@ -50,11 +50,11 @@ func (s *SourcetestPublicTestSuite) TestLinks() {
 	s.Equal("../../../bus/pci/drivers/i915", target)
 }
 
-func (s *SourcetestPublicTestSuite) TestRunner() {
-	r := sourcetest.Runner{
+func (s *SourcetestPublicTestSuite) TestCommands() {
+	r := sourcetest.Commands{
 		Out: map[string]string{"sysctl -n vm.loadavg": "{ 1 2 3 }", "df -kP": "partial"},
 		Err: map[string]error{"df -kP": errors.New("exit status 1")},
-	}
+	}.Mock(s.T())
 	out, err := r.Execute(context.Background(), "sysctl", "-n", "vm.loadavg")
 	s.Require().NoError(err)
 	s.Equal("{ 1 2 3 }", string(out))

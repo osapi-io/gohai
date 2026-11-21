@@ -184,13 +184,14 @@ The file must have these contents, in this order:
    ```go
    switch tt.variant {
    case "linux":
-       c = &cpu.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: tt.runner}
+       c = &cpu.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: tt.runner.Mock(s.T())}
    case "darwin":
-       c = &cpu.Darwin{Exec: tt.runner}
+       c = &cpu.Darwin{Exec: tt.runner.Mock(s.T())}
    }
    ```
-   `tt.runner` is a `sourcetest.Runner`. Its `Out` and `Err` maps answer a
-   command line, such as `"sysctl -n hw.logicalcpu"`.
+   `tt.runner` is a `sourcetest.Commands`: its `Out` and `Err` maps answer a
+   command line, such as `"sysctl -n hw.logicalcpu"`. `Mock` makes the generated
+   `source/mocks.MockRunner` that answers them. Never write a runner by hand.
 4. Optional: separate test methods for public helper functions that are really
    pure and independent (`TestHumanDuration`, `TestBytesToString`,
    `TestNeighFamily`). These are permitted because the helper has its own

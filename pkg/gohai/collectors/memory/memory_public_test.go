@@ -182,7 +182,7 @@ Pages bogus:                         lots.
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		check   func(*memory.Info)
 		wantErr string
 	}{
@@ -244,7 +244,7 @@ Pages bogus:                         lots.
 		{
 			name:    "darwin: hw.memsize, vm_stat and vm.swapusage",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n hw.memsize":   "409600\n",
 				"vm_stat":                vmStat,
 				"sysctl -n vm.swapusage": swapUsage,
@@ -267,7 +267,9 @@ Pages bogus:                         lots.
 		{
 			name:    "darwin: vm_stat and vm.swapusage fail",
 			variant: "darwin",
-			runner:  sourcetest.Runner{Out: map[string]string{"sysctl -n hw.memsize": "409600\n"}},
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sysctl -n hw.memsize": "409600\n"},
+			},
 			check: func(i *memory.Info) {
 				s.Equal(&memory.Info{Total: 409600}, i)
 			},
@@ -275,7 +277,7 @@ Pages bogus:                         lots.
 		{
 			name:    "darwin: more available than the total, and no swap",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n hw.memsize":   "1\n",
 				"vm_stat":                vmStat,
 				"sysctl -n vm.swapusage": "total = 0.00M  used = 0.00M  free = 0.00M\n",
@@ -288,7 +290,7 @@ Pages bogus:                         lots.
 		{
 			name:    "darwin: hw.memsize fails",
 			variant: "darwin",
-			runner: sourcetest.Runner{
+			runner: sourcetest.Commands{
 				Err: map[string]error{"sysctl -n hw.memsize": errors.New("boom")},
 			},
 			wantErr: "sysctl hw.memsize: boom",
@@ -296,7 +298,7 @@ Pages bogus:                         lots.
 		{
 			name:    "darwin: hw.memsize is not a number",
 			variant: "darwin",
-			runner:  sourcetest.Runner{Out: map[string]string{"sysctl -n hw.memsize": "lots\n"}},
+			runner:  sourcetest.Commands{Out: map[string]string{"sysctl -n hw.memsize": "lots\n"}},
 			wantErr: "sysctl hw.memsize",
 		},
 	}
@@ -307,7 +309,7 @@ Pages bogus:                         lots.
 			case "linux":
 				c = &memory.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &memory.Darwin{Exec: tt.runner}
+				c = &memory.Darwin{Exec: tt.runner.Mock(s.T())}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {

@@ -78,7 +78,7 @@ func (s *DNSPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		nilExec bool
 		want    *dns.Info
 	}{
@@ -86,7 +86,7 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			name:    "linux: resolv.conf and resolvectl links",
 			variant: "linux",
 			files:   map[string]string{"/etc/resolv.conf": resolvConf},
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"resolvectl dns":    "Global: 1.1.1.1\nLink 2 (eth0): 10.0.0.1 fe80::1%eth0\nLink 3 (wg0):\n",
 				"resolvectl domain": "Global:\nLink 2 (eth0): corp.example ~.\n",
 			}},
@@ -106,7 +106,7 @@ func (s *DNSPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no resolv.conf, and resolvectl fails",
 			variant: "linux",
-			runner: sourcetest.Runner{Err: map[string]error{
+			runner: sourcetest.Commands{Err: map[string]error{
 				"resolvectl dns": errors.New(
 					"not found",
 				),
@@ -125,7 +125,7 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			name:    "darwin: scoped resolvers, the first of each interface",
 			variant: "darwin",
 			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
-			runner: sourcetest.Runner{
+			runner: sourcetest.Commands{
 				Out: map[string]string{"scutil --dns": "DNS configuration\n\n" +
 					"resolver #1\n  search domain[0] : ts.example\n  nameserver[0] : 100.100.100.100\n  if_index : 24 (utun6)\n\n" +
 					"resolver #2\n  nameserver[0] : 1.1.1.1\n  if_index : 14 (en0)\n\n" +
@@ -147,7 +147,7 @@ func (s *DNSPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: scutil fails",
 			variant: "darwin",
-			runner:  sourcetest.Runner{Err: map[string]error{"scutil --dns": errors.New("boom")}},
+			runner:  sourcetest.Commands{Err: map[string]error{"scutil --dns": errors.New("boom")}},
 			want:    &dns.Info{},
 		},
 		{
@@ -163,13 +163,13 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			var c dns.Collector
 			switch tt.variant {
 			case "linux":
-				l := &dns.Linux{FS: fs, Exec: tt.runner}
+				l := &dns.Linux{FS: fs, Exec: tt.runner.Mock(s.T())}
 				if tt.nilExec {
 					l.Exec = nil
 				}
 				c = l
 			case "darwin":
-				d := &dns.Darwin{FS: fs, Exec: tt.runner}
+				d := &dns.Darwin{FS: fs, Exec: tt.runner.Mock(s.T())}
 				if tt.nilExec {
 					d.Exec = nil
 				}

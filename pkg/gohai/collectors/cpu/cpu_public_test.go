@@ -191,7 +191,7 @@ func (s *CPUPublicTestSuite) TestSources() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		nilExec bool
 		check   func(*cpu.Info)
 		wantErr string
@@ -251,7 +251,7 @@ func (s *CPUPublicTestSuite) TestSources() {
 		{
 			name:    "darwin: an Intel Mac's family, model, flags and frequency",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n hw.logicalcpu":              "8\n",
 				"sysctl -n machdep.cpu.brand_string":   "Intel(R) Core(TM) i9\n",
 				"sysctl -n machdep.cpu.vendor":         "GenuineIntel\n",
@@ -275,7 +275,7 @@ func (s *CPUPublicTestSuite) TestSources() {
 		{
 			name:    "darwin: Apple Silicon's frequency table",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n hw.logicalcpu": "10\n", pmgr: "  | " + table + "\n",
 			}},
 			check: func(i *cpu.Info) {
@@ -285,7 +285,7 @@ func (s *CPUPublicTestSuite) TestSources() {
 		{
 			name:    "darwin: no table in ioreg's output",
 			variant: "darwin",
-			runner: sourcetest.Runner{
+			runner: sourcetest.Commands{
 				Out: map[string]string{"sysctl -n hw.logicalcpu": "10\n", pmgr: "{}\n"},
 			},
 			check: func(i *cpu.Info) {
@@ -295,7 +295,7 @@ func (s *CPUPublicTestSuite) TestSources() {
 		{
 			name:    "darwin: a table that is not hex",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n hw.logicalcpu": "10\n", pmgr: "\"voltage-states5-sram\" = <abc>\n",
 			}},
 			check: func(i *cpu.Info) {
@@ -310,11 +310,11 @@ func (s *CPUPublicTestSuite) TestSources() {
 			case "linux":
 				l := &cpu.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 				if !tt.nilExec {
-					l.Exec = tt.runner
+					l.Exec = tt.runner.Mock(s.T())
 				}
 				c = l
 			case "darwin":
-				c = &cpu.Darwin{Exec: tt.runner}
+				c = &cpu.Darwin{Exec: tt.runner.Mock(s.T())}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
@@ -352,7 +352,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 		err error
 	}
 	darwinExec := func(_ *testing.T, sysctls map[string]sysctlRet) executor.Executor {
-		r := sourcetest.Runner{Out: map[string]string{}, Err: map[string]error{}}
+		r := sourcetest.Commands{Out: map[string]string{}, Err: map[string]error{}}
 		defaults := map[string]sysctlRet{
 			"hw.logicalcpu":            {out: "12\n"},
 			"machdep.cpu.brand_string": {out: "Apple M2 Pro\n"},
@@ -370,7 +370,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 				r.Out[line] = ret.out
 			}
 		}
-		return r
+		return r.Mock(s.T())
 	}
 
 	tests := []struct {

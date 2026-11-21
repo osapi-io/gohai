@@ -116,7 +116,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		want    *load.Info
 		wantErr string
 	}{
@@ -138,7 +138,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: vm.loadavg",
 			variant: "darwin",
-			runner: sourcetest.Runner{
+			runner: sourcetest.Commands{
 				Out: map[string]string{"sysctl -n vm.loadavg": "{ 1.50 2.00 2.50 }\n"},
 			},
 			want: &load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
@@ -146,7 +146,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: sysctl fails",
 			variant: "darwin",
-			runner: sourcetest.Runner{
+			runner: sourcetest.Commands{
 				Err: map[string]error{"sysctl -n vm.loadavg": errors.New("boom")},
 			},
 			wantErr: "sysctl vm.loadavg: boom",
@@ -159,7 +159,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &load.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &load.Darwin{Exec: tt.runner}
+				c = &load.Darwin{Exec: tt.runner.Mock(s.T())}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {

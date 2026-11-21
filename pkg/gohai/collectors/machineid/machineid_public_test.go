@@ -117,7 +117,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		want    *machineid.Info
 		wantErr string
 	}{
@@ -146,7 +146,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: IOPlatformUUID",
 			variant: "darwin",
-			runner: sourcetest.Runner{
+			runner: sourcetest.Commands{
 				Out: map[string]string{ioregLine: "+-o J316sAP  <class IOPlatformExpertDevice>\n" +
 					"    {\n      \"IOPlatformUUID\" = \"052A2E50-1749-5FAA-0000-000000000000\"\n    }\n"},
 			},
@@ -154,12 +154,12 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "darwin: no UUID in the output", variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{ioregLine: "{}\n"}},
+			runner: sourcetest.Commands{Out: map[string]string{ioregLine: "{}\n"}},
 			want:   &machineid.Info{},
 		},
 		{
 			name: "darwin: ioreg fails", variant: "darwin",
-			runner:  sourcetest.Runner{Err: map[string]error{ioregLine: errors.New("boom")}},
+			runner:  sourcetest.Commands{Err: map[string]error{ioregLine: errors.New("boom")}},
 			wantErr: "ioreg IOPlatformExpertDevice: boom",
 		},
 	}
@@ -170,7 +170,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &machineid.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &machineid.Darwin{Exec: tt.runner}
+				c = &machineid.Darwin{Exec: tt.runner.Mock(s.T())}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {

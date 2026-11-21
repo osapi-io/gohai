@@ -118,7 +118,7 @@ func (s *UptimePublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		files   map[string]string
-		runner  sourcetest.Runner
+		runner  sourcetest.Commands
 		want    *uptime.Info
 		wantErr string
 	}{
@@ -161,7 +161,7 @@ func (s *UptimePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: boot time and the clock",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n kern.boottime": "{ sec = 1767229145, usec = 0 } Thu Jan  1 00:59:05 2026\n",
 			}},
 			want: &uptime.Info{Seconds: 93700, BootTime: 1767229145, Human: "1d 2h 1m 40s"},
@@ -169,7 +169,7 @@ func (s *UptimePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: a boot time after the clock",
 			variant: "darwin",
-			runner: sourcetest.Runner{Out: map[string]string{
+			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n kern.boottime": "{ sec = 1999999999, usec = 0 }\n",
 			}},
 			want: &uptime.Info{Seconds: 0, BootTime: 1999999999, Human: "0s"},
@@ -177,14 +177,14 @@ func (s *UptimePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: sysctl fails",
 			variant: "darwin",
-			runner: sourcetest.Runner{
+			runner: sourcetest.Commands{
 				Err: map[string]error{"sysctl -n kern.boottime": errors.New("boom")},
 			},
 			wantErr: "sysctl kern.boottime: boom",
 		},
 		{
 			name: "darwin: no seconds", variant: "darwin",
-			runner:  sourcetest.Runner{Out: map[string]string{"sysctl -n kern.boottime": "nope"}},
+			runner:  sourcetest.Commands{Out: map[string]string{"sysctl -n kern.boottime": "nope"}},
 			wantErr: "no seconds",
 		},
 	}
@@ -195,7 +195,7 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			case "linux":
 				c = &uptime.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &uptime.Darwin{Exec: tt.runner, Now: now}
+				c = &uptime.Darwin{Exec: tt.runner.Mock(s.T()), Now: now}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
