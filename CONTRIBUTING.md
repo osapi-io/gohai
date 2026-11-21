@@ -74,12 +74,13 @@ just deps
     Flat methods.
   - `options.go`. The functional options (`WithEnabled`, `WithDisabled`,
     `WithCollectors`, `WithSources`).
-  - `source/`. `Sources`: the filesystem, the command runner, the clock and the
-    platform family that a collector reads. A zero field is the real host.
-    `Host()` gives the real host, and `Runner` is the interface of the command
-    runner.
-  - `source/mocks/`. `MockRunner`, the generated double of `source.Runner`, for
-    gohai's tests and for a caller that gives gohai its sources.
+  - `source/`. `Sources`: the filesystem, the command runner, the clock, the
+    platform family and the name resolver that a collector reads. A zero field
+    is the real host. `Host()` gives the real host. `Runner` is the interface of
+    the command runner, and `Resolver` of the name lookups.
+  - `source/mocks/`. `MockRunner` and `MockResolver`, the generated doubles of
+    `source.Runner` and `source.Resolver`, for gohai's tests and for a caller
+    that gives gohai its sources.
   - `registry.go`. `PublicRegistry`. The CLI uses it to list the flags.
 - **`pkg/gohai/collectors/<name>/`.** The public sub-package of each collector.
   Use the osapi pattern of one struct for each OS, with no build tags. The
@@ -494,10 +495,10 @@ Before you mark a collector as complete, each item below must be true:
     `TestHumanDuration`.
 
 06. **The seams are the sources.** A test row gives the files, the command
-    output and the clock, through `internal/sourcetest`. Thus the parse runs on
-    each row. A package `var` that a test replaces is only for a read that is
-    not a source, such as a DNS lookup. No `readXFn = readX` wrappers in the
-    middle of the collector.
+    output, the clock and the name lookups, through `internal/sourcetest` and
+    the generated mocks of `pkg/gohai/source/mocks`. Thus the parse runs on each
+    row. No package `var` that a test replaces for a read, and no
+    `readXFn = readX` wrappers in the middle of the collector.
 
 07. **`docs/collectors/<name>.md`** is a functional spec that is complete in
     itself. It has these sections:

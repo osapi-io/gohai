@@ -22,12 +22,14 @@ package hostname
 
 import (
 	"context"
+	"net"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects hostname facts on Linux. Mirrors Ohai's linux branch:
@@ -39,13 +41,14 @@ import (
 type Linux struct {
 	base
 
-	Exec executor.Executor
-	FS   avfs.VFS
+	Exec     executor.Executor
+	FS       avfs.VFS
+	Resolver source.Resolver
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New(), FS: osfs.NewWithNoIdm()}
+	return &Linux{Exec: executor.New(), FS: osfs.NewWithNoIdm(), Resolver: net.DefaultResolver}
 }
 
 // Collect returns hostname facts.
@@ -53,5 +56,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectWithExec(ctx, l.Exec, l.FS)
+	return collectWithExec(ctx, l.Exec, l.FS, l.Resolver)
 }

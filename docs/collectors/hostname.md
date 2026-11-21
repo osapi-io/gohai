@@ -79,11 +79,12 @@ darwin branches of Ohai's `hostname.rb`:
 2. `hostname` with no arguments gives `machine_name`. On stock macOS, this is
    the friendly name from `ComputerName`. On Linux, it is usually the same as
    the short name.
-3. The collector makes the FQDN canonical with `net.LookupHost` and then
-   `net.LookupAddr`. On a temporary error, it tries again, up to 3 times, with a
-   100ms backoff. This is the same as Ohai's
-   `canonicalize_hostname_with_retries`. If the last try fails, the collector
-   uses the short hostname as the FQDN.
+3. The collector makes the FQDN canonical with `LookupHost` and then
+   `LookupAddr` of the `Resolver` of its sources: the system resolver, which
+   reads `/etc/hosts` and then DNS, when the caller gives none. On a temporary
+   error, it tries again, up to 3 times, with a 100ms backoff. This is the same
+   as Ohai's `canonicalize_hostname_with_retries`. If the last try fails, the
+   collector uses the short hostname as the FQDN.
 4. The collector splits the FQDN at the first `.` to get `domain`. `domain` is
    empty if the FQDN is the same as `name`.
 5. If the exec runner is not available, or `hostname -s` or `hostname` fails,

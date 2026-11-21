@@ -22,12 +22,14 @@ package hostname
 
 import (
 	"context"
+	"net"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects hostname facts on macOS. Identical wiring to Linux:
@@ -38,13 +40,14 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
-	FS   avfs.VFS
+	Exec     executor.Executor
+	FS       avfs.VFS
+	Resolver source.Resolver
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New(), FS: osfs.NewWithNoIdm()}
+	return &Darwin{Exec: executor.New(), FS: osfs.NewWithNoIdm(), Resolver: net.DefaultResolver}
 }
 
 // Collect returns hostname facts.
@@ -52,5 +55,5 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectWithExec(ctx, d.Exec, d.FS)
+	return collectWithExec(ctx, d.Exec, d.FS, d.Resolver)
 }

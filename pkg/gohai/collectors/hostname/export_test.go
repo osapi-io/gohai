@@ -24,24 +24,6 @@ import (
 	"time"
 )
 
-// SetLookupHostFn swaps the private net.LookupHost seam.
-func SetLookupHostFn(
-	fn func(string) ([]string, error),
-) (restore func()) {
-	orig := lookupHostFn
-	lookupHostFn = fn
-	return func() { lookupHostFn = orig }
-}
-
-// SetLookupAddrFn swaps the private net.LookupAddr seam.
-func SetLookupAddrFn(
-	fn func(string) ([]string, error),
-) (restore func()) {
-	orig := lookupAddrFn
-	lookupAddrFn = fn
-	return func() { lookupAddrFn = orig }
-}
-
 // SetResolverRetries swaps the retry count used by canonicalFQDN.
 func SetResolverRetries(
 	n int,
