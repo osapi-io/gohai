@@ -27,6 +27,7 @@ package source
 import (
 	"context"
 	"fmt"
+	"net"
 	"os/exec"
 	"time"
 
@@ -58,6 +59,16 @@ type Sources struct {
 	// Family picks the collector's variant, as family.Detect names it, such
 	// as debian or darwin.
 	Family string
+	// Resolver resolves names, as the system resolver does: /etc/hosts and
+	// then DNS. The hostname collector canonicalizes the FQDN with it.
+	Resolver Resolver
+}
+
+// Resolver is the name lookups that a collector makes. *net.Resolver has
+// them.
+type Resolver interface {
+	LookupHost(ctx context.Context, host string) ([]string, error)
+	LookupAddr(ctx context.Context, addr string) ([]string, error)
 }
 
 // Host is the real host: its filesystem, its programs, its clock and its
@@ -79,6 +90,9 @@ func (s Sources) Defaults() Sources {
 	}
 	if s.Family == "" {
 		s.Family = family.Detect()
+	}
+	if s.Resolver == nil {
+		s.Resolver = net.DefaultResolver
 	}
 
 	return s

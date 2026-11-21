@@ -198,11 +198,10 @@ The file must have these contents, in this order:
    contract. **Do not** make `TestReadX` methods that test bridge code that
    `TestCollect` already tests.
 
-**The test seams are the sources.** A row gives files, command output and a
-clock. Use a package `var` that a test replaces only for a read that is not a
-source, such as a DNS lookup. Do NOT add wrappers in the middle, such as
-`readCPUFn = readCPU`. That is test-only code in production code, and the
-consistency rule forbids it.
+**The test seams are the sources.** A row gives files, command output, a clock
+and name lookups. Do not add a package `var` that a test replaces for a read. Do
+NOT add wrappers in the middle, such as `readCPUFn = readCPU`. That is test-only
+code in production code, and the consistency rule forbids it.
 
 No test file has a build tag. `go test ./...` runs all tests on each development
 OS.

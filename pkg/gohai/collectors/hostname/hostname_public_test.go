@@ -26,6 +26,8 @@ import (
 	"net"
 	"testing"
 
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -504,15 +506,23 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			fs := sourcetest.FS(s.T(), tt.files)
-			defer hostname.SetLookupHostFn(tt.lookupHost)()
-			defer hostname.SetLookupAddrFn(tt.lookupAddr)()
+			// The generated resolver answers with the row's lookups.
+			resolver := sourcemocks.NewMockResolver(gomock.NewController(s.T()))
+			resolver.EXPECT().
+				LookupHost(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, host string) ([]string, error) { return tt.lookupHost(host) }).
+				AnyTimes()
+			resolver.EXPECT().
+				LookupAddr(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, addr string) ([]string, error) { return tt.lookupAddr(addr) }).
+				AnyTimes()
 
 			var c hostname.Collector
 			switch tt.variant {
 			case "linux":
-				c = &hostname.Linux{Exec: tt.exec(s.T()), FS: fs}
+				c = &hostname.Linux{Exec: tt.exec(s.T()), FS: fs, Resolver: resolver}
 			case "darwin":
-				c = &hostname.Darwin{Exec: tt.exec(s.T()), FS: fs}
+				c = &hostname.Darwin{Exec: tt.exec(s.T()), FS: fs, Resolver: resolver}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

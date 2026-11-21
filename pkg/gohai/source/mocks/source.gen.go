@@ -59,3 +59,57 @@ func (mr *MockRunnerMockRecorder) Execute(ctx, name any, args ...any) *gomock.Ca
 	varargs := append([]any{ctx, name}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockRunner)(nil).Execute), varargs...)
 }
+
+// MockResolver is a mock of Resolver interface.
+type MockResolver struct {
+	ctrl     *gomock.Controller
+	recorder *MockResolverMockRecorder
+	isgomock struct{}
+}
+
+// MockResolverMockRecorder is the mock recorder for MockResolver.
+type MockResolverMockRecorder struct {
+	mock *MockResolver
+}
+
+// NewMockResolver creates a new mock instance.
+func NewMockResolver(ctrl *gomock.Controller) *MockResolver {
+	mock := &MockResolver{ctrl: ctrl}
+	mock.recorder = &MockResolverMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockResolver) EXPECT() *MockResolverMockRecorder {
+	return m.recorder
+}
+
+// LookupAddr mocks base method.
+func (m *MockResolver) LookupAddr(ctx context.Context, addr string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LookupAddr", ctx, addr)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LookupAddr indicates an expected call of LookupAddr.
+func (mr *MockResolverMockRecorder) LookupAddr(ctx, addr any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LookupAddr", reflect.TypeOf((*MockResolver)(nil).LookupAddr), ctx, addr)
+}
+
+// LookupHost mocks base method.
+func (m *MockResolver) LookupHost(ctx context.Context, host string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LookupHost", ctx, host)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LookupHost indicates an expected call of LookupHost.
+func (mr *MockResolverMockRecorder) LookupHost(ctx, host any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LookupHost", reflect.TypeOf((*MockResolver)(nil).LookupHost), ctx, host)
+}

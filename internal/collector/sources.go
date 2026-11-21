@@ -58,9 +58,10 @@ func Family(
 }
 
 var (
-	fsType   = reflect.TypeFor[avfs.VFS]()
-	execType = reflect.TypeFor[source.Runner]()
-	nowType  = reflect.TypeFor[func() time.Time]()
+	fsType       = reflect.TypeFor[avfs.VFS]()
+	execType     = reflect.TypeFor[source.Runner]()
+	nowType      = reflect.TypeFor[func() time.Time]()
+	resolverType = reflect.TypeFor[source.Resolver]()
 )
 
 // Wire gives the collector variant c the sources of src, and returns c. It
@@ -88,6 +89,7 @@ func Wire[C any](
 	set("FS", fsType, src.FS)
 	set("Exec", execType, src.Exec)
 	set("Now", nowType, src.Now)
+	set("Resolver", resolverType, src.Resolver)
 
 	return c
 }

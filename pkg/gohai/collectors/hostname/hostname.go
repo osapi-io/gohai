@@ -42,13 +42,9 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Package-level injection seams. Kept private so importers don't
-// transitively need them; swapped via the SetXFn helpers in
-// export_test.go. Stdlib calls are swapped the same way so tests avoid
-// real DNS traffic and don't sleep.
+// resolverRetries and resolverBackoff are how often and how far apart the
+// FQDN lookups are tried. Tests set the backoff to zero.
 var (
-	lookupHostFn    = net.LookupHost
-	lookupAddrFn    = net.LookupAddr
 	resolverRetries = 3
 	resolverBackoff = 100 * time.Millisecond
 )
@@ -115,6 +111,7 @@ func collectWithExec(
 	ctx context.Context,
 	exec executor.Executor,
 	fs avfs.VFS,
+	resolver source.Resolver,
 ) (*Info, error) {
 	short, shortOK := "", false
 	machine, machineOK := "", false
@@ -144,7 +141,7 @@ func collectWithExec(
 	}
 
 	info := &Info{Name: short, MachineName: machine}
-	info.FQDN, info.Domain = canonicalFQDN(short)
+	info.FQDN, info.Domain = canonicalFQDN(ctx, resolver, short)
 	return info, nil
 }
 
@@ -160,16 +157,18 @@ func collectWithExec(
 // as FQDN and empty domain, matching Ohai's
 // canonicalize_hostname_with_retries behaviour.
 func canonicalFQDN(
+	ctx context.Context,
+	resolver source.Resolver,
 	short string,
 ) (fqdn, domain string) {
-	if short == "" {
+	if short == "" || resolver == nil {
 		return "", ""
 	}
 	for attempt := 0; attempt < resolverRetries; attempt++ {
 		if attempt > 0 {
 			time.Sleep(resolverBackoff)
 		}
-		ips, err := lookupHostFn(short)
+		ips, err := resolver.LookupHost(ctx, short)
 		if err != nil {
 			if isDNSNotFound(err) {
 				break
@@ -179,7 +178,7 @@ func canonicalFQDN(
 		if len(ips) == 0 {
 			break
 		}
-		names, err := lookupAddrFn(ips[0])
+		names, err := resolver.LookupAddr(ctx, ips[0])
 		if err != nil {
 			if isDNSNotFound(err) {
 				break
