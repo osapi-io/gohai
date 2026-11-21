@@ -38,6 +38,9 @@ type Service struct {
 	State   string `json:"state"`
 	Enabled bool   `json:"enabled"`
 	Type    string `json:"type,omitempty"`
+	// Description is the unit's Description=, as systemctl list-units
+	// prints it.
+	Description string `json:"description,omitempty"`
 }
 
 // Info holds the list of systemd services.
@@ -92,6 +95,7 @@ func NewWith(
 // A service is considered enabled when its ACTIVE state is "active".
 func parseSystemctlOutput(
 	output string,
+	enabled map[string]bool,
 ) *Info {
 	info := &Info{Services: []Service{}}
 	sc := bufio.NewScanner(strings.NewReader(output))
@@ -112,14 +116,34 @@ func parseSystemctlOutput(
 			continue
 		}
 		name := strings.TrimSuffix(fields[0], ".service")
-		// fields[1] = LOAD, fields[2] = ACTIVE, fields[3] = SUB
-		active := fields[2]
-		sub := fields[3]
+		// fields[1] = LOAD, fields[2] = ACTIVE, fields[3] = SUB, then the
+		// description, which can have spaces.
 		info.Services = append(info.Services, Service{
-			Name:    name,
-			State:   sub,
-			Enabled: active == "active",
+			Name:        name,
+			State:       fields[3],
+			Enabled:     enabled[name],
+			Description: strings.Join(fields[4:], " "),
 		})
 	}
 	return info
+}
+
+// parseUnitFiles parses `systemctl list-unit-files --type=service
+// --no-legend --no-pager`: each line is a unit, its state and its preset.
+// A unit is enabled when its state is enabled or enabled-runtime: it
+// starts at boot, whether or not it runs now.
+func parseUnitFiles(
+	output string,
+) map[string]bool {
+	enabled := map[string]bool{}
+	for _, line := range strings.Split(output, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 || !strings.HasSuffix(fields[0], ".service") {
+			continue
+		}
+		enabled[strings.TrimSuffix(fields[0], ".service")] =
+			fields[1] == "enabled" || fields[1] == "enabled-runtime"
+	}
+
+	return enabled
 }
