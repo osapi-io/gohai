@@ -154,6 +154,23 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a relative link, as Ubuntu has, resolves from /etc",
+			variant: "linux",
+			now:     pdt,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.Symlink("../usr/share/zoneinfo/Etc/UTC", "/etc/localtime")
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("Etc/UTC", info.Name)
+			},
+		},
+		{
 			name:    "linux: target without zoneinfo prefix passed through",
 			variant: "linux",
 			now:     pdt,

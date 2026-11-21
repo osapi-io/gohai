@@ -103,7 +103,10 @@ On Linux:
 
 1. The collector gets the IANA `name`. It calls `Readlink("/etc/localtime")`
    through the injected `avfs.VFS` and removes the `/usr/share/zoneinfo/`
-   prefix. This gives values like `America/Los_Angeles`.
+   prefix. This gives values like `America/Los_Angeles`. A relative link, such
+   as `../usr/share/zoneinfo/Etc/UTC` on Ubuntu, is relative to `/etc`, so it
+   also gives `Etc/UTC`. A target outside the zoneinfo directory is the name as
+   the link gives it.
 2. Sometimes `/etc/localtime` is not a symlink. On Debian-style hosts the
    timezone data is a copy, not a symlink. Some container images are the same.
    In this condition, the collector reads `/etc/timezone` through the VFS and

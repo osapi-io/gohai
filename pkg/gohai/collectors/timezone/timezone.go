@@ -23,6 +23,7 @@
 package timezone
 
 import (
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -90,7 +91,17 @@ func resolveName(
 	zoneinfoPrefix string,
 ) string {
 	if target, err := readlink(localtimePath); err == nil {
-		return strings.TrimPrefix(target, zoneinfoPrefix)
+		// A relative link, such as ../usr/share/zoneinfo/Etc/UTC on Ubuntu,
+		// is relative to /etc. A target outside the zoneinfo directory is
+		// the name as the link gives it.
+		abs := target
+		if !filepath.IsAbs(abs) {
+			abs = filepath.Join(filepath.Dir(localtimePath), target)
+		}
+		if name, ok := strings.CutPrefix(abs, zoneinfoPrefix); ok {
+			return name
+		}
+		return target
 	}
 	if name, err := fallback(); err == nil {
 		return strings.TrimSpace(name)
