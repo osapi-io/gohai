@@ -52,3 +52,5 @@ type UnknownCollectorError struct{ Name string }
 func (e UnknownCollectorError) Error() string {
 	return "unknown collector " + e.Name
 }
+
+var JSONName = jsonName

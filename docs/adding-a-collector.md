@@ -253,6 +253,12 @@ from 🚧 to ✅, with the source in parentheses: `✅ (procfs + sysctl)`,
 
 ## Step 8: verify
 
+Run `gohai collector validate`, and read what
+`gohai collector get --name <name>` shows: the constructor, the fields, and the
+files and commands that the collector reads on each platform.
+`gohai collector spec get` lists each part of a collector. Programs that read a
+host through gohai, such as osapi, read the same list from `gohai.Collectors()`.
+
 ```bash
 go build ./...
 go test ./... -count=1

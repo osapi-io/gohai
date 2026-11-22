@@ -112,6 +112,10 @@ gohai collect --format ocsf --pretty            # OCSF inventory_info event
 gohai collect --flat                            # flat key=value pairs
 gohai collect --no-defaults --collector.cpu     # specific collectors only
 gohai collect --pretty | gohai validate          # validate against schema
+gohai collector list                            # each collector, its category and dependencies
+gohai collector get --name services             # its constructor, fields, and what it reads on each platform
+gohai collector spec get                        # the parts of a collector, for an author
+gohai collector validate                        # check each collector against the rules
 gohai version                                   # build info
 ```
 
