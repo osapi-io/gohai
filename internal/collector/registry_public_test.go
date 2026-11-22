@@ -106,6 +106,13 @@ func newFailingCollector(
 	return m
 }
 
+func (s *RegistryPublicTestSuite) TestCategories() {
+	cats := collector.Categories()
+	s.Len(cats, 10)
+	s.Contains(cats, collector.CategoryCloud)
+	s.Contains(cats, collector.CategoryMisc)
+}
+
 func (s *RegistryPublicTestSuite) TestRegister() {
 	tests := []struct {
 		name          string

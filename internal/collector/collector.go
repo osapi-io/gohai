@@ -67,6 +67,15 @@ const (
 	CategoryMisc           = "misc"
 )
 
+// Categories are the categories of the roster above.
+func Categories() []string {
+	return []string{
+		CategorySystem, CategoryHardware, CategoryNetwork, CategoryCloud,
+		CategoryVirtualization, CategorySecurity, CategorySoftware, CategoryUsers,
+		CategoryLinux, CategoryMisc,
+	}
+}
+
 // Collector is the interface every fact collector must implement.
 type Collector interface {
 	// Name returns the unique identifier (e.g., "platform").
