@@ -25,15 +25,18 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
-	"golang.org/x/sys/unix"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
@@ -51,45 +54,74 @@ func TestKernelPublicTestSuite(
 	suite.Run(t, new(KernelPublicTestSuite))
 }
 
-// fakeUtsname fills a unix.Utsname with name/release/version/machine.
-func fakeUtsname(
-	name, release, version, machine string,
-) func(*unix.Utsname) error {
-	return func(u *unix.Utsname) error {
-		copyBytes(u.Sysname[:], name)
-		copyBytes(u.Release[:], release)
-		copyBytes(u.Version[:], version)
-		copyBytes(u.Machine[:], machine)
-		return nil
+// hostFS is a filesystem with each file of files.
+func (s *KernelPublicTestSuite) hostFS(
+	files map[string]string,
+) avfs.VFS {
+	fs := memfs.New()
+	s.Require().NoError(fs.MkdirAll("/proc/sys/kernel", 0o755))
+	for path, content := range files {
+		s.Require().NoError(fs.WriteFile(path, []byte(content), 0o644))
+	}
+
+	return fs
+}
+
+// ubuntu are the /proc/sys/kernel files of an Ubuntu host.
+func ubuntu() map[string]string {
+	return map[string]string{
+		"/proc/sys/kernel/ostype":    "Linux\n",
+		"/proc/sys/kernel/osrelease": "5.15.0-47-generic\n",
+		"/proc/sys/kernel/version":   "#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022\n",
 	}
 }
 
-func copyBytes(
-	dst []byte,
-	src string,
-) {
-	for i := range dst {
-		if i < len(src) {
-			dst[i] = src[i]
-		} else {
-			dst[i] = 0
-		}
-	}
+// answer is one command a mock executor expects, and its output.
+type answer struct {
+	args []string
+	out  string
+	err  error
 }
 
-// rosettaExec returns a mock that canned-answers the Rosetta sysctl.
-func rosettaExec(
-	t *testing.T,
-	out []byte,
-	err error,
+func (s *KernelPublicTestSuite) exec(
+	answers ...answer,
 ) executor.Executor {
-	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
-	m.EXPECT().
-		Execute(gomock.Any(), "sysctl", "-n", "hw.optional.x86_64").
-		Return(out, err).
-		AnyTimes()
+	m := execmocks.NewMockExecutor(gomock.NewController(s.T()))
+	for _, a := range answers {
+		rest := make([]any, 0, len(a.args)-1)
+		for _, x := range a.args[1:] {
+			rest = append(rest, x)
+		}
+		m.EXPECT().Execute(gomock.Any(), a.args[0], rest...).Return([]byte(a.out), a.err)
+	}
+
 	return m
+}
+
+// sysctlKernel is the sysctl that Darwin runs for the uname values.
+func sysctlKernel(
+	out string,
+	err error,
+) answer {
+	return answer{
+		args: []string{
+			"sysctl",
+			"-n",
+			"kern.ostype",
+			"kern.osrelease",
+			"kern.version",
+			"hw.machine",
+		},
+		out: out,
+		err: err,
+	}
+}
+
+func rosetta(
+	out string,
+	err error,
+) answer {
+	return answer{args: []string{"sysctl", "-n", "hw.optional.x86_64"}, out: out, err: err}
 }
 
 func (s *KernelPublicTestSuite) TestNew() {
@@ -97,50 +129,14 @@ func (s *KernelPublicTestSuite) TestNew() {
 	defer func() { platform.Detect = orig }()
 
 	tests := []struct {
-		name         string
-		detect       string
-		validateFunc func(kernel.Collector)
+		name      string
+		detect    string
+		wantLinux bool
 	}{
-		{
-			name:   "darwin dispatches to Darwin",
-			detect: "darwin",
-			validateFunc: func(c kernel.Collector) {
-				_, ok := c.(*kernel.Darwin)
-				s.True(ok)
-			},
-		},
-		{
-			name:   "debian dispatches to Linux",
-			detect: "debian",
-			validateFunc: func(c kernel.Collector) {
-				_, ok := c.(*kernel.Linux)
-				s.True(ok)
-			},
-		},
-		{
-			name:   "rhel dispatches to Linux",
-			detect: "rhel",
-			validateFunc: func(c kernel.Collector) {
-				_, ok := c.(*kernel.Linux)
-				s.True(ok)
-			},
-		},
-		{
-			name:   "arch dispatches to Linux",
-			detect: "arch",
-			validateFunc: func(c kernel.Collector) {
-				_, ok := c.(*kernel.Linux)
-				s.True(ok)
-			},
-		},
-		{
-			name:   "unknown dispatches to Linux",
-			detect: "",
-			validateFunc: func(c kernel.Collector) {
-				_, ok := c.(*kernel.Linux)
-				s.True(ok)
-			},
-		},
+		{name: "darwin dispatches to Darwin", detect: "darwin"},
+		{name: "debian dispatches to Linux", detect: "debian", wantLinux: true},
+		{name: "rhel dispatches to Linux", detect: "rhel", wantLinux: true},
+		{name: "unknown dispatches to Linux", detect: "", wantLinux: true},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -150,121 +146,49 @@ func (s *KernelPublicTestSuite) TestNew() {
 			s.Equal("system", c.Category())
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
-			tt.validateFunc(c)
+			_, linux := c.(*kernel.Linux)
+			s.Equal(tt.wantLinux, linux)
 		})
 	}
 }
 
-func (s *KernelPublicTestSuite) TestBytesToString() {
-	tests := []struct {
-		name         string
-		in           []byte
-		validateFunc func(string)
-	}{
-		{
-			name: "NUL-terminated C string",
-			in:   []byte{'L', 'i', 'n', 'u', 'x', 0, 0, 0},
-			validateFunc: func(got string) {
-				s.Equal("Linux", got)
-			},
-		},
-		{
-			name: "no trailing NUL (full array used)",
-			in:   []byte{'a', 'b', 'c'},
-			validateFunc: func(got string) {
-				s.Equal("abc", got)
-			},
-		},
-		{
-			name: "empty input",
-			in:   []byte{},
-			validateFunc: func(got string) {
-				s.Equal("", got)
-			},
-		},
-		{
-			name: "leading NUL truncates to empty",
-			in:   []byte{0, 'x', 'y'},
-			validateFunc: func(got string) {
-				s.Equal("", got)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			tt.validateFunc(kernel.BytesToString(tt.in))
-		})
-	}
+// TestNewWithReadsTheGivenHost: a fake host gives the collector its
+// kernel, not the kernel of the machine that runs the test.
+func (s *KernelPublicTestSuite) TestNewWithReadsTheGivenHost() {
+	files := ubuntu()
+	files["/proc/sys/kernel/arch"] = "aarch64\n"
+	c := kernel.NewWith(source.Sources{FS: s.hostFS(files), Family: family.Debian})
+
+	got, err := c.Collect(context.Background(), nil)
+	s.Require().NoError(err)
+	s.Equal(&kernel.Info{
+		Name:      "Linux",
+		Release:   "5.15.0-47-generic",
+		Version:   "#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022",
+		Machine:   "aarch64",
+		Processor: "aarch64",
+		OS:        "GNU/Linux",
+	}, got)
 }
 
-func (s *KernelPublicTestSuite) TestDefaultUname() {
+func (s *KernelPublicTestSuite) TestCollectLinux() {
 	tests := []struct {
 		name         string
-		fn           func(*unix.Utsname) error
-		validateFunc func(any, any, any, any, error)
-	}{
-		{
-			name: "success returns populated fields",
-			fn: func(u *unix.Utsname) error {
-				copy(u.Sysname[:], "Linux")
-				copy(u.Release[:], "6.1.0")
-				copy(u.Version[:], "#1 SMP")
-				copy(u.Machine[:], "x86_64")
-				return nil
-			},
-			validateFunc: func(name any, release any, _ any, machine any, err error) {
-				s.Require().NoError(err)
-				s.Equal("Linux", name)
-				s.Equal("6.1.0", release)
-				s.Equal("x86_64", machine)
-			},
-		},
-		{
-			name: "syscall error propagated",
-			fn:   func(*unix.Utsname) error { return errors.New("uname failed") },
-			validateFunc: func(_ any, _ any, _ any, _ any, err error) {
-				s.Error(err)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			restore := kernel.SetUnameSyscall(tt.fn)
-			defer restore()
-			tt.validateFunc(kernel.DefaultUname())
-		})
-	}
-}
-
-func (s *KernelPublicTestSuite) TestCollect() {
-	linuxOK := fakeUtsname("Linux", "5.15.0-47-generic",
-		"#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022", "x86_64")
-	darwinARM := fakeUtsname(
-		"Darwin", "23.4.0",
-		"Darwin Kernel Version 23.4.0: Wed Feb 21 21:44:31 PST 2024",
-		"arm64",
-	)
-	darwinIntel := fakeUtsname(
-		"Darwin", "22.6.0",
-		"Darwin Kernel Version 22.6.0",
-		"x86_64",
-	)
-
-	tests := []struct {
-		name         string
-		variant      string
-		uname        func(*unix.Utsname) error
-		exec         func(*testing.T) executor.Executor
+		files        func() map[string]string
+		answers      []answer
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "linux: canonical identity fields",
-			variant: "linux",
-			uname:   linuxOK,
+			name: "when arch has the machine",
+			files: func() map[string]string {
+				f := ubuntu()
+				f["/proc/sys/kernel/arch"] = "x86_64\n"
+
+				return f
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				i, ok := got.(*kernel.Info)
-				s.Require().True(ok)
+				i := got.(*kernel.Info)
 				s.Equal("Linux", i.Name)
 				s.Equal("5.15.0-47-generic", i.Release)
 				s.Equal("x86_64", i.Machine)
@@ -273,115 +197,140 @@ func (s *KernelPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: uname error propagated",
-			variant: "linux",
-			uname:   func(*unix.Utsname) error { return errors.New("uname failed") },
+			name:    "when the kernel has no arch, uname -m has the machine",
+			files:   ubuntu,
+			answers: []answer{{args: []string{"uname", "-m"}, out: "x86_64\n"}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal("x86_64", got.(*kernel.Info).Machine)
+			},
+		},
+		{
+			name: "when there is no version, it is empty",
+			files: func() map[string]string {
+				f := ubuntu()
+				delete(f, "/proc/sys/kernel/version")
+				f["/proc/sys/kernel/arch"] = "x86_64"
+
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Empty(got.(*kernel.Info).Version)
+			},
+		},
+		{
+			name: "when there is no ostype, it is an error",
+			files: func() map[string]string {
+				f := ubuntu()
+				delete(f, "/proc/sys/kernel/ostype")
+
+				return f
+			},
 			validateFunc: func(_ any, err error) {
-				s.Error(err)
+				s.ErrorContains(err, "/proc/sys/kernel/ostype")
 			},
 		},
 		{
-			name:    "darwin: native arm64 Apple Silicon — no rosetta",
-			variant: "darwin",
-			uname:   darwinARM,
-			exec: func(t *testing.T) executor.Executor {
-				return rosettaExec(t, []byte("0\n"), nil)
+			name: "when there is no osrelease, it is an error",
+			files: func() map[string]string {
+				f := ubuntu()
+				delete(f, "/proc/sys/kernel/osrelease")
+
+				return f
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				i, ok := got.(*kernel.Info)
-				s.Require().True(ok)
-				s.Equal("Darwin", i.Name)
-				s.Equal("arm64", i.Machine)
-				s.Equal("arm64", i.Processor)
-				s.Equal("Darwin", i.OS)
-				s.False(i.RosettaTranslated)
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "/proc/sys/kernel/osrelease")
 			},
 		},
 		{
-			name:    "darwin: native Intel Mac, sysctl returns 0 machine stays x86_64",
-			variant: "darwin",
-			uname:   darwinIntel,
-			exec: func(t *testing.T) executor.Executor {
-				return rosettaExec(t, []byte("0\n"), nil)
+			name:    "when uname -m fails, it is an error",
+			files:   ubuntu,
+			answers: []answer{{args: []string{"uname", "-m"}, err: errors.New("no uname")}},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "uname -m")
 			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := &kernel.Linux{FS: s.hostFS(tt.files()), Exec: s.exec(tt.answers...)}
+			tt.validateFunc(c.Collect(context.Background(), nil))
+		})
+	}
+}
+
+func (s *KernelPublicTestSuite) TestCollectDarwin() {
+	arm := "Darwin\n23.4.0\nDarwin Kernel Version 23.4.0: Wed Feb 21 21:44:31 PST 2024\narm64\n"
+	intel := "Darwin\n22.6.0\nDarwin Kernel Version 22.6.0\nx86_64\n"
+
+	tests := []struct {
+		name         string
+		answers      []answer
+		validateFunc func(any, error)
+	}{
+		{
+			name:    "when it runs on Apple Silicon, with no Rosetta",
+			answers: []answer{sysctlKernel(arm, nil)},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				i, ok := got.(*kernel.Info)
-				s.Require().True(ok)
+				s.Equal(&kernel.Info{
+					Name:      "Darwin",
+					Release:   "23.4.0",
+					Version:   "Darwin Kernel Version 23.4.0: Wed Feb 21 21:44:31 PST 2024",
+					Machine:   "arm64",
+					Processor: "arm64",
+					OS:        "Darwin",
+				}, got)
+			},
+		},
+		{
+			name:    "when it runs on an Intel Mac, sysctl reports 0",
+			answers: []answer{sysctlKernel(intel, nil), rosetta("0\n", nil)},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i := got.(*kernel.Info)
 				s.Equal("x86_64", i.Machine)
-				s.Equal("x86_64", i.Processor)
 				s.False(i.RosettaTranslated)
 			},
 		},
 		{
-			name:    "darwin: native Intel Mac, sysctl errors no rosetta",
-			variant: "darwin",
-			uname:   darwinIntel,
-			exec: func(t *testing.T) executor.Executor {
-				return rosettaExec(t, nil, errors.New("no sysctl"))
-			},
+			name:    "when the Rosetta sysctl fails, there is no Rosetta",
+			answers: []answer{sysctlKernel(intel, nil), rosetta("", errors.New("no sysctl"))},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				i, ok := got.(*kernel.Info)
-				s.Require().True(ok)
-				s.Equal("x86_64", i.Machine)
-				s.False(i.RosettaTranslated)
+				s.False(got.(*kernel.Info).RosettaTranslated)
 			},
 		},
 		{
-			name:    "darwin: Rosetta on Apple Silicon, machine corrected to arm64",
-			variant: "darwin",
-			uname:   darwinIntel,
-			exec: func(t *testing.T) executor.Executor {
-				return rosettaExec(t, []byte("1\n"), nil)
-			},
+			name:    "when it runs under Rosetta, the machine is arm64",
+			answers: []answer{sysctlKernel(intel, nil), rosetta("1\n", nil)},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				i, ok := got.(*kernel.Info)
-				s.Require().True(ok)
+				i := got.(*kernel.Info)
 				s.Equal("arm64", i.Machine)
 				s.Equal("arm64", i.Processor)
 				s.True(i.RosettaTranslated)
 			},
 		},
 		{
-			name:    "darwin: nil Exec, no rosetta",
-			variant: "darwin",
-			uname:   darwinARM,
-			exec:    func(*testing.T) executor.Executor { return nil },
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				i, ok := got.(*kernel.Info)
-				s.Require().True(ok)
-				s.Equal("arm64", i.Machine)
-				s.False(i.RosettaTranslated)
+			name:    "when sysctl fails, it is an error",
+			answers: []answer{sysctlKernel("", errors.New("no sysctl"))},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "sysctl")
 			},
 		},
 		{
-			name:    "darwin: uname error propagated",
-			variant: "darwin",
-			uname:   func(*unix.Utsname) error { return errors.New("uname failed") },
-			exec:    func(*testing.T) executor.Executor { return nil },
+			name:    "when sysctl gives too few values, it is an error",
+			answers: []answer{sysctlKernel("Darwin\n23.4.0\n", nil)},
 			validateFunc: func(_ any, err error) {
-				s.Error(err)
+				s.ErrorContains(err, "not 4")
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			defer kernel.SetUnameSyscall(tt.uname)()
-			var c kernel.Collector
-			switch tt.variant {
-			case "linux":
-				c = &kernel.Linux{}
-			case "darwin":
-				d := &kernel.Darwin{}
-				if tt.exec != nil {
-					d.Exec = tt.exec(s.T())
-				}
-				c = d
-			}
+			c := &kernel.Darwin{Exec: s.exec(tt.answers...)}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}

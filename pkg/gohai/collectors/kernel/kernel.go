@@ -28,11 +28,9 @@
 package kernel
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-
-	"golang.org/x/sys/unix"
 
 	"github.com/osapi-io/gohai/internal/collector"
 )
@@ -68,7 +66,8 @@ func New() Collector {
 }
 
 // NewWith returns the variant for src's family, reading the host through
-// src: its filesystem, its commands and its clock.
+// src: on Linux the files under /proc/sys/kernel and uname -m, on macOS
+// sysctl. Thus a fake host gives the collector its kernel.
 func NewWith(
 	src source.Sources,
 ) Collector {
@@ -79,34 +78,11 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// unameSyscall is the injection seam for unix.Uname. Tests swap this
-// via export_test.go to force the error branch of defaultUname.
-var unameSyscall = unix.Uname
-
-// defaultUname invokes unix.Uname (works on any unix-like OS) and
-// converts the fixed-length byte arrays to Go strings. Shared by both
-// Linux and Darwin factories.
-func defaultUname() (name, release, version, machine string, err error) {
-	var u unix.Utsname
-	if err = unameSyscall(&u); err != nil {
-		return "", "", "", "", fmt.Errorf("uname: %w", err)
-	}
-	return bytesToString(u.Sysname[:]),
-		bytesToString(u.Release[:]),
-		bytesToString(u.Version[:]),
-		bytesToString(u.Machine[:]),
-		nil
-}
-
-// bytesToString trims trailing NUL bytes from a C-style fixed-length
-// byte array and returns the Go string.
-func bytesToString(
+// field is the first line of b, with its white space trimmed.
+func field(
 	b []byte,
 ) string {
-	for i, c := range b {
-		if c == 0 {
-			return string(b[:i])
-		}
-	}
-	return string(b)
+	line, _, _ := strings.Cut(string(b), "\n")
+
+	return strings.TrimSpace(line)
 }
