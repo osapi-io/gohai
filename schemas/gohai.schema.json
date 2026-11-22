@@ -655,6 +655,54 @@
         "devices"
       ]
     },
+    "CacertificatesCertificate": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "fingerprint": {
+          "type": "string"
+        },
+        "not_after": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name",
+        "path",
+        "source",
+        "enabled"
+      ]
+    },
+    "CacertificatesInfo": {
+      "properties": {
+        "certificates": {
+          "items": {
+            "$ref": "#/$defs/CacertificatesCertificate"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "certificates"
+      ]
+    },
     "CollectorTiming": {
       "properties": {
         "duration_ns": {
@@ -1795,6 +1843,9 @@
         },
         "zpools": {
           "$ref": "#/$defs/ZpoolsInfo"
+        },
+        "ca_certificates": {
+          "$ref": "#/$defs/CacertificatesInfo"
         },
         "collect_time": {
           "type": "string",

@@ -32,6 +32,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/blockdevice"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cacertificates"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/command"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
@@ -301,5 +302,6 @@ func builtinCollectors(
 		virtualbox.NewWith(src),
 		vmware.NewWith(src),
 		zpools.NewWith(src),
+		cacertificates.NewWith(src),
 	}
 }
