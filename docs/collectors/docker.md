@@ -10,25 +10,43 @@ collector cannot connect to the daemon, Collect returns nil and no error. This
 is the same as Ohai's `docker.rb`, which does not fail when Docker is missing.
 
 Ohai's docker plugin reports the total container counts from `docker info`.
-gohai also lists each container and each image with `docker ps -a` and
-`docker images`. Thus consumers can see the state of each container.
+gohai also lists each container and each image with `docker ps -a --no-trunc`
+and `docker images`. Thus consumers can see the state of each container. Then
+one `docker inspect` call, with the ID of each container, gives the time each
+container was made, its health, its ports, its mounts, its networks and the
+names of its environment variables. When `docker inspect` fails, each container
+has only what `docker ps` gives.
+
+The collector reads through the `docker` CLI, which `source.Sources` runs. A
+host that runs `dockerd` but has no `docker` CLI on the PATH has no container
+facts, also when the Docker socket is there.
+
+The environment of a container often holds a secret, such as a database
+password. Thus the collector gives only the names of the variables, never their
+values.
 
 ## Collected fields
 
-| Field                 | Type     | Description                                                    | Schema mapping              |
-| --------------------- | -------- | -------------------------------------------------------------- | --------------------------- |
-| `version`             | `string` | The Docker server version, for example `24.0.5`.               | No direct OCSF/OTel mapping |
-| `containers`          | `list`   | All containers, running and stopped.                           | None                        |
-| `containers[].id`     | `string` | The short container ID.                                        | OCSF `container.uid`        |
-| `containers[].name`   | `string` | The container name, without the leading `/`.                   | OCSF `container.name`       |
-| `containers[].image`  | `string` | The image reference that started the container.                | OCSF `container.image.name` |
-| `containers[].state`  | `string` | The Docker state, for example `running`, `exited` or `paused`. | No direct OCSF/OTel mapping |
-| `containers[].status` | `string` | The status text from `docker ps`.                              | No direct OCSF/OTel mapping |
-| `images`              | `list`   | The images on the local host.                                  | None                        |
-| `images[].id`         | `string` | The image ID, the full SHA256 digest.                          | No direct OCSF/OTel mapping |
-| `images[].repository` | `string` | The repository name.                                           | No direct OCSF/OTel mapping |
-| `images[].tag`        | `string` | The image tag.                                                 | No direct OCSF/OTel mapping |
-| `images[].size`       | `string` | The size as text, from `docker images`.                        | No direct OCSF/OTel mapping |
+| Field                    | Type     | Description                                                                                                                 | Schema mapping              |
+| ------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `version`                | `string` | The Docker server version, for example `24.0.5`.                                                                            | No direct OCSF/OTel mapping |
+| `containers`             | `list`   | All containers, running and stopped.                                                                                        | None                        |
+| `containers[].id`        | `string` | The full container ID, which `docker start`, `stop`, `exec` and `rm` take.                                                  | OCSF `container.uid`        |
+| `containers[].name`      | `string` | The container name, without the leading `/`.                                                                                | OCSF `container.name`       |
+| `containers[].image`     | `string` | The image reference that started the container.                                                                             | OCSF `container.image.name` |
+| `containers[].state`     | `string` | The Docker state, for example `running`, `exited` or `paused`.                                                              | No direct OCSF/OTel mapping |
+| `containers[].status`    | `string` | The status text from `docker ps`.                                                                                           | No direct OCSF/OTel mapping |
+| `containers[].created`   | `string` | When the container was made, RFC 3339, from `docker inspect`.                                                               | No direct OCSF/OTel mapping |
+| `containers[].health`    | `string` | The status of its health check, such as `healthy`. Empty when it has none.                                                  | No direct OCSF/OTel mapping |
+| `containers[].ports`     | `list`   | Each port and protocol (`container_port`, such as `80/tcp`), and the `host_ip` and `host_port` it is published on, by port. | No direct OCSF/OTel mapping |
+| `containers[].mounts`    | `list`   | Each volume and bind mount: `type`, `source`, `destination`, `read_only`.                                                   | No direct OCSF/OTel mapping |
+| `containers[].networks`  | `list`   | Each network, by name, with the container's `ip_address` and the `gateway`.                                                 | No direct OCSF/OTel mapping |
+| `containers[].env_names` | `list`   | The names of its environment variables. The values are left out.                                                            | No direct OCSF/OTel mapping |
+| `images`                 | `list`   | The images on the local host.                                                                                               | None                        |
+| `images[].id`            | `string` | The image ID, the full SHA256 digest.                                                                                       | No direct OCSF/OTel mapping |
+| `images[].repository`    | `string` | The repository name.                                                                                                        | No direct OCSF/OTel mapping |
+| `images[].tag`           | `string` | The image tag.                                                                                                              | No direct OCSF/OTel mapping |
+| `images[].size`          | `string` | The size as text, from `docker images`.                                                                                     | No direct OCSF/OTel mapping |
 
 ## Platform support
 
@@ -45,11 +63,28 @@ gohai also lists each container and each image with `docker ps -a` and
     "version": "24.0.5",
     "containers": [
       {
-        "id": "abc123def456",
+        "id": "abc123def4567890abc123def4567890abc123def4567890abc123def4567890",
         "name": "web",
         "image": "nginx:latest",
         "state": "running",
-        "status": "Up 2 hours"
+        "status": "Up 2 hours",
+        "created": "2026-11-22T10:00:00.123456789Z",
+        "health": "healthy",
+        "ports": [
+          { "container_port": "80/tcp", "host_ip": "0.0.0.0", "host_port": "8080" }
+        ],
+        "mounts": [
+          {
+            "type": "volume",
+            "source": "/var/lib/docker/volumes/data/_data",
+            "destination": "/data",
+            "read_only": false
+          }
+        ],
+        "networks": [
+          { "name": "bridge", "ip_address": "172.17.0.2", "gateway": "172.17.0.1" }
+        ],
+        "env_names": ["PATH", "NGINX_VERSION"]
       }
     ],
     "images": [

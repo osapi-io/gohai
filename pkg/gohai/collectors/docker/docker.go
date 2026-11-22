@@ -28,6 +28,8 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -36,13 +38,48 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Container holds metadata for a single Docker container.
+// Container holds metadata for a single Docker container. ID is the full
+// ID, which docker start, stop, exec and rm take. The fields after Status
+// come from docker inspect; they are empty when inspect fails.
 type Container struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Image  string `json:"image"`
-	State  string `json:"state"`
-	Status string `json:"status"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Image   string `json:"image"`
+	State   string `json:"state"`
+	Status  string `json:"status"`
+	Created string `json:"created,omitempty"`
+	// Health is the status of the container's health check, such as
+	// healthy, or empty when it has none.
+	Health   string    `json:"health,omitempty"`
+	Ports    []Port    `json:"ports,omitempty"`
+	Mounts   []Mount   `json:"mounts,omitempty"`
+	Networks []Network `json:"networks,omitempty"`
+	// EnvNames are the names of the container's environment variables. The
+	// values are left out: they often hold secrets, such as a password.
+	EnvNames []string `json:"env_names,omitempty"`
+}
+
+// Port is a port of a container, and the host address it is published on.
+type Port struct {
+	// ContainerPort is the port and protocol, such as 80/tcp.
+	ContainerPort string `json:"container_port"`
+	HostIP        string `json:"host_ip,omitempty"`
+	HostPort      string `json:"host_port,omitempty"`
+}
+
+// Mount is a volume or a bind mount of a container.
+type Mount struct {
+	Type        string `json:"type"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	ReadOnly    bool   `json:"read_only"`
+}
+
+// Network is a network a container is on, with its address there.
+type Network struct {
+	Name      string `json:"name"`
+	IPAddress string `json:"ip_address,omitempty"`
+	Gateway   string `json:"gateway,omitempty"`
 }
 
 // Image holds metadata for a single Docker image.
@@ -107,6 +144,37 @@ type dockerJSONContainer struct {
 	Status string `json:"Status"`
 }
 
+// dockerInspect is the part of one element of `docker inspect` output that
+// the collector reads.
+type dockerInspect struct {
+	ID      string `json:"Id"`
+	Created string `json:"Created"`
+	State   struct {
+		Health *struct {
+			Status string `json:"Status"`
+		} `json:"Health"`
+	} `json:"State"`
+	Config struct {
+		Env []string `json:"Env"`
+	} `json:"Config"`
+	Mounts []struct {
+		Type        string `json:"Type"`
+		Source      string `json:"Source"`
+		Destination string `json:"Destination"`
+		RW          bool   `json:"RW"`
+	} `json:"Mounts"`
+	NetworkSettings struct {
+		Ports map[string][]struct {
+			HostIP   string `json:"HostIp"`
+			HostPort string `json:"HostPort"`
+		} `json:"Ports"`
+		Networks map[string]struct {
+			IPAddress string `json:"IPAddress"`
+			Gateway   string `json:"Gateway"`
+		} `json:"Networks"`
+	} `json:"NetworkSettings"`
+}
+
 // dockerJSONImage is the JSON shape produced by
 // `docker images --format '{{json .}}'`.
 type dockerJSONImage struct {
@@ -136,6 +204,7 @@ func collectDocker(
 	if err != nil {
 		containers = []Container{}
 	}
+	inspectContainers(ctx, exec, containers)
 	images, err := collectImages(ctx, exec)
 	if err != nil {
 		images = []Image{}
@@ -153,7 +222,7 @@ func collectContainers(
 	ctx context.Context,
 	exec executor.Executor,
 ) ([]Container, error) {
-	out, err := exec.Execute(ctx, "docker", "ps", "-a", "--format", "{{json .}}")
+	out, err := exec.Execute(ctx, "docker", "ps", "-a", "--no-trunc", "--format", "{{json .}}")
 	if err != nil {
 		return nil, err
 	}
@@ -177,6 +246,84 @@ func collectContainers(
 		})
 	}
 	return result, nil
+}
+
+// inspectContainers adds what docker inspect has to each container, in one
+// call for all of them. A failed or unreadable inspect leaves the
+// containers as docker ps gave them.
+func inspectContainers(
+	ctx context.Context,
+	exec executor.Executor,
+	containers []Container,
+) {
+	if len(containers) == 0 {
+		return
+	}
+	args := []string{"inspect"}
+	for _, c := range containers {
+		args = append(args, c.ID)
+	}
+	out, err := exec.Execute(ctx, "docker", args...)
+	if err != nil {
+		return
+	}
+	var details []dockerInspect
+	if json.Unmarshal(out, &details) != nil {
+		return
+	}
+	byID := make(map[string]dockerInspect, len(details))
+	for _, d := range details {
+		byID[d.ID] = d
+	}
+	for i := range containers {
+		d, ok := byID[containers[i].ID]
+		if !ok {
+			continue
+		}
+		applyInspect(&containers[i], d)
+	}
+}
+
+// applyInspect sets the fields of c that docker inspect has, sorted so that
+// the facts of one host are the same from run to run.
+func applyInspect(
+	c *Container,
+	d dockerInspect,
+) {
+	c.Created = d.Created
+	if d.State.Health != nil {
+		c.Health = d.State.Health.Status
+	}
+	for _, e := range d.Config.Env {
+		name, _, _ := strings.Cut(e, "=")
+		c.EnvNames = append(c.EnvNames, name)
+	}
+	for _, m := range d.Mounts {
+		c.Mounts = append(c.Mounts, Mount{
+			Type: m.Type, Source: m.Source, Destination: m.Destination, ReadOnly: !m.RW,
+		})
+	}
+	for _, port := range slices.Sorted(maps.Keys(d.NetworkSettings.Ports)) {
+		bindings := d.NetworkSettings.Ports[port]
+		if len(bindings) == 0 {
+			c.Ports = append(c.Ports, Port{ContainerPort: port})
+
+			continue
+		}
+		for _, b := range bindings {
+			c.Ports = append(
+				c.Ports,
+				Port{ContainerPort: port, HostIP: b.HostIP, HostPort: b.HostPort},
+			)
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(d.NetworkSettings.Networks)) {
+		n := d.NetworkSettings.Networks[name]
+		c.Networks = append(
+			c.Networks,
+			Network{Name: name, IPAddress: n.IPAddress, Gateway: n.Gateway},
+		)
+	}
 }
 
 // collectImages runs `docker images --format '{{json .}}'` and parses
