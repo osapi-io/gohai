@@ -29,6 +29,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/blockdevice"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cacertificates"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/command"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
@@ -159,6 +160,7 @@ type Facts struct {
 	VirtualBox     *virtualbox.Info     `json:"virtualbox,omitempty"`
 	VMware         *vmware.Info         `json:"vmware,omitempty"`
 	Zpools         *zpools.Info         `json:"zpools,omitempty"`
+	CACertificates *cacertificates.Info `json:"ca_certificates,omitempty"`
 
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
@@ -393,6 +395,9 @@ func (f *Facts) countPopulated() int {
 		n++
 	}
 	if f.Zpools != nil {
+		n++
+	}
+	if f.CACertificates != nil {
 		n++
 	}
 	return n
@@ -657,6 +662,10 @@ func (f *Facts) set(
 	case "zpools":
 		if v, ok := result.(*zpools.Info); ok {
 			f.Zpools = v
+		}
+	case "ca_certificates":
+		if v, ok := result.(*cacertificates.Info); ok {
+			f.CACertificates = v
 		}
 	}
 }

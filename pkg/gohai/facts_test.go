@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/blockdevice"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/cacertificates"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/command"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/disk"
@@ -78,56 +79,57 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
 )
 
-func hostnameInfoPtr() *hostname.Info         { return &hostname.Info{} }
-func kernelInfoPtr() *kernel.Info             { return &kernel.Info{} }
-func uptimeInfoPtr() *uptime.Info             { return &uptime.Info{} }
-func virtInfoPtr() *virtualization.Info       { return &virtualization.Info{} }
-func machineIDInfoPtr() *machineid.Info       { return &machineid.Info{} }
-func cpuInfoPtr() *cpu.Info                   { return &cpu.Info{} }
-func memoryInfoPtr() *memory.Info             { return &memory.Info{} }
-func filesystemInfoPtr() *filesystem.Info     { return &filesystem.Info{} }
-func diskInfoPtr() *disk.Info                 { return &disk.Info{} }
-func networkInfoPtr() *network.Info           { return &network.Info{} }
-func processInfoPtr() *process.Info           { return &process.Info{} }
-func usersInfoPtr() *users.Info               { return &users.Info{} }
-func timezoneInfoPtr() *timezone.Info         { return &timezone.Info{} }
-func dnsInfoPtr() *dns.Info                   { return &dns.Info{} }
-func rootGroupInfoPtr() *rootgroup.Info       { return &rootgroup.Info{} }
-func shellsInfoPtr() *shells.Info             { return &shells.Info{} }
-func fipsInfoPtr() *fips.Info                 { return &fips.Info{} }
-func loadInfoPtr() *load.Info                 { return &load.Info{} }
-func osReleaseInfoPtr() *osrelease.Info       { return &osrelease.Info{} }
-func lsbInfoPtr() *lsb.Info                   { return &lsb.Info{} }
-func initInfoPtr() *initd.Info                { return &initd.Info{} }
-func shardInfoPtr() *shard.Info               { return &shard.Info{} }
-func packageMgrInfoPtr() *packagemgr.Info     { return &packagemgr.Info{} }
-func sessionsInfoPtr() *sessions.Info         { return &sessions.Info{} }
-func pciInfoPtr() *pci.Info                   { return &pci.Info{} }
-func scsiInfoPtr() *scsi.Info                 { return &scsi.Info{} }
-func hardwareInfoPtr() *hardware.Info         { return &hardware.Info{} }
-func blockDeviceInfoPtr() *blockdevice.Info   { return &blockdevice.Info{} }
-func commandInfoPtr() *command.Info           { return &command.Info{} }
-func dockerInfoPtr() *docker.Info             { return &docker.Info{} }
-func grub2InfoPtr() *grub2.Info               { return &grub2.Info{} }
-func hostnamectlInfoPtr() *hostnamectl.Info   { return &hostnamectl.Info{} }
-func interruptsInfoPtr() *interrupts.Info     { return &interrupts.Info{} }
-func ipcInfoPtr() *ipc.Info                   { return &ipc.Info{} }
-func languagesInfoPtr() *languages.Info       { return &languages.Info{} }
-func libvirtInfoPtr() *libvirt.Info           { return &libvirt.Info{} }
-func livepatchInfoPtr() *livepatch.Info       { return &livepatch.Info{} }
-func mdadmInfoPtr() *mdadm.Info               { return &mdadm.Info{} }
-func packagesInfoPtr() *packages.Info         { return &packages.Info{} }
-func rpmInfoPtr() *rpm.Info                   { return &rpm.Info{} }
-func selinuxInfoPtr() *selinux.Info           { return &selinux.Info{} }
-func servicesInfoPtr() *services.Info         { return &services.Info{} }
-func sshInfoPtr() *ssh.Info                   { return &ssh.Info{} }
-func sysconfInfoPtr() *sysconf.Info           { return &sysconf.Info{} }
-func sysctlInfoPtr() *sysctl.Info             { return &sysctl.Info{} }
-func systemdPathsInfoPtr() *systemdpaths.Info { return &systemdpaths.Info{} }
-func tcInfoPtr() *tc.Info                     { return &tc.Info{} }
-func virtualboxInfoPtr() *virtualbox.Info     { return &virtualbox.Info{} }
-func vmwareInfoPtr() *vmware.Info             { return &vmware.Info{} }
-func zpoolsInfoPtr() *zpools.Info             { return &zpools.Info{} }
+func hostnameInfoPtr() *hostname.Info             { return &hostname.Info{} }
+func kernelInfoPtr() *kernel.Info                 { return &kernel.Info{} }
+func uptimeInfoPtr() *uptime.Info                 { return &uptime.Info{} }
+func virtInfoPtr() *virtualization.Info           { return &virtualization.Info{} }
+func machineIDInfoPtr() *machineid.Info           { return &machineid.Info{} }
+func cpuInfoPtr() *cpu.Info                       { return &cpu.Info{} }
+func memoryInfoPtr() *memory.Info                 { return &memory.Info{} }
+func filesystemInfoPtr() *filesystem.Info         { return &filesystem.Info{} }
+func diskInfoPtr() *disk.Info                     { return &disk.Info{} }
+func networkInfoPtr() *network.Info               { return &network.Info{} }
+func processInfoPtr() *process.Info               { return &process.Info{} }
+func usersInfoPtr() *users.Info                   { return &users.Info{} }
+func timezoneInfoPtr() *timezone.Info             { return &timezone.Info{} }
+func dnsInfoPtr() *dns.Info                       { return &dns.Info{} }
+func rootGroupInfoPtr() *rootgroup.Info           { return &rootgroup.Info{} }
+func shellsInfoPtr() *shells.Info                 { return &shells.Info{} }
+func fipsInfoPtr() *fips.Info                     { return &fips.Info{} }
+func loadInfoPtr() *load.Info                     { return &load.Info{} }
+func osReleaseInfoPtr() *osrelease.Info           { return &osrelease.Info{} }
+func lsbInfoPtr() *lsb.Info                       { return &lsb.Info{} }
+func initInfoPtr() *initd.Info                    { return &initd.Info{} }
+func shardInfoPtr() *shard.Info                   { return &shard.Info{} }
+func packageMgrInfoPtr() *packagemgr.Info         { return &packagemgr.Info{} }
+func sessionsInfoPtr() *sessions.Info             { return &sessions.Info{} }
+func pciInfoPtr() *pci.Info                       { return &pci.Info{} }
+func scsiInfoPtr() *scsi.Info                     { return &scsi.Info{} }
+func hardwareInfoPtr() *hardware.Info             { return &hardware.Info{} }
+func blockDeviceInfoPtr() *blockdevice.Info       { return &blockdevice.Info{} }
+func commandInfoPtr() *command.Info               { return &command.Info{} }
+func dockerInfoPtr() *docker.Info                 { return &docker.Info{} }
+func grub2InfoPtr() *grub2.Info                   { return &grub2.Info{} }
+func hostnamectlInfoPtr() *hostnamectl.Info       { return &hostnamectl.Info{} }
+func interruptsInfoPtr() *interrupts.Info         { return &interrupts.Info{} }
+func ipcInfoPtr() *ipc.Info                       { return &ipc.Info{} }
+func languagesInfoPtr() *languages.Info           { return &languages.Info{} }
+func libvirtInfoPtr() *libvirt.Info               { return &libvirt.Info{} }
+func livepatchInfoPtr() *livepatch.Info           { return &livepatch.Info{} }
+func mdadmInfoPtr() *mdadm.Info                   { return &mdadm.Info{} }
+func packagesInfoPtr() *packages.Info             { return &packages.Info{} }
+func rpmInfoPtr() *rpm.Info                       { return &rpm.Info{} }
+func selinuxInfoPtr() *selinux.Info               { return &selinux.Info{} }
+func servicesInfoPtr() *services.Info             { return &services.Info{} }
+func sshInfoPtr() *ssh.Info                       { return &ssh.Info{} }
+func sysconfInfoPtr() *sysconf.Info               { return &sysconf.Info{} }
+func sysctlInfoPtr() *sysctl.Info                 { return &sysctl.Info{} }
+func systemdPathsInfoPtr() *systemdpaths.Info     { return &systemdpaths.Info{} }
+func tcInfoPtr() *tc.Info                         { return &tc.Info{} }
+func virtualboxInfoPtr() *virtualbox.Info         { return &virtualbox.Info{} }
+func vmwareInfoPtr() *vmware.Info                 { return &vmware.Info{} }
+func zpoolsInfoPtr() *zpools.Info                 { return &zpools.Info{} }
+func caCertificatesInfoPtr() *cacertificates.Info { return &cacertificates.Info{} }
 
 type FactsTestSuite struct {
 	suite.Suite
@@ -499,6 +501,12 @@ func (s *FactsTestSuite) TestSet() {
 			result:   zpoolsInfoPtr(),
 			check:    func(f *Facts) bool { return f.Zpools != nil },
 		},
+		{
+			name:     "ca_certificates",
+			collName: "ca_certificates",
+			result:   caCertificatesInfoPtr(),
+			check:    func(f *Facts) bool { return f.CACertificates != nil },
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -567,8 +575,9 @@ func (s *FactsTestSuite) TestCountPopulated() {
 				VirtualBox:     virtualboxInfoPtr(),
 				VMware:         vmwareInfoPtr(),
 				Zpools:         zpoolsInfoPtr(),
+				CACertificates: caCertificatesInfoPtr(),
 			},
-			want: 46,
+			want: 47,
 		},
 	}
 	for _, tt := range tests {

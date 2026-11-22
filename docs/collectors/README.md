@@ -135,10 +135,11 @@ There is no `cloud` collector. gohai has no aggregator for all cloud providers.
 
 ## Security
 
-| Collector             | Key       | Description                      | Default | Implemented | Depends On |
-| --------------------- | --------- | -------------------------------- | ------- | ----------- | ---------- |
-| [selinux](selinux.md) | `selinux` | SELinux status, policy, contexts | ❌      | ✅          | None       |
-| [ssh](ssh.md)         | `ssh`     | Host keys (RSA, ECDSA, ED25519)  | ❌      | ✅          | None       |
+| Collector                             | Key               | Description                      | Default | Implemented | Depends On |
+| ------------------------------------- | ----------------- | -------------------------------- | ------- | ----------- | ---------- |
+| [ca_certificates](ca_certificates.md) | `ca_certificates` | Trusted certificate authorities  | ❌      | ✅          | None       |
+| [selinux](selinux.md)                 | `selinux`         | SELinux status, policy, contexts | ❌      | ✅          | None       |
+| [ssh](ssh.md)                         | `ssh`             | Host keys (RSA, ECDSA, ED25519)  | ❌      | ✅          | None       |
 
 ## Software
 
