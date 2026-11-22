@@ -22,37 +22,85 @@ package kernel
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Linux collects kernel identity on Linux. `processor` and `os` are
-// synthesized per Option A of issue #29 (Machine and the static string
-// "GNU/Linux") rather than shelling out to `uname -p` / `uname -o`.
+// The files of /proc/sys/kernel that have the fields of uname(2).
+const (
+	procOSType    = "/proc/sys/kernel/ostype"
+	procOSRelease = "/proc/sys/kernel/osrelease"
+	procVersion   = "/proc/sys/kernel/version"
+	// procArch is the machine, on Linux 6.1 and later. An older kernel does
+	// not have it, and the collector runs uname -m.
+	procArch = "/proc/sys/kernel/arch"
+)
+
+// Linux collects kernel identity on Linux from /proc/sys/kernel, the
+// fields that uname(2) reports, and the machine from
+// /proc/sys/kernel/arch or uname -m. `processor` and `os` are synthesized
+// per Option A of issue #29 (Machine and the static string "GNU/Linux")
+// rather than shelling out to `uname -p` / `uname -o`.
 type Linux struct {
 	base
+
+	FS   avfs.VFS
+	Exec executor.Executor
 }
 
-// NewLinux returns a Linux variant.
+// NewLinux returns a Linux variant that reads the host's filesystem and
+// runs its commands.
 func NewLinux() *Linux {
-	return &Linux{}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
 
 // Collect returns kernel Info.
 func (l *Linux) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, release, version, machine, err := defaultUname()
+	name, err := l.FS.ReadFile(procOSType)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", procOSType, err)
+	}
+	release, err := l.FS.ReadFile(procOSRelease)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", procOSRelease, err)
+	}
+	// The build string is optional, as uname -v is.
+	version, _ := l.FS.ReadFile(procVersion)
+	machine, err := l.machine(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Info{
-		Name:      name,
-		Release:   release,
-		Version:   version,
+		Name:      field(name),
+		Release:   field(release),
+		Version:   field(version),
 		Machine:   machine,
 		Processor: machine,
 		OS:        "GNU/Linux",
 	}, nil
+}
+
+// machine is the hardware architecture: /proc/sys/kernel/arch, or uname -m
+// on a kernel without it.
+func (l *Linux) machine(
+	ctx context.Context,
+) (string, error) {
+	if b, err := l.FS.ReadFile(procArch); err == nil && field(b) != "" {
+		return field(b), nil
+	}
+	out, err := l.Exec.Execute(ctx, "uname", "-m")
+	if err != nil {
+		return "", fmt.Errorf("uname -m: %w", err)
+	}
+
+	return field(out), nil
 }

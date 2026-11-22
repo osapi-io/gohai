@@ -45,8 +45,8 @@ modules.
 
 | Platform | Supported                                     |
 | -------- | --------------------------------------------- |
-| Linux    | ✅ (uname syscall)                            |
-| macOS    | ✅ (uname syscall and `sysctl` Rosetta probe) |
+| Linux    | ✅ (`/proc/sys/kernel` and `uname -m`)        |
+| macOS    | ✅ (`sysctl`, and the `sysctl` Rosetta probe) |
 
 ## Example output
 
@@ -128,40 +128,43 @@ None.
 ## Data sources
 
 Ohai's `kernel.rb` runs `uname -s`, `uname -r`, `uname -v`, `uname -m` and
-`uname -p` one at a time. gohai calls `unix.Uname()`, the Go syscall wrapper. It
-returns all fields in one call. The data is the same, and there is no subprocess
-overhead. Both give `name`, `release`, `version` and `machine`. gohai adds
-`processor` and `os`, which are equivalent to `uname -p` and `uname -o`. On
-macOS, gohai also adds `rosetta_translated`. This is a gohai extension, and Ohai
-has no equivalent.
+`uname -p` one at a time. gohai reads the same values through `source.Sources`:
+files on Linux, and one `sysctl` on macOS. Thus `kernel.NewWith(src)` on a fake
+host returns the kernel of that host, not of the machine that runs the test.
+gohai adds `processor` and `os`, which are equivalent to `uname -p` and
+`uname -o`. On macOS, gohai also adds `rosetta_translated`. This is a gohai
+extension, and Ohai has no equivalent.
 
 On Linux:
 
-1. `unix.Uname()` gives `name`, `release`, `version` and `machine`.
-2. `processor` is a copy of `machine`. `os` is always the string `"GNU/Linux"`.
+1. `/proc/sys/kernel/ostype`, `/proc/sys/kernel/osrelease` and
+   `/proc/sys/kernel/version` give `name`, `release` and `version`, the fields
+   of `uname(2)`. A missing `version` is empty. A missing `ostype` or
+   `osrelease` is an error.
+2. `/proc/sys/kernel/arch` gives `machine` on Linux 6.1 and later. On an older
+   kernel, the collector runs `uname -m`.
+3. `processor` is a copy of `machine`. `os` is always the string `"GNU/Linux"`.
    Ohai runs `uname -p` and `uname -o` to get the same values. gohai does not do
-   the extra fork and exec, because the syscall already has all the data. This
-   is Option A of issue #29.
+   the extra fork and exec. This is Option A of issue #29.
 
 On macOS:
 
-1. `unix.Uname()` gives `name`, `release`, `version` and `machine`.
+1. `sysctl -n kern.ostype kern.osrelease kern.version hw.machine` gives `name`,
+   `release`, `version` and `machine`, one to a line, the values of `uname(3)`.
 2. `processor` is a copy of `machine`. `os` is always the string `"Darwin"`.
-3. The collector runs `sysctl -n hw.optional.x86_64` through the shared
-   `internal/executor` runner. It does this only if uname reports
-   `machine == "x86_64"`. If the output without whitespace is `"1"`, the process
+3. The collector runs `sysctl -n hw.optional.x86_64`. It does this only if
+   `machine` is `x86_64`. If the output without whitespace is `"1"`, the process
    runs under Rosetta 2. Then the collector sets `machine` and `processor` to
    `arm64`, the real hardware, and sets `rosetta_translated = true`. On native
-   Apple Silicon, the collector does not run this sysctl. Thus, in the usual
-   case, the collector takes less than a millisecond.
+   Apple Silicon, the collector does not run this sysctl.
 
 The list of loaded modules (`/proc/modules`, `/sys/module/<n>/version`,
 `kextstat`) is in [`kernel_modules`](kernel_modules.md).
 
 ## Backing library
 
-- [`golang.org/x/sys/unix`](https://pkg.go.dev/golang.org/x/sys/unix). The
-  `Uname` syscall for the top-level identity fields.
+- [`avfs`](https://github.com/avfs/avfs). The filesystem of `source.Sources`,
+  for the files of `/proc/sys/kernel`. Tests use `memfs`.
 - [`internal/executor`](../../internal/executor). The shared command runner. The
-  collector uses it to run `sysctl` for the Rosetta probe on macOS. Tests mock
+  collector uses it to run `uname -m` on Linux and `sysctl` on macOS. Tests mock
   it with `go.uber.org/mock`.

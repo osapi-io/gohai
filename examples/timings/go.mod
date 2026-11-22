@@ -6,7 +6,4 @@ replace github.com/osapi-io/gohai => ../../
 
 require github.com/osapi-io/gohai v0.0.0
 
-require (
-	github.com/avfs/avfs v0.35.0 // indirect
-	golang.org/x/sys v0.50.0 // indirect
-)
+require github.com/avfs/avfs v0.35.0 // indirect

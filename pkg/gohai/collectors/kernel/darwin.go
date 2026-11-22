@@ -22,13 +22,16 @@ package kernel
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects kernel identity on macOS. Runs `sysctl -n
+// Darwin collects kernel identity on macOS: kern.ostype, kern.osrelease,
+// kern.version and hw.machine through `sysctl -n`, the values that uname(3)
+// reports. It also runs `sysctl -n
 // hw.optional.x86_64` via the shared Executor for Rosetta 2 detection
 // (issue #31) — a return of "1" with uname reporting `x86_64` means
 // the process is running translated on Apple Silicon; we overwrite
@@ -50,10 +53,18 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, release, version, machine, err := defaultUname()
+	// The four values of uname(3), one to a line, in the order asked.
+	out, err := d.Exec.Execute(ctx, "sysctl", "-n",
+		"kern.ostype", "kern.osrelease", "kern.version", "hw.machine")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("sysctl kern.ostype kern.osrelease kern.version hw.machine: %w", err)
 	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 4 {
+		return nil, fmt.Errorf("sysctl gave %d values, not 4: %q", len(lines), out)
+	}
+	name, release, version, machine := field([]byte(lines[0])), field([]byte(lines[1])),
+		field([]byte(lines[2])), field([]byte(lines[3]))
 	info := &Info{
 		Name:      name,
 		Release:   release,
@@ -62,7 +73,7 @@ func (d *Darwin) Collect(
 		Processor: machine,
 		OS:        "Darwin",
 	}
-	if d.Exec != nil && detectRosetta(ctx, d.Exec, machine) {
+	if detectRosetta(ctx, d.Exec, machine) {
 		info.Machine = "arm64"
 		info.Processor = "arm64"
 		info.RosettaTranslated = true
