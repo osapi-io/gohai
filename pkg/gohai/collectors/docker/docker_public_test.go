@@ -80,14 +80,164 @@ func buildMock(
 			Return(versionOut, versionErr).AnyTimes()
 	}
 	if psOut != nil || psErr != nil {
-		m.EXPECT().Execute(gomock.Any(), "docker", "ps", "-a", "--format", "{{json .}}").
-			Return(psOut, psErr).AnyTimes()
+		m.EXPECT().
+			Execute(gomock.Any(), "docker", "ps", "-a", "--no-trunc", "--format", "{{json .}}").
+			Return(psOut, psErr).
+			AnyTimes()
 	}
 	if imagesOut != nil || imagesErr != nil {
 		m.EXPECT().Execute(gomock.Any(), "docker", "images", "--format", "{{json .}}").
 			Return(imagesOut, imagesErr).AnyTimes()
 	}
+	inspect(m, nil, errors.New("inspect unavailable"))
 	return m
+}
+
+// inspect makes m answer each docker inspect with out and err.
+func inspect(
+	m *execmocks.MockExecutor,
+	out []byte,
+	err error,
+) {
+	m.EXPECT().Execute(gomock.Any(), "docker", gomock.Cond(func(x any) bool {
+		args, ok := x.([]string)
+
+		return ok && len(args) > 0 && args[0] == "inspect"
+	})).Return(out, err).AnyTimes()
+}
+
+// inspectOut is docker inspect of the two containers of containersOut: web
+// publishes a port, mounts a volume, has a health check and holds a secret in
+// its environment; db has no health check and publishes nothing.
+const inspectOut = `[
+  {
+    "Id": "abc123",
+    "Created": "2026-11-22T10:00:00.123456789Z",
+    "State": {"Health": {"Status": "healthy"}},
+    "Config": {"Env": ["PATH=/usr/bin", "DB_PASSWORD=hunter2", "EMPTY"]},
+    "Mounts": [
+      {"Type": "volume", "Source": "/var/lib/docker/volumes/data/_data", "Destination": "/data", "RW": true},
+      {"Type": "bind", "Source": "/etc/nginx", "Destination": "/etc/nginx", "RW": false}
+    ],
+    "NetworkSettings": {
+      "Ports": {
+        "80/tcp": [{"HostIp": "0.0.0.0", "HostPort": "8080"}, {"HostIp": "::", "HostPort": "8080"}],
+        "443/tcp": null
+      },
+      "Networks": {
+        "frontend": {"IPAddress": "172.19.0.2", "Gateway": "172.19.0.1"},
+        "bridge": {"IPAddress": "172.17.0.2", "Gateway": "172.17.0.1"}
+      }
+    }
+  },
+  {
+    "Id": "def456",
+    "Created": "2026-11-21T09:00:00Z",
+    "State": {},
+    "Config": {"Env": []},
+    "Mounts": [],
+    "NetworkSettings": {"Ports": {}, "Networks": {}}
+  },
+  {
+    "Id": "not-listed",
+    "Created": "2026-11-20T09:00:00Z"
+  }
+]`
+
+func (s *DockerPublicTestSuite) TestInspect() {
+	tests := []struct {
+		name         string
+		inspectOut   []byte
+		inspectErr   error
+		validateFunc func([]docker.Container)
+	}{
+		{
+			name:       "when inspect answers, each container has its details, and no env value",
+			inspectOut: []byte(inspectOut),
+			validateFunc: func(cs []docker.Container) {
+				s.Require().Len(cs, 2)
+				web := cs[0]
+				s.Equal("abc123", web.ID)
+				s.Equal("2026-11-22T10:00:00.123456789Z", web.Created)
+				s.Equal("healthy", web.Health)
+				s.Equal([]string{"PATH", "DB_PASSWORD", "EMPTY"}, web.EnvNames)
+				for _, n := range web.EnvNames {
+					s.NotContains(n, "hunter2", "an env value is never in the facts")
+				}
+				s.Equal([]docker.Mount{
+					{
+						Type:        "volume",
+						Source:      "/var/lib/docker/volumes/data/_data",
+						Destination: "/data",
+					},
+					{Type: "bind", Source: "/etc/nginx", Destination: "/etc/nginx", ReadOnly: true},
+				}, web.Mounts)
+				s.Equal([]docker.Port{
+					{ContainerPort: "443/tcp"},
+					{ContainerPort: "80/tcp", HostIP: "0.0.0.0", HostPort: "8080"},
+					{ContainerPort: "80/tcp", HostIP: "::", HostPort: "8080"},
+				}, web.Ports, "sorted by port, and a port that is not published has no host")
+				s.Equal([]docker.Network{
+					{Name: "bridge", IPAddress: "172.17.0.2", Gateway: "172.17.0.1"},
+					{Name: "frontend", IPAddress: "172.19.0.2", Gateway: "172.19.0.1"},
+				}, web.Networks, "sorted by name")
+
+				db := cs[1]
+				s.Equal("2026-11-21T09:00:00Z", db.Created)
+				s.Empty(db.Health, "a container with no health check")
+				s.Nil(db.Ports)
+				s.Nil(db.Mounts)
+				s.Nil(db.Networks)
+				s.Nil(db.EnvNames)
+			},
+		},
+		{
+			name:       "when inspect has only one of the containers, the other is as ps gave it",
+			inspectOut: []byte(`[{"Id": "def456", "Created": "2026-11-21T09:00:00Z"}]`),
+			validateFunc: func(cs []docker.Container) {
+				s.Require().Len(cs, 2)
+				s.Empty(cs[0].Created)
+				s.Equal("2026-11-21T09:00:00Z", cs[1].Created)
+			},
+		},
+		{
+			name:       "when inspect answers with JSON that is not a list, the containers are as ps gave them",
+			inspectOut: []byte(`{"not": "a list"}`),
+			validateFunc: func(cs []docker.Container) {
+				s.Require().Len(cs, 2)
+				s.Empty(cs[0].Created)
+			},
+		},
+		{
+			name:       "when inspect fails, the containers are as ps gave them",
+			inspectErr: errors.New("daemon gone"),
+			validateFunc: func(cs []docker.Container) {
+				s.Require().Len(cs, 2)
+				s.Empty(cs[0].Created)
+				s.Equal("web", cs[0].Name)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			ctrl := gomock.NewController(s.T())
+			m := execmocks.NewMockExecutor(ctrl)
+			m.EXPECT().
+				Execute(gomock.Any(), "docker", "version", "--format", "{{.Server.Version}}").
+				Return([]byte(versionOut), nil)
+			m.EXPECT().
+				Execute(gomock.Any(), "docker", "ps", "-a", "--no-trunc", "--format", "{{json .}}").
+				Return([]byte(containersOut), nil)
+			m.EXPECT().Execute(gomock.Any(), "docker", "images", "--format", "{{json .}}").
+				Return([]byte(imagesOut), nil)
+			inspect(m, tc.inspectOut, tc.inspectErr)
+
+			got, err := (&docker.Linux{Exec: m}).Collect(context.Background(), nil)
+			s.Require().NoError(err)
+			tc.validateFunc(got.(*docker.Info).Containers)
+		})
+	}
 }
 
 func (s *DockerPublicTestSuite) TestNew() {

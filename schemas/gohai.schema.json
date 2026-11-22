@@ -1210,6 +1210,36 @@
         },
         "status": {
           "type": "string"
+        },
+        "created": {
+          "type": "string"
+        },
+        "health": {
+          "type": "string"
+        },
+        "ports": {
+          "items": {
+            "$ref": "#/$defs/DockerPort"
+          },
+          "type": "array"
+        },
+        "mounts": {
+          "items": {
+            "$ref": "#/$defs/DockerMount"
+          },
+          "type": "array"
+        },
+        "networks": {
+          "items": {
+            "$ref": "#/$defs/DockerNetwork"
+          },
+          "type": "array"
+        },
+        "env_names": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -1270,6 +1300,66 @@
         "version",
         "containers",
         "images"
+      ]
+    },
+    "DockerMount": {
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "read_only": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "type",
+        "source",
+        "destination",
+        "read_only"
+      ]
+    },
+    "DockerNetwork": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ip_address": {
+          "type": "string"
+        },
+        "gateway": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "name"
+      ]
+    },
+    "DockerPort": {
+      "properties": {
+        "container_port": {
+          "type": "string"
+        },
+        "host_ip": {
+          "type": "string"
+        },
+        "host_port": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "container_port"
       ]
     },
     "Ec2IAMInstanceInfo": {
