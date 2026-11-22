@@ -38,6 +38,10 @@ type Service struct {
 	State   string `json:"state"`
 	Enabled bool   `json:"enabled"`
 	Type    string `json:"type,omitempty"`
+	// UnitFileState is the state of the unit file, as systemctl
+	// list-unit-files prints it: enabled, enabled-runtime, disabled,
+	// static, masked and the others. Empty when list-unit-files failed.
+	UnitFileState string `json:"unit_file_state,omitempty"`
 	// Description is the unit's Description=, as systemctl list-units
 	// prints it.
 	Description string `json:"description,omitempty"`
@@ -86,18 +90,29 @@ func NewWith(
 }
 
 // parseSystemctlOutput parses `systemctl list-units --type=service
-// --all --no-pager --plain` output.
+// --all --no-pager --plain` output, then adds each unit of files that
+// list-units did not give.
 //
 // Plain output columns (no header, no legend):
 //
 //	UNIT  LOAD  ACTIVE  SUB  DESCRIPTION
 //
-// A service is considered enabled when its ACTIVE state is "active".
+// list-units --all lists only the units that systemd has loaded. A unit
+// that is stopped and disabled is usually not loaded, but it is installed,
+// so it is in the list from its unit file, with the state dead and no
+// description. A template, such as getty@, is not a unit that runs, and an
+// alias is a second name of a unit that is in the list already, so the list
+// has neither.
 func parseSystemctlOutput(
 	output string,
-	enabled map[string]bool,
+	files []unitFile,
 ) *Info {
+	state := map[string]string{}
+	for _, f := range files {
+		state[f.name] = f.state
+	}
 	info := &Info{Services: []Service{}}
+	seen := map[string]bool{}
 	sc := bufio.NewScanner(strings.NewReader(output))
 	for sc.Scan() {
 		line := sc.Text()
@@ -116,34 +131,65 @@ func parseSystemctlOutput(
 			continue
 		}
 		name := strings.TrimSuffix(fields[0], ".service")
+		seen[name] = true
 		// fields[1] = LOAD, fields[2] = ACTIVE, fields[3] = SUB, then the
 		// description, which can have spaces.
 		info.Services = append(info.Services, Service{
-			Name:        name,
-			State:       fields[3],
-			Enabled:     enabled[name],
-			Description: strings.Join(fields[4:], " "),
+			Name:          name,
+			State:         fields[3],
+			Enabled:       enabled(state[name]),
+			UnitFileState: state[name],
+			Description:   strings.Join(fields[4:], " "),
 		})
 	}
+	for _, f := range files {
+		if seen[f.name] || strings.HasSuffix(f.name, "@") || f.state == "alias" {
+			continue
+		}
+		seen[f.name] = true
+		info.Services = append(info.Services, Service{
+			Name:          f.name,
+			State:         "dead",
+			Enabled:       enabled(f.state),
+			UnitFileState: f.state,
+		})
+	}
+
 	return info
 }
 
+// unitFile is one line of systemctl list-unit-files: the unit, without
+// .service, and the state of its file.
+type unitFile struct {
+	name  string
+	state string
+}
+
 // parseUnitFiles parses `systemctl list-unit-files --type=service
-// --no-legend --no-pager`: each line is a unit, its state and its preset.
-// A unit is enabled when its state is enabled or enabled-runtime: it
-// starts at boot, whether or not it runs now.
+// --no-legend --no-pager`: each line is a unit, its state and its preset,
+// in the order that systemctl prints them.
 func parseUnitFiles(
 	output string,
-) map[string]bool {
-	enabled := map[string]bool{}
+) []unitFile {
+	var files []unitFile
 	for _, line := range strings.Split(output, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 2 || !strings.HasSuffix(fields[0], ".service") {
 			continue
 		}
-		enabled[strings.TrimSuffix(fields[0], ".service")] =
-			fields[1] == "enabled" || fields[1] == "enabled-runtime"
+		files = append(
+			files,
+			unitFile{name: strings.TrimSuffix(fields[0], ".service"), state: fields[1]},
+		)
 	}
 
-	return enabled
+	return files
+}
+
+// enabled reports whether a unit file state starts the unit at boot,
+// whether or not it runs now: enabled or enabled-runtime.
+func enabled(
+	state string,
+) bool {
+	return state == "enabled" || state == "enabled-runtime"
 }
