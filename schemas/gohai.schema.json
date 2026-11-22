@@ -4429,6 +4429,9 @@
         "type": {
           "type": "string"
         },
+        "unit_file_state": {
+          "type": "string"
+        },
         "description": {
           "type": "string"
         }

@@ -6,23 +6,29 @@
 
 The collector reports the states of the systemd services on Linux hosts. It runs
 `systemctl list-units --type=service --all --no-pager --plain` for the state and
-the description of each unit, and `systemctl list-unit-files` for whether it is
-enabled. macOS uses launchd, which has a very different service model. On
-Darwin, the collector returns `nil` and no error.
+the description of each unit, and `systemctl list-unit-files` for the state of
+each unit file. `list-units --all` lists only the units that systemd has loaded,
+and a unit that is stopped and disabled is usually not loaded. Thus each unit of
+`list-unit-files` that `list-units` did not give is in the list too, with the
+state `dead` and no description. A template, such as `getty@`, is not a unit
+that runs, and an alias is a second name of a unit, so the list has neither.
+macOS uses launchd, which has a very different service model. On Darwin, the
+collector returns `nil` and no error.
 
 Ohai has no direct equivalent of this collector. Ohai has no plugin that lists
 services. This collector is a gohai addition.
 
 ## Collected fields
 
-| Field                    | Type     | Description                                                                          | Schema mapping              |
-| ------------------------ | -------- | ------------------------------------------------------------------------------------ | --------------------------- |
-| `services`               | `list`   | The list of service objects                                                          | No mapping                  |
-| `services[].name`        | `string` | The unit name without the `.service` suffix                                          | No direct OCSF/OTel mapping |
-| `services[].state`       | `string` | The systemd SUB state, for example `running` or `dead`                               | No direct OCSF/OTel mapping |
-| `services[].enabled`     | `bool`   | `true` when the unit file is `enabled` or `enabled-runtime`: the unit starts at boot | No direct OCSF/OTel mapping |
-| `services[].description` | `string` | The unit's `Description=`, for example `OpenSSH server daemon`                       | No direct OCSF/OTel mapping |
-| `services[].type`        | `string` | Kept for future use. It is empty now                                                 | No direct OCSF/OTel mapping |
+| Field                        | Type     | Description                                                                                                                                  | Schema mapping              |
+| ---------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `services`                   | `list`   | The list of service objects                                                                                                                  | No mapping                  |
+| `services[].name`            | `string` | The unit name without the `.service` suffix                                                                                                  | No direct OCSF/OTel mapping |
+| `services[].state`           | `string` | The systemd SUB state, for example `running` or `dead`                                                                                       | No direct OCSF/OTel mapping |
+| `services[].enabled`         | `bool`   | `true` when the unit file is `enabled` or `enabled-runtime`: the unit starts at boot                                                         | No direct OCSF/OTel mapping |
+| `services[].unit_file_state` | `string` | The state of the unit file: `enabled`, `enabled-runtime`, `disabled`, `static`, `masked` and the others. Empty when `list-unit-files` failed | No direct OCSF/OTel mapping |
+| `services[].description`     | `string` | The unit's `Description=`, for example `OpenSSH server daemon`. Empty for a unit that systemd has not loaded                                 | No direct OCSF/OTel mapping |
+| `services[].type`            | `string` | Kept for future use. It is empty now                                                                                                         | No direct OCSF/OTel mapping |
 
 ## Platform support
 
@@ -41,13 +47,21 @@ services. This collector is a gohai addition.
         "name": "ssh",
         "state": "running",
         "enabled": true,
+        "unit_file_state": "enabled",
         "description": "OpenSSH server daemon"
       },
       {
         "name": "NetworkManager",
         "state": "dead",
         "enabled": false,
+        "unit_file_state": "disabled",
         "description": "Network Manager"
+      },
+      {
+        "name": "console-getty",
+        "state": "dead",
+        "enabled": false,
+        "unit_file_state": "disabled"
       }
     ]
   }

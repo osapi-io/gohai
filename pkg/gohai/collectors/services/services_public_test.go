@@ -189,23 +189,65 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal([]services.Service{
 					{
-						Name:        "ssh",
-						State:       "running",
-						Enabled:     true,
-						Description: "OpenSSH server daemon",
+						Name:          "ssh",
+						State:         "running",
+						Enabled:       true,
+						UnitFileState: "enabled",
+						Description:   "OpenSSH server daemon",
 					},
 					{
-						Name:        "cron",
-						State:       "running",
-						Enabled:     true,
-						Description: "Regular background program",
+						Name:          "cron",
+						State:         "running",
+						Enabled:       true,
+						UnitFileState: "enabled-runtime",
+						Description:   "Regular background program",
 					},
 					{
-						Name:        "NetworkManager",
-						State:       "dead",
-						Enabled:     false,
-						Description: "Network Manager",
+						Name:          "NetworkManager",
+						State:         "dead",
+						Enabled:       false,
+						UnitFileState: "disabled",
+						Description:   "Network Manager",
 					},
+				}, info.Services)
+			},
+		},
+		{
+			name:    "linux: a unit that systemd has not loaded is in the list, from its unit file",
+			variant: "linux",
+			exec: systemctlExecWith(s.T(),
+				[]byte("ssh.service loaded active running OpenSSH server daemon\n"), nil,
+				[]byte("ssh.service enabled enabled\nlabcheck.service disabled enabled\n"), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{
+					{
+						Name:          "ssh",
+						State:         "running",
+						Enabled:       true,
+						UnitFileState: "enabled",
+						Description:   "OpenSSH server daemon",
+					},
+					{Name: "labcheck", State: "dead", Enabled: false, UnitFileState: "disabled"},
+				}, info.Services)
+			},
+		},
+		{
+			name:    "linux: an alias, a template and a unit listed twice are in the list once",
+			variant: "linux",
+			exec: systemctlExecWith(s.T(), []byte(""), nil,
+				[]byte("dbus-org.freedesktop.resolve1.service alias -\n"+
+					"getty@.service static -\n"+
+					"masked.service masked enabled\n"+
+					"masked.service masked enabled\n"), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{
+					{Name: "masked", State: "dead", Enabled: false, UnitFileState: "masked"},
 				}, info.Services)
 			},
 		},
@@ -261,7 +303,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: empty output returns empty list",
 			variant: "linux",
-			exec:    systemctlExec(s.T(), []byte(""), nil),
+			exec:    systemctlExecWith(s.T(), []byte(""), nil, nil, nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -277,19 +319,33 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				[]byte("not-a-service-line\nssh.service loaded active running OpenSSH\n"),
 				nil,
 			),
+			// The unit files of the other tests add cron and NetworkManager.
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
 				s.Require().True(ok)
 				s.Equal([]services.Service{
-					{Name: "ssh", State: "running", Enabled: true, Description: "OpenSSH"},
-				}, info.Services)
+					{
+						Name:          "ssh",
+						State:         "running",
+						Enabled:       true,
+						UnitFileState: "enabled",
+						Description:   "OpenSSH",
+					},
+					{Name: "cron", State: "dead", Enabled: true, UnitFileState: "enabled-runtime"},
+					{
+						Name:          "NetworkManager",
+						State:         "dead",
+						Enabled:       false,
+						UnitFileState: "disabled",
+					},
+				}, info.Services, "getty@ is a template, so it is not in the list")
 			},
 		},
 		{
 			name:    "linux: short field lines skipped",
 			variant: "linux",
-			exec:    systemctlExec(s.T(), []byte("ssh.service loaded\n"), nil),
+			exec:    systemctlExecWith(s.T(), []byte("ssh.service loaded\n"), nil, nil, nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
