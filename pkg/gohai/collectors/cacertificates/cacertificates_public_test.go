@@ -235,6 +235,44 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "when a Red Hat host distrusts a CA in its bundle and in a blocklist",
+			variant: "linux",
+			layout:  "fedora",
+			files: map[string]string{
+				"/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit": "[p11-kit-object-v1]\nlabel: \"Root CA\"\ntrusted: true\n" + root.pem +
+					"\n[p11-kit-object-v1]\nlabel: \"Explicitly Distrust Other CA\"\nx-distrusted: true\n" + other.pem +
+					"\n[p11-kit-object-v1]\nlabel: \"Other CA\"\nclass: x-certificate-extension\nx-distrusted: false\n",
+				// A file in a blocklist is a distrust mark, not a CA that
+				// the host trusts.
+				"/usr/share/pki/ca-trust-source/blocklist/leaf.pem": leaf.pem,
+				"/etc/pki/ca-trust/source/anchors/ours.pem":         noCN.pem,
+				"/etc/pki/ca-trust/source/blocklist/ours.pem":       noCN.pem,
+				"/etc/pki/ca-trust/source/blocklist/README":         "not a CA",
+			},
+			links: map[string]string{"/etc/pki/ca-trust/source/blocklist/gone.pem": "/nowhere"},
+			want: []cacertificates.Certificate{
+				{
+					Name: "Root CA", Path: "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+					Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
+					Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+				},
+				{
+					Name:        "Other CA",
+					Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+					Source:      "system",
+					Enabled:     false,
+					Subject:     "CN=Other CA,O=Test",
+					Fingerprint: other.fingerprint,
+					NotAfter:    other.notAfter,
+				},
+				{
+					Name: "ours", Path: "/etc/pki/ca-trust/source/anchors/ours.pem",
+					Source: "local", Enabled: false, Subject: "O=No CN",
+					Fingerprint: noCN.fingerprint, NotAfter: noCN.notAfter,
+				},
+			},
+		},
+		{
 			name:    "when the host has no CA directories, no conf, and an unreadable file",
 			variant: "linux",
 			layout:  "debian",
