@@ -27,31 +27,52 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Darwin collects SSH host key fingerprints on macOS. macOS ships
 // OpenSSH and stores host keys in the same /etc/ssh/ path as Linux.
+// /etc/passwd on macOS has only the system users, and the other users
+// are in the directory service, so Exec runs dscl to find each home.
 // FS is the virtual filesystem — production uses the real OS filesystem;
 // tests inject an avfs memfs with canned key files.
 type Darwin struct {
 	base
 
-	FS avfs.VFS
+	FS   avfs.VFS
+	Exec executor.Executor
 }
 
 // NewDarwin returns a Darwin variant wired to the real OS filesystem.
 func NewDarwin() *Darwin {
-	return &Darwin{FS: osfs.NewWithNoIdm()}
+	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
 }
 
-// Collect reads SSH host public keys and returns their fingerprints.
+// Collect reads SSH host public keys and returns their fingerprints,
+// and the authorized keys of each user of the directory service. When
+// dscl does not run, the users of /etc/passwd are used.
 func (d *Darwin) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	keys, err := collectHostKeys(d.FS)
-	if err != nil {
-		return nil, err
+	return &Info{
+		Keys:           collectHostKeys(d.FS),
+		AuthorizedKeys: collectAuthorizedKeys(d.FS, d.homes(ctx)),
+	}, nil
+}
+
+// homes is the home of each user from `dscl . -list /Users
+// NFSHomeDirectory`, which a user that is not root can run. It is the
+// users of /etc/passwd when there is no Exec or dscl fails.
+func (d *Darwin) homes(
+	ctx context.Context,
+) []home {
+	if d.Exec != nil {
+		out, err := d.Exec.Execute(ctx, "dscl", ".", "-list", "/Users", "NFSHomeDirectory")
+		if err == nil {
+			return dsclHomes(out)
+		}
 	}
-	return &Info{Keys: keys, AuthorizedKeys: collectAuthorizedKeys(d.FS)}, nil
+
+	return passwdHomes(d.FS)
 }

@@ -44,14 +44,14 @@ func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect reads SSH host public keys and returns their fingerprints.
+// Collect reads SSH host public keys and returns their fingerprints,
+// and the authorized keys of each user of /etc/passwd.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	keys, err := collectHostKeys(l.FS)
-	if err != nil {
-		return nil, err
-	}
-	return &Info{Keys: keys, AuthorizedKeys: collectAuthorizedKeys(l.FS)}, nil
+	return &Info{
+		Keys:           collectHostKeys(l.FS),
+		AuthorizedKeys: collectAuthorizedKeys(l.FS, passwdHomes(l.FS)),
+	}, nil
 }
