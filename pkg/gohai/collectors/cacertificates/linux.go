@@ -24,6 +24,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/x509"
 	"io/fs"
 	"path"
 	"slices"
@@ -41,12 +42,16 @@ type Dir struct {
 	Source string
 }
 
-// Layout is where a family keeps its CAs: the directories, and the file
-// that turns system CAs off, if the family has one.
+// Layout is where a family keeps its CAs: the directories, the file that
+// turns system CAs off, if the family has one, and the p11-kit blocklists.
 type Layout struct {
 	Dirs []Dir
 	// Conf is the file whose "!name" lines turn a system CA off, or "".
 	Conf string
+	// Blocklists are the p11-kit directories whose certificates the host
+	// distrusts. A CA in one of them is not enabled, and a file in one of
+	// them is not a CA that the host trusts.
+	Blocklists []string
 }
 
 // The layouts of the Linux families.
@@ -63,20 +68,43 @@ var (
 			{Path: "/usr/share/pki/ca-trust-source", Source: SourceSystem},
 			{Path: "/etc/pki/ca-trust/source/anchors", Source: SourceLocal},
 		},
+		Blocklists: p11kitBlocklists(
+			"/usr/share/pki/ca-trust-source",
+			"/etc/pki/ca-trust/source",
+		),
 	}
 	suseLayout = Layout{
 		Dirs: []Dir{
 			{Path: "/usr/share/pki/trust", Source: SourceSystem},
 			{Path: "/etc/pki/trust/anchors", Source: SourceLocal},
 		},
+		Blocklists: p11kitBlocklists("/usr/share/pki/trust", "/etc/pki/trust"),
 	}
 	archLayout = Layout{
 		Dirs: []Dir{
 			{Path: "/usr/share/ca-certificates/trust-source", Source: SourceSystem},
 			{Path: "/etc/ca-certificates/trust-source/anchors", Source: SourceLocal},
 		},
+		Blocklists: p11kitBlocklists(
+			"/usr/share/ca-certificates/trust-source",
+			"/etc/ca-certificates/trust-source",
+		),
 	}
 )
+
+// p11kitBlocklists are the blocklist directories of the p11-kit trust
+// sources roots: "blocklist", and "blacklist", the name that p11-kit
+// still reads from older hosts.
+func p11kitBlocklists(
+	roots ...string,
+) []string {
+	out := make([]string, 0, 2*len(roots))
+	for _, r := range roots {
+		out = append(out, r+"/blocklist", r+"/blacklist")
+	}
+
+	return out
+}
 
 // LayoutFor is where the family keeps its CAs. Debian and Alpine keep them
 // in /usr/share/ca-certificates, SUSE and Arch in their own trees, and the
@@ -111,29 +139,97 @@ func NewLinux() *Linux {
 }
 
 // Collect reads each CA file under the layout's directories. A directory
-// that the host does not have has no CAs.
+// that the host does not have has no CAs. A CA that a blocklist or a
+// p11-kit bundle distrusts is not enabled.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	off := l.disabled()
+	distrusted := l.blocklisted()
 	info := &Info{Certificates: []Certificate{}}
 	for _, d := range l.Layout.Dirs {
 		_ = l.FS.WalkDir(d.Path, func(p string, e fs.DirEntry, err error) error {
-			if err != nil || e.IsDir() || !caFile(p) {
+			if err != nil {
 				return nil //nolint:nilerr // a directory the host lacks has no CAs
+			}
+			if e.IsDir() {
+				if slices.Contains(l.Layout.Blocklists, p) {
+					return fs.SkipDir
+				}
+
+				return nil
+			}
+			if !caFile(p) {
+				return nil
 			}
 			data, err := l.FS.ReadFile(p)
 			if err != nil {
 				return nil //nolint:nilerr // an unreadable file is left out
 			}
 			info.Certificates = append(info.Certificates, entries(d, p, data, off)...)
+			if path.Ext(p) == ".p11-kit" {
+				for _, c := range p11kitDistrusted(data) {
+					distrusted[fingerprint(c)] = true
+				}
+			}
+
+			return nil
+		})
+	}
+	for i, c := range info.Certificates {
+		if distrusted[c.Fingerprint] {
+			info.Certificates[i].Enabled = false
+		}
+	}
+
+	return info, nil
+}
+
+// blocklisted are the fingerprints of the certificates in the layout's
+// blocklists.
+func (l *Linux) blocklisted() map[string]bool {
+	out := map[string]bool{}
+	for _, dir := range l.Layout.Blocklists {
+		_ = l.FS.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
+			if err != nil || e.IsDir() || !caFile(p) {
+				return nil //nolint:nilerr // a blocklist the host lacks distrusts nothing
+			}
+			data, err := l.FS.ReadFile(p)
+			if err != nil {
+				return nil //nolint:nilerr // an unreadable file is left out
+			}
+			for _, c := range certs(data) {
+				out[fingerprint(c)] = true
+			}
 
 			return nil
 		})
 	}
 
-	return info, nil
+	return out
+}
+
+// p11kitDistrusted are the certificates of the objects of a p11-kit file
+// that have the attribute "x-distrusted: true", such as Fedora's
+// "Explicitly Distrust DigiNotar Root CA".
+func p11kitDistrusted(
+	data []byte,
+) []*x509.Certificate {
+	var out []*x509.Certificate
+	for _, obj := range strings.Split(string(data), "[p11-kit-object-v1]") {
+		attrs, _, _ := strings.Cut(obj, "-----BEGIN")
+		for _, line := range strings.Split(attrs, "\n") {
+			k, v, ok := strings.Cut(line, ":")
+			if ok && strings.TrimSpace(k) == "x-distrusted" && strings.TrimSpace(v) == "true" {
+				out = append(out, certs([]byte(obj))...)
+
+				break
+			}
+		}
+	}
+
+	return out
 }
 
 // disabled are the names of the system CAs that the layout's conf file

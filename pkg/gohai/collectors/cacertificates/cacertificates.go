@@ -53,7 +53,8 @@ type Certificate struct {
 	// Source is system or local.
 	Source string `json:"source"`
 	// Enabled is false for a system CA that the host's config turns off,
-	// such as a "!" line in /etc/ca-certificates.conf.
+	// such as a "!" line in /etc/ca-certificates.conf, and for a CA that
+	// the host distrusts, such as one in a p11-kit blocklist.
 	Enabled bool `json:"enabled"`
 	// Subject is the certificate's subject, when the file parses.
 	Subject string `json:"subject,omitempty"`
@@ -136,12 +137,20 @@ func describe(
 	e Certificate,
 	c *x509.Certificate,
 ) Certificate {
-	sum := sha256.Sum256(c.Raw)
 	e.Subject = c.Subject.String()
-	e.Fingerprint = hex.EncodeToString(sum[:])
+	e.Fingerprint = fingerprint(c)
 	e.NotAfter = c.NotAfter.UTC().Format(time.RFC3339)
 
 	return e
+}
+
+// fingerprint is the SHA-256 of c's DER, in hex.
+func fingerprint(
+	c *x509.Certificate,
+) string {
+	sum := sha256.Sum256(c.Raw)
+
+	return hex.EncodeToString(sum[:])
 }
 
 // nameOf is the name of a CA that one file of many holds: its subject's

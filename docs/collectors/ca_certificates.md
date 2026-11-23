@@ -21,15 +21,15 @@ host has more than one hundred.
 
 ## Collected fields
 
-| Field                        | Type     | Description                                                                                                                                 | Schema mapping                                                               |
-| ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `certificates[].name`        | `string` | The name of the CA: the path of its file under its directory, with no extension, or its subject's common name when one file holds many CAs. | No direct schema mapping. gohai treats the trust store as a gohai extension. |
-| `certificates[].path`        | `string` | The file that holds the CA, or the keychain on macOS.                                                                                       | `file.path`                                                                  |
-| `certificates[].source`      | `string` | `system` for a CA that the distribution ships, `local` for a CA that an administrator added.                                                | No direct schema mapping.                                                    |
-| `certificates[].enabled`     | `bool`   | `false` for a system CA that the host config turns off, such as a `!` line in `/etc/ca-certificates.conf`.                                  | No direct schema mapping.                                                    |
-| `certificates[].subject`     | `string` | The subject of the certificate, when the file parses.                                                                                       | `certificate.subject`                                                        |
-| `certificates[].fingerprint` | `string` | The SHA-256 of the certificate's DER, in hex.                                                                                               | `certificate.fingerprints[].value`, with `algorithm` SHA-256                 |
-| `certificates[].not_after`   | `string` | The time at which the certificate expires, in RFC 3339.                                                                                     | `certificate.expiration_time`                                                |
+| Field                        | Type     | Description                                                                                                                                     | Schema mapping                                                               |
+| ---------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `certificates[].name`        | `string` | The name of the CA: the path of its file under its directory, with no extension, or its subject's common name when one file holds many CAs.     | No direct schema mapping. gohai treats the trust store as a gohai extension. |
+| `certificates[].path`        | `string` | The file that holds the CA, or the keychain on macOS.                                                                                           | `file.path`                                                                  |
+| `certificates[].source`      | `string` | `system` for a CA that the distribution ships, `local` for a CA that an administrator added.                                                    | No direct schema mapping.                                                    |
+| `certificates[].enabled`     | `bool`   | `false` for a system CA that the host config turns off, such as a `!` line in `/etc/ca-certificates.conf`, or for a CA that the host distrusts. | No direct schema mapping.                                                    |
+| `certificates[].subject`     | `string` | The subject of the certificate, when the file parses.                                                                                           | `certificate.subject`                                                        |
+| `certificates[].fingerprint` | `string` | The SHA-256 of the certificate's DER, in hex.                                                                                                   | `certificate.fingerprints[].value`, with `algorithm` SHA-256                 |
+| `certificates[].not_after`   | `string` | The time at which the certificate expires, in RFC 3339.                                                                                         | `certificate.expiration_time`                                                |
 
 ## Platform support
 
@@ -130,10 +130,20 @@ None.
    certificate, named by its subject's common name.
 4. On the Debian family, it reads `/etc/ca-certificates.conf`. A line `!name`
    turns the system CA `name` off, and its entry has `enabled: false`.
+5. On the Red Hat, SUSE and Arch families, p11-kit sets the trust. The collector
+   reads the certificates in the `blocklist` and `blacklist` directories of each
+   trust source, for example `/usr/share/pki/ca-trust-source/blocklist` and
+   `/etc/pki/ca-trust/source/blocklist` on the Red Hat family. A file in a
+   blocklist is not a CA that the host trusts. Thus it gives no entry.
+6. In a `.p11-kit` file, an object with `x-distrusted: true` marks its
+   certificate as distrusted. Fedora's bundle has one: "Explicitly Distrust
+   DigiNotar Root CA".
+7. A CA whose SHA-256 fingerprint is the same as the fingerprint of a
+   certificate in step 5 or step 6 has `enabled: false`. This applies to a
+   system CA and to a local CA.
 
-The p11-kit bundle of the Red Hat family also holds the trust flags of each CA,
-such as a CA that the distribution distrusts. The collector does not read the
-flags. Thus such a CA shows as `enabled: true`.
+The collector does not read the other trust attributes of p11-kit, such as the
+extensions that limit the purposes of a CA, or `nss-server-distrust-after`.
 
 ### macOS
 
