@@ -43,10 +43,10 @@ Consumers use this to:
 
 ## Platform support
 
-| Platform | Supported                                              |
-| -------- | ------------------------------------------------------ |
-| Linux    | ✅                                                     |
-| macOS    | ✅ (macOS has POSIX flat files and also OpenDirectory) |
+| Platform | Supported                                  |
+| -------- | ------------------------------------------ |
+| Linux    | ✅                                         |
+| macOS    | ✅ (the directory service, through `dscl`) |
 
 ## Example output
 
@@ -102,8 +102,7 @@ None.
 
 ## Data sources
 
-On Linux and macOS, the method is the same, because the two platforms have POSIX
-flat files:
+On Linux, the collector reads the POSIX flat files:
 
 1. The collector reads `/etc/passwd` through the injected `avfs.VFS`. It parses
    each line into `passwd[<username>]`. Each line has seven fields with colons
@@ -127,12 +126,28 @@ keeps the first entry of a duplicate username. It gets the current user from the
 effective UID. gohai parses `/etc/passwd` directly and does not call
 `getpwent(3)`. Thus the collector has no cgo dependency.
 
-On macOS, the local accounts are in Directory Services (`dscl .`). The flat
-files `/etc/passwd` and `/etc/group` have the well-known system users (`root`,
-`daemon` and others). They do not have the accounts that a person made. Those
-accounts are in OpenDirectory, and only `dscl` can list them. Ohai's `passwd`
-plugin has the same limit, because Ruby's `Etc` reads the POSIX flat files on
-macOS. A future change can run `dscl . -list /Users` to get all accounts.
+On macOS, the local accounts are in the directory service (`dscl .`). The flat
+files `/etc/passwd` and `/etc/group` have only the well-known system accounts
+(`root`, `daemon` and others). They do not have the accounts that a person made.
+Thus the collector reads the accounts with `dscl`. A user that is not root can
+run these commands:
+
+1. `dscl . -list /Users <attribute>` for `UniqueID`, `PrimaryGroupID`,
+   `NFSHomeDirectory`, `UserShell` and `RealName`. Each line has the name of a
+   record and its value. Each user with a numeric `UniqueID` gives an entry in
+   `passwd`: `uid`, `gid`, `dir`, `shell` and `gecos` (the `RealName`). A user
+   with two homes keeps the first.
+2. `dscl . -list /Groups PrimaryGroupID` and
+   `dscl . -list /Groups GroupMembership`. Each group with a numeric
+   `PrimaryGroupID` gives an entry in `group`, with the members that
+   `GroupMembership` names.
+3. If `dscl` cannot list the users, the collector uses `/etc/passwd`. If it
+   cannot list the groups, the collector uses `/etc/group`.
+4. The collector gets `current_user` from `id -u`, as on Linux.
+
+This agrees with Ohai. Ohai's `passwd` plugin uses Ruby's `Etc.passwd`, which
+calls `getpwent(3)`. On macOS, `getpwent(3)` reads the directory service. Thus
+Ohai also reports the accounts that a person made.
 
 The collector also reads `/etc/shadow` when the caller can (root). An account
 whose password field starts with `!` or `*` is `locked`, as `passwd -S` reports
