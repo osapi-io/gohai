@@ -47,9 +47,9 @@ const (
 	shadowPath = "/etc/shadow"
 )
 
-// New returns the users variant for the host OS. Both Linux and
-// Darwin read the same /etc/passwd and /etc/group files — separate
-// structs preserve the per-OS dispatch pattern for consistency.
+// New returns the users variant for the host OS. Linux reads
+// /etc/passwd and /etc/group. Darwin reads the directory service, and
+// the same files when dscl cannot list the accounts.
 func New() Collector {
 	return NewWith(source.Sources{})
 }
@@ -74,6 +74,16 @@ func collectPOSIX(
 	fs avfs.VFS,
 	exec executor.Executor,
 ) (*Info, error) {
+	info := readPOSIX(fs)
+	setCurrentUser(ctx, exec, info)
+
+	return info, nil
+}
+
+// readPOSIX reads /etc/passwd, /etc/group and /etc/shadow from fs.
+func readPOSIX(
+	fs avfs.VFS,
+) *Info {
 	info := &Info{
 		Passwd: map[string]PasswdEntry{},
 		Group:  map[string]GroupEntry{},
@@ -87,24 +97,36 @@ func collectPOSIX(
 	if b, err := fs.ReadFile(shadowPath); err == nil {
 		applyShadow(info.Passwd, b)
 	}
+
+	return info
+}
+
+// setCurrentUser sets CurrentUser to the user of info.Passwd whose UID is
+// the effective UID that `id -u` gives. It stays empty when exec is nil,
+// when id fails, or when no user has the UID.
+func setCurrentUser(
+	ctx context.Context,
+	exec executor.Executor,
+	info *Info,
+) {
 	if exec == nil {
-		return info, nil
+		return
 	}
 	out, err := exec.Execute(ctx, "id", "-u")
 	if err != nil {
-		return info, nil
+		return
 	}
 	euid, err := strconv.Atoi(strings.TrimSpace(string(out)))
 	if err != nil {
-		return info, nil
+		return
 	}
 	for name, entry := range info.Passwd {
 		if entry.UID == euid {
 			info.CurrentUser = name
-			break
+
+			return
 		}
 	}
-	return info, nil
 }
 
 // Info holds the enumerated user and group databases plus current user.

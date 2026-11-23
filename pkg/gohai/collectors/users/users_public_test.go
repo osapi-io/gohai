@@ -136,7 +136,8 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		id           string // output of `id -u`; "" uses euid
 		idErr        error
 		nilExec      bool
-		dscl         string // dscl output; "" is a dscl that fails
+		dscl         string            // dscl output; "" is a dscl that fails
+		dsclLists    map[string]string // output of other dscl lines
 		validateFunc func(any, error)
 	}{
 		{
@@ -273,6 +274,72 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			// Most macOS users are in the directory service, not in
+			// /etc/passwd or /etc/group.
+			name:    "darwin: users and groups from the directory service",
+			variant: "darwin",
+			files: map[string]string{
+				"/etc/passwd": "root:*:0:0:System Administrator:/var/root:/bin/sh\n",
+				"/etc/group":  "wheel:*:0:root\n",
+			},
+			euid: 501,
+			dscl: "root ;ShadowHash;\njohn ;ShadowHash;\nguest ;DisabledUser;\n",
+			dsclLists: map[string]string{
+				"dscl . -list /Users UniqueID": "root      0\n" +
+					"john      501\n" +
+					"guest     201\n" +
+					"bad       x\n" +
+					"noid\n",
+				"dscl . -list /Users PrimaryGroupID":   "root 0\njohn 20\nguest 201\n",
+				"dscl . -list /Users NFSHomeDirectory": "root /var/root /private/var/root\njohn /Users/john\n",
+				"dscl . -list /Users UserShell":        "root /bin/sh\njohn /bin/zsh\n",
+				"dscl . -list /Users RealName":         "root      System Administrator\njohn      John Doe\nguest\n",
+				"dscl . -list /Groups PrimaryGroupID":  "admin  80\nstaff  20\nbad    x\n",
+				"dscl . -list /Groups GroupMembership": "admin    root john\nstaff\nghost  root\n",
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Passwd, 3)
+				john := info.Passwd["john"]
+				s.Equal(501, john.UID)
+				s.Equal(20, john.GID)
+				s.Equal("/Users/john", john.Dir)
+				s.Equal("/bin/zsh", john.Shell)
+				s.Equal("John Doe", john.GECOS)
+				s.Equal("/var/root", info.Passwd["root"].Dir, "the first home")
+				s.Equal(201, info.Passwd["guest"].GID)
+				s.Empty(info.Passwd["guest"].Dir)
+				s.True(*info.Passwd["guest"].Locked)
+				s.False(*info.Passwd["john"].Locked)
+				s.Equal("john", info.CurrentUser)
+				s.Require().Len(info.Group, 2)
+				s.Equal(
+					users.GroupEntry{GID: 80, Members: []string{"root", "john"}},
+					info.Group["admin"],
+				)
+				s.Equal(users.GroupEntry{GID: 20}, info.Group["staff"])
+			},
+		},
+		{
+			name:    "darwin: groups from /etc/group when dscl cannot list them",
+			variant: "darwin",
+			files: map[string]string{
+				"/etc/group": "wheel:*:0:root\n",
+			},
+			dsclLists: map[string]string{
+				"dscl . -list /Users UniqueID": "root 0\n",
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Equal(0, info.Passwd["root"].UID)
+				s.Equal([]string{"root"}, info.Group["wheel"].Members)
+			},
+		},
+		{
 			name:    "darwin: nil Exec",
 			variant: "darwin",
 			files:   map[string]string{"/etc/passwd": "root:*:0:0::/var/root:/bin/sh\n"},
@@ -318,6 +385,9 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				r.Out[dscl] = tt.dscl
 			} else {
 				r.Err[dscl] = errors.New("exec dscl: not found")
+			}
+			for line, out := range tt.dsclLists {
+				r.Out[line] = out
 			}
 			var exec executor.Executor = r.Mock(s.T())
 			if tt.nilExec {
