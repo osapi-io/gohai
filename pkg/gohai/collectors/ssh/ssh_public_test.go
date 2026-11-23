@@ -29,6 +29,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"io/fs"
 	"strings"
 	"testing"
@@ -42,9 +43,13 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/internal/platform"
 	gohaisssh "github.com/osapi-io/gohai/pkg/gohai/collectors/ssh"
 )
+
+// dsclHomes is the command line that lists the home of each macOS user.
+const dsclHomes = "dscl . -list /Users NFSHomeDirectory"
 
 var (
 	_ collector.Collector = (*gohaisssh.Linux)(nil)
@@ -234,6 +239,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		name         string
 		variant      string
 		setupFS      func() avfs.VFS
+		commands     sourcetest.Commands
+		nilExec      bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -273,6 +280,97 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				s.Equal("ecdsa-sha2-nistp256", john[0].Type)
 				s.Equal(`no-pty,from="10.0.0.0/8"`, john[0].Options)
 				s.Equal("john laptop", john[0].Comment)
+			},
+		},
+		{
+			// Most macOS users are in the directory service, not in
+			// /etc/passwd. dscl gives the home of each one.
+			name:    "darwin: authorized keys of a directory service user",
+			variant: "darwin",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                      "root:*:0:0::/var/root:/bin/sh\n",
+					"/Users/john/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@mac\n",
+					"/var/root/.ssh/authorized_keys":   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 root@mac\n",
+				})
+			},
+			commands: sourcetest.Commands{Out: map[string]string{
+				dsclHomes: "_www                     /Library/WebServer\n" +
+					"daemon                   /var/root\n" +
+					"john                     /Users/john/\n" +
+					"nobody                   /var/empty\n" +
+					"nohome\n" +
+					"slash                    /\n" +
+					"root                     /var/root /private/var/root\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Require().
+					Len(info.AuthorizedKeys, 3, "john, root and daemon, which shares root's home")
+				s.Require().Len(info.AuthorizedKeys["john"], 1)
+				s.Equal("john@mac", info.AuthorizedKeys["john"][0].Comment)
+				s.Require().Len(info.AuthorizedKeys["root"], 1)
+				s.Equal("root@mac", info.AuthorizedKeys["root"][0].Comment)
+			},
+		},
+		{
+			name:    "darwin: dscl fails, so /etc/passwd gives the homes",
+			variant: "darwin",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                    "root:*:0:0::/var/root:/bin/sh\n",
+					"/var/root/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 root@mac\n",
+				})
+			},
+			commands: sourcetest.Commands{
+				Err: map[string]error{dsclHomes: errors.New("exec dscl: not found")},
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.AuthorizedKeys["root"], 1)
+			},
+		},
+		{
+			name:    "darwin: nil Exec, so /etc/passwd gives the homes",
+			variant: "darwin",
+			nilExec: true,
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                    "root:*:0:0::/var/root:/bin/sh\n",
+					"/var/root/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 root@mac\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.AuthorizedKeys["root"], 1)
+			},
+		},
+		{
+			// A host key that does not parse does not hide the
+			// authorized keys, which do not depend on it.
+			name:    "linux: a bad host key keeps the authorized keys",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub":     "ssh-rsa !!!not-base64 bad\n",
+					"/etc/ssh/ssh_host_ed25519_key.pub": string(generateEd25519Key(s.T())),
+					"/etc/passwd":                       "root:x:0:0::/root:/bin/sh\n",
+					"/root/.ssh/authorized_keys":        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 admin@lab\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Keys, 1, "the bad rsa key is left out")
+				s.Equal("ssh-ed25519", info.Keys[0].Type)
+				s.Require().Len(info.AuthorizedKeys["root"], 1)
 			},
 		},
 		{
@@ -471,19 +569,25 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: malformed base64 returns error",
+			name:    "linux: malformed base64 is left out",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return malformFS{memfs.New()} },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Empty(info.Keys)
 			},
 		},
 		{
-			name:    "linux: too few fields returns error",
+			name:    "linux: too few fields is left out",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return badFieldsFS{memfs.New()} },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Empty(info.Keys)
 			},
 		},
 		{
@@ -523,11 +627,14 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: malformed base64 returns error",
+			name:    "darwin: malformed base64 is left out",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return malformFS{memfs.New()} },
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Empty(info.Keys)
 			},
 		},
 		{
@@ -697,7 +804,11 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &gohaisssh.Linux{FS: tt.setupFS()}
 			case "darwin":
-				c = &gohaisssh.Darwin{FS: tt.setupFS()}
+				var exec executor.Executor = tt.commands.Mock(s.T())
+				if tt.nilExec {
+					exec = nil
+				}
+				c = &gohaisssh.Darwin{FS: tt.setupFS(), Exec: exec}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

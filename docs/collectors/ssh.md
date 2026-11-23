@@ -152,7 +152,8 @@ then uses the well-known paths.
 2. For each file that it finds, the collector parses the single-line format:
    `<type> <base64-wire-blob> [comment]`. It splits the line at the whitespace.
    The line must have at least two fields. If a file has fewer fields, or the
-   base64 does not decode, the collector returns an error.
+   base64 does not decode, the collector does not report that key. The other
+   host keys and the authorized keys stay in the output.
 3. The collector calculates the SHA-256 and MD5 fingerprints over the raw wire
    bytes. These bytes are in RFC 4251 format: the blob decoded from the base64
    field. The SHA-256 format is `SHA256:<base64-without-trailing-=>`. The MD5
@@ -171,11 +172,16 @@ Then it uses the well-known paths. gohai reads only the well-known paths, which
 is correct for all standard deployments. If a `HostKey` directive points to a
 path that is not standard, gohai does not report that key.
 
-For each user of `/etc/passwd` with a home other than `/`, the collector reads
-`<home>/.ssh/authorized_keys` through its filesystem. Each line that has a key
-gives an entry: the options before the key, the key type and its SHA-256
-fingerprint, and the comment after it. A comment line, an empty line and a line
-with no key or a bad key are left out. A user with no file is not in the map.
+For each user with a home other than `/`, the collector reads
+`<home>/.ssh/authorized_keys` through its filesystem. On Linux, the users and
+their homes come from `/etc/passwd`. On macOS, `/etc/passwd` has only the system
+users. The other users are in the directory service. Thus the collector runs
+`dscl . -list /Users NFSHomeDirectory`, and uses the first home of each user.
+This command does not need root. If `dscl` fails, the collector uses
+`/etc/passwd`. Each line that has a key gives an entry: the options before the
+key, the key type and its SHA-256 fingerprint, and the comment after it. A
+comment line, an empty line and a line with no key or a bad key are left out. A
+user with no file is not in the map.
 
 ## Backing library
 
