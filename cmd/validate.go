@@ -56,7 +56,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVarP(&file, "file", "f", "", "path to JSON file (default: stdin)")
+	cmd.Flags().StringVarP(&file, "file", "f", "", "Path to JSON file (default: stdin)")
 
 	return cmd
 }

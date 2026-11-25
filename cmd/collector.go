@@ -80,7 +80,7 @@ func newCollectorListCommand(
 			return writeCollectorList(c.OutOrStdout(), gohai.Collectors(), asJSON)
 		},
 	}
-	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Print JSON")
 
 	return cmd
 }
@@ -112,8 +112,8 @@ one, and a fact that no collector reads is a change to gohai first.`,
 			return writeCollector(c.OutOrStdout(), spec, asJSON)
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "the collector, from "+path+" list")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
+	cmd.Flags().StringVar(&name, "name", "", "The collector, from "+path+" list")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Print JSON")
 	_ = cmd.MarkFlagRequired("name")
 
 	return cmd
@@ -134,7 +134,7 @@ func newCollectorSpecGetCommand(
 			return writeTerms(c.OutOrStdout(), gohai.CollectorTerms(), asJSON)
 		},
 	}
-	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Print JSON")
 
 	return cmd
 }
@@ -164,7 +164,7 @@ func newCollectorValidateCommand(
 			)
 		},
 	}
-	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Print JSON")
 
 	return cmd
 }
