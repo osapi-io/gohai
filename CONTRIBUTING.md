@@ -12,6 +12,13 @@ Thank you for your contribution to gohai.
   the behavior, change the design page in the same work. A design page in this
   repository becomes incorrect when the code changes. No check finds the
   difference.
+- **Keep the descriptions in sync.** `gohai.Collectors()` describes each
+  collector, and `gohai collector list|get|spec get|validate` prints it. osapi
+  mounts the same command as `osapi agent collector`
+  (`cmd.NewCollectorCommand(path)`). Thus a change to a collector, to its
+  description or to these commands changes what osapi prints too. Change the
+  data, never a copy. Then tag a release, so osapi can take it. The rule is in
+  [Keep the descriptions in sync](https://github.com/osapi-io/specs/blob/main/CONTRIBUTING.md#keep-the-descriptions-in-sync).
 - **Examine the work that exists.** Look for a pull request or an issue about
   the change. If you find one, use what it says in your work.
 - **Backward compatibility.** Make sure that your change does not stop a program
