@@ -83,7 +83,7 @@ func newRootCommand() *cobra.Command {
 
 	cmd.AddCommand(newCollectCommand())
 	cmd.AddCommand(newValidateCommand())
-	cmd.AddCommand(newCollectorCommand())
+	cmd.AddCommand(NewCollectorCommand("gohai collector"))
 	cmd.AddCommand(newVersionCommand())
 
 	return cmd

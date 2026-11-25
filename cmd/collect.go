@@ -91,8 +91,8 @@ Examples:
 		"ohai",
 		"output format: ohai (default) or ocsf",
 	)
-	cmd.Flags().BoolVar(&pretty, "pretty", false, "pretty-print JSON output")
-	cmd.Flags().BoolVar(&flat, "flat", false, "output flat key=value pairs")
+	cmd.Flags().BoolVar(&pretty, "pretty", false, "Pretty-print JSON output")
+	cmd.Flags().BoolVar(&flat, "flat", false, "Output flat key=value pairs")
 	cmd.Flags().
 		BoolVar(&listCollectors, "list-collectors", false, "list available collectors and exit")
 	cmd.Flags().BoolVar(
@@ -143,8 +143,8 @@ func registerCollectorFlags(
 ) {
 	names := listAllCollectorNames()
 	for _, n := range names {
-		cmd.Flags().Bool("collector."+n, false, fmt.Sprintf("enable %s collector", n))
-		cmd.Flags().Bool("no-collector."+n, false, fmt.Sprintf("disable %s collector", n))
+		cmd.Flags().Bool("collector."+n, false, fmt.Sprintf("Enable the %s collector", n))
+		cmd.Flags().Bool("no-collector."+n, false, fmt.Sprintf("Disable the %s collector", n))
 	}
 
 	cmd.PreRunE = func(
