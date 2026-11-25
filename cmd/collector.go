@@ -37,11 +37,15 @@ import (
 var errProblems = errors.New("a collector breaks a rule")
 
 // NewCollectorCommand is gohai collector: list, get, spec get and validate,
+// with path the command path that it is mounted at, such as gohai collector,
+// which its examples and its hints name.
 // the commands that describe and check the collectors, as osapi's DSLs
 // describe and check themselves. It is exported so that a program that
 // embeds gohai, such as osapi, mounts the same commands (osapi agent
 // collector), and the two print the same thing.
-func NewCollectorCommand() *cobra.Command {
+func NewCollectorCommand(
+	path string,
+) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "collector",
 		Short: "List, describe and validate the collectors this binary has",
@@ -50,24 +54,26 @@ These commands read the collectors in the binary, so what they print
 always agrees with the build that you run.`,
 	}
 	spec := &cobra.Command{Use: "spec", Short: "Print the parts of a collector"}
-	spec.AddCommand(newCollectorSpecGetCommand())
+	spec.AddCommand(newCollectorSpecGetCommand(path))
 	cmd.AddCommand(
-		newCollectorListCommand(),
-		newCollectorGetCommand(),
+		newCollectorListCommand(path),
+		newCollectorGetCommand(path),
 		spec,
-		newCollectorValidateCommand(),
+		newCollectorValidateCommand(path),
 	)
 
 	return cmd
 }
 
-func newCollectorListCommand() *cobra.Command {
+func newCollectorListCommand(
+	path string,
+) *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List the collectors: category, whether it runs by default, dependencies",
-		Example: `  gohai collector list
-  gohai collector list --json`,
+		Example: "  " + path + " list" + "\n" +
+			"  " + path + " list --json",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -79,7 +85,9 @@ func newCollectorListCommand() *cobra.Command {
 	return cmd
 }
 
-func newCollectorGetCommand() *cobra.Command {
+func newCollectorGetCommand(
+	path string,
+) *cobra.Command {
 	var (
 		name   string
 		asJSON bool
@@ -91,33 +99,35 @@ func newCollectorGetCommand() *cobra.Command {
 the files that it opens or looks at, and the commands that it runs. With
 content, it also reads under these paths. A fake host of a test gives each
 one, and a fact that no collector reads is a change to gohai first.`,
-		Example: `  gohai collector get --name services
-  gohai collector get --name services --json`,
+		Example: "  " + path + " get --name services" + "\n" +
+			"  " + path + " get --name services --json",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
 			spec, ok := gohai.CollectorByName(name)
 			if !ok {
-				return fmt.Errorf("no collector named %q: gohai collector list shows them", name)
+				return fmt.Errorf("no collector named %q: %s list shows them", name, path)
 			}
 
 			return writeCollector(c.OutOrStdout(), spec, asJSON)
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "the collector, from gohai collector list")
+	cmd.Flags().StringVar(&name, "name", "", "the collector, from "+path+" list")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
 	_ = cmd.MarkFlagRequired("name")
 
 	return cmd
 }
 
-func newCollectorSpecGetCommand() *cobra.Command {
+func newCollectorSpecGetCommand(
+	path string,
+) *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "get",
 		Short: "Print each part of a collector, what it does and when to use it",
-		Example: `  gohai collector spec get
-  gohai collector spec get --json`,
+		Example: "  " + path + " spec get" + "\n" +
+			"  " + path + " spec get --json",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(c *cobra.Command, _ []string) error {
@@ -129,7 +139,9 @@ func newCollectorSpecGetCommand() *cobra.Command {
 	return cmd
 }
 
-func newCollectorValidateCommand() *cobra.Command {
+func newCollectorValidateCommand(
+	path string,
+) *cobra.Command {
 	var asJSON bool
 	var rules strings.Builder
 	for _, c := range gohai.CollectorChecks() {
@@ -139,8 +151,8 @@ func newCollectorValidateCommand() *cobra.Command {
 		Use:   "validate",
 		Short: "Check every collector against the rules, and print the fix of each problem",
 		Long:  "It exits 1 when a collector breaks a rule.\n\nThe rules:\n\n" + rules.String(),
-		Example: `  gohai collector validate
-  gohai collector validate --json`,
+		Example: "  " + path + " validate" + "\n" +
+			"  " + path + " validate --json",
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
