@@ -36,10 +36,12 @@ import (
 // errProblems is the error of validate when a collector breaks a rule.
 var errProblems = errors.New("a collector breaks a rule")
 
-// newCollectorCommand is gohai collector: list, get, spec get and validate,
+// NewCollectorCommand is gohai collector: list, get, spec get and validate,
 // the commands that describe and check the collectors, as osapi's DSLs
-// describe and check themselves.
-func newCollectorCommand() *cobra.Command {
+// describe and check themselves. It is exported so that a program that
+// embeds gohai, such as osapi, mounts the same commands (osapi agent
+// collector), and the two print the same thing.
+func NewCollectorCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "collector",
 		Short: "List, describe and validate the collectors this binary has",
