@@ -175,7 +175,9 @@ func New() *Collector {
 func NewWith(
 	src source.Sources,
 ) *Collector {
-	return collector.Wire(&Collector{client: cloudmetadata.New(metadataBaseURL)}, src)
+	return collector.Wire(&Collector{
+		client: cloudmetadata.New(metadataBaseURL, cloudmetadata.WithTransport(src.HTTP)),
+	}, src)
 }
 
 // NewWithClient returns a Collector backed by a caller-supplied client.

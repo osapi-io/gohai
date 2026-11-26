@@ -23,6 +23,8 @@ package sourcetest_test
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -65,6 +67,50 @@ func (s *SourcetestPublicTestSuite) TestCommands() {
 
 	_, err = r.Execute(context.Background(), "nope")
 	s.ErrorContains(err, "exec nope")
+}
+
+func (s *SourcetestPublicTestSuite) TestHTTP() {
+	tests := []struct {
+		name         string
+		url          string
+		validateFunc func(*http.Response)
+	}{
+		{
+			name: "answers a URL it has with 200 and the body",
+			url:  "http://169.254.169.254/latest/meta-data/instance-id",
+			validateFunc: func(resp *http.Response) {
+				s.Equal(http.StatusOK, resp.StatusCode)
+				b, err := io.ReadAll(resp.Body)
+				s.Require().NoError(err)
+				s.Equal("i-123", string(b))
+			},
+		},
+		{
+			name: "answers any other URL with 404",
+			url:  "http://169.254.169.254/nope",
+			validateFunc: func(resp *http.Response) {
+				s.Equal(http.StatusNotFound, resp.StatusCode)
+			},
+		},
+	}
+	rt := sourcetest.HTTP(map[string]string{
+		"http://169.254.169.254/latest/meta-data/instance-id": "i-123",
+	})
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			req, err := http.NewRequestWithContext(
+				context.Background(),
+				http.MethodGet,
+				tt.url,
+				nil,
+			)
+			s.Require().NoError(err)
+			resp, err := rt.RoundTrip(req)
+			s.Require().NoError(err)
+			defer func() { _ = resp.Body.Close() }()
+			tt.validateFunc(resp)
+		})
+	}
 }
 
 func TestSourcetestPublicTestSuite(

@@ -398,6 +398,25 @@ func (s *CloudMetadataPublicTestSuite) TestNewSharesOneTransport() {
 	s.Positive(t.IdleConnTimeout, "an idle connection closes")
 }
 
+func (s *CloudMetadataPublicTestSuite) TestWithTransport() {
+	given := &http.Transport{}
+	shared := cloudmetadata.TransportOf(cloudmetadata.New("http://a.invalid"))
+	tests := []struct {
+		name string
+		rt   http.RoundTripper
+		want http.RoundTripper
+	}{
+		{name: "a given transport carries the requests", rt: given, want: given},
+		{name: "a nil transport keeps the shared one", rt: nil, want: shared},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := cloudmetadata.New("http://a.invalid", cloudmetadata.WithTransport(tt.rt))
+			s.Same(tt.want, cloudmetadata.TransportOf(c))
+		})
+	}
+}
+
 func (s *CloudMetadataPublicTestSuite) TestGetWithHeaders() {
 	var got http.Header
 	srv := newServer(map[string]func(http.ResponseWriter, *http.Request){

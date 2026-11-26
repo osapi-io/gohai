@@ -23,6 +23,8 @@ package gohai_test
 import (
 	"context"
 	"errors"
+	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -33,7 +35,16 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/collector/mocks"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
 	"go.uber.org/mock/gomock"
 )
 
@@ -87,6 +98,91 @@ func (s *GohaiPublicTestSuite) TestWithSources() {
 	s.Require().NotNil(facts.OSRelease)
 	s.Equal("gohaitest", facts.OSRelease.ID)
 	s.Equal("1.0", facts.OSRelease.VersionID)
+}
+
+// hosts is a transport that records the host of each request and answers
+// it with the metadata of a host that is on no cloud. http.RoundTripper is
+// the standard library's interface, so it has no generated mock.
+type hosts struct {
+	mu   sync.Mutex
+	seen map[string]bool
+	next http.RoundTripper
+}
+
+func (h *hosts) RoundTrip(
+	req *http.Request,
+) (*http.Response, error) {
+	h.mu.Lock()
+	h.seen[req.URL.Hostname()] = true
+	h.mu.Unlock()
+
+	return h.next.RoundTrip(req)
+}
+
+func (s *GohaiPublicTestSuite) TestWithSourcesHTTP() {
+	// A fake host with the hints of Azure (waagent) and Scaleway (its
+	// kernel command line). The others probe when no DMI says otherwise.
+	fs := sourcetest.FS(s.T(), map[string]string{
+		"/usr/sbin/waagent": "",
+		"/proc/cmdline":     "BOOT_IMAGE=/vmlinuz scaleway",
+	})
+	tests := []struct {
+		name string
+		new  func(source.Sources) collector.Collector
+		host string
+	}{
+		{
+			name: "gce",
+			new:  func(src source.Sources) collector.Collector { return gce.NewWith(src) },
+			host: "metadata.google.internal.",
+		},
+		{
+			name: "ec2",
+			new:  func(src source.Sources) collector.Collector { return ec2.NewWith(src) },
+			host: "169.254.169.254",
+		},
+		{
+			name: "azure",
+			new:  func(src source.Sources) collector.Collector { return azure.NewWith(src) },
+			host: "169.254.169.254",
+		},
+		{
+			name: "digital_ocean",
+			new:  func(src source.Sources) collector.Collector { return digitalocean.NewWith(src) },
+			host: "169.254.169.254",
+		},
+		{
+			name: "oci",
+			new:  func(src source.Sources) collector.Collector { return oci.NewWith(src) },
+			host: "169.254.169.254",
+		},
+		{
+			name: "alibaba",
+			new:  func(src source.Sources) collector.Collector { return alibaba.NewWith(src) },
+			host: "100.100.100.200",
+		},
+		{
+			name: "openstack",
+			new:  func(src source.Sources) collector.Collector { return openstack.NewWith(src) },
+			host: "169.254.169.254",
+		},
+		{
+			name: "scaleway",
+			new:  func(src source.Sources) collector.Collector { return scaleway.NewWith(src) },
+			host: "169.254.42.42",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name+" reads its metadata service through src.HTTP", func() {
+			rt := &hosts{seen: map[string]bool{}, next: sourcetest.HTTP(nil)}
+			c := tt.new(source.Sources{FS: fs, Family: family.Debian, HTTP: rt})
+			got, err := c.Collect(context.Background(), nil)
+			s.Require().NoError(err)
+			s.Nil(got, "a metadata service that answers 404 is no cloud")
+			s.Equal(map[string]bool{tt.host: true}, rt.seen)
+		})
+	}
 }
 
 func (s *GohaiPublicTestSuite) TestCollect() {

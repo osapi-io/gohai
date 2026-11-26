@@ -82,10 +82,11 @@ Ohai's `has_linode_domain?`.
    - **domain.** The `FQDN` or `Domain` from the `hostname` collector contains
      `"linode"`. The `hostname` collector runs first. This is the same as Ohai's
      `has_linode_domain?`.
-2. The collector reads the interfaces with `net.InterfaceByName("eth0")` and
-   `"eth0:1"` from the Go standard library. For each interface, it uses the
-   first IPv4 address that is not link-local. If an interface is missing, its
-   field is an empty string.
+2. The collector runs `ip -o -4 addr show` through the shared `source.Runner`.
+   Each line names the label of its address: the interface, such as `eth0`, or
+   an alias, such as `eth0:1`. For `eth0` and `eth0:1`, the collector uses the
+   first IPv4 address that is not link-local. If a label is missing, or `ip`
+   fails, its field is an empty string.
 
 The method is the same as Ohai's Linode plugin. It uses the same apt and domain
 signals and the same `eth0` and `eth0:1` interfaces. gohai does not query
@@ -93,4 +94,6 @@ Linode's `metadata.linode.com` API. Ohai does not query it either.
 
 ## Backing library
 
-- The Go standard library: `net.InterfaceByName` and `os.ReadFile`.
+- [`source.Runner`](../../pkg/gohai/source) to run `ip -o -4 addr show`.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read
+  `/etc/apt/sources.list`. Production uses `osfs`. Tests use `memfs`.

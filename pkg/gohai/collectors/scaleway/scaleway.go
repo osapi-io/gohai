@@ -28,12 +28,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/avfs/avfs"
+
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // ProviderName is the canonical cloud identifier this collector
@@ -178,6 +180,8 @@ type rawVolume struct {
 // Collector fetches Scaleway's single-JSON metadata response.
 type Collector struct {
 	client *cloudmetadata.Client
+	// FS is the filesystem that /proc/cmdline is read from.
+	FS avfs.VFS
 }
 
 var _ collector.Collector = (*Collector)(nil)
@@ -185,10 +189,22 @@ var _ collector.Collector = (*Collector)(nil)
 // New returns a default Collector pointed at Scaleway's metadata
 // server with Ohai-matching 6s timeout.
 func New() *Collector {
-	return NewWithClient(cloudmetadata.New(
-		metadataBaseURL,
-		cloudmetadata.WithTimeout(metadataTimeout),
-	))
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns a Collector that reads the metadata service through
+// src.HTTP, so a fake host can answer it. A zero src.HTTP is the shared
+// transport.
+func NewWith(
+	src source.Sources,
+) *Collector {
+	return collector.Wire(&Collector{
+		client: cloudmetadata.New(
+			metadataBaseURL,
+			cloudmetadata.WithTimeout(metadataTimeout),
+			cloudmetadata.WithTransport(src.HTTP),
+		),
+	}, src)
 }
 
 // NewWithClient returns a Collector backed by a caller-supplied client.
@@ -196,7 +212,7 @@ func New() *Collector {
 func NewWithClient(
 	c *cloudmetadata.Client,
 ) *Collector {
-	return &Collector{client: c}
+	return collector.Wire(&Collector{client: c}, source.Sources{})
 }
 
 // Name returns "scaleway".
@@ -220,7 +236,7 @@ func (c *Collector) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	if !onScaleway() {
+	if !onScaleway(c.FS) {
 		return nil, nil
 	}
 	body, err := c.client.Get(ctx, metadataPath)
@@ -241,8 +257,10 @@ func (c *Collector) Collect(
 // boot signature. Matches Ohai's has_scaleway_cmdline? check. The
 // signature is stable across Scaleway's instance types — their kernel
 // always announces the platform on the command line.
-func onScaleway() bool {
-	b, err := os.ReadFile(procCmdlinePath)
+func onScaleway(
+	fs avfs.VFS,
+) bool {
+	b, err := fs.ReadFile(procCmdlinePath)
 	if err != nil {
 		return false
 	}

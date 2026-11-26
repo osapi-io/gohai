@@ -38,6 +38,7 @@ import (
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // ProviderName is the canonical cloud identifier this collector
@@ -296,10 +297,22 @@ var _ collector.Collector = (*Collector)(nil)
 // New returns a default Collector pointed at EC2's metadata server
 // with Ohai-matching 10s timeout.
 func New() *Collector {
-	return NewWithClient(cloudmetadata.New(
-		metadataBaseURL,
-		cloudmetadata.WithTimeout(metadataTimeout),
-	))
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns a Collector that reads the metadata service through
+// src.HTTP, so a fake host can answer it. A zero src.HTTP is the shared
+// transport.
+func NewWith(
+	src source.Sources,
+) *Collector {
+	return NewWithClient(
+		cloudmetadata.New(
+			metadataBaseURL,
+			cloudmetadata.WithTimeout(metadataTimeout),
+			cloudmetadata.WithTransport(src.HTTP),
+		),
+	)
 }
 
 // NewWithClient returns a Collector backed by a caller-supplied client.
