@@ -29,6 +29,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"strings"
@@ -420,7 +421,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-rsa" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-rsa", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(2048, info.Keys[0].KeyLength)
 				}
 			},
@@ -441,7 +441,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-rsa" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-rsa", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(4096, info.Keys[0].KeyLength)
 				}
 			},
@@ -462,7 +461,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-rsa" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-rsa", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(0, info.Keys[0].KeyLength)
 				}
 			},
@@ -483,7 +481,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ecdsa-sha2-nistp256" != "" && len(info.Keys) > 0 {
 					s.Equal("ecdsa-sha2-nistp256", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(256, info.Keys[0].KeyLength)
 				}
 			},
@@ -504,7 +501,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ecdsa-sha2-nistp384" != "" && len(info.Keys) > 0 {
 					s.Equal("ecdsa-sha2-nistp384", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(384, info.Keys[0].KeyLength)
 				}
 			},
@@ -525,7 +521,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ecdsa-sha2-nistp521" != "" && len(info.Keys) > 0 {
 					s.Equal("ecdsa-sha2-nistp521", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(521, info.Keys[0].KeyLength)
 				}
 			},
@@ -546,7 +541,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-ed25519" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-ed25519", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(256, info.Keys[0].KeyLength)
 				}
 			},
@@ -606,7 +600,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-ed25519" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-ed25519", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(256, info.Keys[0].KeyLength)
 				}
 			},
@@ -656,7 +649,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-rsa" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-rsa", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(0, info.Keys[0].KeyLength)
 				}
 			},
@@ -680,7 +672,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-rsa" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-rsa", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(0, info.Keys[0].KeyLength)
 				}
 			},
@@ -704,7 +695,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-rsa" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-rsa", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(0, info.Keys[0].KeyLength)
 				}
 			},
@@ -733,7 +723,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-rsa" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-rsa", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(0, info.Keys[0].KeyLength)
 				}
 			},
@@ -762,7 +751,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ssh-dss" != "" && len(info.Keys) > 0 {
 					s.Equal("ssh-dss", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(0, info.Keys[0].KeyLength)
 				}
 			},
@@ -791,7 +779,6 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				if "ecdsa-sha2-unknown" != "" && len(info.Keys) > 0 {
 					s.Equal("ecdsa-sha2-unknown", info.Keys[0].Type)
 					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.NotEmpty(info.Keys[0].FingerprintMD5)
 					s.Equal(0, info.Keys[0].KeyLength)
 				}
 			},
@@ -811,6 +798,37 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				c = &gohaisssh.Darwin{FS: tt.setupFS(), Exec: exec}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
+		})
+	}
+}
+
+func (s *SSHPublicTestSuite) TestHostKeyJSON() {
+	tests := []struct {
+		name         string
+		key          gohaisssh.HostKey
+		validateFunc func(fields map[string]any)
+	}{
+		{
+			name: "has no MD5 fingerprint, which FIPS 140-3 does not approve",
+			key: gohaisssh.HostKey{
+				Type:              "ssh-ed25519",
+				FingerprintSHA256: "SHA256:abc",
+				KeyLength:         256,
+			},
+			validateFunc: func(fields map[string]any) {
+				s.NotContains(fields, "fingerprint_md5")
+				s.Equal("SHA256:abc", fields["fingerprint_sha256"])
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			b, err := json.Marshal(tc.key)
+			s.Require().NoError(err)
+			var fields map[string]any
+			s.Require().NoError(json.Unmarshal(b, &fields))
+			tc.validateFunc(fields)
 		})
 	}
 }

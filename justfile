@@ -35,7 +35,16 @@ fetch:
 
 # The checks of `just test`, which CI also reads (`just go-ci-checks`): a check
 # added here runs on a laptop and in CI, with no change to the workflow.
-go_slow_checks := "go-fmt-check go-vet go-generate-check go-dead-check"
+go_slow_checks := "go-fmt-check go-vet go-generate-check go-dead-check go-fips-check"
+
+# Fail when a test reaches an algorithm that FIPS 140-3 does not approve
+#
+# osapi's agent embeds gohai and works toward FIPS 140-3 mode
+# (osapi-io/osapi#1382). With fips140=only, Go panics on the use of a
+# non-approved algorithm, such as the MD5 that the ssh and shard collectors
+# used (osapi-io/gohai#364).
+go-fips-check:
+    GODEBUG=fips140=only go test ./...
 
 # Fail when what go generate writes is not what is committed
 #

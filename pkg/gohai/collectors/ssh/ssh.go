@@ -25,8 +25,6 @@
 package ssh
 
 import (
-	// MD5 is the SSH key fingerprint of RFC 4716, not a security use.
-	"crypto/md5"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -79,9 +77,6 @@ type HostKey struct {
 	// FingerprintSHA256 is the SHA-256 fingerprint in OpenSSH format
 	// ("SHA256:<base64>"), matching `ssh-keygen -l -E sha256`.
 	FingerprintSHA256 string `json:"fingerprint_sha256"`
-	// FingerprintMD5 is the MD5 fingerprint in colon-hex format
-	// ("xx:xx:..."), matching `ssh-keygen -l -E md5`.
-	FingerprintMD5 string `json:"fingerprint_md5"`
 	// KeyLength is the effective key length in bits. For RSA/DSA it is
 	// the modulus bit-length; for ECDSA it is the curve size; for
 	// Ed25519 it is always 256.
@@ -175,19 +170,11 @@ func parseHostKeyPub(
 	fingerprintSHA256 := "SHA256:" + base64.StdEncoding.EncodeToString(sha256sum[:])
 	fingerprintSHA256 = strings.TrimRight(fingerprintSHA256, "=")
 
-	md5sum := md5.Sum(raw)
-	hexParts := make([]string, len(md5sum))
-	for i, b := range md5sum {
-		hexParts[i] = fmt.Sprintf("%02x", b)
-	}
-	fingerprintMD5 := strings.Join(hexParts, ":")
-
 	keyLength := deriveKeyLength(keyType, raw)
 
 	return HostKey{
 		Type:              keyType,
 		FingerprintSHA256: fingerprintSHA256,
-		FingerprintMD5:    fingerprintMD5,
 		KeyLength:         keyLength,
 	}, nil
 }

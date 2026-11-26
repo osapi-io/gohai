@@ -56,9 +56,9 @@ func priorWithDMI() collector.PriorResults {
 	}
 }
 
-// Ohai test vector: MD5("somehost004" + "234du3m4i498xdjr2" +
-// "48555CF4-5BB1-21D9-BC4C-E8B73DDE5801")[0:7] → 27767217
-const ohaiDefaultSeed = 27767217
+// The seed of Ohai's test input: SHA-256("somehost004" + "234du3m4i498xdjr2" +
+// "48555CF4-5BB1-21D9-BC4C-E8B73DDE5801")[0:7] → 117055036
+const defaultSeed = 117055036
 
 const sysProfJSON = `{"SPHardwareDataType": [{"serial_number": "234du3m4i498xdjr2"}]}`
 
@@ -131,7 +131,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "linux: matches Ohai test vector (machinename + serial + uuid)",
+			name:    "linux: gives the seed of Ohai's test input (machinename + serial + uuid)",
 			variant: "linux",
 			prior:   priorWithDMI(),
 			validateFunc: func(got any, err error) {
@@ -139,8 +139,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
 
-				if ohaiDefaultSeed >= 0 {
-					s.Equal(ohaiDefaultSeed, info.Seed)
+				if defaultSeed >= 0 {
+					s.Equal(defaultSeed, info.Seed)
 				} else {
 					s.GreaterOrEqual(info.Seed, 0)
 				}
@@ -161,8 +161,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
 
-				if ohaiDefaultSeed >= 0 {
-					s.Equal(ohaiDefaultSeed, info.Seed)
+				if defaultSeed >= 0 {
+					s.Equal(defaultSeed, info.Seed)
 				} else {
 					s.GreaterOrEqual(info.Seed, 0)
 				}
@@ -183,8 +183,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
 
-				if ohaiDefaultSeed >= 0 {
-					s.Equal(ohaiDefaultSeed, info.Seed)
+				if defaultSeed >= 0 {
+					s.Equal(defaultSeed, info.Seed)
 				} else {
 					s.GreaterOrEqual(info.Seed, 0)
 				}
@@ -264,7 +264,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: matches Ohai test vector",
+			name:    "darwin: gives the seed of Ohai's test input",
 			variant: "darwin",
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
@@ -276,8 +276,8 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
 
-				if ohaiDefaultSeed >= 0 {
-					s.Equal(ohaiDefaultSeed, info.Seed)
+				if defaultSeed >= 0 {
+					s.Equal(defaultSeed, info.Seed)
 				} else {
 					s.GreaterOrEqual(info.Seed, 0)
 				}
