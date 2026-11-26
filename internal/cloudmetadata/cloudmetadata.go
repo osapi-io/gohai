@@ -50,6 +50,25 @@ import (
 // without being user-visible when we're not.
 const defaultTimeout = 2 * time.Second
 
+// MaxBody is the most that one metadata response may hold. A metadata
+// document, such as Azure's compute instance, is some kilobytes. A longer
+// body is from an endpoint that is not the provider's, or a broken one, and
+// fails.
+const MaxBody = 1 << 20
+
+// transport is the one transport of each Client, so that the clients of the
+// cloud collectors share their connections. Proxy lookup is off: metadata
+// IPs are link-local and must not route through HTTP_PROXY. An idle
+// connection closes after idleConnTimeout, so a long-running caller, such
+// as osapi's agent, does not keep one open between collections.
+var transport = &http.Transport{
+	Proxy:           nil,
+	IdleConnTimeout: idleConnTimeout,
+}
+
+// idleConnTimeout is how long an idle metadata connection stays open.
+const idleConnTimeout = 30 * time.Second
+
 // ErrNotAvailable signals the provider's metadata endpoint couldn't
 // be reached (connection refused, timeout, DNS failure, HTTP non-2xx).
 // Collectors unwrap this via errors.Is and return (nil, nil) so the
@@ -76,8 +95,8 @@ type Option func(*Client)
 const DefaultUserAgent = "gohai"
 
 // New returns a Client rooted at baseURL. Default timeout is 2s;
-// override with WithTimeout. Default transport has proxy lookup
-// disabled (metadata IPs are link-local — honoring HTTP_PROXY would
+// override with WithTimeout. Each Client shares one transport, with proxy
+// lookup disabled (metadata IPs are link-local — honoring HTTP_PROXY would
 // route cloud probes through a proxy and almost certainly fail).
 // The User-Agent header defaults to DefaultUserAgent; override with
 // WithHeader("User-Agent", "...") if needed.
@@ -89,12 +108,8 @@ func New(
 		baseURL: strings.TrimRight(baseURL, "/"),
 		headers: map[string]string{"User-Agent": DefaultUserAgent},
 		httpClient: &http.Client{
-			Timeout: defaultTimeout,
-			Transport: &http.Transport{
-				// Proxy lookup deliberately disabled — metadata IPs are
-				// link-local and must not route through HTTP_PROXY.
-				Proxy: nil,
-			},
+			Timeout:   defaultTimeout,
+			Transport: transport,
 		},
 	}
 	for _, opt := range opts {
@@ -176,7 +191,7 @@ func (c *Client) RawGet(
 		return nil, 0, fmt.Errorf("%w: %v", ErrNotAvailable, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
-	body, err := io.ReadAll(resp.Body)
+	body, err := readBody(resp.Body)
 	if err != nil {
 		return nil, resp.StatusCode, fmt.Errorf("read body: %w", err)
 	}
@@ -231,7 +246,7 @@ func (c *Client) do(
 			path,
 		)
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := readBody(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
@@ -254,4 +269,19 @@ func (c *Client) GetJSON(
 		return fmt.Errorf("decode json from %s: %w", path, err)
 	}
 	return nil
+}
+
+// readBody reads at most MaxBody of body, and fails when body has more.
+func readBody(
+	body io.Reader,
+) ([]byte, error) {
+	b, err := io.ReadAll(io.LimitReader(body, MaxBody+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > MaxBody {
+		return nil, fmt.Errorf("body is more than %d bytes", MaxBody)
+	}
+
+	return b, nil
 }

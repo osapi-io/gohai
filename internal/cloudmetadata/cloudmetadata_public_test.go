@@ -293,6 +293,38 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			},
 		},
 		{
+			name: "a body of MaxBody bytes is read",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/big": func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = w.Write(make([]byte, cloudmetadata.MaxBody))
+					},
+				})
+				return srv.URL, nil, srv.Close
+			},
+			path: "/big",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Len(body, cloudmetadata.MaxBody)
+			},
+		},
+		{
+			name: "a body of more than MaxBody bytes fails",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/big": func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = w.Write(make([]byte, cloudmetadata.MaxBody+1))
+					},
+				})
+				return srv.URL, nil, srv.Close
+			},
+			path: "/big",
+			validateFunc: func(_ []byte, err error) {
+				s.ErrorContains(err, "body is more than 1048576 bytes")
+				s.NotErrorIs(err, cloudmetadata.ErrNotAvailable)
+			},
+		},
+		{
 			name: "WithHTTPClient swaps underlying transport",
 			setup: func() (string, []cloudmetadata.Option, func()) {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
@@ -354,6 +386,16 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			tt.validateFunc(client.Get(ctx, tt.path))
 		})
 	}
+}
+
+func (s *CloudMetadataPublicTestSuite) TestNewSharesOneTransport() {
+	a := cloudmetadata.TransportOf(cloudmetadata.New("http://a.invalid"))
+	b := cloudmetadata.TransportOf(cloudmetadata.New("http://b.invalid"))
+	s.Same(a, b, "the clients of the cloud collectors share their connections")
+	t, ok := a.(*http.Transport)
+	s.Require().True(ok)
+	s.Nil(t.Proxy, "metadata IPs are link-local and must not route through a proxy")
+	s.Positive(t.IdleConnTimeout, "an idle connection closes")
 }
 
 func (s *CloudMetadataPublicTestSuite) TestGetWithHeaders() {
