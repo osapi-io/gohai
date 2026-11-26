@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostnamectl"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -50,15 +50,15 @@ func TestHostnamectlPublicTestSuite(
 	suite.Run(t, new(HostnamectlPublicTestSuite))
 }
 
-// hostnamectlExec returns a MockExecutor that answers `hostnamectl`
+// hostnamectlExec returns a MockRunner that answers `hostnamectl`
 // with the provided output and error.
 func hostnamectlExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "hostnamectl").
 		Return(out, err).
@@ -149,13 +149,13 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: full output parsed correctly",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnamectlExec(t, fullOutput, nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -182,7 +182,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: minimal output, only static_hostname",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnamectlExec(t, []byte(" Static hostname: node1\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -195,7 +195,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: line without colon-space separator skipped",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnamectlExec(t,
 					[]byte("no separator here\n Static hostname: host2\n"),
 					nil)
@@ -210,7 +210,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: operating_system key (no pretty_name) sets PrettyName",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnamectlExec(t,
 					[]byte(" Operating System: Debian GNU/Linux 12 (bookworm)\n"),
 					nil)
@@ -228,7 +228,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: cpe_os_name key maps to OperatingSystemCPEName",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnamectlExec(t,
 					[]byte(" CPE OS Name: cpe:/o:debian:debian_linux:12\n"),
 					nil)
@@ -246,7 +246,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: non-ASCII value collapses double spaces",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				// Emoji between two words — after stripping, two adjacent spaces remain.
 				return hostnamectlExec(t,
 					[]byte(" Chassis: vm \U0001F5A5 server\n"),
@@ -262,7 +262,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: exec error yields empty Info, no error",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnamectlExec(t, nil, errors.New("command not found"))
 			},
 			validateFunc: func(got any, err error) {
@@ -275,7 +275,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: nil Exec yields empty Info, no error",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*hostnamectl.Info)

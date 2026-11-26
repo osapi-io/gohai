@@ -33,11 +33,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -94,9 +94,9 @@ func newVulnFS(
 
 func noLscpuExec(
 	t *testing.T,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lscpu").
 		Return(nil, errors.New("not found")).
@@ -107,9 +107,9 @@ func noLscpuExec(
 func lscpuExec(
 	t *testing.T,
 	out string,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lscpu").
 		Return([]byte(out), nil).
@@ -351,7 +351,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 		out string
 		err error
 	}
-	darwinExec := func(_ *testing.T, sysctls map[string]sysctlRet) executor.Executor {
+	darwinExec := func(_ *testing.T, sysctls map[string]sysctlRet) source.Runner {
 		r := sourcetest.Commands{Out: map[string]string{}, Err: map[string]error{}}
 		defaults := map[string]sysctlRet{
 			"hw.logicalcpu":            {out: "12\n"},
@@ -379,7 +379,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 		cpuinfo      string // /proc/cpuinfo; "" is no file
 		stat         string // /proc/stat
 		fs           avfs.VFS
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
@@ -471,7 +471,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        x86_64
 CPU op-mode(s):      32-bit, 64-bit
 Byte Order:          Little Endian
@@ -542,7 +542,7 @@ NUMA node0 CPU(s):   0-15
 			variant: "linux",
 			cpuinfo: oneCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        s390x
 Machine type:        3906
 Dispatching mode:    horizontal
@@ -567,7 +567,7 @@ Drawer(s):           2
 			variant: "linux",
 			cpuinfo: oneCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        s390x
 Thread(s) per core:  1
 Core(s) per socket:  3
@@ -590,7 +590,7 @@ Drawer(s):           2
 			variant: "linux",
 			cpuinfo: oneCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        ppc64le
 Thread(s) per core:  4
 Core(s) per socket:  20
@@ -611,7 +611,7 @@ Socket(s):           2
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, "CPU op-mode(s):      ,   ,\n")
 			},
 			validateFunc: func(got any, err error) {
@@ -626,7 +626,7 @@ Socket(s):           2
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, "no colons here\nmore garbage\n")
 			},
 			validateFunc: func(got any, err error) {
@@ -643,7 +643,7 @@ Socket(s):           2
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        x86_64
 NUMA node0 CPU(s):   0-3,8,10-11
 `)
@@ -660,7 +660,7 @@ NUMA node0 CPU(s):   0-3,8,10-11
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        x86_64
 NUMA node0 CPU(s):   bad-data,x-y
 `)
@@ -679,7 +679,7 @@ NUMA node0 CPU(s):   bad-data,x-y
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        x86_64
 NUMA node0 CPU(s):   5-2
 `)
@@ -737,7 +737,7 @@ NUMA node0 CPU(s):   5-2
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        x86_64
 L1d cache:
 L1i cache:           32 KiB
@@ -757,7 +757,7 @@ L1i cache:           32 KiB
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        x86_64
 NUMA node0 CPU(s):   0,,3
 `)
@@ -774,7 +774,7 @@ NUMA node0 CPU(s):   0,,3
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        x86_64
 NUMA node0 CPU(s):   abc
 `)
@@ -793,7 +793,7 @@ NUMA node0 CPU(s):   abc
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        x86_64
 NUMA node0 CPU(s):   ,,,
 `)
@@ -812,7 +812,7 @@ NUMA node0 CPU(s):   ,,,
 			variant: "linux",
 			cpuinfo: oneCPUInfo,
 			fs:      newVulnFS(s, nil),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lscpuExec(t, `Architecture:        s390x
 Thread(s) per core:  1
 Core(s) per socket:  2
@@ -858,7 +858,7 @@ Book(s) per drawer:  1
 		{
 			name:    "darwin: Intel Mac with hyperthreading, all sysctls override",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return darwinExec(t, map[string]sysctlRet{
 					"hw.physicalcpu":      {out: "6\n"},
 					"hw.packages":         {out: "1\n"},
@@ -878,7 +878,7 @@ Book(s) per drawer:  1
 		{
 			name:    "darwin: Apple Silicon, cpufrequency_max and cpufrequency both absent",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return darwinExec(t, map[string]sysctlRet{
 					"hw.physicalcpu":      {out: "10\n"},
 					"hw.packages":         {out: "1\n"},
@@ -898,7 +898,7 @@ Book(s) per drawer:  1
 		{
 			name:    "darwin: Apple Silicon fallback, cpufrequency_max absent but cpufrequency present",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return darwinExec(t, map[string]sysctlRet{
 					"hw.physicalcpu":      {out: "8\n"},
 					"hw.packages":         {out: "1\n"},
@@ -916,7 +916,7 @@ Book(s) per drawer:  1
 		{
 			name:    "darwin: hw.physicalcpu fails, Cores unchanged",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return darwinExec(t, map[string]sysctlRet{
 					"hw.physicalcpu":      {err: errors.New("unknown oid")},
 					"hw.packages":         {out: "1\n"},
@@ -934,7 +934,7 @@ Book(s) per drawer:  1
 		{
 			name:    "darwin: hw.packages fails, Sockets unchanged",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return darwinExec(t, map[string]sysctlRet{
 					"hw.physicalcpu":      {out: "6\n"},
 					"hw.packages":         {err: errors.New("unknown oid")},
@@ -952,7 +952,7 @@ Book(s) per drawer:  1
 		{
 			name:    "darwin: hw.physicalcpu non-numeric, Cores unchanged",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return darwinExec(t, map[string]sysctlRet{
 					"hw.physicalcpu":      {out: "xyz\n"},
 					"hw.packages":         {err: errors.New("unknown oid")},
@@ -970,7 +970,7 @@ Book(s) per drawer:  1
 		{
 			name:    "darwin: hw.cpufrequency_max non-numeric falls through to hw.cpufrequency",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return darwinExec(t, map[string]sysctlRet{
 					"hw.physicalcpu":      {out: "6\n"},
 					"hw.packages":         {out: "1\n"},
@@ -988,7 +988,7 @@ Book(s) per drawer:  1
 		{
 			name:    "darwin: hw.logicalcpu fails",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return darwinExec(
 					t,
 					map[string]sysctlRet{"hw.logicalcpu": {err: errors.New("sysctl error")}},

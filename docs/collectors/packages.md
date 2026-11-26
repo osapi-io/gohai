@@ -118,4 +118,4 @@ reads dpkg, and the other Linux families read rpm.
 
 ## Backing library
 
-`internal/executor.Executor` to run the commands.
+`source.Runner` to run the commands.

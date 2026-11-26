@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin calls `system_profiler SPDisplaysDataType -json` through the
@@ -36,12 +36,12 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect shells out to system_profiler. On any failure (exec missing,

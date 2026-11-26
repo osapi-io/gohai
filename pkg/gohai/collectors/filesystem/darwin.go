@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // mountLineRE is a line of macOS mount: "/dev/disk3s1s1 on / (apfs,
@@ -39,12 +39,12 @@ var mountLineRE = regexp.MustCompile(`^(.*) on (.*) \(([^,)]+)(?:, ([^)]*))?\)$`
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant that runs the host's mount and df.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns filesystem Info.

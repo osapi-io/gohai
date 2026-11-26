@@ -24,7 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects Docker information on macOS hosts. Docker Desktop for
@@ -33,12 +33,12 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect queries Docker and returns version + resource lists. Returns

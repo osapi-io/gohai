@@ -33,10 +33,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	plat "github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -81,13 +81,13 @@ func dirOf(
 	return "/"
 }
 
-// swVersExec returns a MockExecutor that canned-answers `sw_vers`.
+// swVersExec returns a MockRunner that canned-answers `sw_vers`.
 func swVersExec(
 	t *testing.T,
 	out []byte, err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "sw_vers").
 		Return(out, err).
@@ -175,7 +175,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		variant      string
 		osRelease    string
 		fs           avfs.VFS
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
@@ -539,7 +539,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: macOS with RSR patch, BuildVersion + ProductVersionExtra populate",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return swVersExec(t, []byte(swVersWithRSR), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -556,7 +556,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: macOS without RSR, BuildVersion populates VersionExtra empty",
 			variant: "darwin",
-			exec:    func(t *testing.T) executor.Executor { return swVersExec(t, []byte(swVersNoRSR), nil) },
+			exec:    func(t *testing.T) source.Runner { return swVersExec(t, []byte(swVersNoRSR), nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
@@ -570,7 +570,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: sw_vers error, no version or build",
 			variant: "darwin",
-			exec:    func(t *testing.T) executor.Executor { return swVersExec(t, nil, errors.New("not found")) },
+			exec:    func(t *testing.T) source.Runner { return swVersExec(t, nil, errors.New("not found")) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
@@ -584,7 +584,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: sw_vers output with no-colon line, skipped valid lines parsed",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return swVersExec(t,
 					[]byte("no colon line\nBuildVersion:\t23A344\nProductVersionExtra:\n"),
 					nil)
@@ -602,7 +602,7 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: nil Exec, no version or build",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)

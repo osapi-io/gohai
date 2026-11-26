@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/services"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -73,7 +73,7 @@ func systemctlExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	return systemctlExecWith(t, out, err, []byte(unitFilesOut), nil)
 }
 
@@ -85,10 +85,10 @@ func systemctlExecWith(
 	err error,
 	files []byte,
 	filesErr error,
-) executor.Executor {
+) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().Execute(
 		gomock.Any(),
 		"systemctl",
@@ -177,9 +177,9 @@ func launchctlExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	t.Helper()
-	m := execmocks.NewMockExecutor(gomock.NewController(t))
+	m := sourcemocks.NewMockRunner(gomock.NewController(t))
 	m.EXPECT().Execute(gomock.Any(), "launchctl", "print", "system").Return(out, err).AnyTimes()
 
 	return m
@@ -201,7 +201,7 @@ const launchctlDisabled = "\tdisabled services = {\n" +
 func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 	tests := []struct {
 		name string
-		exec executor.Executor
+		exec source.Runner
 		want []services.Service
 	}{
 		{
@@ -258,7 +258,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         executor.Executor
+		exec         source.Runner
 		validateFunc func(any, error)
 	}{
 		{

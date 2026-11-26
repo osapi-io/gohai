@@ -24,7 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // RHEL covers rhel / redhat / centos / fedora / rocky / alma /
@@ -33,12 +33,12 @@ import (
 type RHEL struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewRHEL returns an RHEL variant.
 func NewRHEL() *RHEL {
-	return &RHEL{Exec: executor.New()}
+	return &RHEL{Exec: source.Commands()}
 }
 
 // Collect returns dnf if present, else yum.

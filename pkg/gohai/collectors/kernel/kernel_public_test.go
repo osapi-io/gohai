@@ -31,12 +31,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -85,8 +84,8 @@ type answer struct {
 
 func (s *KernelPublicTestSuite) exec(
 	answers ...answer,
-) executor.Executor {
-	m := execmocks.NewMockExecutor(gomock.NewController(s.T()))
+) source.Runner {
+	m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
 	for _, a := range answers {
 		rest := make([]any, 0, len(a.args)-1)
 		for _, x := range a.args[1:] {

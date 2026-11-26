@@ -28,7 +28,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // The files of /proc/sys/kernel that have the fields of uname(2).
@@ -50,13 +50,13 @@ type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant that reads the host's filesystem and
 // runs its commands.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect returns kernel Info.

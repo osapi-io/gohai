@@ -94,9 +94,9 @@ None.
 
 On Linux:
 
-1. The collector runs `lsscsi` through the shared `internal/executor` runner.
-   `lsscsi` parses `/proc/scsi/scsi` and the sysfs SCSI tree. It writes one
-   device on each row.
+1. The collector runs `lsscsi` through the shared `source.Runner`. `lsscsi`
+   parses `/proc/scsi/scsi` and the sysfs SCSI tree. It writes one device on
+   each row.
 2. The collector splits each row that is not empty into tokens at the
    whitespace. It uses the algorithm of Ohai's `linux/scsi.rb`:
    - Token 0 is in brackets, for example `[0:0:0:0]`. It becomes `scsi_addr`
@@ -127,5 +127,5 @@ not an error.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `lsscsi`. Tests mock it with `go.uber.org/mock`.

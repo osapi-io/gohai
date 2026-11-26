@@ -29,7 +29,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects network facts on macOS: each interface of `ifconfig
@@ -40,13 +40,13 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant that runs the host's ifconfig and
 // netstat.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns network Info.

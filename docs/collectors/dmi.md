@@ -187,8 +187,8 @@ operates without root and in containers. Some useful types are not in this
 collector. Other collectors already give some of them: processor details are in
 `cpu`, PCI slots are in [`pci`](pci.md), and DIMMs are partially in `memory`. No
 consumer has asked for the others (cooling devices, PSU, OEM strings). If a
-consumer needs them, an opt-in path through `dmidecode` and `internal/executor`
-is possible.
+consumer needs them, an opt-in path through `dmidecode` and `source.Runner` is
+possible.
 
 ## Backing library
 

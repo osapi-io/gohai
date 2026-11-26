@@ -25,19 +25,19 @@ import (
 	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects load averages with sysctl -n vm.loadavg.
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant that runs the host's sysctl.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns the load averages.

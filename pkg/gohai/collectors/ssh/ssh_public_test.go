@@ -43,9 +43,9 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/internal/platform"
 	gohaisssh "github.com/osapi-io/gohai/pkg/gohai/collectors/ssh"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // dsclHomes is the command line that lists the home of each macOS user.
@@ -804,7 +804,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &gohaisssh.Linux{FS: tt.setupFS()}
 			case "darwin":
-				var exec executor.Executor = tt.commands.Mock(s.T())
+				var exec source.Runner = tt.commands.Mock(s.T())
 				if tt.nilExec {
 					exec = nil
 				}

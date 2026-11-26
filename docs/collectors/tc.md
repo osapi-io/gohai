@@ -105,4 +105,4 @@ On macOS, the collector returns `nil`.
 
 ## Backing library
 
-`internal/executor.Executor` to run commands.
+`source.Runner` to run commands.

@@ -99,9 +99,8 @@ just deps
     through `collector.Wire`. `New()` is `NewWith(source.Sources{})`. The file
     also has the helpers that all OS variants share, such as shared parsing and
     shared constants.
-  - `linux.go`.
-    `type Linux struct { base; FS avfs.VFS; Exec executor.Executor }`, with
-    `NewLinux()` and the `(l *Linux) Collect(ctx)` method. A collector that
+  - `linux.go`. `type Linux struct { base; FS avfs.VFS; Exec source.Runner }`,
+    with `NewLinux()` and the `(l *Linux) Collect(ctx)` method. A collector that
     reads the clock also has `Now func() time.Time`. Add a field only when the
     collector needs it. Each read of the host goes through these fields. **No
     build tag.**
@@ -140,10 +139,6 @@ just deps
     sources, and panics on a field with one of those names and another type.
   - `registry.go`. `Registry`. It registers collectors, resolves the
     dependencies and runs the collectors at the same time.
-  - `mocks/`. The gomock generation (`go generate`) and the committed mock.
-- **`internal/executor/`.** The abstraction for command execution.
-  - `executor.go`. `Executor`, which is `source.Runner`
-    (`Execute(ctx, name, args...)`).
   - `mocks/`. The gomock generation (`go generate`) and the committed mock.
 - **`internal/sourcetest/`.** The sources of a collector test. `FS` gives a
   memory filesystem that holds the given files. `Commands` holds the command
@@ -418,28 +413,29 @@ got, err := c.Collect(ctx)
 
 The reference implementation is `pkg/gohai/collectors/shells/`.
 
-### `executor.Executor`: command execution
+### `source.Runner`: command execution
 
-`internal/executor` gives a minimal interface with one method:
-`Execute(ctx, name, args...) ([]byte, error)`. Its gomock mock is at
-`internal/executor/mocks/`. The production implementation wraps
-`exec.CommandContext` and returns stdout and stderr together. A collector that
-runs commands (sysctl, sw_vers, lsb_release, loginctl, lscpu, kextstat and
-others) holds the Executor as a struct field.
+`pkg/gohai/source` gives a minimal interface with one method:
+`Execute(ctx, name, args...) ([]byte, error)`. Its gomock mock is `MockRunner`,
+at `pkg/gohai/source/mocks/`. The production implementation,
+`source.Commands()`, wraps `exec.CommandContext`. It returns stdout, and puts
+stderr in the error. A collector that runs commands (sysctl, sw_vers,
+lsb_release, loginctl, lscpu, kextstat and others) holds the Runner as a struct
+field.
 
-**Struct for each OS, with FS and Executor:**
+**Struct for each OS, with FS and Runner:**
 
 ```go
 type Darwin struct {
     base
     FS   avfs.VFS
-    Exec executor.Executor
+    Exec source.Runner
 }
 
 func NewDarwin() *Darwin {
     return &Darwin{
         FS:   osfs.NewWithNoIdm(),
-        Exec: executor.New(),
+        Exec: source.Commands(),
     }
 }
 ```
@@ -448,7 +444,7 @@ func NewDarwin() *Darwin {
 
 ```go
 ctrl := gomock.NewController(t)
-mockExec := mocks.NewMockExecutor(ctrl)
+mockExec := sourcemocks.NewMockRunner(ctrl)
 mockExec.EXPECT().
     Execute(gomock.Any(), "sw_vers", "-productVersionExtra").
     Return([]byte("(a)\n"), nil)
@@ -456,7 +452,7 @@ mockExec.EXPECT().
 c := &platform.Darwin{FS: memfs.New(), Exec: mockExec}
 ```
 
-To make the mocks again, run `go generate ./internal/executor/...`, then commit
+To make the mocks again, run `go generate ./pkg/gohai/source/...`, then commit
 them. The pinned tool is `go.uber.org/mock`, the maintained fork of the archived
 `golang/mock`.
 

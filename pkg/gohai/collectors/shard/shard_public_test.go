@@ -29,11 +29,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -392,7 +392,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				c = &shard.Linux{}
 			case "darwin":
 				ctrl := gomock.NewController(s.T())
-				mockExec := execmocks.NewMockExecutor(ctrl)
+				mockExec := sourcemocks.NewMockRunner(ctrl)
 				mockExec.EXPECT().
 					Execute(gomock.Any(), "ioreg", "-rd1", "-c", "IOPlatformExpertDevice").
 					Return(tt.ioregOut, tt.ioregErr)

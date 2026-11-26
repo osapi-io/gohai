@@ -31,10 +31,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/vmware"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -55,13 +55,13 @@ func TestVMwarePublicTestSuite(
 	suite.Run(t, new(VMwarePublicTestSuite))
 }
 
-// toolboxExec returns a MockExecutor whose Execute expectations are set by
+// toolboxExec returns a MockRunner whose Execute expectations are set by
 // the caller via the returned recorder — convenience for multi-call mocks.
 func toolboxExec(
 	t *testing.T,
-) (*execmocks.MockExecutor, *gomock.Controller) {
+) (*sourcemocks.MockRunner, *gomock.Controller) {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	return m, ctrl
 }
 
@@ -70,7 +70,7 @@ func toolboxExec(
 // initial -v probe used by the darwin/linux variants.
 func fullToolboxMock(
 	t *testing.T,
-) executor.Executor {
+) source.Runner {
 	m, _ := toolboxExec(t)
 	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 		Return([]byte("12.3.0 build-21581411\n"), nil).AnyTimes()
@@ -104,7 +104,7 @@ func fullToolboxMock(
 // vsphereMock is like fullToolboxMock but returns a vSphere session JSON.
 func vsphereMock(
 	t *testing.T,
-) executor.Executor {
+) source.Runner {
 	m, _ := toolboxExec(t)
 	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 		Return([]byte("12.3.0 build-21581411\n"), nil).AnyTimes()
@@ -247,7 +247,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				// probe call (no /proc/scsi/scsi present)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return([]byte("12.3.0\n"), nil).AnyTimes()
@@ -314,7 +314,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return([]byte("12.3.0\n"), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "hosttime").
@@ -380,7 +380,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return([]byte("12.3.0\n"), nil).AnyTimes()
 				m.EXPECT().
@@ -450,7 +450,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return(nil, errors.New("not found")).AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
@@ -491,7 +491,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "darwin",
 			setupDarwin: func() *vmware.Darwin {
 				ctrl := gomock.NewController(s.T())
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return([]byte("12.3.0\n"), nil).AnyTimes()
 				// speed fails — field should be empty string.
@@ -556,7 +556,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "darwin",
 			setupDarwin: func() *vmware.Darwin {
 				ctrl := gomock.NewController(s.T())
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return(nil, errors.New("not found")).AnyTimes()
 				return &vmware.Darwin{Exec: m}
@@ -571,7 +571,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "darwin",
 			setupDarwin: func() *vmware.Darwin {
 				ctrl := gomock.NewController(s.T())
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return([]byte{}, nil).AnyTimes()
 				return &vmware.Darwin{Exec: m}

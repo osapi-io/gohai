@@ -28,7 +28,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin enumerates legacy kernel extensions via `kextstat -k -l`.
@@ -37,12 +37,12 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns the loaded kext map. A failed kextstat yields an

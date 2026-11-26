@@ -116,7 +116,7 @@ On Linux:
    part of the MD layer, not a data or parity member.
 3. The collector sorts the arrays by device name, so the output is always in the
    same order. For each array, it runs `mdadm --detail /dev/<device>` through
-   the injected `executor.Executor`. It parses these lines of the output:
+   the injected `source.Runner`. It parses these lines of the output:
    - `Raid Level : <level>`. The RAID level.
    - `State : <state>`. The array state.
    - `UUID : <uuid>`. The array UUID.
@@ -134,6 +134,6 @@ On macOS, the collector returns `nil`.
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for the `/proc/mdstat`
   read. Production uses `osfs`. Tests use `memfs`.
-- `internal/executor` to run `mdadm --detail`. Production uses `executor.New()`.
+- `source.Runner` to run `mdadm --detail`. Production uses `source.Commands()`.
   Tests use a gomock mock.
 - The Go standard library `bufio`, `regexp` and `strconv` to parse the data.

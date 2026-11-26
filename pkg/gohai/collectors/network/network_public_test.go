@@ -35,11 +35,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -162,16 +162,16 @@ func dirOf(
 	return "/"
 }
 
-// ipRouteExec returns a MockExecutor that canned-answers
+// ipRouteExec returns a MockRunner that canned-answers
 // `ip -o -4 route show table main` and `ip -o -6 route show table main`.
 // Any unmatched call returns an error (i.e., looks like ip is missing).
 func ipRouteExec(
 	t *testing.T,
 	v4 []byte, v4Err error,
 	v6 []byte, v6Err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
 		Return(v4, v4Err).
@@ -206,9 +206,9 @@ func ipRouteExec(
 func ipRouteAndEthtoolFullExec(
 	t *testing.T,
 	driverInfo, ring, channel, coalesce, offload, pause map[string]string,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
 		Return(nil, errors.New("nope")).
@@ -262,9 +262,9 @@ func ipRouteAndEthtoolFullExec(
 func ipRouteAndIPLinkExec(
 	t *testing.T,
 	ipLinkOut string,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
 		Return(nil, errors.New("nope")).
@@ -292,9 +292,9 @@ func ipRouteAndIPLinkExec(
 func ipRouteAndEthtoolExec(
 	t *testing.T,
 	driverInfo map[string]string,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
 		Return(nil, errors.New("nope")).
@@ -488,7 +488,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		ifsFn        func() ([]tIface, error)
 		countersFn   func() ([]tCounters, error)
 		fs           avfs.VFS
-		exec         executor.Executor
+		exec         source.Runner
 		validateFunc func(any, error)
 	}{
 		{
@@ -1380,12 +1380,12 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 						tt.name != "no sysfs speed or duplex: both empty, Driver from sysfs still works",
 					)
 				}
-				var exec executor.Executor
+				var exec source.Runner
 				if tt.exec != nil {
 					// The row's mock answers route, link and ethtool; the
 					// address and neighbour reads come from the row's
 					// interfaces.
-					mock := tt.exec.(*execmocks.MockExecutor)
+					mock := tt.exec.(*sourcemocks.MockRunner)
 					mock.EXPECT().
 						Execute(gomock.Any(), "ip", "-o", "addr", "show").
 						Return([]byte(ipAddrOf(ifs)), nil).

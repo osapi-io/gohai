@@ -201,6 +201,6 @@ On macOS:
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual filesystem
   for `/etc/os-release`, the redhat-release and debian_version supplements, and
   the sequence of 10 old `/etc/*-release` files.
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `sw_vers` on macOS. Tests mock it with
   `go.uber.org/mock`.

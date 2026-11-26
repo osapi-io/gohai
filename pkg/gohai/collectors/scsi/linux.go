@@ -24,7 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux runs `lsscsi` through the shared executor and parses its
@@ -32,12 +32,12 @@ import (
 // without util-linux or without SCSI devices return cleanly.
 type Linux struct {
 	base
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{Exec: source.Commands()}
 }
 
 // Collect runs `lsscsi` and parses the output.

@@ -29,8 +29,8 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux runs the full Ohai-parity detection cascade on Linux. Every
@@ -41,13 +41,13 @@ type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem and
 // the production Executor.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect runs the cascade and returns Info.
@@ -67,7 +67,7 @@ func (l *Linux) Collect(
 func cascadeLinux(
 	ctx context.Context,
 	fs avfs.VFS,
-	exec executor.Executor,
+	exec source.Runner,
 	prior collector.PriorResults,
 	info *Info,
 ) {
@@ -195,7 +195,7 @@ func cascadeLinux(
 // caller, which is always guest when running inside virt).
 func detectViaSystemd(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	info *Info,
 ) {
 	if exec == nil {
@@ -385,7 +385,7 @@ const pathProbe = `command -v "$1"`
 // an exit code of 0 means the binary is on PATH.
 func execBinaryOnPath(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	name string,
 ) bool {
 	if exec == nil {

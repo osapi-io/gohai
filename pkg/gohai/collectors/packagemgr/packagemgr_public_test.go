@@ -24,8 +24,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/internal/sourcetest"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/stretchr/testify/suite"
 
@@ -124,7 +124,7 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 	}
 	tests := []struct {
 		name     string
-		c        func(executor.Executor) packagemgr.Collector
+		c        func(source.Runner) packagemgr.Collector
 		runner   sourcetest.Commands
 		nilExec  bool
 		wantName string
@@ -132,7 +132,7 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 	}{
 		{
 			name: "debian: apt",
-			c:    func(e executor.Executor) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
 			runner: found(
 				map[string]string{"apt": "/usr/bin/apt", "apt-get": "/usr/bin/apt-get"},
 			),
@@ -141,52 +141,52 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 		},
 		{
 			name:     "debian: apt-get when apt is missing",
-			c:        func(e executor.Executor) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
+			c:        func(e source.Runner) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
 			runner:   found(map[string]string{"apt-get": "/usr/bin/apt-get"}),
 			wantName: "apt-get",
 			wantPath: "/usr/bin/apt-get",
 		},
 		{
 			name:     "rhel: dnf",
-			c:        func(e executor.Executor) packagemgr.Collector { return &packagemgr.RHEL{Exec: e} },
+			c:        func(e source.Runner) packagemgr.Collector { return &packagemgr.RHEL{Exec: e} },
 			runner:   found(map[string]string{"dnf": "/usr/bin/dnf"}),
 			wantName: "dnf",
 			wantPath: "/usr/bin/dnf",
 		},
 		{
 			name:     "linux: apk",
-			c:        func(e executor.Executor) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			c:        func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
 			runner:   found(map[string]string{"apk": "/sbin/apk"}),
 			wantName: "apk",
 			wantPath: "/sbin/apk",
 		},
 		{
 			name:     "darwin: brew on the PATH",
-			c:        func(e executor.Executor) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
+			c:        func(e source.Runner) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
 			runner:   found(map[string]string{"brew": "/opt/homebrew/bin/brew"}),
 			wantName: "brew",
 			wantPath: "/opt/homebrew/bin/brew",
 		},
 		{
 			name: "darwin: an alias is not a path",
-			c:    func(e executor.Executor) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
 			runner: sourcetest.Commands{Out: map[string]string{
 				"sh -c command -v brew": "alias brew='echo'\n",
 			}},
 		},
 		{
 			name: "linux: none found",
-			c:    func(e executor.Executor) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
 		},
 		{
 			name:    "linux: nil Exec",
-			c:       func(e executor.Executor) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			c:       func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
 			nilExec: true,
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var exec executor.Executor = tt.runner.Mock(s.T())
+			var exec source.Runner = tt.runner.Mock(s.T())
 			if tt.nilExec {
 				exec = nil
 			}

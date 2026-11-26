@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // platformUUIDRE is the IOPlatformUUID line of ioreg's output.
@@ -38,12 +38,12 @@ var platformUUIDRE = regexp.MustCompile(`"IOPlatformUUID" = "([^"]+)"`)
 // DMI is empty on macOS so we source serial/uuid directly.
 type Darwin struct {
 	base
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to real executors.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect derives the shard seed. On macOS, Ohai uses
@@ -63,7 +63,7 @@ func (d *Darwin) Collect(
 // matching Ohai's hardware["serial_number"] source.
 func readDarwinSerial(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) string {
 	out, err := exec.Execute(ctx, "system_profiler", "SPHardwareDataType", "-json")
 	if err != nil {
@@ -84,7 +84,7 @@ func readDarwinSerial(
 // hardware["platform_UUID"] source. It is "" when ioreg fails.
 func readDarwinUUID(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) string {
 	out, err := exec.Execute(ctx, "ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
 	if err != nil {

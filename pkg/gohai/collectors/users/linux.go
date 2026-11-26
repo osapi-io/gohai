@@ -27,7 +27,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux enumerates users/groups from /etc/passwd and /etc/group.
@@ -35,12 +35,12 @@ type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect reads /etc/passwd + /etc/group and resolves the effective

@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/tc"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -62,10 +62,10 @@ func tcExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().Execute(gomock.Any(), "tc", "-s", "qdisc", "show").
 		Return(out, err).AnyTimes()
 	return m
@@ -138,7 +138,7 @@ func (s *TCPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         executor.Executor
+		exec         source.Runner
 		validateFunc func(any, error)
 	}{
 		{

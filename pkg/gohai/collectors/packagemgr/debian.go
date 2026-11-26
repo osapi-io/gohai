@@ -24,19 +24,19 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Debian covers debian / ubuntu / raspbian — apt-based hosts.
 type Debian struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDebian returns a Debian variant.
 func NewDebian() *Debian {
-	return &Debian{Exec: executor.New()}
+	return &Debian{Exec: source.Commands()}
 }
 
 // Collect returns apt if present.

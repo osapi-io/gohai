@@ -27,7 +27,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects software RAID array data on Linux. FS provides
@@ -37,15 +37,15 @@ type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem and
-// the production executor.
+// the host's commands.
 func NewLinux() *Linux {
 	return &Linux{
 		FS:   osfs.NewWithNoIdm(),
-		Exec: executor.New(),
+		Exec: source.Commands(),
 	}
 }
 

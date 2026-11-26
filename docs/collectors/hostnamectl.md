@@ -94,8 +94,7 @@ None.
 ## Data sources
 
 On Linux, the collector runs `hostnamectl` with no subcommand through the shared
-`internal/executor` runner. It parses the `Key: value` output one line at a
-time:
+`source.Runner`. It parses the `Key: value` output one line at a time:
 
 1. The collector splits each line at the first `": "` separator. It skips lines
    that do not have this separator.
@@ -119,6 +118,6 @@ for Linux.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `hostnamectl` on Linux. Tests mock it with
   `go.uber.org/mock`.

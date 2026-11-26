@@ -155,7 +155,7 @@ not target Windows.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run all `vmware-toolbox-cmd` commands.
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual filesystem
   to read `/proc/scsi/scsi` on Linux. Tests inject a `memfs` instance.

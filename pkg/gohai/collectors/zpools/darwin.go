@@ -24,7 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects ZFS pool status on macOS by running `zpool list`.
@@ -34,12 +34,12 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
-// NewDarwin returns a Darwin variant wired to the production executor.
+// NewDarwin returns a Darwin variant wired to the host's commands.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect runs `zpool list` and returns the parsed pool list.

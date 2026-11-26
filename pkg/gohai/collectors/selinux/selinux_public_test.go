@@ -33,9 +33,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/selinux"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -160,7 +160,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 		name         string
 		variant      string
 		setupFS      func() avfs.VFS
-		setupExec    func(ctrl *gomock.Controller) *execmocks.MockExecutor
+		setupExec    func(ctrl *gomock.Controller) *sourcemocks.MockRunner
 		validateFunc func(any, error)
 	}{
 		{
@@ -176,8 +176,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: no /etc/selinux/config — disabled",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				return execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				return sourcemocks.NewMockRunner(ctrl)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -198,8 +198,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					"/etc/selinux/config": "# comment\nSELINUX=disabled\nSELINUXTYPE=targeted\n",
 				})
 			},
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				return execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				return sourcemocks.NewMockRunner(ctrl)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -220,8 +220,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "sestatus").
 					Return([]byte(sestatusEnforcing), nil)
@@ -246,8 +246,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					"/etc/selinux/config": "SELINUX=permissive\nSELINUXTYPE=minimum\n",
 				})
 			},
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "sestatus").
 					Return([]byte(sestatusPermissive), nil)
@@ -272,8 +272,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "sestatus").
 					Return(nil, errors.New("sestatus: command not found"))
@@ -298,8 +298,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "sestatus").
 					Return([]byte(sestatusDisabled), nil)
@@ -346,8 +346,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					"/etc/selinux/config": "SELINUX=enforcing\nthis line has no equals\nSELINUXTYPE=targeted\n",
 				})
 			},
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "sestatus").
 					Return([]byte(sestatusEnforcing), nil)
@@ -374,8 +374,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				// Include a line with no colon to exercise the !ok branch.
 				out := "SELinux status: enabled\nno colon here\nCurrent mode: enforcing\n"
 				m.EXPECT().

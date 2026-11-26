@@ -28,7 +28,7 @@ import (
 	"sync"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin runs three system_profiler calls concurrently and merges
@@ -38,12 +38,12 @@ import (
 // SPPowerDataType (battery + AC charger).
 type Darwin struct {
 	base
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect runs the three system_profiler calls in parallel and

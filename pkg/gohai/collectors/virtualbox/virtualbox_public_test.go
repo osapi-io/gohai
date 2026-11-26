@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualbox"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -60,15 +60,15 @@ func TestVirtualBoxPublicTestSuite(
 	suite.Run(t, new(VirtualBoxPublicTestSuite))
 }
 
-// vboxExec returns a MockExecutor that answers `VBoxControl guestproperty enumerate`
+// vboxExec returns a MockRunner that answers `VBoxControl guestproperty enumerate`
 // with the supplied output/error pair.
 func vboxExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "VBoxControl", "guestproperty", "enumerate").
 		Return(out, err).
@@ -135,14 +135,14 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		// ----- Linux -----
 		{
 			name:    "linux: canonical guestproperty output parsed",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return vboxExec(t, []byte(vboxControlOutput), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -159,7 +159,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: VBoxControl not found returns nil",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return vboxExec(t, nil, errors.New("exec: not found"))
 			},
 			validateFunc: func(got any, err error) {
@@ -170,7 +170,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: nil Exec returns nil",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				s.Nil(got)
@@ -179,7 +179,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: output with no matching lines yields empty Info",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return vboxExec(
 					t,
 					[]byte("Name: /VirtualBox/GuestInfo/OS/Product, value: Linux\n"),
@@ -197,7 +197,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: partial output — only VBoxVer present",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return vboxExec(
 					t,
 					[]byte(
@@ -219,7 +219,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: canonical guestproperty output parsed",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return vboxExec(t, []byte(vboxControlOutput), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -234,7 +234,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: VBoxControl not found returns nil",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return vboxExec(t, nil, errors.New("exec: not found"))
 			},
 			validateFunc: func(got any, err error) {
@@ -245,7 +245,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: nil Exec returns nil",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				s.Nil(got)

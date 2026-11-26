@@ -29,7 +29,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // procScsiPath is the SCSI device list on Linux. We check it for a
@@ -46,14 +46,14 @@ type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
-// NewLinux returns a Linux variant wired to the real OS filesystem and executor.
+// NewLinux returns a Linux variant wired to the real OS filesystem and commands.
 func NewLinux() *Linux {
 	return &Linux{
 		FS:   osfs.NewWithNoIdm(),
-		Exec: executor.New(),
+		Exec: source.Commands(),
 	}
 }
 
@@ -93,7 +93,7 @@ func (l *Linux) isVMwareGuest(
 // approach.
 func collectVMwareTools(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) *Info {
 	info := &Info{}
 

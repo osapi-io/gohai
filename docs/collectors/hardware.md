@@ -163,7 +163,7 @@ None.
 On macOS:
 
 1. The collector runs `system_profiler ... -json` three times at the same time,
-   through the shared `internal/executor` runner:
+   through the shared `source.Runner`:
    - `SPHardwareDataType` gives the machine identity, the CPU labels, the memory
      and the firmware versions. The collector merges the fields from `_items[0]`
      into the top-level `Info`.
@@ -208,6 +208,6 @@ collectors give equivalent data.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `system_profiler`. Tests mock it with
   `go.uber.org/mock`.

@@ -27,7 +27,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects SSH host key fingerprints on macOS. macOS ships
@@ -40,12 +40,12 @@ type Darwin struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the real OS filesystem.
 func NewDarwin() *Darwin {
-	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect reads SSH host public keys and returns their fingerprints,

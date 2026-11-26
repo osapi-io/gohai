@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects the launchd daemons of the system domain on macOS from
@@ -38,12 +38,12 @@ import (
 // `launchctl list` as a user gives that user's domain.
 type Darwin struct {
 	base
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect runs launchctl and parses its output. It returns an empty list,

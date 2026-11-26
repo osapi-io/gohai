@@ -211,14 +211,13 @@ A bare-metal Mac with no hypervisor software gives an empty `systems` map and an
 empty `system` and `role`.
 
 All file reads use the injected `avfs.VFS`. All commands run through the shared
-`internal/executor` runner. Tests mock the two with `memfs` and
-`go.uber.org/mock`.
+`source.Runner`. Tests mock the two with `memfs` and `go.uber.org/mock`.
 
 ## Backing library
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual filesystem
   for the checks of `/proc`, `/sys`, `/var/lib/...` and `/Applications/...`.
   Tests inject `memfs` with fixed fixtures.
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `systemd-detect-virt`, `command -v <bin>`, `sysctl`,
   `ioreg` and `system_profiler`. Tests mock it with `go.uber.org/mock`.

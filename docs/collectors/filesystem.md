@@ -158,9 +158,8 @@ On Linux:
    gohai also has Ohai's `filesystem[mount][:inodes_percent_used]` field.
 2. When `lsblk` is on the PATH, the collector runs
    `lsblk -J -o NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL` through
-   the shared `internal/executor` runner. It merges the result into the mount
-   table by device path, and fills `uuid`, `label`, `part_uuid` and
-   `part_label`.
+   the shared `source.Runner`. It merges the result into the mount table by
+   device path, and fills `uuid`, `label`, `part_uuid` and `part_label`.
 3. The block devices that `lsblk` reports with an `FSTYPE` and no `MOUNTPOINT`
    go into `unmounted[]`. Thus LUKS containers, inactive LVs and btrfs devices
    are still visible.
@@ -177,8 +176,8 @@ On Linux:
    kernels, containers without a mounted /sys), the collector skips this data
    and reports no error.
 6. **ZFS datasets**. When `zfs` is on the PATH, the collector runs
-   `zfs get -p -H all` through the shared `internal/executor` runner. It parses
-   the tab-separated rows (dataset, property, value, source) into `ZFSDatasets`,
+   `zfs get -p -H all` through the shared `source.Runner`. It parses the
+   tab-separated rows (dataset, property, value, source) into `ZFSDatasets`,
    with the dataset name as the key. `-p` gives byte values as numbers. `-H`
    removes the header. On a host without ZFS (the binary is missing, or the run
    fails), the collector returns zero datasets and no error. This does not
@@ -190,6 +189,6 @@ in one run. The btrfs and ZFS data are on Linux only.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `df` on the two platforms, `mount` on macOS, and
   `lsblk` and `zfs` on Linux. Tests mock it with `go.uber.org/mock`.

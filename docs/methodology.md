@@ -19,7 +19,7 @@ Three rules are short, so this page repeats them. A person who is about to break
 one of them works in this repository:
 
 - A collector reads the host only through its sources: files through `avfs.VFS`,
-  commands through `executor.Executor`, and the clock through `Now`. Never use
+  commands through `source.Runner`, and the clock through `Now`. Never use
   `os.ReadFile`, `exec.Command` or a library that reads the host itself in a
   `Collect` method. Read the files and the commands that Ohai reads.
 - Collector code compiles on all platforms. No file has a `//go:build` tag.

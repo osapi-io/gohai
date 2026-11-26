@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects kernel identity on macOS: kern.ostype, kern.osrelease,
@@ -40,12 +40,12 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns kernel Info.
@@ -89,7 +89,7 @@ func (d *Darwin) Collect(
 // to the translated-on-Apple-Silicon case per issue #31.
 func detectRosetta(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	machine string,
 ) bool {
 	if machine != "x86_64" {

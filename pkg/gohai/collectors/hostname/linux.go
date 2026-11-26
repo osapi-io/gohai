@@ -28,7 +28,6 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -41,14 +40,14 @@ import (
 type Linux struct {
 	base
 
-	Exec     executor.Executor
+	Exec     source.Runner
 	FS       avfs.VFS
 	Resolver source.Resolver
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New(), FS: osfs.NewWithNoIdm(), Resolver: net.DefaultResolver}
+	return &Linux{Exec: source.Commands(), FS: osfs.NewWithNoIdm(), Resolver: net.DefaultResolver}
 }
 
 // Collect returns hostname facts.

@@ -24,7 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux detects language runtimes on Linux by shelling out to each
@@ -32,12 +32,12 @@ import (
 type Linux struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{Exec: source.Commands()}
 }
 
 // Collect probes each language runtime and returns detected versions.

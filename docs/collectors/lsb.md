@@ -77,7 +77,7 @@ None.
 ## Data sources
 
 On Linux, the collector runs `lsb_release -a` through the shared
-`internal/executor` runner. It parses the four labelled lines of the output
+`source.Runner`. It parses the four labelled lines of the output
 (`Distributor ID`, `Release`, `Codename`, `Description`) into the related `Info`
 fields. If the CLI is missing or fails, `Info` stays empty, and the collector
 returns no error. This is the same as Ohai, which does not panic in this case.
@@ -101,6 +101,6 @@ The collector does not support macOS, because Darwin has no LSB.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `lsb_release -a` on Linux. Tests mock it with
   `go.uber.org/mock`.

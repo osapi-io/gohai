@@ -158,4 +158,4 @@ account: `DisabledUser` is locked. When neither is readable, `locked` is unset.
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) for `/etc/passwd` and
   `/etc/group` reads.
-- `internal/executor` to run `id -u`.
+- `source.Runner` to run `id -u`.

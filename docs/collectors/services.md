@@ -127,4 +127,4 @@ On macOS, a launchctl that cannot run is an empty list, not an error.
 
 ## Backing library
 
-`internal/executor.Executor` to run the command.
+`source.Runner` to run the command.

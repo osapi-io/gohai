@@ -96,7 +96,7 @@ that it parses macOS values that contain `=` correctly, for example
 `vm.swapusage`.
 
 On Linux and macOS, the collector runs `sysctl -a` through the shared
-`internal/executor` runner:
+`source.Runner`:
 
 1. The collector looks for a separator in each output line. It tries `": "`
    first. This is the native macOS format, and it is also used when values
@@ -118,5 +118,5 @@ finds no match, and the collector correctly uses `" = "`.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `sysctl -a`. Tests mock it with `go.uber.org/mock`.

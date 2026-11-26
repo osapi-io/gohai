@@ -26,7 +26,7 @@ import (
 	"regexp"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // platformUUIDRE is the IOPlatformUUID line of ioreg's output.
@@ -37,12 +37,12 @@ var platformUUIDRE = regexp.MustCompile(`"IOPlatformUUID" = "([^"]+)"`)
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant that runs the host's ioreg.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns the machine ID.

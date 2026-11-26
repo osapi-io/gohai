@@ -24,7 +24,7 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects traffic-control qdisc configuration on Linux hosts by
@@ -33,12 +33,12 @@ import (
 type Linux struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{Exec: source.Commands()}
 }
 
 // Collect runs `tc -s qdisc show` and parses the output.

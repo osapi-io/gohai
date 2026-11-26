@@ -30,7 +30,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects CPU facts on macOS from sysctl: the model, the vendor,
@@ -41,13 +41,13 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant that runs the host's sysctl and
 // ioreg.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns the CPU Info: one entry, for the package, as gopsutil
@@ -108,7 +108,7 @@ var voltageStatesRE = regexp.MustCompile(`"voltage-states5-sram" = <([0-9a-f]+)>
 // when ioreg fails or has no table.
 func maxPmgrFrequency(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) float64 {
 	out, err := exec.Execute(ctx, "ioreg", "-l", "-w0", "-c", "AppleARMIODevice", "-n", "pmgr")
 	if err != nil {
@@ -134,7 +134,7 @@ func maxPmgrFrequency(
 // fails.
 func sysctlString(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	key string,
 ) string {
 	out, err := exec.Execute(ctx, "sysctl", "-n", key)
@@ -149,7 +149,7 @@ func sysctlString(
 // Returns (0, false) on any exec error or parse failure.
 func sysctlInt(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	key string,
 ) (int, bool) {
 	out, err := exec.Execute(ctx, "sysctl", "-n", key)
@@ -167,7 +167,7 @@ func sysctlInt(
 // used for hw.cpufrequency which exceeds int32 on modern CPUs.
 func sysctlInt64(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	key string,
 ) (int64, bool) {
 	out, err := exec.Execute(ctx, "sysctl", "-n", key)
