@@ -13,17 +13,18 @@ and a unit that is stopped and disabled is usually not loaded. Thus each unit of
 `list-unit-files` that `list-units` did not give is in the list too, with the
 state `dead` and no description. A template, such as `getty@`, is not a unit
 that runs, and an alias is a second name of a unit, so the list has neither. On
-macOS, it runs `launchctl list`, which gives the label of each daemon, its PID
-and the status of its last exit, and `launchctl print-disabled system` for the
-daemons that are disabled. As root, `launchctl list` gives the system domain,
-where `/Library/LaunchDaemons` loads. As a user, it gives the domain of that
-user. A daemon with a PID is `running`. One with no PID is `dead` when its last
-exit was 0, and `failed` when it was not. A daemon is `enabled` unless
-`print-disabled` names it disabled. A daemon that launchd has not loaded is not
-in `launchctl list`. Each one that `print-disabled` names is in the list too,
-with the state `dead`, as on Linux. The name is the label, such as
-`io.osapi.agent`. launchd has no description and no unit file, so both are
-empty.
+macOS, it runs `launchctl print system`. Its `services` block gives the PID, the
+last exit and the label of each daemon that launchd has loaded in the system
+domain, where `/Library/LaunchDaemons` loads. Its `disabled services` block
+gives launchd's override of each label. A user can read the system domain, so
+the result is the same as for root. `launchctl list` is not used: as a user, it
+gives the domain of that user. A daemon with a PID that is not 0 is `running`.
+One with no PID is `failed` when its last exit is a number that is not 0, and
+`dead` otherwise. A daemon is `enabled` unless the `disabled services` block
+says disabled. The name is the label, such as `io.osapi.agent`. launchd has no
+description and no unit file, so both are empty. A daemon that launchd has not
+loaded is not in the `services` block. Each one that the `disabled services`
+block names is in the list too, with the state `dead`, as on Linux.
 
 Ohai has no direct equivalent of this collector. Ohai has no plugin that lists
 services. This collector is a gohai addition.

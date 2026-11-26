@@ -30,11 +30,12 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// Darwin collects the launchd daemons of the system domain on macOS: `launchctl
-// list` for each label, its PID and the status of its last exit, and
-// `launchctl print-disabled system` for the labels that are disabled. As root,
-// launchctl list gives the system domain; as a user, it gives that user's
-// domain.
+// Darwin collects the launchd daemons of the system domain on macOS from
+// `launchctl print system`: its services block has the PID, the last exit
+// and the label of each daemon that launchd has loaded, and its disabled
+// services block has launchd's override of each label. A user can read the
+// system domain, so the result does not depend on who runs the collector:
+// `launchctl list` as a user gives that user's domain.
 type Darwin struct {
 	base
 	Exec executor.Executor
@@ -54,40 +55,49 @@ func (d *Darwin) Collect(
 	if d.Exec == nil {
 		return &Info{Services: []Service{}}, nil
 	}
-	out, err := d.Exec.Execute(ctx, "launchctl", "list")
+	out, err := d.Exec.Execute(ctx, "launchctl", "print", "system")
 	if err != nil {
 		return &Info{Services: []Service{}}, nil
 	}
-	// When print-disabled fails, no daemon is reported disabled: launchd
-	// runs a daemon unless it is disabled.
-	disabled, _ := d.Exec.Execute(ctx, "launchctl", "print-disabled", "system")
 
-	return parseLaunchctlList(string(out), parseDisabled(string(disabled))), nil
+	return parsePrintSystem(string(out)), nil
 }
 
-// parseLaunchctlList parses `launchctl list`:
+// parsePrintSystem parses the two blocks of `launchctl print system`:
 //
-//	PID	Status	Label
-//	412	0	com.apple.example
-//	-	78	io.osapi.app
+//	services = {
+//		     412      - 	com.apple.example
+//		       0     78 	io.osapi.app
+//	}
+//	disabled services = {
+//		"io.osapi.app" => disabled
+//	}
 //
-// A daemon with a PID runs. One with none and a status of 0 is dead, as
-// systemd says of a stopped unit, and one with another status failed.
-func parseLaunchctlList(
+// A daemon with a PID that is not 0 runs. One with none is failed when its
+// last exit is a number that is not 0, and dead otherwise, as systemd says of
+// a stopped unit. A daemon is enabled unless the disabled block says
+// disabled. A label of the disabled block that launchd has not loaded is in
+// the list too, dead, as systemd's list adds the unit files that it has not
+// loaded.
+func parsePrintSystem(
 	out string,
-	disabled map[string]bool,
 ) *Info {
+	disabled := parseDisabled(block(out, "disabled services"))
 	info := &Info{Services: []Service{}}
 	loaded := map[string]bool{}
-	for _, line := range strings.Split(out, "\n") {
+	for _, line := range block(out, "services") {
 		f := strings.Fields(line)
-		if len(f) != 3 || !isPID(f[0]) || !isStatus(f[1]) {
+		if len(f) != 3 {
+			continue
+		}
+		pid, err := strconv.Atoi(f[0])
+		if err != nil {
 			continue
 		}
 		state := "running"
-		if f[0] == "-" {
+		if pid == 0 {
 			state = "dead"
-			if f[1] != "0" {
+			if code, err := strconv.Atoi(f[1]); err == nil && code != 0 {
 				state = "failed"
 			}
 		}
@@ -96,9 +106,6 @@ func parseLaunchctlList(
 			Name: f[2], State: state, Enabled: !disabled[f[2]], Type: "launchd",
 		})
 	}
-	// A daemon that launchd has not loaded is not in launchctl list. One
-	// that print-disabled names is there too, dead, as systemd's list adds
-	// the unit files that it has not loaded.
 	labels := make([]string, 0, len(disabled))
 	for label := range disabled {
 		if !loaded[label] {
@@ -115,17 +122,37 @@ func parseLaunchctlList(
 	return info
 }
 
-// parseDisabled parses `launchctl print-disabled system`:
-//
-//	disabled services = {
-//		"com.apple.ftp-proxy" => disabled
-//		"io.osapi.app" => enabled
-//	}
-func parseDisabled(
+// block is the lines of the top-level block name of `launchctl print`, from
+// its "name = {" line to its closing brace.
+func block(
 	out string,
+	name string,
+) []string {
+	var lines []string
+	in := false
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case line == "\t"+name+" = {":
+			in = true
+		case in && line == "\t}":
+			return lines
+		case in:
+			lines = append(lines, line)
+		}
+	}
+
+	return lines
+}
+
+// parseDisabled parses the lines of the disabled services block:
+//
+//	"com.apple.ftp-proxy" => disabled
+//	"io.osapi.app" => enabled
+func parseDisabled(
+	lines []string,
 ) map[string]bool {
 	disabled := map[string]bool{}
-	for _, line := range strings.Split(out, "\n") {
+	for _, line := range lines {
 		label, state, ok := strings.Cut(strings.TrimSpace(line), " => ")
 		if ok && strings.HasPrefix(label, `"`) {
 			disabled[strings.Trim(label, `"`)] = strings.TrimSpace(state) == "disabled"
@@ -133,23 +160,4 @@ func parseDisabled(
 	}
 
 	return disabled
-}
-
-// isPID is whether s is a process ID or -, for a daemon that does not run.
-func isPID(
-	s string,
-) bool {
-	_, err := strconv.Atoi(s)
-
-	return s == "-" || err == nil
-}
-
-// isStatus is whether s is the status of a daemon's last exit, which is
-// negative for a signal.
-func isStatus(
-	s string,
-) bool {
-	_, err := strconv.Atoi(s)
-
-	return err == nil
 }

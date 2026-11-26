@@ -172,29 +172,31 @@ func (s *ServicesPublicTestSuite) TestNew() {
 	}
 }
 
-// launchctlExec answers launchctl list with out and err, and print-disabled
-// with disabled and disabledErr.
+// launchctlExec answers launchctl print system with out and err.
 func launchctlExec(
 	t *testing.T,
 	out []byte,
 	err error,
-	disabled []byte,
-	disabledErr error,
 ) executor.Executor {
 	t.Helper()
 	m := execmocks.NewMockExecutor(gomock.NewController(t))
-	m.EXPECT().Execute(gomock.Any(), "launchctl", "list").Return(out, err).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "launchctl", "print-disabled", "system").
-		Return(disabled, disabledErr).AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "launchctl", "print", "system").Return(out, err).AnyTimes()
 
 	return m
 }
 
-const launchctlOut = "PID\tStatus\tLabel\n412\t0\tcom.apple.cron\n-\t0\tio.osapi.app\n-\t78\tio.osapi.web\n" +
-	"not a row\n"
+const launchctlServices = "system = {\n\ttype = system\n\tservice stats = {\n\t\tx = 1\n\t}\n" +
+	"\tservices = {\n" +
+	"\t\t     412      - \tcom.apple.cron\n" +
+	"\t\t       0      0 \tio.osapi.app\n" +
+	"\t\t       0     78 \tio.osapi.web\n" +
+	"\t\t       0   (pe) \tcom.apple.lskdd\n" +
+	"\t\tnot a row\n" +
+	"\t}\n"
 
-const disabledOut = "disabled services = {\n\t\"io.osapi.app\" => disabled\n\t\"com.apple.cron\" => enabled\n" +
-	"\t\"io.osapi.off\" => disabled\n\t\"io.osapi.idle\" => enabled\n}\n"
+const launchctlDisabled = "\tdisabled services = {\n" +
+	"\t\t\"io.osapi.app\" => disabled\n\t\t\"com.apple.cron\" => enabled\n" +
+	"\t\t\"io.osapi.off\" => disabled\n\t\t\"io.osapi.idle\" => enabled\n\t}\n}\n"
 
 func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 	tests := []struct {
@@ -204,27 +206,36 @@ func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 	}{
 		{
 			name: "each daemon, with its state and whether it is enabled, and the ones not loaded",
-			exec: launchctlExec(s.T(), []byte(launchctlOut), nil, []byte(disabledOut), nil),
+			exec: launchctlExec(s.T(), []byte(launchctlServices+launchctlDisabled), nil),
 			want: []services.Service{
 				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
 				{Name: "io.osapi.app", State: "dead", Enabled: false, Type: "launchd"},
 				{Name: "io.osapi.web", State: "failed", Enabled: true, Type: "launchd"},
+				{Name: "com.apple.lskdd", State: "dead", Enabled: true, Type: "launchd"},
 				{Name: "io.osapi.idle", State: "dead", Enabled: true, Type: "launchd"},
 				{Name: "io.osapi.off", State: "dead", Enabled: false, Type: "launchd"},
 			},
 		},
 		{
-			name: "no list of the disabled: each is enabled",
-			exec: launchctlExec(s.T(), []byte(launchctlOut), nil, nil, errors.New("denied")),
+			name: "no disabled block: each is enabled",
+			exec: launchctlExec(s.T(), []byte(launchctlServices+"}\n"), nil),
 			want: []services.Service{
 				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
 				{Name: "io.osapi.app", State: "dead", Enabled: true, Type: "launchd"},
 				{Name: "io.osapi.web", State: "failed", Enabled: true, Type: "launchd"},
+				{Name: "com.apple.lskdd", State: "dead", Enabled: true, Type: "launchd"},
+			},
+		},
+		{
+			name: "output that stops inside the services block",
+			exec: launchctlExec(s.T(), []byte("\tservices = {\n\t\t     412      - \tcom.apple.cron\n"), nil),
+			want: []services.Service{
+				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
 			},
 		},
 		{
 			name: "launchctl that cannot run is an empty list",
-			exec: launchctlExec(s.T(), nil, errors.New("not found"), nil, nil),
+			exec: launchctlExec(s.T(), nil, errors.New("not found")),
 			want: []services.Service{},
 		},
 		{name: "no executor is an empty list", want: []services.Service{}},
