@@ -182,4 +182,5 @@ the same:
 ## Backing library
 
 - [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
-  client of all cloud-provider collectors.
+  client of all cloud-provider collectors. Its transport is the `HTTP` of the
+  sources, so a fake host can answer the metadata reads.

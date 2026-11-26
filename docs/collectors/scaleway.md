@@ -117,10 +117,10 @@ signature, but its kernel command line always contains `"scaleway"`.
 
 ## Data sources
 
-1. **cmdline gate.** The collector reads `/proc/cmdline` and looks for the
-   substring `"scaleway"`. The check is not case-sensitive. If the file or the
-   substring is missing, the collector stops and returns `(nil, nil)`. This is
-   the same as Ohai's `has_scaleway_cmdline?`.
+1. **cmdline gate.** The collector reads `/proc/cmdline` through `FS` and looks
+   for the substring `"scaleway"`. The check is not case-sensitive. If the file
+   or the substring is missing, the collector stops and returns `(nil, nil)`.
+   This is the same as Ohai's `has_scaleway_cmdline?`.
 
 2. **Endpoint.** The collector reads one JSON document from
    `http://169.254.42.42/conf?format=json`.
@@ -155,4 +155,7 @@ same endpoint, the same single JSON GET and the same 6-second timeout.
 ## Backing library
 
 - [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
-  client of all cloud-provider collectors.
+  client of all cloud-provider collectors. Its transport is the `HTTP` of the
+  sources, so a fake host can answer the metadata reads.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read
+  `/proc/cmdline`.

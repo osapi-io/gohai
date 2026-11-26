@@ -256,4 +256,5 @@ same header, the same single recursive request, and the same full tree.
 - [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
   client of all cloud-provider collectors. It sends GET requests with a short
   timeout, adds the `Metadata-Flavor` header, and gives the `ErrNotAvailable`
-  sentinel.
+  sentinel. Its transport is the `HTTP` of the sources, so a fake host can
+  answer the metadata reads.

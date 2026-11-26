@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -68,6 +69,11 @@ type Sources struct {
 	// Resolver resolves names, as the system resolver does: /etc/hosts and
 	// then DNS. The hostname collector canonicalizes the FQDN with it.
 	Resolver Resolver
+	// HTTP is the transport of the cloud collectors' metadata reads, such as
+	// http://169.254.169.254. A fake host gives one that answers them, so a
+	// test reads no network. When it is zero, the collectors share one
+	// transport that uses no proxy.
+	HTTP http.RoundTripper
 }
 
 // Resolver is the name lookups that a collector makes. *net.Resolver has
@@ -85,7 +91,8 @@ func Host() Sources {
 
 // Defaults fills each zero field of s with the real host's. A zero Family
 // with a given FS is the family of that FS's /etc/os-release, not the real
-// host's.
+// host's. A zero HTTP stays zero: it is the cloud collectors' shared
+// transport.
 func (s Sources) Defaults() Sources {
 	if s.Family == "" {
 		if s.FS != nil {

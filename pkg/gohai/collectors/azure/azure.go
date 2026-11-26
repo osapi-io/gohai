@@ -410,16 +410,19 @@ func New() *Collector {
 func NewWith(
 	src source.Sources,
 ) *Collector {
-	return collector.Wire(newClient(), src)
+	return collector.Wire(newClient(src), src)
 }
 
 // newClient is a Collector with Azure's metadata client.
-func newClient() *Collector {
+func newClient(
+	src source.Sources,
+) *Collector {
 	return NewWithClient(
 		cloudmetadata.New(
 			metadataBaseURL,
 			cloudmetadata.WithHeader(metadataHeaderKey, metadataHeaderValue),
 			cloudmetadata.WithTimeout(metadataTimeout),
+			cloudmetadata.WithTransport(src.HTTP),
 		),
 	)
 }

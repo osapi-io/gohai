@@ -19,13 +19,15 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package sourcetest builds the sources a collector test reads: a
-// filesystem that holds given files, and a runner that answers given
-// command lines.
+// filesystem that holds given files, a runner that answers given
+// command lines, and a transport that answers given metadata URLs.
 package sourcetest
 
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -117,4 +119,38 @@ func Links(
 	}
 
 	return fs
+}
+
+// HTTP is a transport that answers each URL of bodies, such as
+// "http://169.254.169.254/latest/meta-data/instance-id", with 200 and
+// its body. Any other URL answers 404, as a metadata service does for a
+// path it does not have. A cloud collector reads it as
+// source.Sources.HTTP, and reads no network.
+func HTTP(
+	bodies map[string]string,
+) http.RoundTripper {
+	return metadata(bodies)
+}
+
+// metadata is the transport of HTTP. http.RoundTripper is the standard
+// library's interface, so it has no generated mock.
+type metadata map[string]string
+
+// RoundTrip answers req from the bodies.
+func (m metadata) RoundTrip(
+	req *http.Request,
+) (*http.Response, error) {
+	body, ok := m[req.URL.String()]
+	status := http.StatusOK
+	if !ok {
+		status = http.StatusNotFound
+	}
+
+	return &http.Response{
+		StatusCode: status,
+		Status:     http.StatusText(status),
+		Header:     http.Header{},
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Request:    req,
+	}, nil
 }

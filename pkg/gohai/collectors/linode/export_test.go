@@ -20,8 +20,6 @@
 
 package linode
 
-import "net"
-
 // SetAptSourcesPath swaps the apt sources.list path tests point at.
 func SetAptSourcesPath(
 	path string,
@@ -30,17 +28,3 @@ func SetAptSourcesPath(
 	aptSourcesPath = path
 	return func() { aptSourcesPath = orig }
 }
-
-// SetInterfaceAddrs swaps the interface-address lookup seam tests
-// use to inject canned addresses without touching real NICs.
-func SetInterfaceAddrs(
-	fn func(name string) ([]net.Addr, error),
-) func() {
-	orig := interfaceAddrs
-	interfaceAddrs = fn
-	return func() { interfaceAddrs = orig }
-}
-
-// DefaultInterfaceAddrs exposes the production lookup for tests so
-// the real net.InterfaceByName → iface.Addrs() code path executes.
-var DefaultInterfaceAddrs = defaultInterfaceAddrs

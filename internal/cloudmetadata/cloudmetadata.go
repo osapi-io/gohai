@@ -127,6 +127,19 @@ func WithHeader(
 	return func(c *Client) { c.headers[k] = v }
 }
 
+// WithTransport makes rt the transport of the Client's requests. A nil rt
+// keeps the shared transport. A caller's source.Sources.HTTP comes here,
+// so a fake host answers the metadata reads.
+func WithTransport(
+	rt http.RoundTripper,
+) Option {
+	return func(c *Client) {
+		if rt != nil {
+			c.httpClient.Transport = rt
+		}
+	}
+}
+
 // WithTimeout overrides the default 2s per-request timeout.
 func WithTimeout(
 	d time.Duration,

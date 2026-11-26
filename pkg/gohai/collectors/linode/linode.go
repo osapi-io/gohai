@@ -21,14 +21,16 @@
 // Package linode detects Linode hosts and reports their public /
 // private IPs. Linode does not expose a metadata endpoint that Ohai
 // uses — detection is heuristic (apt sources list), and the output
-// comes entirely from the host's own network interfaces. Returns
-// nil with no error when no Linode signature is found.
+// comes entirely from the host's own addresses, which `ip -o -4 addr
+// show` gives through the sources. Returns nil with no error when no
+// Linode signature is found.
 package linode
 
 import (
 	"bytes"
 	"context"
 	"net"
+	"slices"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -51,21 +53,6 @@ var aptSourcesPath = "/etc/apt/sources.list"
 // linodeSignature is the substring we look for in apt sources.
 const linodeSignature = "linode"
 
-// interfaceAddrs is the "given an interface name, return its
-// addresses" seam. Tests swap it to return canned addresses without
-// touching the host's NICs.
-var interfaceAddrs = defaultInterfaceAddrs
-
-func defaultInterfaceAddrs(
-	name string,
-) ([]net.Addr, error) {
-	iface, err := net.InterfaceByName(name)
-	if err != nil {
-		return nil, err
-	}
-	return iface.Addrs()
-}
-
 // Info is the Linode view. Mirrors Ohai's node['linode'] which only
 // reports two facts: public_ip and private_ip. No metadata service
 // call — these come from the host's own eth0 / eth0:1 aliases.
@@ -78,6 +65,9 @@ type Info struct {
 type Collector struct {
 	// FS is the filesystem that the apt sources are read from.
 	FS avfs.VFS
+	// Exec runs `ip -o -4 addr show`, which gives the addresses of eth0
+	// and its eth0:1 alias.
+	Exec source.Runner
 }
 
 var _ collector.Collector = (*Collector)(nil)
@@ -110,15 +100,20 @@ func (*Collector) Dependencies() []string { return []string{"hostname"} }
 // (apt-sources OR domain contains "linode"), else (nil, nil).
 // Mirrors Ohai's looks_like_linode? OR chain.
 func (c *Collector) Collect(
-	_ context.Context,
+	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onLinode(c.FS, prior) {
 		return nil, nil
 	}
 	info := &Info{}
-	info.PublicIP = firstIPv4("eth0")
-	info.PrivateIP = firstIPv4("eth0:1")
+	out, err := c.Exec.Execute(ctx, "ip", "-o", "-4", "addr", "show")
+	if err != nil {
+		return info, nil
+	}
+	addrs := ipv4ByLabel(out)
+	info.PublicIP = addrs["eth0"]
+	info.PrivateIP = addrs["eth0:1"]
 	return info, nil
 }
 
@@ -144,29 +139,31 @@ func onLinode(
 	return false
 }
 
-// firstIPv4 returns the first non-link-local IPv4 address on the
-// named interface. Empty when the interface is missing or has no
-// qualifying address.
-func firstIPv4(
-	name string,
-) string {
-	addrs, err := interfaceAddrs(name)
-	if err != nil {
-		return ""
+// ipv4ByLabel parses `ip -o -4 addr show` into the first IPv4 address
+// of each label that is not link-local. The label is the interface name,
+// or an alias such as eth0:1, the last word before the backslash:
+//
+//	2: eth0    inet 50.1.2.3/24 brd 50.1.2.255 scope global eth0\  valid_lft forever
+//	2: eth0    inet 10.0.0.5/17 scope global eth0:1\  valid_lft forever
+func ipv4ByLabel(
+	out []byte,
+) map[string]string {
+	addrs := map[string]string{}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		head, _, _ := strings.Cut(line, "\\")
+		fields := strings.Fields(head)
+		inet := slices.Index(fields, "inet")
+		if inet < 0 || inet+1 >= len(fields) {
+			continue
+		}
+		ip, _, err := net.ParseCIDR(fields[inet+1])
+		if err != nil || ip.To4() == nil || ip.IsLinkLocalUnicast() {
+			continue
+		}
+		label := fields[len(fields)-1]
+		if _, ok := addrs[label]; !ok {
+			addrs[label] = ip.String()
+		}
 	}
-	for _, a := range addrs {
-		ipnet, ok := a.(*net.IPNet)
-		if !ok {
-			continue
-		}
-		ip4 := ipnet.IP.To4()
-		if ip4 == nil {
-			continue
-		}
-		if ip4.IsLinkLocalUnicast() {
-			continue
-		}
-		return ip4.String()
-	}
-	return ""
+	return addrs
 }
