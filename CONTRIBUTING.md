@@ -131,11 +131,13 @@ just deps
     the page gives the date of.
 - **`internal/platform/`.** `Detect()`, a `var` that tests can replace, which is
   `family.Detect` on a real host. `NewWith` uses it only when `src` has no
-  family.
+  family and no filesystem. With a filesystem, the family is that of its
+  `/etc/os-release`.
 - **`internal/collector/`.** The collector interface and the registry code.
   - `collector.go`. The `Collector` interface.
   - `sources.go`. `IsDarwin(src)` and `Family(src)` select a variant. `Wire`
-    sets the `FS`, `Exec` and `Now` fields of a variant from the sources.
+    sets the `FS`, `Exec`, `Now` and `Resolver` fields of a variant from the
+    sources, and panics on a field with one of those names and another type.
   - `registry.go`. `Registry`. It registers collectors, resolves the
     dependencies and runs the collectors at the same time.
   - `mocks/`. The gomock generation (`go generate`) and the committed mock.

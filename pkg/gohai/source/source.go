@@ -61,7 +61,9 @@ type Sources struct {
 	// from the boot time.
 	Now func() time.Time
 	// Family picks the collector's variant, as family.Detect names it, such
-	// as debian or darwin.
+	// as debian or darwin. When it is zero and FS is given, it is the family
+	// of FS's /etc/os-release, so a caller that gives a macOS filesystem
+	// gives darwin.
 	Family string
 	// Resolver resolves names, as the system resolver does: /etc/hosts and
 	// then DNS. The hostname collector canonicalizes the FQDN with it.
@@ -81,8 +83,17 @@ func Host() Sources {
 	return Sources{}.Defaults()
 }
 
-// Defaults fills each zero field of s with the real host's.
+// Defaults fills each zero field of s with the real host's. A zero Family
+// with a given FS is the family of that FS's /etc/os-release, not the real
+// host's.
 func (s Sources) Defaults() Sources {
+	if s.Family == "" {
+		if s.FS != nil {
+			s.Family = family.FromOSRelease(s.FS)
+		} else {
+			s.Family = family.Detect()
+		}
+	}
 	if s.FS == nil {
 		s.FS = osfs.NewWithNoIdm()
 	}
@@ -91,9 +102,6 @@ func (s Sources) Defaults() Sources {
 	}
 	if s.Now == nil {
 		s.Now = time.Now
-	}
-	if s.Family == "" {
-		s.Family = family.Detect()
 	}
 	if s.Resolver == nil {
 		s.Resolver = net.DefaultResolver

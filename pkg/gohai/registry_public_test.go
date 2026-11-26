@@ -21,11 +21,19 @@
 package gohai_test
 
 import (
+	"reflect"
 	"testing"
+	"time"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 type RegistryPublicTestSuite struct {
@@ -36,6 +44,55 @@ func TestRegistryPublicTestSuite(
 	t *testing.T,
 ) {
 	suite.Run(t, new(RegistryPublicTestSuite))
+}
+
+// TestBuiltinCollectorsTakeSources checks that each field of each built-in
+// collector that holds a source has the source that was given. A field that
+// collector.Wire does not set, such as one with another name, reads the real
+// host under a caller's fake host, and nothing else would say so.
+func (s *RegistryPublicTestSuite) TestBuiltinCollectorsTakeSources() {
+	ctrl := gomock.NewController(s.T())
+	fs := memfs.New()
+	exec := sourcemocks.NewMockRunner(ctrl)
+	resolver := sourcemocks.NewMockResolver(ctrl)
+	now := func() time.Time { return time.Unix(42, 0) }
+
+	for _, platform := range []string{family.Debian, family.Darwin} {
+		src := source.Sources{
+			FS: fs, Exec: exec, Now: now, Resolver: resolver, Family: platform,
+		}
+		sources := map[reflect.Type]any{
+			reflect.TypeFor[avfs.VFS]():         avfs.VFS(fs),
+			reflect.TypeFor[source.Runner]():    source.Runner(exec),
+			reflect.TypeFor[source.Resolver]():  source.Resolver(resolver),
+			reflect.TypeFor[func() time.Time](): now,
+		}
+		for _, c := range gohai.BuiltinCollectors(src) {
+			v := reflect.ValueOf(c)
+			if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
+				continue
+			}
+			st := v.Elem()
+			for i := range st.NumField() {
+				field := st.Type().Field(i)
+				name := platform + " " + c.Name() + "." + field.Name
+				want, isSource := sources[field.Type]
+				if !isSource {
+					continue
+				}
+				if !s.True(field.IsExported(), name+" is not exported, so Wire cannot set it") {
+					continue
+				}
+				got := st.Field(i).Interface()
+				if field.Type == reflect.TypeFor[func() time.Time]() {
+					s.Equal(reflect.ValueOf(want).Pointer(), reflect.ValueOf(got).Pointer(), name)
+
+					continue
+				}
+				s.True(got == want, name)
+			}
+		}
+	}
 }
 
 func (s *RegistryPublicTestSuite) TestNewRegistry() {

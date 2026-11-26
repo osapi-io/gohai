@@ -54,3 +54,7 @@ func (e UnknownCollectorError) Error() string {
 }
 
 var JSONName = jsonName
+
+// BuiltinCollectors exposes the built-in collectors, built from src, so a
+// test can check that each one takes src.
+var BuiltinCollectors = builtinCollectors

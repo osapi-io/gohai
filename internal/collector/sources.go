@@ -21,6 +21,7 @@
 package collector
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
@@ -32,29 +33,28 @@ import (
 )
 
 // IsDarwin reports whether a collector built from src takes its macOS
-// variant: src's family when it names one, else the host's, through
-// platform.Detect, which a test can swap.
+// variant, by Family.
 func IsDarwin(
 	src source.Sources,
 ) bool {
-	f := src.Family
-	if f == "" {
-		f = platform.Detect()
-	}
-
-	return f == family.Darwin
+	return Family(src) == family.Darwin
 }
 
-// Family is src's family, or the host's through platform.Detect when src
-// names none.
+// Family is src's family. When src names none, it is the family of src.FS's
+// /etc/os-release, so that a fake filesystem and the variant agree. With no
+// FS either, it is the real host's, through platform.Detect, which a test
+// can swap.
 func Family(
 	src source.Sources,
 ) string {
-	if src.Family != "" {
+	switch {
+	case src.Family != "":
 		return src.Family
+	case src.FS != nil:
+		return family.FromOSRelease(src.FS)
+	default:
+		return platform.Detect()
 	}
-
-	return platform.Detect()
 }
 
 var (
@@ -66,9 +66,11 @@ var (
 
 // Wire gives the collector variant c the sources of src, and returns c. It
 // sets the exported fields of the variant that hold a source: FS (an
-// avfs.VFS), Exec (a source.Runner) and Now (a func() time.Time). A field
-// the variant does not have is not set. A zero source in src is the real
-// host's.
+// avfs.VFS), Exec (a source.Runner), Now (a func() time.Time) and Resolver
+// (a source.Resolver). A field the variant does not have is not set. A zero
+// source in src is the real host's. A field with one of those names and a
+// different type panics: the collector would read the real host, and
+// nothing would say so.
 func Wire[C any](
 	c C,
 	src source.Sources,
@@ -82,9 +84,14 @@ func Wire[C any](
 	s := v.Elem()
 	set := func(name string, t reflect.Type, value any) {
 		f := s.FieldByName(name)
-		if f.IsValid() && f.CanSet() && f.Type() == t {
-			f.Set(reflect.ValueOf(value))
+		if !f.IsValid() {
+			return
 		}
+		if f.Type() != t || !f.CanSet() {
+			panic(fmt.Sprintf("collector.Wire: %s.%s is %s, not %s",
+				s.Type(), name, f.Type(), t))
+		}
+		f.Set(reflect.ValueOf(value))
 	}
 	set("FS", fsType, src.FS)
 	set("Exec", execType, src.Exec)

@@ -28,12 +28,15 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 func osPrior() collector.PriorResults {
@@ -401,4 +404,27 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			tt.validateFunc(out, httpCalled)
 		})
 	}
+}
+
+func (s *OpenStackPublicTestSuite) TestNewWith() {
+	fs := memfs.New()
+	s.Require().NoError(fs.MkdirAll("/etc", 0o755))
+	s.Require().NoError(fs.WriteFile(
+		"/etc/passwd", []byte("dhc-user:x:1000:1000::/home/dhc-user:/bin/bash\n"), 0o644,
+	))
+	// SetupTest points the passwd path at a missing file. This test reads
+	// /etc/passwd of the given filesystem.
+	defer openstack.SetPasswdPath("/etc/passwd")()
+	c := openstack.NewWith(source.Sources{FS: fs, Family: family.Debian})
+	s.Same(fs, c.FS)
+
+	srv := httptest.NewServer(canned(metadataTree, ""))
+	defer srv.Close()
+	c = openstack.NewWithClient(cloudmetadata.New(srv.URL))
+	c.FS = fs
+	out, err := c.Collect(context.Background(), osPrior())
+	s.Require().NoError(err)
+	info, ok := out.(*openstack.Info)
+	s.Require().True(ok)
+	s.Equal("dreamhost", info.Provider, "the passwd of the given filesystem has dhc-user")
 }

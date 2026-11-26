@@ -29,11 +29,13 @@ import (
 	"bytes"
 	"context"
 	"net"
-	"os"
 	"strings"
+
+	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // ProviderName is the canonical cloud identifier this collector
@@ -73,12 +75,22 @@ type Info struct {
 }
 
 // Collector detects Linode hosts and reads interface-derived IPs.
-type Collector struct{}
+type Collector struct {
+	// FS is the filesystem that the apt sources are read from.
+	FS avfs.VFS
+}
 
 var _ collector.Collector = (*Collector)(nil)
 
-// New returns a new Collector.
-func New() *Collector { return &Collector{} }
+// New returns a Collector that reads the real host.
+func New() *Collector { return NewWith(source.Sources{}) }
+
+// NewWith returns a Collector that reads the host through src.
+func NewWith(
+	src source.Sources,
+) *Collector {
+	return collector.Wire(&Collector{}, src)
+}
 
 // Name returns "linode".
 func (*Collector) Name() string { return "linode" }
@@ -101,7 +113,7 @@ func (c *Collector) Collect(
 	_ context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
-	if !onLinode(prior) {
+	if !onLinode(c.FS, prior) {
 		return nil, nil
 	}
 	info := &Info{}
@@ -115,9 +127,10 @@ func (c *Collector) Collect(
 //   - The host's FQDN or Domain contains "linode" (has_linode_domain?,
 //     e.g. members.linode.com)
 func onLinode(
+	fs avfs.VFS,
 	prior collector.PriorResults,
 ) bool {
-	if b, err := os.ReadFile(aptSourcesPath); err == nil {
+	if b, err := fs.ReadFile(aptSourcesPath); err == nil {
 		if bytes.Contains(bytes.ToLower(b), []byte(linodeSignature)) {
 			return true
 		}

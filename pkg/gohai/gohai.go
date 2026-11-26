@@ -111,6 +111,9 @@ func New(
 		opt(&cfg)
 	}
 
+	// Each of the collectors picks its variant by the family, so find it
+	// once, not once for each collector.
+	cfg.sources.Family = collector.Family(cfg.sources)
 	g := &Gohai{registry: collector.NewRegistry()}
 	registerBuiltins(g.registry, cfg.sources)
 
@@ -286,12 +289,12 @@ func builtinCollectors(
 		packagemgr.NewWith(src),
 		gce.New(),
 		ec2.New(),
-		azure.New(),
+		azure.NewWith(src),
 		digitalocean.New(),
 		oci.New(),
 		alibaba.New(),
-		linode.New(),
-		openstack.New(),
+		linode.NewWith(src),
+		openstack.NewWith(src),
 		scaleway.New(),
 		dmi.NewWith(src),
 		gpu.NewWith(src),

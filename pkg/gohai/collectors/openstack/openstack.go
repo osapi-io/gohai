@@ -30,12 +30,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"os"
 	"strings"
+
+	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // ProviderName is the canonical cloud identifier this collector
@@ -157,6 +159,8 @@ type rawDevice struct {
 // Collector fetches OpenStack's EC2-compatible + Nova-specific docs.
 type Collector struct {
 	client *cloudmetadata.Client
+	// FS is the filesystem that /etc/passwd is read from.
+	FS avfs.VFS
 }
 
 var _ collector.Collector = (*Collector)(nil)
@@ -164,14 +168,21 @@ var _ collector.Collector = (*Collector)(nil)
 // New returns a default Collector pointed at OpenStack's metadata
 // server.
 func New() *Collector {
-	return NewWithClient(cloudmetadata.New(metadataBaseURL))
+	return NewWith(source.Sources{})
+}
+
+// NewWith is New reading the host's files through src.
+func NewWith(
+	src source.Sources,
+) *Collector {
+	return collector.Wire(&Collector{client: cloudmetadata.New(metadataBaseURL)}, src)
 }
 
 // NewWithClient returns a Collector backed by a caller-supplied client.
 func NewWithClient(
 	c *cloudmetadata.Client,
 ) *Collector {
-	return &Collector{client: c}
+	return collector.Wire(&Collector{client: c}, source.Sources{})
 }
 
 // Name returns "openstack".
@@ -210,7 +221,7 @@ func (c *Collector) Collect(
 		tree = nil
 	}
 	info := &Info{
-		Provider: detectProvider(),
+		Provider: detectProvider(c.FS),
 	}
 	if tree != nil {
 		populateFromTree(info, tree)
@@ -247,8 +258,10 @@ func (c *Collector) Collect(
 // detectProvider checks /etc/passwd for the "dhc-user" account that
 // Dreamhost shipped in their pre-2016 OpenStack images. Matches
 // Ohai's openstack_provider.
-func detectProvider() string {
-	f, err := os.Open(passwdPath)
+func detectProvider(
+	fs avfs.VFS,
+) string {
+	f, err := fs.Open(passwdPath)
 	if err != nil {
 		return providerOpenStack
 	}
