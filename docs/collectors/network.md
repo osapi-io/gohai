@@ -267,8 +267,12 @@ On Linux:
     (`driver`, `version`, `firmware_version`, `bus_info`,
     `expansion_rom_version`, `supports_statistics`, `supports_test`,
     `supports_eeprom_access`, `supports_register_dump`, `supports_priv_flags`).
-    The collector skips interfaces that are not Ethernet (loopback, tunnels). If
-    the binary is missing or a call fails, the field stays empty.
+    The collector skips interfaces that are not Ethernet (loopback, tunnels). It
+    also skips virtual interfaces, such as a veth, a bridge or a bond: an
+    interface with no `/sys/class/net/<iface>/device`. A container host can have
+    hundreds of veths, and ethtool would run six times for each one. Ohai does
+    not skip them. If the binary is missing or a call fails, the field stays
+    empty.
 
 08. **Ethtool tuning set.** For the same interfaces, the collector runs five
     more ethtool probes through the executor. It parses each probe into a typed

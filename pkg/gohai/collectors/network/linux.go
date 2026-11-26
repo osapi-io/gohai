@@ -77,8 +77,8 @@ func (l *Linux) Collect(
 	info := &Info{Interfaces: ifs}
 	if l.Exec != nil {
 		applyRoutes(ctx, l.Exec, info)
-		applyEthtoolDriverInfo(ctx, l.Exec, info)
-		applyEthtoolTuning(ctx, l.Exec, info)
+		applyEthtoolDriverInfo(ctx, l.FS, l.Exec, info)
+		applyEthtoolTuning(ctx, l.FS, l.Exec, info)
 		applyIPLinkExtras(ctx, l.Exec, info)
 	}
 	if l.Exec != nil {
@@ -89,21 +89,38 @@ func (l *Linux) Collect(
 	return info, nil
 }
 
+// ethtoolTarget reports whether ethtool runs for the interface: an
+// Ethernet interface that a device backs. A virtual interface, such as a
+// veth, a bridge or a bond, has no /sys/class/net/<iface>/device. A
+// container host has hundreds of veths, and ethtool would run six times
+// for each one (osapi-io/gohai#356).
+func ethtoolTarget(
+	fs avfs.VFS,
+	iface Interface,
+) bool {
+	if iface.Encapsulation != "Ethernet" {
+		return false
+	}
+	_, err := fs.Stat("/sys/class/net/" + iface.Name + "/device")
+	return err == nil
+}
+
 // applyEthtoolDriverInfo invokes `ethtool -i <iface>` per Ethernet
-// interface and attaches the parsed driver info under
-// `Interface.Ethtool.DriverInfo`. Mirrors Ohai's
-// ethernet_driver_info: only Ethernet-encapsulated interfaces are
-// queried (loopback, tunnels, etc. are skipped). ethtool failures —
+// interface that a device backs, and attaches the parsed driver info
+// under `Interface.Ethtool.DriverInfo`. Mirrors Ohai's
+// ethernet_driver_info, but skips virtual interfaces (see
+// ethtoolTarget), as well as loopback, tunnels and the like. ethtool failures —
 // binary missing, unsupported by the driver — silently leave Ethtool
 // nil for that interface; non-Ethernet hosts get no Ethtool data at
 // all, matching Ohai's behaviour.
 func applyEthtoolDriverInfo(
 	ctx context.Context,
+	fs avfs.VFS,
 	exec source.Runner,
 	info *Info,
 ) {
 	for i := range info.Interfaces {
-		if info.Interfaces[i].Encapsulation != "Ethernet" {
+		if !ethtoolTarget(fs, info.Interfaces[i]) {
 			continue
 		}
 		out, err := exec.Execute(ctx, "ethtool", "-i", info.Interfaces[i].Name)
@@ -155,18 +172,19 @@ func applyIPLinkExtras(
 
 // applyEthtoolTuning invokes the five tuning-oriented ethtool
 // subcommands (ring, channel, coalesce, offload, pause) per Ethernet
-// interface and attaches each parsed result to the corresponding
+// interface that a device backs (see ethtoolTarget), and attaches each parsed result to the corresponding
 // EthtoolInfo field. Mirrors Ohai's ethernet_{ring,channel,coalesce,
 // offload,pause}_parameters block. Each subcommand is independent —
 // failure of one doesn't suppress the others — and any per-call
 // error or empty parse silently skips that field.
 func applyEthtoolTuning(
 	ctx context.Context,
+	fs avfs.VFS,
 	exec source.Runner,
 	info *Info,
 ) {
 	for i := range info.Interfaces {
-		if info.Interfaces[i].Encapsulation != "Ethernet" {
+		if !ethtoolTarget(fs, info.Interfaces[i]) {
 			continue
 		}
 		name := info.Interfaces[i].Name
