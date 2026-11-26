@@ -37,10 +37,11 @@ type config struct {
 
 // WithSources makes each collector read the host through src: its
 // filesystem, its commands, its clock and its family. A zero field is the
-// real host's. Without it, collectors read the real host. A caller with a
-// fake host, such as osapi in its tests, gets the same collectors reading
-// that host. The cloud collectors read their metadata service, which src
-// does not cover.
+// real host's, except a zero family with a given filesystem, which is the
+// family of that filesystem's /etc/os-release. Without it, collectors read
+// the real host. A caller with a fake host, such as osapi in its tests, gets
+// the same collectors reading that host. The cloud collectors read their
+// metadata service, which src does not cover.
 func WithSources(
 	src source.Sources,
 ) Option {

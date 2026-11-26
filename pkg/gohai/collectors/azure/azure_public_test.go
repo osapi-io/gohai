@@ -28,10 +28,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 const cannedResponse = `{
@@ -444,4 +447,26 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			tt.validateFunc(out, httpCalled, gotAPI, err)
 		})
 	}
+}
+
+func (s *AzurePublicTestSuite) TestNewWith() {
+	fs := memfs.New()
+	c := azure.NewWith(source.Sources{FS: fs, Family: family.Debian})
+	s.Same(fs, c.FS)
+	out, err := c.Collect(context.Background(), nil)
+	s.Require().NoError(err)
+	s.Nil(out, "the given filesystem has no waagent and no leases, so no metadata read")
+
+	s.Require().NoError(fs.MkdirAll("/usr/sbin", 0o755))
+	s.Require().NoError(fs.WriteFile("/usr/sbin/waagent", []byte("#!/bin/sh\n"), 0o755))
+	called := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+	c = azure.NewWithClient(cloudmetadata.New(srv.URL))
+	c.FS = fs
+	_, _ = c.Collect(context.Background(), nil)
+	s.True(called, "the waagent of the given filesystem says Azure")
 }

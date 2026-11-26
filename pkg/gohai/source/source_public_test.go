@@ -54,6 +54,16 @@ func (s *SourcePublicTestSuite) TestDefaultsKeepsWhatIsGiven() {
 	s.NotNil(got.Exec)
 }
 
+func (s *SourcePublicTestSuite) TestDefaultsFamilyFromFS() {
+	fs := memfs.New()
+	s.Require().NoError(fs.MkdirAll("/etc", 0o755))
+	s.Require().NoError(fs.WriteFile("/etc/os-release", []byte("ID=rocky\n"), 0o644))
+
+	s.Equal(family.RHEL, source.Sources{FS: fs}.Defaults().Family)
+	s.Empty(source.Sources{FS: memfs.New()}.Defaults().Family,
+		"a filesystem with no os-release is no family, not the real host's")
+}
+
 func (s *SourcePublicTestSuite) TestCommands() {
 	tests := []struct {
 		name    string

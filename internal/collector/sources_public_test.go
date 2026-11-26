@@ -50,10 +50,16 @@ type variant struct {
 // bare is a variant with no source field.
 type bare struct{ Name string }
 
+// wrongType is a variant whose FS field is not an avfs.VFS.
+type wrongType struct{ FS string }
+
 func (s *SourcesPublicTestSuite) TestIsDarwinAndFamily() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 	platform.Detect = func() string { return family.Debian }
+	fedora := memfs.New()
+	s.Require().NoError(fedora.MkdirAll("/etc", 0o755))
+	s.Require().NoError(fedora.WriteFile("/etc/os-release", []byte("ID=fedora\n"), 0o644))
 
 	tests := []struct {
 		name       string
@@ -72,6 +78,16 @@ func (s *SourcesPublicTestSuite) TestIsDarwinAndFamily() {
 		{
 			name: "when src names none, the host's", src: source.Sources{},
 			wantFamily: family.Debian, wantDarwin: false,
+		},
+		{
+			name:       "when src names none and gives a filesystem, its os-release's",
+			src:        source.Sources{FS: fedora},
+			wantFamily: family.Fedora, wantDarwin: false,
+		},
+		{
+			name:       "when the filesystem has no os-release, none and not the host's",
+			src:        source.Sources{FS: memfs.New()},
+			wantFamily: "", wantDarwin: false,
 		},
 	}
 	for _, tc := range tests {
@@ -105,6 +121,12 @@ func (s *SourcesPublicTestSuite) TestWire() {
 
 	s.Equal(bare{Name: "v"}, collector.Wire(bare{Name: "v"}, source.Sources{}),
 		"a value that is not a pointer to a struct is returned as it is")
+
+	s.PanicsWithValue(
+		"collector.Wire: collector_test.wrongType.FS is string, not avfs.VFS",
+		func() { collector.Wire(&wrongType{}, source.Sources{Family: family.Debian}) },
+		"a source field of another type would read the real host",
+	)
 }
 
 func TestSourcesPublicTestSuite(

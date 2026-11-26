@@ -30,12 +30,14 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"os"
 	"sort"
 	"time"
 
+	"github.com/avfs/avfs"
+
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // ProviderName is the canonical cloud identifier this collector
@@ -391,6 +393,9 @@ type rawSubnet struct {
 // Collector fetches Azure's single-JSON metadata response.
 type Collector struct {
 	client *cloudmetadata.Client
+	// FS is the filesystem that the waagent binary and the dhclient leases
+	// are read from.
+	FS avfs.VFS
 }
 
 var _ collector.Collector = (*Collector)(nil)
@@ -398,6 +403,18 @@ var _ collector.Collector = (*Collector)(nil)
 // New returns a default Collector pointed at Azure's metadata server
 // with the required Metadata: true header and Ohai-matching 6s timeout.
 func New() *Collector {
+	return NewWith(source.Sources{})
+}
+
+// NewWith is New reading the host's files through src.
+func NewWith(
+	src source.Sources,
+) *Collector {
+	return collector.Wire(newClient(), src)
+}
+
+// newClient is a Collector with Azure's metadata client.
+func newClient() *Collector {
 	return NewWithClient(
 		cloudmetadata.New(
 			metadataBaseURL,
@@ -411,7 +428,7 @@ func New() *Collector {
 func NewWithClient(
 	c *cloudmetadata.Client,
 ) *Collector {
-	return &Collector{client: c}
+	return collector.Wire(&Collector{client: c}, source.Sources{})
 }
 
 // Name returns "azure".
@@ -436,7 +453,7 @@ func (c *Collector) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	if !onAzure() {
+	if !onAzure(c.FS) {
 		return nil, nil
 	}
 	version := c.negotiateAPIVersion(ctx)
@@ -458,11 +475,13 @@ func (c *Collector) Collect(
 // Matches Ohai's has_waagent? || has_dhcp_option_245? chain.
 // Windows-specific signals (C:\WindowsAzure directory, DhcpDomain
 // registry key) are not implemented — gohai is Linux/macOS primary.
-func onAzure() bool {
-	if _, err := os.Stat(waagentPath); err == nil {
+func onAzure(
+	fs avfs.VFS,
+) bool {
+	if _, err := fs.Stat(waagentPath); err == nil {
 		return true
 	}
-	if body, err := os.ReadFile(dhclientLeasesPath); err == nil {
+	if body, err := fs.ReadFile(dhclientLeasesPath); err == nil {
 		if bytes.Contains(body, []byte(dhcpOption245Signature)) {
 			return true
 		}

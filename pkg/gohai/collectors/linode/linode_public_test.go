@@ -28,11 +28,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 type LinodePublicTestSuite struct {
@@ -344,4 +347,23 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			tt.validateFunc(out)
 		})
 	}
+}
+
+func (s *LinodePublicTestSuite) TestNewWith() {
+	fs := memfs.New()
+	s.Require().NoError(fs.MkdirAll("/etc/apt", 0o755))
+	s.Require().NoError(fs.WriteFile(
+		"/etc/apt/sources.list",
+		[]byte("deb http://mirrors.linode.com/debian bookworm main\n"),
+		0o644,
+	))
+	defer linode.SetInterfaceAddrs(func(string) ([]net.Addr, error) {
+		return nil, errors.New("not found")
+	})()
+
+	c := linode.NewWith(source.Sources{FS: fs, Family: family.Debian})
+	s.Same(fs, c.FS)
+	out, err := c.Collect(context.Background(), nil)
+	s.Require().NoError(err)
+	s.NotNil(out, "the apt sources of the given filesystem name linode")
 }
