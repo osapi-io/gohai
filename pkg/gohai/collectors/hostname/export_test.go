@@ -24,15 +24,6 @@ import (
 	"time"
 )
 
-// SetResolverRetries swaps the retry count used by canonicalFQDN.
-func SetResolverRetries(
-	n int,
-) (restore func()) {
-	orig := resolverRetries
-	resolverRetries = n
-	return func() { resolverRetries = orig }
-}
-
 // SetResolverBackoff swaps the backoff between resolver retries.
 func SetResolverBackoff(
 	d time.Duration,
