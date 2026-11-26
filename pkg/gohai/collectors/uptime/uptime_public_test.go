@@ -104,7 +104,7 @@ func (s *UptimePublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := uptime.New()
 			s.Equal("uptime", c.Name())
-			s.Equal("system", c.Category())
+			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

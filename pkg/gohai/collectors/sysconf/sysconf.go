@@ -54,10 +54,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "sysconf" }
-func (base) Category() string       { return collector.CategoryMisc }
-func (base) DefaultEnabled() bool   { return false }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "sysconf" }
+func (base) Category() collector.Category { return collector.CategoryMisc }
+func (base) DefaultEnabled() bool         { return false }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the sysconf variant for the host OS.
 func New() Collector {

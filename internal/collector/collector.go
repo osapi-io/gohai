@@ -29,12 +29,11 @@ import "context"
 // GetDep — that handles the runtime type assertion for you.
 type PriorResults map[string]any
 
-// GetDep returns the prior collector's result cast to T. ok is false
-// when the collector wasn't in prior (disabled or missing) or when the
-// stored value's type doesn't match T. Compile-time type safety: the
-// caller names T explicitly (GetDep[*dmi.Info](prior, "dmi")), so a
-// type mismatch between what the dependency returns and what the
-// caller expects surfaces at compile time in the generic instantiation.
+// GetDep returns the prior collector's result cast to T, such as
+// GetDep[*dmi.Info](prior, "dmi"). ok is false when the collector wasn't in
+// prior (disabled or missing) or when the stored value's type doesn't match
+// T. The type check is at run time: a T that is not what the dependency
+// returns compiles, and gives ok false.
 func GetDep[T any](
 	prior PriorResults,
 	name string,
@@ -55,21 +54,25 @@ func GetDep[T any](
 // opaque tags. Keep this list in sync with the docs when the roster
 // changes.
 const (
-	CategorySystem         = "system"
-	CategoryHardware       = "hardware"
-	CategoryNetwork        = "network"
-	CategoryCloud          = "cloud"
-	CategoryVirtualization = "virtualization"
-	CategorySecurity       = "security"
-	CategorySoftware       = "software"
-	CategoryUsers          = "users"
-	CategoryLinux          = "linux"
-	CategoryMisc           = "misc"
+	CategorySystem         Category = "system"
+	CategoryHardware       Category = "hardware"
+	CategoryNetwork        Category = "network"
+	CategoryCloud          Category = "cloud"
+	CategoryVirtualization Category = "virtualization"
+	CategorySecurity       Category = "security"
+	CategorySoftware       Category = "software"
+	CategoryUsers          Category = "users"
+	CategoryLinux          Category = "linux"
+	CategoryMisc           Category = "misc"
 )
 
+// Category is the group a collector belongs to. The constants above are
+// the set: a collector returns one of them.
+type Category string
+
 // Categories are the categories of the roster above.
-func Categories() []string {
-	return []string{
+func Categories() []Category {
+	return []Category{
 		CategorySystem, CategoryHardware, CategoryNetwork, CategoryCloud,
 		CategoryVirtualization, CategorySecurity, CategorySoftware, CategoryUsers,
 		CategoryLinux, CategoryMisc,
@@ -85,7 +88,7 @@ type Collector interface {
 	// "hardware", "cloud", "network", etc. Used by the SDK's
 	// WithCategory option and the CLI's --category flag to enable
 	// sets of related collectors at once.
-	Category() string
+	Category() Category
 
 	// DefaultEnabled reports whether this collector should run when no
 	// explicit enable/disable flags are provided. Most collectors return

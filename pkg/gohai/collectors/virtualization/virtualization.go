@@ -80,9 +80,9 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string         { return "virtualization" }
-func (base) Category() string     { return collector.CategoryVirtualization }
-func (base) DefaultEnabled() bool { return true }
+func (base) Name() string                 { return "virtualization" }
+func (base) Category() collector.Category { return collector.CategoryVirtualization }
+func (base) DefaultEnabled() bool         { return true }
 
 // Dependencies declares cpu — the Linux cascade consults the cpu
 // prior result's HypervisorVendor/VirtualizationType as a KVM

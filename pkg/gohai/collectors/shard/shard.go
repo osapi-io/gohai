@@ -25,17 +25,16 @@
 package shard
 
 import (
+	// MD5 is Ohai's hash for the shard seed, not a security use.
+	"crypto/md5"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-	//nolint:gosec // MD5 is not used for security — it's Ohai's hash for shard distribution.
-	"crypto/md5"
-
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds the derived shard seed.
@@ -50,8 +49,8 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string     { return "shard" }
-func (base) Category() string { return collector.CategorySystem }
+func (base) Name() string                 { return "shard" }
+func (base) Category() collector.Category { return collector.CategorySystem }
 
 func (base) DefaultEnabled() bool { return true }
 
@@ -144,7 +143,6 @@ func computeSeed(
 	machinename, serial, uuid string,
 ) int {
 	data := machinename + serial + uuid
-	//nolint:gosec // MD5 is Ohai's spec — not a security context.
 	h := md5.Sum([]byte(data))
 	hex := fmt.Sprintf("%x", h)
 	val, _ := strconv.ParseInt(hex[:7], 16, 64)

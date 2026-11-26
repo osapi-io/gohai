@@ -103,7 +103,7 @@ func (s *MemoryPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := memory.New()
 			s.Equal("memory", c.Name())
-			s.Equal("hardware", c.Category())
+			s.Equal("hardware", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

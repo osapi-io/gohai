@@ -134,7 +134,7 @@ func (s *KernelModulesPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := kernelmodules.New()
 			s.Equal("kernel_modules", c.Name())
-			s.Equal("system", c.Category())
+			s.Equal("system", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

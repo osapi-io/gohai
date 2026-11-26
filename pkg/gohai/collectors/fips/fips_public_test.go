@@ -134,7 +134,7 @@ func (s *FipsPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := fips.New()
 			s.Equal("fips", c.Name())
-			s.Equal("system", c.Category())
+			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

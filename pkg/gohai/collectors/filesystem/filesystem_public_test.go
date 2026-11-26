@@ -226,7 +226,7 @@ func (s *FilesystemPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := filesystem.New()
 			s.Equal("filesystem", c.Name())
-			s.Equal("hardware", c.Category())
+			s.Equal("hardware", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

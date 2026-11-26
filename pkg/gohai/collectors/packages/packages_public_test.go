@@ -123,7 +123,7 @@ func (s *PackagesPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := packages.New()
 			s.Equal("packages", c.Name())
-			s.Equal("software", c.Category())
+			s.Equal("software", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

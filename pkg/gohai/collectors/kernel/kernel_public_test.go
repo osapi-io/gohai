@@ -143,7 +143,7 @@ func (s *KernelPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := kernel.New()
 			s.Equal("kernel", c.Name())
-			s.Equal("system", c.Category())
+			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			_, linux := c.(*kernel.Linux)

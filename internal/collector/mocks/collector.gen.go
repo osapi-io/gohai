@@ -42,10 +42,10 @@ func (m *MockCollector) EXPECT() *MockCollectorMockRecorder {
 }
 
 // Category mocks base method.
-func (m *MockCollector) Category() string {
+func (m *MockCollector) Category() collector.Category {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Category")
-	ret0, _ := ret[0].(string)
+	ret0, _ := ret[0].(collector.Category)
 	return ret0
 }
 

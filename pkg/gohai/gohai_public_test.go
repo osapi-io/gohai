@@ -31,6 +31,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/collector/mocks"
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"go.uber.org/mock/gomock"
@@ -47,7 +48,7 @@ func newFailingCollector(
 ) *mocks.MockCollector {
 	m := mocks.NewMockCollector(ctrl)
 	m.EXPECT().Name().Return(name).AnyTimes()
-	m.EXPECT().Category().Return("misc").AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
 	m.EXPECT().DefaultEnabled().Return(false).AnyTimes()
 	m.EXPECT().Dependencies().Return(nil).AnyTimes()
 	m.EXPECT().

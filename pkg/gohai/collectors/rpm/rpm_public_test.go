@@ -135,7 +135,7 @@ func (s *RPMPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := rpm.New()
 			s.Equal("rpm", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal("linux", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

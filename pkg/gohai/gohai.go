@@ -220,7 +220,7 @@ func selectCollectors(
 	// immediately rather than silently selecting nothing.
 	enabled := cfg.enabled
 	for _, cat := range cfg.categories {
-		names := reg.NamesInCategory(cat)
+		names := reg.NamesInCategory(collector.Category(cat))
 		if len(names) == 0 {
 			return nil, fmt.Errorf("unknown category %q", cat)
 		}
@@ -242,15 +242,17 @@ func selectCollectors(
 	return sel, nil
 }
 
-// registerBuiltins registers every built-in collector. Registration errors
-// would only occur from programmer bugs (duplicate names, empty names),
-// which are caught by tests — callers can rely on registration succeeding.
+// registerBuiltins registers every built-in collector. A registration error
+// is a duplicate or empty name in builtinCollectors, a bug that would drop a
+// collector with no signal, so it panics.
 func registerBuiltins(
 	reg *collector.Registry,
 	src source.Sources,
 ) {
 	for _, c := range builtinCollectors(src) {
-		_ = reg.Register(c)
+		if err := reg.Register(c); err != nil {
+			panic(fmt.Sprintf("gohai: register built-in collector %q: %v", c.Name(), err))
+		}
 	}
 }
 

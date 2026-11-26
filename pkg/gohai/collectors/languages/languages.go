@@ -57,7 +57,7 @@ type base struct{}
 func (base) Name() string { return "languages" }
 
 // Category returns "software".
-func (base) Category() string { return collector.CategorySoftware }
+func (base) Category() collector.Category { return collector.CategorySoftware }
 
 // DefaultEnabled returns false — runtime detection shells out multiple times.
 func (base) DefaultEnabled() bool { return false }

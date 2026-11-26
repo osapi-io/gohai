@@ -59,10 +59,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "os_release" }
-func (base) Category() string       { return collector.CategorySystem }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "os_release" }
+func (base) Category() collector.Category { return collector.CategorySystem }
+func (base) DefaultEnabled() bool         { return true }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the os_release variant for the host OS. Linux only —
 // macOS has no equivalent (sw_vers is already wrapped by platform).

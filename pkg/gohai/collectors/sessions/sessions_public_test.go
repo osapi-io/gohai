@@ -129,7 +129,7 @@ func (s *SessionsPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := sessions.New()
 			s.Equal("sessions", c.Name())
-			s.Equal("users", c.Category())
+			s.Equal("users", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

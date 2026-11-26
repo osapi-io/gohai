@@ -25,19 +25,18 @@
 package ssh
 
 import (
+	// MD5 is the SSH key fingerprint of RFC 4716, not a security use.
+	"crypto/md5"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"strings"
 
-	"crypto/md5" //nolint:gosec // MD5 is standard for SSH key fingerprints (RFC 4716)
-
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // sshDir is the standard directory containing SSH host public keys.
@@ -101,7 +100,7 @@ type base struct{}
 func (base) Name() string { return "ssh" }
 
 // Category returns "security".
-func (base) Category() string { return collector.CategorySecurity }
+func (base) Category() collector.Category { return collector.CategorySecurity }
 
 // DefaultEnabled returns false — host key collection is opt-in.
 func (base) DefaultEnabled() bool { return false }
@@ -172,11 +171,11 @@ func parseHostKeyPub(
 		return HostKey{}, fmt.Errorf("base64 decode: %w", err)
 	}
 
-	sha256sum := sha256.Sum256(raw) //nolint:gosec
+	sha256sum := sha256.Sum256(raw)
 	fingerprintSHA256 := "SHA256:" + base64.StdEncoding.EncodeToString(sha256sum[:])
 	fingerprintSHA256 = strings.TrimRight(fingerprintSHA256, "=")
 
-	md5sum := md5.Sum(raw) //nolint:gosec
+	md5sum := md5.Sum(raw)
 	hexParts := make([]string, len(md5sum))
 	for i, b := range md5sum {
 		hexParts[i] = fmt.Sprintf("%02x", b)

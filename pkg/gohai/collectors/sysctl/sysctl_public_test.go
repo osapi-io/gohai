@@ -121,7 +121,7 @@ func (s *SysctlPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := sysctl.New()
 			s.Equal("sysctl", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal("linux", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

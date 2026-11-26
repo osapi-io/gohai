@@ -81,7 +81,7 @@ type base struct{}
 func (base) Name() string { return "ca_certificates" }
 
 // Category returns "security".
-func (base) Category() string { return collector.CategorySecurity }
+func (base) Category() collector.Category { return collector.CategorySecurity }
 
 // DefaultEnabled returns false: it reads and parses each CA file, more than
 // a hundred on a typical host.

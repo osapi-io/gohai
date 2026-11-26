@@ -126,7 +126,7 @@ func (s *InterruptsPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := interrupts.New()
 			s.Equal("interrupts", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal("linux", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

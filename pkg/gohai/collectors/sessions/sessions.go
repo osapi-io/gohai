@@ -66,8 +66,8 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string     { return "sessions" }
-func (base) Category() string { return collector.CategoryUsers }
+func (base) Name() string                 { return "sessions" }
+func (base) Category() collector.Category { return collector.CategoryUsers }
 
 // DefaultEnabled is false: sessions are niche and change per-invocation.
 // Opt in via --collector.sessions or WithEnabled("sessions").

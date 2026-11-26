@@ -147,7 +147,7 @@ func (s *SelinuxPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := selinux.New()
 			s.Equal("selinux", c.Name())
-			s.Equal("security", c.Category())
+			s.Equal("security", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

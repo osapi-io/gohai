@@ -164,8 +164,8 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string     { return "users" }
-func (base) Category() string { return collector.CategoryUsers }
+func (base) Name() string                 { return "users" }
+func (base) Category() collector.Category { return collector.CategoryUsers }
 
 // DefaultEnabled is false — enumerating /etc/passwd is opt-in
 // because consumers rarely need a full account dump.

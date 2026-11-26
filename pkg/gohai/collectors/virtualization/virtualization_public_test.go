@@ -214,7 +214,7 @@ func (s *VirtualizationPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := virtualization.New()
 			s.Equal("virtualization", c.Name())
-			s.Equal("virtualization", c.Category())
+			s.Equal("virtualization", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Equal([]string{"cpu"}, c.Dependencies())
 			tt.validateFunc(c)

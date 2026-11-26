@@ -172,7 +172,7 @@ func (s *CPUPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := cpu.New()
 			s.Equal("cpu", c.Name())
-			s.Equal("hardware", c.Category())
+			s.Equal("hardware", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

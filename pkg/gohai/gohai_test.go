@@ -62,7 +62,7 @@ func newCycleCollector(
 ) *mocks.MockCollector {
 	m := mocks.NewMockCollector(ctrl)
 	m.EXPECT().Name().Return(name).AnyTimes()
-	m.EXPECT().Category().Return("misc").AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
 	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
 	m.EXPECT().Dependencies().Return(deps).AnyTimes()
 	m.EXPECT().
@@ -317,7 +317,7 @@ func (s *GohaiTestSuite) TestCollectPropagatesRunError() {
 	s.Require().NoError(reg.Register(newCycleCollector(gomock.NewController(s.T()), "b", "a")))
 
 	g := &Gohai{registry: reg}
-	sel, err := reg.Selected(nil, nil)
+	sel, err := reg.SelectedWith(true, nil, nil)
 	s.Require().NoError(err)
 	g.selected = sel
 

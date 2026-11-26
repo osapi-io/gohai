@@ -64,7 +64,7 @@ type base struct{}
 func (base) Name() string { return "libvirt" }
 
 // Category returns "virtualization".
-func (base) Category() string { return collector.CategoryVirtualization }
+func (base) Category() collector.Category { return collector.CategoryVirtualization }
 
 // DefaultEnabled returns false — libvirt is opt-in only.
 func (base) DefaultEnabled() bool { return false }

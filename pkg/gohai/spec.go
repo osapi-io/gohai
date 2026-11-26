@@ -99,7 +99,7 @@ func Collectors() []CollectorSpec {
 		pkg := packageOf(c)
 		spec := CollectorSpec{
 			Name:           c.Name(),
-			Category:       c.Category(),
+			Category:       string(c.Category()),
 			DefaultEnabled: c.DefaultEnabled(),
 			Dependencies:   append([]string{}, c.Dependencies()...),
 			Package:        pkg,
@@ -279,7 +279,7 @@ func CollectorProblems(
 				"the name "+c.Name+" is not lowercase letters, digits and underscores.",
 			)
 		}
-		if !slices.Contains(collector.Categories(), c.Category) {
+		if !slices.Contains(collector.Categories(), collector.Category(c.Category)) {
 			add(c.Name, RuleCategory, "the category "+c.Category+" is not one of the categories.")
 		}
 		if c.Fields == nil {
@@ -335,7 +335,7 @@ func CollectorTerms() []Term {
 			When: "Always. It is also the JSON name of its field of gohai.Facts.",
 		},
 		{
-			Name: "Category() string",
+			Name: "Category() collector.Category",
 			Does: "Puts the collector in a group, one of the collector.Category constants, that --category enables at once.",
 			When: "Always.",
 		},

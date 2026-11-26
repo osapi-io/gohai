@@ -90,7 +90,7 @@ func (r *Registry) Get(
 // has that category — callers should treat that as a user error
 // ("unknown category") rather than silently running nothing.
 func (r *Registry) NamesInCategory(
-	cat string,
+	cat Category,
 ) []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -112,18 +112,6 @@ func (r *Registry) Names() []string {
 		names = append(names, n)
 	}
 	return names
-}
-
-// Selected returns the collectors that should run treating every
-// DefaultEnabled() collector as on, plus anything in `enable`, minus
-// anything in `disable`. Kept for backward compatibility; new callers
-// should use SelectedWith and decide explicitly whether to honour
-// DefaultEnabled().
-func (r *Registry) Selected(
-	enable []string,
-	disable []string,
-) ([]Collector, error) {
-	return r.SelectedWith(true, enable, disable)
 }
 
 // SelectedWith returns the collectors that should run. When

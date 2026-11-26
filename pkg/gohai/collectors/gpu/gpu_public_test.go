@@ -106,7 +106,7 @@ func (s *GPUPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := gpu.New()
 			s.Equal("gpu", c.Name())
-			s.Equal("hardware", c.Category())
+			s.Equal("hardware", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

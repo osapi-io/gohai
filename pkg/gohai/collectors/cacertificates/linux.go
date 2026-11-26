@@ -150,8 +150,9 @@ func (l *Linux) Collect(
 	info := &Info{Certificates: []Certificate{}}
 	for _, d := range l.Layout.Dirs {
 		_ = l.FS.WalkDir(d.Path, func(p string, e fs.DirEntry, err error) error {
+			// A directory the host lacks, or cannot read, has no CAs.
 			if err != nil {
-				return nil //nolint:nilerr // a directory the host lacks has no CAs
+				return fs.SkipDir
 			}
 			if e.IsDir() {
 				if slices.Contains(l.Layout.Blocklists, p) {
@@ -163,14 +164,13 @@ func (l *Linux) Collect(
 			if !caFile(p) {
 				return nil
 			}
-			data, err := l.FS.ReadFile(p)
-			if err != nil {
-				return nil //nolint:nilerr // an unreadable file is left out
-			}
-			info.Certificates = append(info.Certificates, entries(d, p, data, off)...)
-			if path.Ext(p) == ".p11-kit" {
-				for _, c := range p11kitDistrusted(data) {
-					distrusted[fingerprint(c)] = true
+			// An unreadable file is left out.
+			if data, rerr := l.FS.ReadFile(p); rerr == nil {
+				info.Certificates = append(info.Certificates, entries(d, p, data, off)...)
+				if path.Ext(p) == ".p11-kit" {
+					for _, c := range p11kitDistrusted(data) {
+						distrusted[fingerprint(c)] = true
+					}
 				}
 			}
 
@@ -192,15 +192,18 @@ func (l *Linux) blocklisted() map[string]bool {
 	out := map[string]bool{}
 	for _, dir := range l.Layout.Blocklists {
 		_ = l.FS.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
-			if err != nil || e.IsDir() || !caFile(p) {
-				return nil //nolint:nilerr // a blocklist the host lacks distrusts nothing
-			}
-			data, err := l.FS.ReadFile(p)
+			// A blocklist the host lacks, or cannot read, distrusts nothing.
 			if err != nil {
-				return nil //nolint:nilerr // an unreadable file is left out
+				return fs.SkipDir
 			}
-			for _, c := range certs(data) {
-				out[fingerprint(c)] = true
+			if e.IsDir() || !caFile(p) {
+				return nil
+			}
+			// An unreadable file is left out.
+			if data, rerr := l.FS.ReadFile(p); rerr == nil {
+				for _, c := range certs(data) {
+					out[fingerprint(c)] = true
+				}
 			}
 
 			return nil

@@ -218,10 +218,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "network" }
-func (base) Category() string       { return collector.CategoryNetwork }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "network" }
+func (base) Category() collector.Category { return collector.CategoryNetwork }
+func (base) DefaultEnabled() bool         { return true }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the network variant for the host OS.
 func New() Collector {

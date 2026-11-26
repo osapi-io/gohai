@@ -58,10 +58,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "fips" }
-func (base) Category() string       { return collector.CategorySystem }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "fips" }
+func (base) Category() collector.Category { return collector.CategorySystem }
+func (base) DefaultEnabled() bool         { return true }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the fips variant for the host OS. Only Linux reports
 // FIPS mode — matches Ohai, which only provides the plugin on :linux

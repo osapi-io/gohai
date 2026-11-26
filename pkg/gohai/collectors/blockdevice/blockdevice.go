@@ -82,7 +82,7 @@ type base struct{}
 func (base) Name() string { return "block_device" }
 
 // Category returns "linux".
-func (base) Category() string { return collector.CategoryLinux }
+func (base) Category() collector.Category { return collector.CategoryLinux }
 
 // DefaultEnabled returns false — block_device is opt-in.
 func (base) DefaultEnabled() bool { return false }

@@ -106,7 +106,7 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := packagemgr.New()
 			s.Equal("package_mgr", c.Name())
-			s.Equal("software", c.Category())
+			s.Equal("software", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)
