@@ -23,6 +23,8 @@ linters:
       # Named rules, not the whole set: these are conventions Go itself
       # has an opinion about. Rules that report a threshold are left out.
       rules:
+        - name: blank-imports
+        - name: context-as-argument
         - name: error-naming
         - name: error-return
         - name: error-strings
@@ -30,19 +32,22 @@ linters:
         - name: exported
         - name: increment-decrement
         - name: indent-error-flow
+        - name: package-comments
         - name: range
         - name: receiver-naming
         - name: superfluous-else
         - name: time-naming
         - name: unused-parameter
+        - name: var-declaration
         - name: var-naming
 
   exclusions:
     paths:
       # Go shipped inside a JS package. Not ours, and not tracked in git.
       - node_modules
+    # The comments preset is not here: it hid revive's checks of doc
+    # comments, such as a license header that was a package's doc.
     presets:
-      - comments
       - std-error-handling
 
 formatters:

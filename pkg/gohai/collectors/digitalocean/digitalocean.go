@@ -18,10 +18,10 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package digital_ocean collects DigitalOcean droplet metadata from
+// Package digitalocean collects DigitalOcean droplet metadata from
 // the link-local metadata server at http://169.254.169.254/metadata/v1.json.
 // The collector returns nil with no error when the endpoint is not
-// reachable — that's the signal that the host isn't a DO droplet.
+// reachable. That is the signal that the host is not a droplet.
 package digitalocean
 
 import (
