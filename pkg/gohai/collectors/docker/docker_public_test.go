@@ -209,6 +209,16 @@ func (s *DockerPublicTestSuite) TestInspect() {
 			},
 		},
 		{
+			name:       "when inspect fails for a container that went away, the others have their details",
+			inspectOut: []byte(`[{"Id": "def456", "Created": "2026-11-21T09:00:00Z"}]`),
+			inspectErr: errors.New("exit status 1: no such object: abc123"),
+			validateFunc: func(cs []docker.Container) {
+				s.Require().Len(cs, 2)
+				s.Empty(cs[0].Created)
+				s.Equal("2026-11-21T09:00:00Z", cs[1].Created)
+			},
+		},
+		{
 			name:       "when inspect fails, the containers are as ps gave them",
 			inspectErr: errors.New("daemon gone"),
 			validateFunc: func(cs []docker.Container) {

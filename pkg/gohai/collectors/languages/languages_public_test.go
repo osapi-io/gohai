@@ -81,8 +81,8 @@ func buildFullMock(
 		Return([]byte("v20.1.0\n"), nil).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "java", "-version").
-		Return([]byte("openjdk version \"21.0.1\" 2023-10-17\n"), nil).
+		Execute(gomock.Any(), "java", "--version").
+		Return([]byte("openjdk 21.0.1 2023-10-17\nOpenJDK Runtime Environment (build 21.0.1+12)\n"), nil).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "perl", "--version").
@@ -103,7 +103,7 @@ func buildAbsentMock(
 	m.EXPECT().Execute(gomock.Any(), "python3", "--version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "ruby", "--version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "node", "--version").Return(nil, absent).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "java", "-version").Return(nil, absent).AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "java", "--version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "perl", "--version").Return(nil, absent).AnyTimes()
 	return m
 }
@@ -130,7 +130,7 @@ func buildSingleMock(
 		{"python3", "--version"},
 		{"ruby", "--version"},
 		{"node", "--version"},
-		{"java", "-version"},
+		{"java", "--version"},
 		{"perl", "--version"},
 	}
 	for _, p := range probes {
@@ -334,17 +334,17 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: java version without quotes uses first line",
+			name:    "linux: java single token fallback",
 			variant: "linux",
 			exec: buildSingleMock(
 				s.T(),
-				langOverride{"java", "-version", "java version abc\nother line"},
+				langOverride{"java", "--version", "abc\nother line"},
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*languages.Info)
 				s.Require().True(ok)
-				s.Equal(languages.Info{Java: strPtr("java version abc")}, *info)
+				s.Equal(languages.Info{Java: strPtr("abc")}, *info)
 			},
 		},
 		{

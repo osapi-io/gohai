@@ -109,7 +109,9 @@ func collectLanguages(
 	info.Python = probe("python3", []string{"--version"}, parsePythonVersion)
 	info.Ruby = probe("ruby", []string{"--version"}, parseRubyVersion)
 	info.Node = probe("node", []string{"--version"}, parseNodeVersion)
-	info.Java = probe("java", []string{"-version"}, parseJavaVersion)
+	// java --version writes to stdout. java -version writes to stderr,
+	// which is not data.
+	info.Java = probe("java", []string{"--version"}, parseJavaVersion)
 	info.Perl = probe("perl", []string{"--version"}, parsePerlVersion)
 	return info
 }
@@ -168,20 +170,16 @@ func parseNodeVersion(
 	return strPtr(strings.TrimPrefix(out, "v"))
 }
 
-// parseJavaVersion extracts the version from the first line of
-// `java -version` output. Java writes to stderr; the combined output
-// format is "openjdk version \"21.0.1\" ...".
+// parseJavaVersion extracts the version from the second field of the first
+// line of `java --version`, such as "openjdk 21.0.1 2023-10-17".
 func parseJavaVersion(
 	out string,
 ) *string {
-	out = strings.TrimSpace(out)
-	// First line only — remaining lines are JVM details.
-	line := strings.SplitN(out, "\n", 2)[0]
-	// Extract the quoted version: java version "21.0.1"
-	start := strings.Index(line, "\"")
-	end := strings.LastIndex(line, "\"")
-	if start >= 0 && end > start {
-		return strPtr(line[start+1 : end])
+	// First line only, such as "openjdk 21.0.1 2023-10-17". The rest is
+	// the runtime and the VM.
+	line := strings.SplitN(strings.TrimSpace(out), "\n", 2)[0]
+	if f := strings.Fields(line); len(f) >= 2 {
+		return strPtr(f[1])
 	}
 	return strPtr(line)
 }

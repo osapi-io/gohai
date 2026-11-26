@@ -25,7 +25,8 @@ package executor
 
 import "github.com/osapi-io/gohai/pkg/gohai/source"
 
-// Executor runs a command and returns its combined stdout and stderr.
+// Executor runs a command and returns its stdout. On a failure, the error
+// has the command's stderr.
 type Executor = source.Runner
 
 // New returns the runner of the real host.

@@ -18,7 +18,7 @@ sub-plugin for each language. gohai puts them all in one collector.
 | `python` | `*string` | The Python 3 version, from `python3 --version` | No direct OCSF/OTel mapping                                                |
 | `ruby`   | `*string` | The Ruby version, from `ruby --version`        | No direct OCSF/OTel mapping                                                |
 | `node`   | `*string` | The Node.js version, without the leading `v`   | No direct OCSF/OTel mapping                                                |
-| `java`   | `*string` | The Java version, from the quoted string       | No direct OCSF/OTel mapping                                                |
+| `java`   | `*string` | The Java version, from `java --version`        | No direct OCSF/OTel mapping                                                |
 | `perl`   | `*string` | The Perl version, from the `(vX.Y.Z)` form     | No direct OCSF/OTel mapping                                                |
 
 If a field is `nil`, it is not in the JSON output. This shows that the runtime
@@ -90,9 +90,9 @@ the two platforms:
    whitespace as the separator (`ruby 3.2.2 (...)` → `3.2.2`).
 4. **Node.** `node --version`. The collector removes the leading `v` from the
    output (`v20.1.0` → `20.1.0`).
-5. **Java.** `java -version`. Java writes to stderr. The executor returns the
-   combined output. The collector gets the version from the first quoted string
-   (`"21.0.1"`).
+5. **Java.** `java --version`, which writes to stdout. The collector gets the
+   second field of the first line (`openjdk 21.0.1 2023-10-17` → `21.0.1`). Java
+   8 does not have `--version`, so the collector gives no version for it.
 6. **Perl.** `perl --version`. The collector gets the `(vX.Y.Z)` form in
    parentheses from the first line.
 

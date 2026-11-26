@@ -263,8 +263,10 @@ func inspectContainers(
 	for _, c := range containers {
 		args = append(args, c.ID)
 	}
+	// docker inspect exits non-zero when a container went away after docker
+	// ps, and still gives the others on stdout.
 	out, err := exec.Execute(ctx, "docker", args...)
-	if err != nil {
+	if err != nil && len(out) == 0 {
 		return
 	}
 	var details []dockerInspect
