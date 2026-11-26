@@ -68,7 +68,25 @@ func (s *SourcePublicTestSuite) TestCommands() {
 			args:    []string{"hello"},
 			want:    "hello\n",
 		},
+		{
+			name:    "when the command writes to stderr, only stdout is data",
+			command: "sh",
+			args:    []string{"-c", "echo out; echo warning >&2"},
+			want:    "out\n",
+		},
+		{
+			name:    "when the command runs, LC_ALL is C",
+			command: "sh",
+			args:    []string{"-c", "echo $LC_ALL"},
+			want:    "C\n",
+		},
 		{name: "when the command fails", command: "false", wantErr: "exec false"},
+		{
+			name:    "when the command fails, the error has its stderr",
+			command: "sh",
+			args:    []string{"-c", "echo no such container >&2; exit 3"},
+			wantErr: "exit status 3: no such container",
+		},
 		{
 			name:    "when the command does not exist",
 			command: "gohai-no-such-command",
@@ -85,6 +103,69 @@ func (s *SourcePublicTestSuite) TestCommands() {
 			}
 			s.Require().NoError(err)
 			s.Equal(tc.want, string(out))
+		})
+	}
+}
+
+func (s *SourcePublicTestSuite) TestCommandsWith() {
+	tests := []struct {
+		name    string
+		ctx     func() context.Context
+		args    []string
+		limit   int
+		want    string
+		wantErr string
+	}{
+		{
+			name:    "when the command runs past the timeout",
+			args:    []string{"-c", "sleep 5"},
+			wantErr: "exec sh: stopped after 200ms",
+		},
+		{
+			name: "when a child keeps the pipes open after the command exits",
+			args: []string{"-c", "echo done; sleep 5 &"},
+			want: "done\n",
+		},
+		{
+			name:    "when stdout is more than the limit",
+			args:    []string{"-c", "printf 0123456789abcdef; printf more"},
+			limit:   10,
+			want:    "0123456789",
+			wantErr: "exec sh: stdout is more than 10 bytes",
+		},
+		{
+			name: "when the caller's context is cancelled",
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+
+				return ctx
+			},
+			args:    []string{"-c", "sleep 5"},
+			wantErr: "exec sh: context canceled",
+		},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			ctx := context.Background()
+			if tc.ctx != nil {
+				ctx = tc.ctx()
+			}
+			limit := tc.limit
+			if limit == 0 {
+				limit = source.MaxOutput
+			}
+			start := time.Now()
+			out, err := source.CommandsWith(200*time.Millisecond, 100*time.Millisecond, limit).
+				Execute(ctx, "sh", tc.args...)
+			s.Less(time.Since(start), 3*time.Second)
+			s.Equal(tc.want, string(out))
+			if tc.wantErr != "" {
+				s.ErrorContains(err, tc.wantErr)
+
+				return
+			}
+			s.NoError(err)
 		})
 	}
 }

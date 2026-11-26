@@ -25,10 +25,14 @@
 package source
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/avfs/avfs"
@@ -37,8 +41,8 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
-// Runner runs a command and returns its combined stdout and stderr.
-// Context cancellation stops the process.
+// Runner runs a command and returns its stdout. Context cancellation stops
+// the process. On a failure, the error has the command's stderr.
 type Runner interface {
 	Execute(
 		ctx context.Context,
@@ -98,26 +102,107 @@ func (s Sources) Defaults() Sources {
 	return s
 }
 
-// commands runs the host's programs.
-type commands struct{}
+// CommandTimeout is the longest that one command of the real host runs.
+// A hung program, such as docker with a stopped daemon, then fails its
+// collector and not the whole collection.
+const CommandTimeout = 30 * time.Second
 
-// Commands is the Runner of the real host.
-func Commands() Runner {
-	return commands{}
+// MaxOutput is the most stdout that one command keeps. A command that
+// writes more fails.
+const MaxOutput = 64 << 20
+
+// commandWaitDelay is how long Execute waits for the pipes to close after
+// the command exits or is stopped. A child that keeps the pipes open, such
+// as a daemon that the command starts, then does not block Execute.
+const commandWaitDelay = 2 * time.Second
+
+// maxStderr is the most stderr that one command keeps, for its error.
+const maxStderr = 4 << 10
+
+// commands runs the host's programs.
+type commands struct {
+	timeout   time.Duration
+	waitDelay time.Duration
+	limit     int
 }
 
-// Execute runs name with args, and returns the combined output. On a
-// non-zero exit it returns the output and an error that wraps the
-// *exec.ExitError.
-func (commands) Execute(
+// Commands is the Runner of the real host. Each command runs with
+// LC_ALL=C, so that its output is the same in each locale, and stops after
+// CommandTimeout.
+func Commands() Runner {
+	return commands{timeout: CommandTimeout, waitDelay: commandWaitDelay, limit: MaxOutput}
+}
+
+// Execute runs name with args, and returns its stdout. Stderr is not data:
+// on a failure, the error has it. On a non-zero exit the error wraps the
+// *exec.ExitError, and the stdout is returned with it.
+func (c commands) Execute(
 	ctx context.Context,
 	name string,
 	args ...string,
 ) ([]byte, error) {
-	out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
-	if err != nil {
+	runCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	stdout := &capped{limit: c.limit}
+	stderr := &capped{limit: maxStderr}
+	cmd := exec.CommandContext(runCtx, name, args...)
+	cmd.Env = append(os.Environ(), "LC_ALL=C")
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	cmd.WaitDelay = c.waitDelay
+
+	err := cmd.Run()
+	// A child that kept the pipes open after the command exited is not a
+	// failure of the command: its output is complete.
+	if errors.Is(err, exec.ErrWaitDelay) {
+		err = nil
+	}
+	out := stdout.Bytes()
+	switch {
+	case stdout.over:
+		return out, fmt.Errorf("exec %s: stdout is more than %d bytes", name, c.limit)
+	case err != nil && ctx.Err() == nil && errors.Is(runCtx.Err(), context.DeadlineExceeded):
+		return out, fmt.Errorf("exec %s: stopped after %s: %w", name, c.timeout, err)
+	case err != nil:
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return out, fmt.Errorf("exec %s: %w: %s", name, err, msg)
+		}
+
 		return out, fmt.Errorf("exec %s: %w", name, err)
 	}
 
 	return out, nil
 }
+
+// capped keeps the first limit bytes written to it, and records that more
+// came. It reads all that comes, so that the command does not block on a
+// full pipe. The buffer is a field, not embedded: io.Copy would use an
+// embedded buffer's ReadFrom and pass by Write.
+type capped struct {
+	buf   bytes.Buffer
+	limit int
+	over  bool
+}
+
+// Write keeps what fits in the limit.
+func (c *capped) Write(
+	p []byte,
+) (int, error) {
+	if room := c.limit - c.buf.Len(); room < len(p) {
+		c.over = true
+		if room > 0 {
+			c.buf.Write(p[:room])
+		}
+
+		return len(p), nil
+	}
+
+	return c.buf.Write(p)
+}
+
+// Bytes is what was kept.
+func (c *capped) Bytes() []byte { return c.buf.Bytes() }
+
+// String is what was kept, as a string.
+func (c *capped) String() string { return c.buf.String() }
