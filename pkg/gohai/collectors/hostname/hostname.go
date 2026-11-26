@@ -42,12 +42,11 @@ import (
 	"github.com/osapi-io/gohai/internal/executor"
 )
 
-// resolverRetries and resolverBackoff are how often and how far apart the
-// FQDN lookups are tried. Tests set the backoff to zero.
-var (
-	resolverRetries = 3
-	resolverBackoff = 100 * time.Millisecond
-)
+// resolverRetries is how often the FQDN lookups are tried, and
+// resolverBackoff how far apart. Tests set the backoff to zero.
+const resolverRetries = 3
+
+var resolverBackoff = 100 * time.Millisecond
 
 // kernelHostname is the name the kernel holds, on Linux.
 const kernelHostname = "/proc/sys/kernel/hostname"
