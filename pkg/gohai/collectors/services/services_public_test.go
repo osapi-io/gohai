@@ -193,7 +193,8 @@ func launchctlExec(
 const launchctlOut = "PID\tStatus\tLabel\n412\t0\tcom.apple.cron\n-\t0\tio.osapi.app\n-\t78\tio.osapi.web\n" +
 	"not a row\n"
 
-const disabledOut = "disabled services = {\n\t\"io.osapi.app\" => disabled\n\t\"com.apple.cron\" => enabled\n}\n"
+const disabledOut = "disabled services = {\n\t\"io.osapi.app\" => disabled\n\t\"com.apple.cron\" => enabled\n" +
+	"\t\"io.osapi.off\" => disabled\n\t\"io.osapi.idle\" => enabled\n}\n"
 
 func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 	tests := []struct {
@@ -202,12 +203,14 @@ func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 		want []services.Service
 	}{
 		{
-			name: "each daemon, with its state and whether it is enabled",
+			name: "each daemon, with its state and whether it is enabled, and the ones not loaded",
 			exec: launchctlExec(s.T(), []byte(launchctlOut), nil, []byte(disabledOut), nil),
 			want: []services.Service{
 				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
 				{Name: "io.osapi.app", State: "dead", Enabled: false, Type: "launchd"},
 				{Name: "io.osapi.web", State: "failed", Enabled: true, Type: "launchd"},
+				{Name: "io.osapi.idle", State: "dead", Enabled: true, Type: "launchd"},
+				{Name: "io.osapi.off", State: "dead", Enabled: false, Type: "launchd"},
 			},
 		},
 		{

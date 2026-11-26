@@ -19,7 +19,9 @@ daemons that are disabled. As root, `launchctl list` gives the system domain,
 where `/Library/LaunchDaemons` loads. As a user, it gives the domain of that
 user. A daemon with a PID is `running`. One with no PID is `dead` when its last
 exit was 0, and `failed` when it was not. A daemon is `enabled` unless
-`print-disabled` names it disabled. The name is the label, such as
+`print-disabled` names it disabled. A daemon that launchd has not loaded is not
+in `launchctl list`. Each one that `print-disabled` names is in the list too,
+with the state `dead`, as on Linux. The name is the label, such as
 `io.osapi.agent`. launchd has no description and no unit file, so both are
 empty.
 
