@@ -376,9 +376,13 @@ func containsLineWithPrefix(
 	return false
 }
 
-// execBinaryOnPath runs `command -v <name>` through the executor; an
-// exit code of 0 means the binary is on PATH. Tests stub it through
-// the gomock executor; production wraps real shell behaviour.
+// pathProbe is the shell script that execBinaryOnPath runs. `command` is
+// a shell builtin: Linux has no /usr/bin/command, so it runs through sh,
+// with the name as "$1" and never as part of the script.
+const pathProbe = `command -v "$1"`
+
+// execBinaryOnPath runs `command -v <name>` in sh through the executor;
+// an exit code of 0 means the binary is on PATH.
 func execBinaryOnPath(
 	ctx context.Context,
 	exec executor.Executor,
@@ -387,7 +391,7 @@ func execBinaryOnPath(
 	if exec == nil {
 		return false
 	}
-	_, err := exec.Execute(ctx, "command", "-v", name)
+	_, err := exec.Execute(ctx, "sh", "-c", pathProbe, "sh", name)
 	return err == nil
 }
 

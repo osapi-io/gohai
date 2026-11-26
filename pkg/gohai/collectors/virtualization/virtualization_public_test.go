@@ -267,7 +267,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(t, map[string][]byte{
-					"command -v docker": []byte("/usr/bin/docker\n"),
+					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -283,8 +283,8 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(t, map[string][]byte{
-					"command -v podman": []byte("/usr/bin/podman\n"),
-					"command -v nova":   []byte("/usr/bin/nova\n"),
+					"sh -c command -v \"$1\" sh podman": []byte("/usr/bin/podman\n"),
+					"sh -c command -v \"$1\" sh nova":   []byte("/usr/bin/nova\n"),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -668,7 +668,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(
 					t,
-					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
+					map[string][]byte{
+						"sh -c command -v \"$1\" sh lxc-start": []byte("/usr/bin/lxc-start\n"),
+					},
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -689,7 +691,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(
 					t,
-					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
+					map[string][]byte{
+						"sh -c command -v \"$1\" sh lxc-start": []byte("/usr/bin/lxc-start\n"),
+					},
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -710,7 +714,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(
 					t,
-					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
+					map[string][]byte{
+						"sh -c command -v \"$1\" sh lxc-start": []byte("/usr/bin/lxc-start\n"),
+					},
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -731,7 +737,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(
 					t,
-					map[string][]byte{"command -v lxc-start": []byte("/usr/bin/lxc-start\n")},
+					map[string][]byte{
+						"sh -c command -v \"$1\" sh lxc-start": []byte("/usr/bin/lxc-start\n"),
+					},
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -1011,7 +1019,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			},
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(t, map[string][]byte{
-					"command -v docker": []byte("/usr/bin/docker\n"),
+					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -1083,7 +1091,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(t, map[string][]byte{
-					"command -v docker": []byte("/usr/local/bin/docker\n"),
+					"sh -c command -v \"$1\" sh docker": []byte("/usr/local/bin/docker\n"),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -1099,7 +1107,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(t, map[string][]byte{
-					"command -v VBoxManage": []byte("/usr/local/bin/VBoxManage\n"),
+					"sh -c command -v \"$1\" sh VBoxManage": []byte("/usr/local/bin/VBoxManage\n"),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -1115,7 +1123,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
 			exec: func(t *testing.T) executor.Executor {
 				return virtExec(t, map[string][]byte{
-					"command -v prlctl": []byte("/usr/local/bin/prlctl\n"),
+					"sh -c command -v \"$1\" sh prlctl": []byte("/usr/local/bin/prlctl\n"),
 				})
 			},
 			validateFunc: func(got any, err error) {
