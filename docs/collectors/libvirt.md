@@ -144,6 +144,6 @@ The collector does not support macOS. On Darwin, `Collect` always returns `nil`.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run all `virsh` commands. Tests mock it with
   `go.uber.org/mock`.

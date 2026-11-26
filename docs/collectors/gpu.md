@@ -132,7 +132,7 @@ On Linux:
 On macOS:
 
 1. The collector runs `system_profiler SPDisplaysDataType -json` through the
-   shared `internal/executor`. Apple returns one object for each GPU in the
+   shared `source.Runner`. Apple returns one object for each GPU in the
    `SPDisplaysDataType` array.
 2. The `spdisplays_vendor` and `sppci_bus` values have Apple prefixes,
    `sppci_vendor_` and `spdisplays_`. The collector removes them, so consumers
@@ -149,6 +149,6 @@ On macOS:
 - `internal/pcidev`. The PCI devices of sysfs and the names of `pci.ids`, which
   it reads through the filesystem of the collector. The `pci` collector uses it
   too.
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `system_profiler` on macOS. Tests mock it with
   `go.uber.org/mock`.

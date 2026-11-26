@@ -31,7 +31,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects network facts on Linux: each interface of
@@ -53,13 +53,13 @@ type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem
 // and the production Executor.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect returns network Info.
@@ -99,7 +99,7 @@ func (l *Linux) Collect(
 // all, matching Ohai's behaviour.
 func applyEthtoolDriverInfo(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	info *Info,
 ) {
 	for i := range info.Interfaces {
@@ -131,7 +131,7 @@ func applyEthtoolDriverInfo(
 // existing applyRoutes path.
 func applyIPLinkExtras(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	info *Info,
 ) {
 	out, err := exec.Execute(ctx, "ip", "-d", "link")
@@ -162,7 +162,7 @@ func applyIPLinkExtras(
 // error or empty parse silently skips that field.
 func applyEthtoolTuning(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	info *Info,
 ) {
 	for i := range info.Interfaces {
@@ -302,7 +302,7 @@ func openVZGuest(
 // top-level default_* fields.
 func applyRoutes(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	info *Info,
 ) {
 	for _, fam := range []struct{ flag, family string }{

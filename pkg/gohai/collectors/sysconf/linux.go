@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux reads the sysconf values with getconf, as Ohai's sysconf plugin
@@ -35,12 +35,12 @@ import (
 type Linux struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant that runs the host's getconf.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{Exec: source.Commands()}
 }
 
 // Collect returns the sysconf Info.
@@ -55,7 +55,7 @@ func (l *Linux) Collect(
 // both have the four names.
 func collectSysconf(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) (*Info, error) {
 	info := &Info{}
 	for _, v := range []struct {

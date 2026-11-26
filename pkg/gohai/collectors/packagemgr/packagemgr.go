@@ -31,7 +31,6 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
@@ -82,7 +81,7 @@ func NewWith(
 // Ohai's `which`. Both are "" when exec is nil or none is found.
 func firstFound(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	names ...string,
 ) (string, string) {
 	if exec == nil {

@@ -165,6 +165,6 @@ The list of loaded modules (`/proc/modules`, `/sys/module/<n>/version`,
 
 - [`avfs`](https://github.com/avfs/avfs). The filesystem of `source.Sources`,
   for the files of `/proc/sys/kernel`. Tests use `memfs`.
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `uname -m` on Linux and `sysctl` on macOS. Tests mock
   it with `go.uber.org/mock`.

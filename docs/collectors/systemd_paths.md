@@ -89,7 +89,7 @@ None.
 ## Data sources
 
 On Linux, the collector runs `systemd-path` with no arguments through the shared
-`internal/executor` runner. Then it parses the output:
+`source.Runner`. Then it parses the output:
 
 1. The collector splits each line on the first `": "` separator. It skips lines
    that do not have this separator.
@@ -104,6 +104,6 @@ utility. Ohai's plugin is only `collect_data(:linux)`.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `systemd-path` on Linux. Tests mock it with
   `go.uber.org/mock`.

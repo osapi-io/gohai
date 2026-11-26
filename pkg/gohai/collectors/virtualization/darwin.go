@@ -29,7 +29,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin runs the macOS detection cascade. Mirrors Ohai's
@@ -43,13 +43,13 @@ type Darwin struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the real OS filesystem
 // and the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect runs the cascade and returns Info.
@@ -71,7 +71,7 @@ func (d *Darwin) Collect(
 func cascadeDarwin(
 	ctx context.Context,
 	fs avfs.VFS,
-	exec executor.Executor,
+	exec source.Runner,
 	info *Info,
 ) {
 	// 1-3. Hypervisor host binaries on PATH.

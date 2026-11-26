@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -42,7 +41,7 @@ type SourcesPublicTestSuite struct {
 // variant is a collector variant with each source field.
 type variant struct {
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 	Now  func() time.Time
 	Name string
 }

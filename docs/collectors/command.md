@@ -80,7 +80,7 @@ None.
 ## Data sources
 
 On Linux and on macOS, the collector runs `ps -ef` through the shared
-`internal/executor` runner:
+`source.Runner`:
 
 1. The collector removes the whitespace at the end of each output line.
 2. The collector skips blank lines.
@@ -95,5 +95,5 @@ supports all of the POSIX `-ef` flags.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `ps -ef`. Tests mock it with `go.uber.org/mock`.

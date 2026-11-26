@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -133,15 +133,15 @@ const powerJSON = `{
   ]
 }`
 
-// hwExec returns a MockExecutor keyed by the data-type arg so the
+// hwExec returns a MockRunner keyed by the data-type arg so the
 // same mock answers all three system_profiler calls in one test case.
 func hwExec(
 	t *testing.T,
 	hwOut, storageOut, powerOut []byte,
 	hwErr, storageErr, powerErr error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "system_profiler", "SPHardwareDataType", "-json").
 		Return(hwOut, hwErr).
@@ -218,13 +218,13 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "darwin: happy path Apple Silicon + APFS + battery + charger",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(
 					t,
 					[]byte(hwJSONAppleSilicon),
@@ -278,7 +278,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: Intel Mac populates cpu_type/packages",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte(hwJSONIntel), []byte(`{}`), []byte(`{}`), nil, nil, nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -298,7 +298,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: all three calls fail → empty Info",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, nil, nil, nil,
 					errors.New("no"), errors.New("no"), errors.New("no"))
 			},
@@ -315,7 +315,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: malformed hardware JSON tolerated",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte("not json"), []byte(`{}`), []byte(`{}`), nil, nil, nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -328,7 +328,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: empty SPHardwareDataType items array tolerated",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(
 					t,
 					[]byte(`{"SPHardwareDataType": []}`),
@@ -349,7 +349,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: storage without CoreStorage (modern APFS only)",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(
 					t,
 					[]byte(`{}`),
@@ -375,7 +375,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: malformed storage JSON tolerated",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte(`{}`), []byte("not json"), []byte(`{}`), nil, nil, nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -388,7 +388,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: malformed power JSON tolerated",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte("not json"), nil, nil, nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -402,7 +402,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: max_capacity zero → remaining stays 0",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte(`{
                     "SPPowerDataType": [{
                         "_name": "spbattery_information",
@@ -424,7 +424,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: nil Exec yields empty",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*hardware.Info)
@@ -435,7 +435,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: int-as-string fields parse correctly",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(
 					t,
 					[]byte(`{"SPHardwareDataType": [{"packages": "4"}]}`),
@@ -456,7 +456,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: battery ints and booleans in odd JSON shapes",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				// cycle_count as string, amperage missing entirely,
 				// fully_charged as native bool, is_charging as "yes".
 				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte(`{
@@ -487,7 +487,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: battery unparseable string cycle count leaves zero",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte(`{
                     "SPPowerDataType": [{
                         "_name": "spbattery_information",
@@ -508,7 +508,7 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: number_processors as float parses to string",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hwExec(
 					t,
 					[]byte(`{"SPHardwareDataType": [{"number_processors": 8}]}`),

@@ -32,7 +32,6 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Pool holds the attributes of a single ZFS pool.
@@ -145,7 +144,7 @@ func parseZpoolList(
 // error — ZFS is not installed on this host.
 func collectPools(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) (*Info, error) {
 	if exec == nil {
 		return &Info{Pools: []Pool{}}, nil

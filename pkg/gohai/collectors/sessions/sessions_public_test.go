@@ -30,11 +30,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -52,14 +52,14 @@ func TestSessionsPublicTestSuite(
 	suite.Run(t, new(SessionsPublicTestSuite))
 }
 
-// loginctlExec returns a MockExecutor that canned-answers the
+// loginctlExec returns a MockRunner that canned-answers the
 // `loginctl list-sessions` command.
 func loginctlExec(
 	t *testing.T,
 	out []byte, err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(
 			gomock.Any(),
@@ -152,14 +152,14 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		files        map[string]string
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: loginctl present, parses sessions ignores utmp",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, loginctlOutput, nil) },
+			exec:    func(t *testing.T) source.Runner { return loginctlExec(t, loginctlOutput, nil) },
 			files:   utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -178,7 +178,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: loginctl missing, falls back to utmp",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return loginctlExec(t, nil, errors.New("not found"))
 			},
 			files: utmp,
@@ -195,7 +195,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: nil Exec, utmp path direct",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			files:   utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -208,7 +208,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: loginctl returns empty output, empty session list not fallback",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return loginctlExec(t, []byte(""), nil) },
+			exec:    func(t *testing.T) source.Runner { return loginctlExec(t, []byte(""), nil) },
 			files:   utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -220,7 +220,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: loginctl missing AND no utmp file",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return loginctlExec(t, nil, errors.New("not found"))
 			},
 			validateFunc: func(_ any, err error) {

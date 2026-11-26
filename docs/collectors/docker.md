@@ -147,4 +147,4 @@ On both Linux and macOS:
 
 ## Backing library
 
-`internal/executor.Executor` to run the commands.
+`source.Runner` to run the commands.

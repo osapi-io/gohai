@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/libvirt"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -108,13 +108,13 @@ func TestLibvirtPublicTestSuite(
 	suite.Run(t, new(LibvirtPublicTestSuite))
 }
 
-// fullVirshMock returns a MockExecutor wired for the canonical happy-path:
+// fullVirshMock returns a MockRunner wired for the canonical happy-path:
 // version, uri, list --all, and dominfo for each domain.
 func fullVirshMock(
 	t *testing.T,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 		Return([]byte(virshVersionOutput), nil).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -187,14 +187,14 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		// ----- Linux -----
 		{
 			name:    "linux: full happy path — version, URI, two domains with dominfo",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return fullVirshMock(t) },
+			exec:    func(t *testing.T) source.Runner { return fullVirshMock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*libvirt.Info)
@@ -222,9 +222,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: version without daemon line uses library fallback",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionNoDeamon), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -244,9 +244,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: library line without libvirt prefix — raw value used",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				// "Using library:" with a value that does NOT start with "libvirt "
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte("Using library: somevendor 9.0.0\n"), nil).AnyTimes()
@@ -266,9 +266,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: dominfo with no-colon lines skipped, valid fields parsed",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -294,9 +294,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: virsh version fails — returns nil",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return(nil, errors.New("virsh: command not found")).AnyTimes()
 				return m
@@ -309,7 +309,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: nil Exec returns nil",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				s.Nil(got)
@@ -318,9 +318,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: virsh uri fails — URI stays empty, domains still collected",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -340,9 +340,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: virsh list fails — returns Info with version only",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -362,9 +362,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: virsh dominfo fails — domain kept with name+state only",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -389,9 +389,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: empty domain list — Domains field nil",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -411,7 +411,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin always returns nil",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				s.Nil(got)

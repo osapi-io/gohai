@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/packages"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -56,10 +56,10 @@ func mockExec(
 	args []string,
 	out []byte,
 	execErr error,
-) executor.Executor {
+) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	extraArgs := make([]any, len(args))
 	for i, a := range args {
 		extraArgs[i] = a
@@ -150,14 +150,14 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		name         string
 		variant      string
 		detect       string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux debian: dpkg-query returns packages",
 			variant: "linux",
 			detect:  "debian",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"dpkg-query",
@@ -195,7 +195,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux debian: dpkg skips non-installed and malformed lines",
 			variant: "linux",
 			detect:  "debian",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"dpkg-query",
@@ -220,7 +220,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux debian: dpkg skips short lines",
 			variant: "linux",
 			detect:  "debian",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"dpkg-query",
@@ -243,7 +243,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux debian: dpkg skips empty-name entries",
 			variant: "linux",
 			detect:  "debian",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"dpkg-query",
@@ -268,7 +268,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux debian: dpkg-query fails, empty list",
 			variant: "linux",
 			detect:  "debian",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"dpkg-query",
@@ -291,7 +291,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux rhel: rpm returns packages",
 			variant: "linux",
 			detect:  "rhel",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"rpm",
@@ -330,7 +330,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux rhel: rpm fails, empty list",
 			variant: "linux",
 			detect:  "rhel",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"rpm",
@@ -354,7 +354,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux rhel: rpm skips short lines",
 			variant: "linux",
 			detect:  "rhel",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"rpm",
@@ -378,7 +378,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux rhel: rpm skips empty-name entries",
 			variant: "linux",
 			detect:  "rhel",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"rpm",
@@ -409,7 +409,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "linux: nil Exec returns empty list",
 			variant: "linux",
 			detect:  "debian",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*packages.Info)
@@ -420,7 +420,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: brew list returns packages",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(t, "brew", []string{"list", "--versions"}, brewOut, nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -437,7 +437,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: brew output with blank lines skipped",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"brew",
@@ -458,7 +458,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: brew output with only-name line skipped",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(t, "brew", []string{"list", "--versions"}, []byte("git\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -471,7 +471,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: brew fails, empty list",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return mockExec(
 					t,
 					"brew",
@@ -490,7 +490,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: nil Exec returns empty list",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*packages.Info)

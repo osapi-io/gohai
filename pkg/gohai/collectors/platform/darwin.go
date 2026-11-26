@@ -29,7 +29,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin collects platform identification on macOS. The name and the
@@ -46,12 +46,12 @@ import (
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns platform Info.
@@ -73,7 +73,7 @@ func (d *Darwin) Collect(
 // supplements info with Build + VersionExtra. Silent on exec failure.
 func applySwVers(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	info *Info,
 ) {
 	out, err := exec.Execute(ctx, "sw_vers")

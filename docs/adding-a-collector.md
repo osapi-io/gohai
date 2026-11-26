@@ -102,18 +102,18 @@ import (
     "github.com/avfs/avfs/vfs/osfs"
 
     "github.com/osapi-io/gohai/internal/collector"
-    "github.com/osapi-io/gohai/internal/executor"
+    "github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 type Linux struct {
     base
 
-    FS   avfs.VFS          // files: /proc, /sys, /etc
-    Exec executor.Executor // commands: lscpu, ip, df
+    FS   avfs.VFS      // files: /proc, /sys, /etc
+    Exec source.Runner // commands: lscpu, ip, df
 }
 
 func NewLinux() *Linux {
-    return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+    return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 func (l *Linux) Collect(

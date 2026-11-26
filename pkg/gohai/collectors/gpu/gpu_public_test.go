@@ -29,11 +29,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -51,15 +51,15 @@ func TestGPUPublicTestSuite(
 	suite.Run(t, new(GPUPublicTestSuite))
 }
 
-// displayExec returns a MockExecutor that returns (out, err) when
+// displayExec returns a MockRunner that returns (out, err) when
 // system_profiler SPDisplaysDataType -json is invoked.
 func displayExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "system_profiler", "SPDisplaysDataType", "-json").
 		Return(out, err).
@@ -155,7 +155,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		variant      string
 		files        map[string]string
 		links        map[string]string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
@@ -200,7 +200,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: system_profiler JSON parsed for Apple GPU + discrete",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return displayExec(t, []byte(darwinJSON), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -221,7 +221,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: missing model falls back to _name",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return displayExec(
 					t,
 					[]byte(
@@ -242,7 +242,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: exec error yields empty Info",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return displayExec(t, nil, errors.New("not found"))
 			},
 			validateFunc: func(got any, err error) {
@@ -255,7 +255,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: malformed JSON yields empty Info",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return displayExec(t, []byte("not json"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -268,7 +268,7 @@ func (s *GPUPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: nil Exec yields empty",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*gpu.Info)

@@ -29,9 +29,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/rpm"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -147,7 +147,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		setupExec    func(ctrl *gomock.Controller) *execmocks.MockExecutor
+		setupExec    func(ctrl *gomock.Controller) *sourcemocks.MockRunner
 		validateFunc func(any, error)
 	}{
 		{
@@ -161,8 +161,8 @@ func (s *RPMPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: rpm not installed — empty macros, no error",
 			variant: "linux",
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "rpm", "--showrc").
 					Return(nil, errors.New("rpm: command not found"))
@@ -179,8 +179,8 @@ func (s *RPMPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: rpm --showrc parsed correctly",
 			variant: "linux",
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "rpm", "--showrc").
 					Return([]byte(showrcOutput), nil)
@@ -206,8 +206,8 @@ func (s *RPMPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no marker lines — empty macros",
 			variant: "linux",
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "rpm", "--showrc").
 					Return([]byte(showrcNoMarker), nil)
@@ -239,8 +239,8 @@ func (s *RPMPublicTestSuite) TestCollect() {
 			// (no value) exercises the len(parts) != 3 branch.
 			name:    "linux: edge-case macro lines",
 			variant: "linux",
-			setupExec: func(ctrl *gomock.Controller) *execmocks.MockExecutor {
-				m := execmocks.NewMockExecutor(ctrl)
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
 				// "-" alone: len(SplitN("-", " ", 3)) == 1 → skip.
 				// "- %novalue": len == 2 → name="%novalue", value="".
 				out := `=====

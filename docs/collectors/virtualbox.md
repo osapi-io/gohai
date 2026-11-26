@@ -111,5 +111,5 @@ output and gives no message about them.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `VBoxControl`. Tests mock it with `go.uber.org/mock`.

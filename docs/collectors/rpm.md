@@ -101,8 +101,8 @@ None.
 
 On Linux:
 
-1. The collector runs `rpm --showrc` through the injected `executor.Executor`.
-   If the command fails (rpm is not installed, or permission is denied), the
+1. The collector runs `rpm --showrc` through the injected `source.Runner`. If
+   the command fails (rpm is not installed, or permission is denied), the
    collector returns `{macros: {}}` and no error. This is the same as Ohai,
    which skips the plugin if it does not find rpm. Thus there is no error on
    systems without RPM, for example Debian and Alpine.
@@ -124,4 +124,4 @@ you need them, open a methodology issue.
 
 ## Backing library
 
-- `internal/executor` to run `rpm --showrc`. Tests use a gomock mock.
+- `source.Runner` to run `rpm --showrc`. Tests use a gomock mock.

@@ -131,13 +131,12 @@ On Linux:
 
 On macOS:
 
-1. The collector runs `kextstat -k -l` through the shared `internal/executor`
-   runner. Each row has fixed columns:
-   `Index Refs Address Size Wired Name (Version)`. The collector parses each row
-   into a `Module` with `name`, `version`, `size` and `refcount`. It removes the
-   parentheses from `version`. `size` is in hex. If `kextstat` is missing or
-   gives a non-zero exit code, the modules map stays empty. macOS has no
-   equivalent of `/proc/modules`.
+1. The collector runs `kextstat -k -l` through the shared `source.Runner`. Each
+   row has fixed columns: `Index Refs Address Size Wired Name (Version)`. The
+   collector parses each row into a `Module` with `name`, `version`, `size` and
+   `refcount`. It removes the parentheses from `version`. `size` is in hex. If
+   `kextstat` is missing or gives a non-zero exit code, the modules map stays
+   empty. macOS has no equivalent of `/proc/modules`.
 2. The collector does not read System Extensions (macOS 11 and later). A future
    change can use `systemextensionsctl list`.
 
@@ -146,6 +145,6 @@ On macOS:
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual filesystem
   that reads `/proc/modules` and `/sys/module/<name>/version` on Linux. Tests
   inject `memfs` with fixed content.
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `kextstat` on macOS. Tests mock it with
   `go.uber.org/mock`.

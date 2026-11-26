@@ -27,7 +27,7 @@ import (
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects installed packages on Linux hosts. On Debian-family
@@ -37,7 +37,7 @@ import (
 type Linux struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 	// Manager is the package database: dpkg, or rpm. NewWith picks it
 	// from the family of its sources.
 	Manager string
@@ -45,7 +45,7 @@ type Linux struct {
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New(), Manager: "dpkg"}
+	return &Linux{Exec: source.Commands(), Manager: "dpkg"}
 }
 
 // Collect queries the installed-package database and returns the
@@ -71,7 +71,7 @@ func (l *Linux) Collect(
 // Only "installed" status packages are included.
 func collectDpkg(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) (*Info, error) {
 	format := "${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n"
 	out, err := exec.Execute(ctx, "dpkg-query", "-W", "-f="+format)
@@ -104,7 +104,7 @@ func collectDpkg(
 // Ohai's packages.rb rhel branch: %{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}
 func collectRPM(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) (*Info, error) {
 	format := "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n"
 	out, err := exec.Execute(ctx, "rpm", "-qa", "--qf", format)

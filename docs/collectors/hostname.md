@@ -72,7 +72,7 @@ On Linux and macOS, the steps are the same. They are the same as the linux and
 darwin branches of Ohai's `hostname.rb`:
 
 1. `hostname -s` gives `name`. The collector runs it through the shared
-   `internal/executor` runner. Thus the short name is the same as the value that
+   `source.Runner`. Thus the short name is the same as the value that
    `$(hostname -s)` gives in other tools on the host. This is important on Macs
    that MDM manages, where `scutil --get HostName` can be different. It is also
    important on Linux hosts where a person changed `/etc/hostname` to an FQDN.
@@ -94,13 +94,13 @@ darwin branches of Ohai's `hostname.rb`:
    have `util-linux-hostname`. On macOS, there is no fallback for the short
    name, and the collector gives an error.
 
-The collector runs both commands through the shared `internal/executor` runner.
-Tests use `go.uber.org/mock` to mock the cases where the command is there, is
-missing, or gives empty output.
+The collector runs both commands through the shared `source.Runner`. Tests use
+`go.uber.org/mock` to mock the cases where the command is there, is missing, or
+gives empty output.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `hostname -s` and `hostname` on Linux and macOS.
   Tests mock it with `go.uber.org/mock`.
 - The Go standard library `net` package for forward and reverse DNS

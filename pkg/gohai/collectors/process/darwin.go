@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // lstartLayout is ps's lstart: "Thu Nov 20 12:04:00 2026".
@@ -40,12 +40,12 @@ const lstartLayout = "Mon Jan 2 15:04:05 2006"
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant that runs the host's ps.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New()}
+	return &Darwin{Exec: source.Commands()}
 }
 
 // Collect returns a process snapshot.

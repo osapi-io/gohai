@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysctl"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -50,15 +50,15 @@ func TestSysctlPublicTestSuite(
 	suite.Run(t, new(SysctlPublicTestSuite))
 }
 
-// sysctlExec returns a MockExecutor that answers `sysctl -a` with the
+// sysctlExec returns a MockRunner that answers `sysctl -a` with the
 // provided output and error.
 func sysctlExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "sysctl", "-a").
 		Return(out, err).
@@ -144,13 +144,13 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: canonical key=value output parsed",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, linuxOutput, nil) },
+			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, linuxOutput, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -166,7 +166,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "linux: empty output yields empty params map",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, []byte{}, nil) },
+			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, []byte{}, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -177,7 +177,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "linux: lines without separator skipped",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return sysctlExec(t, []byte("no_separator\nkernel.panic = 1\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -190,7 +190,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "linux: empty key skipped",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				// Line with separator but no key portion — key becomes empty, skipped.
 				return sysctlExec(t, []byte(": value\nkernel.panic = 2\n"), nil)
 			},
@@ -204,7 +204,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "linux: exec error yields empty params, no error",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, nil, errors.New("not found")) },
+			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, nil, errors.New("not found")) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -215,7 +215,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "linux: nil Exec yields empty params, no error",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -226,7 +226,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "darwin: colon-separated output parsed",
 			variant: "darwin",
-			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, darwinOutput, nil) },
+			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, darwinOutput, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -242,7 +242,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "darwin: exec error yields empty params, no error",
 			variant: "darwin",
-			exec:    func(t *testing.T) executor.Executor { return sysctlExec(t, nil, errors.New("not found")) },
+			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, nil, errors.New("not found")) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -253,7 +253,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "darwin: nil Exec yields empty params, no error",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)

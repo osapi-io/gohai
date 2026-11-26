@@ -189,7 +189,7 @@ On Linux:
    `vulnerabilities` field.
 
 3. If `lscpu` is on PATH, the collector runs it through the injected
-   `executor.Executor` and merges these fields:
+   `source.Runner` and merges these fields:
 
    - The cache size of each level (`caches.l1d` / `l1i` / `l2` / `l3`).
    - The NUMA node → CPU index lists (`numa_nodes`).
@@ -225,5 +225,5 @@ On macOS:
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read
   `/proc/cpuinfo`, `/proc/stat` and sysfs. Production uses `osfs`. Tests use
   `memfs`.
-- `internal/executor` to run `lscpu` on Linux, and `sysctl` and `ioreg` on
-  macOS. Tests use the generated gomock.
+- `source.Runner` to run `lscpu` on Linux, and `sysctl` and `ioreg` on macOS.
+  Tests use the generated gomock.

@@ -102,4 +102,4 @@ an error, because missing runtimes are usual on minimal hosts.
 
 ## Backing library
 
-`internal/executor.Executor` to run the commands.
+`source.Runner` to run the commands.

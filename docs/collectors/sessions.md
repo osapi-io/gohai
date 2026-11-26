@@ -111,7 +111,7 @@ On Linux:
 
 1. If `loginctl` is on the PATH, the collector runs
    `loginctl --no-pager --no-legend --no-ask-password list-sessions` through the
-   shared `internal/executor`. It splits each line that is not empty at the
+   shared `source.Runner`. It splits each line that is not empty at the
    whitespace into `session_id uid user [seat]`. It adds the result to
    `logged_in[]`. Empty output means that there are no active sessions. This is
    a valid result, and the collector does not try utmp in that case.
@@ -134,4 +134,4 @@ collector keeps utmp for hosts from before systemd and for containers.
 
 ## Backing library
 
-- [`internal/executor`](../../internal/executor) to run `loginctl` on Linux.
+- [`source.Runner`](../../pkg/gohai/source) to run `loginctl` on Linux.

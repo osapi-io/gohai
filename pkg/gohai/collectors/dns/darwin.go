@@ -29,7 +29,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin reads /etc/resolv.conf through FS, and each interface's
@@ -38,12 +38,12 @@ type Darwin struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewDarwin returns a Darwin variant that reads the host.
 func NewDarwin() *Darwin {
-	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 var (

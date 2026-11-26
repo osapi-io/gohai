@@ -244,13 +244,13 @@ On Linux:
     empty.
 
 05. **Routes.** The collector runs `ip -o -4 route show table main` and
-    `ip -o -6 route show table main` through the shared `internal/executor`
-    runner. It parses each line into a `Route` (`destination`, `gateway`,
-    `interface`, `source`, `scope`, `proto`, `metric`). A multipath entry
-    contains `\`. The collector replaces it with a space, so the entry is on one
-    line. A route with the destination `default`, `0.0.0.0/0` or `::/0` sets the
-    related top-level `default_*` fields. The collector also adds each route to
-    the `routes` slice of its interface. If `ip` is not available, the routing
+    `ip -o -6 route show table main` through the shared `source.Runner`. It
+    parses each line into a `Route` (`destination`, `gateway`, `interface`,
+    `source`, `scope`, `proto`, `metric`). A multipath entry contains `\`. The
+    collector replaces it with a space, so the entry is on one line. A route
+    with the destination `default`, `0.0.0.0/0` or `::/0` sets the related
+    top-level `default_*` fields. The collector also adds each route to the
+    `routes` slice of its interface. If `ip` is not available, the routing
     fields stay empty. Minimal containers without iproute2 do not have `ip`.
 
 06. **Link details.** `/sys/class/net/<iface>/speed` and `/duplex` give the
@@ -262,10 +262,10 @@ On Linux:
     driver symlink, so the field stays empty.
 
 07. **Ethtool driver info.** For each interface that is similar to Ethernet, the
-    collector runs `ethtool -i <iface>` through the shared `internal/executor`
-    runner. It parses the key and value output into
-    `interfaces[].ethtool.driver_info` (`driver`, `version`, `firmware_version`,
-    `bus_info`, `expansion_rom_version`, `supports_statistics`, `supports_test`,
+    collector runs `ethtool -i <iface>` through the shared `source.Runner`. It
+    parses the key and value output into `interfaces[].ethtool.driver_info`
+    (`driver`, `version`, `firmware_version`, `bus_info`,
+    `expansion_rom_version`, `supports_statistics`, `supports_test`,
     `supports_eeprom_access`, `supports_register_dump`, `supports_priv_flags`).
     The collector skips interfaces that are not Ethernet (loopback, tunnels). If
     the binary is missing or a call fails, the field stays empty.
@@ -313,6 +313,6 @@ gateway. Encapsulation and the OpenVZ merge are Linux only.
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual file
   system for `/sys/class/net`, `/proc/net/dev` and the OpenVZ probes
   (`/proc/vz`, `/proc/bc/0`).
-- [`internal/executor`](../../internal/executor). The shared command runner. The
+- [`source.Runner`](../../pkg/gohai/source). The shared command runner. The
   collector uses it to run `ip` and `ethtool` on Linux, and `ifconfig` and
   `netstat` on macOS. Tests mock it with `go.uber.org/mock`.

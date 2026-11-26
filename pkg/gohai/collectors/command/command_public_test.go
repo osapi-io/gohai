@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/command"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -50,15 +50,15 @@ func TestCommandPublicTestSuite(
 	suite.Run(t, new(CommandPublicTestSuite))
 }
 
-// psExec returns a MockExecutor that answers `ps -ef` with the
+// psExec returns a MockRunner that answers `ps -ef` with the
 // provided output and error.
 func psExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ps", "-ef").
 		Return(out, err).
@@ -139,13 +139,13 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: ps output parsed and trailing whitespace trimmed",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return psExec(t, psOutput, nil) },
+			exec:    func(t *testing.T) source.Runner { return psExec(t, psOutput, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
@@ -161,7 +161,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		{
 			name:    "linux: empty output yields empty slice",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return psExec(t, []byte{}, nil) },
+			exec:    func(t *testing.T) source.Runner { return psExec(t, []byte{}, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
@@ -172,7 +172,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		{
 			name:    "linux: blank lines in output are skipped",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return psExec(t, []byte("header\n\nprocess1\n\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -185,7 +185,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		{
 			name:    "linux: exec error yields empty slice, no error",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return psExec(t, nil, errors.New("not found")) },
+			exec:    func(t *testing.T) source.Runner { return psExec(t, nil, errors.New("not found")) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
@@ -196,7 +196,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		{
 			name:    "linux: nil Exec yields empty slice, no error",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
@@ -207,7 +207,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		{
 			name:    "darwin: ps output parsed",
 			variant: "darwin",
-			exec:    func(t *testing.T) executor.Executor { return psExec(t, psOutput, nil) },
+			exec:    func(t *testing.T) source.Runner { return psExec(t, psOutput, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
@@ -223,7 +223,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		{
 			name:    "darwin: exec error yields empty slice, no error",
 			variant: "darwin",
-			exec:    func(t *testing.T) executor.Executor { return psExec(t, nil, errors.New("not found")) },
+			exec:    func(t *testing.T) source.Runner { return psExec(t, nil, errors.New("not found")) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
@@ -234,7 +234,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		{
 			name:    "darwin: nil Exec yields empty slice, no error",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)

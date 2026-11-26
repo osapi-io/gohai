@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/languages"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -60,10 +60,10 @@ func strPtr(
 // language probes.
 func buildFullMock(
 	t *testing.T,
-) executor.Executor {
+) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "go", "version").
 		Return([]byte("go version go1.21.0 linux/amd64\n"), nil).
@@ -94,10 +94,10 @@ func buildFullMock(
 // buildAbsentMock creates a mock where every probe fails.
 func buildAbsentMock(
 	t *testing.T,
-) executor.Executor {
+) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	absent := errors.New("not found")
 	m.EXPECT().Execute(gomock.Any(), "go", "version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "python3", "--version").Return(nil, absent).AnyTimes()
@@ -119,10 +119,10 @@ type langOverride struct {
 func buildSingleMock(
 	t *testing.T,
 	override langOverride,
-) executor.Executor {
+) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	absent := errors.New("not found")
 
 	probes := []struct{ cmd, arg string }{
@@ -217,7 +217,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         executor.Executor
+		exec         source.Runner
 		validateFunc func(any, error)
 	}{
 		{

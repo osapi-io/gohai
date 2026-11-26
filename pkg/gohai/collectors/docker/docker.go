@@ -35,7 +35,6 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Container holds metadata for a single Docker container. ID is the full
@@ -188,7 +187,7 @@ type dockerJSONImage struct {
 // Returns nil when Docker is absent (version call fails).
 func collectDocker(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) (*Info, error) {
 	if exec == nil {
 		return nil, nil
@@ -220,7 +219,7 @@ func collectDocker(
 // parses the NDJSON output (one JSON object per line).
 func collectContainers(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) ([]Container, error) {
 	out, err := exec.Execute(ctx, "docker", "ps", "-a", "--no-trunc", "--format", "{{json .}}")
 	if err != nil {
@@ -253,7 +252,7 @@ func collectContainers(
 // containers as docker ps gave them.
 func inspectContainers(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	containers []Container,
 ) {
 	if len(containers) == 0 {
@@ -332,7 +331,7 @@ func applyInspect(
 // the NDJSON output.
 func collectImages(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) ([]Image, error) {
 	out, err := exec.Execute(ctx, "docker", "images", "--format", "{{json .}}")
 	if err != nil {

@@ -110,7 +110,7 @@ None.
 On Linux and macOS, the method is the same:
 
 1. The collector runs `zpool list -H -o name,size,alloc,free,health,altroot`
-   through the injected `executor.Executor`. `-H` removes the header line. `-o`
+   through the injected `source.Runner`. `-H` removes the header line. `-o`
    selects the six fields that gohai needs, with tabs between them.
 2. The command can fail. The exit code can be non-zero, `zpool` can be missing
    from `PATH`, or the executor can be `nil`. In these conditions, the collector
@@ -130,7 +130,7 @@ uses them.
 
 ## Backing library
 
-- `internal/executor` to run `zpool list`. Production uses `executor.New()`.
+- `source.Runner` to run `zpool list`. Production uses `source.Commands()`.
   Tests use a gomock mock.
 - The Go standard library `bufio` and `strings` to parse the output.
 

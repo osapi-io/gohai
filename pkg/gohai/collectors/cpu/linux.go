@@ -30,7 +30,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects CPU facts on Linux. /proc/cpuinfo, read through FS, is
@@ -41,12 +41,12 @@ import (
 //     (read through FS — an avfs.VFS, so tests can inject memfs content).
 //   - NUMA topology, per-level cache sizes, and — on s390x / ppc64le —
 //     authoritative core/socket/thread counts via `lscpu` (run through
-//     Exec — an executor.Executor, so tests can mock the command).
+//     Exec — an source.Runner, so tests can mock the command).
 type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to production dependencies:
@@ -55,7 +55,7 @@ type Linux struct {
 func NewLinux() *Linux {
 	return &Linux{
 		FS:   osfs.NewWithNoIdm(),
-		Exec: executor.New(),
+		Exec: source.Commands(),
 	}
 }
 

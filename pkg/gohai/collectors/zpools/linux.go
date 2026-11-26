@@ -24,20 +24,20 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects ZFS pool status on Linux by running `zpool list`. Exec
-// is injected for testability — production uses executor.New().
+// is injected for testability — production uses source.Commands().
 type Linux struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 }
 
-// NewLinux returns a Linux variant wired to the production executor.
+// NewLinux returns a Linux variant wired to the host's commands.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New()}
+	return &Linux{Exec: source.Commands()}
 }
 
 // Collect runs `zpool list` and returns the parsed pool list. When zpool

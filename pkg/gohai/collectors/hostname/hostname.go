@@ -39,7 +39,6 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // resolverRetries is how often the FQDN lookups are tried, and
@@ -108,7 +107,7 @@ func NewWith(
 // and darwin branches.
 func collectWithExec(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	fs avfs.VFS,
 	resolver source.Resolver,
 ) (*Info, error) {

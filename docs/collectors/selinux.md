@@ -138,8 +138,8 @@ On Linux:
    and does not run `sestatus`. When SELinux is disabled, sestatus exits with a
    status that is not zero.
 3. If the configured mode is `enforcing` or `permissive`, the collector runs
-   `sestatus` through the injected `executor.Executor`. It parses these lines of
-   the output:
+   `sestatus` through the injected `source.Runner`. It parses these lines of the
+   output:
    - `SELinux status:` → overrides the `status` field.
    - `Current mode:` → `current_mode`.
    - `Loaded policy name:` → `loaded_policy_name`. If this value is different
@@ -160,4 +160,4 @@ scope of gohai.
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read
   `/etc/selinux/config`. Production uses `osfs`. Tests use `memfs`.
-- `internal/executor` to run `sestatus`. Tests use a gomock mock.
+- `source.Runner` to run `sestatus`. Tests use a gomock mock.

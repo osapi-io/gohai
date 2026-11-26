@@ -29,7 +29,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects filesystem data on Linux. /proc/mounts, read through
@@ -44,14 +44,14 @@ type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to production dependencies:
 // the real OS filesystem for sysfs reads (btrfs allocation), and a
 // real `os/exec` wrapper for `df`, `lsblk` and `zfs`.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm(), Exec: executor.New()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect returns filesystem Info. Optional lsblk enrichment is

@@ -31,11 +31,11 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -118,9 +118,9 @@ func strconvBytes(
 // simulates lsblk absent from PATH or a minimal container.
 func noLsblkExec(
 	t *testing.T,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, errors.New("not found")).
@@ -138,9 +138,9 @@ func noLsblkExec(
 func lsblkExec(
 	t *testing.T,
 	out string,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
 		Return([]byte(out), nil).
@@ -157,9 +157,9 @@ func lsblkExec(
 func lsblkZFSExec(
 	t *testing.T,
 	lsblkOut, zfsOut string,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
 		Return([]byte(lsblkOut), nil).
@@ -255,7 +255,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		mounts       string            // /proc/mounts on Linux
 		out          map[string]string // df on Linux; mount and df on macOS
 		errs         map[string]error
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		fs           avfs.VFS // optional; nil → btrfs sysfs reads short-circuit
 		validateFunc func(any, error)
 	}{
@@ -264,7 +264,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec:    func(t *testing.T) executor.Executor { return noLsblkExec(t) },
+			exec:    func(t *testing.T) source.Runner { return noLsblkExec(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -281,7 +281,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda","fstype":null,"children":[
 						{"name":"sda1","fstype":"ext4","uuid":"root-uuid","label":"","mountpoint":"/","partuuid":"part-1","partlabel":""},
@@ -307,7 +307,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda","fstype":null,"children":[
 						{"name":"sda1","fstype":"ext4","uuid":"root-uuid","label":"","mountpoint":"/","partuuid":"","partlabel":""},
@@ -333,7 +333,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda","fstype":"","children":[
 						{"name":"sda1","fstype":"ext4","uuid":"u","label":"","mountpoint":"/","partuuid":"","partlabel":""}
@@ -353,7 +353,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sdc1","fstype":"ext4","uuid":"u","label":"","mountpoint":"/mnt/foo","partuuid":"","partlabel":""}
 				]}`)
@@ -370,7 +370,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec:    func(t *testing.T) executor.Executor { return lsblkExec(t, `not json`) },
+			exec:    func(t *testing.T) source.Runner { return lsblkExec(t, `not json`) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -385,7 +385,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -398,7 +398,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			name:    "linux: no /proc/mounts",
 			variant: "linux",
 			out:     baseDF,
-			exec:    func(t *testing.T) executor.Executor { return noLsblkExec(t) },
+			exec:    func(t *testing.T) source.Runner { return noLsblkExec(t) },
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
 			},
@@ -407,7 +407,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			name:    "linux: df fails, mounts kept without usage",
 			variant: "linux",
 			mounts:  baseMounts,
-			exec:    func(t *testing.T) executor.Executor { return noLsblkExec(t) },
+			exec:    func(t *testing.T) source.Runner { return noLsblkExec(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
@@ -421,7 +421,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				// tab-separated `zfs get -p -H all` — realistic subset
 				// covering pool root + nested fs + snapshot (mountpoint
 				// absent) + dataset with `none` (skipped for mountpoint).
@@ -484,7 +484,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkZFSExec(t, "", "")
 			},
 			validateFunc: func(got any, err error) {
@@ -499,7 +499,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkZFSExec(
 					t,
 					"",
@@ -519,7 +519,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			name:    "linux: btrfs mount enriched with allocation + raid profile",
 			variant: "linux",
 			mounts:  btrfsMount,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"abc-123","mountpoint":"/"}
 				]}`)
@@ -549,7 +549,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			name:    "linux: btrfs single profile recognised + zero-byte file tolerated",
 			variant: "linux",
 			mounts:  btrfsMount,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"single-fs","mountpoint":"/"}
 				]}`)
@@ -573,7 +573,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			name:    "linux: btrfs mount without /sys/fs/btrfs entry leaves Btrfs nil",
 			variant: "linux",
 			mounts:  btrfsMount,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"missing","mountpoint":"/"}
 				]}`)
@@ -590,7 +590,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			name:    "linux: btrfs bg dirs exist but with no profile + missing files",
 			variant: "linux",
 			mounts:  btrfsMount,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"empty-files","mountpoint":"/"}
 				]}`)
@@ -619,7 +619,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			name:    "linux: btrfs allocation root exists but no bg subdirs yields nil Btrfs",
 			variant: "linux",
 			mounts:  btrfsMount,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"btrfs","uuid":"empty-bg","mountpoint":"/"}
 				]}`)
@@ -640,7 +640,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			name:    "linux: non-btrfs mount left alone even with FS configured",
 			variant: "linux",
 			mounts:  "/dev/sda1 / ext4 rw 0 0\n",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
 					{"name":"sda1","fstype":"ext4","uuid":"ext-uuid","mountpoint":"/"}
 				]}`)
@@ -691,9 +691,9 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					s.Require().NoError(fs.MkdirAll("/proc", 0o755))
 					s.Require().NoError(fs.WriteFile("/proc/mounts", []byte(tt.mounts), 0o644))
 				}
-				var exec executor.Executor
+				var exec source.Runner
 				if tt.exec != nil {
-					if mock, ok := tt.exec(s.T()).(*execmocks.MockExecutor); ok && mock != nil {
+					if mock, ok := tt.exec(s.T()).(*sourcemocks.MockRunner); ok && mock != nil {
 						// The row's mock answers lsblk and zfs; df answers
 						// come from the row's out and errs.
 						df := sourcetest.Commands{Out: tt.out, Err: tt.errs}.Mock(s.T())

@@ -31,10 +31,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernelmodules"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -85,9 +85,9 @@ func kextstatExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "kextstat", "-k", "-l").
 		Return(out, err).
@@ -154,7 +154,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		name         string
 		variant      string
 		fs           avfs.VFS
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
@@ -222,7 +222,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: kextstat output parsed into modules",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return kextstatExec(t, kextstatOut, nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -240,7 +240,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: kextstat error yields empty modules",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return kextstatExec(t, nil, errors.New("not found"))
 			},
 			validateFunc: func(got any, err error) {
@@ -253,7 +253,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: unparseable line skipped leaves empty",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return kextstatExec(t, []byte("garbage line that cannot match\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -266,7 +266,7 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: nil Exec yields empty modules",
 			variant: "darwin",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*kernelmodules.Info)

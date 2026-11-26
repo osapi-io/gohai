@@ -27,7 +27,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects SELinux status on Linux hosts. FS provides file
@@ -37,7 +37,7 @@ type Linux struct {
 	base
 
 	FS   avfs.VFS
-	Exec executor.Executor
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem and
@@ -45,7 +45,7 @@ type Linux struct {
 func NewLinux() *Linux {
 	return &Linux{
 		FS:   osfs.NewWithNoIdm(),
-		Exec: executor.New(),
+		Exec: source.Commands(),
 	}
 }
 

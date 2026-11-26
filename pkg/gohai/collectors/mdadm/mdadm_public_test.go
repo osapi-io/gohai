@@ -32,9 +32,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/mdadm"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -179,9 +179,9 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		setupFS func() avfs.VFS
-		// setupEx returns an executor.Executor to inject. Return nil to test
+		// setupEx returns a source.Runner to inject. Return nil to test
 		// the no-executor path (Exec field left nil on the Linux struct).
-		setupEx      func(*testing.T) *execmocks.MockExecutor
+		setupEx      func(*testing.T) *sourcemocks.MockRunner
 		validateFunc func(any, error)
 	}{
 		{
@@ -193,9 +193,9 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/mdstat", mdstatRaid1, fs.FileMode(0o444))
 				return f
 			},
-			setupEx: func(t *testing.T) *execmocks.MockExecutor {
+			setupEx: func(t *testing.T) *sourcemocks.MockRunner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md0").
 					Return(detailRaid1, nil)
@@ -229,9 +229,9 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/mdstat", mdstatWithSpare, fs.FileMode(0o444))
 				return f
 			},
-			setupEx: func(t *testing.T) *execmocks.MockExecutor {
+			setupEx: func(t *testing.T) *sourcemocks.MockRunner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md1").
 					Return(nil, errors.New("mdadm not found"))
@@ -259,9 +259,9 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/mdstat", mdstatTwo, fs.FileMode(0o444))
 				return f
 			},
-			setupEx: func(t *testing.T) *execmocks.MockExecutor {
+			setupEx: func(t *testing.T) *sourcemocks.MockRunner {
 				ctrl := gomock.NewController(t)
-				m := execmocks.NewMockExecutor(ctrl)
+				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "mdadm", "--detail", gomock.Any()).
 					Return(nil, errors.New("not found")).AnyTimes()
 				return m
@@ -287,7 +287,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 					fs.FileMode(0o444))
 				return f
 			},
-			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
+			setupEx: func(_ *testing.T) *sourcemocks.MockRunner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*mdadm.Info)
@@ -299,7 +299,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			name:    "linux: /proc/mdstat absent returns empty list",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
-			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
+			setupEx: func(_ *testing.T) *sourcemocks.MockRunner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*mdadm.Info)
@@ -316,7 +316,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/mdstat", mdstatRaid1, fs.FileMode(0o444))
 				return f
 			},
-			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
+			setupEx: func(_ *testing.T) *sourcemocks.MockRunner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*mdadm.Info)
@@ -330,7 +330,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			name:    "linux: read error on /proc/mdstat propagates",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
-			setupEx: func(_ *testing.T) *execmocks.MockExecutor { return nil },
+			setupEx: func(_ *testing.T) *sourcemocks.MockRunner { return nil },
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
 			},

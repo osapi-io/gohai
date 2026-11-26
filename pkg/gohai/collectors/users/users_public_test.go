@@ -32,10 +32,10 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
@@ -389,7 +389,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			for line, out := range tt.dsclLists {
 				r.Out[line] = out
 			}
-			var exec executor.Executor = r.Mock(s.T())
+			var exec source.Runner = r.Mock(s.T())
 			if tt.nilExec {
 				exec = nil
 			}

@@ -91,7 +91,7 @@ On macOS:
 1. The collector reads `machinename` from the earlier result of `hostname`, the
    same as on Linux.
 2. `serial` comes from `system_profiler SPHardwareDataType -json` through the
-   shared `internal/executor` runner. This is the same source as Ohai's
+   shared `source.Runner`. This is the same source as Ohai's
    `hardware["serial_number"]`. If there is an error or no data, serial stays
    empty.
 3. `uuid` is the `IOPlatformUUID` line of
@@ -110,5 +110,5 @@ add them if a consumer needs them.
 
 - The Go standard library (`crypto/md5`, `fmt`, `strconv`) to calculate the
   hash.
-- [`internal/executor`](../../internal/executor) to run `system_profiler` and
-  `ioreg` on macOS.
+- [`source.Runner`](../../pkg/gohai/source) to run `system_profiler` and `ioreg`
+  on macOS.

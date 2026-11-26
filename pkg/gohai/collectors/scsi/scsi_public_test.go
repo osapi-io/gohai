@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scsi"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -50,15 +50,15 @@ func TestSCSIPublicTestSuite(
 	suite.Run(t, new(SCSIPublicTestSuite))
 }
 
-// lsscsiExec returns a MockExecutor that returns (out, err) when
+// lsscsiExec returns a MockRunner that returns (out, err) when
 // `lsscsi` is invoked.
 func lsscsiExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lsscsi").
 		Return(out, err).
@@ -125,13 +125,13 @@ malformed
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: happy path parses lsscsi output",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsscsiExec(t, []byte(lsscsiOut), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -165,7 +165,7 @@ malformed
 		{
 			name:    "linux: missing lsscsi binary yields empty info, no error",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsscsiExec(t, nil, errors.New("not found"))
 			},
 			validateFunc: func(got any, err error) {
@@ -178,7 +178,7 @@ malformed
 		{
 			name:    "linux: nil Exec yields empty info",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*scsi.Info)
@@ -189,7 +189,7 @@ malformed
 		{
 			name:    "linux: empty output yields empty info",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsscsiExec(t, []byte{}, nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -202,7 +202,7 @@ malformed
 		{
 			name:    "linux: minimum 5-field row (no name) still parses",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsscsiExec(t, []byte("[0:0:0:0] disk ATA KC48 /dev/sda\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -221,7 +221,7 @@ malformed
 		{
 			name:    "linux: row with empty brackets is skipped",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsscsiExec(t, []byte("[] disk ATA KC48 /dev/sda\n"), nil)
 			},
 			validateFunc: func(got any, err error) {

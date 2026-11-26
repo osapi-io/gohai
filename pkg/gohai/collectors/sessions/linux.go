@@ -27,7 +27,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects logged-in sessions on Linux. Prefers
@@ -39,13 +39,13 @@ import (
 type Linux struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 	FS   avfs.VFS
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: executor.New(), FS: osfs.NewWithNoIdm()}
+	return &Linux{Exec: source.Commands(), FS: osfs.NewWithNoIdm()}
 }
 
 // Collect returns logged-in session Info.

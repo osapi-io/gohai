@@ -32,11 +32,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
@@ -54,15 +53,15 @@ func TestHostnamePublicTestSuite(
 	suite.Run(t, new(HostnamePublicTestSuite))
 }
 
-// hostnameExec returns a MockExecutor that canned-answers
+// hostnameExec returns a MockRunner that canned-answers
 // `hostname -s` and bare `hostname` separately.
 func hostnameExec(
 	t *testing.T,
 	shortOut []byte, shortErr error,
 	bareOut []byte, bareErr error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "hostname", "-s").
 		Return(shortOut, shortErr).
@@ -156,7 +155,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 		files        map[string]string
 		lookupHost   func(string) ([]string, error)
 		lookupAddr   func(string) ([]string, error)
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
@@ -165,7 +164,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: okLookupHost,
 			lookupAddr: okLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -186,7 +185,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: emptyLookupHost,
 			lookupAddr: emptyLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -202,7 +201,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: okLookupHost,
 			lookupAddr: emptyLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -218,7 +217,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: okLookupHost,
 			lookupAddr: func(string) ([]string, error) { return []string{"web01."}, nil },
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("web01\n"), nil, []byte("web01\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -234,7 +233,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: darwinLookupHost,
 			lookupAddr: darwinLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(
 					t,
 					[]byte("johns-mbp\n"),
@@ -261,7 +260,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(
 					t,
 					nil,
@@ -287,7 +286,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
 			},
 			validateFunc: func(got any, err error) {
@@ -307,7 +306,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
 			},
 			validateFunc: func(got any, err error) {
@@ -327,7 +326,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("\n"), nil, []byte(""), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -347,7 +346,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      kernelName,
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
-			exec:       func(*testing.T) executor.Executor { return nil },
+			exec:       func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*hostname.Info)
@@ -365,7 +364,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      nil,
 			lookupHost: emptyLookupHost,
 			lookupAddr: emptyLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
 			},
 			validateFunc: func(_ any, err error) {
@@ -387,7 +386,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				}
 			}(),
 			lookupAddr: darwinLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -417,7 +416,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 					return []string{"johns-mbp.local."}, nil
 				}
 			}(),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -445,7 +444,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				}
 			}(),
 			lookupAddr: failLookupAddr,
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -472,7 +471,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 					return nil, &net.DNSError{Err: "no PTR", IsNotFound: true}
 				}
 			}(),
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, []byte("johns-mbp\n"), nil, []byte("Johns\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -492,7 +491,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			files:      map[string]string{"/proc/sys/kernel/hostname": "\n"},
 			lookupHost: func(string) ([]string, error) { return nil, errors.New("unused") },
 			lookupAddr: func(string) ([]string, error) { return nil, errors.New("unused") },
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
 			},
 			validateFunc: func(got any, err error) {

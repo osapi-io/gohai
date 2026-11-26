@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/lsb"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -50,14 +50,14 @@ func TestLSBPublicTestSuite(
 	suite.Run(t, new(LSBPublicTestSuite))
 }
 
-// lsbReleaseExec returns a MockExecutor that canned-answers
+// lsbReleaseExec returns a MockRunner that canned-answers
 // `lsb_release -a`.
 func lsbReleaseExec(
 	t *testing.T,
 	out []byte, err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lsb_release", "-a").
 		Return(out, err).
@@ -138,13 +138,13 @@ Codename:	noble
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: CLI succeeds, four fields populated",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return lsbReleaseExec(t, cliFull, nil) },
+			exec:    func(t *testing.T) source.Runner { return lsbReleaseExec(t, cliFull, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*lsb.Info)
@@ -158,7 +158,7 @@ Codename:	noble
 		{
 			name:    "linux: CLI returns subset, only matching fields populated",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsbReleaseExec(t, []byte("Distributor ID:\tDebian\nRelease:\t12\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
@@ -171,7 +171,7 @@ Codename:	noble
 		{
 			name:    "linux: CLI output with unmatched / no-colon lines: skipped",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsbReleaseExec(t,
 					[]byte("no colon line here\nunrelated: value\nDistributor ID:\tArch\n"),
 					nil)
@@ -186,7 +186,7 @@ Codename:	noble
 		{
 			name:    "linux: CLI missing, empty Info no error",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return lsbReleaseExec(t, nil, errors.New("not found"))
 			},
 			validateFunc: func(got any, err error) {
@@ -199,7 +199,7 @@ Codename:	noble
 		{
 			name:    "linux: nil Exec, empty Info no error",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*lsb.Info)

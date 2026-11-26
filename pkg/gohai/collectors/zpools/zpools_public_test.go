@@ -29,10 +29,10 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
-	execmocks "github.com/osapi-io/gohai/internal/executor/mocks"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -40,14 +40,14 @@ var (
 	_ collector.Collector = (*zpools.Darwin)(nil)
 )
 
-// zpoolExec returns a MockExecutor that canned-answers `zpool list ...`.
+// zpoolExec returns a MockRunner that canned-answers `zpool list ...`.
 func zpoolExec(
 	t *testing.T,
 	out []byte,
 	err error,
-) executor.Executor {
+) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := execmocks.NewMockExecutor(ctrl)
+	m := sourcemocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "zpool", "list", "-H", "-o", "name,size,alloc,free,health,altroot").
 		Return(out, err).
@@ -142,13 +142,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string
-		exec         func(*testing.T) executor.Executor
+		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: single pool all fields populated",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, onePool, nil) },
+			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, onePool, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -161,7 +161,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: two pools returned in order",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, twoPools, nil) },
+			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, twoPools, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -182,7 +182,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: dash fields sanitized to empty strings",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, dashFields, nil) },
+			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, dashFields, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -195,7 +195,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: altroot present",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, altRootPool, nil) },
+			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, altRootPool, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -215,7 +215,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: malformed line skipped",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, malformedLine, nil) },
+			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, malformedLine, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -226,7 +226,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: empty output returns empty list",
 			variant: "linux",
-			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, []byte{}, nil) },
+			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, []byte{}, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -237,7 +237,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: zpool not installed returns empty list",
 			variant: "linux",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return zpoolExec(t, nil, errors.New("exec: zpool not found"))
 			},
 			validateFunc: func(got any, err error) {
@@ -250,7 +250,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: nil executor returns empty list",
 			variant: "linux",
-			exec:    func(*testing.T) executor.Executor { return nil },
+			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -261,7 +261,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: single pool",
 			variant: "darwin",
-			exec:    func(t *testing.T) executor.Executor { return zpoolExec(t, onePool, nil) },
+			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, onePool, nil) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -274,7 +274,7 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: zpool not installed returns empty list",
 			variant: "darwin",
-			exec: func(t *testing.T) executor.Executor {
+			exec: func(t *testing.T) source.Runner {
 				return zpoolExec(t, nil, errors.New("exec: zpool not found"))
 			},
 			validateFunc: func(got any, err error) {

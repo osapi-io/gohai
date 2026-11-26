@@ -31,7 +31,6 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // Info holds the detected runtime versions. A nil pointer for a
@@ -87,7 +86,7 @@ func NewWith(
 // are identical on both platforms.
 func collectLanguages(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 ) *Info {
 	info := &Info{}
 	if exec == nil {

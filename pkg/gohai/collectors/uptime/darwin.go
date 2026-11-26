@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // bootSecRE is the seconds of sysctl kern.boottime:
@@ -41,14 +41,14 @@ var bootSecRE = regexp.MustCompile(`sec = (\d+)`)
 type Darwin struct {
 	base
 
-	Exec executor.Executor
+	Exec source.Runner
 	Now  func() time.Time
 }
 
 // NewDarwin returns a Darwin variant that runs the host's sysctl and reads
 // its clock.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New(), Now: time.Now}
+	return &Darwin{Exec: source.Commands(), Now: time.Now}
 }
 
 // Collect returns uptime facts.

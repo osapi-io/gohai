@@ -28,7 +28,6 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -40,14 +39,14 @@ import (
 type Darwin struct {
 	base
 
-	Exec     executor.Executor
+	Exec     source.Runner
 	FS       avfs.VFS
 	Resolver source.Resolver
 }
 
 // NewDarwin returns a Darwin variant wired to the production Executor.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: executor.New(), FS: osfs.NewWithNoIdm(), Resolver: net.DefaultResolver}
+	return &Darwin{Exec: source.Commands(), FS: osfs.NewWithNoIdm(), Resolver: net.DefaultResolver}
 }
 
 // Collect returns hostname facts.

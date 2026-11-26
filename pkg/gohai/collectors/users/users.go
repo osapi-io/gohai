@@ -36,7 +36,6 @@ import (
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/executor"
 )
 
 // passwdPath / groupPath are the standard POSIX flat-file locations
@@ -72,7 +71,7 @@ func NewWith(
 func collectPOSIX(
 	ctx context.Context,
 	fs avfs.VFS,
-	exec executor.Executor,
+	exec source.Runner,
 ) (*Info, error) {
 	info := readPOSIX(fs)
 	setCurrentUser(ctx, exec, info)
@@ -106,7 +105,7 @@ func readPOSIX(
 // when id fails, or when no user has the UID.
 func setCurrentUser(
 	ctx context.Context,
-	exec executor.Executor,
+	exec source.Runner,
 	info *Info,
 ) {
 	if exec == nil {
