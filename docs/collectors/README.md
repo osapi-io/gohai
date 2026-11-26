@@ -149,7 +149,7 @@ There is no `cloud` collector. gohai has no aggregator for all cloud providers.
 | [packages](packages.md)       | `packages`    | Installed packages                                  | ❌      | ✅          | None       |
 | [languages](languages.md)     | `languages`   | Go, Python, Ruby, Node and more                     | ❌      | ✅          | None       |
 | [docker](docker.md)           | `docker`      | Containers, images, Docker info                     | ❌      | ✅          | None       |
-| [services](services.md)       | `services`    | Systemd service states                              | ❌      | ✅          | None       |
+| [services](services.md)       | `services`    | Systemd and launchd service states                  | ❌      | ✅          | None       |
 
 ## Users & sessions
 
