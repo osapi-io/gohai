@@ -228,7 +228,11 @@ func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 		},
 		{
 			name: "output that stops inside the services block",
-			exec: launchctlExec(s.T(), []byte("\tservices = {\n\t\t     412      - \tcom.apple.cron\n"), nil),
+			exec: launchctlExec(
+				s.T(),
+				[]byte("\tservices = {\n\t\t     412      - \tcom.apple.cron\n"),
+				nil,
+			),
 			want: []services.Service{
 				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
 			},
