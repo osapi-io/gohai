@@ -24,33 +24,35 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
+	"io"
 
 	"github.com/spf13/cobra"
 
 	"github.com/osapi-io/gohai/internal/cli"
 )
 
-// Execute runs the gohai CLI. Called from main.go.
-func Execute() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		<-sigChan
-		cancel()
-	}()
-
+// Execute runs the gohai CLI with args, the words after the binary's name,
+// and returns the exit code: 0, or 1 after it prints the error to errOut.
+// main.go gives it the process's arguments and streams, and a ctx that a
+// signal cancels.
+func Execute(
+	ctx context.Context,
+	args []string,
+	in io.Reader,
+	out, errOut io.Writer,
+) int {
 	cmd := newRootCommand()
+	cmd.SetArgs(args)
+	cmd.SetIn(in)
+	cmd.SetOut(out)
+	cmd.SetErr(errOut)
 	if err := cmd.ExecuteContext(ctx); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		_, _ = fmt.Fprintf(errOut, "error: %v\n", err)
+
+		return 1
 	}
+
+	return 0
 }
 
 func newRootCommand() *cobra.Command {
