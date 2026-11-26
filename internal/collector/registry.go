@@ -32,7 +32,8 @@ import (
 // Hooks are optional per-run observability callbacks. Both fields may
 // be nil.
 type Hooks struct {
-	// OnError is invoked when a collector's Collect returns an error.
+	// OnError is invoked when a collector's Collect returns an error or
+	// panics.
 	// Called from the collector's goroutine, concurrent with other
 	// collectors in the same level.
 	OnError func(name string, err error)
@@ -173,30 +174,28 @@ func (r *Registry) SelectedWith(
 // Run executes the named collectors in dependency order. Dependencies are
 // auto-included even if not in the names list. Collectors at the same level
 // (no inter-dependencies) run concurrently. Returns a map of collector name
-// to result. Failed collectors are omitted from the result map. hooks may
+// to result. Failed collectors are omitted from the result map, and their
+// error goes to hooks.OnError. A panic in a collector is its error. A
+// cancelled ctx starts no next level, and Run returns ctx's error. hooks may
 // be zero-valued; any non-nil field is invoked per collector.
 func (r *Registry) Run(
 	ctx context.Context,
 	names []string,
 	hooks Hooks,
 ) (map[string]any, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	wanted, err := r.expandWithDeps(names)
+	levels, collectors, err := r.plan(names)
 	if err != nil {
 		return nil, err
 	}
 
-	levels, err := r.topoLevels(wanted)
-	if err != nil {
-		return nil, err
-	}
-
-	results := make(map[string]any, len(wanted))
+	results := make(map[string]any, len(collectors))
 	var resultsMu sync.Mutex
 
 	for _, level := range levels {
+		// A cancelled run starts no more collectors.
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		// Snapshot prior results once per level. Collectors at the
 		// same level have no inter-dependencies by definition, so
 		// they all see the same prior state — matches the
@@ -210,12 +209,12 @@ func (r *Registry) Run(
 
 		var wg sync.WaitGroup
 		for _, name := range level {
-			c := r.collectors[name]
+			c := collectors[name]
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				start := time.Now()
-				out, cerr := c.Collect(ctx, prior)
+				out, cerr := collect(ctx, c, prior)
 				dur := time.Since(start)
 				if hooks.OnComplete != nil {
 					hooks.OnComplete(c.Name(), dur, cerr)
@@ -234,6 +233,49 @@ func (r *Registry) Run(
 		wg.Wait()
 	}
 	return results, nil
+}
+
+// plan is the levels of names and their dependencies, and the collector of
+// each name. It holds the registry's lock only while it reads, so that a
+// Register does not wait for a whole run.
+func (r *Registry) plan(
+	names []string,
+) ([][]string, map[string]Collector, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	wanted, err := r.expandWithDeps(names)
+	if err != nil {
+		return nil, nil, err
+	}
+	levels, err := r.topoLevels(wanted)
+	if err != nil {
+		return nil, nil, err
+	}
+	collectors := make(map[string]Collector, len(wanted))
+	for _, level := range levels {
+		for _, name := range level {
+			collectors[name] = r.collectors[name]
+		}
+	}
+
+	return levels, collectors, nil
+}
+
+// collect runs c. A panic in c is its error, so that one collector does not
+// stop the process that runs gohai.
+func collect(
+	ctx context.Context,
+	c Collector,
+	prior PriorResults,
+) (out any, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			out, err = nil, fmt.Errorf("collector %s panicked: %v", c.Name(), p)
+		}
+	}()
+
+	return c.Collect(ctx, prior)
 }
 
 func (r *Registry) expandWithDeps(

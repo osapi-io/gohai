@@ -83,6 +83,16 @@ func (s *OptionsPublicTestSuite) TestNew() {
 			},
 		},
 		{
+			name: "with collectors and disabled together errors",
+			opts: []gohai.Option{
+				gohai.WithCollectors("platform"),
+				gohai.WithDisabled("hostname"),
+			},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "WithCollectors and WithDisabled together")
+			},
+		},
+		{
 			name: "unknown only errors",
 			opts: []gohai.Option{gohai.WithCollectors("nope")},
 			validateFunc: func(_ any, err error) {

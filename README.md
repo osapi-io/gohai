@@ -93,7 +93,8 @@ no implementation.
 You enable or disable each collector with flags in the node_exporter style.
 `--collector.<name>` enables a collector. `--no-collector.<name>` disables it.
 SDK consumers use `gohai.WithEnabled(...)` / `gohai.WithDisabled(...)` /
-`gohai.WithCollectors(...)`.
+`gohai.WithCollectors(...)`. `WithCollectors` names each collector to run, so
+`gohai.New` refuses it with `WithDisabled`.
 
 The defaults are optional. `gohai.New()` returns an empty registry. Pass
 `gohai.WithDefaults()` to get the recommended set. This set has collectors that
@@ -182,10 +183,14 @@ fmt.Println(facts.Platform.Name, facts.CPU.Cores)
 fmt.Println(facts.Network.DefaultInterface)
 ```
 
-To add the timing and the error message of each collector to Facts, add
-`gohai.WithTimings()` to `gohai.New(...)`. Use this to find slow collectors. Use
-it also to see why a collector failed, without a stop of the run. Refer to the
-`Timings` field on [pkg.go.dev][package documentation].
+A collector that fails, or panics, has no typed field in Facts, the same as one
+that was not selected. `Facts.Errors` (`_errors` in the JSON) has the error of
+each collector that failed, and the others run. A cancelled context stops the
+run with an error.
+
+To add the timing of each collector to Facts, add `gohai.WithTimings()` to
+`gohai.New(...)`. Use this to find slow collectors. Refer to the `Timings` field
+on [pkg.go.dev][package documentation].
 
 ### Find the cloud of the host
 

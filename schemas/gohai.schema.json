@@ -1854,6 +1854,12 @@
         "collect_duration_ns": {
           "type": "integer"
         },
+        "_errors": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
         "_timings": {
           "$ref": "#/$defs/Timings"
         }
