@@ -172,6 +172,70 @@ func (s *ServicesPublicTestSuite) TestNew() {
 	}
 }
 
+// launchctlExec answers launchctl list with out and err, and print-disabled
+// with disabled and disabledErr.
+func launchctlExec(
+	t *testing.T,
+	out []byte,
+	err error,
+	disabled []byte,
+	disabledErr error,
+) executor.Executor {
+	t.Helper()
+	m := execmocks.NewMockExecutor(gomock.NewController(t))
+	m.EXPECT().Execute(gomock.Any(), "launchctl", "list").Return(out, err).AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "launchctl", "print-disabled", "system").
+		Return(disabled, disabledErr).AnyTimes()
+
+	return m
+}
+
+const launchctlOut = "PID\tStatus\tLabel\n412\t0\tcom.apple.cron\n-\t0\tio.osapi.app\n-\t78\tio.osapi.web\n" +
+	"not a row\n"
+
+const disabledOut = "disabled services = {\n\t\"io.osapi.app\" => disabled\n\t\"com.apple.cron\" => enabled\n}\n"
+
+func (s *ServicesPublicTestSuite) TestCollectDarwin() {
+	tests := []struct {
+		name string
+		exec executor.Executor
+		want []services.Service
+	}{
+		{
+			name: "each daemon, with its state and whether it is enabled",
+			exec: launchctlExec(s.T(), []byte(launchctlOut), nil, []byte(disabledOut), nil),
+			want: []services.Service{
+				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
+				{Name: "io.osapi.app", State: "dead", Enabled: false, Type: "launchd"},
+				{Name: "io.osapi.web", State: "failed", Enabled: true, Type: "launchd"},
+			},
+		},
+		{
+			name: "no list of the disabled: each is enabled",
+			exec: launchctlExec(s.T(), []byte(launchctlOut), nil, nil, errors.New("denied")),
+			want: []services.Service{
+				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
+				{Name: "io.osapi.app", State: "dead", Enabled: true, Type: "launchd"},
+				{Name: "io.osapi.web", State: "failed", Enabled: true, Type: "launchd"},
+			},
+		},
+		{
+			name: "launchctl that cannot run is an empty list",
+			exec: launchctlExec(s.T(), nil, errors.New("not found"), nil, nil),
+			want: []services.Service{},
+		},
+		{name: "no executor is an empty list", want: []services.Service{}},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got, err := (&services.Darwin{Exec: tt.exec}).Collect(context.Background(), nil)
+			s.Require().NoError(err)
+			s.Equal(tt.want, got.(*services.Info).Services)
+		})
+	}
+	s.NotNil(services.NewDarwin().Exec)
+}
+
 func (s *ServicesPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
@@ -353,20 +417,6 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				s.Equal([]services.Service{}, info.Services)
 			},
 		},
-		{
-			name:    "darwin: returns nil",
-			variant: "darwin",
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				if true {
-					s.Nil(got)
-					return
-				}
-				info, ok := got.(*services.Info)
-				s.Require().True(ok)
-				s.Equal([]services.Service(nil), info.Services)
-			},
-		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -375,7 +425,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &services.Linux{Exec: tt.exec}
 			case "darwin":
-				c = services.NewDarwin()
+				c = &services.Darwin{Exec: tt.exec}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

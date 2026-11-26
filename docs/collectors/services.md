@@ -4,16 +4,24 @@
 
 ## Description
 
-The collector reports the states of the systemd services on Linux hosts. It runs
+The collector reports the states of the services of the host: the systemd
+services on Linux, and the launchd daemons on macOS. On Linux, it runs
 `systemctl list-units --type=service --all --no-pager --plain` for the state and
 the description of each unit, and `systemctl list-unit-files` for the state of
 each unit file. `list-units --all` lists only the units that systemd has loaded,
 and a unit that is stopped and disabled is usually not loaded. Thus each unit of
 `list-unit-files` that `list-units` did not give is in the list too, with the
 state `dead` and no description. A template, such as `getty@`, is not a unit
-that runs, and an alias is a second name of a unit, so the list has neither.
-macOS uses launchd, which has a very different service model. On Darwin, the
-collector returns `nil` and no error.
+that runs, and an alias is a second name of a unit, so the list has neither. On
+macOS, it runs `launchctl list`, which gives the label of each daemon, its PID
+and the status of its last exit, and `launchctl print-disabled system` for the
+daemons that are disabled. As root, `launchctl list` gives the system domain,
+where `/Library/LaunchDaemons` loads. As a user, it gives the domain of that
+user. A daemon with a PID is `running`. One with no PID is `dead` when its last
+exit was 0, and `failed` when it was not. A daemon is `enabled` unless
+`print-disabled` names it disabled. The name is the label, such as
+`io.osapi.agent`. launchd has no description and no unit file, so both are
+empty.
 
 Ohai has no direct equivalent of this collector. Ohai has no plugin that lists
 services. This collector is a gohai addition.
@@ -32,10 +40,10 @@ services. This collector is a gohai addition.
 
 ## Platform support
 
-| Platform | Supported                 |
-| -------- | ------------------------- |
-| Linux    | ✅                        |
-| macOS    | nil (launchd is not read) |
+| Platform | Supported    |
+| -------- | ------------ |
+| Linux    | ✅           |
+| macOS    | ✅ (launchd) |
 
 ## Example output
 
@@ -112,7 +120,7 @@ On Linux:
 7. When systemctl is missing, the collector returns an empty list, not an error.
    Many containers do not have systemd.
 
-On macOS, the collector returns `nil`.
+On macOS, a launchctl that cannot run is an empty list, not an error.
 
 ## Backing library
 
