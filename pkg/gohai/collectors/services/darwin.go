@@ -22,6 +22,7 @@ package services
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -77,6 +78,7 @@ func parseLaunchctlList(
 	disabled map[string]bool,
 ) *Info {
 	info := &Info{Services: []Service{}}
+	loaded := map[string]bool{}
 	for _, line := range strings.Split(out, "\n") {
 		f := strings.Fields(line)
 		if len(f) != 3 || !isPID(f[0]) || !isStatus(f[1]) {
@@ -89,8 +91,24 @@ func parseLaunchctlList(
 				state = "failed"
 			}
 		}
+		loaded[f[2]] = true
 		info.Services = append(info.Services, Service{
 			Name: f[2], State: state, Enabled: !disabled[f[2]], Type: "launchd",
+		})
+	}
+	// A daemon that launchd has not loaded is not in launchctl list. One
+	// that print-disabled names is there too, dead, as systemd's list adds
+	// the unit files that it has not loaded.
+	labels := make([]string, 0, len(disabled))
+	for label := range disabled {
+		if !loaded[label] {
+			labels = append(labels, label)
+		}
+	}
+	sort.Strings(labels)
+	for _, label := range labels {
+		info.Services = append(info.Services, Service{
+			Name: label, State: "dead", Enabled: !disabled[label], Type: "launchd",
 		})
 	}
 
