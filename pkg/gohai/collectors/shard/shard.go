@@ -19,14 +19,15 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package shard derives a deterministic shard seed from stable host
-// identity. Matches Ohai's shard plugin: concatenate machinename +
-// DMI serial + DMI uuid, MD5 hash, take the first 7 hex chars as an
-// integer. The same host always maps to the same bucket.
+// identity: concatenate machinename + DMI serial + DMI uuid, hash it
+// with SHA-256, and take the first 7 hex chars as an integer. The same
+// host always maps to the same bucket. Ohai's shard plugin uses MD5,
+// which is not a FIPS 140-3 approved algorithm, so the seeds differ
+// from Ohai's.
 package shard
 
 import (
-	// MD5 is Ohai's hash for the shard seed, not a security use.
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"strconv"
 	"strings"
@@ -136,14 +137,13 @@ func chSerial(c *dmi.Chassis) string {
 	return c.SerialNumber
 }
 
-// computeSeed matches Ohai's shard algorithm: concatenate sources
-// (no separator), MD5 hash, first 7 hex chars interpreted as base-16
-// integer.
+// computeSeed concatenates the sources (no separator), hashes them
+// with SHA-256, and reads the first 7 hex chars as a base-16 integer.
 func computeSeed(
 	machinename, serial, uuid string,
 ) int {
 	data := machinename + serial + uuid
-	h := md5.Sum([]byte(data))
+	h := sha256.Sum256([]byte(data))
 	hex := fmt.Sprintf("%x", h)
 	val, _ := strconv.ParseInt(hex[:7], 16, 64)
 	return int(val)

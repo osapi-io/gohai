@@ -4697,9 +4697,6 @@
         "fingerprint_sha256": {
           "type": "string"
         },
-        "fingerprint_md5": {
-          "type": "string"
-        },
         "key_length": {
           "type": "integer"
         }
@@ -4709,7 +4706,6 @@
       "required": [
         "type",
         "fingerprint_sha256",
-        "fingerprint_md5",
         "key_length"
       ]
     },

@@ -78,7 +78,7 @@ ______________________________________________________________________
 | machine_id            | ID                | `id`                 | T1   | `id`                 | no       | OCSF `device.uid`, unique device identifier; OTel `host.id` is also a match                     | [OCSF device](https://schema.ocsf.io/1.8.0/objects/device)                                         |
 | root_group            | Name              | `name`               | T3   | `name`               | no       | No OCSF/OTel equivalent, root user's primary group name                                         | Convention, Go standard library `os/user`                                                          |
 | shells                | Paths             | `paths`              | T3   | `paths`              | no       | No OCSF/OTel equivalent, valid login shell paths from /etc/shells                               | Convention, /etc/shells                                                                            |
-| shard                 | Seed              | `seed`               | T3   | `seed`               | no       | No OCSF/OTel equivalent, deterministic shard seed (MD5-based)                                   | Convention, Ohai shard algorithm                                                                   |
+| shard                 | Seed              | `seed`               | T3   | `seed`               | no       | No OCSF/OTel equivalent, deterministic shard seed (SHA-256)                                     | Convention, Ohai shard algorithm                                                                   |
 
 ## Hardware collectors
 
@@ -950,7 +950,6 @@ ______________________________________________________________________
 | ssh                      | Keys                   | `keys`                      | T3   | `keys`                      | no       | No OCSF/OTel equivalent, SSH host key list                   | Convention, /etc/ssh/\*.pub         |
 | ssh.key                  | Type                   | `type`                      | T3   | `type`                      | no       | No OCSF/OTel equivalent, key algorithm                       | Convention, SSH public key field    |
 | ssh.key                  | FingerprintSHA256      | `fingerprint_sha256`        | T3   | `fingerprint_sha256`        | no       | No OCSF/OTel equivalent, SHA-256 fingerprint                 | Convention, ssh-keygen -E sha256    |
-| ssh.key                  | FingerprintMD5         | `fingerprint_md5`           | T3   | `fingerprint_md5`           | no       | No OCSF/OTel equivalent, MD5 fingerprint                     | Convention, ssh-keygen -E md5       |
 | ssh.key                  | KeyLength              | `key_length`                | T3   | `key_length`                | no       | No OCSF/OTel equivalent, key length in bits                  | Convention, SSH key spec            |
 | ssh                      | AuthorizedKeys         | `authorized_keys`           | T3   | `authorized_keys`           | no       | No OCSF/OTel equivalent, keys of each user's authorized_keys | Convention, OpenSSH file name       |
 | ssh.authorized_keys.\*[] | Type                   | `type`                      | T3   | `type`                      | no       | No OCSF/OTel equivalent, key algorithm                       | Convention, OpenSSH key type        |

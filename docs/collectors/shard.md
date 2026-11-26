@@ -5,10 +5,10 @@
 ## Description
 
 The collector calculates a deterministic shard seed from the stable identity of
-the host. The algorithm is the same as in Ohai's `shard` plugin:
+the host. The algorithm is the same as Ohai's `shard` plugin in FIPS mode:
 
 1. Join `machinename + DMI serial + DMI uuid`.
-2. Make the MD5 hash of the result.
+2. Make the SHA-256 hash of the result.
 3. Read the first 7 hex characters as a base-16 integer.
 
 The same host always gets the same bucket. Different hosts spread evenly across
@@ -24,9 +24,9 @@ Consumers use this data to:
 
 ## Collected fields
 
-| Field  | Type  | Description                                                                                                                                                         | Schema mapping                                                  |
-| ------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `seed` | `int` | The first 7 hex characters of MD5(`machinename + serial + uuid`), read as a base-16 integer. It does not change across reboots if the DMI identity does not change. | No direct schema mapping. Shard is a gohai and Ohai convention. |
+| Field  | Type  | Description                                                                                                                                                             | Schema mapping                                                  |
+| ------ | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `seed` | `int` | The first 7 hex characters of SHA-256(`machinename + serial + uuid`), read as a base-16 integer. It does not change across reboots if the DMI identity does not change. | No direct schema mapping. Shard is a gohai and Ohai convention. |
 
 ## Platform support
 
@@ -82,7 +82,7 @@ On Linux:
    is the same as the fallback chain of Ohai's `get_dmi_property` (system →
    base_board → chassis).
 3. The collector reads `uuid` from `dmi.Info.Product.UUID`.
-4. The collector joins the three strings with no separator and makes the MD5
+4. The collector joins the three strings with no separator and makes the SHA-256
    hash. It reads the first 7 hex characters of the digest as a base-16 integer.
    This is the same as Ohai's `hexdigest(data)[0...7].to_i(16)`.
 
@@ -97,18 +97,20 @@ On macOS:
 3. `uuid` is the `IOPlatformUUID` line of
    `ioreg -rd1 -c IOPlatformExpertDevice`. This is the same as Ohai's
    `hardware["platform_UUID"]`. If there is an error, uuid stays empty.
-4. The collector does the same MD5 → 7 hex characters → integer calculation as
-   on Linux.
+4. The collector does the same SHA-256 → 7 hex characters → integer calculation
+   as on Linux.
 
-The algorithm is the same as Ohai's `shard.rb`. It uses the same default sources
-(`machinename`, `serial`, `uuid`) and gives the same MD5 → integer output. gohai
-does not have two features of Ohai. It cannot configure `[:sources]` for each
-plugin. It does not select the digest for FIPS (SHA-256 under FIPS). gohai can
-add them if a consumer needs them.
+The algorithm is the same as Ohai's `shard.rb` in FIPS mode. It uses the same
+default sources (`machinename`, `serial`, `uuid`) and the same SHA-256 → integer
+output. Ohai uses MD5 when FIPS is off, so the seed of a host differs from
+Ohai's seed there. gohai always uses SHA-256, because MD5 is not a FIPS 140-3
+approved algorithm, and osapi's agent embeds gohai in FIPS 140-3 mode. gohai
+cannot configure `[:sources]` for each plugin, as Ohai can. gohai can add it if
+a consumer needs it.
 
 ## Backing library
 
-- The Go standard library (`crypto/md5`, `fmt`, `strconv`) to calculate the
+- The Go standard library (`crypto/sha256`, `fmt`, `strconv`) to calculate the
   hash.
 - [`source.Runner`](../../pkg/gohai/source) to run `system_profiler` and `ioreg`
   on macOS.
