@@ -35,7 +35,7 @@ fetch:
 
 # The checks of `just test`, which CI also reads (`just go-ci-checks`): a check
 # added here runs on a laptop and in CI, with no change to the workflow.
-go_slow_checks := "go-fmt-check go-vet go-generate-check"
+go_slow_checks := "go-fmt-check go-vet go-generate-check go-dead-check"
 
 # Fail when what go generate writes is not what is committed
 #
