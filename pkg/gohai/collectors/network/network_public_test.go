@@ -284,6 +284,37 @@ func ipRouteAndIPLinkExec(
 	return m
 }
 
+// ethtoolOnlyFor answers `ethtool -i` for name, and fails the test for an
+// ethtool run on any other interface.
+func ethtoolOnlyFor(
+	t *testing.T,
+	name string,
+) source.Runner {
+	ctrl := gomock.NewController(t)
+	m := sourcemocks.NewMockRunner(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-d", "link").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			if args[1] != name {
+				t.Errorf("ethtool ran for %s", args[1])
+			}
+			if args[0] == "-i" {
+				return []byte("driver: igb\n"), nil
+			}
+			return nil, errors.New("ethtool: not supported")
+		}).
+		AnyTimes()
+	return m
+}
+
 // ipRouteAndEthtoolExec extends ipRouteExec with a canned `ethtool -i
 // <iface>` response. driverInfo maps interface name → ethtool stdout;
 // missing interfaces fall back to the "not found" error. Other
@@ -548,8 +579,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: fsWith(s.T(), map[string]string{
-				"/sys/class/net/lo/type":   "772\n", // Loopback
-				"/sys/class/net/eth0/type": "1\n",   // Ethernet
+				"/sys/class/net/lo/type":            "772\n", // Loopback
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n", // Ethernet
 			}),
 			exec: ipRouteAndEthtoolExec(s.T(), map[string]string{
 				"eth0": "driver: e1000e\n" +
@@ -581,11 +613,45 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name: "linux: ethtool skips a virtual interface, which no device backs",
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
+					{
+						Index: 2,
+						Name:  "eth0", MTU: 1500, MAC: "02:42:ac:11:00:02",
+						Flags: []string{"up", "broadcast", "multicast"},
+					},
+					{
+						Index: 3,
+						Name:  "veth0", MTU: 1500, MAC: "02:42:ac:11:00:03",
+						Flags: []string{"up", "broadcast", "multicast"},
+					},
+				}, nil
+			},
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=igb\n",
+				"/sys/class/net/veth0/type":         "1\n",
+			}),
+			exec: ethtoolOnlyFor(s.T(), "eth0"),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 2)
+				s.Require().NotNil(i.Interfaces[0].Ethtool)
+				s.Equal("igb", i.Interfaces[0].Ethtool.DriverInfo["driver"])
+				s.Nil(i.Interfaces[1].Ethtool)
+			},
+		},
+		{
 			name:       "linux: ethtool -i error skipped silently, Ethtool stays nil",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: fsWith(s.T(), map[string]string{
-				"/sys/class/net/eth0/type": "1\n",
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
 			exec: ipRouteAndEthtoolExec(s.T(), nil),
 			validateFunc: func(got any, err error) {
@@ -602,7 +668,8 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: fsWith(s.T(), map[string]string{
-				"/sys/class/net/eth0/type": "1\n",
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
 			exec: ipRouteAndEthtoolExec(s.T(), map[string]string{
 				// whitespace-only lines + a colon-only line — exercises both
@@ -621,7 +688,8 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: fsWith(s.T(), map[string]string{
-				"/sys/class/net/eth0/type": "1\n",
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
 			exec: ipRouteAndEthtoolFullExec(s.T(),
 				map[string]string{"eth0": "driver: igb\n"},
@@ -701,7 +769,8 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: fsWith(s.T(), map[string]string{
-				"/sys/class/net/eth0/type": "1\n",
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
 			exec: ipRouteAndEthtoolFullExec(
 				s.T(),
