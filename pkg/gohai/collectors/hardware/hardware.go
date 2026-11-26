@@ -125,10 +125,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "hardware" }
-func (base) Category() string       { return collector.CategoryHardware }
-func (base) DefaultEnabled() bool   { return false }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "hardware" }
+func (base) Category() collector.Category { return collector.CategoryHardware }
+func (base) DefaultEnabled() bool         { return false }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the hardware variant for the host OS. Linux returns an
 // empty Info — this collector is Darwin-only, matching Ohai.

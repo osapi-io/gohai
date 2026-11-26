@@ -134,7 +134,7 @@ func (s *AlibabaPublicTestSuite) TestInterface() {
 		},
 		{
 			name: "Category",
-			got:  c.Category(),
+			got:  string(c.Category()),
 			validateFunc: func(got any) {
 				s.Equal("cloud", got)
 			},

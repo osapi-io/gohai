@@ -55,10 +55,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "kernel" }
-func (base) Category() string       { return collector.CategorySystem }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "kernel" }
+func (base) Category() collector.Category { return collector.CategorySystem }
+func (base) DefaultEnabled() bool         { return true }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the kernel variant for the host OS.
 func New() Collector {

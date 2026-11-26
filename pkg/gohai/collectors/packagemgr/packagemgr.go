@@ -48,10 +48,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "package_mgr" }
-func (base) Category() string       { return collector.CategorySoftware }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "package_mgr" }
+func (base) Category() collector.Category { return collector.CategorySoftware }
+func (base) DefaultEnabled() bool         { return true }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the package_mgr variant for the host OS. The distro
 // family drives the variant: Debian → apt; RHEL, Fedora and Amazon →

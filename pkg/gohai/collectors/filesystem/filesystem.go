@@ -151,10 +151,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "filesystem" }
-func (base) Category() string       { return collector.CategoryHardware }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "filesystem" }
+func (base) Category() collector.Category { return collector.CategoryHardware }
+func (base) DefaultEnabled() bool         { return true }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the filesystem variant for the host OS.
 func New() Collector {

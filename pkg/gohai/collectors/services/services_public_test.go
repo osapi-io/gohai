@@ -164,7 +164,7 @@ func (s *ServicesPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := services.New()
 			s.Equal("services", c.Name())
-			s.Equal("software", c.Category())
+			s.Equal("software", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

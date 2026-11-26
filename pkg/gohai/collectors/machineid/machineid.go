@@ -38,10 +38,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "machine_id" }
-func (base) Category() string       { return collector.CategorySystem }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "machine_id" }
+func (base) Category() collector.Category { return collector.CategorySystem }
+func (base) DefaultEnabled() bool         { return true }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the machine_id variant appropriate for the detected host.
 // Linux and Darwin have substantially different sources of truth, so

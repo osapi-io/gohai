@@ -49,7 +49,7 @@ type base struct{}
 func (base) Name() string { return "root_group" }
 
 // Category returns "system".
-func (base) Category() string { return collector.CategorySystem }
+func (base) Category() collector.Category { return collector.CategorySystem }
 
 // DefaultEnabled returns true — root_group is on by default.
 func (base) DefaultEnabled() bool { return true }

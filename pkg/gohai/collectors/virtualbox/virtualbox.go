@@ -57,7 +57,7 @@ type base struct{}
 func (base) Name() string { return "virtualbox" }
 
 // Category returns "virtualization".
-func (base) Category() string { return collector.CategoryVirtualization }
+func (base) Category() collector.Category { return collector.CategoryVirtualization }
 
 // DefaultEnabled returns false — virtualbox is opt-in only.
 func (base) DefaultEnabled() bool { return false }

@@ -65,7 +65,7 @@ type base struct{}
 func (base) Name() string { return "vmware" }
 
 // Category returns "virtualization".
-func (base) Category() string { return collector.CategoryVirtualization }
+func (base) Category() collector.Category { return collector.CategoryVirtualization }
 
 // DefaultEnabled returns false — vmware is opt-in only.
 func (base) DefaultEnabled() bool { return false }

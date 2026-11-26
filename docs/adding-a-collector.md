@@ -153,12 +153,9 @@ func builtinCollectors(src source.Sources) []collector.Collector {
 
 Add the related `Facts` field and `set()` switch case in `pkg/gohai/facts.go`.
 
-**This step can fail and show no error.** `registerBuiltins` discards the error
-from each `Register` call, and no test examines it. Thus a duplicate name
-removes a collector, and nothing reports it. The
-[registration limitation](https://github.com/osapi-io/specs/blob/main/components/gohai/README.md#known-limitations)
-gives the details. Before you open the pull request, make sure that
-`NewRegistry().Names()` contains your collector.
+`registerBuiltins` panics when a `Register` call fails, such as on a duplicate
+name. `TestBuiltinCollectorsSetFacts` in `pkg/gohai` fails when your collector
+has no `Facts` field of its name, or when `set()` has no case for it.
 
 ## Step 5: tests (100% coverage, one test file)
 

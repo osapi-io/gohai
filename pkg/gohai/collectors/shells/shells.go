@@ -54,7 +54,7 @@ type base struct{}
 func (base) Name() string { return "shells" }
 
 // Category returns "system".
-func (base) Category() string { return collector.CategorySystem }
+func (base) Category() collector.Category { return collector.CategorySystem }
 
 // DefaultEnabled returns true — shells is on by default.
 func (base) DefaultEnabled() bool { return true }

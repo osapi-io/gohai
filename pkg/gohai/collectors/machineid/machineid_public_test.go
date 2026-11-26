@@ -103,7 +103,7 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := machineid.New()
 			s.Equal("machine_id", c.Name())
-			s.Equal("system", c.Category())
+			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

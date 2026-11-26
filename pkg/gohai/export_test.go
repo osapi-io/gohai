@@ -58,3 +58,16 @@ var JSONName = jsonName
 // BuiltinCollectors exposes the built-in collectors, built from src, so a
 // test can check that each one takes src.
 var BuiltinCollectors = builtinCollectors
+
+// RegisterBuiltins exposes registerBuiltins, so a test can register the
+// built-in collectors twice.
+var RegisterBuiltins = registerBuiltins
+
+// Set exposes Facts.set, so a test can check that each built-in collector's
+// result reaches its field.
+func (f *Facts) Set(
+	name string,
+	result any,
+) {
+	f.set(name, result)
+}

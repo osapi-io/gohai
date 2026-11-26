@@ -94,7 +94,7 @@ type base struct{}
 func (base) Name() string { return "dmi" }
 
 // Category returns "hardware".
-func (base) Category() string { return collector.CategoryHardware }
+func (base) Category() collector.Category { return collector.CategoryHardware }
 
 // DefaultEnabled returns false — dmi is opt-in. Cloud collectors
 // declare it as a dependency so enabling any cloud collector pulls

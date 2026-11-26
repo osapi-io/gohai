@@ -58,7 +58,7 @@ type base struct{}
 func (base) Name() string { return "dns" }
 
 // Category is the collector's category.
-func (base) Category() string { return collector.CategoryNetwork }
+func (base) Category() collector.Category { return collector.CategoryNetwork }
 
 // DefaultEnabled is false: most callers do not need it.
 func (base) DefaultEnabled() bool { return false }

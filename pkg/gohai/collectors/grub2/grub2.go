@@ -70,7 +70,7 @@ type base struct{}
 func (base) Name() string { return "grub2" }
 
 // Category returns "linux".
-func (base) Category() string { return collector.CategoryLinux }
+func (base) Category() collector.Category { return collector.CategoryLinux }
 
 // DefaultEnabled returns false — grub2 is opt-in.
 func (base) DefaultEnabled() bool { return false }

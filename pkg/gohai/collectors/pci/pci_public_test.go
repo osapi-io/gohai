@@ -86,7 +86,7 @@ func (s *PCIPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := pci.New()
 			s.Equal("pci", c.Name())
-			s.Equal("hardware", c.Category())
+			s.Equal("hardware", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

@@ -120,7 +120,7 @@ func (s *LSBPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := lsb.New()
 			s.Equal("lsb", c.Name())
-			s.Equal("linux", c.Category())
+			s.Equal("linux", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

@@ -48,7 +48,7 @@ func (p *PublicRegistry) Names() []string {
 func (p *PublicRegistry) NamesInCategory(
 	cat string,
 ) []string {
-	return p.reg.NamesInCategory(cat)
+	return p.reg.NamesInCategory(collector.Category(cat))
 }
 
 // CategoryOf returns the collector's category, or empty string when
@@ -61,5 +61,5 @@ func (p *PublicRegistry) CategoryOf(
 	if !ok {
 		return ""
 	}
-	return c.Category()
+	return string(c.Category())
 }

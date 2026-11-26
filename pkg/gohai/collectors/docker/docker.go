@@ -109,7 +109,7 @@ type base struct{}
 func (base) Name() string { return "docker" }
 
 // Category returns "software".
-func (base) Category() string { return collector.CategorySoftware }
+func (base) Category() collector.Category { return collector.CategorySoftware }
 
 // DefaultEnabled returns false — docker may not be present on the host.
 func (base) DefaultEnabled() bool { return false }

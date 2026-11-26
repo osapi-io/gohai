@@ -48,10 +48,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "command" }
-func (base) Category() string       { return collector.CategoryMisc }
-func (base) DefaultEnabled() bool   { return false }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "command" }
+func (base) Category() collector.Category { return collector.CategoryMisc }
+func (base) DefaultEnabled() bool         { return false }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the command variant for the host OS.
 func New() Collector {

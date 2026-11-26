@@ -64,7 +64,7 @@ type base struct{}
 func (base) Name() string { return "services" }
 
 // Category returns "software".
-func (base) Category() string { return collector.CategorySoftware }
+func (base) Category() collector.Category { return collector.CategorySoftware }
 
 // DefaultEnabled returns false — full service list can be large.
 func (base) DefaultEnabled() bool { return false }

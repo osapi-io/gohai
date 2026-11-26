@@ -71,8 +71,8 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string     { return "process" }
-func (base) Category() string { return collector.CategoryMisc }
+func (base) Name() string                 { return "process" }
+func (base) Category() collector.Category { return collector.CategoryMisc }
 
 // DefaultEnabled is false: process enumeration scales with process
 // count and isn't useful on every invocation. Opt in via

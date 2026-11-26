@@ -111,7 +111,7 @@ func (s *ShardPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := shard.New()
 			s.Equal("shard", c.Name())
-			s.Equal("system", c.Category())
+			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Equal([]string{"hostname", "dmi"}, c.Dependencies())
 			tt.validateFunc(c)

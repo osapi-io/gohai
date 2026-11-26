@@ -76,7 +76,7 @@ type base struct{}
 func (base) Name() string { return "selinux" }
 
 // Category returns "security".
-func (base) Category() string { return collector.CategorySecurity }
+func (base) Category() collector.Category { return collector.CategorySecurity }
 
 // DefaultEnabled returns false — SELinux collection is opt-in.
 func (base) DefaultEnabled() bool { return false }

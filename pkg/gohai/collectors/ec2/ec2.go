@@ -313,7 +313,7 @@ func NewWithClient(
 func (*Collector) Name() string { return "ec2" }
 
 // Category returns "cloud".
-func (*Collector) Category() string { return collector.CategoryCloud }
+func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false — cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }

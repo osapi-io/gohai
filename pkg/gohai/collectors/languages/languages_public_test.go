@@ -205,7 +205,7 @@ func (s *LanguagesPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := languages.New()
 			s.Equal("languages", c.Name())
-			s.Equal("software", c.Category())
+			s.Equal("software", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

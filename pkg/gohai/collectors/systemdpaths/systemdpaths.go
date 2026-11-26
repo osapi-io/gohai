@@ -47,10 +47,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "systemd_paths" }
-func (base) Category() string       { return collector.CategoryLinux }
-func (base) DefaultEnabled() bool   { return false }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "systemd_paths" }
+func (base) Category() collector.Category { return collector.CategoryLinux }
+func (base) DefaultEnabled() bool         { return false }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the systemd_paths variant for the host OS.
 func New() Collector {

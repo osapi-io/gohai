@@ -175,7 +175,7 @@ func (s *LibvirtPublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := libvirt.New()
 			s.Equal("libvirt", c.Name())
-			s.Equal("virtualization", c.Category())
+			s.Equal("virtualization", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

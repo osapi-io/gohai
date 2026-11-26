@@ -129,7 +129,7 @@ func (s *HostnamePublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := hostname.New()
 			s.Equal("hostname", c.Name())
-			s.Equal("system", c.Category())
+			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)

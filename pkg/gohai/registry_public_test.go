@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -93,6 +94,43 @@ func (s *RegistryPublicTestSuite) TestBuiltinCollectorsTakeSources() {
 			}
 		}
 	}
+}
+
+// TestBuiltinCollectorsSetFacts checks that each built-in collector has a
+// Facts field of its name, and that Facts.set puts its result there. A
+// collector that is registered but missing from the switch of Facts.set
+// would lose its data with no signal.
+func (s *RegistryPublicTestSuite) TestBuiltinCollectorsSetFacts() {
+	ft := reflect.TypeFor[gohai.Facts]()
+	byName := map[string]reflect.StructField{}
+	for i := range ft.NumField() {
+		f := ft.Field(i)
+		byName[gohai.JSONName(f)] = f
+	}
+	for _, c := range gohai.BuiltinCollectors(source.Sources{Family: family.Debian, FS: memfs.New()}) {
+		field, ok := byName[c.Name()]
+		if !s.True(ok, "gohai.Facts has no field named %s", c.Name()) {
+			continue
+		}
+		s.Require().Equal(reflect.Pointer, field.Type.Kind(), c.Name())
+		result := reflect.New(field.Type.Elem())
+		facts := &gohai.Facts{}
+		facts.Set(c.Name(), result.Interface())
+		s.Equal(result.Pointer(), reflect.ValueOf(facts).Elem().FieldByIndex(field.Index).Pointer(),
+			"Facts.set puts the result of %s in its field", c.Name())
+	}
+}
+
+// TestRegisterBuiltinsPanicsOnADuplicate checks that a registration error
+// of a built-in collector is not dropped.
+func (s *RegistryPublicTestSuite) TestRegisterBuiltinsPanicsOnADuplicate() {
+	reg := collector.NewRegistry()
+	src := source.Sources{Family: family.Debian, FS: memfs.New()}
+	gohai.RegisterBuiltins(reg, src)
+	s.PanicsWithValue(
+		`gohai: register built-in collector "platform": collector "platform" already registered`,
+		func() { gohai.RegisterBuiltins(reg, src) },
+	)
 }
 
 func (s *RegistryPublicTestSuite) TestNewRegistry() {

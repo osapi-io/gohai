@@ -57,7 +57,7 @@ func (s *RegistryPublicTestSuite) SetupTest() {
 func newCollector(
 	ctrl *gomock.Controller,
 	name string,
-	category string,
+	category collector.Category,
 	defaultEnabled bool,
 	deps ...string,
 ) *mocks.MockCollector {
@@ -95,7 +95,7 @@ func newCollectorWith(
 
 	m := mocks.NewMockCollector(ctrl)
 	m.EXPECT().Name().Return(name).AnyTimes()
-	m.EXPECT().Category().Return("misc").AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
 	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
 	m.EXPECT().Dependencies().Return(deps).AnyTimes()
 
@@ -115,7 +115,7 @@ func newFailingCollector(
 
 	m := mocks.NewMockCollector(ctrl)
 	m.EXPECT().Name().Return(name).AnyTimes()
-	m.EXPECT().Category().Return("misc").AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
 	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
 	m.EXPECT().Dependencies().Return(deps).AnyTimes()
 	m.EXPECT().
@@ -225,7 +225,7 @@ func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 
 	tests := []struct {
 		name         string
-		category     string
+		category     collector.Category
 		validateFunc func([]string)
 	}{
 		{
@@ -405,7 +405,7 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 			s.Require().
 				NoError(reg.Register(newCollector(s.ctrl, "opt", "", false)))
 
-			tt.validateFunc(reg.Selected(tt.enable, tt.disable))
+			tt.validateFunc(reg.SelectedWith(true, tt.enable, tt.disable))
 		})
 	}
 }

@@ -47,10 +47,10 @@ type Collector interface {
 
 type base struct{}
 
-func (base) Name() string           { return "load" }
-func (base) Category() string       { return collector.CategoryMisc }
-func (base) DefaultEnabled() bool   { return true }
-func (base) Dependencies() []string { return nil }
+func (base) Name() string                 { return "load" }
+func (base) Category() collector.Category { return collector.CategoryMisc }
+func (base) DefaultEnabled() bool         { return true }
+func (base) Dependencies() []string       { return nil }
 
 // New returns the load collector variant for the host OS: Linux reads
 // /proc/loadavg, and macOS runs sysctl -n vm.loadavg, as Ohai does.

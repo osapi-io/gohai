@@ -63,7 +63,7 @@ type base struct{}
 func (base) Name() string { return "tc" }
 
 // Category returns "linux".
-func (base) Category() string { return collector.CategoryLinux }
+func (base) Category() collector.Category { return collector.CategoryLinux }
 
 // DefaultEnabled returns false — tc requires iproute2 and is
 // Linux-specific.

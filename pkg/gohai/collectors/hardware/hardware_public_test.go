@@ -206,7 +206,7 @@ func (s *HardwarePublicTestSuite) TestNew() {
 			platform.Detect = func() string { return tt.detect }
 			c := hardware.New()
 			s.Equal("hardware", c.Name())
-			s.Equal("hardware", c.Category())
+			s.Equal("hardware", string(c.Category()))
 			s.False(c.DefaultEnabled())
 			s.Empty(c.Dependencies())
 			tt.validateFunc(c)
