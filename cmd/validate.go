@@ -21,7 +21,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -52,7 +51,7 @@ Examples:
 			c *cobra.Command,
 			_ []string,
 		) error {
-			return runValidate(c.Context(), c.OutOrStdout(), c.ErrOrStderr(), file)
+			return runValidate(c.InOrStdin(), c.OutOrStdout(), c.ErrOrStderr(), file)
 		},
 	}
 
@@ -62,11 +61,11 @@ Examples:
 }
 
 func runValidate(
-	_ context.Context,
+	in io.Reader,
 	out, errOut io.Writer,
 	file string,
 ) error {
-	input, err := readInput(file)
+	input, err := readInput(in, file)
 	if err != nil {
 		return err
 	}
@@ -85,7 +84,10 @@ func runValidate(
 	return nil
 }
 
+// readInput is the JSON of file, or of in when file is empty. A terminal
+// on in is no input: the user ran gohai validate with nothing piped.
 func readInput(
+	in io.Reader,
 	file string,
 ) ([]byte, error) {
 	if file != "" {
@@ -97,12 +99,13 @@ func readInput(
 		return data, nil
 	}
 
-	info, err := os.Stdin.Stat()
-	if err == nil && info.Mode()&os.ModeCharDevice != 0 {
-		return nil, fmt.Errorf("no input: pass --file or pipe JSON to stdin")
+	if f, ok := in.(*os.File); ok {
+		if info, err := f.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+			return nil, fmt.Errorf("no input: pass --file or pipe JSON to stdin")
+		}
 	}
 
-	data, err := io.ReadAll(os.Stdin)
+	data, err := io.ReadAll(in)
 	if err != nil {
 		return nil, fmt.Errorf("read stdin: %w", err)
 	}

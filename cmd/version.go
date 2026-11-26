@@ -72,13 +72,7 @@ func newVersionCommand() *cobra.Command {
 			c *cobra.Command,
 			_ []string,
 		) error {
-			v := buildVersion()
-			jsonOut, err := v.JSONString()
-			if err != nil {
-				return fmt.Errorf("render version JSON: %w", err)
-			}
-
-			if _, err := fmt.Fprintln(c.OutOrStdout(), jsonOut); err != nil {
+			if err := writeJSON(c.OutOrStdout(), buildVersion()); err != nil {
 				return fmt.Errorf("write version: %w", err)
 			}
 

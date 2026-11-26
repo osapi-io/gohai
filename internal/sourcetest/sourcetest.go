@@ -35,6 +35,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -48,12 +49,8 @@ func FS(
 	t.Helper()
 	fs := memfs.New()
 	for path, content := range files {
-		if err := fs.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := fs.WriteFile(path, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, fs.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, fs.WriteFile(path, []byte(content), 0o644))
 	}
 
 	return fs
@@ -110,12 +107,8 @@ func Links(
 	sort.Strings(paths)
 	for _, path := range paths {
 		target := links[path]
-		if err := fs.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := fs.Symlink(target, path); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, fs.MkdirAll(filepath.Dir(path), 0o755))
+		require.NoError(t, fs.Symlink(target, path))
 	}
 
 	return fs

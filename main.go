@@ -21,8 +21,18 @@
 // Command gohai collects system facts and prints them as JSON.
 package main
 
-import "github.com/osapi-io/gohai/cmd"
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/osapi-io/gohai/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code := cmd.Execute(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	stop()
+	os.Exit(code)
 }

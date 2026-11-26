@@ -1,6 +1,4 @@
-/cmd/
 /examples/
 /gen/
-main.go
+^github.com/osapi-io/gohai/main.go:
 /mocks/
-/sourcetest/

@@ -322,6 +322,12 @@ just go-unit-cov-check   # Report coverage and fail below the target
 `.github/codecov.yml` and the shared `go` justfile module both declare the
 target. Change the two together.
 
+`.coverignore` leaves out only code that no test is for: the generated mocks and
+`schemas/gen`, the examples, and the root `main.go`. `main.go` gives the
+process's arguments, streams and signals to `cmd.Execute`, which the tests of
+`cmd` run. The `main.go` line is anchored to the root, so that a file named
+`main.go` in a package is counted.
+
 ### Test file conventions
 
 - Public tests: `*_public_test.go`, in the `_test` package of the package. They
