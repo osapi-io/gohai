@@ -82,6 +82,26 @@ func newCollector(
 	return m
 }
 
+// newCollectorWith is a Collector mock with the given identity and no
+// Collect, which the test sets.
+func newCollectorWith(
+	ctrl *gomock.Controller,
+	name string,
+	deps ...string,
+) *mocks.MockCollector {
+	if len(deps) == 0 {
+		deps = nil
+	}
+
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return("misc").AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
+	m.EXPECT().Dependencies().Return(deps).AnyTimes()
+
+	return m
+}
+
 // newFailingCollector is newCollector with Collect returning err.
 func newFailingCollector(
 	ctrl *gomock.Controller,
@@ -391,13 +411,15 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 }
 
 func (s *RegistryPublicTestSuite) TestRun() {
-	tests := []struct {
+	type runCase struct {
 		name         string
+		ctx          context.Context
 		setup        func(reg *collector.Registry)
 		names        []string
 		hooks        func(mu *sync.Mutex, onErr *[]string, onComp *[]string) collector.Hooks
 		validateFunc func(map[string]any, []string, []string, error)
-	}{
+	}
+	tests := []runCase{
 		{
 			name: "orders by dependency",
 			setup: func(reg *collector.Registry) {
@@ -468,6 +490,79 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.Require().NoError(err)
 				s.Contains(results, "good")
 				s.Contains(errNames, "bad")
+			},
+		},
+		{
+			name: "a panic in a collector is its error, and the others run",
+			setup: func(reg *collector.Registry) {
+				bad := newCollectorWith(s.ctrl, "bad")
+				bad.EXPECT().
+					Collect(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(context.Context, collector.PriorResults) (any, error) {
+						panic("index out of range")
+					})
+				s.Require().NoError(reg.Register(bad))
+				s.Require().
+					NoError(reg.Register(newCollector(s.ctrl, "good", "", true)))
+			},
+			names: []string{"bad", "good"},
+			hooks: func(mu *sync.Mutex, onErr *[]string, _ *[]string) collector.Hooks {
+				return collector.Hooks{
+					OnError: func(_ string, err error) {
+						mu.Lock()
+						defer mu.Unlock()
+						*onErr = append(*onErr, err.Error())
+					},
+				}
+			},
+			validateFunc: func(results map[string]any, errs, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Contains(results, "good")
+				s.NotContains(results, "bad")
+				s.Equal([]string{"collector bad panicked: index out of range"}, errs)
+			},
+		},
+		func() runCase {
+			ctx, cancel := context.WithCancel(context.Background())
+
+			return runCase{
+				name: "a cancelled run starts no next level",
+				ctx:  ctx,
+				setup: func(reg *collector.Registry) {
+					a := newCollectorWith(s.ctrl, "a")
+					a.EXPECT().
+						Collect(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(context.Context, collector.PriorResults) (any, error) {
+							cancel()
+
+							return "a-result", nil
+						})
+					b := newCollectorWith(s.ctrl, "b", "a")
+					b.EXPECT().Collect(gomock.Any(), gomock.Any()).Times(0)
+					s.Require().NoError(reg.Register(a))
+					s.Require().NoError(reg.Register(b))
+				},
+				names: []string{"b"},
+				validateFunc: func(_ map[string]any, _, _ []string, err error) {
+					s.ErrorIs(err, context.Canceled)
+				},
+			}
+		}(),
+		{
+			name: "a collector can register while the run goes on",
+			setup: func(reg *collector.Registry) {
+				a := newCollectorWith(s.ctrl, "a")
+				a.EXPECT().
+					Collect(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(context.Context, collector.PriorResults) (any, error) {
+						return "a-result", reg.Register(newCollector(s.ctrl, "late", "", true))
+					})
+				s.Require().NoError(reg.Register(a))
+			},
+			names: []string{"a"},
+			validateFunc: func(results map[string]any, _, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Equal("a-result", results["a"])
 			},
 		},
 		{
@@ -549,7 +644,11 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			if tt.hooks != nil {
 				hooks = tt.hooks(&mu, &errNames, &completeNames)
 			}
-			results, err := reg.Run(context.Background(), tt.names, hooks)
+			ctx := tt.ctx
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			results, err := reg.Run(ctx, tt.names, hooks)
 
 			mu.Lock()
 			defer mu.Unlock()

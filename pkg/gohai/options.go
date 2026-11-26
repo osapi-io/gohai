@@ -68,7 +68,8 @@ func WithEnabled(
 }
 
 // WithDisabled explicitly disables one or more collectors. Subtracts
-// from the WithDefaults / WithEnabled set.
+// from the WithDefaults / WithEnabled set. New refuses it with
+// WithCollectors.
 func WithDisabled(
 	names ...string,
 ) Option {
@@ -76,7 +77,8 @@ func WithDisabled(
 }
 
 // WithCollectors restricts collection to ONLY the named collectors and
-// their dependencies. Overrides any default-set selection.
+// their dependencies. Overrides any default-set selection. New refuses it
+// with WithDisabled.
 func WithCollectors(
 	names ...string,
 ) Option {

@@ -165,11 +165,14 @@ type Facts struct {
 	CollectTime     time.Time     `json:"collect_time"`
 	CollectDuration time.Duration `json:"collect_duration_ns"`
 
+	// Errors is the error of each collector that failed, by its name. A
+	// failed collector has no typed field above, the same as one that was
+	// not selected, so this is how a caller tells the two apart.
+	Errors map[string]string `json:"_errors,omitempty"`
+
 	// Timings is populated only when the Gohai instance was built with
 	// WithTimings(). Contains per-collector wall-clock durations, status
-	// ("ok" / "err"), and — for failed collectors — the error message.
-	// Failed collectors are dropped from the typed fields above; their
-	// entry here is how the failure surfaces.
+	// ("ok" / "err"), and the error message of a failed collector.
 	Timings *Timings `json:"_timings,omitempty"`
 }
 

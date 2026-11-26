@@ -125,9 +125,10 @@ func New(
 
 // Collect runs all selected collectors and returns Facts. Each collector's
 // typed result is written to the matching field on Facts; collectors that
-// error or aren't selected leave their field nil. When the instance was
-// built with WithTimings, per-collector durations and error messages are
-// embedded in Facts.Timings.
+// error or aren't selected leave their field nil, and Facts.Errors has the
+// error of each that failed. A cancelled ctx is an error. When the instance
+// was built with WithTimings, per-collector durations are embedded in
+// Facts.Timings.
 func (g *Gohai) Collect(
 	ctx context.Context,
 ) (*Facts, error) {
@@ -140,8 +141,19 @@ func (g *Gohai) Collect(
 	var (
 		samplesMu sync.Mutex
 		samples   map[string]CollectorTiming
+		errorsMu  sync.Mutex
+		errs      map[string]string
 	)
-	hooks := collector.Hooks{}
+	hooks := collector.Hooks{
+		OnError: func(name string, err error) {
+			errorsMu.Lock()
+			defer errorsMu.Unlock()
+			if errs == nil {
+				errs = make(map[string]string)
+			}
+			errs[name] = err.Error()
+		},
+	}
 	if g.withTimings {
 		samples = make(map[string]CollectorTiming, len(names))
 		hooks.OnComplete = func(name string, dur time.Duration, err error) {
@@ -167,6 +179,7 @@ func (g *Gohai) Collect(
 	facts := &Facts{
 		CollectTime:     start,
 		CollectDuration: time.Since(start),
+		Errors:          errs,
 	}
 	if g.withTimings {
 		facts.Timings = &Timings{Collectors: samples}
@@ -181,8 +194,14 @@ func selectCollectors(
 	reg *collector.Registry,
 	cfg config,
 ) ([]collector.Collector, error) {
-	// WithCollectors wins outright — explicit roster, no defaults.
+	// WithCollectors wins outright — explicit roster, no defaults. It
+	// names each collector, so a disabled list with it is a mistake.
 	if len(cfg.only) > 0 {
+		if len(cfg.disabled) > 0 {
+			return nil, fmt.Errorf(
+				"WithCollectors and WithDisabled together: name only the collectors to run",
+			)
+		}
 		out := make([]collector.Collector, 0, len(cfg.only))
 		for _, n := range cfg.only {
 			c, ok := reg.Get(n)

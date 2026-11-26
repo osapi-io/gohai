@@ -199,6 +199,20 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 				s.Equal("err", entry.Status)
 				s.Contains(entry.Error, "simulated collector failure")
 				s.Greater(entry.DurationNs, int64(0))
+				s.Contains(facts.Errors["failtest"], "simulated collector failure")
+			},
+		},
+		{
+			name:          "failed collector surfaces in Errors without WithTimings",
+			injectFailing: true,
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.Nil(facts.Timings)
+				s.Equal(
+					map[string]string{"failtest": "simulated collector failure"},
+					facts.Errors,
+				)
 			},
 		},
 	}
