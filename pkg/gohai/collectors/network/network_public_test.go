@@ -658,6 +658,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		fs           avfs.VFS
 		exec         source.Runner
 		budget       time.Duration
+		ctx          context.Context
 		validateFunc func(any, error)
 	}{
 		{
@@ -841,6 +842,23 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			}),
 			exec:   noEthtool(s.T()),
 			budget: time.Nanosecond,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Nil(i.Interfaces[1].Ethtool)
+			},
+		},
+		{
+			name:       "linux: a budget whose deadline passed before its timer fired runs no ethtool",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
+			}),
+			exec: noEthtool(s.T()),
+			ctx:  unfiredDeadline{context.Background()},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1673,9 +1691,24 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				l.SetEthtoolBudget(tt.budget)
 				c = l
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			ctx := tt.ctx
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			tt.validateFunc(c.Collect(ctx, nil))
 		})
 	}
+}
+
+// unfiredDeadline is a context whose deadline has passed, but whose timer
+// has not fired: Err is still nil. That is the state that a 1ns budget is
+// in until its timer runs on another goroutine.
+type unfiredDeadline struct {
+	context.Context
+}
+
+func (unfiredDeadline) Deadline() (time.Time, bool) {
+	return time.Unix(0, 0), true
 }
 
 // tIface is an interface as a test row gives it; writeSysfs, ipAddrOf
