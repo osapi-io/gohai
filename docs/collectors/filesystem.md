@@ -190,21 +190,21 @@ in one run. The btrfs and ZFS data are on Linux only.
 
 ### Network mounts
 
-A df of a network mount, such as NFS or SMB, waits for its server. A server
-that does not answer makes df wait until the command timeout, and df then
-prints no row for the mounts after it.
+A df of a network mount, such as NFS or SMB, waits for its server. A server that
+does not answer makes df wait until the command timeout, and df then prints no
+row for the mounts after it.
 
 Thus, when the mount table has a network mount, the collector does not run one
 df of all the mounts. It runs one df of the local mounts, as
-`df -akP -- <mount point>...`, and one df for each network mount. These
-commands run at the same time, with a maximum of eight network commands at a
-time. A server that does not answer costs only the sizes of its own mount, and
-the collector waits for one command timeout at most.
+`df -akP -- <mount point>...`, and one df for each network mount. These commands
+run at the same time, with a maximum of eight network commands at a time. A
+server that does not answer costs only the sizes of its own mount, and the
+collector waits for one command timeout at most.
 
-The network types are `nfs`, `nfs4`, `cifs`, `smb3`, `smbfs`, `afpfs`,
-`webdav`, `9p`, `afs`, `ceph`, `glusterfs`, `fuse.glusterfs`, `fuse.sshfs`,
-`davfs`, `fuse.davfs2` and `lustre`. With no network mount, the collector runs
-one df of all the mounts.
+The network types are `nfs`, `nfs4`, `cifs`, `smb3`, `smbfs`, `afpfs`, `webdav`,
+`9p`, `afs`, `ceph`, `glusterfs`, `fuse.glusterfs`, `fuse.sshfs`, `davfs`,
+`fuse.davfs2` and `lustre`. With no network mount, the collector runs one df of
+all the mounts.
 
 ## Backing library
 
