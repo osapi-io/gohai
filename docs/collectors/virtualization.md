@@ -103,9 +103,9 @@ for name, role := range v.Systems {
 ```
 
 `InContainer()` reports whether the host runs as a guest of a container system:
-docker, podman, lxc, lxd, nspawn, openvz and the others. A Docker host, or a
-virtual machine such as a KVM guest, is not in a container. osapi uses it to
-leave out what an agent in a container cannot do.
+docker, crio, kubernetes, podman, lxc, lxd, nspawn, openvz and the others. A
+Docker host, or a virtual machine such as a KVM guest, is not in a container.
+osapi uses it to leave out what an agent in a container cannot do.
 
 ```go
 if v.InContainer() {
@@ -173,13 +173,31 @@ The order is important. The last positive result sets the primary `system` and
 
     - Direct: `/(docker|lxc|containerd)/…` → the runtime in the path. The
       collector records containerd as docker.
+
     - Nested (systemd-managed, docker-ce, cgroup v2): `/<parent>/docker-…` or
       `/<parent>/lxc-…`. This regex finds `/system.slice/docker-<hash>.scope`,
       `/docker-ce/docker/<hash>`, `/kubepods/.../docker-<hash>.scope` and the
       GitHub Actions runner layouts.
 
-    The collector also reads `/proc/1/environ` for `container=lxc`,
-    `container=systemd-nspawn` or `container=podman`.
+    - Scope (cgroup v2, such as a Kubernetes pod):
+      `/…/cri-containerd-<hash>.scope`, `/…/crio-<hash>.scope` or
+      `/…/docker-<hash>.scope` → docker, crio or docker. The collector records
+      containerd as docker.
+
+    The collector also reads `/proc/1/environ` and `/proc/self/environ` for a
+    variable that starts with `container=lxc`, `container=systemd-nspawn` or
+    `container=podman`. Only root can read `/proc/1/environ`. The collector can
+    always read its own environment, and a process in a container gets the
+    variables of the container.
+
+    `KUBERNETES_SERVICE_HOST` in one of the two environments →
+    `systems[kubernetes] = guest`. Kubernetes is not a runtime, so it is the
+    primary `system` only when no other check set one. A pod that has its own
+    cgroup namespace has the cgroup path `0::/`, and the environment is the only
+    sign of the pod.
+
+    `/run/.containerenv` → podman guest. podman writes this file in each
+    container that it runs.
 
 11. **LXC host.** This check runs only if no earlier check set `system`, and
     each line of `/proc/self/cgroup` has the root path `/`. A root path of `/`

@@ -44,6 +44,8 @@ type Info struct {
 // such as kvm or wsl, is not one.
 var containers = map[string]bool{
 	"docker":         true,
+	"crio":           true,
+	"kubernetes":     true,
 	"podman":         true,
 	"lxc":            true,
 	"lxc-libvirt":    true,
