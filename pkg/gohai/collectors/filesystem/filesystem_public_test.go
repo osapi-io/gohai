@@ -417,6 +417,79 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: an NFS server that does not answer costs only its own mount",
+			variant: "linux",
+			mounts: "/dev/sda1 / ext4 rw 0 0\nsrv:/export /mnt/nfs nfs4 rw 0 0\n" +
+				"/dev/sdb1 /data ext4 rw 0 0\n",
+			out: map[string]string{
+				// One df of every mount stops at the hung server, so the
+				// mounts after it get no row.
+				"df -akP": dfHead + "/dev/sda1 100 50 50 50% /\n",
+				"df -aiP": "Filesystem Inodes IUsed IFree IUse% Mounted on\n" +
+					"/dev/sda1 1000 250 750 25% /\n",
+				"df -akP -- / /data": dfHead + "/dev/sda1 100 50 50 50% /\n" +
+					"/dev/sdb1 200 20 180 10% /data\n",
+				"df -aiP -- / /data": "Filesystem Inodes IUsed IFree IUse% Mounted on\n" +
+					"/dev/sda1 1000 250 750 25% /\n/dev/sdb1 2000 200 1800 10% /data\n",
+			},
+			errs: map[string]error{
+				"df -akP":             errors.New("exec df: stopped after 30s"),
+				"df -aiP":             errors.New("exec df: stopped after 30s"),
+				"df -akP -- /mnt/nfs": errors.New("exec df: stopped after 30s"),
+				"df -aiP -- /mnt/nfs": errors.New("exec df: stopped after 30s"),
+			},
+			exec: func(t *testing.T) source.Runner { return noLsblkExec(t) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Mounts, 3)
+				s.Equal(uint64(100*1024), i.Mounts[0].Total)
+				s.Zero(i.Mounts[1].Total)
+				s.Equal("/data", i.Mounts[2].Mountpoint)
+				s.Equal(uint64(200*1024), i.Mounts[2].Total)
+				s.Equal(uint64(2000), i.Mounts[2].InodesTotal)
+			},
+		},
+		{
+			name:    "linux: an NFS mount that answers gets its sizes",
+			variant: "linux",
+			mounts:  "/dev/sda1 / ext4 rw 0 0\nsrv:/export /mnt/nfs nfs4 rw 0 0\n",
+			out: map[string]string{
+				"df -akP -- /": dfHead + "/dev/sda1 100 50 50 50% /\n",
+				"df -aiP -- /": "Filesystem Inodes IUsed IFree IUse% Mounted on\n" +
+					"/dev/sda1 1000 250 750 25% /\n",
+				"df -akP -- /mnt/nfs": dfHead + "srv:/export 400 100 300 25% /mnt/nfs\n",
+				"df -aiP -- /mnt/nfs": "Filesystem Inodes IUsed IFree IUse% Mounted on\n" +
+					"srv:/export 40 10 30 25% /mnt/nfs\n",
+			},
+			exec: func(t *testing.T) source.Runner { return noLsblkExec(t) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Mounts, 2)
+				s.Equal(uint64(400*1024), i.Mounts[1].Total)
+				s.Equal(uint64(40), i.Mounts[1].InodesTotal)
+			},
+		},
+		{
+			name:    "linux: only network mounts",
+			variant: "linux",
+			mounts:  "srv:/export /mnt/nfs nfs rw 0 0\n",
+			out: map[string]string{
+				"df -akP -- /mnt/nfs": dfHead + "srv:/export 400 100 300 25% /mnt/nfs\n",
+			},
+			exec: func(t *testing.T) source.Runner { return noLsblkExec(t) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Mounts, 1)
+				s.Equal(uint64(400*1024), i.Mounts[0].Total)
+			},
+		},
+		{
 			name:    "linux: ZFS datasets parsed with pool + nested + mountpoints",
 			variant: "linux",
 			mounts:  baseMounts,
@@ -667,6 +740,32 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				s.Equal(uint64(500*1024), i.Mounts[0].Total)
 				s.Equal([]string{"local", "journaled"}, i.Mounts[0].Opts)
 				s.Equal(uint64(100), i.Mounts[0].InodesTotal)
+			},
+		},
+		{
+			name:    "darwin: an SMB server that does not answer costs only its own mount",
+			variant: "darwin",
+			out: map[string]string{
+				"mount": "/dev/disk3s1 on / (apfs, local, journaled)\n" +
+					"//u@srv/share on /Volumes/share (smbfs, nodev, nosuid)\n" +
+					"/dev/disk4s1 on /Volumes/ext (apfs, local)\n",
+				"df -ki": "Filesystem 1024-blocks Used Available Capacity iused ifree %iused Mounted on\n" +
+					"/dev/disk3s1 500 200 300 40% 10 90 10% /\n",
+				"df -ki -- / /Volumes/ext": "Filesystem 1024-blocks Used Available Capacity iused ifree %iused Mounted on\n" +
+					"/dev/disk3s1 500 200 300 40% 10 90 10% /\n" +
+					"/dev/disk4s1 800 100 700 13% 5 95 5% /Volumes/ext\n",
+			},
+			errs: map[string]error{
+				"df -ki":                   errors.New("exec df: stopped after 30s"),
+				"df -ki -- /Volumes/share": errors.New("exec df: stopped after 30s"),
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Mounts, 3)
+				s.Zero(i.Mounts[1].Total)
+				s.Equal(uint64(800*1024), i.Mounts[2].Total)
 			},
 		},
 		{

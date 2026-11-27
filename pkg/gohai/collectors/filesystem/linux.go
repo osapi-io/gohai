@@ -33,7 +33,7 @@ import (
 )
 
 // Linux collects filesystem data on Linux. /proc/mounts, read through
-// FS, is the mount table; `df -akP` and `df -aiP` give the capacity and
+// FS, is the mount table; df gives the capacity and
 // inodes of each mount. When `lsblk` is
 // on PATH we layer UUID / label / partition-UUID / partition-label per
 // mount and surface block devices with a filesystem but no mountpoint
@@ -108,7 +108,8 @@ func (l *Linux) Collect(
 const procMounts = "/proc/mounts"
 
 // mounts is each mount of /proc/mounts, with its sizes from df -akP and
-// its inodes from df -aiP. A mount that df does not list keeps no sizes.
+// its inodes from df -aiP. A mount that df does not list, or whose df did
+// not answer in time, keeps no sizes.
 func (l *Linux) mounts(
 	ctx context.Context,
 ) ([]Mount, error) {
@@ -117,7 +118,6 @@ func (l *Linux) mounts(
 		return nil, fmt.Errorf("read %s: %w", procMounts, err)
 	}
 	mounts := []Mount{}
-	var points []string
 	for _, line := range strings.Split(string(b), "\n") {
 		f := strings.Fields(line)
 		if len(f) < 4 {
@@ -128,18 +128,14 @@ func (l *Linux) mounts(
 			Type: f[2], Opts: strings.Split(f[3], ","),
 		}
 		mounts = append(mounts, m)
-		points = append(points, m.Mountpoint)
 	}
 	if l.Exec == nil {
 		return mounts, nil
 	}
-	// df exits non-zero when one mount cannot be read, and still prints
-	// the others.
 	// -a: without it, df leaves out some real filesystems, such as udev
 	// on /dev. A pseudo filesystem prints "-" and stays without sizes.
-	sizes, _ := l.Exec.Execute(ctx, "df", "-akP")
-	counts, _ := l.Exec.Execute(ctx, "df", "-aiP")
-	sizeRows, inodeRows := dfRows(sizes, points, 4), dfRows(counts, points, 4)
+	sizeRows := df(ctx, l.Exec, mounts, 4, "-akP")
+	inodeRows := df(ctx, l.Exec, mounts, 4, "-aiP")
 	for i := range mounts {
 		if r, ok := sizeRows[mounts[i].Mountpoint]; ok {
 			usage(&mounts[i], r[0], r[1], r[2])
