@@ -154,7 +154,8 @@ extensions that limit the purposes of a CA, or `nss-server-distrust-after`.
 2. It parses each PEM certificate, and keeps only the certificates that are CAs.
    The System keychain can also hold certificates that are not CAs, such as a
    certificate of the device.
-3. A keychain that `security` cannot read gives no CAs.
+3. A host without `security` gives no CAs. A keychain that `security` fails to
+   read is an error.
 
 ## Backing library
 

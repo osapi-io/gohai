@@ -23,6 +23,8 @@ package kernelmodules_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -238,10 +240,20 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: kextstat error yields empty modules",
+			name:    "darwin: a failed kextstat is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return kextstatExec(t, nil, errors.New("not found"))
+				return kextstatExec(t, nil, errors.New("exit status 1"))
+			},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "read kexts")
+			},
+		},
+		{
+			name:    "darwin: no kextstat yields empty modules",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return kextstatExec(t, nil, fmt.Errorf("exec %s: %w", "x", exec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)

@@ -23,6 +23,8 @@ package gpu_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -240,10 +242,10 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: exec error yields empty Info",
+			name:    "darwin: no system_profiler yields empty Info",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return displayExec(t, nil, errors.New("not found"))
+				return displayExec(t, nil, fmt.Errorf("exec %s: %w", "x", exec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -253,16 +255,23 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: malformed JSON yields empty Info",
+			name:    "darwin: a failed system_profiler is an error",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return displayExec(t, nil, errors.New("exit status 1"))
+			},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "read displays")
+			},
+		},
+		{
+			name:    "darwin: malformed JSON is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
 				return displayExec(t, []byte("not json"), nil)
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				i, ok := got.(*gpu.Info)
-				s.Require().True(ok)
-				s.Empty(i.Cards)
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "parse system_profiler")
 			},
 		},
 		{

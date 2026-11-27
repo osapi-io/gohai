@@ -23,6 +23,7 @@ package kernelmodules
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -56,8 +57,11 @@ func (d *Darwin) Collect(
 		return info, nil
 	}
 	out, err := d.Exec.Execute(ctx, "kextstat", "-k", "-l")
-	if err != nil {
+	if collector.Absent(err) {
 		return info, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read kexts: %w", err)
 	}
 	info.Modules = parseKextstat(out)
 	return info, nil

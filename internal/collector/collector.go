@@ -22,7 +22,23 @@
 // fact collectors into the registry.
 package collector
 
-import "context"
+import (
+	"context"
+	"errors"
+	"io/fs"
+	"os/exec"
+)
+
+// Absent reports whether err says that the source of a read is not on
+// the host: the file does not exist, or the command is not on the PATH.
+// A collector gives an empty result, or no fact, for an absent source,
+// and returns any other error (specs components/gohai/collectors.md,
+// "When a read fails").
+func Absent(
+	err error,
+) bool {
+	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, exec.ErrNotFound)
+}
 
 // PriorResults is the map of already-completed collector outputs
 // passed to each collector's Collect call. Access typed values via

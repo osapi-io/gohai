@@ -23,6 +23,8 @@ package lsb_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -184,10 +186,20 @@ Codename:	noble
 			},
 		},
 		{
+			name:    "linux: a failed lsb_release is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return lsbReleaseExec(t, nil, errors.New("exit status 1"))
+			},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "read lsb_release")
+			},
+		},
+		{
 			name:    "linux: CLI missing, empty Info no error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return lsbReleaseExec(t, nil, errors.New("not found"))
+				return lsbReleaseExec(t, nil, fmt.Errorf("exec %s: %w", "x", exec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)

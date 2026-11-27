@@ -143,6 +143,9 @@ On macOS:
    `0`.
 4. If `sppci_model` is empty, the collector uses the top-level `_name` field.
    `_name` always has a value.
+5. A host without `system_profiler` gives an empty `cards` slice. A run of
+   `system_profiler` that fails, or output that does not parse as JSON, is an
+   error.
 
 ## Backing library
 

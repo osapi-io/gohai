@@ -22,6 +22,7 @@ package lsb
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -45,9 +46,9 @@ func NewLinux() *Linux {
 	return &Linux{Exec: source.Commands()}
 }
 
-// Collect runs `lsb_release -a` and parses its labelled lines. Exec
-// errors or empty output yield an empty Info — not an error (matches
-// Ohai's no-panic behaviour).
+// Collect runs `lsb_release -a` and parses its labelled lines. A host
+// without lsb_release, or with empty output, gives an empty Info. A
+// failed run is an error.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -56,8 +57,11 @@ func (l *Linux) Collect(
 		return &Info{}, nil
 	}
 	out, err := l.Exec.Execute(ctx, "lsb_release", "-a")
-	if err != nil {
+	if collector.Absent(err) {
 		return &Info{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read lsb_release: %w", err)
 	}
 	return parseLsbReleaseCLI(string(out)), nil
 }

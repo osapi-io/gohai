@@ -23,6 +23,7 @@ package hardware
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,9 +48,9 @@ func NewDarwin() *Darwin {
 }
 
 // Collect runs the three system_profiler calls in parallel and
-// populates Info. Each call's failure is tolerated silently — a
-// host without a battery returns nil Battery; a host whose storage
-// query fails returns no Storage; etc.
+// populates Info. A host without system_profiler gives an empty Info,
+// and a failed call is an error. A host without a battery answers the
+// power call with no battery, and gets a nil Battery.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -61,25 +62,52 @@ func (d *Darwin) Collect(
 
 	var wg sync.WaitGroup
 	var hwOut, storageOut, powerOut []byte
+	var hwErr, storageErr, powerErr error
 
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		hwOut, _ = d.Exec.Execute(ctx, "system_profiler", "SPHardwareDataType", "-json")
+		hwOut, hwErr = d.Exec.Execute(ctx, "system_profiler", "SPHardwareDataType", "-json")
 	}()
 	go func() {
 		defer wg.Done()
-		storageOut, _ = d.Exec.Execute(ctx, "system_profiler", "SPStorageDataType", "-json")
+		storageOut, storageErr = d.Exec.Execute(
+			ctx,
+			"system_profiler",
+			"SPStorageDataType",
+			"-json",
+		)
 	}()
 	go func() {
 		defer wg.Done()
-		powerOut, _ = d.Exec.Execute(ctx, "system_profiler", "SPPowerDataType", "-json")
+		powerOut, powerErr = d.Exec.Execute(ctx, "system_profiler", "SPPowerDataType", "-json")
 	}()
 	wg.Wait()
 
-	applyHardware(info, hwOut)
-	applyStorage(info, storageOut)
-	applyPower(info, powerOut)
+	if collector.Absent(hwErr) {
+		return info, nil
+	}
+	for _, err := range []error{hwErr, storageErr, powerErr} {
+		if err != nil && !collector.Absent(err) {
+			return nil, fmt.Errorf("read system_profiler: %w", err)
+		}
+	}
+
+	if hwErr == nil {
+		if err := applyHardware(info, hwOut); err != nil {
+			return nil, err
+		}
+	}
+	if storageErr == nil {
+		if err := applyStorage(info, storageOut); err != nil {
+			return nil, err
+		}
+	}
+	if powerErr == nil {
+		if err := applyPower(info, powerOut); err != nil {
+			return nil, err
+		}
+	}
 	return info, nil
 }
 
@@ -88,7 +116,7 @@ func (d *Darwin) Collect(
 func applyHardware(
 	info *Info,
 	out []byte,
-) {
+) error {
 	var payload struct {
 		Items []struct {
 			MachineModel          string `json:"machine_model"`
@@ -109,8 +137,11 @@ func applyHardware(
 			SMCVersionSystem      string `json:"SMC_version_system"`
 		} `json:"SPHardwareDataType"`
 	}
-	if err := json.Unmarshal(out, &payload); err != nil || len(payload.Items) == 0 {
-		return
+	if err := json.Unmarshal(out, &payload); err != nil {
+		return fmt.Errorf("parse system_profiler SPHardwareDataType: %w", err)
+	}
+	if len(payload.Items) == 0 {
+		return nil
 	}
 	h := payload.Items[0]
 	info.MachineModel = h.MachineModel
@@ -129,13 +160,15 @@ func applyHardware(
 	info.BootROMVersion = h.BootROMVersion
 	info.OSLoaderVersion = h.OSLoaderVersion
 	info.SMCVersionSystem = h.SMCVersionSystem
+
+	return nil
 }
 
 // applyStorage parses SPStorageDataType and fills Info.Storage.
 func applyStorage(
 	info *Info,
 	out []byte,
-) {
+) error {
 	var payload struct {
 		Items []struct {
 			Name        string `json:"_name"`
@@ -152,7 +185,7 @@ func applyStorage(
 		} `json:"SPStorageDataType"`
 	}
 	if err := json.Unmarshal(out, &payload); err != nil {
-		return
+		return fmt.Errorf("parse system_profiler: %w", err)
 	}
 	for _, item := range payload.Items {
 		entry := Storage{
@@ -171,18 +204,20 @@ func applyStorage(
 		}
 		info.Storage = append(info.Storage, entry)
 	}
+
+	return nil
 }
 
 // applyPower parses SPPowerDataType and fills Info.Battery + Charger.
 func applyPower(
 	info *Info,
 	out []byte,
-) {
+) error {
 	var payload struct {
 		Items []map[string]any `json:"SPPowerDataType"`
 	}
 	if err := json.Unmarshal(out, &payload); err != nil {
-		return
+		return fmt.Errorf("parse system_profiler: %w", err)
 	}
 	for _, item := range payload.Items {
 		name, _ := item["_name"].(string)
@@ -193,6 +228,8 @@ func applyPower(
 			info.Charger = parseCharger(item)
 		}
 	}
+
+	return nil
 }
 
 func parseBattery(

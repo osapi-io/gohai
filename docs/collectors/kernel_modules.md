@@ -135,8 +135,8 @@ On macOS:
    row has fixed columns: `Index Refs Address Size Wired Name (Version)`. The
    collector parses each row into a `Module` with `name`, `version`, `size` and
    `refcount`. It removes the parentheses from `version`. `size` is in hex. If
-   `kextstat` is missing or gives a non-zero exit code, the modules map stays
-   empty. macOS has no equivalent of `/proc/modules`.
+   `kextstat` is missing, the modules map stays empty. A run of `kextstat` that
+   fails is an error. macOS has no equivalent of `/proc/modules`.
 2. The collector does not read System Extensions (macOS 11 and later). A future
    change can use `systemextensionsctl list`.
 
