@@ -153,7 +153,8 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 					CmdLine: "/sbin/init splash", CreationTime: 1700000005,
 					CPUPercent: 1, RSS: 1024 * 1024, MemPercent: 25, CPUSeconds: 0.11,
 				},
-				{PID: 42, Name: "kworker"},
+				// uid 1000 is not in /etc/passwd, so it is the owner.
+				{PID: 42, Name: "kworker", Owner: "1000"},
 			}},
 		},
 		{
@@ -334,4 +335,18 @@ func (s *ProcessPublicTestSuite) TestRead() {
 			s.Equal(tt.want, got)
 		})
 	}
+}
+
+func (s *ProcessPublicTestSuite) TestCollectCancelled() {
+	c := &process.Linux{
+		FS: sourcetest.FS(s.T(), map[string]string{
+			"/proc/1/stat": "1 (init) S 0\n",
+		}),
+		Now: time.Now,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	got, err := c.Collect(ctx, nil)
+	s.ErrorIs(err, context.Canceled)
+	s.Nil(got)
 }

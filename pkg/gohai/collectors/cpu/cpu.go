@@ -57,7 +57,7 @@ type Info struct {
 	Family          string            `json:"family,omitempty"`
 	ModelID         string            `json:"model_id,omitempty"`
 	Stepping        int32             `json:"stepping,omitempty"`
-	Speed           float64           `json:"speed,omitempty"`
+	Speed           float64           `json:"speed,omitempty"`      // MHz: the maximum clock when the OS gives one, else the current clock
 	CacheSize       int32             `json:"cache_size,omitempty"` // KB — aggregate from /proc/cpuinfo
 	Flags           []string          `json:"flags,omitempty"`
 	Caches          *Caches           `json:"caches,omitempty"`           // per-level sizes from lscpu (Linux)
@@ -113,8 +113,8 @@ type CPU struct {
 	Stepping   int32    `json:"stepping,omitempty"`
 	PhysicalID string   `json:"physical_id,omitempty"` // socket index
 	CoreID     string   `json:"core_id,omitempty"`     // physical core within socket
-	Cores      int32    `json:"cores,omitempty"`       // cores on this socket
-	Speed      float64  `json:"speed,omitempty"`
+	Cores      int32    `json:"cores,omitempty"`       // Linux: 1 for each logical CPU, as gopsutil gives it, so a sum is the thread count. macOS: the physical cores
+	Speed      float64  `json:"speed,omitempty"`       // MHz: the maximum clock when the OS gives one, else the current clock
 	CacheSize  int32    `json:"cache_size,omitempty"`
 	Flags      []string `json:"flags,omitempty"`
 }

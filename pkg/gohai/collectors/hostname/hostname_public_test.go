@@ -25,6 +25,7 @@ import (
 	"errors"
 	"net"
 	"testing"
+	"time"
 
 	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 
@@ -526,4 +527,41 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
+}
+
+func (s *HostnamePublicTestSuite) TestCollectCancelledStopsRetries() {
+	// With an hour between retries, a retry that sleeps through the
+	// cancel would hang the test.
+	defer hostname.SetResolverBackoff(time.Hour)()
+	calls := 0
+	resolver := sourcemocks.NewMockResolver(gomock.NewController(s.T()))
+	resolver.EXPECT().
+		LookupHost(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ string) ([]string, error) {
+			calls++
+
+			return nil, ctx.Err()
+		}).
+		AnyTimes()
+	c := &hostname.Darwin{
+		Exec: hostnameExec(
+			s.T(),
+			nil,
+			errors.New("no hostname -s"),
+			[]byte("Friendly Name\n"),
+			nil,
+		),
+		FS: sourcetest.FS(s.T(), map[string]string{
+			"/proc/sys/kernel/hostname": "kernel-short\n",
+		}),
+		Resolver: resolver,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	got, err := c.Collect(ctx, nil)
+	s.Require().NoError(err)
+	info, ok := got.(*hostname.Info)
+	s.Require().True(ok)
+	s.Equal("kernel-short", info.FQDN)
+	s.Equal(1, calls)
 }
