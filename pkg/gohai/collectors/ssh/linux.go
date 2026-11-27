@@ -27,31 +27,52 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects SSH host key fingerprints on Linux. Reads the standard
 // host public key files from /etc/ssh/. FS is the virtual filesystem —
 // production uses the real OS filesystem; tests inject an avfs memfs
-// with canned key files.
+// with canned key files. Exec runs `getent passwd`, for the users of
+// LDAP or sssd, and `sshd -T`, for the AuthorizedKeysFile.
 type Linux struct {
 	base
 
-	FS avfs.VFS
+	FS   avfs.VFS
+	Exec source.Runner
 }
 
-// NewLinux returns a Linux variant wired to the real OS filesystem.
+// NewLinux returns a Linux variant wired to the real OS filesystem and
+// programs.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect reads SSH host public keys and returns their fingerprints,
-// and the authorized keys of each user of /etc/passwd.
+// and the authorized keys of each user.
 func (l *Linux) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	return &Info{
 		Keys:           collectHostKeys(l.FS),
-		AuthorizedKeys: collectAuthorizedKeys(l.FS, passwdHomes(l.FS)),
+		AuthorizedKeys: collectAuthorizedKeys(l.FS, l.homes(ctx), keyFiles(ctx, l.Exec)),
 	}, nil
+}
+
+// homes is the home of each user of `getent passwd`, which has the users
+// of LDAP and sssd when their service lists them, or of /etc/passwd when
+// there is no Exec or getent fails.
+func (l *Linux) homes(
+	ctx context.Context,
+) []home {
+	if l.Exec != nil {
+		if out, err := l.Exec.Execute(ctx, "getent", "passwd"); err == nil {
+			if homes := parsePasswd(out); len(homes) > 0 {
+				return homes
+			}
+		}
+	}
+
+	return passwdHomes(l.FS)
 }

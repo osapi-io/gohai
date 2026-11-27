@@ -57,7 +57,7 @@ func (d *Darwin) Collect(
 ) (any, error) {
 	return &Info{
 		Keys:           collectHostKeys(d.FS),
-		AuthorizedKeys: collectAuthorizedKeys(d.FS, d.homes(ctx)),
+		AuthorizedKeys: collectAuthorizedKeys(d.FS, d.homes(ctx), keyFiles(ctx, d.Exec)),
 	}, nil
 }
 

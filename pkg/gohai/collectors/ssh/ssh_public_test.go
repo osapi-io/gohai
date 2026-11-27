@@ -284,6 +284,162 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: an LDAP user from getent passwd",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                      "root:x:0:0::/root:/bin/sh\n",
+					"/home/alice/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 alice@ldap\n",
+				})
+			},
+			commands: sourcetest.Commands{Out: map[string]string{
+				"getent passwd": "root:x:0:0::/root:/bin/sh\nalice:*:5001:5001::/home/alice:/bin/bash\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.AuthorizedKeys["alice"], 1)
+				s.Equal("alice@ldap", info.AuthorizedKeys["alice"][0].Comment)
+			},
+		},
+		{
+			name:    "linux: getent with no users falls back to /etc/passwd",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                "root:x:0:0::/root:/bin/sh\n",
+					"/root/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 root@lab\n",
+				})
+			},
+			commands: sourcetest.Commands{Out: map[string]string{"getent passwd": "\n"}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.AuthorizedKeys["root"], 1)
+			},
+		},
+		{
+			name:    "linux: the AuthorizedKeysFile of sshd -T, with its tokens",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd": "svc:x:900:900::/:/usr/sbin/nologin\n" +
+						"john:x:1000:1000::/home/john:/bin/bash\n",
+					"/etc/ssh/authorized_keys/svc":     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 svc@ci\n",
+					"/etc/ssh/keys/1000%/john":         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@uid\n",
+					"/home/john/.ssh/authorized_keys":  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@home\n",
+					"/home/john/.ssh/authorized_keys2": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@two\n",
+				})
+			},
+			commands: sourcetest.Commands{Out: map[string]string{
+				"sshd -T": "port 22\nauthorizedkeysfile /etc/ssh/authorized_keys/%u " +
+					"/etc/ssh/keys/%U%%/%u .ssh/authorized_keys %h/.ssh/authorized_keys %x bad%\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				svc := info.AuthorizedKeys["svc"]
+				s.Require().Len(svc, 1, "a home of / reads an absolute pattern only")
+				s.Equal("svc@ci", svc[0].Comment)
+				john := info.AuthorizedKeys["john"]
+				s.Require().
+					Len(john, 2, "the same file twice is read once, and authorized_keys2 is not named")
+				s.Equal("john@uid", john[0].Comment)
+				s.Equal("john@home", john[1].Comment)
+			},
+		},
+		{
+			name:    "linux: authorized_keys2 is read when sshd -T does not run",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                      "john:x:1000:1000::/home/john:/bin/bash\n",
+					"/home/john/.ssh/authorized_keys2": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@two\n",
+				})
+			},
+			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.AuthorizedKeys["john"], 1)
+			},
+		},
+		{
+			name:    "linux: an AuthorizedKeysFile of none, and sshd -T with no such line",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                     "john:x:1000:1000::/home/john:/bin/bash\n",
+					"/home/john/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@home\n",
+				})
+			},
+			commands: sourcetest.Commands{
+				Out: map[string]string{"sshd -T": "authorizedkeysfile none\n"},
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Nil(info.AuthorizedKeys)
+			},
+		},
+		{
+			name:    "linux: sshd -T with no AuthorizedKeysFile line has the default",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                     "john:x:1000:1000::/home/john:/bin/bash\n",
+					"/home/john/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@home\n",
+				})
+			},
+			commands: sourcetest.Commands{Out: map[string]string{"sshd -T": "port 22\n"}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				s.Len(info.AuthorizedKeys["john"], 1)
+			},
+		},
+		{
+			name:    "linux: quoted options keep their text, and command and environment are redacted",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd": "john:x:1000:1000::/home/john:/bin/bash\n",
+					"/home/john/.ssh/authorized_keys": `command="/bin/deploy  --token s3cret ssh-rsa x",` +
+						`environment="API_KEY=abc \"q\"",no-pty ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john  laptop` + "\n" +
+						`"quoted first" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 q` + "\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*gohaisssh.Info)
+				s.Require().True(ok)
+				john := info.AuthorizedKeys["john"]
+				s.Require().Len(john, 2)
+				s.Equal(`"quoted first"`, john[1].Options)
+				s.Equal(
+					"ssh-ed25519",
+					john[0].Type,
+					"a key type inside a quoted option is not the key",
+				)
+				s.Equal(`command="[redacted]",environment="[redacted]",no-pty`, john[0].Options)
+				s.Equal("john  laptop", john[0].Comment)
+				s.NotContains(john[0].Line, "s3cret")
+				s.NotContains(john[0].Line, "API_KEY")
+				s.True(
+					strings.HasSuffix(
+						john[0].Line,
+						"AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john  laptop",
+					),
+				)
+			},
+		},
+		{
 			// Most macOS users are in the directory service, not in
 			// /etc/passwd. dscl gives the home of each one.
 			name:    "darwin: authorized keys of a directory service user",
@@ -789,7 +945,11 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			var c gohaisssh.Collector
 			switch tt.variant {
 			case "linux":
-				c = &gohaisssh.Linux{FS: tt.setupFS()}
+				var exec source.Runner = tt.commands.Mock(s.T())
+				if tt.nilExec {
+					exec = nil
+				}
+				c = &gohaisssh.Linux{FS: tt.setupFS(), Exec: exec}
 			case "darwin":
 				var exec source.Runner = tt.commands.Mock(s.T())
 				if tt.nilExec {
