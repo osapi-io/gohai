@@ -58,6 +58,7 @@ type Interface struct {
 	MTU           int          `json:"mtu"`
 	MAC           string       `json:"mac,omitempty"`           // OCSF: network_interface.mac
 	Encapsulation string       `json:"encapsulation,omitempty"` // canonical: Ethernet / Loopback / PPP / SLIP / IPIP / 6to4
+	Kind          string       `json:"kind,omitempty"`          // Linux: ethernet / bridge / bond / wifi / vlan / vxlan / wireguard / tun / loopback / virtual
 	Driver        string       `json:"driver,omitempty"`        // sysfs driver name (e1000e, virtio_net, ixgbe, ...)
 	Speed         string       `json:"speed,omitempty"`         // ghw link speed string ("1000Mb/s")
 	Duplex        string       `json:"duplex,omitempty"`        // half | full | unknown

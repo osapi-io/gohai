@@ -121,6 +121,93 @@ func (s *NetworkPublicTestSuite) TestNew() {
 	}
 }
 
+// TestKind: each interface's kind comes from sysfs, which tells a bridge, a
+// bond, Wi-Fi, a VLAN and a NIC apart, although each is Ethernet.
+func (s *NetworkPublicTestSuite) TestKind() {
+	tests := []struct {
+		name  string
+		iface network.Interface
+		files map[string]string
+		want  string
+	}{
+		{
+			name:  "loopback",
+			iface: network.Interface{Name: "lo", Encapsulation: "Loopback"},
+			want:  "loopback",
+		},
+		{
+			name:  "a bridge",
+			iface: network.Interface{Name: "br0", Encapsulation: "Ethernet"},
+			files: map[string]string{"/sys/class/net/br0/bridge/bridge_id": "8000.x\n"},
+			want:  "bridge",
+		},
+		{
+			name:  "a bond",
+			iface: network.Interface{Name: "bond0", Encapsulation: "Ethernet"},
+			files: map[string]string{"/sys/class/net/bond0/bonding/mode": "active-backup 1\n"},
+			want:  "bond",
+		},
+		{
+			name:  "Wi-Fi, by its wireless directory",
+			iface: network.Interface{Name: "wlan0", Encapsulation: "Ethernet"},
+			files: map[string]string{"/sys/class/net/wlan0/wireless/link": "0\n"},
+			want:  "wifi",
+		},
+		{
+			name:  "Wi-Fi, by its phy",
+			iface: network.Interface{Name: "wlp2s0", Encapsulation: "Ethernet"},
+			files: map[string]string{"/sys/class/net/wlp2s0/phy80211/name": "phy0\n"},
+			want:  "wifi",
+		},
+		{
+			name:  "a VLAN, by its uevent",
+			iface: network.Interface{Name: "eth0.10", Encapsulation: "Ethernet"},
+			files: map[string]string{
+				"/sys/class/net/eth0.10/uevent": "DEVTYPE=vlan\nINTERFACE=eth0.10\n",
+			},
+			want: "vlan",
+		},
+		{
+			name:  "a uevent with a DEVTYPE that has no kind, on a NIC",
+			iface: network.Interface{Name: "eth1", Encapsulation: "Ethernet"},
+			files: map[string]string{
+				"/sys/class/net/eth1/uevent":        "DEVTYPE=other\n",
+				"/sys/class/net/eth1/device/vendor": "0x8086\n",
+			},
+			want: "ethernet",
+		},
+		{
+			name:  "a tun device",
+			iface: network.Interface{Name: "tun0", Encapsulation: "PPP"},
+			files: map[string]string{"/sys/class/net/tun0/tun_flags": "0x1001\n"},
+			want:  "tun",
+		},
+		{
+			name:  "a NIC",
+			iface: network.Interface{Name: "eth0", Encapsulation: "Ethernet"},
+			files: map[string]string{"/sys/class/net/eth0/device/vendor": "0x8086\n"},
+			want:  "ethernet",
+		},
+		{
+			name:  "Ethernet that software makes, such as a dummy",
+			iface: network.Interface{Name: "dummy0", Encapsulation: "Ethernet"},
+			files: map[string]string{"/sys/class/net/dummy0/type": "1\n"},
+			want:  "virtual",
+		},
+		{
+			name:  "a link that is not Ethernet",
+			iface: network.Interface{Name: "ppp0", Encapsulation: "PPP"},
+		},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			ifs := []network.Interface{tc.iface}
+			network.ApplyKind(fsWith(s.T(), tc.files), ifs)
+			s.Equal(tc.want, ifs[0].Kind)
+		})
+	}
+}
+
 // fsWith builds a memfs containing the given (path → contents) map.
 func fsWith(
 	t require.TestingT,

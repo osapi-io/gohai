@@ -83,6 +83,7 @@ func (l *Linux) Collect(
 		return nil, err
 	}
 	applyEncapsulation(l.FS, ifs)
+	applyKind(l.FS, ifs)
 	ifs = applyOpenVZAliasMerge(l.FS, ifs)
 	applyNICStats(l.FS, ifs)
 	info := &Info{Interfaces: ifs}
@@ -314,6 +315,76 @@ func applyEncapsulation(
 		if name, ok := arphrdEncapsulation[t]; ok {
 			ifs[i].Encapsulation = name
 		}
+	}
+}
+
+// applyKind sets each interface's kind from sysfs: what sort of device it
+// is, which its encapsulation does not tell (a bridge, a bond, a Wi-Fi card
+// and a NIC are each Ethernet). A tool that writes the interface's config,
+// such as netplan, puts each kind in a section of its own. The order of the
+// checks matters: a bridge's uevent can also name it, but its bridge/
+// directory is always there.
+func applyKind(
+	fs avfs.VFS,
+	ifs []Interface,
+) {
+	for i := range ifs {
+		ifs[i].Kind = kindOf(fs, ifs[i])
+	}
+}
+
+// devtypeKind is the kind of a DEVTYPE in an interface's uevent.
+var devtypeKind = map[string]string{
+	"bridge":    "bridge",
+	"bond":      "bond",
+	"wlan":      "wifi",
+	"vlan":      "vlan",
+	"vxlan":     "vxlan",
+	"wireguard": "wireguard",
+}
+
+// kindOf is the kind of one interface; empty for one that is not Ethernet
+// and that nothing else names, such as PPP.
+func kindOf(
+	fs avfs.VFS,
+	iface Interface,
+) string {
+	dir := "/sys/class/net/" + iface.Name
+	has := func(name string) bool {
+		_, err := fs.Stat(dir + "/" + name)
+		return err == nil
+	}
+	switch {
+	case iface.Encapsulation == "Loopback":
+		return "loopback"
+	case has("bridge"):
+		return "bridge"
+	case has("bonding"):
+		return "bond"
+	case has("wireless"), has("phy80211"):
+		return "wifi"
+	}
+	if b, err := fs.ReadFile(dir + "/uevent"); err == nil {
+		for _, line := range strings.Split(string(b), "\n") {
+			if t, ok := strings.CutPrefix(strings.TrimSpace(line), "DEVTYPE="); ok {
+				if k, ok := devtypeKind[t]; ok {
+					return k
+				}
+			}
+		}
+	}
+	switch {
+	case has("tun_flags"):
+		return "tun"
+	case iface.Encapsulation != "Ethernet":
+		return ""
+	case has("device"):
+		// A device backs it: a NIC.
+		return "ethernet"
+	default:
+		// Ethernet with no device: a dummy, a veth or another link that
+		// software makes.
+		return "virtual"
 	}
 }
 
