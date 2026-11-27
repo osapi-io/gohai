@@ -103,7 +103,7 @@ func parsePrintSystem(
 		}
 		loaded[f[2]] = true
 		info.Services = append(info.Services, Service{
-			Name: f[2], State: state, Enabled: !disabled[f[2]], Type: "launchd",
+			Name: f[2], State: state, Enabled: !disabled[f[2]], Loaded: true, Type: "launchd",
 		})
 	}
 	labels := make([]string, 0, len(disabled))
