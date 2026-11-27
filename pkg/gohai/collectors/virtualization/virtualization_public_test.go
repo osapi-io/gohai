@@ -892,6 +892,109 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: cgroup v2 Kubernetes pod with containerd",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup": "0::/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod1a2b.slice/cri-containerd-0123abcd.scope\n",
+				})
+			},
+			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("docker", i.System)
+				s.Equal("guest", i.Systems["docker"])
+			},
+		},
+		{
+			name:    "linux: cgroup v2 Kubernetes pod with CRI-O",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup": "0::/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod9f.slice/crio-89abcdef.scope\n",
+				})
+			},
+			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("crio", i.System)
+				s.Equal("guest", i.Role)
+			},
+		},
+		{
+			name:    "linux: a pod with a cgroup namespace is found by its environment",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup":  "0::/\n",
+					"/proc/self/environ": "PATH=/usr/bin\x00KUBERNETES_SERVICE_HOST=10.96.0.1\x00",
+				})
+			},
+			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("kubernetes", i.System)
+				s.Equal("guest", i.Role)
+			},
+		},
+		{
+			name:    "linux: Kubernetes is a layer when the runtime is known",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/cgroup":  "0::/kubepods.slice/kubepods-pod1.slice/cri-containerd-0123.scope\n",
+					"/proc/self/environ": "KUBERNETES_SERVICE_HOST=10.96.0.1\x00",
+				})
+			},
+			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("docker", i.System)
+				s.Equal("guest", i.Systems["kubernetes"])
+			},
+		},
+		{
+			name:    "linux: a non-root agent reads container= from its own environment",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/proc/self/environ": "container=lxc-libvirt\x00",
+				})
+			},
+			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("lxc", i.System)
+			},
+		},
+		{
+			name:    "linux: /run/.containerenv is a podman container",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/run/.containerenv": "engine=\"podman-5.2.0\"\n",
+				})
+			},
+			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("podman", i.System)
+				s.Equal("guest", i.Role)
+			},
+		},
+		{
 			name:    "linux: environ container=lxc",
 			variant: "linux",
 			fs: func() avfs.VFS {

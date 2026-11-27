@@ -23,6 +23,7 @@ package virtualization
 import (
 	"context"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -282,8 +283,26 @@ var cgroupContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]+:/(docker|lxc|containe
 // in linux/virtualization.rb.
 var cgroupNestedContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]*:/[^/]+/(docker|lxc)-?`)
 
-// detectViaCgroup parses /proc/self/cgroup and /proc/1/environ for
-// container hints. Mirrors Ohai's cascade in the linux plugin.
+// cgroupScopeRE matches the cgroup v2 path of a container that a
+// Kubernetes node or systemd runs, such as
+// `0::/kubepods.slice/.../cri-containerd-<hash>.scope` or
+// `.../crio-<hash>.scope`. The other two regexes need the runtime as the
+// first or second part of the path, and these paths have it last.
+var cgroupScopeRE = regexp.MustCompile(
+	`(?m)^\d+:[^:]*:/\S*/(cri-containerd|crio|docker)-[0-9a-f]+\.scope$`,
+)
+
+// scopeRuntimes is the system that each runtime of cgroupScopeRE records.
+// containerd is docker, as the direct regex records it.
+var scopeRuntimes = map[string]string{
+	"cri-containerd": "docker",
+	"crio":           "crio",
+	"docker":         "docker",
+}
+
+// detectViaCgroup parses /proc/self/cgroup, /proc/1/environ,
+// /proc/self/environ and /run/.containerenv for container hints. The
+// first two mirror Ohai's cascade in the linux plugin.
 func detectViaCgroup(
 	fs avfs.VFS,
 	info *Info,
@@ -302,20 +321,56 @@ func detectViaCgroup(
 		if !matched {
 			if m := cgroupNestedContainerRE.FindStringSubmatch(text); m != nil {
 				addSystem(info, m[1], "guest", false)
+				matched = true
+			}
+		}
+		if !matched {
+			if m := cgroupScopeRE.FindStringSubmatch(text); m != nil {
+				addSystem(info, scopeRuntimes[m[1]], "guest", false)
 			}
 		}
 	}
-	if b, err := fs.ReadFile("/proc/1/environ"); err == nil {
-		text := string(b)
+	// /proc/1/environ is readable only by root. The collector's own
+	// environment, /proc/self/environ, is readable by its user, and a
+	// process in a container gets the container's variables.
+	for _, path := range []string{"/proc/1/environ", "/proc/self/environ"} {
+		b, err := fs.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		vars := strings.Split(string(b), "\x00")
 		switch {
-		case strings.Contains(text, "container=lxc"):
+		case hasVar(vars, "container=lxc"):
 			addSystem(info, "lxc", "guest", false)
-		case strings.Contains(text, "container=systemd-nspawn"):
+		case hasVar(vars, "container=systemd-nspawn"):
 			addSystem(info, "nspawn", "guest", false)
-		case strings.Contains(text, "container=podman"):
+		case hasVar(vars, "container=podman"):
 			addSystem(info, "podman", "guest", false)
 		}
+		// A pod gets KUBERNETES_SERVICE_HOST. Kubernetes is a layer, not
+		// the runtime, so it is the primary system only when nothing else
+		// is.
+		if hasVar(vars, "KUBERNETES_SERVICE_HOST=") {
+			if info.System == "" {
+				addSystem(info, "kubernetes", "guest", false)
+			} else {
+				info.Systems["kubernetes"] = "guest"
+			}
+		}
 	}
+	// podman writes /run/.containerenv in each container that it runs.
+	if fileExists(fs, "/run/.containerenv") {
+		addSystem(info, "podman", "guest", false)
+	}
+}
+
+// hasVar reports whether one of vars starts with prefix, such as
+// container=lxc for container=lxc-libvirt.
+func hasVar(
+	vars []string,
+	prefix string,
+) bool {
+	return slices.ContainsFunc(vars, func(v string) bool { return strings.HasPrefix(v, prefix) })
 }
 
 // cgroupRootsAllSlash reports whether every line of /proc/self/cgroup
