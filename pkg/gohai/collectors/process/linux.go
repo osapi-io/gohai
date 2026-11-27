@@ -21,6 +21,7 @@
 package process
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"strconv"
@@ -53,9 +54,9 @@ func NewLinux() *Linux {
 }
 
 // Collect returns a process snapshot. A process that ends while it is
-// read is left out.
+// read is left out. A cancelled ctx stops the read, with its error.
 func (l *Linux) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	entries, err := l.FS.ReadDir("/proc")
@@ -68,6 +69,9 @@ func (l *Linux) Collect(
 	now := l.Now().Unix()
 	procs := []Process{}
 	for _, e := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		pid, err := strconv.ParseInt(e.Name(), 10, 32)
 		if err != nil {
 			continue
@@ -134,7 +138,9 @@ func (l *Linux) read(
 		for _, line := range strings.Split(string(status), "\n") {
 			if v, ok := strings.CutPrefix(line, "Uid:"); ok {
 				if uid := strings.Fields(v); len(uid) > 0 {
-					p.Owner = users[uid[0]]
+					// A user that /etc/passwd does not have, such as
+					// one from LDAP, is its uid, as ps shows it.
+					p.Owner = cmp.Or(users[uid[0]], uid[0])
 				}
 			}
 			if v, ok := strings.CutPrefix(line, "VmRSS:"); ok {

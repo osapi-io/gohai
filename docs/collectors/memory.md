@@ -222,7 +222,8 @@ On macOS:
    - `compressed`, from `Pages stored in compressor`. Apple Silicon uses the
      compressor much.
 3. `sysctl -n vm.swapusage` gives the `swap.*` fields.
-4. If `vm_stat` or `vm.swapusage` fails, its fields stay at zero.
+4. If `vm_stat` or `vm.swapusage` fails, the collector gives an error. Zero
+   fields would show a host with no free memory or no swap.
 
 ## Backing library
 

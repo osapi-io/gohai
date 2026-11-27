@@ -242,6 +242,15 @@ Pages bogus:                         lots.
 		},
 		{name: "linux: no /proc/meminfo", variant: "linux", wantErr: "read /proc/meminfo"},
 		{
+			name:    "linux: more swap free than swap total",
+			variant: "linux",
+			files: map[string]string{"/proc/meminfo": "MemTotal: 1000 kB\n" +
+				"SwapTotal: 100 kB\nSwapFree: 200 kB\n"},
+			check: func(i *memory.Info) {
+				s.Equal(&memory.Swap{Total: 100 * kb, Free: 100 * kb}, i.Swap)
+			},
+		},
+		{
 			name:    "darwin: hw.memsize, vm_stat and vm.swapusage",
 			variant: "darwin",
 			runner: sourcetest.Commands{Out: map[string]string{
@@ -265,14 +274,20 @@ Pages bogus:                         lots.
 			},
 		},
 		{
-			name:    "darwin: vm_stat and vm.swapusage fail",
+			name:    "darwin: vm_stat fails",
 			variant: "darwin",
 			runner: sourcetest.Commands{
 				Out: map[string]string{"sysctl -n hw.memsize": "409600\n"},
 			},
-			check: func(i *memory.Info) {
-				s.Equal(&memory.Info{Total: 409600}, i)
+			wantErr: "vm_stat: exec vm_stat: not found",
+		},
+		{
+			name:    "darwin: vm.swapusage fails",
+			variant: "darwin",
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sysctl -n hw.memsize": "409600\n", "vm_stat": vmStat},
 			},
+			wantErr: "sysctl vm.swapusage",
 		},
 		{
 			name:    "darwin: more available than the total, and no swap",

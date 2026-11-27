@@ -62,12 +62,19 @@ func (d *Darwin) Collect(
 		return nil, fmt.Errorf("sysctl hw.memsize: %w", err)
 	}
 	info := &Info{Total: total}
-	if out, err := d.Exec.Execute(ctx, "vm_stat"); err == nil {
-		applyVMStat(info, out)
+	// Without vm_stat, Available and Used would be zero, which reads as
+	// a host with no free memory. Without vm.swapusage, Swap would be nil,
+	// which reads as a host with no swap. Both are errors instead.
+	out, err = d.Exec.Execute(ctx, "vm_stat")
+	if err != nil {
+		return nil, fmt.Errorf("vm_stat: %w", err)
 	}
-	if out, err := d.Exec.Execute(ctx, "sysctl", "-n", "vm.swapusage"); err == nil {
-		info.Swap = parseSwapUsage(string(out))
+	applyVMStat(info, out)
+	out, err = d.Exec.Execute(ctx, "sysctl", "-n", "vm.swapusage")
+	if err != nil {
+		return nil, fmt.Errorf("sysctl vm.swapusage: %w", err)
 	}
+	info.Swap = parseSwapUsage(string(out))
 
 	return info, nil
 }

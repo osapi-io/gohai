@@ -23,20 +23,20 @@ Consumers use this data to:
 
 ## Collected fields
 
-| Field                       | Type    | Description                                                                             | Schema mapping                |
-| --------------------------- | ------- | --------------------------------------------------------------------------------------- | ----------------------------- |
-| `count`                     | int     | The total number of processes.                                                          | No direct schema mapping.     |
-| `processes[].pid`           | int32   | The process ID.                                                                         | `process.pid`.                |
-| `processes[].parent_pid`    | int32   | The parent process ID.                                                                  | `process.parent_process.pid`. |
-| `processes[].name`          | string  | The executable name, without the path or arguments.                                     | `process.name`.               |
-| `processes[].owner`         | string  | The username of the owner.                                                              | `process.user.name`.          |
-| `processes[].cmd_line`      | string  | The full command line: argv, with spaces between the items.                             | `process.cmd_line`.           |
-| `processes[].state`         | string  | The state as a word: `running`, `sleep`, `zombie`, `stop`, …                            | No direct schema mapping.     |
-| `processes[].creation_time` | int64   | The process start time, in Unix seconds.                                                | `process.created_time`.       |
-| `processes[].cpu_percent`   | float64 | CPU time used since start, as a share of the time since start. 100 is one full CPU.     | No direct schema mapping.     |
-| `processes[].mem_percent`   | float64 | RSS as a share of physical memory.                                                      | No direct schema mapping.     |
-| `processes[].rss`           | int64   | The resident set size, in bytes.                                                        | OTel `process.memory.usage`.  |
-| `processes[].cpu_seconds`   | float64 | User and system CPU time used, in seconds. Two samples give the CPU share between them. | No direct schema mapping.     |
+| Field                       | Type    | Description                                                                                                                      | Schema mapping                |
+| --------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `count`                     | int     | The total number of processes.                                                                                                   | No direct schema mapping.     |
+| `processes[].pid`           | int32   | The process ID.                                                                                                                  | `process.pid`.                |
+| `processes[].parent_pid`    | int32   | The parent process ID.                                                                                                           | `process.parent_process.pid`. |
+| `processes[].name`          | string  | The executable name, without the path or arguments.                                                                              | `process.name`.               |
+| `processes[].owner`         | string  | The username of the owner. On Linux, a uid that `/etc/passwd` does not have, such as an LDAP user, is the uid, as `ps` shows it. | `process.user.name`.          |
+| `processes[].cmd_line`      | string  | The full command line: argv, with spaces between the items.                                                                      | `process.cmd_line`.           |
+| `processes[].state`         | string  | The state as a word: `running`, `sleep`, `zombie`, `stop`, …                                                                     | No direct schema mapping.     |
+| `processes[].creation_time` | int64   | The process start time, in Unix seconds.                                                                                         | `process.created_time`.       |
+| `processes[].cpu_percent`   | float64 | CPU time used since start, as a share of the time since start. 100 is one full CPU.                                              | No direct schema mapping.     |
+| `processes[].mem_percent`   | float64 | RSS as a share of physical memory.                                                                                               | No direct schema mapping.     |
+| `processes[].rss`           | int64   | The resident set size, in bytes.                                                                                                 | OTel `process.memory.usage`.  |
+| `processes[].cpu_seconds`   | float64 | User and system CPU time used, in seconds. Two samples give the CPU share between them.                                          | No direct schema mapping.     |
 
 The field name `cmd_line` comes from OCSF (`process.cmd_line`), not from Ohai's
 `command`. If OCSF and Ohai both name a field, the OCSF name is used.

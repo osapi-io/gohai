@@ -142,7 +142,9 @@ func readMeminfo(
 		}
 	}
 	if total := kv["SwapTotal"]; total > 0 {
-		free := kv["SwapFree"]
+		// A SwapFree above SwapTotal is a malformed file. Used is then 0,
+		// not an unsigned wrap to a huge number.
+		free := min(kv["SwapFree"], total)
 		info.Swap = &Swap{
 			Total: total, Free: free, Used: total - free,
 			UsedPercent: float64(total-free) / float64(total) * 100,

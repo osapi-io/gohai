@@ -164,7 +164,12 @@ func canonicalFQDN(
 	}
 	for attempt := 0; attempt < resolverRetries; attempt++ {
 		if attempt > 0 {
-			time.Sleep(resolverBackoff)
+			// A cancelled lookup is not a failure to retry: stop at once.
+			select {
+			case <-ctx.Done():
+				return short, ""
+			case <-time.After(resolverBackoff):
+			}
 		}
 		ips, err := resolver.LookupHost(ctx, short)
 		if err != nil {
