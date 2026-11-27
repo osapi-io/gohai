@@ -208,10 +208,34 @@ func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 			name: "each daemon, with its state and whether it is enabled, and the ones not loaded",
 			exec: launchctlExec(s.T(), []byte(launchctlServices+launchctlDisabled), nil),
 			want: []services.Service{
-				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
-				{Name: "io.osapi.app", State: "dead", Enabled: false, Type: "launchd"},
-				{Name: "io.osapi.web", State: "failed", Enabled: true, Type: "launchd"},
-				{Name: "com.apple.lskdd", State: "dead", Enabled: true, Type: "launchd"},
+				{
+					Name:    "com.apple.cron",
+					State:   "running",
+					Enabled: true,
+					Loaded:  true,
+					Type:    "launchd",
+				},
+				{
+					Name:    "io.osapi.app",
+					State:   "dead",
+					Enabled: false,
+					Loaded:  true,
+					Type:    "launchd",
+				},
+				{
+					Name:    "io.osapi.web",
+					State:   "failed",
+					Enabled: true,
+					Loaded:  true,
+					Type:    "launchd",
+				},
+				{
+					Name:    "com.apple.lskdd",
+					State:   "dead",
+					Enabled: true,
+					Loaded:  true,
+					Type:    "launchd",
+				},
 				{Name: "io.osapi.idle", State: "dead", Enabled: true, Type: "launchd"},
 				{Name: "io.osapi.off", State: "dead", Enabled: false, Type: "launchd"},
 			},
@@ -220,10 +244,28 @@ func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 			name: "no disabled block: each is enabled",
 			exec: launchctlExec(s.T(), []byte(launchctlServices+"}\n"), nil),
 			want: []services.Service{
-				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
-				{Name: "io.osapi.app", State: "dead", Enabled: true, Type: "launchd"},
-				{Name: "io.osapi.web", State: "failed", Enabled: true, Type: "launchd"},
-				{Name: "com.apple.lskdd", State: "dead", Enabled: true, Type: "launchd"},
+				{
+					Name:    "com.apple.cron",
+					State:   "running",
+					Enabled: true,
+					Loaded:  true,
+					Type:    "launchd",
+				},
+				{Name: "io.osapi.app", State: "dead", Enabled: true, Loaded: true, Type: "launchd"},
+				{
+					Name:    "io.osapi.web",
+					State:   "failed",
+					Enabled: true,
+					Loaded:  true,
+					Type:    "launchd",
+				},
+				{
+					Name:    "com.apple.lskdd",
+					State:   "dead",
+					Enabled: true,
+					Loaded:  true,
+					Type:    "launchd",
+				},
 			},
 		},
 		{
@@ -234,7 +276,13 @@ func (s *ServicesPublicTestSuite) TestCollectDarwin() {
 				nil,
 			),
 			want: []services.Service{
-				{Name: "com.apple.cron", State: "running", Enabled: true, Type: "launchd"},
+				{
+					Name:    "com.apple.cron",
+					State:   "running",
+					Enabled: true,
+					Loaded:  true,
+					Type:    "launchd",
+				},
 			},
 		},
 		{
@@ -274,6 +322,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 						Name:          "ssh",
 						State:         "running",
 						Enabled:       true,
+						Loaded:        true,
 						UnitFileState: "enabled",
 						Description:   "OpenSSH server daemon",
 					},
@@ -281,6 +330,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 						Name:          "cron",
 						State:         "running",
 						Enabled:       true,
+						Loaded:        true,
 						UnitFileState: "enabled-runtime",
 						Description:   "Regular background program",
 					},
@@ -288,10 +338,28 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 						Name:          "NetworkManager",
 						State:         "dead",
 						Enabled:       false,
+						Loaded:        true,
 						UnitFileState: "disabled",
 						Description:   "Network Manager",
 					},
 				}, info.Services)
+			},
+		},
+		{
+			name:    "linux: a unit whose LOAD is not loaded is not loaded",
+			variant: "linux",
+			exec: systemctlExec(s.T(), []byte(
+				"gone.service  not-found inactive dead gone.service\n"+
+					"hidden.service masked   inactive dead hidden.service\n"), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Require().GreaterOrEqual(len(info.Services), 2)
+				s.Equal("gone", info.Services[0].Name)
+				s.False(info.Services[0].Loaded)
+				s.Equal("hidden", info.Services[1].Name)
+				s.False(info.Services[1].Loaded)
 			},
 		},
 		{
@@ -309,6 +377,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 						Name:          "ssh",
 						State:         "running",
 						Enabled:       true,
+						Loaded:        true,
 						UnitFileState: "enabled",
 						Description:   "OpenSSH server daemon",
 					},
@@ -411,6 +480,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 						Name:          "ssh",
 						State:         "running",
 						Enabled:       true,
+						Loaded:        true,
 						UnitFileState: "enabled",
 						Description:   "OpenSSH",
 					},

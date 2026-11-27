@@ -4576,6 +4576,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "loaded": {
+          "type": "boolean"
+        },
         "type": {
           "type": "string"
         },
@@ -4591,7 +4594,8 @@
       "required": [
         "name",
         "state",
-        "enabled"
+        "enabled",
+        "loaded"
       ]
     },
     "SessionsInfo": {

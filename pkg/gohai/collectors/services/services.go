@@ -37,7 +37,12 @@ type Service struct {
 	Name    string `json:"name"`
 	State   string `json:"state"`
 	Enabled bool   `json:"enabled"`
-	Type    string `json:"type,omitempty"`
+	// Loaded is whether the init system has the service loaded: systemd's
+	// LOAD column is "loaded", or launchd's services block has the label.
+	// A unit that only has a unit file, or a label that only has a launchd
+	// override, is not loaded.
+	Loaded bool   `json:"loaded"`
+	Type   string `json:"type,omitempty"`
 	// UnitFileState is the state of the unit file, as systemctl
 	// list-unit-files prints it: enabled, enabled-runtime, disabled,
 	// static, masked and the others. Empty when list-unit-files failed.
@@ -137,6 +142,7 @@ func parseSystemctlOutput(
 		info.Services = append(info.Services, Service{
 			Name:          name,
 			State:         fields[3],
+			Loaded:        fields[1] == "loaded",
 			Enabled:       enabled(state[name]),
 			UnitFileState: state[name],
 			Description:   strings.Join(fields[4:], " "),
