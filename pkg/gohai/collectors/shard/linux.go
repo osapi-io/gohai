@@ -42,7 +42,12 @@ func (l *Linux) Collect(
 	_ context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
-	machinename := getMachineName(prior)
+	machinename, err := getMachineName(prior)
+	if err != nil {
+		return nil, err
+	}
+	// DMI is optional: a container or an ARM board has none, and Ohai
+	// then seeds from the machine name alone.
 	dmiInfo, _ := collector.GetDep[*dmi.Info](prior, "dmi")
 	serial := getDMISerial(dmiInfo)
 	uuid := getDMIUUID(dmiInfo)

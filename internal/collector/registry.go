@@ -164,7 +164,8 @@ func (r *Registry) SelectedWith(
 // (no inter-dependencies) run concurrently. Returns a map of collector name
 // to result. Failed collectors are omitted from the result map, and their
 // error goes to hooks.OnError. A panic in a collector is its error. A
-// cancelled ctx starts no next level, and Run returns ctx's error. hooks may
+// ctx cancelled before Run returns, in any level, is ctx's error, and no
+// next level starts. hooks may
 // be zero-valued; any non-nil field is invoked per collector.
 func (r *Registry) Run(
 	ctx context.Context,
@@ -219,6 +220,11 @@ func (r *Registry) Run(
 			}()
 		}
 		wg.Wait()
+	}
+	// A ctx cancelled during the last level is an error too, as it is in
+	// an earlier one: the caller can't tell which facts it lost.
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return results, nil
 }

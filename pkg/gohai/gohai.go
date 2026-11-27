@@ -188,7 +188,15 @@ func (g *Gohai) Collect(
 		facts.Timings = &Timings{Collectors: samples}
 	}
 	for name, result := range results {
-		facts.set(name, result)
+		if result == nil || facts.set(name, result) {
+			continue
+		}
+		// A collector that gives a type its Facts field doesn't hold would
+		// lose its fact with no word, so the mismatch is its error.
+		if facts.Errors == nil {
+			facts.Errors = make(map[string]string)
+		}
+		facts.Errors[name] = fmt.Sprintf("gave a %T, which its Facts field does not hold", result)
 	}
 	return facts, nil
 }

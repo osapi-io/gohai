@@ -63,8 +63,8 @@ type Sources struct {
 	Now func() time.Time
 	// Family picks the collector's variant, as family.Detect names it, such
 	// as debian or darwin. When it is zero and FS is given, it is the family
-	// of FS's /etc/os-release, so a caller that gives a macOS filesystem
-	// gives darwin.
+	// that family.FromFS reads from FS: darwin for a filesystem with macOS's
+	// SystemVersion.plist, else the family that its /etc/os-release names.
 	Family string
 	// Resolver resolves names, as the system resolver does: /etc/hosts and
 	// then DNS. The hostname collector canonicalizes the FQDN with it.
@@ -96,7 +96,7 @@ func Host() Sources {
 func (s Sources) Defaults() Sources {
 	if s.Family == "" {
 		if s.FS != nil {
-			s.Family = family.FromOSRelease(s.FS)
+			s.Family = family.FromFS(s.FS)
 		} else {
 			s.Family = family.Detect()
 		}

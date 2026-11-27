@@ -70,6 +70,22 @@ func newFailingCollector(
 	return m
 }
 
+// newCollectorGiving is a collector named name whose Collect gives result.
+func newCollectorGiving(
+	ctrl *gomock.Controller,
+	name string,
+	result any,
+) *mocks.MockCollector {
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(false).AnyTimes()
+	m.EXPECT().Dependencies().Return(nil).AnyTimes()
+	m.EXPECT().Collect(gomock.Any(), gomock.Any()).Return(result, nil).AnyTimes()
+
+	return m
+}
+
 type GohaiPublicTestSuite struct {
 	suite.Suite
 }
@@ -190,6 +206,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 		name          string
 		opts          []gohai.Option
 		injectFailing bool
+		injectAs      any
 		validateFunc  func(*gohai.Facts, error)
 	}{
 		{
@@ -300,6 +317,20 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:     "a result that no Facts field holds surfaces in Errors",
+			injectAs: "x",
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts)
+				s.Equal(
+					map[string]string{
+						"wrongtype": "gave a string, which its Facts field does not hold",
+					},
+					facts.Errors,
+				)
+			},
+		},
+		{
 			name:          "failed collector surfaces in Errors without WithTimings",
 			injectFailing: true,
 			validateFunc: func(facts *gohai.Facts, err error) {
@@ -326,6 +357,12 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 					)),
 				)
 				s.Require().NoError(g.Select("failtest"))
+			}
+			if tt.injectAs != nil {
+				s.Require().NoError(
+					g.Register(newCollectorGiving(gomock.NewController(s.T()), "wrongtype", tt.injectAs)),
+				)
+				s.Require().NoError(g.Select("wrongtype"))
 			}
 			tt.validateFunc(g.Collect(context.Background()))
 		})

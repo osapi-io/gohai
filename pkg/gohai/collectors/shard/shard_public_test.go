@@ -128,6 +128,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		ioregErr     error
 		spOut        []byte
 		spErr        error
+		noExec       bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -209,7 +210,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: no hostname prior → seed from serial+uuid only",
+			name:    "linux: no hostname prior → ErrNoMachineName, no seed",
 			variant: "linux",
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{
@@ -217,31 +218,38 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				},
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*shard.Info)
-				s.Require().True(ok)
-
-				if -1 >= 0 {
-					s.Equal(-1, info.Seed)
-				} else {
-					s.GreaterOrEqual(info.Seed, 0)
-				}
+				s.Require().ErrorIs(err, shard.ErrNoMachineName)
+				s.Nil(got)
 			},
 		},
 		{
-			name:    "linux: empty prior → deterministic zero-input seed",
+			name:    "linux: empty prior → ErrNoMachineName, no seed",
 			variant: "linux",
 			prior:   collector.PriorResults{},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*shard.Info)
-				s.Require().True(ok)
-
-				if -1 >= 0 {
-					s.Equal(-1, info.Seed)
-				} else {
-					s.GreaterOrEqual(info.Seed, 0)
-				}
+				s.Require().ErrorIs(err, shard.ErrNoMachineName)
+				s.Nil(got)
+			},
+		},
+		{
+			name:    "linux: an empty machine name → ErrNoMachineName, no seed",
+			variant: "linux",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: "  "},
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, shard.ErrNoMachineName)
+				s.Nil(got)
+			},
+		},
+		{
+			name:    "darwin: no hostname prior → ErrNoMachineName, and no command runs",
+			variant: "darwin",
+			prior:   collector.PriorResults{},
+			noExec:  true,
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, shard.ErrNoMachineName)
+				s.Nil(got)
 			},
 		},
 		{
@@ -393,6 +401,10 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			case "darwin":
 				ctrl := gomock.NewController(s.T())
 				mockExec := sourcemocks.NewMockRunner(ctrl)
+				if tt.noExec {
+					c = &shard.Darwin{Exec: mockExec}
+					break
+				}
 				mockExec.EXPECT().
 					Execute(gomock.Any(), "ioreg", "-rd1", "-c", "IOPlatformExpertDevice").
 					Return(tt.ioregOut, tt.ioregErr)

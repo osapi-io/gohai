@@ -154,17 +154,24 @@ func Detect() string {
 		return Darwin
 	}
 
-	return FromOSRelease(hostFS)
+	return FromFS(hostFS)
 }
 
-// FromOSRelease is the family of the Linux host whose filesystem is fs:
-// the family of the platform its /etc/os-release ID names, the platform
+// macOSVersion is the file that each macOS host has and no Linux host has.
+const macOSVersion = "/System/Library/CoreServices/SystemVersion.plist"
+
+// FromFS is the family of the host whose filesystem is fs: darwin when fs
+// has macOS's SystemVersion.plist and no /etc/os-release; otherwise the
+// family of the platform that its /etc/os-release ID names, the platform
 // itself when it has no family, or "" when the file has no ID.
-func FromOSRelease(
+func FromFS(
 	fs avfs.VFS,
 ) string {
 	data, err := fs.ReadFile(osRelease)
 	if err != nil {
+		if _, statErr := fs.Stat(macOSVersion); statErr == nil {
+			return Darwin
+		}
 		return ""
 	}
 	var id string

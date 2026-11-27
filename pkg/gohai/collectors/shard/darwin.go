@@ -53,7 +53,10 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
-	machinename := getMachineName(prior)
+	machinename, err := getMachineName(prior)
+	if err != nil {
+		return nil, err
+	}
 	serial := readDarwinSerial(ctx, d.Exec)
 	uuid := readDarwinUUID(ctx, d.Exec)
 	return &Info{Seed: computeSeed(machinename, serial, uuid)}, nil

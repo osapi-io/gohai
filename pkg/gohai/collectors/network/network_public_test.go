@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
@@ -315,6 +316,55 @@ func ethtoolOnlyFor(
 	return m
 }
 
+// driverInfoOnlyFor answers `ethtool -i name` with driver, and fails the
+// test for any other ethtool run: a bond or a bridge gets no tuning runs.
+func driverInfoOnlyFor(
+	t *testing.T,
+	name string,
+	driver string,
+) source.Runner {
+	ctrl := gomock.NewController(t)
+	m := sourcemocks.NewMockRunner(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-d", "link").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, args ...string) ([]byte, error) {
+			if args[0] != "-i" || args[1] != name {
+				t.Errorf("ethtool %s ran for %s", args[0], args[1])
+			}
+			return []byte("driver: " + driver + "\n"), nil
+		}).
+		AnyTimes()
+	return m
+}
+
+// noEthtool answers the ip reads and fails the test for any ethtool run.
+func noEthtool(
+	t *testing.T,
+) source.Runner {
+	ctrl := gomock.NewController(t)
+	m := sourcemocks.NewMockRunner(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ip", "-d", "link").
+		Return(nil, errors.New("nope")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
+		Times(0)
+	return m
+}
+
 // ipRouteAndEthtoolExec extends ipRouteExec with a canned `ethtool -i
 // <iface>` response. driverInfo maps interface name → ethtool stdout;
 // missing interfaces fall back to the "not found" error. Other
@@ -520,6 +570,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		countersFn   func() ([]tCounters, error)
 		fs           avfs.VFS
 		exec         source.Runner
+		budget       time.Duration
 		validateFunc func(any, error)
 	}{
 		{
@@ -642,6 +693,71 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Interfaces, 2)
 				s.Require().NotNil(i.Interfaces[0].Ethtool)
 				s.Equal("igb", i.Interfaces[0].Ethtool.DriverInfo["driver"])
+				s.Nil(i.Interfaces[1].Ethtool)
+			},
+		},
+		{
+			name: "linux: a bond gets ethtool -i, and no tuning run",
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{{
+					Index: 4,
+					Name:  "bond0", MTU: 1500, MAC: "02:42:ac:11:00:04",
+					Flags: []string{"up", "broadcast", "multicast"},
+				}}, nil
+			},
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/bond0/type":         "1\n",
+				"/sys/class/net/bond0/bonding/mode": "active-backup 1\n",
+			}),
+			exec: driverInfoOnlyFor(s.T(), "bond0", "bonding"),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Require().NotNil(i.Interfaces[0].Ethtool)
+				s.Equal("bonding", i.Interfaces[0].Ethtool.DriverInfo["driver"])
+				s.Nil(i.Interfaces[0].Ethtool.RingParams)
+			},
+		},
+		{
+			name: "linux: a bridge gets ethtool -i",
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{{
+					Index: 5,
+					Name:  "br0", MTU: 1500, MAC: "02:42:ac:11:00:05",
+					Flags: []string{"up", "broadcast", "multicast"},
+				}}, nil
+			},
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/br0/type":             "1\n",
+				"/sys/class/net/br0/bridge/stp_state": "0\n",
+			}),
+			exec: driverInfoOnlyFor(s.T(), "br0", "bridge"),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(i.Interfaces[0].Ethtool)
+				s.Equal("bridge", i.Interfaces[0].Ethtool.DriverInfo["driver"])
+			},
+		},
+		{
+			name:       "linux: a spent ethtool budget runs no ethtool",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
+			}),
+			exec:   noEthtool(s.T()),
+			budget: time.Nanosecond,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
 				s.Nil(i.Interfaces[1].Ethtool)
 			},
 		},
@@ -1466,7 +1582,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 						AnyTimes()
 					exec = mock
 				}
-				c = &network.Linux{FS: tt.fs, Exec: exec}
+				l := &network.Linux{FS: tt.fs, Exec: exec}
+				l.SetEthtoolBudget(tt.budget)
+				c = l
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

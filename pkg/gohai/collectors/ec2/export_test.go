@@ -19,13 +19,3 @@
 // DEALINGS IN THE SOFTWARE.
 
 package ec2
-
-// SetHypervisorUUIDPath swaps the /sys/hypervisor/uuid path tests
-// read for the xen-UUID detection signal.
-func SetHypervisorUUIDPath(
-	path string,
-) func() {
-	orig := hypervisorUUIDPath
-	hypervisorUUIDPath = path
-	return func() { hypervisorUUIDPath = orig }
-}

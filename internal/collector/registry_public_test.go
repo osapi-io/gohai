@@ -548,6 +548,30 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				},
 			}
 		}(),
+		func() runCase {
+			ctx, cancel := context.WithCancel(context.Background())
+
+			return runCase{
+				name: "a run cancelled during its last level is an error",
+				ctx:  ctx,
+				setup: func(reg *collector.Registry) {
+					a := newCollectorWith(s.ctrl, "a")
+					a.EXPECT().
+						Collect(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(context.Context, collector.PriorResults) (any, error) {
+							cancel()
+
+							return "a-result", nil
+						})
+					s.Require().NoError(reg.Register(a))
+				},
+				names: []string{"a"},
+				validateFunc: func(results map[string]any, _, _ []string, err error) {
+					s.ErrorIs(err, context.Canceled)
+					s.Nil(results)
+				},
+			}
+		}(),
 		{
 			name: "a collector can register while the run goes on",
 			setup: func(reg *collector.Registry) {

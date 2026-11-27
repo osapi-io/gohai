@@ -28,6 +28,7 @@ package shard
 
 import (
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -74,15 +75,21 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// getMachineName extracts the raw hostname from the hostname prior.
+// ErrNoMachineName is the error of Collect when the hostname collector gave
+// no machine name, such as when it failed. A seed without the machine name is
+// the same on each host that lost it, so shard gives none.
+var ErrNoMachineName = errors.New("shard: the hostname collector gave no machine name")
+
+// getMachineName extracts the raw hostname from the hostname prior. It is
+// ErrNoMachineName when the prior has none.
 func getMachineName(
 	prior collector.PriorResults,
-) string {
+) (string, error) {
 	info, ok := collector.GetDep[*hostname.Info](prior, "hostname")
-	if !ok || info == nil {
-		return ""
+	if !ok || info == nil || strings.TrimSpace(info.MachineName) == "" {
+		return "", ErrNoMachineName
 	}
-	return info.MachineName
+	return info.MachineName, nil
 }
 
 // getDMISerial mirrors Ohai's get_dmi_property for serial_number —
