@@ -33,14 +33,18 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// nonASCIIRe strips visual icons produced by newer systemd versions
-// (Unicode decorators in hostnamectl output). Mirrors Ohai's
-// `/[^\p{ASCII}]/u` regex.
+// nonASCIIRe strips the icon that newer systemd versions print after the
+// chassis, such as "vm 🖴". It mirrors Ohai's `/[^\p{ASCII}]/u` regex, but
+// only on the chassis: a location, a deployment or a vendor name can be
+// UTF-8 text.
 var nonASCIIRe = regexp.MustCompile(`[^\x00-\x7F]+`)
 
 // Info holds hostnamectl fields.
 type Info struct {
-	StaticHostname            string `json:"static_hostname,omitempty"`
+	StaticHostname string `json:"static_hostname,omitempty"`
+	// TransientHostname is the hostname that DHCP or mDNS set, which
+	// hostnamectl shows when it differs from the static one.
+	TransientHostname         string `json:"transient_hostname,omitempty"`
 	IconName                  string `json:"icon_name,omitempty"`
 	Chassis                   string `json:"chassis,omitempty"`
 	Deployment                string `json:"deployment,omitempty"`
@@ -103,19 +107,20 @@ func parseHostnamectl(
 		}
 		rawKey := strings.TrimSpace(line[:idx])
 		rawVal := strings.TrimSpace(line[idx+2:])
-		// Strip non-ASCII visual decorators (systemd ≥ v250 emoji icons).
-		val := strings.TrimSpace(nonASCIIRe.ReplaceAllString(rawVal, ""))
-		// Collapse multiple spaces introduced by stripping non-ASCII.
-		for strings.Contains(val, "  ") {
-			val = strings.ReplaceAll(val, "  ", " ")
-		}
-		val = strings.TrimSpace(val)
+		val := rawVal
 		// Map to fields using the same key→snake_case logic as Ohai:
 		// key.downcase.tr(" ", "_").
 		key := strings.ToLower(strings.ReplaceAll(rawKey, " ", "_"))
+		if key == "chassis" {
+			// Strip the icon that systemd v250 and later prints, then
+			// collapse the spaces that the strip leaves.
+			val = strings.Join(strings.Fields(nonASCIIRe.ReplaceAllString(val, "")), " ")
+		}
 		switch key {
 		case "static_hostname":
 			info.StaticHostname = val
+		case "transient_hostname":
+			info.TransientHostname = val
 		case "icon_name":
 			info.IconName = val
 		case "chassis":

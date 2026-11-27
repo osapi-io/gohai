@@ -234,7 +234,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 					Ruby:   strPtr("3.2.2"),
 					Node:   strPtr("20.1.0"),
 					Java:   strPtr("21.0.1"),
-					Perl:   strPtr("v5.36.0"),
+					Perl:   strPtr("5.36.0"),
 				}, *info)
 			},
 		},
@@ -274,7 +274,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 					Ruby:   strPtr("3.2.2"),
 					Node:   strPtr("20.1.0"),
 					Java:   strPtr("21.0.1"),
-					Perl:   strPtr("v5.36.0"),
+					Perl:   strPtr("5.36.0"),
 				}, *info)
 			},
 		},

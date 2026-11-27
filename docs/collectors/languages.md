@@ -41,7 +41,7 @@ is missing.
     "ruby": "3.2.2",
     "node": "20.1.0",
     "java": "21.0.1",
-    "perl": "v5.36.0"
+    "perl": "5.36.0"
   }
 }
 ```
@@ -75,8 +75,7 @@ the same `--version` command. gohai puts all six probes in one collector. The
 version parse is the same as in Ohai's parser for each language. gohai handles
 the same special cases:
 
-- the stderr output of Java
-- the version in parentheses of Perl
+- the version in parentheses of Perl, without its `v`
 - the `v` at the start of the Node version
 
 Linux and Darwin use the same probe sequence. The version flags are the same on
@@ -94,7 +93,8 @@ the two platforms:
    second field of the first line (`openjdk 21.0.1 2023-10-17` → `21.0.1`). Java
    8 does not have `--version`, so the collector gives no version for it.
 6. **Perl.** `perl --version`. The collector gets the `(vX.Y.Z)` form in
-   parentheses from the first line.
+   parentheses from the first line, and removes the `v` (`(v5.36.0)` →
+   `5.36.0`).
 
 If a probe fails, the collector sets its field to `nil`. A probe fails if the
 command is not found or gives a non-zero exit code. The collector never returns

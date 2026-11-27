@@ -2600,6 +2600,9 @@
         "static_hostname": {
           "type": "string"
         },
+        "transient_hostname": {
+          "type": "string"
+        },
         "icon_name": {
           "type": "string"
         },
