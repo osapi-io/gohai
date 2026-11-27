@@ -198,18 +198,69 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: invalid count field returns error",
+			name:    "linux: a count that is not a number ends the counts, and the other lines stay",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/proc", 0o755)
 				_ = f.WriteFile("/proc/interrupts",
-					[]byte("           CPU0\n  0:      BAD   IO-APIC   2-edge   timer\n"),
+					[]byte(
+						"           CPU0       CPU1\n"+
+							"XYZ:          5   text after one count\n"+
+							"  0:         46          0   IO-APIC   2-edge      timer\n",
+					),
 					fs.FileMode(0o444))
 				return f
 			},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{
+					{Number: "XYZ", Type: "text after one count", CountsPerCPU: []int64{5, 0}},
+					{Number: "0", Type: "IO-APIC", Device: "timer", CountsPerCPU: []int64{46, 0}},
+				}, info.IRQs)
+			},
+		},
+		{
+			name:    "linux: arm64 GIC lines have a trigger word between the hwirq and the device",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc", 0o755)
+				_ = f.WriteFile("/proc/interrupts",
+					[]byte(
+						"           CPU0       CPU1\n"+
+							" 11:      12345      23456     GICv3  27 Level     arch_timer\n"+
+							" 14:          0          0     GICv3  33 Edge      uart-pl011, serial\n"+
+							"IPI0:       100        200       Rescheduling interrupts\n",
+					),
+					fs.FileMode(0o444))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{
+					{
+						Number:       "11",
+						Type:         "GICv3",
+						Device:       "arch_timer",
+						CountsPerCPU: []int64{12345, 23456},
+					},
+					{
+						Number:       "14",
+						Type:         "GICv3",
+						Device:       "uart-pl011, serial",
+						CountsPerCPU: []int64{0, 0},
+					},
+					{
+						Number:       "IPI0",
+						Type:         "Rescheduling interrupts",
+						CountsPerCPU: []int64{100, 200},
+					},
+				}, info.IRQs)
 			},
 		},
 		{

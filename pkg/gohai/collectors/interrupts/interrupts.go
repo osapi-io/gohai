@@ -25,7 +25,6 @@ package interrupts
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -129,15 +128,17 @@ func parseInterrupts(
 
 		fields := strings.Fields(rest)
 
+		// The counts end at the first field that is not a number: a line
+		// can have fewer counts than CPUs, then its type or description.
 		counts := make([]int64, cpuCount)
-		for i := range cpuCount {
-			if i < len(fields) {
-				v, err := strconv.ParseInt(fields[i], 10, 64)
-				if err != nil {
-					return nil, fmt.Errorf("parse interrupt count cpu%d irq %s: %w", i, number, err)
-				}
-				counts[i] = v
+		extraStart := 0
+		for extraStart < cpuCount && extraStart < len(fields) {
+			v, err := strconv.ParseInt(fields[extraStart], 10, 64)
+			if err != nil {
+				break
 			}
+			counts[extraStart] = v
+			extraStart++
 		}
 
 		irq := IRQ{
@@ -145,21 +146,21 @@ func parseInterrupts(
 			CountsPerCPU: counts,
 		}
 
-		// Fields after the CPU counts are type, optional vector, and device.
-		// For non-numeric IRQs the trailing content is just a type label.
-		// Guard against lines with fewer fields than cpuCount (e.g. ERR on
-		// a multi-CPU host that only reports one count).
-		extraStart := cpuCount
-		if extraStart > len(fields) {
-			extraStart = len(fields)
-		}
+		// Fields after the CPU counts are the chip, the hwirq, and the
+		// device. On x86 the hwirq carries its trigger ("2-edge"). On arm64
+		// the trigger is a word of its own ("27 Level"), which is not part
+		// of the device. For non-numeric IRQs the trailing content is just a
+		// type label.
 		extra := fields[extraStart:]
 		isNumeric := isNumericIRQ(number)
 		if isNumeric && len(extra) >= 1 {
 			irq.Type = extra[0]
-			// extra[1] is the vector (skipped), extra[2:] joined is the device.
-			if len(extra) >= 3 {
-				irq.Device = strings.Join(extra[2:], " ")
+			device := 2
+			if len(extra) > device && isTrigger(extra[device]) {
+				device++
+			}
+			if len(extra) > device {
+				irq.Device = strings.Join(extra[device:], " ")
 			}
 		} else if !isNumeric && len(extra) >= 1 {
 			irq.Type = strings.Join(extra, " ")
@@ -169,6 +170,14 @@ func parseInterrupts(
 	}
 
 	return &Info{IRQs: irqs}, nil
+}
+
+// isTrigger reports whether field is the trigger word that arm64 prints
+// between the hwirq and the device.
+func isTrigger(
+	field string,
+) bool {
+	return field == "Level" || field == "Edge"
 }
 
 // isNumericIRQ reports whether the IRQ number string is a decimal integer.

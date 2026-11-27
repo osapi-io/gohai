@@ -292,6 +292,33 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: dominfo with an empty CPU(s) value keeps the domain and its other fields",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				ctrl := gomock.NewController(t)
+				m := sourcemocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+					Return([]byte(virshVersionOutput), nil).AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+					Return([]byte(virshURIOutput), nil).AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+					Return([]byte(" Id   Name   State\n-----------\n 1    testvm   running\n"), nil).
+					AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "virsh", "dominfo", "testvm").
+					Return([]byte("CPU(s):\nAutostart: enable\n"), nil).
+					AnyTimes()
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Domains, 1)
+				s.Zero(i.Domains[0].VCPUs)
+				s.True(i.Domains[0].Autostart)
+			},
+		},
+		{
 			name:    "linux: virsh version fails — returns nil",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {

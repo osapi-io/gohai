@@ -109,18 +109,18 @@ On Linux:
    This occurs in containers that do not bind-mount `/proc`.
 2. The collector parses the first line as the CPU header to get the CPU count.
 3. For each line after the header, the collector splits the line at `:` to get
-   the IRQ number. Then it parses the next _N_ tokens as decimal event counts.
-   Whitespace separates the tokens, and _N_ is the CPU count. The collector
-   skips lines that have no colon.
-4. For numeric IRQs, the token at index _N_ is the interrupt controller type, if
-   it is there. The token at index _N+1_ is the interrupt vector, and the
-   collector skips it. The collector joins the tokens from index _N+2_ to the
-   end to make the device name.
+   the IRQ number. Then it parses up to _N_ tokens as decimal event counts.
+   Whitespace separates the tokens, and _N_ is the CPU count. The counts stop at
+   the first token that is not a number, and the missing counts are zero. The
+   collector skips lines that have no colon.
+4. For numeric IRQs, the token after the counts is the interrupt controller
+   type, if it is there. The next token is the hwirq, and the collector skips
+   it. On arm64 a trigger word, `Level` or `Edge`, comes after the hwirq, and
+   the collector skips it too. The collector joins the rest of the tokens to
+   make the device name.
 5. For non-numeric IRQs, for example `NMI`, `LOC` and `ERR`, the collector joins
    the tokens after the counts to make the type label. Usually, `ERR` and `MIS`
    have no tokens after the counts.
-6. If a count token is not a decimal number, the collector returns a parse
-   error.
 
 On macOS, the collector returns `nil`.
 
