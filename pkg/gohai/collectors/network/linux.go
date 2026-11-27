@@ -158,7 +158,7 @@ func applyEthtoolDriverInfo(
 	info *Info,
 ) {
 	for i := range info.Interfaces {
-		if ctx.Err() != nil {
+		if spent(ctx) {
 			return
 		}
 		if !driverInfoTarget(fs, info.Interfaces[i]) {
@@ -225,7 +225,7 @@ func applyEthtoolTuning(
 	info *Info,
 ) {
 	for i := range info.Interfaces {
-		if ctx.Err() != nil {
+		if spent(ctx) {
 			return
 		}
 		if !ethtoolTarget(fs, info.Interfaces[i]) {
@@ -757,4 +757,19 @@ func readNetDev(
 	}
 
 	return counters
+}
+
+// spent reports whether the ethtool budget in ctx is used up. A timer
+// context sets Err only when its timer fires on another goroutine, so a
+// deadline that has passed can still have a nil Err: the deadline decides.
+// time.Now here reads no fact of the host; it measures the budget.
+func spent(
+	ctx context.Context,
+) bool {
+	if ctx.Err() != nil {
+		return true
+	}
+	deadline, ok := ctx.Deadline()
+
+	return ok && !time.Now().Before(deadline)
 }
