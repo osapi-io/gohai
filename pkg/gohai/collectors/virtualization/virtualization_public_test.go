@@ -142,6 +142,17 @@ func (s *VirtualizationPublicTestSuite) TestInContainer() {
 			want: true,
 		},
 		{
+			name: "when the host is a CRI-O container",
+			info: &virtualization.Info{Systems: map[string]string{"crio": "guest"}}, want: true,
+		},
+		{
+			name: "when the host is a pod that only its environment shows",
+			info: &virtualization.Info{
+				Systems: map[string]string{"kubernetes": "guest"},
+			},
+			want: true,
+		},
+		{
 			name: "when the host only runs docker",
 			info: &virtualization.Info{Systems: map[string]string{"docker": "host"}}, want: false,
 		},
