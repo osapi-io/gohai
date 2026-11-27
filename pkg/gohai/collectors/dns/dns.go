@@ -39,6 +39,10 @@ type Info struct {
 	// Interfaces is the resolver of each interface that has one, by
 	// interface name.
 	Interfaces map[string]Resolver `json:"interfaces,omitempty"`
+	// Global is systemd-resolved's resolver that belongs to no interface
+	// (resolvectl's Global line). With systemd-resolved, resolv.conf names
+	// only its stub, 127.0.0.53, so these are the upstream servers.
+	Global *Resolver `json:"global,omitempty"`
 }
 
 // Resolver is the name servers and domains of one interface.

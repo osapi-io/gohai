@@ -18,14 +18,15 @@ DefaultEnabled is `false`.
 
 ## Collected fields
 
-| Field                      | Type       | Description                                                 | Schema mapping            |
-| -------------------------- | ---------- | ----------------------------------------------------------- | ------------------------- |
-| `nameservers`              | `[]string` | The `nameserver` lines of `/etc/resolv.conf`, in order.     | No direct schema mapping. |
-| `search`                   | `[]string` | The last `search` or `domain` line.                         | No direct schema mapping. |
-| `options`                  | `[]string` | The `options` lines, each option a value.                   | No direct schema mapping. |
-| `interfaces`               | `map`      | The resolver of each interface that has one, by name.       | No direct schema mapping. |
-| `interfaces.*.nameservers` | `[]string` | The name servers of the interface, without an IPv6 zone.    | No direct schema mapping. |
-| `interfaces.*.domains`     | `[]string` | The domains of the interface. `~.` routes every name there. | No direct schema mapping. |
+| Field                      | Type       | Description                                                                                                                                                                                               | Schema mapping            |
+| -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `nameservers`              | `[]string` | The `nameserver` lines of `/etc/resolv.conf`, in order.                                                                                                                                                   | No direct schema mapping. |
+| `search`                   | `[]string` | The last `search` or `domain` line.                                                                                                                                                                       | No direct schema mapping. |
+| `options`                  | `[]string` | The `options` lines, each option a value.                                                                                                                                                                 | No direct schema mapping. |
+| `interfaces`               | `map`      | The resolver of each interface that has one, by name.                                                                                                                                                     | No direct schema mapping. |
+| `interfaces.*.nameservers` | `[]string` | The name servers of the interface, without an IPv6 zone, a port or a TLS server name.                                                                                                                     | No direct schema mapping. |
+| `interfaces.*.domains`     | `[]string` | The domains of the interface. `~.` routes every name there.                                                                                                                                               | No direct schema mapping. |
+| `global`                   | `object`   | systemd-resolved's resolver of no interface (`resolvectl`'s `Global` line): its `nameservers` and `domains`. With systemd-resolved, `resolv.conf` names only the stub, so these are the upstream servers. | No direct schema mapping. |
 
 ## Platform support
 
@@ -100,8 +101,9 @@ On Linux:
    starts with `#` or `;` is a comment.
 2. When the command runner is there, it runs `resolvectl dns` and
    `resolvectl domain`. Each `Link N (name): …` line gives that interface's name
-   servers or domains. If `resolvectl` fails, as on a host without
-   systemd-resolved, the interfaces stay empty.
+   servers or domains, and the `Global: …` line gives `global`. A server loses
+   its `%zone`, its `#name` and its port. If `resolvectl` fails, as on a host
+   without systemd-resolved, the interfaces stay empty.
 
 On macOS:
 

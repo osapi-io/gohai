@@ -152,11 +152,14 @@ On macOS:
 1. `sysctl -n kern.ostype kern.osrelease kern.version hw.machine` gives `name`,
    `release`, `version` and `machine`, one to a line, the values of `uname(3)`.
 2. `processor` is a copy of `machine`. `os` is always the string `"Darwin"`.
-3. The collector runs `sysctl -n hw.optional.x86_64`. It does this only if
+3. The collector runs `sysctl -n sysctl.proc_translated`. It does this only if
    `machine` is `x86_64`. If the output without whitespace is `"1"`, the process
    runs under Rosetta 2. Then the collector sets `machine` and `processor` to
-   `arm64`, the real hardware, and sets `rosetta_translated = true`. On native
-   Apple Silicon, the collector does not run this sysctl.
+   `arm64`, the real hardware, and sets `rosetta_translated = true`. An Intel
+   Mac has no such key, and that reads as not translated. On native Apple
+   Silicon, the collector does not run this sysctl. `hw.optional.x86_64` can't
+   be used, because it is `1` on an Intel Mac too. This is not tested on Intel
+   hardware.
 
 The list of loaded modules (`/proc/modules`, `/sys/module/<n>/version`,
 `kextstat`) is in [`kernel_modules`](kernel_modules.md).

@@ -1219,6 +1219,9 @@
             "$ref": "#/$defs/DnsResolver"
           },
           "type": "object"
+        },
+        "global": {
+          "$ref": "#/$defs/DnsResolver"
         }
       },
       "additionalProperties": false,

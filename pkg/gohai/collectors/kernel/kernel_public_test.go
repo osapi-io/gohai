@@ -120,7 +120,7 @@ func rosetta(
 	out string,
 	err error,
 ) answer {
-	return answer{args: []string{"sysctl", "-n", "hw.optional.x86_64"}, out: out, err: err}
+	return answer{args: []string{"sysctl", "-n", "sysctl.proc_translated"}, out: out, err: err}
 }
 
 func (s *KernelPublicTestSuite) TestNew() {
@@ -284,8 +284,11 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 			},
 		},
 		{
-			name:    "when it runs on an Intel Mac, sysctl reports 0",
-			answers: []answer{sysctlKernel(intel, nil), rosetta("0\n", nil)},
+			name: "when it runs on an Intel Mac, which has no sysctl.proc_translated, there is no Rosetta",
+			answers: []answer{
+				sysctlKernel(intel, nil),
+				rosetta("", errors.New("unknown oid 'sysctl.proc_translated'")),
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i := got.(*kernel.Info)

@@ -101,6 +101,25 @@ func (s *DNSPublicTestSuite) TestCollect() {
 					},
 					"wg0": {},
 				},
+				Global: &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+			},
+		},
+		{
+			name:    "linux: DNS over TLS servers lose their port and name, and Global domains are read",
+			variant: "linux",
+			runner: sourcetest.Commands{Out: map[string]string{
+				"resolvectl dns": "Global: 1.1.1.1:853#cloudflare-dns.com [2606:4700::1111]:853#cloudflare-dns.com\n" +
+					"Link 2 (eth0): 10.0.0.1:53 fe80::1%eth0\n",
+				"resolvectl domain": "Global: ~. corp.example\nLink 2 (eth0):\n",
+			}},
+			want: &dns.Info{
+				Interfaces: map[string]dns.Resolver{
+					"eth0": {Nameservers: []string{"10.0.0.1", "fe80::1"}},
+				},
+				Global: &dns.Resolver{
+					Nameservers: []string{"1.1.1.1", "2606:4700::1111"},
+					Domains:     []string{"~.", "corp.example"},
+				},
 			},
 		},
 		{

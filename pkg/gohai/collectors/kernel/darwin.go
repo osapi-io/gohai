@@ -31,11 +31,10 @@ import (
 
 // Darwin collects kernel identity on macOS: kern.ostype, kern.osrelease,
 // kern.version and hw.machine through `sysctl -n`, the values that uname(3)
-// reports. It also runs `sysctl -n
-// hw.optional.x86_64` via the shared Executor for Rosetta 2 detection
-// (issue #31) — a return of "1" with uname reporting `x86_64` means
-// the process is running translated on Apple Silicon; we overwrite
-// Machine to `arm64` (the real hardware) and set RosettaTranslated.
+// reports. It also runs `sysctl -n sysctl.proc_translated` for Rosetta
+// 2 detection (issue #31): a "1" with uname reporting `x86_64` means the
+// process runs translated on Apple Silicon, so Machine is set to `arm64`
+// (the real hardware) and RosettaTranslated is set.
 // Module/kext enumeration now lives in the kernel_modules collector.
 type Darwin struct {
 	base
@@ -81,12 +80,13 @@ func (d *Darwin) Collect(
 	return info, nil
 }
 
-// detectRosetta returns true when we are executing under Rosetta 2:
-// sysctl reports x86_64 capability AND uname's machine is x86_64.
-// Either signal alone is ambiguous — sysctl returns 1 on native Intel
-// and on Apple Silicon (where Rosetta is available); uname returns
-// x86_64 on native Intel and under Rosetta. The conjunction pins it
-// to the translated-on-Apple-Silicon case per issue #31.
+// detectRosetta returns true when the process runs under Rosetta 2.
+// uname gives x86_64 both on a native Intel Mac and under Rosetta, so
+// it asks sysctl.proc_translated, which is 1 only for a translated
+// process. The key is 0 for a native process on Apple Silicon, and an
+// Intel Mac does not have it, which reads as not translated.
+// hw.optional.x86_64 does not tell the two apart: it is 1 on an Intel
+// Mac too. Not tested on Intel hardware.
 func detectRosetta(
 	ctx context.Context,
 	exec source.Runner,
@@ -95,7 +95,7 @@ func detectRosetta(
 	if machine != "x86_64" {
 		return false
 	}
-	out, err := exec.Execute(ctx, "sysctl", "-n", "hw.optional.x86_64")
+	out, err := exec.Execute(ctx, "sysctl", "-n", "sysctl.proc_translated")
 	if err != nil {
 		return false
 	}
