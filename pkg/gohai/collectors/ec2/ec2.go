@@ -29,13 +29,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"os"
 	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/avfs/avfs"
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -65,8 +66,7 @@ const (
 const hypervisorUUIDPrefix = "ec2"
 
 // hypervisorUUIDPath is the sysfs file we read for xen detection.
-// Package-level var so tests can swap it.
-var hypervisorUUIDPath = "/sys/hypervisor/uuid"
+const hypervisorUUIDPath = "/sys/hypervisor/uuid"
 
 // IMDSv2 token flow constants. Matches Ohai's mixin/ec2_metadata.rb.
 const (
@@ -289,6 +289,8 @@ type rawIAMInfo struct {
 
 // Collector fetches EC2 metadata via IMDSv2 (with IMDSv1 fallback).
 type Collector struct {
+	// FS is the filesystem that /sys/hypervisor/uuid is read from.
+	FS     avfs.VFS
 	client *cloudmetadata.Client
 }
 
@@ -312,14 +314,17 @@ func NewWith(
 			cloudmetadata.WithTimeout(metadataTimeout),
 			cloudmetadata.WithTransport(src.HTTP),
 		),
+		src,
 	)
 }
 
-// NewWithClient returns a Collector backed by a caller-supplied client.
+// NewWithClient returns a Collector backed by a caller-supplied client, that
+// reads the host through src.
 func NewWithClient(
 	c *cloudmetadata.Client,
+	src source.Sources,
 ) *Collector {
-	return &Collector{client: c}
+	return collector.Wire(&Collector{client: c}, src)
 }
 
 // Name returns "ec2".
@@ -348,7 +353,7 @@ func (c *Collector) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
-	if !onEC2(prior) {
+	if !onEC2(c.FS, prior) {
 		return nil, nil
 	}
 
@@ -496,6 +501,7 @@ func fetchPublicKeys(
 // Any match → detected. Falls open when dmi isn't in prior — the
 // HTTP probe will still error-out on non-EC2 hosts.
 func onEC2(
+	fs avfs.VFS,
 	prior collector.PriorResults,
 ) bool {
 	info, ok := collector.GetDep[*dmi.Info](prior, "dmi")
@@ -510,7 +516,7 @@ func onEC2(
 			return true
 		}
 	}
-	if b, err := os.ReadFile(hypervisorUUIDPath); err == nil {
+	if b, err := fs.ReadFile(hypervisorUUIDPath); err == nil {
 		if strings.HasPrefix(strings.TrimSpace(string(b)), hypervisorUUIDPrefix) {
 			return true
 		}

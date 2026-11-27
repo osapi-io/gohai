@@ -407,270 +407,335 @@ func (f *Facts) countPopulated() int {
 }
 
 // set assigns the result of a single collector into the correct typed
-// field on f. Unknown names are silently ignored (shouldn't happen for
-// registered collectors).
+// field on f. It is false when the name is unknown or the result is not
+// the name's type, so the caller can record the result as an error.
 func (f *Facts) set(
 	name string,
 	result any,
-) {
+) bool {
 	switch name {
 	case "platform":
 		if v, ok := result.(*platform.Info); ok {
 			f.Platform = v
+			return true
 		}
 	case "hostname":
 		if v, ok := result.(*hostname.Info); ok {
 			f.Hostname = v
+			return true
 		}
 	case "kernel":
 		if v, ok := result.(*kernel.Info); ok {
 			f.Kernel = v
+			return true
 		}
 	case "kernel_modules":
 		if v, ok := result.(*kernelmodules.Info); ok {
 			f.KernelModules = v
+			return true
 		}
 	case "uptime":
 		if v, ok := result.(*uptime.Info); ok {
 			f.Uptime = v
+			return true
 		}
 	case "virtualization":
 		if v, ok := result.(*virtualization.Info); ok {
 			f.Virtualization = v
+			return true
 		}
 	case "machine_id":
 		if v, ok := result.(*machineid.Info); ok {
 			f.MachineID = v
+			return true
 		}
 	case "cpu":
 		if v, ok := result.(*cpu.Info); ok {
 			f.CPU = v
+			return true
 		}
 	case "load":
 		if v, ok := result.(*load.Info); ok {
 			f.Load = v
+			return true
 		}
 	case "memory":
 		if v, ok := result.(*memory.Info); ok {
 			f.Memory = v
+			return true
 		}
 	case "filesystem":
 		if v, ok := result.(*filesystem.Info); ok {
 			f.Filesystem = v
+			return true
 		}
 	case "disk":
 		if v, ok := result.(*disk.Info); ok {
 			f.Disk = v
+			return true
 		}
 	case "network":
 		if v, ok := result.(*network.Info); ok {
 			f.Network = v
+			return true
 		}
 	case "process":
 		if v, ok := result.(*process.Info); ok {
 			f.Process = v
+			return true
 		}
 	case "users":
 		if v, ok := result.(*users.Info); ok {
 			f.Users = v
+			return true
 		}
 	case "sessions":
 		if v, ok := result.(*sessions.Info); ok {
 			f.Sessions = v
+			return true
 		}
 	case "timezone":
 		if v, ok := result.(*timezone.Info); ok {
 			f.Timezone = v
+			return true
 		}
 	case "dns":
 		if v, ok := result.(*dns.Info); ok {
 			f.DNS = v
+			return true
 		}
 	case "root_group":
 		if v, ok := result.(*rootgroup.Info); ok {
 			f.RootGroup = v
+			return true
 		}
 	case "shells":
 		if v, ok := result.(*shells.Info); ok {
 			f.Shells = v
+			return true
 		}
 	case "fips":
 		if v, ok := result.(*fips.Info); ok {
 			f.Fips = v
+			return true
 		}
 	case "os_release":
 		if v, ok := result.(*osrelease.Info); ok {
 			f.OSRelease = v
+			return true
 		}
 	case "lsb":
 		if v, ok := result.(*lsb.Info); ok {
 			f.LSB = v
+			return true
 		}
 	case "init":
 		if v, ok := result.(*initd.Info); ok {
 			f.Init = v
+			return true
 		}
 	case "shard":
 		if v, ok := result.(*shard.Info); ok {
 			f.Shard = v
+			return true
 		}
 	case "package_mgr":
 		if v, ok := result.(*packagemgr.Info); ok {
 			f.PackageMgr = v
+			return true
 		}
 	case "gce":
 		if v, ok := result.(*gce.Info); ok {
 			f.Gce = v
+			return true
 		}
 	case "ec2":
 		if v, ok := result.(*ec2.Info); ok {
 			f.Ec2 = v
+			return true
 		}
 	case "azure":
 		if v, ok := result.(*azure.Info); ok {
 			f.Azure = v
+			return true
 		}
 	case "digital_ocean":
 		if v, ok := result.(*digitalocean.Info); ok {
 			f.DigitalOcean = v
+			return true
 		}
 	case "oci":
 		if v, ok := result.(*oci.Info); ok {
 			f.OCI = v
+			return true
 		}
 	case "alibaba":
 		if v, ok := result.(*alibaba.Info); ok {
 			f.Alibaba = v
+			return true
 		}
 	case "linode":
 		if v, ok := result.(*linode.Info); ok {
 			f.Linode = v
+			return true
 		}
 	case "openstack":
 		if v, ok := result.(*openstack.Info); ok {
 			f.OpenStack = v
+			return true
 		}
 	case "scaleway":
 		if v, ok := result.(*scaleway.Info); ok {
 			f.Scaleway = v
+			return true
 		}
 	case "dmi":
 		if v, ok := result.(*dmi.Info); ok {
 			f.DMI = v
+			return true
 		}
 	case "gpu":
 		if v, ok := result.(*gpu.Info); ok {
 			f.GPU = v
+			return true
 		}
 	case "pci":
 		if v, ok := result.(*pci.Info); ok {
 			f.PCI = v
+			return true
 		}
 	case "scsi":
 		if v, ok := result.(*scsi.Info); ok {
 			f.SCSI = v
+			return true
 		}
 	case "hardware":
 		if v, ok := result.(*hardware.Info); ok {
 			f.Hardware = v
+			return true
 		}
 	case "block_device":
 		if v, ok := result.(*blockdevice.Info); ok {
 			f.BlockDevice = v
+			return true
 		}
 	case "command":
 		if v, ok := result.(*command.Info); ok {
 			f.Command = v
+			return true
 		}
 	case "docker":
 		if v, ok := result.(*docker.Info); ok {
 			f.Docker = v
+			return true
 		}
 	case "grub2":
 		if v, ok := result.(*grub2.Info); ok {
 			f.Grub2 = v
+			return true
 		}
 	case "hostnamectl":
 		if v, ok := result.(*hostnamectl.Info); ok {
 			f.Hostnamectl = v
+			return true
 		}
 	case "interrupts":
 		if v, ok := result.(*interrupts.Info); ok {
 			f.Interrupts = v
+			return true
 		}
 	case "ipc":
 		if v, ok := result.(*ipc.Info); ok {
 			f.IPC = v
+			return true
 		}
 	case "languages":
 		if v, ok := result.(*languages.Info); ok {
 			f.Languages = v
+			return true
 		}
 	case "libvirt":
 		if v, ok := result.(*libvirt.Info); ok {
 			f.Libvirt = v
+			return true
 		}
 	case "livepatch":
 		if v, ok := result.(*livepatch.Info); ok {
 			f.Livepatch = v
+			return true
 		}
 	case "mdadm":
 		if v, ok := result.(*mdadm.Info); ok {
 			f.Mdadm = v
+			return true
 		}
 	case "packages":
 		if v, ok := result.(*packages.Info); ok {
 			f.Packages = v
+			return true
 		}
 	case "rpm":
 		if v, ok := result.(*rpm.Info); ok {
 			f.RPM = v
+			return true
 		}
 	case "selinux":
 		if v, ok := result.(*selinux.Info); ok {
 			f.SELinux = v
+			return true
 		}
 	case "services":
 		if v, ok := result.(*services.Info); ok {
 			f.Services = v
+			return true
 		}
 	case "ssh":
 		if v, ok := result.(*ssh.Info); ok {
 			f.SSH = v
+			return true
 		}
 	case "sysconf":
 		if v, ok := result.(*sysconf.Info); ok {
 			f.Sysconf = v
+			return true
 		}
 	case "sysctl":
 		if v, ok := result.(*sysctl.Info); ok {
 			f.Sysctl = v
+			return true
 		}
 	case "systemd_paths":
 		if v, ok := result.(*systemdpaths.Info); ok {
 			f.SystemdPaths = v
+			return true
 		}
 	case "tc":
 		if v, ok := result.(*tc.Info); ok {
 			f.TC = v
+			return true
 		}
 	case "virtualbox":
 		if v, ok := result.(*virtualbox.Info); ok {
 			f.VirtualBox = v
+			return true
 		}
 	case "vmware":
 		if v, ok := result.(*vmware.Info); ok {
 			f.VMware = v
+			return true
 		}
 	case "zpools":
 		if v, ok := result.(*zpools.Info); ok {
 			f.Zpools = v
+			return true
 		}
 	case "ca_certificates":
 		if v, ok := result.(*cacertificates.Info); ok {
 			f.CACertificates = v
+			return true
 		}
 	}
+	return false
 }
 
 func flattenMap(

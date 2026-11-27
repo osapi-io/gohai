@@ -25,17 +25,18 @@ import (
 	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 func ec2Prior() collector.PriorResults {
@@ -127,7 +128,6 @@ const identityDoc = `{
 
 type EC2PublicTestSuite struct {
 	suite.Suite
-	tmpDir string
 }
 
 func TestEC2PublicTestSuite(
@@ -136,24 +136,17 @@ func TestEC2PublicTestSuite(
 	suite.Run(t, new(EC2PublicTestSuite))
 }
 
-func (s *EC2PublicTestSuite) SetupTest() {
-	s.tmpDir = s.T().TempDir()
-	// Default: point hypervisor UUID path at a nonexistent file so
-	// detection is driven by DMI unless the test overrides.
-	s.pointAwayFromHypervisor()
-}
-
-func (s *EC2PublicTestSuite) pointAwayFromHypervisor() {
-	ec2.SetHypervisorUUIDPath(filepath.Join(s.tmpDir, "no-uuid"))
-}
-
-// writeHypervisorUUID writes a /sys/hypervisor/uuid replacement.
-func (s *EC2PublicTestSuite) writeHypervisorUUID(
+// hostFS is a fake host's filesystem, with /sys/hypervisor/uuid holding
+// content, or no such file when content is "".
+func (s *EC2PublicTestSuite) hostFS(
 	content string,
-) func() {
-	path := filepath.Join(s.tmpDir, "hypervisor-uuid")
-	s.Require().NoError(os.WriteFile(path, []byte(content), 0o644))
-	return ec2.SetHypervisorUUIDPath(path)
+) avfs.VFS {
+	fs := memfs.New()
+	if content != "" {
+		s.Require().NoError(fs.MkdirAll("/sys/hypervisor", 0o755))
+		s.Require().NoError(fs.WriteFile("/sys/hypervisor/uuid", []byte(content), 0o644))
+	}
+	return fs
 }
 
 // server wires a handler that implements EC2's IMDS behavior:
@@ -808,10 +801,6 @@ func (s *EC2PublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.hypervisor != "" {
-				defer s.writeHypervisorUUID(tt.hypervisor)()
-			}
-
 			var httpCalled bool
 			h := tt.handler
 			if h == nil {
@@ -830,7 +819,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			}
 
 			client := cloudmetadata.New(srv.URL)
-			c := ec2.NewWithClient(client)
+			c := ec2.NewWithClient(client, source.Sources{FS: s.hostFS(tt.hypervisor)})
 
 			prior := tt.prior
 			if prior == nil {

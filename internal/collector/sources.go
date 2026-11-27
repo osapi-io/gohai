@@ -51,7 +51,7 @@ func Family(
 	case src.Family != "":
 		return src.Family
 	case src.FS != nil:
-		return family.FromOSRelease(src.FS)
+		return family.FromFS(src.FS)
 	default:
 		return platform.Detect()
 	}

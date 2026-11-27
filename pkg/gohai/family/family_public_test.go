@@ -21,6 +21,7 @@
 package family_test
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -127,6 +128,46 @@ func (s *FamilyPublicTestSuite) TestDetect() {
 			defer family.SetGOOS(tc.goos)()
 			defer family.SetFS(fs)()
 			s.Equal(tc.want, family.Detect())
+		})
+	}
+}
+
+func (s *FamilyPublicTestSuite) TestFromFS() {
+	tests := []struct {
+		name  string
+		files map[string]string
+		want  string
+	}{
+		{
+			name: "when the filesystem is macOS's",
+			files: map[string]string{
+				"/System/Library/CoreServices/SystemVersion.plist": "<plist/>",
+			},
+			want: family.Darwin,
+		},
+		{
+			name: "when the filesystem has both, os-release wins",
+			files: map[string]string{
+				"/System/Library/CoreServices/SystemVersion.plist": "<plist/>",
+				"/etc/os-release": "ID=ubuntu\n",
+			},
+			want: family.Debian,
+		},
+		{
+			name:  "when the filesystem names a Linux platform",
+			files: map[string]string{"/etc/os-release": "ID=fedora\n"},
+			want:  family.Fedora,
+		},
+		{name: "when the filesystem has neither", want: ""},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			fs := memfs.New()
+			for path, content := range tc.files {
+				s.Require().NoError(fs.MkdirAll(filepath.Dir(path), 0o755))
+				s.Require().NoError(fs.WriteFile(path, []byte(content), 0o644))
+			}
+			s.Equal(tc.want, family.FromFS(fs))
 		})
 	}
 }

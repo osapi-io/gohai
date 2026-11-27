@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -54,7 +55,17 @@ type Linux struct {
 
 	FS   avfs.VFS
 	Exec source.Runner
+
+	// ethtoolBudget bounds all of the collector's ethtool runs together. A
+	// zero budget is defaultEthtoolBudget.
+	ethtoolBudget time.Duration
 }
+
+// defaultEthtoolBudget bounds all of a collection's ethtool runs. Each run
+// also has the source's own command timeout, but six runs for each NIC
+// one after another could otherwise cost minutes on a host with a stuck
+// driver.
+const defaultEthtoolBudget = 60 * time.Second
 
 // NewLinux returns a Linux variant wired to the real OS filesystem
 // and the production Executor.
@@ -77,11 +88,15 @@ func (l *Linux) Collect(
 	info := &Info{Interfaces: ifs}
 	if l.Exec != nil {
 		applyRoutes(ctx, l.Exec, info)
-		applyEthtoolDriverInfo(ctx, l.FS, l.Exec, info)
-		applyEthtoolTuning(ctx, l.FS, l.Exec, info)
+		budget := l.ethtoolBudget
+		if budget == 0 {
+			budget = defaultEthtoolBudget
+		}
+		ectx, cancel := context.WithTimeout(ctx, budget)
+		applyEthtoolDriverInfo(ectx, l.FS, l.Exec, info)
+		applyEthtoolTuning(ectx, l.FS, l.Exec, info)
+		cancel()
 		applyIPLinkExtras(ctx, l.Exec, info)
-	}
-	if l.Exec != nil {
 		if out, err := l.Exec.Execute(ctx, "ip", "neigh", "show"); err == nil {
 			info.Neighbours = parseIPNeigh(out)
 		}
@@ -105,8 +120,30 @@ func ethtoolTarget(
 	return err == nil
 }
 
+// driverInfoTarget reports whether `ethtool -i` runs for the interface: an
+// Ethernet interface that a device backs, or a bond or a bridge, whose
+// driver ("bonding", "bridge") Ohai reports too. A veth is neither, so a
+// container host's veths cost nothing.
+func driverInfoTarget(
+	fs avfs.VFS,
+	iface Interface,
+) bool {
+	if ethtoolTarget(fs, iface) {
+		return true
+	}
+	if iface.Encapsulation != "Ethernet" {
+		return false
+	}
+	for _, kind := range []string{"bonding", "bridge"} {
+		if _, err := fs.Stat("/sys/class/net/" + iface.Name + "/" + kind); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // applyEthtoolDriverInfo invokes `ethtool -i <iface>` per Ethernet
-// interface that a device backs, and attaches the parsed driver info
+// interface that driverInfoTarget names, and attaches the parsed driver info
 // under `Interface.Ethtool.DriverInfo`. Mirrors Ohai's
 // ethernet_driver_info, but skips virtual interfaces (see
 // ethtoolTarget), as well as loopback, tunnels and the like. ethtool failures —
@@ -120,7 +157,10 @@ func applyEthtoolDriverInfo(
 	info *Info,
 ) {
 	for i := range info.Interfaces {
-		if !ethtoolTarget(fs, info.Interfaces[i]) {
+		if ctx.Err() != nil {
+			return
+		}
+		if !driverInfoTarget(fs, info.Interfaces[i]) {
 			continue
 		}
 		out, err := exec.Execute(ctx, "ethtool", "-i", info.Interfaces[i].Name)
@@ -184,6 +224,9 @@ func applyEthtoolTuning(
 	info *Info,
 ) {
 	for i := range info.Interfaces {
+		if ctx.Err() != nil {
+			return
+		}
 		if !ethtoolTarget(fs, info.Interfaces[i]) {
 			continue
 		}
