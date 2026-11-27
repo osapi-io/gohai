@@ -22,10 +22,10 @@ Consumers use this data to:
 
 ## Signals
 
-- `patches`. A map of patch module names to their status. A **nil** value shows
-  that the `/sys/kernel/livepatch` directory does not exist. Then the kernel has
-  no livepatch support, or no livepatch was ever loaded. An **empty map** shows
-  that the directory exists, but no patches are loaded now.
+- `patches`. A map of patch module names to their status. An **empty map** shows
+  that the directory exists, but no patches are loaded now. When the
+  `/sys/kernel/livepatch` directory does not exist, the kernel has no livepatch
+  support, and the collector gives no `livepatch` fact.
 - `patches[name].enabled`. `true` when the patch is active. A patch that is
   loaded but not enabled is unusual. It can show that the patch failed or that
   someone rolled it back.
@@ -35,11 +35,11 @@ Consumers use this data to:
 
 ## Collected fields
 
-| Field                      | Type               | Description                                                                   | Schema mapping                                                  |
-| -------------------------- | ------------------ | ----------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `patches`                  | `map[string]Patch` | A map of patch module name to status. `nil` if there is no livepatch support. | No direct OCSF or OTel mapping. gohai convention: `patches`.    |
-| `patches[name].enabled`    | `bool`             | `true` if the patch is active (sysfs `enabled == "1"`).                       | No direct OCSF or OTel mapping. gohai convention: `enabled`.    |
-| `patches[name].transition` | `bool`             | `true` if the patch is in a transition (sysfs `transition == "1"`).           | No direct OCSF or OTel mapping. gohai convention: `transition`. |
+| Field                      | Type               | Description                                                                                                                   | Schema mapping                                                  |
+| -------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `patches`                  | `map[string]Patch` | A map of patch module name to status. Empty when no patch is loaded. With no livepatch support, there is no `livepatch` fact. | No direct OCSF or OTel mapping. gohai convention: `patches`.    |
+| `patches[name].enabled`    | `bool`             | `true` if the patch is active (sysfs `enabled == "1"`).                                                                       | No direct OCSF or OTel mapping. gohai convention: `enabled`.    |
+| `patches[name].transition` | `bool`             | `true` if the patch is in a transition (sysfs `transition == "1"`).                                                           | No direct OCSF or OTel mapping. gohai convention: `transition`. |
 
 ## Platform support
 
@@ -67,13 +67,7 @@ Consumers use this data to:
 
 ### Kernel without livepatch support
 
-```json
-{
-  "livepatch": {
-    "patches": null
-  }
-}
-```
+The facts have no `livepatch` key.
 
 ### Livepatch supported but no patches loaded
 
@@ -98,7 +92,7 @@ import (
 g, _ := gohai.New(gohai.WithCollectors("livepatch"))
 facts, _ := g.Collect(context.Background())
 
-if facts.Livepatch != nil && facts.Livepatch.Patches != nil {
+if facts.Livepatch != nil {
     for name, p := range facts.Livepatch.Patches {
         fmt.Printf("%s: enabled=%v transition=%v\n", name, p.Enabled, p.Transition)
     }
@@ -130,9 +124,9 @@ On Linux:
 1. The collector reads the directory list of `/sys/kernel/livepatch/` through
    the injected `avfs.VFS`. The directory does not exist if the kernel build has
    no `CONFIG_LIVEPATCH`, or if the kernel is older than 4.0. Then the collector
-   returns `{patches: nil}`. The `nil` value tells consumers that there is no
-   livepatch support. An empty map is different. It means that the kernel has
-   support, but no patch is loaded.
+   gives no fact, so consumers see that there is no livepatch support. An empty
+   map is different. It means that the kernel has support, but no patch is
+   loaded.
 2. For each directory entry under `/sys/kernel/livepatch/`, the collector does
    these steps:
    - It skips entries that are not directories. Sysfs can add regular files at

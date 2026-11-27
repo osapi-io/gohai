@@ -27,11 +27,10 @@ package livepatch
 import (
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // livepatchDir is the sysfs path containing loaded livepatch modules.
@@ -41,9 +40,9 @@ const livepatchDir = "/sys/kernel/livepatch"
 type Info struct {
 	// Patches is the map of loaded livepatch modules keyed by patch name.
 	// An empty map means no livepatches are loaded (but the subsystem
-	// exists). A nil Patches field means the livepatch sysfs directory
-	// does not exist — either the kernel was not compiled with livepatch
-	// support or no livepatches have ever been loaded.
+	// exists). When the livepatch sysfs directory does not exist, because
+	// the kernel has no livepatch support, the collector gives no fact, so
+	// Patches is never nil.
 	Patches map[string]Patch `json:"patches"`
 }
 

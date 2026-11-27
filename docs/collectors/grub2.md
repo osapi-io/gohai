@@ -22,9 +22,9 @@ Consumers use this data to:
 
 ## Collected fields
 
-| Field         | Type                | Description                                                                     | Schema mapping                                                                                  |
-| ------------- | ------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `environment` | `map[string]string` | The key=value pairs from the grubenv file. `nil` if no path has a grubenv file. | No direct OCSF or OTel mapping. gohai convention: `environment`. Ohai uses `grub2.environment`. |
+| Field         | Type                | Description                                                                                            | Schema mapping                                                                                  |
+| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `environment` | `map[string]string` | The key=value pairs from the grubenv file. With no grubenv file on any path, there is no `grub2` fact. | No direct OCSF or OTel mapping. gohai convention: `environment`. Ohai uses `grub2.environment`. |
 
 ## Platform support
 
@@ -52,13 +52,7 @@ Consumers use this data to:
 
 ### Host without GRUB2 installed
 
-```json
-{
-  "grub2": {
-    "environment": null
-  }
-}
-```
+The facts have no `grub2` key.
 
 ## SDK usage
 
@@ -73,8 +67,8 @@ import (
 g, _ := gohai.New(gohai.WithCollectors("grub2"))
 facts, _ := g.Collect(context.Background())
 
-if facts.GRUB2 != nil && facts.GRUB2.Environment != nil {
-    fmt.Println("Next boot entry:", facts.GRUB2.Environment["saved_entry"])
+if facts.Grub2 != nil {
+    fmt.Println("Next boot entry:", facts.Grub2.Environment["saved_entry"])
 }
 ```
 
@@ -101,7 +95,7 @@ On Linux:
    `avfs.VFS`. RHEL, Fedora, CentOS, Rocky and AlmaLinux use this path.
 2. If that file does not exist, the collector reads `/boot/grub/grubenv`. Debian
    and Ubuntu use this path.
-3. If neither file exists, the collector returns `{environment: nil}`. The `nil`
+3. If neither file exists, the collector gives no fact. The missing `grub2` key
    tells consumers that GRUB2 is not installed.
 4. The collector parses the file one line at a time:
    - It skips lines that start with `#`, for example the standard

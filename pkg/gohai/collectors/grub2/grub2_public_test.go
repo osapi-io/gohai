@@ -149,27 +149,17 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 			setupFS: func() avfs.VFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-
-				if true {
-					s.Nil(got)
-					return
-				}
-
-				info, ok := got.(*grub2.Info)
-				s.Require().True(ok)
-				s.Equal(map[string]string(nil), info.Environment)
+				s.Nil(got)
 			},
 		},
 		{
-			name:    "linux: no grubenv on any path — nil environment",
+			name:    "linux: no grubenv on any path gives no fact",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 
-				info, ok := got.(*grub2.Info)
-				s.Require().True(ok)
-				s.Equal(map[string]string(nil), info.Environment)
+				s.Nil(got)
 			},
 		},
 		{

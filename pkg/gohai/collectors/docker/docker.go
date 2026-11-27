@@ -225,7 +225,7 @@ func collectContainers(
 	if err != nil {
 		return nil, err
 	}
-	var result []Container
+	result := []Container{}
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
@@ -337,7 +337,7 @@ func collectImages(
 	if err != nil {
 		return nil, err
 	}
-	var result []Image
+	result := []Image{}
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
