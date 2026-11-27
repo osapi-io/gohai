@@ -57,7 +57,6 @@ func (d *Darwin) Collect(
 		return nil, fmt.Errorf("mount: %w", err)
 	}
 	mounts := []Mount{}
-	var points []string
 	for _, line := range strings.Split(string(out), "\n") {
 		m := mountLineRE.FindStringSubmatch(line)
 		if m == nil {
@@ -68,12 +67,8 @@ func (d *Darwin) Collect(
 			mount.Opts = strings.Split(m[4], ", ")
 		}
 		mounts = append(mounts, mount)
-		points = append(points, mount.Mountpoint)
 	}
-	// df exits non-zero when one mount cannot be read, and still prints
-	// the others.
-	df, _ := d.Exec.Execute(ctx, "df", "-ki")
-	rows := dfRows(df, points, 7)
+	rows := df(ctx, d.Exec, mounts, 7, "-ki")
 	for i := range mounts {
 		if r, ok := rows[mounts[i].Mountpoint]; ok {
 			usage(&mounts[i], r[0], r[1], r[2])

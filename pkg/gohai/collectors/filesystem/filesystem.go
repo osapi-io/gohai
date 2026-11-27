@@ -25,9 +25,11 @@
 package filesystem
 
 import (
+	"context"
 	"encoding/json"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
@@ -196,6 +198,90 @@ func inodes(
 	if m.InodesTotal > 0 {
 		m.InodesUsedPercent = float64(used) / float64(m.InodesTotal) * 100
 	}
+}
+
+// networkTypes are the filesystem types that a server holds. A df of one
+// of them waits for the server, and a server that does not answer makes
+// df wait until its timeout.
+var networkTypes = map[string]bool{
+	"9p": true, "afpfs": true, "afs": true, "ceph": true, "cifs": true,
+	"davfs": true, "fuse.davfs2": true, "fuse.glusterfs": true,
+	"fuse.sshfs": true, "glusterfs": true, "lustre": true, "nfs": true,
+	"nfs4": true, "smb3": true, "smbfs": true, "webdav": true,
+}
+
+// maxNetworkDF is the most df commands of network mounts that run at the
+// same time.
+const maxNetworkDF = 8
+
+// df is the rows of df for mounts, by mountpoint, with the n fields that
+// dfRows takes. With no network mount, it is one `df flags`. Else the
+// local mounts are one `df flags -- mountpoint...`, each network mount is
+// a command of its own, and they all run at the same time as the local
+// one. Thus a server that does not
+// answer costs the rows of its own mount only, and the collector waits
+// one command timeout at most, not one for each df.
+//
+// df exits non-zero when one mount cannot be read, and still prints the
+// others. Thus its error is not used: the rows that it printed are.
+func df(
+	ctx context.Context,
+	exec source.Runner,
+	mounts []Mount,
+	n int,
+	flags string,
+) map[string][]uint64 {
+	var local, network []string
+	for _, m := range mounts {
+		if networkTypes[m.Type] {
+			network = append(network, m.Mountpoint)
+		} else {
+			local = append(local, m.Mountpoint)
+		}
+	}
+	// With no network mount, one df of all the mounts cannot wait for a
+	// server. It is the command line that a fake host answers.
+	if len(network) == 0 {
+		out, _ := exec.Execute(ctx, "df", flags)
+
+		return dfRows(out, local, n)
+	}
+	groups := [][]string{}
+	if len(local) > 0 {
+		groups = append(groups, local)
+	}
+	for _, p := range network {
+		groups = append(groups, []string{p})
+	}
+
+	// The local command takes no slot, so that hung network mounts never
+	// make it wait.
+	outs := make([][]byte, len(groups))
+	slots := make(chan struct{}, maxNetworkDF)
+	var wg sync.WaitGroup
+	for i, points := range groups {
+		isNetwork := len(local) == 0 || i > 0
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if isNetwork {
+				slots <- struct{}{}
+				defer func() { <-slots }()
+			}
+			args := append([]string{flags, "--"}, points...)
+			outs[i], _ = exec.Execute(ctx, "df", args...)
+		}()
+	}
+	wg.Wait()
+
+	rows := map[string][]uint64{}
+	for i, out := range outs {
+		for mp, r := range dfRows(out, groups[i], n) {
+			rows[mp] = r
+		}
+	}
+
+	return rows
 }
 
 // dfRows is the numbers of each line of df output, by mountpoint: the n
