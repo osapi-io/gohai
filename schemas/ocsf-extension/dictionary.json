@@ -15,7 +15,7 @@
     },
     "init_system": {
       "caption": "Init System",
-      "description": "The init system type: systemd, launchd, upstart, sysvinit.",
+      "description": "The init system type: systemd, launchd, openrc, runit, or init when PID 1 is named init (sysvinit, upstart or busybox).",
       "type": "string_t"
     },
     "uptime_seconds": {

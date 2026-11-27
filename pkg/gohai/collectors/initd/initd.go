@@ -18,17 +18,17 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package initd detects the init system a Linux host is using —
-// systemd, upstart, sysvinit, openrc, or runit — by reading
-// /proc/1/comm. On macOS the answer is always launchd.
+// Package initd detects the init system a Linux host is using, such as
+// systemd, openrc or runit, by reading /proc/1/comm. A PID 1 named init
+// is reported as init: sysvinit, upstart and busybox all use that name.
+// On macOS the answer is always launchd.
 package initd
 
 import (
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // proc1CommPath is the file whose contents are the name of PID 1.
@@ -36,7 +36,7 @@ const proc1CommPath = "/proc/1/comm"
 
 // Info holds init system identification.
 type Info struct {
-	Name string `json:"name"` // e.g., "systemd", "upstart", "sysvinit", "openrc", "launchd"
+	Name string `json:"name"` // e.g., "systemd", "openrc", "runit", "init", "launchd"
 }
 
 // Collector is the public interface every init variant satisfies.
@@ -68,22 +68,22 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// classify normalizes the raw PID-1 comm string. Known init systems
-// are mapped to canonical names; unknown values are returned as-is.
+// renames maps a PID-1 comm that names a known init system another way
+// to that system's name.
+var renames = map[string]string{
+	"openrc-init": "openrc",
+}
+
+// classify gives the init system's name from the raw PID-1 comm. It
+// returns "init" as it is: sysvinit, upstart and busybox all run PID 1 as
+// init, so the comm does not tell which one it is.
 func classify(
 	raw string,
 ) string {
 	name := strings.TrimSpace(raw)
-	switch name {
-	case "systemd", "upstart", "init", "sysvinit", "openrc", "openrc-init",
-		"runit", "finit", "s6-linux-init", "s6-svscan", "dinit":
-		if name == "init" {
-			return "sysvinit"
-		}
-		if name == "openrc-init" {
-			return "openrc"
-		}
-		return name
+	if renamed, ok := renames[name]; ok {
+		return renamed
 	}
+
 	return name
 }
