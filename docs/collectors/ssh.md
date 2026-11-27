@@ -40,17 +40,17 @@ The collector reports these signals for each key type:
 
 ## Collected fields
 
-| Field                                    | Type     | Description                                                           | Schema mapping                                                                                                                                    |
-| ---------------------------------------- | -------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `keys[].type`                            | `string` | The key algorithm as the .pub file gives it, for example `ssh-rsa`.   | No direct OCSF mapping. OTel has no SSH host key object. gohai convention: the key type field, unchanged, from the public key file.               |
-| `keys[].fingerprint_sha256`              | `string` | The SHA-256 fingerprint in `SHA256:<base64>` format.                  | No direct OCSF or OTel mapping. gohai convention: `fingerprint_sha256`. It is the same as the output format of OpenSSH `-E sha256`.               |
-| `keys[].key_length`                      | `int`    | The effective key length in bits (RSA modulus, ECDSA curve, Ed25519). | No direct OCSF or OTel mapping. gohai convention: `key_length`. The unit is bits, the same as OpenSSH's `-b` flag and the `ssh-keygen -l` output. |
-| `authorized_keys`                        | `map`    | The keys of each user's `~/.ssh/authorized_keys`, by user name.       | No direct schema mapping.                                                                                                                         |
-| `authorized_keys.*[].type`               | `string` | The key algorithm.                                                    | No direct schema mapping.                                                                                                                         |
-| `authorized_keys.*[].fingerprint_sha256` | `string` | The SHA-256 fingerprint, as for host keys.                            | No direct schema mapping.                                                                                                                         |
-| `authorized_keys.*[].comment`            | `string` | The comment after the key.                                            | No direct schema mapping.                                                                                                                         |
-| `authorized_keys.*[].options`            | `string` | The options before the key, such as `no-pty`.                         | No direct schema mapping.                                                                                                                         |
-| `authorized_keys.*[].line`               | `string` | The line as the file has it.                                          | No direct schema mapping.                                                                                                                         |
+| Field                                    | Type     | Description                                                                | Schema mapping                                                                                                                                    |
+| ---------------------------------------- | -------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `keys[].type`                            | `string` | The key algorithm as the .pub file gives it, for example `ssh-rsa`.        | No direct OCSF mapping. OTel has no SSH host key object. gohai convention: the key type field, unchanged, from the public key file.               |
+| `keys[].fingerprint_sha256`              | `string` | The SHA-256 fingerprint in `SHA256:<base64>` format.                       | No direct OCSF or OTel mapping. gohai convention: `fingerprint_sha256`. It is the same as the output format of OpenSSH `-E sha256`.               |
+| `keys[].key_length`                      | `int`    | The effective key length in bits (RSA modulus, ECDSA curve, Ed25519).      | No direct OCSF or OTel mapping. gohai convention: `key_length`. The unit is bits, the same as OpenSSH's `-b` flag and the `ssh-keygen -l` output. |
+| `authorized_keys`                        | `map`    | The keys of each user's authorized keys files, by user name.               | No direct schema mapping.                                                                                                                         |
+| `authorized_keys.*[].type`               | `string` | The key algorithm.                                                         | No direct schema mapping.                                                                                                                         |
+| `authorized_keys.*[].fingerprint_sha256` | `string` | The SHA-256 fingerprint, as for host keys.                                 | No direct schema mapping.                                                                                                                         |
+| `authorized_keys.*[].comment`            | `string` | The comment after the key.                                                 | No direct schema mapping.                                                                                                                         |
+| `authorized_keys.*[].options`            | `string` | The options before the key, such as `no-pty`. See [Redaction](#redaction). | No direct schema mapping.                                                                                                                         |
+| `authorized_keys.*[].line`               | `string` | The line as the file has it, with the same redaction.                      | No direct schema mapping.                                                                                                                         |
 
 ## Platform support
 
@@ -164,16 +164,45 @@ Then it uses the well-known paths. gohai reads only the well-known paths, which
 is correct for all standard deployments. If a `HostKey` directive points to a
 path that is not standard, gohai does not report that key.
 
-For each user with a home other than `/`, the collector reads
-`<home>/.ssh/authorized_keys` through its filesystem. On Linux, the users and
-their homes come from `/etc/passwd`. On macOS, `/etc/passwd` has only the system
-users. The other users are in the directory service. Thus the collector runs
-`dscl . -list /Users NFSHomeDirectory`, and uses the first home of each user.
-This command does not need root. If `dscl` fails, the collector uses
-`/etc/passwd`. Each line that has a key gives an entry: the options before the
-key, the key type and its SHA-256 fingerprint, and the comment after it. A
-comment line, an empty line and a line with no key or a bad key are left out. A
-user with no file is not in the map.
+### Authorized keys
+
+The collector reads the authorized keys files of each user through its
+filesystem:
+
+1. **The users.** On Linux, the users and their homes come from `getent passwd`.
+   It has the users of LDAP and sssd when their service lists them. sssd does
+   not list them when `enumerate` is off, which is its default. If `getent`
+   fails or gives no user, the collector uses `/etc/passwd`. On macOS,
+   `/etc/passwd` has only the system users, and the other users are in the
+   directory service. Thus the collector runs
+   `dscl . -list /Users NFSHomeDirectory`, and uses the first home of each user.
+   This command does not need root. If `dscl` fails, the collector uses
+   `/etc/passwd`.
+2. **The files.** The collector runs `sshd -T` and uses its
+   `authorizedkeysfile`. It changes the tokens of each pattern: `%%` to `%`,
+   `%h` to the home, `%u` to the user and `%U` to the uid. A relative pattern is
+   in the home. `none` is no file. `sshd -T` needs root. If it does not run, the
+   files are sshd's default, `.ssh/authorized_keys` and `.ssh/authorized_keys2`.
+   A user with the home `/` has only the files of absolute patterns, such as
+   `/etc/ssh/authorized_keys/%u`. A pattern with a token that the user does not
+   have, such as `%U` for a user of `dscl`, is left out.
+3. **The lines.** Each line that has a key gives an entry: the options before
+   the key, the key type and its SHA-256 fingerprint, and the comment after it.
+   The collector splits the line at the spaces that are not in double quotes, as
+   sshd does. Thus an option value with a space, such as `command="a b"`, keeps
+   its text, and a key type in an option value is not the key. A comment line,
+   an empty line and a line with no key or a bad key are left out. A user with
+   no file is not in the map.
+
+The collector does not run an `AuthorizedKeysCommand`, and does not read the
+`Match` blocks of `sshd_config`.
+
+### Redaction
+
+A `command=` or an `environment=` option can hold a secret, such as a token in a
+forced command. The collector replaces the value of each one with
+`"[redacted]"`, in `options` and in `line`. The rest of a line is public key
+data.
 
 ## Backing library
 

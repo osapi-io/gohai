@@ -25,10 +25,12 @@
 package ssh
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -52,8 +54,10 @@ var hostKeyFiles = []string{
 // Info holds the SSH host keys found on this host.
 type Info struct {
 	Keys []HostKey `json:"keys"`
-	// AuthorizedKeys is the keys of each user's ~/.ssh/authorized_keys,
-	// by user name. A user with no file is not in it.
+	// AuthorizedKeys is the keys of each user's authorized_keys files, by
+	// user name: the AuthorizedKeysFile of `sshd -T`, else
+	// ~/.ssh/authorized_keys and ~/.ssh/authorized_keys2. A user with no
+	// file is not in it.
 	AuthorizedKeys map[string][]AuthorizedKey `json:"authorized_keys,omitempty"`
 }
 
@@ -62,10 +66,11 @@ type AuthorizedKey struct {
 	Type              string `json:"type"`
 	FingerprintSHA256 string `json:"fingerprint_sha256"`
 	Comment           string `json:"comment,omitempty"`
-	// Options are the options before the key, such as
-	// `no-pty,from="10.0.0.0/8"`.
+	// Options are the options before the key, as the file has them, such
+	// as `no-pty,from="10.0.0.0/8"`. The value of a command= or an
+	// environment= option is redacted, because it can hold a secret.
 	Options string `json:"options,omitempty"`
-	// Line is the line as the file has it.
+	// Line is the line as the file has it, with the same redaction.
 	Line string `json:"line"`
 }
 
@@ -262,10 +267,12 @@ func readWireString(
 	return b[4 : 4+n]
 }
 
-// home is the home directory of one user.
+// home is the home directory of one user, and its uid when the source
+// gives one.
 type home struct {
 	user string
 	dir  string
+	uid  string
 }
 
 // passwdHomes is the home of each user of /etc/passwd.
@@ -276,16 +283,101 @@ func passwdHomes(
 	if err != nil {
 		return nil
 	}
+
+	return parsePasswd(b)
+}
+
+// parsePasswd is the home of each line of passwd(5) format, as
+// /etc/passwd and `getent passwd` give it.
+func parsePasswd(
+	b []byte,
+) []home {
 	var out []home
 	for _, line := range strings.Split(string(b), "\n") {
 		f := strings.Split(line, ":")
 		if len(f) < 6 {
 			continue
 		}
-		out = append(out, home{user: f[0], dir: f[5]})
+		out = append(out, home{user: f[0], dir: f[5], uid: f[2]})
 	}
 
 	return out
+}
+
+// defaultKeyFiles is sshd's AuthorizedKeysFile when it does not say.
+var defaultKeyFiles = []string{".ssh/authorized_keys", ".ssh/authorized_keys2"}
+
+// keyFiles is the AuthorizedKeysFile patterns of `sshd -T`. A host where
+// sshd -T does not run, such as an agent that is not root, has the
+// default. "none" is no file.
+func keyFiles(
+	ctx context.Context,
+	exec source.Runner,
+) []string {
+	if exec == nil {
+		return defaultKeyFiles
+	}
+	out, err := exec.Execute(ctx, "sshd", "-T")
+	if err != nil {
+		return defaultKeyFiles
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 2 || !strings.EqualFold(f[0], "authorizedkeysfile") {
+			continue
+		}
+		if len(f) == 2 && f[1] == "none" {
+			return nil
+		}
+
+		return f[1:]
+	}
+
+	return defaultKeyFiles
+}
+
+// keyPath is pattern for h, with sshd's tokens: %% is %, %h the home,
+// %u the user and %U the uid. A relative path is in the home. It is
+// false when h has no value for a token, or no home for a relative path.
+func keyPath(
+	pattern string,
+	h home,
+) (string, bool) {
+	var b strings.Builder
+	for i := 0; i < len(pattern); i++ {
+		if pattern[i] != '%' {
+			b.WriteByte(pattern[i])
+			continue
+		}
+		if i+1 == len(pattern) {
+			return "", false
+		}
+		i++
+		var v string
+		switch pattern[i] {
+		case '%':
+			v = "%"
+		case 'h':
+			v = h.dir
+		case 'u':
+			v = h.user
+		case 'U':
+			v = h.uid
+		}
+		if v == "" {
+			return "", false
+		}
+		b.WriteString(v)
+	}
+	p := b.String()
+	if strings.HasPrefix(p, "/") {
+		return p, true
+	}
+	if h.dir == "" || h.dir == "/" {
+		return "", false
+	}
+
+	return strings.TrimRight(h.dir, "/") + "/" + p, true
 }
 
 // dsclHomes is the home of each user of `dscl . -list /Users
@@ -306,24 +398,30 @@ func dsclHomes(
 	return homes
 }
 
-// collectAuthorizedKeys is the keys of <home>/.ssh/authorized_keys for
-// each user that has a home. A line that is not a key is left out.
+// collectAuthorizedKeys is the keys of each file of patterns for each
+// user of homes. A line that is not a key is left out.
 func collectAuthorizedKeys(
 	fs avfs.VFS,
 	homes []home,
+	patterns []string,
 ) map[string][]AuthorizedKey {
 	out := map[string][]AuthorizedKey{}
 	for _, h := range homes {
-		if h.dir == "" || h.dir == "/" {
-			continue
-		}
-		keys, err := fs.ReadFile(strings.TrimRight(h.dir, "/") + "/.ssh/authorized_keys")
-		if err != nil {
-			continue
-		}
-		for _, l := range strings.Split(string(keys), "\n") {
-			if k, ok := parseAuthorizedKey(strings.TrimSpace(l)); ok {
-				out[h.user] = append(out[h.user], k)
+		read := map[string]bool{}
+		for _, pattern := range patterns {
+			path, ok := keyPath(pattern, h)
+			if !ok || read[path] {
+				continue
+			}
+			read[path] = true
+			keys, err := fs.ReadFile(path)
+			if err != nil {
+				continue
+			}
+			for _, l := range strings.Split(string(keys), "\n") {
+				if k, ok := parseAuthorizedKey(strings.TrimSpace(l)); ok {
+					out[h.user] = append(out[h.user], k)
+				}
 			}
 		}
 	}
@@ -343,26 +441,84 @@ func parseAuthorizedKey(
 	if line == "" || strings.HasPrefix(line, "#") {
 		return AuthorizedKey{}, false
 	}
-	f := strings.Fields(line)
+	f := fields(line)
 	for i := 0; i+1 < len(f); i++ {
-		if !isKeyType(f[i]) {
+		if !isKeyType(f[i].text) {
 			continue
 		}
-		hk, err := parseHostKeyPub([]byte(f[i] + " " + f[i+1]))
+		hk, err := parseHostKeyPub([]byte(f[i].text + " " + f[i+1].text))
 		if err != nil {
 			return AuthorizedKey{}, false
+		}
+		comment := ""
+		if i+2 < len(f) {
+			comment = line[f[i+2].start:]
 		}
 
 		return AuthorizedKey{
 			Type:              hk.Type,
 			FingerprintSHA256: hk.FingerprintSHA256,
-			Comment:           strings.Join(f[i+2:], " "),
-			Options:           strings.Join(f[:i], " "),
-			Line:              line,
+			Comment:           comment,
+			Options:           redactOptions(strings.TrimSpace(line[:f[i].start])),
+			Line:              redactOptions(line[:f[i].start]) + line[f[i].start:],
 		}, true
 	}
 
 	return AuthorizedKey{}, false
+}
+
+// field is one field of an authorized_keys line, and where it starts.
+type field struct {
+	text  string
+	start int
+}
+
+// fields splits line at the spaces and tabs that are not in double
+// quotes, as sshd reads the options. A space in an option value, such as
+// command="a b", is then not a field of its own, and a key type in one,
+// such as command="echo ssh-rsa", is not the key.
+func fields(
+	line string,
+) []field {
+	var out []field
+	start, quoted := -1, false
+	for i := 0; i < len(line); i++ {
+		c := line[i]
+		switch {
+		case c == '"' && (i == 0 || line[i-1] != '\\'):
+			quoted = !quoted
+			if start < 0 {
+				start = i
+			}
+		case (c == ' ' || c == '\t') && !quoted:
+			if start >= 0 {
+				out = append(out, field{text: line[start:i], start: start})
+				start = -1
+			}
+		default:
+			if start < 0 {
+				start = i
+			}
+		}
+	}
+	if start >= 0 {
+		out = append(out, field{text: line[start:], start: start})
+	}
+
+	return out
+}
+
+// secretOptionRE is a command= or environment= option with its quoted
+// value, which sshd lets hold escaped quotes.
+var secretOptionRE = regexp.MustCompile(`(?i)\b(command|environment)="(?:[^"\\]|\\.)*"`)
+
+// redactOptions is options with the value of each command= and
+// environment= option replaced, because a forced command or a variable
+// can hold a token.
+func redactOptions(
+	options string,
+) string {
+	return secretOptionRE.ReplaceAllString(options, `$1="[redacted]"`)
 }
 
 // isKeyType reports whether s names an OpenSSH public key type.
