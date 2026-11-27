@@ -668,3 +668,31 @@ func (s *CloudMetadataPublicTestSuite) TestGetJSON() {
 		})
 	}
 }
+
+func (s *CloudMetadataPublicTestSuite) TestRedirectIsNotFollowed() {
+	var hits int
+	var gotToken string
+	other := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		hits++
+		gotToken = r.Header.Get("X-aws-ec2-metadata-token")
+	}))
+	defer other.Close()
+	srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+		"/latest/meta-data/instance-id": func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, other.URL+"/steal", http.StatusFound)
+		},
+	})
+	defer srv.Close()
+
+	client := cloudmetadata.New(
+		srv.URL,
+		cloudmetadata.WithHeader("X-aws-ec2-metadata-token", "secret-token"),
+	)
+	_, err := client.Get(context.Background(), "/latest/meta-data/instance-id")
+	s.ErrorIs(err, cloudmetadata.ErrNotAvailable)
+	_, status, err := client.RawGet(context.Background(), "/latest/meta-data/instance-id")
+	s.Require().NoError(err)
+	s.Equal(http.StatusFound, status)
+	s.Zero(hits)
+	s.Empty(gotToken)
+}

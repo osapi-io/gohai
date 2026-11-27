@@ -267,4 +267,6 @@ gohai does not implement the Windows signal
 
 - [`internal/cloudmetadata`](../../internal/cloudmetadata/). The shared HTTP
   client of all cloud-provider collectors. Its transport is the `HTTP` of the
-  sources, so a fake host can answer the metadata reads.
+  sources, so a fake host can answer the metadata reads. It does not follow a
+  redirect: a 3xx answer is a failure. A redirect would send the request again,
+  with its token headers, to the host that the redirect names.

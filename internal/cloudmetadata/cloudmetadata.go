@@ -110,6 +110,14 @@ func New(
 		httpClient: &http.Client{
 			Timeout:   defaultTimeout,
 			Transport: transport,
+			// A metadata service does not redirect. A redirect would get
+			// the request again, with its token headers, such as EC2's
+			// X-aws-ec2-metadata-token, at the host that the redirect
+			// names: Go removes only Authorization and Cookie. The 3xx is
+			// the answer instead, which is not a 2xx.
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
 		},
 	}
 	for _, opt := range opts {
