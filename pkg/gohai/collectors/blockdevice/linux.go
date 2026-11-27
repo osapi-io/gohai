@@ -65,11 +65,15 @@ func (l *Linux) Collect(
 
 	devices := make([]BlockDevice, 0, len(entries))
 	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
 		name := entry.Name()
 		base := filepath.Join(sysBlockDir, name)
+		// Each entry of /sys/block is a symbolic link to the device's
+		// directory under /sys/devices, so ReadDir does not report it as a
+		// directory. Stat follows the link.
+		info, err := l.FS.Stat(base)
+		if err != nil || !info.IsDir() {
+			continue
+		}
 		dev := filepath.Join(base, "device")
 		queue := filepath.Join(base, "queue")
 

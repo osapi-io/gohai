@@ -123,47 +123,64 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/sys/block/sda/device", 0o755)
-				_ = f.MkdirAll("/sys/block/sda/queue", 0o755)
-				_ = f.WriteFile("/sys/block/sda/size", []byte("976773168\n"), fs.FileMode(0o444))
-				_ = f.WriteFile("/sys/block/sda/removable", []byte("0\n"), fs.FileMode(0o444))
+				_ = f.MkdirAll("/sys/devices/block/sda/device", 0o755)
+				_ = f.MkdirAll("/sys/devices/block/sda/queue", 0o755)
 				_ = f.WriteFile(
-					"/sys/block/sda/queue/rotational",
+					"/sys/devices/block/sda/size",
+					[]byte("976773168\n"),
+					fs.FileMode(0o444),
+				)
+				_ = f.WriteFile(
+					"/sys/devices/block/sda/removable",
+					[]byte("0\n"),
+					fs.FileMode(0o444),
+				)
+				_ = f.WriteFile(
+					"/sys/devices/block/sda/queue/rotational",
 					[]byte("1\n"),
 					fs.FileMode(0o444),
 				)
 				_ = f.WriteFile(
-					"/sys/block/sda/queue/physical_block_size",
+					"/sys/devices/block/sda/queue/physical_block_size",
 					[]byte("512\n"),
 					fs.FileMode(0o444),
 				)
 				_ = f.WriteFile(
-					"/sys/block/sda/queue/logical_block_size",
+					"/sys/devices/block/sda/queue/logical_block_size",
 					[]byte("512\n"),
 					fs.FileMode(0o444),
 				)
 				_ = f.WriteFile(
-					"/sys/block/sda/device/model",
+					"/sys/devices/block/sda/device/model",
 					[]byte("WDC WD5000AAKX\n"),
 					fs.FileMode(0o444),
 				)
 				_ = f.WriteFile(
-					"/sys/block/sda/device/vendor",
+					"/sys/devices/block/sda/device/vendor",
 					[]byte("ATA     \n"),
 					fs.FileMode(0o444),
 				)
-				_ = f.WriteFile("/sys/block/sda/device/rev", []byte("1H15\n"), fs.FileMode(0o444))
 				_ = f.WriteFile(
-					"/sys/block/sda/device/state",
+					"/sys/devices/block/sda/device/rev",
+					[]byte("1H15\n"),
+					fs.FileMode(0o444),
+				)
+				_ = f.WriteFile(
+					"/sys/devices/block/sda/device/state",
 					[]byte("running\n"),
 					fs.FileMode(0o444),
 				)
-				_ = f.WriteFile("/sys/block/sda/device/timeout", []byte("30\n"), fs.FileMode(0o444))
 				_ = f.WriteFile(
-					"/sys/block/sda/device/queue_depth",
+					"/sys/devices/block/sda/device/timeout",
+					[]byte("30\n"),
+					fs.FileMode(0o444),
+				)
+				_ = f.WriteFile(
+					"/sys/devices/block/sda/device/queue_depth",
 					[]byte("32\n"),
 					fs.FileMode(0o444),
 				)
+				linkBlockDevices(f, "sda")
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -193,20 +210,29 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/sys/block/nvme0n1/queue", 0o755)
+				_ = f.MkdirAll("/sys/devices/block/nvme0n1/queue", 0o755)
 				_ = f.WriteFile(
-					"/sys/block/nvme0n1/size",
+					"/sys/devices/block/nvme0n1/size",
 					[]byte("1000215216\n"),
 					fs.FileMode(0o444),
 				)
-				_ = f.WriteFile("/sys/block/nvme0n1/removable", []byte("0\n"), fs.FileMode(0o444))
 				_ = f.WriteFile(
-					"/sys/block/nvme0n1/queue/rotational",
+					"/sys/devices/block/nvme0n1/removable",
 					[]byte("0\n"),
 					fs.FileMode(0o444),
 				)
-				_ = f.MkdirAll("/sys/block/sda/queue", 0o755)
-				_ = f.WriteFile("/sys/block/sda/size", []byte("500107862\n"), fs.FileMode(0o444))
+				_ = f.WriteFile(
+					"/sys/devices/block/nvme0n1/queue/rotational",
+					[]byte("0\n"),
+					fs.FileMode(0o444),
+				)
+				_ = f.MkdirAll("/sys/devices/block/sda/queue", 0o755)
+				_ = f.WriteFile(
+					"/sys/devices/block/sda/size",
+					[]byte("500107862\n"),
+					fs.FileMode(0o444),
+				)
+				linkBlockDevices(f, "nvme0n1", "sda")
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -243,7 +269,8 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/sys/block/vda", 0o755)
+				_ = f.MkdirAll("/sys/devices/block/vda", 0o755)
+				linkBlockDevices(f, "vda")
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -260,12 +287,13 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
-				_ = f.MkdirAll("/sys/block/sdb/device", 0o755)
+				_ = f.MkdirAll("/sys/devices/block/sdb/device", 0o755)
 				_ = f.WriteFile(
-					"/sys/block/sdb/device/firmware_rev",
+					"/sys/devices/block/sdb/device/firmware_rev",
 					[]byte("GXA2\n"),
 					fs.FileMode(0o444),
 				)
+				linkBlockDevices(f, "sdb")
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -285,8 +313,9 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 				_ = f.MkdirAll("/sys/block", 0o755)
 				// Write a regular file alongside a real device dir.
 				_ = f.WriteFile("/sys/block/not_a_device", []byte("x"), fs.FileMode(0o444))
-				_ = f.MkdirAll("/sys/block/sdc", 0o755)
-				_ = f.WriteFile("/sys/block/sdc/size", []byte("1024\n"), fs.FileMode(0o444))
+				_ = f.MkdirAll("/sys/devices/block/sdc", 0o755)
+				_ = f.WriteFile("/sys/devices/block/sdc/size", []byte("1024\n"), fs.FileMode(0o444))
+				linkBlockDevices(f, "sdc")
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -324,5 +353,18 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
+	}
+}
+
+// linkBlockDevices links /sys/block/<name> to /sys/devices/block/<name>
+// for each name, as the kernel does: every entry of /sys/block is a
+// symbolic link, not a directory.
+func linkBlockDevices(
+	f *memfs.MemFS,
+	names ...string,
+) {
+	_ = f.MkdirAll("/sys/block", 0o755)
+	for _, n := range names {
+		_ = f.Symlink("/sys/devices/block/"+n, "/sys/block/"+n)
 	}
 }
