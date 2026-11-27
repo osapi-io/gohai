@@ -9,7 +9,7 @@
 <p align="center">An SDK-first Go library that collects system facts.</p>
 
 <p align="center">
-  <a href="https://github.com/osapi-io/gohai/releases/latest"><img alt="release" src="https://img.shields.io/github/release/osapi-io/gohai.svg?style=for-the-badge"></a>
+  <a href="https://github.com/osapi-io/gohai/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/osapi-io/gohai?style=for-the-badge"></a>
   <a href="https://codecov.io/gh/osapi-io/gohai"><img alt="codecov" src="https://img.shields.io/codecov/c/github/osapi-io/gohai?style=for-the-badge"></a>
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-brightgreen.svg?style=for-the-badge"></a>
   <a href="https://github.com/osapi-io/gohai/actions/workflows/go.yml"><img alt="build" src="https://img.shields.io/github/actions/workflow/status/osapi-io/gohai/go.yml?style=for-the-badge"></a>
