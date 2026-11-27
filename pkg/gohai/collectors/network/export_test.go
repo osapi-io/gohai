@@ -28,3 +28,6 @@ func (l *Linux) SetEthtoolBudget(
 ) {
 	l.ethtoolBudget = budget
 }
+
+// ApplyKind is applyKind, for a test of each kind.
+var ApplyKind = applyKind

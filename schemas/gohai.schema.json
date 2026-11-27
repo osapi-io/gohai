@@ -3441,6 +3441,9 @@
         "encapsulation": {
           "type": "string"
         },
+        "kind": {
+          "type": "string"
+        },
         "driver": {
           "type": "string"
         },
