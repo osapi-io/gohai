@@ -68,6 +68,45 @@ func mockExec(
 	return m
 }
 
+func (s *PackagesPublicTestSuite) TestNewManager() {
+	orig := platform.Detect
+	defer func() { platform.Detect = orig }()
+
+	tests := []struct {
+		name   string
+		detect string
+		want   string
+	}{
+		{name: "when the family is debian", detect: "debian", want: "dpkg"},
+		{name: "when the family is rhel", detect: "rhel", want: "rpm"},
+		{name: "when the family is fedora", detect: "fedora", want: "rpm"},
+		{name: "when the family is amazon", detect: "amazon", want: "rpm"},
+		{name: "when the family is suse", detect: "suse", want: "rpm"},
+		{name: "when the family is arch", detect: "arch", want: ""},
+		{name: "when the family is alpine", detect: "alpine", want: ""},
+		{name: "when the family is unknown", detect: "nixos", want: ""},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			platform.Detect = func() string { return tt.detect }
+			l, ok := packages.New().(*packages.Linux)
+			s.Require().True(ok)
+			s.Equal(tt.want, l.Manager)
+		})
+	}
+}
+
+func (s *PackagesPublicTestSuite) TestCollectNoManager() {
+	got, err := (&packages.Linux{Exec: source.Commands(), Manager: ""}).Collect(
+		context.Background(),
+		nil,
+	)
+	s.Require().NoError(err)
+	info, ok := got.(*packages.Info)
+	s.Require().True(ok)
+	s.Equal([]packages.Package{}, info.Packages)
+}
+
 func (s *PackagesPublicTestSuite) TestNew() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
