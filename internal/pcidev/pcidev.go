@@ -30,13 +30,17 @@ import (
 	"io"
 	"path"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/avfs/avfs"
 )
 
 const (
+	// idsLineMax is the longest pci.ids line that ParseIDs reads. A longer
+	// line is skipped.
+	idsLineMax = 64 * 1024
+
 	// devicesDir has a link for each PCI address of the host.
 	devicesDir = "/sys/bus/pci/devices"
 	// unknown is the name of an ID that pci.ids does not have.
@@ -114,6 +118,7 @@ func LoadDB(
 // a product under it "\t1c82  GP107", a subsystem under that
 // "\t\t1458 3764  Name"; and a class line "C 03  Display controller" with
 // its subclasses "\t00  VGA compatible controller".
+// A line longer than the read buffer is skipped, and the parse goes on.
 func ParseIDs(
 	b []byte,
 ) *DB {
@@ -123,10 +128,20 @@ func ParseIDs(
 		subclasses: map[string]string{},
 	}
 	var vendor, product, class string
-	sc := bufio.NewScanner(bytes.NewReader(b))
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for sc.Scan() {
-		line := sc.Text()
+	r := bufio.NewReaderSize(bytes.NewReader(b), idsLineMax)
+	for {
+		raw, long, err := r.ReadLine()
+		if err != nil {
+			break
+		}
+		if long {
+			for long && err == nil {
+				_, long, err = r.ReadLine()
+			}
+
+			continue
+		}
+		line := string(raw)
 		if line == "" || line[0] == '#' {
 			continue
 		}
@@ -184,7 +199,7 @@ func List(
 			out = append(out, d)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Address < out[j].Address })
+	slices.SortFunc(out, func(a, b Device) int { return strings.Compare(a.Address, b.Address) })
 
 	return out
 }

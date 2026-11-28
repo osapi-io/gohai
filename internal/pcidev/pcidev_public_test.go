@@ -23,6 +23,7 @@ package pcidev_test
 import (
 	"bytes"
 	"compress/gzip"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -65,10 +66,10 @@ func (s *PCIDevPublicTestSuite) TestList() {
 	}
 	dev := "/sys/bus/pci/devices/"
 	tests := []struct {
-		name  string
-		files map[string]string
-		links map[string]string
-		check func([]pcidev.Device)
+		name         string
+		files        map[string]string
+		links        map[string]string
+		validateFunc func([]pcidev.Device)
 	}{
 		{
 			name: "a named device with its driver, IOMMU group and parent",
@@ -82,7 +83,7 @@ func (s *PCIDevPublicTestSuite) TestList() {
 				dev + "0000:01:00.0/driver":      "../../../bus/pci/drivers/nvidia",
 				dev + "0000:01:00.0/iommu_group": "../../../kernel/iommu_groups/14",
 			},
-			check: func(d []pcidev.Device) {
+			validateFunc: func(d []pcidev.Device) {
 				s.Require().Len(d, 1)
 				s.Equal(pcidev.Device{
 					Address: "0000:01:00.0", VendorID: "10de", VendorName: "NVIDIA Corporation",
@@ -105,10 +106,10 @@ func (s *PCIDevPublicTestSuite) TestList() {
 				dev + "0000:00:04.0/.keep":      "",
 				dev + "not-an-address/modalias": gpuModalias,
 			},
-			check: func(d []pcidev.Device) {
+			validateFunc: func(d []pcidev.Device) {
 				s.Require().Len(d, 2)
-				s.Equal("0000:00:00.0", d[0].Address, "address order")
-				s.Equal("NVIDIA Corporation", d[0].VendorName, "named from the gzip pci.ids")
+				s.Equal("0000:00:00.0", d[0].Address)
+				s.Equal("NVIDIA Corporation", d[0].VendorName)
 				s.Equal("unknown", d[1].VendorName)
 				s.Equal("unknown", d[1].ProductName)
 				s.Equal("Display controller", d[1].ClassName)
@@ -119,12 +120,27 @@ func (s *PCIDevPublicTestSuite) TestList() {
 			},
 		},
 		{
+			name: "a pci.ids line longer than the read buffer is skipped, and the parse goes on",
+			files: map[string]string{
+				"/usr/share/hwdata/pci.ids": "8086  " + strings.Repeat(
+					"x",
+					2*1024*1024,
+				) + "\n" + ids,
+				dev + "0000:01:00.0/modalias": gpuModalias,
+			},
+			validateFunc: func(d []pcidev.Device) {
+				s.Require().Len(d, 1)
+				s.Equal("NVIDIA Corporation", d[0].VendorName)
+				s.Equal("GV-N105TOC-4GD", d[0].SubsystemName)
+			},
+		},
+		{
 			name: "a pci.ids.gz that is not gzip, and no other: names unknown",
 			files: map[string]string{
 				"/usr/share/hwdata/pci.ids.gz": "plain text",
 				dev + "0000:01:00.0/modalias":  gpuModalias,
 			},
-			check: func(d []pcidev.Device) {
+			validateFunc: func(d []pcidev.Device) {
 				s.Require().Len(d, 1)
 				s.Equal("unknown", d[0].VendorName)
 			},
@@ -135,26 +151,55 @@ func (s *PCIDevPublicTestSuite) TestList() {
 				"/usr/share/hwdata/pci.ids.gz": gz(ids)[:30],
 				dev + "0000:01:00.0/modalias":  gpuModalias,
 			},
-			check: func(d []pcidev.Device) {
+			validateFunc: func(d []pcidev.Device) {
 				s.Require().Len(d, 1)
 				s.Equal("unknown", d[0].VendorName)
 			},
 		},
 		{
-			name:  "no /sys/bus/pci",
-			check: func(d []pcidev.Device) { s.Empty(d) },
+			name:         "no /sys/bus/pci",
+			validateFunc: func(d []pcidev.Device) { s.Empty(d) },
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			fs := sourcetest.Links(s.T(), sourcetest.FS(s.T(), tt.files), tt.links)
-			tt.check(pcidev.List(fs, pcidev.LoadDB(fs)))
+			tt.validateFunc(pcidev.List(fs, pcidev.LoadDB(fs)))
 		})
 	}
 }
 
 func (s *PCIDevPublicTestSuite) TestRead() {
-	fs := sourcetest.FS(s.T(), nil)
-	_, ok := pcidev.Read(fs, pcidev.ParseIDs(nil), "0000:09:00.0")
-	s.False(ok, "no modalias")
+	tests := []struct {
+		name         string
+		files        map[string]string
+		address      string
+		validateFunc func(pcidev.Device, bool)
+	}{
+		{
+			name:    "a device with no modalias is not read",
+			address: "0000:09:00.0",
+			validateFunc: func(_ pcidev.Device, ok bool) {
+				s.False(ok)
+			},
+		},
+		{
+			name: "a device with a modalias is read, unnamed with no pci.ids",
+			files: map[string]string{
+				"/sys/bus/pci/devices/0000:01:00.0/modalias": gpuModalias,
+			},
+			address: "0000:01:00.0",
+			validateFunc: func(d pcidev.Device, ok bool) {
+				s.Require().True(ok)
+				s.Equal("10de", d.VendorID)
+				s.Equal("unknown", d.VendorName)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			fs := sourcetest.FS(s.T(), tt.files)
+			tt.validateFunc(pcidev.Read(fs, pcidev.ParseIDs(nil), tt.address))
+		})
+	}
 }
