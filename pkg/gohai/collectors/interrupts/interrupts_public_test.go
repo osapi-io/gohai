@@ -333,7 +333,7 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				if true {
-					s.Nil(got)
+					s.Exactly(nil, got)
 					return
 				}
 				info, ok := got.(*interrupts.Info)

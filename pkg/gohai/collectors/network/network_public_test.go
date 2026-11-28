@@ -470,7 +470,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			nilExec:    true,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -1495,7 +1495,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "ip -o addr show: exit status 1")
 			},
 		},
@@ -1506,7 +1506,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs:         fsWith(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, errors.New("exit status 2"), nil, errAbsent),
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "ip -o -4 route show: exit status 2")
 			},
 		},
@@ -1517,7 +1517,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs:         fsWith(s.T(), map[string]string{"/proc/net/if_inet6": ""}),
 			exec:       ipRouteExec(s.T(), nil, nil, nil, errors.New("exit status 2")),
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "ip -o -6 route show: exit status 2")
 			},
 		},
@@ -1557,7 +1557,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "ip -d link: exit status 1")
 			},
 		},
@@ -1573,7 +1573,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "ip neigh show: exit status 1")
 			},
 		},
@@ -1590,7 +1590,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			}(),
 			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.ErrorContains(err, "read /proc/net/dev")
 			},
 		},

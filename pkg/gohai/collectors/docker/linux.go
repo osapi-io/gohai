@@ -45,5 +45,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectDocker(ctx, l.Exec)
+	return collector.Result(collectDocker(ctx, l.Exec))
 }

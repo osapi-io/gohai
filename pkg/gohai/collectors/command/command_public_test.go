@@ -220,7 +220,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			exec:    func(t *testing.T) source.Runner { return psExec(t, nil, errors.New("exit status 1")) },
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.Contains(err.Error(), "read ps")
 			},
 		},
@@ -270,7 +270,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			exec:    func(t *testing.T) source.Runner { return psExec(t, nil, errors.New("exit status 1")) },
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.Contains(err.Error(), "read ps")
 			},
 		},

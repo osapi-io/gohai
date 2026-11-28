@@ -175,7 +175,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			}
 			s.Require().NoError(err)
 			if tt.want == nil {
-				s.Nil(got)
+				s.Exactly(nil, got)
 
 				return
 			}

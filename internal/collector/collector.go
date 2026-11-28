@@ -40,6 +40,20 @@ func Absent(
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, exec.ErrNotFound)
 }
 
+// Result returns v as a Collect result. A nil v becomes an untyped nil, so
+// the registry records no fact. A typed nil pointer in an any is not nil,
+// and would put a null fact in the output.
+func Result[T any](
+	v *T,
+	err error,
+) (any, error) {
+	if v == nil {
+		return nil, err
+	}
+
+	return v, err
+}
+
 // PriorResults is the map of already-completed collector outputs
 // passed to each collector's Collect call. Access typed values via
 // GetDep — that handles the runtime type assertion for you.

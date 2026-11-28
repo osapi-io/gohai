@@ -243,7 +243,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorIs(err, shard.ErrNoMachineName)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -252,7 +252,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			prior:   collector.PriorResults{},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorIs(err, shard.ErrNoMachineName)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -263,7 +263,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorIs(err, shard.ErrNoMachineName)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -273,7 +273,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			noExec:  true,
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorIs(err, shard.ErrNoMachineName)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{

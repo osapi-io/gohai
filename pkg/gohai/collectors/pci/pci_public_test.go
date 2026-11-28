@@ -151,7 +151,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 	}

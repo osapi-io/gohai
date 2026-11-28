@@ -343,7 +343,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				if true {
-					s.Nil(got)
+					s.Exactly(nil, got)
 					return
 				}
 				info, ok := got.(*fips.Info)

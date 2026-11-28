@@ -513,7 +513,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -527,7 +527,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -539,7 +539,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				return &vmware.Linux{FS: f, Exec: fullToolboxMock(s.T())}
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.ErrorContains(err, "read /proc/scsi/scsi")
 			},
 		},
@@ -555,7 +555,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -569,7 +569,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "vmware-toolbox-cmd -v: context deadline exceeded")
 			},
 		},
@@ -590,7 +590,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				}
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(
 					err,
 					"vmware-toolbox-cmd stat raw json session: context deadline exceeded",
@@ -631,7 +631,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				}
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.ErrorIs(err, errKilled)
 			},
 		},
@@ -646,7 +646,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.ErrorIs(err, errKilled)
 			},
 		},
@@ -663,7 +663,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				}
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "vmware-toolbox-cmd stat speed: signal: killed")
 			},
 		},
@@ -675,7 +675,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		// ----- Darwin -----
@@ -771,7 +771,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -786,7 +786,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -800,7 +800,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				return &vmware.Darwin{Exec: m}
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "vmware-toolbox-cmd -v: context deadline exceeded")
 			},
 		},
@@ -813,7 +813,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				}
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "vmware-toolbox-cmd stat hosttime: context deadline exceeded")
 			},
 		},
@@ -825,7 +825,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 	}

@@ -332,7 +332,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -341,7 +341,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -360,7 +360,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read virsh uri")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -379,7 +379,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read virsh list")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -439,7 +439,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 	}

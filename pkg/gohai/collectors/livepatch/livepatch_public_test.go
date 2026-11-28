@@ -142,7 +142,7 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 			setupFS: func() avfs.VFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -152,7 +152,7 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 			// /sys/kernel/livepatch does not exist: no livepatch support.
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{

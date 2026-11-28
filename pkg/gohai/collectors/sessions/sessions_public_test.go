@@ -260,7 +260,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 				return loginctlExec(t, nil, errors.New("exit status 1"))
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "loginctl list-sessions: exit status 1")
 			},
 		},
@@ -270,7 +270,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			exec:    func(*testing.T) source.Runner { return nil },
 			dirs:    []string{"/var/run/utmp"},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.ErrorContains(err, "read /var/run/utmp")
 			},
 		},
@@ -304,7 +304,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			dirs:    []string{"/var/run/utmpx"},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.ErrorContains(err, "read /var/run/utmpx")
 			},
 		},

@@ -48,5 +48,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return run(ctx, l.Exec, linuxSep)
+	return collector.Result(run(ctx, l.Exec, linuxSep))
 }

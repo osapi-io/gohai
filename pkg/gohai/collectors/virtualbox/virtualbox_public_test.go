@@ -166,7 +166,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -178,7 +178,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
 				s.Contains(err.Error(), "permission denied")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -187,7 +187,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -253,7 +253,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -265,7 +265,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
 				s.Contains(err.Error(), "permission denied")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -274,7 +274,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 	}

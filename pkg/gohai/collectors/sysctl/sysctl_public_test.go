@@ -256,7 +256,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "sysctl -a: signal: killed")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{

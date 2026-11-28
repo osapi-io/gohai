@@ -153,21 +153,6 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
  Sent 1024 bytes 8 pkt (dropped 0, overlimits 0 requeues 0)
  backlog 10Kb 7p requeues 0
   maxpacket 1514 drop_overlimit 0 new_flow_count 4 ecn_mark 0
-qdisc sfq 20: dev eth1 parent 1:20 limit 127p quantum 1514b
- Sent x bytes 2 pkt (dropped 1, overlimits 0 requeues 0)
- backlog 2Mb zp requeues 0
-qdisc pfifo 30: dev eth2 root
- backlog 1Gb 3p requeues 0
-qdisc pfifo 40: dev eth3 root
- backlog 5Tb -1p
-qdisc pfifo 50: dev eth4 root
- backlog -2b
-qdisc pfifo 60: dev eth5 root
- backlog
-qdisc pfifo 70: dev eth6 root
- backlog 9b
-qdisc pfifo 80: dev eth7 root
- backlog 12 4p
 `), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -204,91 +189,148 @@ qdisc pfifo 80: dev eth7 root
 							},
 						},
 					},
-					{
-						Name: "eth1",
-						QDiscs: []tc.QDisc{
-							{
-								Kind:   "sfq",
-								Handle: "20",
-								Parent: "1:20",
-								Stats: &tc.Stats{
-									SentPackets:  2,
-									Dropped:      1,
-									BacklogBytes: 2 * 1024 * 1024,
-								},
-							},
-						},
-					},
-					{
-						Name: "eth2",
-						QDiscs: []tc.QDisc{
-							{
-								Kind:   "pfifo",
-								Handle: "30",
-								Parent: "root",
-								Stats: &tc.Stats{
-									BacklogBytes:   1 << 30,
-									BacklogPackets: 3,
-								},
-							},
-						},
-					},
-					{
-						Name: "eth3",
-						QDiscs: []tc.QDisc{
-							{
-								Kind:   "pfifo",
-								Handle: "40",
-								Parent: "root",
-								Stats:  &tc.Stats{},
-							},
-						},
-					},
-					{
-						Name: "eth4",
-						QDiscs: []tc.QDisc{
-							{
-								Kind:   "pfifo",
-								Handle: "50",
-								Parent: "root",
-								Stats:  &tc.Stats{},
-							},
-						},
-					},
-					{
-						Name: "eth5",
-						QDiscs: []tc.QDisc{
-							{
-								Kind:   "pfifo",
-								Handle: "60",
-								Parent: "root",
-								Stats:  &tc.Stats{},
-							},
-						},
-					},
-					{
-						Name: "eth6",
-						QDiscs: []tc.QDisc{
-							{
-								Kind:   "pfifo",
-								Handle: "70",
-								Parent: "root",
-								Stats:  &tc.Stats{BacklogBytes: 9},
-							},
-						},
-					},
-					{
-						Name: "eth7",
-						QDiscs: []tc.QDisc{
-							{
-								Kind:   "pfifo",
-								Handle: "80",
-								Parent: "root",
-								Stats:  &tc.Stats{BacklogPackets: 4},
-							},
-						},
-					},
 				}, info.Interfaces)
+			},
+		},
+		{
+			name:    "linux: a sent count that is not a number is 0",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ Sent x bytes 2 pkt (dropped 1, overlimits 0 requeues 0)
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(&tc.Stats{SentPackets: 2, Dropped: 1}, info.Interfaces[0].QDiscs[0].Stats)
+			},
+		},
+		{
+			name:    "linux: a backlog in Mb is in bytes",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ backlog 2Mb 0p
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(
+					&tc.Stats{BacklogBytes: 2 * 1024 * 1024},
+					info.Interfaces[0].QDiscs[0].Stats,
+				)
+			},
+		},
+		{
+			name:    "linux: a backlog in Gb is in bytes",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ backlog 1Gb 3p
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(
+					&tc.Stats{BacklogBytes: 1 << 30, BacklogPackets: 3},
+					info.Interfaces[0].QDiscs[0].Stats,
+				)
+			},
+		},
+		{
+			name:    "linux: backlog packets that are not a number are 0",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ backlog 9b zp
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(&tc.Stats{BacklogBytes: 9}, info.Interfaces[0].QDiscs[0].Stats)
+			},
+		},
+		{
+			name:    "linux: a backlog size with an unknown unit is 0",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ backlog 5Tb 2p
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(&tc.Stats{BacklogPackets: 2}, info.Interfaces[0].QDiscs[0].Stats)
+			},
+		},
+		{
+			name:    "linux: a negative backlog size is 0",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ backlog -2b -1p
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(&tc.Stats{}, info.Interfaces[0].QDiscs[0].Stats)
+			},
+		},
+		{
+			name:    "linux: a backlog size with no unit is 0",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ backlog 12 4p
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(&tc.Stats{BacklogPackets: 4}, info.Interfaces[0].QDiscs[0].Stats)
+			},
+		},
+		{
+			name:    "linux: a backlog line with no size gives empty stats",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ backlog
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(&tc.Stats{}, info.Interfaces[0].QDiscs[0].Stats)
+			},
+		},
+		{
+			name:    "linux: a backlog line with no packets keeps its size",
+			variant: "linux",
+			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+ backlog 9b
+`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 1)
+				s.Require().Len(info.Interfaces[0].QDiscs, 1)
+				s.Equal(&tc.Stats{BacklogBytes: 9}, info.Interfaces[0].QDiscs[0].Stats)
 			},
 		},
 		{
@@ -347,7 +389,7 @@ qdisc pfifo 80: dev eth7 root
 			variant: "linux",
 			exec:    tcExec(s.T(), nil, errors.New("exit status 2")),
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "tc -s qdisc show: exit status 2")
 			},
 		},
@@ -423,7 +465,7 @@ qdisc pfifo 80: dev eth7 root
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				if true {
-					s.Nil(got)
+					s.Exactly(nil, got)
 					return
 				}
 				info, ok := got.(*tc.Info)

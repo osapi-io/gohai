@@ -46,5 +46,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectPools(ctx, l.Exec)
+	return collector.Result(collectPools(ctx, l.Exec))
 }

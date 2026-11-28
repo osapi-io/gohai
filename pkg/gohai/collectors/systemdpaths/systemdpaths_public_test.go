@@ -225,7 +225,7 @@ user-runtime: /run/user/1000
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
 				s.Contains(err.Error(), "permission denied")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -245,7 +245,7 @@ user-runtime: /run/user/1000
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				if true {
-					s.Nil(got)
+					s.Exactly(nil, got)
 					return
 				}
 				info, ok := got.(*systemdpaths.Info)

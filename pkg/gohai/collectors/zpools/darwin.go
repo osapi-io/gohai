@@ -47,5 +47,5 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectPools(ctx, d.Exec)
+	return collector.Result(collectPools(ctx, d.Exec))
 }

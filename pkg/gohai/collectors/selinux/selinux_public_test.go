@@ -172,7 +172,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			setupFS: func() avfs.VFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -401,7 +401,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "sestatus: signal: killed")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -417,7 +417,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /sys/fs/selinux/enforce")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{

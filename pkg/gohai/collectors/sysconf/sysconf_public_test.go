@@ -174,7 +174,7 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 			}
 			s.Require().NoError(err)
 			if tt.nilExec {
-				s.Nil(got)
+				s.Exactly(nil, got)
 
 				return
 			}
