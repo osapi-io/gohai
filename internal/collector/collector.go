@@ -132,9 +132,10 @@ type Collector interface {
 
 	// Collect gathers facts and returns a typed struct (or nil if not
 	// supported). prior contains the typed outputs of collectors that
-	// finished before this one (always includes everything declared in
-	// Dependencies; may include additional upstream siblings). Access
-	// typed values via GetDep[T].
+	// finished before this one. It always includes everything declared in
+	// Dependencies, and may include other upstream collectors. When a
+	// dependency fails, Collect is not called, and the collector's error
+	// wraps ErrDependencyFailed. Access typed values via GetDep[T].
 	Collect(
 		ctx context.Context,
 		prior PriorResults,
