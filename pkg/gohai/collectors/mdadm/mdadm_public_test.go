@@ -207,17 +207,57 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal([]mdadm.Array{
 					{
-						Device:      "md0",
-						Level:       "raid1",
-						State:       "clean",
-						UUID:        "a5d3:1234:dead:beef",
-						ActiveDisks: 2,
-						TotalDisks:  2,
-						SpareDisks:  0,
-						Members:     []string{"sda1", "sdb1"},
-						Spares:      []string{},
+						Device:       "md0",
+						Level:        "raid1",
+						State:        "clean",
+						UUID:         "a5d3:1234:dead:beef",
+						ActiveDisks:  2,
+						TotalDisks:   2,
+						SpareDisks:   0,
+						WorkingDisks: 2,
+						Members:      []string{"sda1", "sdb1"},
+						Spares:       []string{},
 					},
 				}, info.Arrays)
+			},
+		},
+		{
+			name:    "linux: a degraded raid1 keeps its whole state, and counts its failed disk",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc", 0o755)
+				_ = f.WriteFile("/proc/mdstat", mdstatRaid1, fs.FileMode(0o444))
+				return f
+			},
+			setupEx: func(t *testing.T) *sourcemocks.MockRunner {
+				ctrl := gomock.NewController(t)
+				m := sourcemocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md0").
+					Return([]byte(
+						"/dev/md0:\n"+
+							"        Raid Level : raid1\n"+
+							"     Total Devices : 2\n"+
+							"             State : clean, degraded \n"+
+							"    Active Devices : 1\n"+
+							"   Working Devices : 1\n"+
+							"    Failed Devices : 1\n"+
+							"     Spare Devices : 0\n"+
+							"              UUID : a5d3:1234:dead:beef\n"+
+							"       Array State : A. ('A' == active, '.' == missing)\n",
+					), nil)
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Arrays, 1)
+				s.Equal("clean, degraded", info.Arrays[0].State)
+				s.Equal(1, info.Arrays[0].FailedDisks)
+				s.Equal(1, info.Arrays[0].WorkingDisks)
+				s.Equal(1, info.Arrays[0].ActiveDisks)
 			},
 		},
 		{
