@@ -74,6 +74,19 @@ var mdstatTwo = []byte(
 		"unused devices: <none>\n",
 )
 
+// mdstatInactive is /proc/mdstat with an active md0 and an inactive md127,
+// for which `mdadm --detail` exits non-zero.
+var mdstatInactive = []byte(
+	"Personalities : [raid1]\n" +
+		"md0 : active raid1 sda1[0] sdb1[1]\n" +
+		"      1046528 blocks super 1.2 [2/2] [UU]\n" +
+		"\n" +
+		"md127 : inactive sdc1[1](S)\n" +
+		"      1046528 blocks super 1.2\n" +
+		"\n" +
+		"unused devices: <none>\n",
+)
+
 // detailRaid1 is sample `mdadm --detail` output for md0.
 var detailRaid1 = []byte(
 	"/dev/md0:\n" +
@@ -180,7 +193,9 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 		setupFS func() avfs.VFS
 		// setupEx returns a source.Runner to inject. Return nil to test
 		// the no-executor path (Exec field left nil on the Linux struct).
-		setupEx      func(*testing.T) *mocks.MockRunner
+		setupEx func(*testing.T) *mocks.MockRunner
+		// cancel runs Collect with a context that is already cancelled.
+		cancel       bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -328,8 +343,46 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a failed mdadm --detail is an error",
+			name:    "linux: a failed --detail on one inactive array keeps the others",
 			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc", 0o755)
+				_ = f.WriteFile("/proc/mdstat", mdstatInactive, fs.FileMode(0o444))
+				return f
+			},
+			setupEx: func(t *testing.T) *mocks.MockRunner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md0").
+					Return(detailRaid1, nil)
+				m.EXPECT().
+					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md127").
+					Return(nil, errors.New("exit status 1"))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Arrays, 2)
+				s.Equal("md0", info.Arrays[0].Device)
+				s.Equal("raid1", info.Arrays[0].Level)
+				s.Empty(info.Arrays[0].DetailError)
+				s.Equal("md127", info.Arrays[1].Device)
+				s.Empty(info.Arrays[1].Level)
+				s.Equal([]string{"sdc1"}, info.Arrays[1].Spares)
+				s.Equal(
+					"mdadm --detail /dev/md127: exit status 1",
+					info.Arrays[1].DetailError,
+				)
+			},
+		},
+		{
+			name:    "linux: a cancelled context during --detail is an error",
+			variant: "linux",
+			cancel:  true,
 			setupFS: func() avfs.VFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/proc", 0o755)
@@ -341,12 +394,12 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md0").
-					Return(nil, errors.New("exit status 1"))
+					Return(nil, context.Canceled)
 				return m
 			},
 			validateFunc: func(got any, err error) {
 				s.Exactly(nil, got)
-				s.EqualError(err, "mdadm --detail /dev/md0: exit status 1")
+				s.EqualError(err, "mdadm --detail /dev/md0: context canceled")
 			},
 		},
 		{
@@ -474,7 +527,12 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = mdadm.NewDarwin()
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancel {
+				cancel()
+			}
+			tt.validateFunc(c.Collect(ctx, nil))
 		})
 	}
 }
