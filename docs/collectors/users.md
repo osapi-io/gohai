@@ -112,7 +112,8 @@ On Linux, the collector reads the POSIX flat files:
    This is the same as the C-library loop of `Etc.passwd`. The collector skips
    comments (`#`) and lines that are not valid (fewer than 7 fields). A missing
    `/etc/passwd` gives an empty map. One that exists and does not read is an
-   error.
+   error, and the collector keeps the facts of the files that did read, with the
+   status `partial`.
 2. The collector reads `/etc/group` through the same VFS. Each line has four
    fields with colons between them: `name:password:gid:members`, with commas
    between the members. The collector keeps `gid` and the `members` slice that
@@ -146,8 +147,9 @@ run these commands:
    `GroupMembership` names.
 3. If the host has no `dscl`, or the directory service lists no users, the
    collector uses `/etc/passwd`. For the groups, it uses `/etc/group` in the
-   same way. A `dscl` run that fails is an error, so a failed read is not
-   reported as the system accounts of the flat files.
+   same way. A `dscl` run that fails is an error. The collector keeps the facts
+   of the flat files with that error, and its status is `partial`, so a caller
+   does not take the flat files' system accounts for the directory service.
 4. The collector gets `current_user` from `id -u`, as on Linux.
 
 This agrees with Ohai. Ohai's `passwd` plugin uses Ruby's `Etc.passwd`, which

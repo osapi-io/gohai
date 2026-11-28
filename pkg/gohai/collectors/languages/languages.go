@@ -83,7 +83,7 @@ func NewWith(
 }
 
 // collectLanguages probes each well-known language runtime and returns
-// an Info struct. It is shared between Linux and Darwin, because version flags
+// an Info struct, with the joined error of each probe that failed. It is shared between Linux and Darwin, because version flags
 // are identical on both platforms. A runtime that is not on the PATH is nil;
 // one that runs and fails, or a done ctx, is an error.
 func collectLanguages(
@@ -139,10 +139,14 @@ func collectLanguages(
 	info.Node = probe("node", []string{"--version"}, parseNodeVersion)
 	info.Java = probeJava(ctx, exec, skip, run, &errs)
 	info.Perl = probe("perl", []string{"--version"}, parsePerlVersion)
-	if err := errors.Join(errs...); err != nil {
+	err := errors.Join(errs...)
+	// A cancelled run has no facts to keep.
+	if ctx.Err() != nil {
 		return nil, err
 	}
-	return info, nil
+	// A probe that failed leaves its runtime unset, and the other runtimes
+	// keep their versions: the result is partial, with each failure joined.
+	return info, err
 }
 
 // probeJava reads the Java version. Java 9 and later print it for

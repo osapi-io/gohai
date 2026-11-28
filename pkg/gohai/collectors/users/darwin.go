@@ -22,6 +22,7 @@ package users
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -56,18 +57,16 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	// A read that fails keeps what the others read: the result is partial,
+	// with each failure joined.
 	info, err := readPOSIX(d.FS)
-	if err != nil {
-		return nil, err
-	}
+	errs := []error{err}
 	if d.Exec != nil {
-		if err := d.applyDscl(ctx, info); err != nil {
-			return nil, err
-		}
+		errs = append(errs, d.applyDscl(ctx, info))
 	}
 	setCurrentUser(ctx, d.Exec, info)
 
-	return info, nil
+	return info, errors.Join(errs...)
 }
 
 // applyDscl puts the users and groups of the directory service in info,
