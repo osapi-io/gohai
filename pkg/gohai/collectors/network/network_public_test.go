@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"testing"
@@ -525,12 +526,31 @@ func (s *NetworkPublicTestSuite) TestSources() {
 				s.Require().Len(tun.Addresses, 1)
 				s.Equal("10.8.0.1", tun.Addresses[0].Addr)
 				s.Equal(32, tun.Addresses[0].Prefixlen)
+				s.Equal("10.8.0.2", tun.Addresses[0].Peer)
 				s.Require().NotNil(tun.Counters)
 				s.Equal(uint64(30), tun.Counters.BytesSent)
 				s.Equal(uint64(10), tun.Counters.BytesRecv)
 				s.Require().Len(i.Neighbours, 1)
 				s.Equal("FAILED", i.Neighbours[0].State)
 				s.Empty(i.Neighbours[0].MAC)
+			},
+		},
+		{
+			name:    "linux: the scope is the one that ip prints, also when an admin set it",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/eth0/ifindex": "2\n",
+			},
+			runner: sourcetest.Commands{Out: map[string]string{
+				"ip -o addr show": "2: eth0    inet 192.0.2.7/24 brd 192.0.2.255 scope link eth0\n" +
+					"2: eth0    inet 198.51.100.7/24 scope weird eth0\n",
+			}},
+			check: func(i *network.Info) {
+				s.Require().Len(i.Interfaces, 1)
+				s.Require().Len(i.Interfaces[0].Addresses, 2)
+				s.Equal("Link", i.Interfaces[0].Addresses[0].Scope)
+				s.Equal("Global", i.Interfaces[0].Addresses[1].Scope)
+				s.Empty(i.Interfaces[0].Addresses[0].Peer)
 			},
 		},
 		{
@@ -1423,6 +1443,34 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name: "openvz guest: an alias after an earlier merged alias still merges into its base",
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
+					{Name: "venet0:1", Addrs: []string{"203.0.113.1/32"}},
+					{Name: "venet0", MTU: 1500},
+					{Name: "venet1", MTU: 1500},
+					{Name: "venet1:1", Addrs: []string{"203.0.113.2/32"}},
+				}, nil
+			},
+			countersFn: zeroCounters,
+			fs: fsWith(s.T(), map[string]string{
+				"/proc/vz/version": "",
+			}),
+			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 2)
+				s.Equal("venet0", i.Interfaces[0].Name)
+				s.Require().Len(i.Interfaces[0].Addresses, 1)
+				s.Equal("203.0.113.1", i.Interfaces[0].Addresses[0].Addr)
+				s.Equal("venet1", i.Interfaces[1].Name)
+				s.Require().Len(i.Interfaces[1].Addresses, 1)
+				s.Equal("203.0.113.2", i.Interfaces[1].Addresses[0].Addr)
+			},
+		},
+		{
 			name: "openvz host (/proc/bc/0 present): no merge",
 			ifsFn: func() ([]tIface, error) {
 				return []tIface{
@@ -1814,7 +1862,26 @@ func ipAddrOf(
 			if strings.Contains(a, ":") {
 				fam = "inet6"
 			}
-			out += fmt.Sprintf("%d: %s    %s %s scope global %s\n", i.Index, i.Name, fam, a, i.Name)
+			// The scope that ip prints: host for loopback, link for
+			// link-local, global for the rest.
+			scope := "global"
+			if ip, _, err := net.ParseCIDR(a); err == nil {
+				switch {
+				case ip.IsLoopback():
+					scope = "host"
+				case ip.IsLinkLocalUnicast():
+					scope = "link"
+				}
+			}
+			out += fmt.Sprintf(
+				"%d: %s    %s %s scope %s %s\n",
+				i.Index,
+				i.Name,
+				fam,
+				a,
+				scope,
+				i.Name,
+			)
 		}
 	}
 
