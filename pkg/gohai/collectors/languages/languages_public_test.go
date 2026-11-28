@@ -88,6 +88,16 @@ func buildFullMock(
 		Execute(gomock.Any(), "perl", "--version").
 		Return([]byte("This is perl 5, version 36, subversion 0 (v5.36.0)\n"), nil).
 		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "sh", "-c", "command -v python3").
+		Return([]byte("/usr/bin/python3\n"), nil).
+		AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "xcode-select", "-p").Return(nil, nil).AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "sh", "-c", "command -v java").
+		Return([]byte("/usr/bin/java\n"), nil).
+		AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "/usr/libexec/java_home").Return(nil, nil).AnyTimes()
 	return m
 }
 
@@ -105,6 +115,15 @@ func buildAbsentMock(
 	m.EXPECT().Execute(gomock.Any(), "node", "--version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "java", "--version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "perl", "--version").Return(nil, absent).AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "sh", "-c", "java -version 2>&1").
+		Return(nil, absent).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), "sh", "-c", "command -v python3").
+		Return(nil, absent).
+		AnyTimes()
+	m.EXPECT().Execute(gomock.Any(), "sh", "-c", "command -v java").Return(nil, absent).AnyTimes()
 	return m
 }
 
@@ -146,6 +165,10 @@ func buildSingleMock(
 				AnyTimes()
 		}
 	}
+	m.EXPECT().
+		Execute(gomock.Any(), "sh", "-c", "java -version 2>&1").
+		Return(nil, absent).
+		AnyTimes()
 
 	return m
 }
@@ -345,6 +368,89 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 				info, ok := got.(*languages.Info)
 				s.Require().True(ok)
 				s.Equal(languages.Info{Java: strPtr("abc")}, *info)
+			},
+		},
+		{
+			name:    "linux: java 8 has no --version, so java -version gives it",
+			variant: "linux",
+			exec: func() source.Runner {
+				m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
+				absent := errors.New("not found")
+				for _, p := range [][]string{
+					{"go", "version"},
+					{"python3", "--version"},
+					{"ruby", "--version"},
+					{"node", "--version"},
+					{"java", "--version"},
+					{"perl", "--version"},
+				} {
+					m.EXPECT().Execute(gomock.Any(), p[0], p[1]).Return(nil, absent).AnyTimes()
+				}
+				m.EXPECT().
+					Execute(gomock.Any(), "sh", "-c", "java -version 2>&1").
+					Return([]byte("openjdk version \"1.8.0_292\"\nOpenJDK Runtime Environment\n"), nil)
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{Java: strPtr("1.8.0_292")}, *info)
+			},
+		},
+		{
+			name:    "darwin: the python3 and java stubs do not run without the tools and a JDK",
+			variant: "darwin",
+			exec: func() source.Runner {
+				m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
+				absent := errors.New("not found")
+				for _, p := range [][]string{
+					{"go", "version"}, {"ruby", "--version"}, {"node", "--version"}, {"perl", "--version"},
+				} {
+					m.EXPECT().Execute(gomock.Any(), p[0], p[1]).Return(nil, absent).AnyTimes()
+				}
+				m.EXPECT().
+					Execute(gomock.Any(), "sh", "-c", "command -v python3").
+					Return([]byte("/usr/bin/python3\n"), nil)
+				m.EXPECT().Execute(gomock.Any(), "xcode-select", "-p").Return(nil, absent)
+				m.EXPECT().
+					Execute(gomock.Any(), "sh", "-c", "command -v java").
+					Return([]byte("/usr/bin/java\n"), nil)
+				m.EXPECT().Execute(gomock.Any(), "/usr/libexec/java_home").Return(nil, absent)
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{}, *info)
+			},
+		},
+		{
+			name:    "darwin: a python3 from Homebrew runs without the tools",
+			variant: "darwin",
+			exec: func() source.Runner {
+				m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
+				absent := errors.New("not found")
+				for _, p := range [][]string{
+					{"go", "version"}, {"ruby", "--version"}, {"node", "--version"}, {"perl", "--version"},
+				} {
+					m.EXPECT().Execute(gomock.Any(), p[0], p[1]).Return(nil, absent).AnyTimes()
+				}
+				m.EXPECT().
+					Execute(gomock.Any(), "sh", "-c", "command -v python3").
+					Return([]byte("/opt/homebrew/bin/python3\n"), nil)
+				m.EXPECT().
+					Execute(gomock.Any(), "python3", "--version").
+					Return([]byte("Python 3.12.1\n"), nil)
+				m.EXPECT().Execute(gomock.Any(), "sh", "-c", "command -v java").Return(nil, absent)
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{Python: strPtr("3.12.1")}, *info)
 			},
 		},
 		{

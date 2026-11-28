@@ -71,10 +71,10 @@ func (d *Darwin) Collect(
 //
 //	1: index, 2: refcount, 3: size (hex), 4: name, 5: version.
 //
-// Character classes match Ohai's regex exactly (kernel.rb :darwin
-// branch) — field-tested on real macOS output.
+// The name is any run of non-space characters, because a bundle ID can
+// hold a hyphen or an underscore, such as com.paragon-software.filesystems.ntfs.
 var kextstatLine = regexp.MustCompile(
-	`^\s*(\d+)\s+(\d+)\s+0x[0-9a-f]+\s+0x([0-9a-f]+)\s+0x[0-9a-f]+\s+([a-zA-Z0-9\.]+) \(([0-9\.]+)\)`,
+	`^\s*(\d+)\s+(\d+)\s+0x[0-9a-f]+\s+0x([0-9a-f]+)\s+0x[0-9a-f]+\s+(\S+) \(([0-9\.]+)\)`,
 )
 
 // parseKextstat turns `kextstat -k -l` output into a Module map keyed

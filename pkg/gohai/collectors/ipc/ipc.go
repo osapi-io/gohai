@@ -26,6 +26,8 @@ package ipc
 import (
 	"strings"
 
+	"github.com/avfs/avfs"
+
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -116,13 +118,13 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// readTrimmed reads a sysfs/procfs file using readFn and returns its
+// readTrimmed reads a sysfs/procfs file from fs and returns its
 // trimmed content, or empty string on error.
 func readTrimmed(
-	readFn func(string) ([]byte, error),
+	fs avfs.VFS,
 	path string,
 ) string {
-	b, err := readFn(path)
+	b, err := fs.ReadFile(path)
 	if err != nil {
 		return ""
 	}

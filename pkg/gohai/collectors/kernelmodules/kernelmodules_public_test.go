@@ -149,6 +149,8 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 		`Index Refs Address            Size       Wired      Name (Version) <Linked Against>
     1    0 0xffffff7f80000000 0x8a8      0xa8       com.apple.iokit.IOPCIFamily (2.9)
     2   12 0xffffff7f80001000 0x1000     0x100      com.apple.driver.AppleACPIPlatform (6.1)
+    3    0 0xffffff7f80002000 0x2000     0x200      com.paragon-software.filesystems.ntfs (1.0)
+    4    0 0xffffff7f80003000 0x3000     0x300      com.devguru.driver.Samsung_USB_Driver (1.2)
 `,
 	)
 
@@ -231,8 +233,10 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				i, ok := got.(*kernelmodules.Info)
 				s.Require().True(ok)
-				s.Len(i.Modules, 2)
+				s.Len(i.Modules, 4)
 				s.Equal("2.9", i.Modules["com.apple.iokit.IOPCIFamily"].Version)
+				s.Equal(3, i.Modules["com.paragon-software.filesystems.ntfs"].Index)
+				s.Equal("1.2", i.Modules["com.devguru.driver.Samsung_USB_Driver"].Version)
 				s.Equal(uint64(0x8a8), i.Modules["com.apple.iokit.IOPCIFamily"].Size)
 				s.Equal(1, i.Modules["com.apple.iokit.IOPCIFamily"].Index)
 				s.Equal(12, i.Modules["com.apple.driver.AppleACPIPlatform"].RefCount)

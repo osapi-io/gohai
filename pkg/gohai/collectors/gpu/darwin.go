@@ -69,8 +69,8 @@ func (d *Darwin) Collect(
 	if err := json.Unmarshal(out, &payload); err != nil {
 		return nil, fmt.Errorf("parse system_profiler SPDisplaysDataType: %w", err)
 	}
-	for _, d := range payload.Displays {
-		info.Cards = append(info.Cards, d.toCard())
+	for _, display := range payload.Displays {
+		info.Cards = append(info.Cards, display.toCard())
 	}
 	return info, nil
 }

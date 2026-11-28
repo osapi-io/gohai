@@ -51,23 +51,19 @@ func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	readFn := func(path string) ([]byte, error) {
-		return l.FS.ReadFile(path)
-	}
-
-	semRaw := readTrimmed(readFn, "/proc/sys/kernel/sem")
+	semRaw := readTrimmed(l.FS, "/proc/sys/kernel/sem")
 
 	return &Info{
 		Sem: parseSem(semRaw),
 		Msg: MsgLimits{
-			MSGMNB: readTrimmed(readFn, "/proc/sys/kernel/msgmnb"),
-			MSGMNI: readTrimmed(readFn, "/proc/sys/kernel/msgmni"),
-			MSGMAX: readTrimmed(readFn, "/proc/sys/kernel/msgmax"),
+			MSGMNB: readTrimmed(l.FS, "/proc/sys/kernel/msgmnb"),
+			MSGMNI: readTrimmed(l.FS, "/proc/sys/kernel/msgmni"),
+			MSGMAX: readTrimmed(l.FS, "/proc/sys/kernel/msgmax"),
 		},
 		Shm: ShmLimits{
-			SHMALL: readTrimmed(readFn, "/proc/sys/kernel/shmall"),
-			SHMMAX: readTrimmed(readFn, "/proc/sys/kernel/shmmax"),
-			SHMMNI: readTrimmed(readFn, "/proc/sys/kernel/shmmni"),
+			SHMALL: readTrimmed(l.FS, "/proc/sys/kernel/shmall"),
+			SHMMAX: readTrimmed(l.FS, "/proc/sys/kernel/shmmax"),
+			SHMMNI: readTrimmed(l.FS, "/proc/sys/kernel/shmmni"),
 		},
 	}, nil
 }
