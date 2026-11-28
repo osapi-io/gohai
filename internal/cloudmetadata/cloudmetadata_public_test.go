@@ -391,11 +391,11 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 func (s *CloudMetadataPublicTestSuite) TestNewSharesOneTransport() {
 	a := cloudmetadata.TransportOf(cloudmetadata.New("http://a.invalid"))
 	b := cloudmetadata.TransportOf(cloudmetadata.New("http://b.invalid"))
-	s.Same(a, b, "the clients of the cloud collectors share their connections")
+	s.Same(a, b)
 	t, ok := a.(*http.Transport)
 	s.Require().True(ok)
-	s.Nil(t.Proxy, "metadata IPs are link-local and must not route through a proxy")
-	s.Positive(t.IdleConnTimeout, "an idle connection closes")
+	s.Nil(t.Proxy)
+	s.Positive(t.IdleConnTimeout)
 }
 
 func (s *CloudMetadataPublicTestSuite) TestWithTransport() {

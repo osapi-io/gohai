@@ -152,7 +152,7 @@ func (s *DockerPublicTestSuite) TestInspect() {
 		validateFunc func([]docker.Container)
 	}{
 		{
-			name:       "when inspect answers, each container has its details, and no env value",
+			name:       "when inspect answers, each container has its details in sorted order, and no env value",
 			inspectOut: []byte(inspectOut),
 			validateFunc: func(cs []docker.Container) {
 				s.Require().Len(cs, 2)
@@ -162,7 +162,7 @@ func (s *DockerPublicTestSuite) TestInspect() {
 				s.Equal("healthy", web.Health)
 				s.Equal([]string{"PATH", "DB_PASSWORD", "EMPTY"}, web.EnvNames)
 				for _, n := range web.EnvNames {
-					s.NotContains(n, "hunter2", "an env value is never in the facts")
+					s.NotContains(n, "hunter2")
 				}
 				s.Equal([]docker.Mount{
 					{
@@ -176,15 +176,15 @@ func (s *DockerPublicTestSuite) TestInspect() {
 					{ContainerPort: "443/tcp"},
 					{ContainerPort: "80/tcp", HostIP: "0.0.0.0", HostPort: "8080"},
 					{ContainerPort: "80/tcp", HostIP: "::", HostPort: "8080"},
-				}, web.Ports, "sorted by port, and a port that is not published has no host")
+				}, web.Ports)
 				s.Equal([]docker.Network{
 					{Name: "bridge", IPAddress: "172.17.0.2", Gateway: "172.17.0.1"},
 					{Name: "frontend", IPAddress: "172.19.0.2", Gateway: "172.19.0.1"},
-				}, web.Networks, "sorted by name")
+				}, web.Networks)
 
 				db := cs[1]
 				s.Equal("2026-11-21T09:00:00Z", db.Created)
-				s.Empty(db.Health, "a container with no health check")
+				s.Empty(db.Health)
 				s.Nil(db.Ports)
 				s.Nil(db.Mounts)
 				s.Nil(db.Networks)

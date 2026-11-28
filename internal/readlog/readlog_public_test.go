@@ -42,7 +42,7 @@ func (s *ReadlogPublicTestSuite) TestSources() {
 	s.Equal(int64(0), src.Now().Unix())
 
 	_, err := src.FS.Open("/a")
-	s.ErrorIs(err, fs.ErrNotExist, "the host has nothing on it")
+	s.ErrorIs(err, fs.ErrNotExist)
 	_, _ = src.FS.OpenFile("/b", os.O_RDONLY, 0)
 	_, _ = src.FS.ReadFile("/c")
 	_, _ = src.FS.ReadDir("/d")
@@ -56,7 +56,7 @@ func (s *ReadlogPublicTestSuite) TestSources() {
 
 	out, err := src.Exec.Execute(context.Background(), "systemctl", "list-units", "--all")
 	s.NoError(err)
-	s.Nil(out, "a command answers with no output")
+	s.Nil(out)
 	_, _ = src.Exec.Execute(context.Background(), "hostname")
 
 	addrs, err := src.Resolver.LookupHost(context.Background(), "x")
