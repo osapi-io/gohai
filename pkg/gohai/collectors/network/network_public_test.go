@@ -124,90 +124,6 @@ func (s *NetworkPublicTestSuite) TestNew() {
 
 // TestKind: each interface's kind comes from sysfs, which tells a bridge, a
 // bond, Wi-Fi, a VLAN and a NIC apart, although each is Ethernet.
-func (s *NetworkPublicTestSuite) TestKind() {
-	tests := []struct {
-		name  string
-		iface network.Interface
-		files map[string]string
-		want  string
-	}{
-		{
-			name:  "loopback",
-			iface: network.Interface{Name: "lo", Encapsulation: "Loopback"},
-			want:  "loopback",
-		},
-		{
-			name:  "a bridge",
-			iface: network.Interface{Name: "br0", Encapsulation: "Ethernet"},
-			files: map[string]string{"/sys/class/net/br0/bridge/bridge_id": "8000.x\n"},
-			want:  "bridge",
-		},
-		{
-			name:  "a bond",
-			iface: network.Interface{Name: "bond0", Encapsulation: "Ethernet"},
-			files: map[string]string{"/sys/class/net/bond0/bonding/mode": "active-backup 1\n"},
-			want:  "bond",
-		},
-		{
-			name:  "Wi-Fi, by its wireless directory",
-			iface: network.Interface{Name: "wlan0", Encapsulation: "Ethernet"},
-			files: map[string]string{"/sys/class/net/wlan0/wireless/link": "0\n"},
-			want:  "wifi",
-		},
-		{
-			name:  "Wi-Fi, by its phy",
-			iface: network.Interface{Name: "wlp2s0", Encapsulation: "Ethernet"},
-			files: map[string]string{"/sys/class/net/wlp2s0/phy80211/name": "phy0\n"},
-			want:  "wifi",
-		},
-		{
-			name:  "a VLAN, by its uevent",
-			iface: network.Interface{Name: "eth0.10", Encapsulation: "Ethernet"},
-			files: map[string]string{
-				"/sys/class/net/eth0.10/uevent": "DEVTYPE=vlan\nINTERFACE=eth0.10\n",
-			},
-			want: "vlan",
-		},
-		{
-			name:  "a uevent with a DEVTYPE that has no kind, on a NIC",
-			iface: network.Interface{Name: "eth1", Encapsulation: "Ethernet"},
-			files: map[string]string{
-				"/sys/class/net/eth1/uevent":        "DEVTYPE=other\n",
-				"/sys/class/net/eth1/device/vendor": "0x8086\n",
-			},
-			want: "ethernet",
-		},
-		{
-			name:  "a tun device",
-			iface: network.Interface{Name: "tun0", Encapsulation: "PPP"},
-			files: map[string]string{"/sys/class/net/tun0/tun_flags": "0x1001\n"},
-			want:  "tun",
-		},
-		{
-			name:  "a NIC",
-			iface: network.Interface{Name: "eth0", Encapsulation: "Ethernet"},
-			files: map[string]string{"/sys/class/net/eth0/device/vendor": "0x8086\n"},
-			want:  "ethernet",
-		},
-		{
-			name:  "Ethernet that software makes, such as a dummy",
-			iface: network.Interface{Name: "dummy0", Encapsulation: "Ethernet"},
-			files: map[string]string{"/sys/class/net/dummy0/type": "1\n"},
-			want:  "virtual",
-		},
-		{
-			name:  "a link that is not Ethernet",
-			iface: network.Interface{Name: "ppp0", Encapsulation: "PPP"},
-		},
-	}
-	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			ifs := []network.Interface{tc.iface}
-			network.ApplyKind(fsWith(s.T(), tc.files), ifs)
-			s.Equal(tc.want, ifs[0].Kind)
-		})
-	}
-}
 
 // fsWith builds a memfs containing the given (path → contents) map.
 func fsWith(
@@ -494,151 +410,6 @@ func ipRouteAndEthtoolExec(
 
 // TestSources covers the reads that the TestCollect fixtures do not
 // reach: the edges of sysfs, /proc/net/dev, ip and the macOS commands.
-func (s *NetworkPublicTestSuite) TestSources() {
-	tests := []struct {
-		name    string
-		variant string
-		files   map[string]string
-		runner  sourcetest.Commands
-		check   func(*network.Info)
-	}{
-		{
-			name:    "linux: an unknown speed and duplex, a peer address, odd counters and neighbours",
-			variant: "linux",
-			files: map[string]string{
-				"/sys/class/net/tun0/ifindex": "4\n",
-				"/sys/class/net/tun0/speed":   "-1\n",
-				"/sys/class/net/tun0/duplex":  "unknown\n",
-				"/proc/net/dev": "Inter-|   Receive\n face |bytes\n" +
-					"  tun0: 1 2\n" +
-					"  tun0: 10 20 0 0 0 0 0 0 30 40 0 0 0 0 0 0\n",
-			},
-			runner: sourcetest.Commands{Out: map[string]string{
-				"ip -o addr show": "4: tun0    inet 10.8.0.1 peer 10.8.0.2/32 scope global tun0\n" +
-					"4: tun0    link/none\n",
-				"ip neigh show": "\nnot-an-ip dev eth0\n10.0.0.9 dev tun0 FAILED\n",
-			}},
-			check: func(i *network.Info) {
-				s.Require().Len(i.Interfaces, 1)
-				tun := i.Interfaces[0]
-				s.Equal("Unknown!", tun.Speed)
-				s.Equal("Unknown!", tun.Duplex)
-				s.Require().Len(tun.Addresses, 1)
-				s.Equal("10.8.0.1", tun.Addresses[0].Addr)
-				s.Equal(32, tun.Addresses[0].Prefixlen)
-				s.Equal("10.8.0.2", tun.Addresses[0].Peer)
-				s.Require().NotNil(tun.Counters)
-				s.Equal(uint64(30), tun.Counters.BytesSent)
-				s.Equal(uint64(10), tun.Counters.BytesRecv)
-				s.Require().Len(i.Neighbours, 1)
-				s.Equal("FAILED", i.Neighbours[0].State)
-				s.Empty(i.Neighbours[0].MAC)
-			},
-		},
-		{
-			name:    "linux: the scope is the one that ip prints, also when an admin set it",
-			variant: "linux",
-			files: map[string]string{
-				"/sys/class/net/eth0/ifindex": "2\n",
-			},
-			runner: sourcetest.Commands{Out: map[string]string{
-				"ip -o addr show": "2: eth0    inet 192.0.2.7/24 brd 192.0.2.255 scope link eth0\n" +
-					"2: eth0    inet 198.51.100.7/24 scope weird eth0\n",
-			}},
-			check: func(i *network.Info) {
-				s.Require().Len(i.Interfaces, 1)
-				s.Require().Len(i.Interfaces[0].Addresses, 2)
-				s.Equal("Link", i.Interfaces[0].Addresses[0].Scope)
-				s.Equal("Global", i.Interfaces[0].Addresses[1].Scope)
-				s.Empty(i.Interfaces[0].Addresses[0].Peer)
-			},
-		},
-		{
-			name:    "darwin: routes and defaults from netstat -rn",
-			variant: "darwin",
-			runner: sourcetest.Commands{Out: map[string]string{
-				"ifconfig -a -v": "en0: flags=8863<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 index 14\n" +
-					"\tinet 192.168.0.40 netmask 0xffff0000\n",
-				"netstat -rn": "Routing tables\n\nnot a table row before any table\n" +
-					"Internet:\n" +
-					"Destination        Gateway            Flags               Netif Expire\n" +
-					"default            link#24            UCSIg               utun6\n" +
-					"default            192.168.0.1        UGScg                 en0\n" +
-					"default            192.168.0.254      UGScIg                en0\n" +
-					"127                127.0.0.1          UCS                   lo0\n" +
-					"short\n\n" +
-					"Internet6:\n" +
-					"Destination                             Gateway                                 Flags               Netif Expire\n" +
-					"default                                 fe80::1a90:88ff:fe6b:f272%en0           UGcg                  en0\n" +
-					"default                                 fe80::%utun0                            UGcIg               utun0\n",
-			}},
-			check: func(i *network.Info) {
-				s.Equal("en0", i.DefaultInterface, "the first default with a gateway")
-				s.Equal("192.168.0.1", i.DefaultGateway)
-				s.Equal("en0", i.DefaultInet6Interface)
-				s.Equal("fe80::1a90:88ff:fe6b:f272", i.DefaultInet6Gateway, "no zone")
-				s.Require().Len(i.Routes, 6)
-				s.Equal(network.Route{
-					Destination: "127", Family: "inet", Gateway: "127.0.0.1", Interface: "lo0",
-				}, i.Routes[3])
-				s.Require().Len(i.Interfaces, 1)
-				s.Len(i.Interfaces[0].Routes, 3, "the routes of en0 attach to it")
-			},
-		},
-		{
-			name:    "darwin: ifconfig and netstat on a Mac",
-			variant: "darwin",
-			runner: sourcetest.Commands{Out: map[string]string{
-				"ifconfig -a -v": "\tbefore any interface\n" +
-					"lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384 index 1\n" +
-					"\tinet 127.0.0.1 netmask 0xff000000\n" +
-					"\tinet6 ::1 prefixlen 128\n" +
-					"\tinet6 fe80::1%lo0 prefixlen 64 scopeid 0x1\n" +
-					"gif0: flags=8010<POINTOPOINT,MULTICAST> mtu 1280 index 2\n" +
-					"\tinet 10.1.1.1 --> 10.1.1.2\n" +
-					"\tinet6 fe80::2\n" +
-					"\tinet bogus netmask 0xff000000\n" +
-					"\tinet6 bogus prefixlen 64\n" +
-					"\tstatus: active\n",
-				"netstat -ibdnW": "Name  Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll Drop\n" +
-					"lo0   16384 <Link#1>                        869107     0  169411755   869107     0  169411755     0   0\n" +
-					"lo0   16384 127           127.0.0.1         869107     -  169411755   869107     -  169411755     -   -\n" +
-					"gif0* 1280  <Link#2>                             1     2          3        4     5          6     0   7\n",
-			}},
-			check: func(i *network.Info) {
-				s.Require().Len(i.Interfaces, 2)
-				lo, gif := i.Interfaces[0], i.Interfaces[1]
-				s.Equal(1, lo.Number)
-				s.Equal([]string{"up", "loopback", "multicast"}, lo.Flags)
-				s.Require().Len(lo.Addresses, 3)
-				s.Equal(8, lo.Addresses[0].Prefixlen)
-				s.Equal("fe80::1", lo.Addresses[2].Addr)
-				s.Equal(uint64(169411755), lo.Counters.BytesSent)
-				s.Equal(2, gif.Number)
-				s.Equal("down", gif.State)
-				s.Equal([]string{"pointtopoint", "multicast"}, gif.Flags)
-				s.Require().Len(gif.Addresses, 2)
-				s.Equal(32, gif.Addresses[0].Prefixlen, "no netmask")
-				s.Equal(128, gif.Addresses[1].Prefixlen, "no prefixlen")
-				s.Equal(uint64(3), gif.Counters.BytesRecv)
-				s.Equal(uint64(7), gif.Counters.Dropout)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			var c network.Collector = &network.Darwin{Exec: tt.runner.Mock(s.T())}
-			if tt.variant == "linux" {
-				c = &network.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: tt.runner.Mock(s.T())}
-			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			info, ok := got.(*network.Info)
-			s.Require().True(ok)
-			tt.check(info)
-		})
-	}
-}
 
 func (s *NetworkPublicTestSuite) TestCollect() {
 	canonicalInterfaces := func() ([]tIface, error) {
@@ -671,14 +442,19 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 	}
 
 	tests := []struct {
-		name         string
-		variant      string
-		ifsFn        func() ([]tIface, error)
-		countersFn   func() ([]tCounters, error)
-		fs           avfs.VFS
-		exec         source.Runner
-		budget       time.Duration
-		ctx          context.Context
+		name       string
+		variant    string
+		ifsFn      func() ([]tIface, error)
+		countersFn func() ([]tCounters, error)
+		fs         avfs.VFS
+		exec       source.Runner
+		budget     time.Duration
+		ctx        context.Context
+		// files and runner give a row its host through the sources: the
+		// sysfs and /proc files, and the commands. A row with a runner
+		// does not use the interface seams above.
+		files        map[string]string
+		runner       *sourcetest.Commands
 		validateFunc func(any, error)
 	}{
 		{
@@ -1721,9 +1497,345 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.ErrorContains(err, "ifconfig -a -v: ")
 			},
 		},
+		{
+			name:    "linux: an unknown speed and duplex, a peer address, odd counters and neighbours",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/tun0/ifindex": "4\n",
+				"/sys/class/net/tun0/speed":   "-1\n",
+				"/sys/class/net/tun0/duplex":  "unknown\n",
+				"/proc/net/dev": "Inter-|   Receive\n face |bytes\n" +
+					"  tun0: 1 2\n" +
+					"  tun0: 10 20 0 0 0 0 0 0 30 40 0 0 0 0 0 0\n",
+			},
+			runner: &sourcetest.Commands{Out: map[string]string{
+				"ip -o addr show": "4: tun0    inet 10.8.0.1 peer 10.8.0.2/32 scope global tun0\n" +
+					"4: tun0    link/none\n",
+				"ip neigh show": "\nnot-an-ip dev eth0\n10.0.0.9 dev tun0 FAILED\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				tun := i.Interfaces[0]
+				s.Equal("Unknown!", tun.Speed)
+				s.Equal("Unknown!", tun.Duplex)
+				s.Require().Len(tun.Addresses, 1)
+				s.Equal("10.8.0.1", tun.Addresses[0].Addr)
+				s.Equal(32, tun.Addresses[0].Prefixlen)
+				s.Equal("10.8.0.2", tun.Addresses[0].Peer)
+				s.Require().NotNil(tun.Counters)
+				s.Equal(uint64(30), tun.Counters.BytesSent)
+				s.Equal(uint64(10), tun.Counters.BytesRecv)
+				s.Require().Len(i.Neighbours, 1)
+				s.Equal("FAILED", i.Neighbours[0].State)
+				s.Empty(i.Neighbours[0].MAC)
+			},
+		},
+		{
+			name:    "linux: the scope is the one that ip prints, also when an admin set it",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/eth0/ifindex": "2\n",
+			},
+			runner: &sourcetest.Commands{Out: map[string]string{
+				"ip -o addr show": "2: eth0    inet 192.0.2.7/24 brd 192.0.2.255 scope link eth0\n" +
+					"2: eth0    inet 198.51.100.7/24 scope weird eth0\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Require().Len(i.Interfaces[0].Addresses, 2)
+				s.Equal("Link", i.Interfaces[0].Addresses[0].Scope)
+				s.Equal("Global", i.Interfaces[0].Addresses[1].Scope)
+				s.Empty(i.Interfaces[0].Addresses[0].Peer)
+			},
+		},
+		{
+			name:    "darwin: routes and defaults from netstat -rn",
+			variant: "darwin",
+			runner: &sourcetest.Commands{Out: map[string]string{
+				"ifconfig -a -v": "en0: flags=8863<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 index 14\n" +
+					"\tinet 192.168.0.40 netmask 0xffff0000\n",
+				"netstat -rn": "Routing tables\n\nnot a table row before any table\n" +
+					"Internet:\n" +
+					"Destination        Gateway            Flags               Netif Expire\n" +
+					"default            link#24            UCSIg               utun6\n" +
+					"default            192.168.0.1        UGScg                 en0\n" +
+					"default            192.168.0.254      UGScIg                en0\n" +
+					"127                127.0.0.1          UCS                   lo0\n" +
+					"short\n\n" +
+					"Internet6:\n" +
+					"Destination                             Gateway                                 Flags               Netif Expire\n" +
+					"default                                 fe80::1a90:88ff:fe6b:f272%en0           UGcg                  en0\n" +
+					"default                                 fe80::%utun0                            UGcIg               utun0\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				// The first default with a gateway.
+				s.Equal("en0", i.DefaultInterface)
+				s.Equal("192.168.0.1", i.DefaultGateway)
+				s.Equal("en0", i.DefaultInet6Interface)
+				// No zone.
+				s.Equal("fe80::1a90:88ff:fe6b:f272", i.DefaultInet6Gateway)
+				s.Require().Len(i.Routes, 6)
+				s.Equal(network.Route{
+					Destination: "127", Family: "inet", Gateway: "127.0.0.1", Interface: "lo0",
+				}, i.Routes[3])
+				s.Require().Len(i.Interfaces, 1)
+				// The routes of en0 attach to it.
+				s.Len(i.Interfaces[0].Routes, 3)
+			},
+		},
+		{
+			name:    "darwin: ifconfig and netstat on a Mac",
+			variant: "darwin",
+			runner: &sourcetest.Commands{Out: map[string]string{
+				"ifconfig -a -v": "\tbefore any interface\n" +
+					"lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 16384 index 1\n" +
+					"\tinet 127.0.0.1 netmask 0xff000000\n" +
+					"\tinet6 ::1 prefixlen 128\n" +
+					"\tinet6 fe80::1%lo0 prefixlen 64 scopeid 0x1\n" +
+					"gif0: flags=8010<POINTOPOINT,MULTICAST> mtu 1280 index 2\n" +
+					"\tinet 10.1.1.1 --> 10.1.1.2\n" +
+					"\tinet6 fe80::2\n" +
+					"\tinet bogus netmask 0xff000000\n" +
+					"\tinet6 bogus prefixlen 64\n" +
+					"\tstatus: active\n",
+				"netstat -ibdnW": "Name  Mtu   Network       Address            Ipkts Ierrs     Ibytes    Opkts Oerrs     Obytes  Coll Drop\n" +
+					"lo0   16384 <Link#1>                        869107     0  169411755   869107     0  169411755     0   0\n" +
+					"lo0   16384 127           127.0.0.1         869107     -  169411755   869107     -  169411755     -   -\n" +
+					"gif0* 1280  <Link#2>                             1     2          3        4     5          6     0   7\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 2)
+				lo, gif := i.Interfaces[0], i.Interfaces[1]
+				s.Equal(1, lo.Number)
+				s.Equal([]string{"up", "loopback", "multicast"}, lo.Flags)
+				s.Require().Len(lo.Addresses, 3)
+				s.Equal(8, lo.Addresses[0].Prefixlen)
+				s.Equal("fe80::1", lo.Addresses[2].Addr)
+				s.Equal(uint64(169411755), lo.Counters.BytesSent)
+				s.Equal(2, gif.Number)
+				s.Equal("down", gif.State)
+				s.Equal([]string{"pointtopoint", "multicast"}, gif.Flags)
+				s.Require().Len(gif.Addresses, 2)
+				// No netmask.
+				s.Equal(32, gif.Addresses[0].Prefixlen)
+				// No prefixlen.
+				s.Equal(128, gif.Addresses[1].Prefixlen)
+				s.Equal(uint64(3), gif.Counters.BytesRecv)
+				s.Equal(uint64(7), gif.Counters.Dropout)
+			},
+		},
+		{
+			name:    "linux kind: loopback",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/lo/type": "772\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("lo", i.Interfaces[0].Name)
+				s.Equal("loopback", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: a bridge",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/br0/bridge/bridge_id": "8000.x\n",
+				"/sys/class/net/br0/type":             "1\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("br0", i.Interfaces[0].Name)
+				s.Equal("bridge", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: a bond",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/bond0/bonding/mode": "active-backup 1\n",
+				"/sys/class/net/bond0/type":         "1\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("bond0", i.Interfaces[0].Name)
+				s.Equal("bond", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: Wi-Fi, by its wireless directory",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/wlan0/wireless/link": "0\n",
+				"/sys/class/net/wlan0/type":          "1\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("wlan0", i.Interfaces[0].Name)
+				s.Equal("wifi", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: Wi-Fi, by its phy",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/wlp2s0/phy80211/name": "phy0\n",
+				"/sys/class/net/wlp2s0/type":          "1\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("wlp2s0", i.Interfaces[0].Name)
+				s.Equal("wifi", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: a VLAN, by its uevent",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/eth0.10/uevent": "DEVTYPE=vlan\nINTERFACE=eth0.10\n",
+				"/sys/class/net/eth0.10/type":   "1\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("eth0.10", i.Interfaces[0].Name)
+				s.Equal("vlan", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: a uevent with a DEVTYPE that has no kind, on a NIC",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/eth1/uevent":        "DEVTYPE=other\n",
+				"/sys/class/net/eth1/device/vendor": "0x8086\n",
+				"/sys/class/net/eth1/type":          "1\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("eth1", i.Interfaces[0].Name)
+				s.Equal("ethernet", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: a tun device",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/tun0/tun_flags": "0x1001\n",
+				"/sys/class/net/tun0/type":      "512\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("tun0", i.Interfaces[0].Name)
+				s.Equal("tun", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: a NIC",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/eth0/device/vendor": "0x8086\n",
+				"/sys/class/net/eth0/type":          "1\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("eth0", i.Interfaces[0].Name)
+				s.Equal("ethernet", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: Ethernet that software makes, such as a dummy",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/dummy0/type": "1\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("dummy0", i.Interfaces[0].Name)
+				s.Equal("virtual", i.Interfaces[0].Kind)
+			},
+		},
+		{
+			name:    "linux kind: a link that is not Ethernet",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/ppp0/type": "512\n",
+			},
+			runner: &sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("ppp0", i.Interfaces[0].Name)
+				s.Equal("", i.Interfaces[0].Kind)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			if tt.runner != nil {
+				var c network.Collector = &network.Darwin{Exec: tt.runner.Mock(s.T())}
+				if tt.variant == "linux" {
+					c = &network.Linux{
+						FS:   sourcetest.FS(s.T(), tt.files),
+						Exec: tt.runner.Mock(s.T()),
+					}
+				}
+				tt.validateFunc(c.Collect(context.Background(), nil))
+
+				return
+			}
 			ifs, ifsErr := tt.ifsFn()
 			counters, _ := tt.countersFn()
 			var c network.Collector
