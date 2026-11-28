@@ -24,7 +24,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
+	"errors"
 	"regexp"
 	"strconv"
 	"strings"
@@ -58,7 +58,7 @@ func (d *Darwin) Collect(
 ) (any, error) {
 	count, ok := sysctlInt(ctx, d.Exec, "hw.logicalcpu")
 	if !ok {
-		return nil, fmt.Errorf("sysctl hw.logicalcpu failed")
+		return nil, errors.New("sysctl hw.logicalcpu failed")
 	}
 	c := CPU{
 		ModelName: sysctlString(ctx, d.Exec, "machdep.cpu.brand_string"),
