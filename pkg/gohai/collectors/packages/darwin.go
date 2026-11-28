@@ -54,7 +54,7 @@ func NewDarwin() *Darwin {
 
 // Collect runs `brew list --versions` and parses its output. Returns
 // an empty list (not an error) if Homebrew is absent, and the error if
-// brew fails.
+// brew fails. With no Exec there is no fact.
 //
 // brew is the first of brewPaths that exists, else brew from the PATH.
 // brew refuses to run as root, so a root gohai runs it as the owner of
@@ -64,7 +64,7 @@ func (d *Darwin) Collect(
 	_ collector.PriorResults,
 ) (any, error) {
 	if d.Exec == nil {
-		return &Info{Packages: []Package{}}, nil
+		return nil, nil
 	}
 	name, args := d.brewCommand(ctx)
 	out, err := d.Exec.Execute(ctx, name, args...)

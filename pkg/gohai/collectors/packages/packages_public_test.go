@@ -198,17 +198,27 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "linux arch: no package database, an empty list",
+			name:    "linux arch: no package database, so packages are unsupported",
 			variant: "linux",
 			detect:  "arch",
 			exec: func(t *testing.T) source.Runner {
 				return mocks.NewMockRunner(gomock.NewController(t))
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*packages.Info)
-				s.Require().True(ok)
-				s.Equal([]packages.Package{}, info.Packages)
+				s.ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux alpine: no package database, so packages are unsupported",
+			variant: "linux",
+			detect:  "alpine",
+			exec: func(t *testing.T) source.Runner {
+				return mocks.NewMockRunner(gomock.NewController(t))
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -508,15 +518,13 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: nil Exec returns empty list",
+			name:    "linux: nil Exec gives no fact",
 			variant: "linux",
 			detect:  "debian",
 			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				info, ok := got.(*packages.Info)
-				s.Require().True(ok)
-				s.Equal([]packages.Package{}, info.Packages)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -1027,27 +1035,23 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: nil Exec returns empty list",
+			name:    "darwin: nil Exec gives no fact",
 			variant: "darwin",
 			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				info, ok := got.(*packages.Info)
-				s.Require().True(ok)
-				s.Equal([]packages.Package{}, info.Packages)
+				s.Exactly(nil, got)
 			},
 		},
 		{
-			name:      "linux: with no package manager the list is empty",
+			name:      "linux: with no package manager, packages are unsupported",
 			variant:   "linux",
 			detect:    "debian",
 			exec:      func(*testing.T) source.Runner { return source.Commands() },
 			noManager: true,
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*packages.Info)
-				s.Require().True(ok)
-				s.Equal([]packages.Package{}, info.Packages)
+				s.ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 	}
