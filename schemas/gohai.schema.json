@@ -4151,6 +4151,9 @@
         "package_manager": {
           "type": "string"
         },
+        "kind": {
+          "type": "string"
+        },
         "description": {
           "type": "string"
         },

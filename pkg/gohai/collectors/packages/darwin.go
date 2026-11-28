@@ -79,17 +79,21 @@ func (d *Darwin) Collect(
 	info := &Info{Packages: []Package{}}
 	read := false
 	var errs []error
-	for _, kind := range []string{"--formula", "--cask"} {
-		args := append(slices.Clone(prefix), "list", kind, "--versions")
+	for _, kind := range []string{"formula", "cask"} {
+		flag := "--" + kind
+		args := append(slices.Clone(prefix), "list", flag, "--versions")
 		out, err := d.Exec.Execute(ctx, name, args...)
 		if err != nil {
 			if !collector.Absent(err) {
-				errs = append(errs, fmt.Errorf("brew list %s: %w", kind, err))
+				errs = append(errs, fmt.Errorf("brew list %s: %w", flag, err))
 			}
 			continue
 		}
 		read = true
-		info.Packages = append(info.Packages, parseBrew(string(out)).Packages...)
+		info.Packages = append(
+			info.Packages,
+			parseBrew(string(out), kind).Packages...,
+		)
 	}
 	err := errors.Join(errs...)
 	if err != nil && !read {
@@ -152,9 +156,11 @@ func (d *Darwin) uid(
 // parseBrew parses the output of `brew list --formula --versions` or
 // `brew list --cask --versions`: one line for each keg or cask,
 // "<name> <version> [<version> ...]". Version is the newest of the
-// installed versions, and Versions lists each of them.
+// installed versions, and Versions lists each of them. Kind is formula
+// or cask, from the call that printed the line.
 func parseBrew(
 	out string,
+	kind string,
 ) *Info {
 	info := &Info{Packages: []Package{}}
 	for rawLine := range strings.Lines(out) {
@@ -174,6 +180,7 @@ func parseBrew(
 			Version:        newest,
 			Versions:       versions,
 			PackageManager: "brew",
+			Kind:           kind,
 		})
 	}
 

@@ -546,18 +546,21 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 					{
 						Name:           "zsh",
 						Version:        "5.9",
 						Versions:       []string{"5.9"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 					{
 						Name:           "curl",
 						Version:        "8.1.2",
 						Versions:       []string{"8.1.2", "8.1.1"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -600,6 +603,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -678,12 +682,14 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 					{
 						Name:           "zsh",
 						Version:        "5.9",
 						Versions:       []string{"5.9"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -708,6 +714,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "120.0",
 						Versions:       []string{"120.0"},
 						PackageManager: "brew",
+						Kind:           "cask",
 					},
 				}, info.Packages)
 			},
@@ -751,12 +758,47 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 					{
 						Name:           "firefox",
 						Version:        "120.0",
 						Versions:       []string{"120.0"},
 						PackageManager: "brew",
+						Kind:           "cask",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a formula and a cask with the same name differ in kind",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "docker 28.5.2\n",
+						caskLine: "docker 4.52.0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "docker",
+						Version:        "28.5.2",
+						Versions:       []string{"28.5.2"},
+						PackageManager: "brew",
+						Kind:           "formula",
+					},
+					{
+						Name:           "docker",
+						Version:        "4.52.0",
+						Versions:       []string{"4.52.0"},
+						PackageManager: "brew",
+						Kind:           "cask",
 					},
 				}, info.Packages)
 			},
@@ -783,6 +825,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -809,6 +852,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -836,6 +880,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -862,6 +907,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -889,6 +935,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -918,6 +965,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -944,6 +992,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.40.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -968,6 +1017,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "2.40.0",
 						Versions:       []string{"2.9.1", "2.40.0", "2.10"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -992,6 +1042,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "1.2.0",
 						Versions:       []string{"1.2.0", "1.2.0rc1"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -1016,6 +1067,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "1.2.0",
 						Versions:       []string{"1.2.0rc1", "1.2.0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -1040,6 +1092,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "1.2.1",
 						Versions:       []string{"1.2", "1.2.1"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -1064,6 +1117,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "1.2.1",
 						Versions:       []string{"1.2.1", "1.2"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -1088,6 +1142,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "1a",
 						Versions:       []string{"a1", "1a", "b2"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -1112,6 +1167,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "1c",
 						Versions:       []string{"1b", "1a_2", "1c"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
@@ -1136,6 +1192,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						Version:        "1.0",
 						Versions:       []string{"1.0", "1_0"},
 						PackageManager: "brew",
+						Kind:           "formula",
 					},
 				}, info.Packages)
 			},
