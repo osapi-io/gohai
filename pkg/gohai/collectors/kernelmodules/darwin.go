@@ -73,8 +73,10 @@ func (d *Darwin) Collect(
 //
 // The name is any run of non-space characters, because a bundle ID can
 // hold a hyphen or an underscore, such as com.paragon-software.filesystems.ntfs.
+// The version is everything inside the parentheses, because a bundle
+// version can carry a letter, such as 1.0.0d1 or 2.1.0b3.
 var kextstatLine = regexp.MustCompile(
-	`^\s*(\d+)\s+(\d+)\s+0x[0-9a-f]+\s+0x([0-9a-f]+)\s+0x[0-9a-f]+\s+(\S+) \(([0-9\.]+)\)`,
+	`^\s*(\d+)\s+(\d+)\s+0x[0-9a-f]+\s+0x([0-9a-f]+)\s+0x[0-9a-f]+\s+(\S+) \(([^)]+)\)`,
 )
 
 // parseKextstat turns `kextstat -k -l` output into a Module map keyed
