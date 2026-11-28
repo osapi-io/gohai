@@ -329,30 +329,10 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			},
 		},
 		{
-			name: "WithHTTPClient swaps underlying transport",
-			setup: func() (string, []cloudmetadata.Option, func()) {
-				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-					"/ok": func(w http.ResponseWriter, _ *http.Request) {
-						_, _ = w.Write([]byte("custom-ok"))
-					},
-				})
-				custom := &http.Client{Timeout: time.Second}
-				opts := []cloudmetadata.Option{cloudmetadata.WithHTTPClient(custom)}
-				return srv.URL, opts, srv.Close
-			},
-			path: "/ok",
-			validateFunc: func(body []byte, err error) {
-				s.Require().NoError(err)
-				s.Equal("custom-ok", string(body))
-			},
-		},
-		{
 			name: "body read failure returns non-ErrNotAvailable error",
 			setup: func() (string, []cloudmetadata.Option, func()) {
 				opts := []cloudmetadata.Option{
-					cloudmetadata.WithHTTPClient(&http.Client{
-						Transport: brokenBodyTransport{},
-					}),
+					cloudmetadata.WithTransport(brokenBodyTransport{}),
 				}
 				return "http://example.invalid", opts, func() {}
 			},
@@ -645,9 +625,7 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 
 			opts := []cloudmetadata.Option(nil)
 			if tt.name == "body read failure returns non-ErrNotAvailable error" {
-				opts = append(opts, cloudmetadata.WithHTTPClient(&http.Client{
-					Transport: brokenBodyTransport{},
-				}))
+				opts = append(opts, cloudmetadata.WithTransport(brokenBodyTransport{}))
 			}
 
 			client := cloudmetadata.New(baseURL, opts...)
