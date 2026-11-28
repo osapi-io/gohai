@@ -61,7 +61,7 @@ type Interface struct {
 	Kind          string       `json:"kind,omitempty"`          // Linux: ethernet / bridge / bond / wifi / vlan / vxlan / wireguard / tun / loopback / virtual
 	Driver        string       `json:"driver,omitempty"`        // sysfs driver name (e1000e, virtio_net, ixgbe, ...)
 	Speed         string       `json:"speed,omitempty"`         // ghw link speed string ("1000Mb/s")
-	Duplex        string       `json:"duplex,omitempty"`        // half | full | unknown
+	Duplex        string       `json:"duplex,omitempty"`        // Full | Half | Unknown!, as ethtool writes it
 	Flags         []string     `json:"flags,omitempty"`
 	Addresses     []Address    `json:"addresses,omitempty"`
 	Routes        []Route      `json:"routes,omitempty"`
@@ -186,6 +186,9 @@ type Address struct {
 	Netmask   string `json:"netmask,omitempty"`   // IPv4 only
 	Broadcast string `json:"broadcast,omitempty"` // IPv4 only
 	Scope     string `json:"scope,omitempty"`     // Global | Link | Host | Site
+	// Peer is the other end of a point-to-point address, from the peer
+	// word of `ip addr`. It is empty for other addresses.
+	Peer string `json:"peer,omitempty"`
 }
 
 // Route is one entry from the kernel routing table.

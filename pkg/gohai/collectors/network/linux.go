@@ -398,19 +398,28 @@ func applyOpenVZAliasMerge(
 	if !openVZGuest(fs) {
 		return ifs
 	}
-	byName := map[string]int{}
-	for i, iface := range ifs {
-		byName[iface.Name] = i
-	}
-	out := ifs[:0]
+	present := map[string]bool{}
 	for _, iface := range ifs {
-		if base, alias := isOpenVZAlias(iface.Name); alias {
-			if idx, ok := byName[base]; ok {
-				ifs[idx].Addresses = append(ifs[idx].Addresses, iface.Addresses...)
-				continue
-			}
+		present[iface.Name] = true
+	}
+	// A new slice, and the base found in it by name: filtering ifs in
+	// place moves the bases, so an index taken before the filter can
+	// name a slot that the result no longer holds.
+	out := make([]Interface, 0, len(ifs))
+	pos := map[string]int{}
+	var pending []Interface
+	for _, iface := range ifs {
+		if base, alias := isOpenVZAlias(iface.Name); alias && present[base] {
+			pending = append(pending, iface)
+			continue
 		}
+		pos[iface.Name] = len(out)
 		out = append(out, iface)
+	}
+	for _, alias := range pending {
+		base, _ := isOpenVZAlias(alias.Name)
+		i := pos[base]
+		out[i].Addresses = append(out[i].Addresses, alias.Addresses...)
 	}
 	return out
 }
@@ -743,12 +752,50 @@ func parseIPAddr(
 		if len(f) < 4 || (f[2] != "inet" && f[2] != "inet6") {
 			continue
 		}
-		if a, ok := parseAddress(withPrefix(f[3])); ok {
+		a, ok := parseIPAddrFields(f)
+		if ok {
 			addrs[f[1]] = append(addrs[f[1]], a)
 		}
 	}
 
 	return addrs
+}
+
+// ipScopes maps the scope word of `ip addr` to the scope names that
+// parseAddress gives.
+var ipScopes = map[string]string{"global": "Global", "link": "Link", "host": "Host", "site": "Site"}
+
+// parseIPAddrFields is the address of one `ip -o addr show` line, split
+// into fields: "<n>: <dev> inet|inet6 <addr>/<len> ... scope <s> ...". A
+// point-to-point address, "inet <local> peer <peer>/<len>", has the length
+// on the peer, and keeps the peer. The scope is the one that ip prints,
+// which an administrator can set.
+func parseIPAddrFields(
+	f []string,
+) (Address, bool) {
+	cidr, peer := f[3], ""
+	if len(f) > 5 && f[4] == "peer" {
+		peerIP, plen, _ := strings.Cut(f[5], "/")
+		peer = peerIP
+		if plen != "" && !strings.Contains(cidr, "/") {
+			cidr += "/" + plen
+		}
+	}
+	a, ok := parseAddress(withPrefix(cidr))
+	if !ok {
+		return Address{}, false
+	}
+	a.Peer = peer
+	for i := 4; i+1 < len(f); i++ {
+		if f[i] == "scope" {
+			if sc, known := ipScopes[f[i+1]]; known {
+				a.Scope = sc
+			}
+			break
+		}
+	}
+
+	return a, true
 }
 
 // readNetDev is the counters of /proc/net/dev, by interface: received

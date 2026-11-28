@@ -52,7 +52,7 @@ Per interface:
 | `encapsulation`           | string            | The canonical encapsulation: `Ethernet`, `Loopback`, `PPP`, `SLIP`, `IPIP`, `6to4` or `VJSLIP`. Linux only.                                                                                                                                                                                                                                 | No direct schema mapping. |
 | `driver`                  | string            | The kernel driver of the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only, from sysfs.                                                                                                                                                                                                                                                     | No direct schema mapping. |
 | `speed`                   | string            | The negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only, from sysfs.                                                                                                                                                                                                                                                               | No direct schema mapping. |
-| `duplex`                  | string            | The link duplex (`Full`, `Half`). Linux only, from sysfs.                                                                                                                                                                                                                                                                                   | No direct schema mapping. |
+| `duplex`                  | string            | The link duplex as ethtool writes it: `Full`, `Half`, or `Unknown!` for a link that is down or virtual. The speed is `Unknown!` in that case too. Linux only, from sysfs.                                                                                                                                                                   | No direct schema mapping. |
 | `flags`                   | []string          | The interface flags (`up`, `broadcast`, `multicast`).                                                                                                                                                                                                                                                                                       | No direct schema mapping. |
 | `addresses[]`             | []Address         | Refer to the table below.                                                                                                                                                                                                                                                                                                                   | None                      |
 | `routes[]`                | []Route           | The routes whose `dev` is this interface.                                                                                                                                                                                                                                                                                                   | No direct schema mapping. |
@@ -71,14 +71,15 @@ Per interface:
 
 Per address:
 
-| Field       | Type   | Description                                                                     | Schema mapping            |
-| ----------- | ------ | ------------------------------------------------------------------------------- | ------------------------- |
-| `addr`      | string | The address as text, with no CIDR (`"10.0.0.5"`, `"fe80::1"`).                  | `network_interface.ip`.   |
-| `family`    | string | `inet` or `inet6`.                                                              | No direct schema mapping. |
-| `prefixlen` | int    | The prefix length (24, 64, …).                                                  | No direct schema mapping. |
-| `netmask`   | string | The IPv4 netmask, from the prefix (`"255.255.255.0"`). Not set for IPv6.        | No direct schema mapping. |
-| `broadcast` | string | The IPv4 broadcast address, from the address and the prefix. Not set for IPv6.  | No direct schema mapping. |
-| `scope`     | string | `Global`, `Link` or `Host`, from the classification of the Go standard library. | No direct schema mapping. |
+| Field       | Type   | Description                                                                                                                                    | Schema mapping            |
+| ----------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `addr`      | string | The address as text, with no CIDR (`"10.0.0.5"`, `"fe80::1"`).                                                                                 | `network_interface.ip`.   |
+| `family`    | string | `inet` or `inet6`.                                                                                                                             | No direct schema mapping. |
+| `prefixlen` | int    | The prefix length (24, 64, …).                                                                                                                 | No direct schema mapping. |
+| `netmask`   | string | The IPv4 netmask, from the prefix (`"255.255.255.0"`). Not set for IPv6.                                                                       | No direct schema mapping. |
+| `broadcast` | string | The IPv4 broadcast address, from the address and the prefix. Not set for IPv6.                                                                 | No direct schema mapping. |
+| `scope`     | string | `Global`, `Link`, `Host` or `Site`: the scope word that `ip addr` prints on Linux, and on macOS the classification of the Go standard library. | No direct schema mapping. |
+| `peer`      | string | The other end of a point-to-point address, from the `peer` word of `ip addr`. Linux only. Not set for other addresses.                         | No direct schema mapping. |
 
 Per route:
 
@@ -224,18 +225,21 @@ On Linux:
     each interface.
 
 03. **Address structure.** `ip -o addr show` gives the address CIDRs of each
-    interface. An address with no prefix, such as the local end of a
-    point-to-point link, gets a host prefix. The collector parses each CIDR with
-    `net.ParseCIDR`. It sets these fields:
+    interface. A point-to-point address, `inet <local> peer <peer>/<len>`, takes
+    the prefix length from the peer and keeps the peer in `peer`. Another
+    address with no prefix gets a host prefix. The collector parses each CIDR
+    with `net.ParseCIDR`. It sets these fields:
 
     - `family`, from the address kind.
     - `prefixlen`, from the mask.
     - `netmask` (IPv4), from the prefix.
     - `broadcast` (IPv4). The collector sets the host bits with an OR of the
       inverse mask.
-    - `scope`, from the classification of the Go standard library. `IsLoopback`
-      gives `Host`. `IsLinkLocalUnicast` or `IsLinkLocalMulticast` gives `Link`.
-      All other addresses give `Global`.
+    - `scope`, from the `scope` word of the line (`global`, `link`, `host` or
+      `site`), which an administrator can set. When the word is missing or not
+      one of these, the Go standard library decides: `IsLoopback` gives `Host`,
+      `IsLinkLocalUnicast` or `IsLinkLocalMulticast` gives `Link`, and all other
+      addresses give `Global`.
 
 04. **Encapsulation.** The collector reads `/sys/class/net/<iface>/type` (an
     ARPHRD\_\* integer) through the injected `avfs.VFS`. A static table maps the

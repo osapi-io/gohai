@@ -3311,6 +3311,9 @@
         },
         "scope": {
           "type": "string"
+        },
+        "peer": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
