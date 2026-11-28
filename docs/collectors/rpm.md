@@ -19,8 +19,8 @@ Consumers use this data to:
   sure that `%_topdir`, `%optflags` and `%_arch` have the correct values.
 - Find macro overrides in `~/.rpmmacros` or `/etc/rpm/macros.d/` that can change
   package builds.
-- Record the RPM version and the platform compatibility metadata, to manage the
-  build system configuration of the full fleet.
+- Compare the macro definitions across the fleet, to manage the build system
+  configuration of each host.
 
 ## Collected fields
 
