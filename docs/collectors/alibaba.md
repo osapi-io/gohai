@@ -153,9 +153,10 @@ on Alibaba Cloud, and the collector sends no request.
     than a letter, a digit, `_`, `.`, `:` or `-`, and the names `.` and `..`.
     Such a name would change the path or the query of the next request. Ohai
     does not check the names.
-05. **Leaf parsing:** the collector first tries to parse each leaf as JSON. If
-    the parse fails, it keeps the raw text. This is the same as the `parse_json`
-    fallback in Ohai.
+05. **Leaf parsing:** the collector keeps each leaf as its trimmed text, and
+    reads the bandwidth fields as integers from that text. Ohai parses each leaf
+    as JSON first. That turns a numeric leaf, such as `owner-account-id`, into a
+    number, which loses digits above 2^53 and which a text field cannot keep.
 06. **Key sanitization:** dashes and slashes in path segments become underscores
     in the map keys. The collector removes underscores at the end of a key. This
     is the same as Ohai's `sanitize_key`.

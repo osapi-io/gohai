@@ -75,7 +75,7 @@ var treeResponses = map[string]string{
 	"/meta-data/vswitch-cidr-block":                         "172.16.0.0/24",
 	"/meta-data/serial-number":                              "sn-xyz",
 	"/meta-data/network-type":                               "vpc",
-	"/meta-data/owner-account-id":                           "acct-1234567890",
+	"/meta-data/owner-account-id":                           "12345678901234567",
 	"/meta-data/source-address":                             "http://mirrors.cloud.aliyuncs.com",
 	"/meta-data/dns-conf/":                                  "nameservers",
 	"/meta-data/dns-conf/nameservers":                       "100.100.2.136 100.100.2.138",
@@ -88,9 +88,11 @@ var treeResponses = map[string]string{
 	"/meta-data/image/market-place/product-code":            "cmjj00001234",
 	"/meta-data/image/market-place/charge-type":             "PrePaid",
 	"/meta-data/tags/":                                      "instance/",
-	"/meta-data/tags/instance/":                             "env\nrole",
+	"/meta-data/tags/instance/":                             "env\nrole\ncount\nspot",
 	"/meta-data/tags/instance/env":                          "prod",
 	"/meta-data/tags/instance/role":                         "web",
+	"/meta-data/tags/instance/count":                        "3",
+	"/meta-data/tags/instance/spot":                         "true",
 	"/meta-data/disks/":                                     "bp1abc/",
 	"/meta-data/disks/bp1abc/":                              "id\nname",
 	"/meta-data/disks/bp1abc/id":                            "d-bp1abc",
@@ -215,7 +217,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				s.Equal([]string{"ntp1.aliyun.com", "ntp2.aliyun.com"}, info.NTPServers)
 				s.Equal("ecs-default", info.RAMRoleName)
 				s.Equal(int64(1048576), info.MaxBandwidthIngress)
-				s.Equal("acct-1234567890", info.AccountUID)
+				s.Equal("12345678901234567", info.AccountUID)
 				s.Equal("http://mirrors.cloud.aliyuncs.com", info.SourceAddress)
 				s.Equal("ECS Virt", info.VirtualizationSolution)
 				s.Equal("build123", info.VirtualizationSolutionVersion)
@@ -225,9 +227,11 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				s.Equal("cmjj00001234", info.Marketplace.ProductCode)
 				s.Equal("PrePaid", info.Marketplace.ChargeType)
 
-				s.Require().Len(info.Tags, 2)
+				s.Require().Len(info.Tags, 4)
 				s.Equal("prod", info.Tags["env"])
 				s.Equal("web", info.Tags["role"])
+				s.Equal("3", info.Tags["count"])
+				s.Equal("true", info.Tags["spot"])
 
 				s.Require().Len(info.Disks, 1)
 				disk := info.Disks["bp1abc"]
@@ -498,16 +502,16 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name: "wrong-typed leaf value is tolerated by strVal",
+			name: "a numeric leaf keeps its digits",
 			tree: map[string]string{
 				"/":                      "meta-data/",
 				"/meta-data/":            "instance-id",
-				"/meta-data/instance-id": `123`, // parses as JSON number, not string
+				"/meta-data/instance-id": `123`,
 			},
 			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
-				s.Empty(info.ID) // strVal returns "" when type isn't string
+				s.Equal("123", info.ID)
 			},
 		},
 		{
