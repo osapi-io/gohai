@@ -23,6 +23,7 @@ package docker_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -488,6 +489,49 @@ func (s *DockerPublicTestSuite) TestCollect() {
 					},
 					Images: []docker.Image{},
 				}, info)
+			},
+		},
+		{
+			name:    "linux: a container line longer than 64 KiB keeps it and the next one",
+			variant: "linux",
+			exec: buildMock(
+				s.T(),
+				[]byte(versionOut),
+				nil,
+				[]byte(
+					`{"ID":"abc123","Names":"/web","Image":"nginx","State":"running","Status":"Up","Labels":"`+
+						strings.Repeat(
+							"a",
+							70*1024,
+						)+`"}`+"\n"+
+						`{"ID":"def456","Names":"/db","Image":"postgres","State":"exited","Status":"Exited"}`+"\n",
+				),
+				nil,
+				[]byte(
+					`{"ID":"sha256:abc","Repository":"nginx","Tag":"`+strings.Repeat(
+						"t",
+						70*1024,
+					)+`","Size":"187MB"}`+"\n"+
+						`{"ID":"sha256:def","Repository":"postgres","Tag":"16","Size":"400MB"}`+"\n",
+				),
+				nil,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal([]docker.Container{
+					{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
+					{
+						ID:     "def456",
+						Name:   "db",
+						Image:  "postgres",
+						State:  "exited",
+						Status: "Exited",
+					},
+				}, info.Containers)
+				s.Len(info.Images, 2)
+				s.Equal("postgres", info.Images[1].Repository)
 			},
 		},
 		{

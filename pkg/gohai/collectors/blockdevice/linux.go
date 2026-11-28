@@ -53,10 +53,6 @@ func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	readFn := func(path string) ([]byte, error) {
-		return l.FS.ReadFile(path)
-	}
-
 	entries, err := l.FS.ReadDir(sysBlockDir)
 	if err != nil {
 		// /sys/block absent — container or unsupported host.
@@ -79,18 +75,18 @@ func (l *Linux) Collect(
 
 		bd := BlockDevice{
 			Name:              name,
-			Size:              readSysFile(readFn, filepath.Join(base, "size")),
-			Removable:         readSysFile(readFn, filepath.Join(base, "removable")),
-			Rotational:        readSysFile(readFn, filepath.Join(queue, "rotational")),
-			PhysicalBlockSize: readSysFile(readFn, filepath.Join(queue, "physical_block_size")),
-			LogicalBlockSize:  readSysFile(readFn, filepath.Join(queue, "logical_block_size")),
-			Model:             readSysFile(readFn, filepath.Join(dev, "model")),
-			Vendor:            readSysFile(readFn, filepath.Join(dev, "vendor")),
-			Rev:               readSysFile(readFn, filepath.Join(dev, "rev")),
-			State:             readSysFile(readFn, filepath.Join(dev, "state")),
-			Timeout:           readSysFile(readFn, filepath.Join(dev, "timeout")),
-			QueueDepth:        readSysFile(readFn, filepath.Join(dev, "queue_depth")),
-			FirmwareRev:       readSysFile(readFn, filepath.Join(dev, "firmware_rev")),
+			Size:              readSysFile(l.FS, filepath.Join(base, "size")),
+			Removable:         readSysFile(l.FS, filepath.Join(base, "removable")),
+			Rotational:        readSysFile(l.FS, filepath.Join(queue, "rotational")),
+			PhysicalBlockSize: readSysFile(l.FS, filepath.Join(queue, "physical_block_size")),
+			LogicalBlockSize:  readSysFile(l.FS, filepath.Join(queue, "logical_block_size")),
+			Model:             readSysFile(l.FS, filepath.Join(dev, "model")),
+			Vendor:            readSysFile(l.FS, filepath.Join(dev, "vendor")),
+			Rev:               readSysFile(l.FS, filepath.Join(dev, "rev")),
+			State:             readSysFile(l.FS, filepath.Join(dev, "state")),
+			Timeout:           readSysFile(l.FS, filepath.Join(dev, "timeout")),
+			QueueDepth:        readSysFile(l.FS, filepath.Join(dev, "queue_depth")),
+			FirmwareRev:       readSysFile(l.FS, filepath.Join(dev, "firmware_rev")),
 		}
 		devices = append(devices, bd)
 	}

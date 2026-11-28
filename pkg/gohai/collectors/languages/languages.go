@@ -87,6 +87,7 @@ func NewWith(
 func collectLanguages(
 	ctx context.Context,
 	exec source.Runner,
+	skip func(cmd string) bool,
 ) *Info {
 	info := &Info{}
 	if exec == nil {
@@ -97,6 +98,9 @@ func collectLanguages(
 		args []string,
 		parser func(string) *string,
 	) *string {
+		if skip != nil && skip(cmd) {
+			return nil
+		}
 		out, err := exec.Execute(ctx, cmd, args...)
 		if err != nil {
 			return nil
@@ -108,9 +112,15 @@ func collectLanguages(
 	info.Python = probe("python3", []string{"--version"}, parsePythonVersion)
 	info.Ruby = probe("ruby", []string{"--version"}, parseRubyVersion)
 	info.Node = probe("node", []string{"--version"}, parseNodeVersion)
-	// java --version writes to stdout. java -version writes to stderr,
-	// which is not data.
 	info.Java = probe("java", []string{"--version"}, parseJavaVersion)
+	if info.Java == nil && (skip == nil || !skip("java")) {
+		// Java 8 has no --version. Its java -version writes to stderr, so
+		// the shell joins stderr to stdout.
+		out, err := exec.Execute(ctx, "sh", "-c", "java -version 2>&1")
+		if err == nil {
+			info.Java = parseJavaVersion(string(out))
+		}
+	}
 	info.Perl = probe("perl", []string{"--version"}, parsePerlVersion)
 	return info
 }
@@ -169,14 +179,21 @@ func parseNodeVersion(
 	return strPtr(strings.TrimPrefix(out, "v"))
 }
 
-// parseJavaVersion extracts the version from the second field of the first
-// line of `java --version`, such as "openjdk 21.0.1 2023-10-17".
+// parseJavaVersion extracts the version from the first line of
+// `java --version`, such as "openjdk 21.0.1 2023-10-17", or the quoted
+// version of `java -version`, such as `openjdk version "1.8.0_292"`.
 func parseJavaVersion(
 	out string,
 ) *string {
 	// First line only, such as "openjdk 21.0.1 2023-10-17". The rest is
 	// the runtime and the VM.
 	line := strings.SplitN(strings.TrimSpace(out), "\n", 2)[0]
+	// java -version quotes the version: openjdk version "1.8.0_292".
+	if _, rest, ok := strings.Cut(line, `version "`); ok {
+		if v, _, ok := strings.Cut(rest, `"`); ok {
+			return strPtr(v)
+		}
+	}
 	if f := strings.Fields(line); len(f) >= 2 {
 		return strPtr(f[1])
 	}

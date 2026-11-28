@@ -25,6 +25,8 @@ package blockdevice
 import (
 	"strings"
 
+	"github.com/avfs/avfs"
+
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -108,14 +110,14 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// readSysFile reads a sysfs file via the provided readFn and returns its
+// readSysFile reads a sysfs file from fs and returns its
 // trimmed content. Returns empty string on any error (sysfs files may not
 // exist for all devices).
 func readSysFile(
-	readFn func(string) ([]byte, error),
+	fs avfs.VFS,
 	path string,
 ) string {
-	b, err := readFn(path)
+	b, err := fs.ReadFile(path)
 	if err != nil {
 		return ""
 	}

@@ -25,7 +25,6 @@
 package docker
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"maps"
@@ -226,9 +225,10 @@ func collectContainers(
 		return nil, err
 	}
 	result := []Container{}
-	sc := bufio.NewScanner(strings.NewReader(string(out)))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	// One line for each object. A split has no line limit, and a container's
+	// labels can make its line longer than a bufio.Scanner takes.
+	for line := range strings.SplitSeq(string(out), "\n") {
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
@@ -338,9 +338,10 @@ func collectImages(
 		return nil, err
 	}
 	result := []Image{}
-	sc := bufio.NewScanner(strings.NewReader(string(out)))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	// One line for each object. A split has no line limit, and a container's
+	// labels can make its line longer than a bufio.Scanner takes.
+	for line := range strings.SplitSeq(string(out), "\n") {
+		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
