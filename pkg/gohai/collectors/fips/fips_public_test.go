@@ -33,6 +33,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/fips"
 )
 
@@ -49,22 +50,6 @@ func TestFipsPublicTestSuite(
 	t *testing.T,
 ) {
 	suite.Run(t, new(FipsPublicTestSuite))
-}
-
-// pathErrorFS wraps a memfs and forces ReadFile to error on a
-// specific path, to exercise read failures other than ErrNotExist.
-type pathErrorFS struct {
-	avfs.VFS
-	failPath string
-}
-
-func (p pathErrorFS) ReadFile(
-	path string,
-) ([]byte, error) {
-	if path == p.failPath {
-		return nil, errors.New("permission denied")
-	}
-	return p.VFS.ReadFile(path)
 }
 
 // newFipsFS builds a memfs with the given path→contents mapping.
@@ -310,7 +295,11 @@ func (s *FipsPublicTestSuite) TestCollect() {
 			name:    "linux: kernel read error propagated",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return pathErrorFS{VFS: memfs.New(), failPath: "/proc/sys/crypto/fips_enabled"}
+				return sourcetest.ReadError(
+					memfs.New(),
+					errors.New("permission denied"),
+					"/proc/sys/crypto/fips_enabled",
+				)
 			},
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
@@ -321,7 +310,11 @@ func (s *FipsPublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				base := newFipsFS(map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"})
-				return pathErrorFS{VFS: base, failPath: "/etc/crypto-policies/config"}
+				return sourcetest.ReadError(
+					base,
+					errors.New("permission denied"),
+					"/etc/crypto-policies/config",
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.EqualError(err, "read /etc/crypto-policies/config: permission denied")
