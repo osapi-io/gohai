@@ -30,6 +30,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/blockdevice"
 )
 
@@ -180,7 +181,9 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 					[]byte("32\n"),
 					fs.FileMode(0o444),
 				)
-				linkBlockDevices(f, "sda")
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/sda": "/sys/devices/block/sda",
+				})
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -232,7 +235,10 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 					[]byte("500107862\n"),
 					fs.FileMode(0o444),
 				)
-				linkBlockDevices(f, "nvme0n1", "sda")
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/nvme0n1": "/sys/devices/block/nvme0n1",
+					"/sys/block/sda":     "/sys/devices/block/sda",
+				})
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -270,7 +276,9 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/sys/devices/block/vda", 0o755)
-				linkBlockDevices(f, "vda")
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/vda": "/sys/devices/block/vda",
+				})
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -293,7 +301,9 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 					[]byte("GXA2\n"),
 					fs.FileMode(0o444),
 				)
-				linkBlockDevices(f, "sdb")
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/sdb": "/sys/devices/block/sdb",
+				})
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -315,7 +325,9 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/sys/block/not_a_device", []byte("x"), fs.FileMode(0o444))
 				_ = f.MkdirAll("/sys/devices/block/sdc", 0o755)
 				_ = f.WriteFile("/sys/devices/block/sdc/size", []byte("1024\n"), fs.FileMode(0o444))
-				linkBlockDevices(f, "sdc")
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/sdc": "/sys/devices/block/sdc",
+				})
 				return f
 			},
 			validateFunc: func(got any, err error) {
@@ -353,18 +365,5 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
-	}
-}
-
-// linkBlockDevices links /sys/block/<name> to /sys/devices/block/<name>
-// for each name, as the kernel does: every entry of /sys/block is a
-// symbolic link, not a directory.
-func linkBlockDevices(
-	f *memfs.MemFS,
-	names ...string,
-) {
-	_ = f.MkdirAll("/sys/block", 0o755)
-	for _, n := range names {
-		_ = f.Symlink("/sys/devices/block/"+n, "/sys/block/"+n)
 	}
 }
