@@ -76,11 +76,15 @@ func cascadeLinux(
 	//    authoritative on systemd hosts).
 	detectViaSystemd(ctx, exec, info)
 
-	// 1. docker / 2. podman / 5. nova as host binaries.
-	if execBinaryOnPath(ctx, exec, "docker") {
+	// 1. docker / 2. podman / 5. nova as hosts. A CLI on the PATH is not a
+	//    runtime: a container image can hold the docker CLI. docker is a
+	//    host when its daemon's socket is there. podman has no daemon, so
+	//    it is a host when its binary is there outside a podman container.
+	if execBinaryOnPath(ctx, exec, "docker") &&
+		(fileExists(fs, "/var/run/docker.sock") || fileExists(fs, "/run/docker.sock")) {
 		addSystem(info, "docker", "host", false)
 	}
-	if execBinaryOnPath(ctx, exec, "podman") {
+	if execBinaryOnPath(ctx, exec, "podman") && !fileExists(fs, "/run/.containerenv") {
 		addSystem(info, "podman", "host", false)
 	}
 	if execBinaryOnPath(ctx, exec, "nova") {

@@ -273,7 +273,25 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: docker host on PATH",
+			name:    "linux: docker CLI and its daemon socket: a docker host",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{"/var/run/docker.sock": ""})
+			},
+			exec: func(t *testing.T) source.Runner {
+				return virtExec(t, map[string][]byte{
+					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["docker"])
+			},
+		},
+		{
+			name:    "linux: docker CLI with no daemon socket, as in a CI image: not a host",
 			variant: "linux",
 			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
@@ -285,7 +303,44 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
 				s.Require().True(ok)
-				s.Equal("host", i.Systems["docker"])
+				s.NotContains(i.Systems, "docker")
+			},
+		},
+		{
+			name:    "linux: podman CLI inside a podman container: a guest, not a host",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{"/run/.containerenv": ""})
+			},
+			exec: func(t *testing.T) source.Runner {
+				return virtExec(t, map[string][]byte{
+					"sh -c command -v \"$1\" sh podman": []byte("/usr/bin/podman\n"),
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["podman"])
+				s.Equal("guest", i.Role)
+			},
+		},
+		{
+			name:    "linux: a kvm host that is also a kvm guest keeps one role in Systems and Role",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/sys/devices/virtual/misc/kvm": "",
+					"/proc/cpuinfo":                 "model name : QEMU Virtual CPU\n",
+				})
+			},
+			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("kvm", i.System)
+				s.Equal(i.Systems["kvm"], i.Role)
 			},
 		},
 		{
@@ -1128,7 +1183,8 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			variant: "linux",
 			fs: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
-					"/proc/cpuinfo": "model name : QEMU Virtual CPU\n",
+					"/proc/cpuinfo":        "model name : QEMU Virtual CPU\n",
+					"/var/run/docker.sock": "",
 				})
 			},
 			exec: func(t *testing.T) source.Runner {
@@ -1275,6 +1331,24 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 				i, ok := got.(*virtualization.Info)
 				s.Require().True(ok)
 				s.Equal("guest", i.Systems["qemu"])
+			},
+		},
+		{
+			name:    "darwin: a VMware Fusion guest also has hv_vmm_present, and is vmware, not qemu",
+			variant: "darwin",
+			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			exec: func(t *testing.T) source.Runner {
+				return virtExec(t, map[string][]byte{
+					"sysctl -n kern.hv_vmm_present":      []byte("1\n"),
+					"system_profiler SPHardwareDataType": []byte(sysProfilerVMware),
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("vmware", i.System)
+				s.NotContains(i.Systems, "qemu")
 			},
 		},
 		{

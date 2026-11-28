@@ -109,11 +109,12 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// addSystem records a detected layer in info.Systems and updates the
-// primary System/Role to the most recent positive detection. Layers
-// are preserved on conflict unless force is true (used for `.dockerenv`
-// and other authoritative signals Ohai overrides on). Callers always
-// pass non-empty literal name/role; no defensive empty-string check.
+// addSystem records a detected layer in info.Systems and makes it the
+// primary System. Layers are preserved on conflict unless force is true
+// (used for `.dockerenv` and other authoritative signals Ohai overrides
+// on). Role is the role that Systems keeps for the name, so the two never
+// disagree. Callers always pass non-empty literal name/role; no defensive
+// empty-string check.
 func addSystem(
 	info *Info,
 	name, role string,
@@ -126,5 +127,5 @@ func addSystem(
 		info.Systems[name] = role
 	}
 	info.System = name
-	info.Role = role
+	info.Role = info.Systems[name]
 }
