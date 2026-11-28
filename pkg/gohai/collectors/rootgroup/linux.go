@@ -47,5 +47,5 @@ func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return resolveRootGroup(l.FS)
+	return collector.Result(resolveRootGroup(l.FS))
 }

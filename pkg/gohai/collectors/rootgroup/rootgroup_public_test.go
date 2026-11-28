@@ -145,6 +145,12 @@ func (s *RootGroupPublicTestSuite) TestCollect() {
 			want: "wheel",
 		},
 		{
+			name:    "darwin: no /etc/passwd",
+			variant: "darwin",
+			files:   map[string]string{"/etc/group": "wheel:*:0:root\n"},
+			wantErr: "lookup user root",
+		},
+		{
 			name:    "linux: no /etc/passwd",
 			variant: "linux",
 			files:   map[string]string{"/etc/group": "root:x:0:\n"},
@@ -176,6 +182,7 @@ func (s *RootGroupPublicTestSuite) TestCollect() {
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
 				s.ErrorContains(err, tt.wantErr)
+				s.Exactly(nil, got)
 
 				return
 			}

@@ -214,8 +214,18 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 			name:    "linux: other read error propagated",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return sourcetest.FailRead(s.T(), memfs.New(), "/etc/shells") },
-			validateFunc: func(_ any, err error) {
+			validateFunc: func(got any, err error) {
 				s.Error(err)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: other read error propagated",
+			variant: "darwin",
+			setupFS: func() avfs.VFS { return sourcetest.FailRead(s.T(), memfs.New(), "/etc/shells") },
+			validateFunc: func(got any, err error) {
+				s.Error(err)
+				s.Exactly(nil, got)
 			},
 		},
 		{
