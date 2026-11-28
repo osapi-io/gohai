@@ -58,6 +58,10 @@ func (e UnknownCollectorError) Error() string {
 
 var JSONName = jsonName
 
+// StatusFrom exposes statusFrom, so a test can give it a status that no
+// collector returns.
+var StatusFrom = statusFrom
+
 // BuiltinCollectors exposes the built-in collectors, built from src, so a
 // test can check that each one takes src.
 var BuiltinCollectors = builtinCollectors

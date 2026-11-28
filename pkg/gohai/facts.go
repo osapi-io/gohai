@@ -200,7 +200,9 @@ type CollectorTiming struct {
 	Error      string `json:"error,omitempty"`
 }
 
-// Status is why a collector has its fact, or has none.
+// Status is why a collector has its fact, or has none. It has the values of
+// the registry's internal Status, which statusFrom in gohai.go converts. TestStatus fails
+// when the two sets differ, so add a status to both.
 type Status string
 
 // The statuses of a collector after a run.

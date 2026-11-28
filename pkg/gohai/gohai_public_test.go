@@ -820,6 +820,62 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 	}
 }
 
+func (s *GohaiPublicTestSuite) TestStatusFrom() {
+	tests := []struct {
+		name         string
+		status       collector.Status
+		validateFunc func(got gohai.Status)
+	}{
+		{
+			name:   "ok is StatusOK",
+			status: collector.StatusOK,
+			validateFunc: func(got gohai.Status) {
+				s.Equal(gohai.StatusOK, got)
+			},
+		},
+		{
+			name:   "absent is StatusAbsent",
+			status: collector.StatusAbsent,
+			validateFunc: func(got gohai.Status) {
+				s.Equal(gohai.StatusAbsent, got)
+			},
+		},
+		{
+			name:   "unsupported is StatusUnsupported",
+			status: collector.StatusUnsupported,
+			validateFunc: func(got gohai.Status) {
+				s.Equal(gohai.StatusUnsupported, got)
+			},
+		},
+		{
+			name:   "failed is StatusFailed",
+			status: collector.StatusFailed,
+			validateFunc: func(got gohai.Status) {
+				s.Equal(gohai.StatusFailed, got)
+			},
+		},
+		{
+			name:   "partial is StatusPartial",
+			status: collector.StatusPartial,
+			validateFunc: func(got gohai.Status) {
+				s.Equal(gohai.StatusPartial, got)
+			},
+		},
+		{
+			name:   "a status with no constant is StatusFailed, not a new string",
+			status: collector.Status("stale"),
+			validateFunc: func(got gohai.Status) {
+				s.Equal(gohai.StatusFailed, got)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(gohai.StatusFrom(tt.status))
+		})
+	}
+}
+
 func (s *GohaiPublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
