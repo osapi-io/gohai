@@ -23,8 +23,11 @@ package services_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -307,6 +310,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		name         string
 		variant      string
 		exec         source.Runner
+		noSystemd    bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -415,24 +419,40 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: list-unit-files fails, no unit is enabled",
+			name:    "linux: list-unit-files fails: an error",
 			variant: "linux",
 			exec: systemctlExecWith(s.T(), []byte(systemctlOut), nil,
 				nil, errors.New("boom")),
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*services.Info)
-				s.Require().True(ok)
-				for _, svc := range info.Services {
-					s.False(svc.Enabled, svc.Name)
-				}
-				s.Equal("OpenSSH server daemon", info.Services[0].Description)
+				s.Require().ErrorContains(err, "systemctl list-unit-files: boom")
+				s.Nil(got)
 			},
 		},
 		{
-			name:    "linux: systemctl fails, empty list",
+			name:    "linux: no systemctl: empty list",
 			variant: "linux",
-			exec:    systemctlExec(s.T(), nil, errors.New("not found")),
+			exec:    systemctlExec(s.T(), nil, fmt.Errorf("systemctl: %w", osexec.ErrNotFound)),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{}, info.Services)
+			},
+		},
+		{
+			name:    "linux: systemctl fails on a systemd host: an error",
+			variant: "linux",
+			exec:    systemctlExec(s.T(), nil, errors.New("signal: killed")),
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "systemctl list-units: signal: killed")
+				s.Nil(got)
+			},
+		},
+		{
+			name:      "linux: a host that systemd did not boot: empty list, no systemctl",
+			variant:   "linux",
+			noSystemd: true,
+			exec:      sourcemocks.NewMockRunner(gomock.NewController(s.T())),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -511,7 +531,11 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			var c services.Collector
 			switch tt.variant {
 			case "linux":
-				c = &services.Linux{Exec: tt.exec}
+				fs := memfs.New()
+				if !tt.noSystemd {
+					s.Require().NoError(fs.MkdirAll("/run/systemd/system", 0o755))
+				}
+				c = &services.Linux{FS: fs, Exec: tt.exec}
 			case "darwin":
 				c = &services.Darwin{Exec: tt.exec}
 			}

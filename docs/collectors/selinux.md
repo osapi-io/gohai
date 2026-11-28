@@ -5,9 +5,10 @@
 ## Description
 
 The collector reports the SELinux enforcement status and the policy data on
-Linux hosts. It reads `/etc/selinux/config` to get the configured mode and the
-policy type. It runs `sestatus` to get the runtime enforcement mode, the loaded
-policy name, the policy version and the maximum kernel policy version.
+Linux hosts. The running kernel gives the status and the runtime mode, through
+selinuxfs's `/sys/fs/selinux/enforce`. `/etc/selinux/config` gives the
+configured mode and the policy type, and `sestatus` gives the loaded policy
+name, the policy version and the maximum kernel policy version.
 
 On macOS, the collector returns `nil`. SELinux is a Linux kernel security
 module, and macOS does not have it.
@@ -26,12 +27,12 @@ Consumers use this data to:
 
 ## Signals
 
-- `status`. This field tells if SELinux is available. It is `"enabled"` when
-  SELinux is compiled in and the config mode is not `disabled`. Otherwise, it is
-  `"disabled"`. Check this field first. If it is `"disabled"`, the other fields
-  do not apply.
-- `current_mode`. The runtime mode from `sestatus`: `"enforcing"`,
-  `"permissive"` or `"disabled"`. It can be different from `config_mode` when an
+- `status`. This field tells if SELinux is on in the running kernel. It is
+  `"enabled"` when `/sys/fs/selinux/enforce` exists, whatever the config file
+  says, and `"disabled"` when it does not. Check this field first. If it is
+  `"disabled"`, `current_mode` and the versions do not apply.
+- `current_mode`. The runtime mode from `/sys/fs/selinux/enforce`: `"enforcing"`
+  for 1, `"permissive"` for 0. It can be different from `config_mode` when an
   admin ran `setenforce` and did not reboot.
 - `config_mode`. The SELINUX= value from `/etc/selinux/config`. This is the mode
   that the system uses when it boots. Compare it with `current_mode` to find
@@ -130,26 +131,28 @@ On Linux:
 
 1. The collector reads `/etc/selinux/config` through the injected `avfs.VFS`. It
    parses `SELINUX=` to get the configured mode and `SELINUXTYPE=` to get the
-   policy type. It skips lines that start with `#` and blank lines. If the file
-   does not exist, SELinux is not installed. The collector then returns
-   `{status: "disabled"}` immediately and does not run `sestatus`.
-2. If the configured mode is `disabled`, the collector returns
-   `{status: "disabled", config_mode: "disabled", loaded_policy_name: <SELINUXTYPE>}`
-   and does not run `sestatus`. When SELinux is disabled, sestatus exits with a
-   status that is not zero.
-3. If the configured mode is `enforcing` or `permissive`, the collector runs
-   `sestatus` through the injected `source.Runner`. It parses these lines of the
-   output:
-   - `SELinux status:` → overrides the `status` field.
-   - `Current mode:` → `current_mode`.
-   - `Loaded policy name:` → `loaded_policy_name`. If this value is different
-     from the SELINUXTYPE in the config, it can override it.
+   policy type. It skips lines that start with `#` and blank lines. A missing
+   file gives an empty `config_mode`.
+
+2. It reads `/sys/fs/selinux/enforce`. When the file does not exist, the running
+   kernel has SELinux off: the collector returns `status: "disabled"` with the
+   config fields, and does not run `sestatus`. A config file that says
+   `enforcing` does not change that. A file that exists and cannot be read is an
+   error.
+
+3. When the file exists, `status` is `"enabled"`, and `current_mode` is
+   `"enforcing"` for 1 and `"permissive"` for 0.
+
+4. The collector runs `sestatus` through the injected `source.Runner`, and takes
+   these lines of the output:
+
+   - `Loaded policy name:` → `loaded_policy_name`.
    - `Max kernel policy version:` → `max_kernel_policy_version`.
    - `Policy version:` → `policy_version`.
-4. If `sestatus` fails, for example because the binary is not found or the
-   permission is denied, the collector uses the config mode. Because that mode
-   is not `disabled`, it sets `status: "enabled"`. The `current_mode`,
-   `policy_version` and `max_kernel_policy_version` fields are then missing.
+
+   It does not take the status or the mode from `sestatus`: the kernel gives
+   them. A missing `sestatus` leaves the versions empty. A `sestatus` that is
+   installed and fails is an error.
 
 Note: Ohai uses `sestatus -v -b`, which also collects policy booleans and
 process contexts. gohai uses plain `sestatus` and collects only the status, mode

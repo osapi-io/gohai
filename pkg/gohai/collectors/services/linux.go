@@ -22,6 +22,12 @@ package services
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	osexec "os/exec"
+
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -34,23 +40,34 @@ import (
 type Linux struct {
 	base
 
+	// FS tells a host with systemd from one without: systemd makes
+	// /run/systemd/system when it boots.
+	FS   avfs.VFS
 	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: source.Commands()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
-// Collect runs systemctl and parses its output. Returns an empty list
-// (not an error) when systemctl is absent — containers without systemd
-// are common.
+// systemdRun is the directory systemd makes when it is the init system.
+const systemdRun = "/run/systemd/system"
+
+// Collect runs systemctl and parses its output. A host that systemd did not
+// boot, such as a container, has no services and no error. On a host that
+// systemd booted, a systemctl that fails is an error.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	if l.Exec == nil {
 		return &Info{Services: []Service{}}, nil
+	}
+	if l.FS != nil {
+		if _, err := l.FS.Stat(systemdRun); err != nil {
+			return &Info{Services: []Service{}}, nil
+		}
 	}
 	out, err := l.Exec.Execute(
 		ctx,
@@ -62,11 +79,13 @@ func (l *Linux) Collect(
 		"--plain",
 	)
 	if err != nil {
-		return &Info{Services: []Service{}}, nil
+		if errors.Is(err, osexec.ErrNotFound) {
+			return &Info{Services: []Service{}}, nil
+		}
+		return nil, fmt.Errorf("systemctl list-units: %w", err)
 	}
-	// Enabled is the unit-file state, not whether the unit runs now. When
-	// list-unit-files fails, no unit is reported enabled.
-	files, _ := l.Exec.Execute(
+	// Enabled is the unit-file state, not whether the unit runs now.
+	files, err := l.Exec.Execute(
 		ctx,
 		"systemctl",
 		"list-unit-files",
@@ -74,5 +93,8 @@ func (l *Linux) Collect(
 		"--no-legend",
 		"--no-pager",
 	)
+	if err != nil {
+		return nil, fmt.Errorf("systemctl list-unit-files: %w", err)
+	}
 	return parseSystemctlOutput(string(out), parseUnitFiles(string(files))), nil
 }

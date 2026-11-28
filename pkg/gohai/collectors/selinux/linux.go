@@ -22,6 +22,11 @@ package selinux
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io/fs"
+	osexec "os/exec"
+	"strings"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -49,43 +54,45 @@ func NewLinux() *Linux {
 	}
 }
 
-// Collect gathers SELinux status. If sestatus is unavailable (not
-// installed or returns an error), the collector falls back to
-// /etc/selinux/config for the config mode. This matches Ohai's
-// linux/selinux.rb which also uses sestatus as its primary source.
+// enforcePath is selinuxfs's enforcing switch: present when the running
+// kernel has SELinux on, with "1" for enforcing and "0" for permissive.
+const enforcePath = "/sys/fs/selinux/enforce"
+
+// Collect gathers SELinux status. The running kernel decides Status and
+// CurrentMode: SELinux is enabled when selinuxfs has its enforce file,
+// whatever /etc/selinux/config says, and disabled when it has none.
+// /etc/selinux/config gives the configured mode and the policy, and
+// sestatus, when it is installed, gives the rest. A sestatus that is
+// installed and fails is an error.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info := &Info{}
+	info := &Info{Status: "disabled"}
+	info.ConfigMode, info.LoadedPolicyName = parseConfigFile(l.FS)
 
-	// Primary: read /etc/selinux/config for the configured mode and
-	// policy type. If the file is absent, SELinux is disabled or not
-	// installed.
-	configMode, policyName := parseConfigFile(l.FS)
-	if configMode == "" {
-		info.Status = "disabled"
+	enforce, err := l.FS.ReadFile(enforcePath)
+	switch {
+	case err == nil:
+		info.Status = "enabled"
+		info.CurrentMode = "permissive"
+		if strings.TrimSpace(string(enforce)) == "1" {
+			info.CurrentMode = "enforcing"
+		}
+	case errors.Is(err, fs.ErrNotExist):
 		return info, nil
-	}
-	info.ConfigMode = configMode
-	info.LoadedPolicyName = policyName
-
-	if configMode == "disabled" {
-		info.Status = "disabled"
-		return info, nil
+	default:
+		return nil, fmt.Errorf("read %s: %w", enforcePath, err)
 	}
 
-	// Secondary: sestatus for runtime mode and version numbers.
 	if l.Exec != nil {
 		out, err := l.Exec.Execute(ctx, "sestatus")
-		if err == nil {
+		switch {
+		case err == nil:
 			parseSestatus(out, info)
+		case !errors.Is(err, osexec.ErrNotFound):
+			return nil, fmt.Errorf("sestatus: %w", err)
 		}
-	}
-
-	// If sestatus didn't set status, derive it from the config mode.
-	if info.Status == "" {
-		info.Status = "enabled"
 	}
 
 	return info, nil
