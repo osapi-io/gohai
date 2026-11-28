@@ -25,7 +25,10 @@
 package dns
 
 import (
+	"fmt"
 	"strings"
+
+	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -89,6 +92,25 @@ func NewWith(
 
 // resolvConf is the classic resolver file, on Linux and on macOS.
 const resolvConf = "/etc/resolv.conf"
+
+// readResolvConf returns an Info with the resolv.conf fields of fsys. A
+// host with no resolv.conf gives an empty Info, and any other read
+// error is returned.
+func readResolvConf(
+	fsys avfs.VFS,
+) (*Info, error) {
+	info := &Info{}
+	b, err := fsys.ReadFile(resolvConf)
+	if collector.Absent(err) {
+		return info, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", resolvConf, err)
+	}
+	parseResolvConf(info, b)
+
+	return info, nil
+}
 
 // parseResolvConf fills info from resolv.conf: nameserver lines, the
 // last search or domain line, and options.

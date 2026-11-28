@@ -22,6 +22,7 @@ package libvirt
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -29,8 +30,9 @@ import (
 
 // Linux collects libvirt domain data on Linux hosts via the virsh CLI. virsh
 // must be on PATH and able to connect to the libvirt daemon (typically
-// qemu:///system). When virsh is absent or the connection fails Collect
-// returns nil with no error — not every Linux host is a KVM hypervisor.
+// qemu:///system). When virsh is absent or `virsh version` does not
+// answer, Collect returns nil with no error: not every Linux host is a
+// KVM hypervisor. Once the daemon answers, a failed read is an error.
 type Linux struct {
 	base
 
@@ -43,7 +45,8 @@ func NewLinux() *Linux {
 }
 
 // Collect queries virsh for version, URI, and full domain list. Returns nil
-// (no error) when virsh is absent or cannot connect to the daemon.
+// (no error) when virsh is absent or cannot connect to the daemon, and an
+// error when the URI or the domain list cannot be read after that.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -62,19 +65,21 @@ func (l *Linux) Collect(
 		Version: parseVirshVersion(verOut),
 	}
 
-	// Collect the connection URI.
-	if uriOut, uriErr := l.Exec.Execute(ctx, "virsh", "uri"); uriErr == nil {
-		info.URI = parseVirshURI(uriOut)
+	uriOut, err := l.Exec.Execute(ctx, "virsh", "uri")
+	if err != nil {
+		return nil, fmt.Errorf("read virsh uri: %w", err)
 	}
+	info.URI = parseVirshURI(uriOut)
 
-	// Enumerate domains; errors yield an empty list rather than a failure.
-	listOut, listErr := l.Exec.Execute(ctx, "virsh", "list", "--all")
-	if listErr != nil {
-		return info, nil
+	listOut, err := l.Exec.Execute(ctx, "virsh", "list", "--all")
+	if err != nil {
+		return nil, fmt.Errorf("read virsh list: %w", err)
 	}
 	domains := parseVirshList(listOut)
 
-	// Enrich each domain with UUID, vCPUs, memory, and autostart via dominfo.
+	// Enrich each domain with UUID, vCPUs, memory, and autostart via
+	// dominfo. A domain can go away between the list and its dominfo, so
+	// a failed dominfo keeps the domain with its name and state only.
 	for i := range domains {
 		diOut, diErr := l.Exec.Execute(ctx, "virsh", "dominfo", domains[i].Name)
 		if diErr == nil {

@@ -45,12 +45,16 @@ func NewLinux() *Linux {
 
 // Collect reads the grubenv file and returns the environment map. It
 // returns no fact when no checked path has a grubenv file, as on a host
-// that boots with a different loader.
+// that boots with a different loader, and an error when a grubenv file
+// cannot be read.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	env := readGrubenv(l.FS)
+	env, err := readGrubenv(l.FS)
+	if err != nil {
+		return nil, err
+	}
 	if env == nil {
 		return nil, nil
 	}

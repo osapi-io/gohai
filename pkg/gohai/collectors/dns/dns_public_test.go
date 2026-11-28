@@ -81,11 +81,15 @@ func (s *DNSPublicTestSuite) TestCollect() {
 		runner  sourcetest.Commands
 		nilExec bool
 		want    *dns.Info
+		wantErr string
 	}{
 		{
 			name:    "linux: resolv.conf and resolvectl links",
 			variant: "linux",
-			files:   map[string]string{"/etc/resolv.conf": resolvConf},
+			files: map[string]string{
+				"/etc/resolv.conf":                 resolvConf,
+				"/run/systemd/resolve/resolv.conf": "",
+			},
 			runner: sourcetest.Commands{Out: map[string]string{
 				"resolvectl dns":    "Global: 1.1.1.1\nLink 2 (eth0): 10.0.0.1 fe80::1%eth0\nLink 3 (wg0):\n",
 				"resolvectl domain": "Global:\nLink 2 (eth0): corp.example ~.\n",
@@ -107,6 +111,7 @@ func (s *DNSPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: DNS over TLS servers lose their port and name, and Global domains are read",
 			variant: "linux",
+			files:   map[string]string{"/run/systemd/resolve/resolv.conf": ""},
 			runner: sourcetest.Commands{Out: map[string]string{
 				"resolvectl dns": "Global: 1.1.1.1:853#cloudflare-dns.com [2606:4700::1111]:853#cloudflare-dns.com\n" +
 					"Link 2 (eth0): 10.0.0.1:53 fe80::1%eth0\n",
@@ -123,15 +128,43 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: no resolv.conf, and resolvectl fails",
+			name:    "linux: no resolv.conf, and systemd-resolved is not running",
 			variant: "linux",
 			runner: sourcetest.Commands{Err: map[string]error{
-				"resolvectl dns": errors.New(
-					"not found",
-				),
-				"resolvectl domain": errors.New("not found"),
+				"resolvectl dns":    errors.New("exit status 1"),
+				"resolvectl domain": errors.New("exit status 1"),
 			}},
 			want: &dns.Info{},
+		},
+		{
+			name:    "linux: systemd-resolved runs, but the host has no resolvectl",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/resolv.conf":                 "nameserver 127.0.0.53\n",
+				"/run/systemd/resolve/resolv.conf": "",
+			},
+			want: &dns.Info{Nameservers: []string{"127.0.0.53"}},
+		},
+		{
+			name:    "linux: systemd-resolved runs, and resolvectl fails",
+			variant: "linux",
+			files:   map[string]string{"/run/systemd/resolve/resolv.conf": ""},
+			runner: sourcetest.Commands{Err: map[string]error{
+				"resolvectl dns": errors.New("exit status 1"),
+			}},
+			wantErr: "read resolvectl dns",
+		},
+		{
+			name:    "linux: a resolved runtime directory that cannot be checked is an error",
+			variant: "linux",
+			files:   map[string]string{"/run/systemd": ""},
+			wantErr: "stat /run/systemd/resolve",
+		},
+		{
+			name:    "linux: a resolv.conf that cannot be read is an error",
+			variant: "linux",
+			files:   map[string]string{"/etc/resolv.conf/x": ""},
+			wantErr: "read /etc/resolv.conf",
 		},
 		{
 			name:    "linux: nil Exec",
@@ -167,7 +200,19 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			name:    "darwin: scutil fails",
 			variant: "darwin",
 			runner:  sourcetest.Commands{Err: map[string]error{"scutil --dns": errors.New("boom")}},
-			want:    &dns.Info{},
+			wantErr: "read scutil --dns",
+		},
+		{
+			name:    "darwin: no scutil on the host",
+			variant: "darwin",
+			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
+			want:    &dns.Info{Nameservers: []string{"1.1.1.1"}},
+		},
+		{
+			name:    "darwin: a resolv.conf that cannot be read is an error",
+			variant: "darwin",
+			files:   map[string]string{"/etc/resolv.conf/x": ""},
+			wantErr: "read /etc/resolv.conf",
 		},
 		{
 			name:    "darwin: nil Exec",
@@ -195,6 +240,12 @@ func (s *DNSPublicTestSuite) TestCollect() {
 				c = d
 			}
 			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.Require().ErrorContains(err, tt.wantErr)
+				s.Nil(got)
+
+				return
+			}
 			s.Require().NoError(err)
 			s.Equal(tt.want, got)
 		})

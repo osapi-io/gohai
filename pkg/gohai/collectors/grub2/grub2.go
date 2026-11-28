@@ -27,6 +27,7 @@ package grub2
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -98,18 +99,24 @@ func NewWith(
 // readGrubenv tries each path in grubenvPaths in order and returns the
 // parsed environment from the first file found. Returns nil when no
 // grubenv file exists on any path, and an empty map for a file with no
-// pair.
+// pair. A file that exists but cannot be read, such as a 0600 grubenv
+// read by a user who is not root, is an error.
 func readGrubenv(
 	fs avfs.VFS,
-) map[string]string {
+) (map[string]string, error) {
 	for _, path := range grubenvPaths {
 		b, err := fs.ReadFile(path)
-		if err != nil {
+		if collector.Absent(err) {
 			continue
 		}
-		return parseGrubenv(b)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", path, err)
+		}
+
+		return parseGrubenv(b), nil
 	}
-	return nil
+
+	return nil, nil
 }
 
 // parseGrubenv parses a grubenv file. The format is:

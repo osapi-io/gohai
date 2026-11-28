@@ -343,7 +343,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: virsh uri fails — URI stays empty, domains still collected",
+			name:    "linux: virsh uri fails after the daemon answered is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
@@ -357,15 +357,12 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				return m
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				i, ok := got.(*libvirt.Info)
-				s.Require().True(ok)
-				s.Empty(i.URI)
-				s.Equal("10.0.0", i.Version)
+				s.Require().ErrorContains(err, "read virsh uri")
+				s.Nil(got)
 			},
 		},
 		{
-			name:    "linux: virsh list fails — returns Info with version only",
+			name:    "linux: virsh list fails after the daemon answered is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
@@ -379,11 +376,8 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				return m
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				i, ok := got.(*libvirt.Info)
-				s.Require().True(ok)
-				s.Equal("10.0.0", i.Version)
-				s.Nil(i.Domains)
+				s.Require().ErrorContains(err, "read virsh list")
+				s.Nil(got)
 			},
 		},
 		{

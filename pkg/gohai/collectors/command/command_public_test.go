@@ -23,6 +23,8 @@ package command_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -132,7 +134,7 @@ func (s *CommandPublicTestSuite) TestNew() {
 
 func (s *CommandPublicTestSuite) TestCollect() {
 	psOutput := []byte(`UID        PID  PPID  C STIME TTY          TIME CMD
-root         1     0  0 10:00 ?        00:00:01 /sbin/init
+root         1     0  0 10:00 ?        00:00:01 /sbin/init  	
 root         2     0  0 10:00 ?        00:00:00 [kthreadd]
 user      1234     1  0 10:01 pts/0    00:00:00 bash
 `)
@@ -200,14 +202,26 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			},
 		},
 		{
-			name:    "linux: exec error yields empty slice, no error",
+			name:    "linux: no ps on the host yields empty slice, no error",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return psExec(t, nil, errors.New("not found")) },
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, nil, fmt.Errorf("exec ps: %w", exec.ErrNotFound))
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
 				s.Require().True(ok)
 				s.Equal([]string{}, info.PS)
+			},
+		},
+		{
+			name:    "linux: a ps that fails is an error",
+			variant: "linux",
+			exec:    func(t *testing.T) source.Runner { return psExec(t, nil, errors.New("exit status 1")) },
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Nil(got)
+				s.Contains(err.Error(), "read ps")
 			},
 		},
 		{
@@ -238,14 +252,26 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			},
 		},
 		{
-			name:    "darwin: exec error yields empty slice, no error",
+			name:    "darwin: no ps on the host yields empty slice, no error",
 			variant: "darwin",
-			exec:    func(t *testing.T) source.Runner { return psExec(t, nil, errors.New("not found")) },
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, nil, fmt.Errorf("exec ps: %w", exec.ErrNotFound))
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
 				s.Require().True(ok)
 				s.Equal([]string{}, info.PS)
+			},
+		},
+		{
+			name:    "darwin: a ps that fails is an error",
+			variant: "darwin",
+			exec:    func(t *testing.T) source.Runner { return psExec(t, nil, errors.New("exit status 1")) },
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Nil(got)
+				s.Contains(err.Error(), "read ps")
 			},
 		},
 		{

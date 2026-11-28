@@ -22,14 +22,15 @@ package command
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin runs `ps -ef` on macOS and captures the raw output lines.
-// macOS ps supports the same POSIX `-ef` flags as Linux. Exec errors
-// yield an empty Info — not an error.
+// macOS ps supports the same POSIX `-ef` flags as Linux. A host with
+// no ps gives an empty Info; a ps that fails is an error.
 type Darwin struct {
 	base
 
@@ -50,8 +51,11 @@ func (d *Darwin) Collect(
 		return &Info{PS: []string{}}, nil
 	}
 	out, err := d.Exec.Execute(ctx, "ps", "-ef")
-	if err != nil {
+	if collector.Absent(err) {
 		return &Info{PS: []string{}}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read ps: %w", err)
 	}
 	return parsePSOutput(string(out)), nil
 }

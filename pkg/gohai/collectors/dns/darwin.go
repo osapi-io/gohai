@@ -22,6 +22,7 @@ package dns
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -57,16 +58,19 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info := &Info{}
-	if b, err := d.FS.ReadFile(resolvConf); err == nil {
-		parseResolvConf(info, b)
+	info, err := readResolvConf(d.FS)
+	if err != nil {
+		return nil, err
 	}
 	if d.Exec == nil {
 		return info, nil
 	}
 	out, err := d.Exec.Execute(ctx, "scutil", "--dns")
-	if err != nil {
+	if collector.Absent(err) {
 		return info, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read scutil --dns: %w", err)
 	}
 	// Each "resolver #N" block has its servers, its search domains and,
 	// when it belongs to one, its interface. The first block of an

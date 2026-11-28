@@ -163,6 +163,20 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a grubenv that cannot be read is an error",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/boot/grub2/grubenv/x": "",
+					"/boot/grub/grubenv":    "from=grub\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /boot/grub2/grubenv")
+				s.Nil(got)
+			},
+		},
+		{
 			name:    "linux: grubenv at /boot/grub2/grubenv",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
