@@ -592,7 +592,8 @@ Before you mark a collector as complete, each item below must be true:
     - Backing library.
 
     **No "Known gaps vs. Ohai" section.** Methodology gaps are GitHub issues
-    with the labels `methodology-gap` / `collector:<name>`.
+    with the labels `methodology-gap` and `component/collectors`, with the name
+    of the collector in the title, such as `process: ...`.
 
 08. **docs/collectors/README.md**: the row of the collector shows
     `✅ (<backing>)`.
@@ -604,7 +605,7 @@ Before you mark a collector as complete, each item below must be true:
     upstream library, and each intentional difference.
 
 11. **Check the GitHub issues** for tracked methodology gaps:
-    `gh issue list --label methodology-gap --label collector:<name>`. If the
+    `gh issue list --label methodology-gap --search "<name> in:title"`. If the
     work closes a tracked issue, the "Doc after this fix lands" block of the
     issue IS the content to paste into Data sources. The PR description must
     include `Closes #N`.
