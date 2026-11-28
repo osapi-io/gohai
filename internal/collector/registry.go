@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"time"
@@ -41,6 +42,15 @@ type Hooks struct {
 	// regardless of success or failure, with the wall-clock duration
 	// of that call. Useful for --debug timing output.
 	OnComplete func(name string, dur time.Duration, err error)
+}
+
+// PanicError is the error of a collector that panicked. Error names the
+// collector and the panic value, and Stack holds the goroutine's stack at the
+// panic, so that a caller can find where it was.
+type PanicError struct {
+	Collector string
+	Value     any
+	Stack     []byte
 }
 
 // Registry holds the set of registered collectors.
@@ -166,10 +176,11 @@ func (r *Registry) SelectedWith(
 // auto-included even if not in the names list. Collectors at the same level
 // (no inter-dependencies) run concurrently. Returns a map of collector name
 // to result. Failed collectors are omitted from the result map, and their
-// error goes to hooks.OnError. A panic in a collector is its error. A
-// ctx cancelled before Run returns, in any level, is ctx's error, and no
-// next level starts. hooks may
-// be zero-valued; any non-nil field is invoked per collector.
+// error goes to hooks.OnError. A panic in a collector is its error, a
+// *PanicError. A ctx cancelled before Run returns, in any level, is ctx's
+// error, and no next level starts. Run then also returns the results of the
+// collectors that finished, so that a caller can tell which facts it has.
+// hooks may be zero-valued; any non-nil field is invoked per collector.
 func (r *Registry) Run(
 	ctx context.Context,
 	names []string,
@@ -186,7 +197,7 @@ func (r *Registry) Run(
 	for _, level := range levels {
 		// A cancelled run starts no more collectors.
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return results, err
 		}
 		// Snapshot prior results once per level. Collectors at the
 		// same level have no inter-dependencies by definition, so
@@ -225,9 +236,9 @@ func (r *Registry) Run(
 		wg.Wait()
 	}
 	// A ctx cancelled during the last level is an error too, as it is in
-	// an earlier one: the caller can't tell which facts it lost.
+	// an earlier one. The results show which facts finished.
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return results, err
 	}
 	return results, nil
 }
@@ -259,8 +270,8 @@ func (r *Registry) plan(
 	return levels, collectors, nil
 }
 
-// collect runs c. A panic in c is its error, so that one collector does not
-// stop the process that runs gohai.
+// collect runs c. A panic in c is its error, a *PanicError with the stack, so
+// that one collector does not stop the process that runs gohai.
 func collect(
 	ctx context.Context,
 	c Collector,
@@ -268,11 +279,17 @@ func collect(
 ) (out any, err error) {
 	defer func() {
 		if p := recover(); p != nil {
-			out, err = nil, fmt.Errorf("collector %s panicked: %v", c.Name(), p)
+			out, err = nil, &PanicError{Collector: c.Name(), Value: p, Stack: debug.Stack()}
 		}
 	}()
 
 	return c.Collect(ctx, prior)
+}
+
+// Error names the collector and the panic value. The stack is in Stack, not in
+// the text, because the text goes into the facts' errors.
+func (e *PanicError) Error() string {
+	return fmt.Sprintf("collector %s panicked: %v", e.Collector, e.Value)
 }
 
 func (r *Registry) expandWithDeps(
@@ -327,7 +344,7 @@ func (r *Registry) topoLevels(
 			}
 		}
 		if len(level) == 0 {
-			return nil, fmt.Errorf("dependency cycle detected among collectors")
+			return nil, errors.New("dependency cycle detected among collectors")
 		}
 		sort.Strings(level)
 		levels = append(levels, level)
