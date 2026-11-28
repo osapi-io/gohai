@@ -104,12 +104,15 @@ func collectDpkg(
 }
 
 // collectRPM queries rpm on RHEL/Fedora/SUSE hosts. Format mirrors
-// Ohai's packages.rb rhel branch: %{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}
+// Ohai's packages.rb rhel branch: %{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH},
+// with the epoch before the version when there is one.
 func collectRPM(
 	ctx context.Context,
 	exec source.Runner,
 ) (*Info, error) {
-	format := "%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n"
+	// An epoch, when the package has one, goes before the version as
+	// "epoch:", as rpm and dnf print it: openssl 1:3.2.4-3.fc42.
+	format := "%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n"
 	out, err := exec.Execute(ctx, "rpm", "-qa", "--qf", format)
 	if err != nil {
 		return &Info{Packages: []Package{}}, nil

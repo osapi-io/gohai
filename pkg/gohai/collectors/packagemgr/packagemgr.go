@@ -36,7 +36,7 @@ import (
 
 // Info holds package manager identification.
 type Info struct {
-	Name string `json:"name"`           // "apt", "dnf", "yum", "zypper", "pacman", "apk", "brew"
+	Name string `json:"name"`           // "apt", "dnf", "yum", "zypper", "pacman", "apk", "xbps-install", "emerge", "brew", "port"
 	Path string `json:"path,omitempty"` // absolute path to the manager binary
 }
 

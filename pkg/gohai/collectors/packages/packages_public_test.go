@@ -337,7 +337,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					[]string{
 						"-qa",
 						"--qf",
-						"%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
 					},
 					rpmOut,
 					nil,
@@ -376,7 +376,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					[]string{
 						"-qa",
 						"--qf",
-						"%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
 					},
 					nil,
 					errors.New("not found"),
@@ -400,7 +400,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					[]string{
 						"-qa",
 						"--qf",
-						"%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
 					},
 					[]byte("bash\n"),
 					nil,
@@ -424,7 +424,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					[]string{
 						"-qa",
 						"--qf",
-						"%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
 					},
 					[]byte("\t1.0-1.fc36\tx86_64\nbash\t5.1-6.fc36\tx86_64\n"),
 					nil,

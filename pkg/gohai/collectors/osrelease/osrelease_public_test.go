@@ -168,6 +168,22 @@ UBUNTU_CODENAME=noble
 			},
 		},
 		{
+			name:    "linux: quotes and escapes, as os-release(5) writes them",
+			variant: "linux",
+			content: "NAME=\"Say \\\"Hi\\\"\"\nPRETTY_NAME='it''s'\nID=plain\nVERSION=\"don't\"\nVERSION_ID=\"1\nBUILD_ID=\"\"\n",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal(`Say "Hi"`, info.Name)
+				s.Equal(`it''s`, info.PrettyName)
+				s.Equal("plain", info.ID)
+				s.Equal("don't", info.Version)
+				s.Equal(`"1`, info.VersionID)
+				s.Equal("", info.Extra["BUILD_ID"])
+			},
+		},
+		{
 			name:    "linux: missing file soft-misses",
 			variant: "linux",
 			missing: true,

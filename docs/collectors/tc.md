@@ -21,7 +21,7 @@ handle and the parent of each qdisc.
 | `interfaces[].name`            | `string` | The network interface name, for example `eth0`                    | No direct OCSF/OTel mapping |
 | `interfaces[].qdiscs`          | `list`   | The qdiscs that are attached to this interface                    | None                        |
 | `interfaces[].qdiscs[].kind`   | `string` | The qdisc type, for example `fq_codel`, `pfifo_fast` or `noqueue` | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].handle` | `string` | The qdisc handle, for example `1:` or `0:`                        | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].handle` | `string` | The qdisc handle without its colon, for example `1` or `0`        | No direct OCSF/OTel mapping |
 | `interfaces[].qdiscs[].parent` | `string` | The parent handle. It is empty for root qdiscs                    | No direct OCSF/OTel mapping |
 
 ## Platform support
