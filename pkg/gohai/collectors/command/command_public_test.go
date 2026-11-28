@@ -22,6 +22,7 @@ package command_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -131,6 +132,12 @@ func (s *CommandPublicTestSuite) TestNew() {
 }
 
 func (s *CommandPublicTestSuite) TestCollect() {
+	// secretOutput holds arguments that look like secrets, which must
+	// never reach the facts.
+	secretOutput := []byte(`UID        PID  PPID  C STIME TTY          TIME CMD
+app        700     1  0 10:02 ?        00:00:03 /usr/bin/app --password=fake-pw-123 --token fake-tok-456
+app        701     1  0 10:02 ?        00:00:00 sh -c echo fake-env-789
+`)
 	psOutput := []byte(`UID        PID  PPID  C STIME TTY          TIME CMD
 root         1     0  0 10:00 ?        00:00:01 /sbin/init  	
 root         2     0  0 10:00 ?        00:00:00 [kthreadd]
@@ -143,6 +150,141 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: the arguments of a command never reach the facts",
+			variant: "linux",
+			exec:    func(t *testing.T) source.Runner { return psExec(t, secretOutput, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{
+					"UID        PID  PPID  C STIME TTY          TIME CMD",
+					"app        700     1  0 10:02 ?        00:00:03 /usr/bin/app",
+					"app        701     1  0 10:02 ?        00:00:00 sh",
+				}, info.PS)
+				facts, err := json.Marshal(got)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "fake-pw-123")
+				s.NotContains(string(facts), "fake-tok-456")
+				s.NotContains(string(facts), "fake-env-789")
+			},
+		},
+		{
+			name:    "darwin: the arguments of a command never reach the facts",
+			variant: "darwin",
+			exec:    func(t *testing.T) source.Runner { return psExec(t, secretOutput, nil) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				facts, err := json.Marshal(got)
+				s.Require().NoError(err)
+				s.Contains(string(facts), "/usr/bin/app")
+				s.NotContains(string(facts), "fake-pw-123")
+				s.NotContains(string(facts), "fake-tok-456")
+				s.NotContains(string(facts), "fake-env-789")
+			},
+		},
+		{
+			name:    "linux: the BusyBox layout keeps no arguments",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, []byte("PID   USER     TIME  COMMAND\n"+
+					"    1 root      0:00 /sbin/init --fake-pw-123\n"+
+					"   42 app       0:01 app --token fake-tok-456\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{
+					"PID   USER     TIME  COMMAND",
+					"    1 root      0:00 /sbin/init",
+					"   42 app       0:01 app",
+				}, info.PS)
+			},
+		},
+		{
+			name:    "linux: columns split by tabs keep no arguments",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(
+					t,
+					[]byte("PID\tTIME\tCMD\n7\t0:00\tapp\t--token\tfake-tok-456\n"),
+					nil,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"PID\tTIME\tCMD", "7\t0:00\tapp"}, info.PS)
+			},
+		},
+		{
+			name:    "linux: a line with no field at the command column is dropped",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, []byte("UID PID PPID C STIME TTY TIME CMD\n"+
+					"root 1 0 0 10:00 ?\n"+
+					"app 7 1 0 10:02 ? 00:00:00 app --note\n"+
+					"fake-pw-123 rest of an argument that held a newline\n"+
+					"x fake-tok-456\n"+
+					"root 8 1 0 10:03 ? 00:00:00 sshd\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{
+					"UID PID PPID C STIME TTY TIME CMD",
+					"app 7 1 0 10:02 ? 00:00:00 app",
+					"root 8 1 0 10:03 ? 00:00:00 sshd",
+				}, info.PS)
+				facts, err := json.Marshal(got)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "fake-pw-123")
+				s.NotContains(string(facts), "fake-tok-456")
+			},
+		},
+		{
+			name:    "linux: a header with no PID column gives no lines",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, []byte("USER TIME CMD\nroot 0:00 init --fake-pw-123\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
+		},
+		{
+			name:    "linux: a header with the command before another column gives no lines",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, []byte("PID CMD TIME\n1 init --fake-pw-123 0:00\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
+		},
+		{
+			name:    "linux: output with no CMD or COMMAND header gives no lines",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, []byte("PID USER ARGS\n1 root /sbin/init --fake-pw-123\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
+		},
 		{
 			name:    "linux: ps output parsed and trailing whitespace trimmed",
 			variant: "linux",
@@ -172,6 +314,7 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 				info, ok := got.(*command.Info)
 				s.Require().True(ok)
 				s.Require().Len(info.PS, 3)
+				s.Equal("root  9  1  0 10:00 ?  00:00:01 java", info.PS[1])
 				s.Equal("root 10 1 0 10:00 ? 00:00:00 sshd", info.PS[2])
 			},
 		},
@@ -190,13 +333,13 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			name:    "linux: blank lines in output are skipped",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return psExec(t, []byte("header\n\nprocess1\n\n"), nil)
+				return psExec(t, []byte("PID CMD\n\n1 process1\n\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
 				s.Require().True(ok)
-				s.Equal([]string{"header", "process1"}, info.PS)
+				s.Equal([]string{"PID CMD", "1 process1"}, info.PS)
 			},
 		},
 		{

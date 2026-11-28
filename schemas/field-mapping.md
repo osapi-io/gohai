@@ -1024,6 +1024,6 @@ ______________________________________________________________________
 
 ## Miscellaneous collectors (new)
 
-| Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source                                           | Citation                        |
-| --------- | -------- | ------------ | ---- | ----------- | -------- | ------------------------------------------------ | ------------------------------- |
-| command   | PS       | `ps`         | T3   | `ps`        | no       | No OCSF/OTel equivalent, raw ps -ef output lines | Convention, Ohai command plugin |
+| Collector | Go Field | Current JSON | Tier | Chosen JSON | Changed? | Source                                                         | Citation                        |
+| --------- | -------- | ------------ | ---- | ----------- | -------- | -------------------------------------------------------------- | ------------------------------- |
+| command   | PS       | `ps`         | T3   | `ps`        | no       | No OCSF/OTel equivalent, ps -ef output lines without arguments | Convention, Ohai command plugin |

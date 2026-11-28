@@ -28,7 +28,8 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// Darwin runs `ps -ef` on macOS and captures the raw output lines.
+// Darwin runs `ps -ef` on macOS and captures the output lines without
+// the arguments of each command.
 // macOS ps supports the same POSIX `-ef` flags as Linux. A host with
 // no ps gives an empty Info; a ps that fails is an error.
 type Darwin struct {
@@ -42,7 +43,8 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect runs `ps -ef` and returns its raw output lines.
+// Collect runs `ps -ef` and returns the output lines without the
+// arguments of each command.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
