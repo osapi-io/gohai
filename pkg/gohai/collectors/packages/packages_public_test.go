@@ -70,45 +70,6 @@ func mockExec(
 	return m
 }
 
-func (s *PackagesPublicTestSuite) TestNewManager() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
-	tests := []struct {
-		name   string
-		detect string
-		want   string
-	}{
-		{name: "when the family is debian", detect: "debian", want: "dpkg"},
-		{name: "when the family is rhel", detect: "rhel", want: "rpm"},
-		{name: "when the family is fedora", detect: "fedora", want: "rpm"},
-		{name: "when the family is amazon", detect: "amazon", want: "rpm"},
-		{name: "when the family is suse", detect: "suse", want: "rpm"},
-		{name: "when the family is arch", detect: "arch", want: ""},
-		{name: "when the family is alpine", detect: "alpine", want: ""},
-		{name: "when the family is unknown", detect: "nixos", want: ""},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			l, ok := packages.New().(*packages.Linux)
-			s.Require().True(ok)
-			s.Equal(tt.want, l.Manager)
-		})
-	}
-}
-
-func (s *PackagesPublicTestSuite) TestCollectNoManager() {
-	got, err := (&packages.Linux{Exec: source.Commands(), Manager: ""}).Collect(
-		context.Background(),
-		nil,
-	)
-	s.Require().NoError(err)
-	info, ok := got.(*packages.Info)
-	s.Require().True(ok)
-	s.Equal([]packages.Package{}, info.Packages)
-}
-
 func (s *PackagesPublicTestSuite) TestNew() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
@@ -130,32 +91,72 @@ func (s *PackagesPublicTestSuite) TestNew() {
 			name:   "debian dispatches to Linux",
 			detect: "debian",
 			validateFunc: func(c packages.Collector) {
-				_, ok := c.(*packages.Linux)
+				l, ok := c.(*packages.Linux)
 				s.True(ok)
+				s.Equal("dpkg", l.Manager)
 			},
 		},
 		{
 			name:   "rhel dispatches to Linux",
 			detect: "rhel",
 			validateFunc: func(c packages.Collector) {
-				_, ok := c.(*packages.Linux)
+				l, ok := c.(*packages.Linux)
 				s.True(ok)
+				s.Equal("rpm", l.Manager)
 			},
 		},
 		{
 			name:   "arch dispatches to Linux",
 			detect: "arch",
 			validateFunc: func(c packages.Collector) {
-				_, ok := c.(*packages.Linux)
+				l, ok := c.(*packages.Linux)
 				s.True(ok)
+				s.Equal("", l.Manager)
+			},
+		},
+		{
+			name:   "fedora dispatches to Linux with rpm",
+			detect: "fedora",
+			validateFunc: func(c packages.Collector) {
+				l, ok := c.(*packages.Linux)
+				s.True(ok)
+				s.Equal("rpm", l.Manager)
+			},
+		},
+		{
+			name:   "suse dispatches to Linux with rpm",
+			detect: "suse",
+			validateFunc: func(c packages.Collector) {
+				l, ok := c.(*packages.Linux)
+				s.True(ok)
+				s.Equal("rpm", l.Manager)
+			},
+		},
+		{
+			name:   "amazon dispatches to Linux with rpm",
+			detect: "amazon",
+			validateFunc: func(c packages.Collector) {
+				l, ok := c.(*packages.Linux)
+				s.True(ok)
+				s.Equal("rpm", l.Manager)
+			},
+		},
+		{
+			name:   "alpine dispatches to Linux with no database",
+			detect: "alpine",
+			validateFunc: func(c packages.Collector) {
+				l, ok := c.(*packages.Linux)
+				s.True(ok)
+				s.Equal("", l.Manager)
 			},
 		},
 		{
 			name:   "unknown dispatches to Linux",
 			detect: "",
 			validateFunc: func(c packages.Collector) {
-				_, ok := c.(*packages.Linux)
+				l, ok := c.(*packages.Linux)
 				s.True(ok)
+				s.Equal("", l.Manager)
 			},
 		},
 	}
@@ -194,6 +195,20 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux arch: no package database, an empty list",
+			variant: "linux",
+			detect:  "arch",
+			exec: func(t *testing.T) source.Runner {
+				return sourcemocks.NewMockRunner(gomock.NewController(t))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
+		},
 		{
 			name:    "linux debian: dpkg-query returns packages",
 			variant: "linux",
@@ -613,10 +628,9 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			var c packages.Collector
 			switch tt.variant {
 			case "linux":
-				l := &packages.Linux{Exec: tt.exec(s.T()), Manager: "dpkg"}
-				if tt.detect != "debian" {
-					l.Manager = "rpm"
-				}
+				l, ok := packages.New().(*packages.Linux)
+				s.Require().True(ok)
+				l.Exec = tt.exec(s.T())
 				c = l
 			case "darwin":
 				c = &packages.Darwin{Exec: tt.exec(s.T())}

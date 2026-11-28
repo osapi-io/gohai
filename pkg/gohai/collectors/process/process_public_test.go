@@ -124,12 +124,13 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 	const psArgs = "ps -ax -ww -o pid=,args="
 
 	tests := []struct {
-		name    string
-		variant string
-		files   map[string]string
-		runner  sourcetest.Commands
-		want    *process.Info
-		wantErr string
+		name      string
+		variant   string
+		files     map[string]string
+		runner    sourcetest.Commands
+		cancelled bool // the context is cancelled before Collect
+		want      *process.Info
+		wantErr   string
 	}{
 		{
 			name:    "linux: /proc, with owners and start times",
@@ -228,6 +229,13 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			runner:  sourcetest.Commands{Err: map[string]error{psMain: errors.New("boom")}},
 			wantErr: "ps: boom",
 		},
+		{
+			name:      "linux: a cancelled context is the error, with no snapshot",
+			variant:   "linux",
+			files:     map[string]string{"/proc/1/stat": "1 (init) S 0\n"},
+			cancelled: true,
+			wantErr:   context.Canceled.Error(),
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -241,7 +249,12 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &process.Darwin{Exec: tt.runner.Mock(s.T())}
 			}
-			got, err := c.Collect(context.Background(), nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancelled {
+				cancel()
+			}
+			got, err := c.Collect(ctx, nil)
 			if tt.wantErr != "" {
 				s.ErrorContains(err, tt.wantErr)
 
@@ -335,18 +348,4 @@ func (s *ProcessPublicTestSuite) TestRead() {
 			s.Equal(tt.want, got)
 		})
 	}
-}
-
-func (s *ProcessPublicTestSuite) TestCollectCancelled() {
-	c := &process.Linux{
-		FS: sourcetest.FS(s.T(), map[string]string{
-			"/proc/1/stat": "1 (init) S 0\n",
-		}),
-		Now: time.Now,
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	got, err := c.Collect(ctx, nil)
-	s.ErrorIs(err, context.Canceled)
-	s.Nil(got)
 }
