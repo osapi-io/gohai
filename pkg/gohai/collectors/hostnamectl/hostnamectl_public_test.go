@@ -328,12 +328,12 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a hostnamectl with no systemd bus yields empty Info, no error",
+			name:    "linux: a host not booted with systemd yields empty Info, no error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				return hostnamectlExec(t, nil, errors.New(
 					"hostnamectl: exit status 1: System has not been booted with systemd as init system (PID 1). "+
-						"Can't operate.\nFailed to connect to bus: Host is down",
+						"Can't operate.",
 				))
 			},
 			validateFunc: func(got any, err error) {
