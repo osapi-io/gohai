@@ -29,10 +29,10 @@ package alibaba
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -335,12 +335,10 @@ func (w *walker) walk(
 			if err != nil {
 				return nil, err
 			}
-			var jv any
-			if json.Unmarshal(leaf, &jv) == nil {
-				result[key] = jv
-			} else {
-				result[key] = strings.TrimSpace(string(leaf))
-			}
+			// A leaf is kept as its text. Decoding it as JSON would turn a
+			// numeric leaf, such as owner-account-id, into a float64 that
+			// strVal drops and that loses digits above 2^53.
+			result[key] = strings.TrimSpace(string(leaf))
 		}
 	}
 	return result, nil
@@ -533,17 +531,17 @@ func strVal(
 	return ""
 }
 
-// intVal returns the integer value at key. json.Unmarshal parses
-// JSON numbers as float64, so that is the only dynamic type we handle.
-// Any other type (absent, string, nested map) returns 0.
+// intVal returns the integer value of the leaf at key. A leaf that is
+// absent, is not text, or does not parse as an integer returns 0.
 func intVal(
 	m map[string]any,
 	key string,
 ) int64 {
-	if v, ok := m[key].(float64); ok {
-		return int64(v)
+	v, err := strconv.ParseInt(strVal(m, key), 10, 64)
+	if err != nil {
+		return 0
 	}
-	return 0
+	return v
 }
 
 // splitSpace splits whitespace-separated entries. Empty / whitespace-
