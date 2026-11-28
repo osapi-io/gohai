@@ -155,7 +155,7 @@ On Linux:
    table. The collector changes the octal escapes of the file, such as `\040`
    for a space, back to characters. `df -akP` gives the capacity, used and
    available bytes of each mount. `df -aiP` gives the inode counts
-   (`inodes_total`, `inodes_used`, `inodes_available`). When `total > 0`, the
+   (`inodes_total`, `inodes_used`, `inodes_free`). When `total > 0`, the
    collector calculates `inodes_used_percent` as `used / total * 100`. Thus
    gohai also has Ohai's `filesystem[mount][:inodes_percent_used]` field. See
    [Network mounts](#network-mounts).
