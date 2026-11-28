@@ -37,7 +37,7 @@ type Hooks struct {
 	// OnError is invoked when a collector's Collect returns an error or
 	// panics.
 	// Called from the collector's goroutine, concurrent with other
-	// collectors in the same level.
+	// collectors.
 	OnError func(name string, err error)
 	// OnComplete is invoked after every collector's Collect returns,
 	// regardless of success or failure, with the wall-clock duration
@@ -46,8 +46,7 @@ type Hooks struct {
 	// OnStatus is invoked once for each collector that ran, or that did not
 	// run because a dependency failed, with its status and its error. The
 	// error of StatusUnsupported is ErrUnsupported. Called from the
-	// collector's goroutine, concurrent with other collectors in the same
-	// level.
+	// collector's goroutine, concurrent with other collectors.
 	OnStatus func(name string, status Status, err error)
 }
 
@@ -191,12 +190,14 @@ func (r *Registry) SelectedWith(
 }
 
 // Run executes the named collectors in dependency order. Dependencies are
-// auto-included even if not in the names list. Collectors at the same level
-// (no inter-dependencies) run concurrently. Returns a map of collector name
-// to result. Failed collectors are omitted from the result map, and their
-// error goes to hooks.OnError. A panic in a collector is its error, a
-// *PanicError. A ctx cancelled before Run returns, in any level, is ctx's
-// error, and no next level starts. Run then also returns the results of the
+// auto-included even if not in the names list. Each collector starts when its
+// own dependencies finish, not when every collector of an earlier level does,
+// so a dependent does not wait for a slow collector it does not need, and
+// collectors with no path between them run concurrently. Returns a map of
+// collector name to result. Failed collectors are omitted from the result
+// map, and their error goes to hooks.OnError. A panic in a collector is its
+// error, a *PanicError. A ctx cancelled before Run returns is ctx's error,
+// and no collector starts after it. Run then also returns the results of the
 // collectors that finished, so that a caller can tell which facts it has.
 // hooks may be zero-valued; any non-nil field is invoked per collector.
 func (r *Registry) Run(
@@ -209,76 +210,104 @@ func (r *Registry) Run(
 		return nil, err
 	}
 
+	// waiting is the number of unfinished dependencies of each collector,
+	// and dependents is the collectors that wait for each one.
+	waiting := make(map[string]int, len(collectors))
+	dependents := make(map[string][]string, len(collectors))
+	for name, c := range collectors {
+		for _, dep := range c.Dependencies() {
+			waiting[name]++
+			dependents[dep] = append(dependents[dep], name)
+		}
+	}
+
 	results := make(map[string]any, len(collectors))
 	failed := make(map[string]error, len(collectors))
-	var resultsMu sync.Mutex
+	var (
+		mu sync.Mutex
+		wg sync.WaitGroup
+	)
 
-	for _, level := range levels {
-		// A cancelled run starts no more collectors.
-		if err := ctx.Err(); err != nil {
-			return results, err
+	var start func(name string)
+	start = func(name string) {
+		// A cancelled run starts no more collectors, so their dependents
+		// do not start either.
+		if ctx.Err() != nil {
+			return
 		}
-		// Snapshot prior results once per level. Collectors at the
-		// same level have no inter-dependencies by definition, so
-		// they all see the same prior state, as the
-		// topological contract.
-		resultsMu.Lock()
+		c := collectors[name]
+		// Each dependency of c has finished, so prior holds the fact of
+		// each one that has a fact.
+		mu.Lock()
 		prior := make(PriorResults, len(results))
 		for k, v := range results {
 			prior[k] = v
 		}
-		failedBefore := make(map[string]error, len(failed))
-		for k, v := range failed {
-			failedBefore[k] = v
-		}
-		resultsMu.Unlock()
+		cerr := dependencyError(c, failed)
+		mu.Unlock()
 
-		var wg sync.WaitGroup
-		for _, name := range level {
-			c := collectors[name]
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				start := time.Now()
-				var out any
-				cerr := dependencyError(c, failedBefore)
-				if cerr == nil {
-					out, cerr = collect(ctx, c, prior)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			begin := time.Now()
+			var out any
+			if cerr == nil {
+				out, cerr = collect(ctx, c, prior)
+			}
+			dur := time.Since(begin)
+			status := StatusOf(out, cerr)
+			if hooks.OnStatus != nil {
+				hooks.OnStatus(c.Name(), status, cerr)
+			}
+			if status == StatusUnsupported {
+				// Nothing to read on this platform is not an error of
+				// the run, and a dependent runs without the fact.
+				out, cerr = nil, nil
+			}
+			if hooks.OnComplete != nil {
+				hooks.OnComplete(c.Name(), dur, cerr)
+			}
+			if cerr != nil && hooks.OnError != nil {
+				hooks.OnError(c.Name(), cerr)
+			}
+
+			var ready []string
+			mu.Lock()
+			// Only a collector with no fact stops its dependents. A partial
+			// one gives them the fact it read.
+			if cerr != nil && out == nil {
+				failed[c.Name()] = cerr
+			}
+			// A partial result keeps what the collector read before its
+			// error.
+			if out != nil {
+				results[c.Name()] = out
+			}
+			for _, d := range dependents[c.Name()] {
+				waiting[d]--
+				if waiting[d] == 0 {
+					ready = append(ready, d)
 				}
-				dur := time.Since(start)
-				status := StatusOf(out, cerr)
-				if hooks.OnStatus != nil {
-					hooks.OnStatus(c.Name(), status, cerr)
-				}
-				if status == StatusUnsupported {
-					// Nothing to read on this platform is not an error of
-					// the run, and a dependent runs without the fact.
-					out, cerr = nil, nil
-				}
-				if hooks.OnComplete != nil {
-					hooks.OnComplete(c.Name(), dur, cerr)
-				}
-				if cerr != nil && hooks.OnError != nil {
-					hooks.OnError(c.Name(), cerr)
-				}
-				resultsMu.Lock()
-				defer resultsMu.Unlock()
-				// Only a collector with no fact stops its dependents. A partial
-				// one gives them the fact it read.
-				if cerr != nil && out == nil {
-					failed[c.Name()] = cerr
-				}
-				// A partial result keeps what the collector read before its
-				// error.
-				if out != nil {
-					results[c.Name()] = out
-				}
-			}()
-		}
-		wg.Wait()
+			}
+			mu.Unlock()
+
+			slices.Sort(ready)
+			for _, d := range ready {
+				start(d)
+			}
+		}()
 	}
-	// A ctx cancelled during the last level is an error too, as it is in
-	// an earlier one. The results show which facts finished.
+
+	// The first level is the collectors with no dependency.
+	if len(levels) > 0 {
+		for _, name := range levels[0] {
+			start(name)
+		}
+	}
+	wg.Wait()
+
+	// A ctx cancelled during the run is an error. The results show which
+	// facts finished.
 	if err := ctx.Err(); err != nil {
 		return results, err
 	}
@@ -286,7 +315,8 @@ func (r *Registry) Run(
 }
 
 // plan is the levels of names and their dependencies, and the collector of
-// each name. It holds the registry's lock only while it reads, so that a
+// each name. The levels find a dependency cycle, and the first level is the
+// collectors that Run starts first. It holds the registry's lock only while it reads, so that a
 // Register does not wait for a whole run.
 func (r *Registry) plan(
 	names []string,
@@ -405,8 +435,8 @@ func (r *Registry) topoLevels(
 	return levels, nil
 }
 
-// dependencyError is the error of a collector whose dependency failed in an
-// earlier level, or nil when each dependency succeeded. A collector that
+// dependencyError is the error of a collector whose dependency failed with no
+// fact, or nil when each dependency succeeded. A collector that
 // failed this way is itself failed, so its own dependents do not run either.
 func dependencyError(
 	c Collector,
