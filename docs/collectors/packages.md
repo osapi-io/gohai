@@ -92,11 +92,11 @@ finds:
 **On Linux (RHEL/Fedora/SUSE and all non-debian distros):**
 
 1. The collector runs
-   `rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\n'`.
+   `rpm -qa --qf '%{NAME}\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\t%{ARCH}\n'`.
 2. It parses the tab-delimited output, one package on each line.
 3. It skips malformed lines and entries with an empty name.
-4. The version string has the release component (`5.1-6.el9`), as rpm reports
-   it.
+4. The version string has the release component (`5.1-6.el9`), and the epoch
+   first when the package has one (`1:3.2.4-3.fc42`), as rpm and dnf print it.
 
 **On macOS:**
 
