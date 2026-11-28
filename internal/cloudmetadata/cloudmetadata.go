@@ -169,17 +169,6 @@ func WithTimeout(
 	return func(c *Client) { c.httpClient.Timeout = d }
 }
 
-// WithHTTPClient swaps the underlying http.Client wholesale. Tests
-// rarely need this: pointing baseURL at an httptest.Server exercises
-// the full HTTP round-trip via the default client. Reserved for
-// advanced cases (custom Transport for TLS-on-metadata, retry
-// wrappers, etc.).
-func WithHTTPClient(
-	h *http.Client,
-) Option {
-	return func(c *Client) { c.httpClient = h }
-}
-
 // Get fetches baseURL + path and returns the response body on 2xx.
 // Wraps transport failures and non-2xx responses in ErrNotAvailable
 // so callers can branch with errors.Is.
