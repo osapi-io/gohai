@@ -24,12 +24,14 @@ package timezone
 
 import (
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
+	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // localtimePath is the standard symlink path on both Linux and macOS.
@@ -73,38 +75,81 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// clockZone is the abbreviation and offset of the clock's time. Shared
-// by both variants.
+// clockZone is the abbreviation and offset of the clock's time in the zone
+// of the host's /etc/localtime, read through fs, so that a change of zone
+// shows at the next collection, and a fake filesystem gives its own zone.
+// When the file cannot be read or parsed, it is the process's local zone.
 func clockZone(
+	fs avfs.VFS,
 	now func() time.Time,
 ) (string, int) {
-	return now().Zone()
+	t := now()
+	if fs != nil {
+		if data, err := fs.ReadFile(localtimePath); err == nil {
+			if loc, err := time.LoadLocationFromTZData("localtime", data); err == nil {
+				return t.In(loc).Zone()
+			}
+		}
+	}
+
+	return t.Zone()
 }
 
-// resolveName tries readlink(localtimePath) first; on hosts where
-// /etc/localtime is a copied file (Debian/Ubuntu installer output,
-// container images) falls back to the file named by the `fallback`
-// reader. Returns empty when neither source yields a name.
+// ianaName is the shape of an IANA zone name, such as Europe/Paris, Etc/UTC
+// or UTC.
+var ianaName = regexp.MustCompile(`^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$`)
+
+// zoneinfoDir is the directory part that precedes an IANA name in a zone
+// file's path, wherever the tzdata lives: /usr/share/zoneinfo/ on glibc,
+// /etc/zoneinfo/ on NixOS, /var/db/timezone/zoneinfo/ on macOS.
+const zoneinfoDir = "/zoneinfo/"
+
+// nameFromPath is the IANA name in a zone file's path: the part after the
+// last zoneinfo directory, or "" when the path has none or the rest is not
+// an IANA name.
+func nameFromPath(
+	path string,
+) string {
+	i := strings.LastIndex(path, zoneinfoDir)
+	if i < 0 {
+		return ""
+	}
+	name := path[i+len(zoneinfoDir):]
+	if !ianaName.MatchString(name) {
+		return ""
+	}
+
+	return name
+}
+
+// resolveName is the IANA name of the host's zone: from the target of the
+// /etc/localtime link, else from the first fallback that gives one. A
+// relative link, such as ../usr/share/zoneinfo/Etc/UTC on Ubuntu, is relative
+// to /etc. A name that is not IANA-shaped, such as a path, is not a name.
 func resolveName(
 	readlink func(string) (string, error),
-	fallback func() (string, error),
-	zoneinfoPrefix string,
+	fallbacks ...func() (string, error),
 ) string {
 	if target, err := readlink(localtimePath); err == nil {
-		// A relative link, such as ../usr/share/zoneinfo/Etc/UTC on Ubuntu,
-		// is relative to /etc. A target outside the zoneinfo directory is
-		// the name as the link gives it.
 		abs := target
 		if !filepath.IsAbs(abs) {
 			abs = filepath.Join(filepath.Dir(localtimePath), target)
 		}
-		if name, ok := strings.CutPrefix(abs, zoneinfoPrefix); ok {
+		if name := nameFromPath(abs); name != "" {
 			return name
 		}
-		return target
+		if ianaName.MatchString(target) {
+			return target
+		}
 	}
-	if name, err := fallback(); err == nil {
-		return strings.TrimSpace(name)
+	for _, fallback := range fallbacks {
+		name, err := fallback()
+		if err != nil {
+			continue
+		}
+		if name = strings.TrimSpace(name); ianaName.MatchString(name) {
+			return name
+		}
 	}
 	return ""
 }

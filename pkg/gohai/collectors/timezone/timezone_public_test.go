@@ -23,11 +23,13 @@ package timezone_test
 import (
 	"context"
 	"io/fs"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
+	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -113,6 +115,15 @@ func (s *TimezonePublicTestSuite) TestNew() {
 	}
 }
 
+// tzdata is a zone file from testdata, copied from Go's zoneinfo.zip.
+func (s *TimezonePublicTestSuite) tzdata(
+	name string,
+) []byte {
+	b, err := osfs.NewWithNoIdm().ReadFile(filepath.Join("testdata", name))
+	s.Require().NoError(err)
+	return b
+}
+
 func (s *TimezonePublicTestSuite) TestCollect() {
 	pdt := func() time.Time {
 		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PDT", -7*3600))
@@ -120,6 +131,8 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 	pst := func() time.Time {
 		return time.Date(2026, 4, 12, 12, 0, 0, 0, time.FixedZone("PST", -8*3600))
 	}
+	utc := func() time.Time { return time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC) }
+	tokyo := s.tzdata("Asia_Tokyo")
 
 	tests := []struct {
 		name         string
@@ -272,6 +285,185 @@ func (s *TimezonePublicTestSuite) TestCollect() {
 				s.Equal("", info.Name)
 				s.Equal("PST", info.Abbrev)
 				s.Equal(-8*3600, info.Offset)
+			},
+		},
+		{
+			name:    "linux: a copied /etc/localtime gives the zone's abbreviation and offset",
+			variant: "linux",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc", 0o755))
+				s.Require().NoError(f.WriteFile("/etc/localtime", tokyo, 0o644))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("", info.Name)
+				s.Equal("JST", info.Abbrev)
+				s.Equal(9*3600, info.Offset)
+			},
+		},
+		{
+			name:    "linux: a copied /etc/localtime and /etc/sysconfig/clock name the zone",
+			variant: "linux",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc", 0o755))
+				s.Require().NoError(f.WriteFile("/etc/localtime", tokyo, 0o644))
+				s.Require().NoError(f.MkdirAll("/etc/sysconfig", 0o755))
+				s.Require().
+					NoError(f.WriteFile("/etc/sysconfig/clock", []byte("# comment\nZONE=\"Asia/Tokyo\"\nUTC=true\n"), 0o644))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("Asia/Tokyo", info.Name)
+				s.Equal("JST", info.Abbrev)
+				s.Equal(9*3600, info.Offset)
+			},
+		},
+		{
+			name:    "linux: /etc/timezone that is not a name gives way to /etc/sysconfig/clock",
+			variant: "linux",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc", 0o755))
+				s.Require().NoError(f.WriteFile("/etc/timezone", []byte("not a zone\n"), 0o644))
+				s.Require().NoError(f.MkdirAll("/etc/sysconfig", 0o755))
+				s.Require().
+					NoError(f.WriteFile("/etc/sysconfig/clock", []byte("ZONE=Europe/Paris\n"), 0o644))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("Europe/Paris", info.Name)
+				s.Equal("UTC", info.Abbrev)
+				s.Equal(0, info.Offset)
+			},
+		},
+		{
+			name:    "linux: /etc/sysconfig/clock with no ZONE line gives no name",
+			variant: "linux",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc/sysconfig", 0o755))
+				s.Require().
+					NoError(f.WriteFile("/etc/sysconfig/clock", []byte("UTC=true\n"), 0o644))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("", info.Name)
+				s.Equal("UTC", info.Abbrev)
+				s.Equal(0, info.Offset)
+			},
+		},
+		{
+			name:    "linux: a /etc/localtime that is not zone data uses the clock's zone",
+			variant: "linux",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc", 0o755))
+				s.Require().NoError(f.WriteFile("/etc/localtime", []byte("garbage"), 0o644))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("", info.Name)
+				s.Equal("UTC", info.Abbrev)
+				s.Equal(0, info.Offset)
+			},
+		},
+		{
+			name:    "linux: NixOS's link under /etc/zoneinfo gives the name",
+			variant: "linux",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc", 0o755))
+				s.Require().NoError(f.Symlink("/etc/zoneinfo/Europe/Paris", "/etc/localtime"))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("Europe/Paris", info.Name)
+				s.Equal("UTC", info.Abbrev)
+				s.Equal(0, info.Offset)
+			},
+		},
+		{
+			name:    "linux: a link to a path with no zoneinfo directory gives no name",
+			variant: "linux",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc", 0o755))
+				s.Require().NoError(f.Symlink("/opt/tz/custom.file", "/etc/localtime"))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("", info.Name)
+				s.Equal("UTC", info.Abbrev)
+				s.Equal(0, info.Offset)
+			},
+		},
+		{
+			name:    "linux: a link whose zoneinfo part is not a name gives no name",
+			variant: "linux",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc", 0o755))
+				s.Require().NoError(f.Symlink("/usr/share/zoneinfo/not a zone", "/etc/localtime"))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("", info.Name)
+				s.Equal("UTC", info.Abbrev)
+				s.Equal(0, info.Offset)
+			},
+		},
+		{
+			name:    "darwin: a link under a versioned zoneinfo directory gives the name",
+			variant: "darwin",
+			now:     utc,
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/etc", 0o755))
+				s.Require().
+					NoError(f.Symlink("/var/db/timezone/tz/2024a.1.0/zoneinfo/Asia/Tokyo", "/etc/localtime"))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*timezone.Info)
+				s.Require().True(ok)
+				s.Equal("Asia/Tokyo", info.Name)
+				s.Equal("UTC", info.Abbrev)
+				s.Equal(0, info.Offset)
 			},
 		},
 	}
