@@ -52,18 +52,12 @@ func readOSRelease(
 	if err != nil {
 		return
 	}
-	for _, line := range strings.Split(string(b), "\n") {
-		key, value, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		value = strings.Trim(strings.TrimSpace(value), `"'`)
-		switch key {
-		case "ID":
-			info.Name = family.Platform(value)
-		case "VERSION_ID":
-			info.Version = value
-		}
+	pairs := family.ParseOSRelease(b)
+	if id, ok := pairs["ID"]; ok {
+		info.Name = family.Platform(id)
+	}
+	if version, ok := pairs["VERSION_ID"]; ok {
+		info.Version = version
 	}
 	info.Family = family.Of(info.Name)
 }

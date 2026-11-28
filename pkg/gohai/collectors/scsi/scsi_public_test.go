@@ -232,14 +232,11 @@ malformed
 			},
 		},
 		{
-			name:    "darwin: returns empty",
+			name:    "darwin: no fact",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				info, ok := got.(*scsi.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Empty(info.Devices)
+				s.Nil(got)
 			},
 		},
 	}

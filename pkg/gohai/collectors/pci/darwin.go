@@ -26,11 +26,11 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin returns an empty Info. macOS exposes PCI topology through
-// IOKit (reachable via `ioreg -p IODeviceTree -c IOPCIDevice -l`) but
-// Ohai's pci plugin is Linux-only and the shape it emits is built
-// around Linux's sysfs/lspci model; we match that scope by not
-// implementing Darwin.
+// Darwin returns no fact, as each collector does on a platform it does not
+// support. macOS exposes PCI topology through IOKit (reachable via
+// `ioreg -p IODeviceTree -c IOPCIDevice -l`), but Ohai's pci plugin is
+// Linux-only and the shape it emits is built around Linux's sysfs and lspci
+// model, so gohai has the same scope.
 type Darwin struct {
 	base
 }
@@ -40,10 +40,10 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect returns an empty Info on macOS.
+// Collect returns no fact on macOS.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return &Info{Devices: map[string]Device{}}, nil
+	return nil, nil
 }

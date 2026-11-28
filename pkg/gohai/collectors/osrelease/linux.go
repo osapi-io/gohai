@@ -57,5 +57,5 @@ func (l *Linux) Collect(
 		}
 		return nil, err
 	}
-	return parseOSRelease(string(b)), nil
+	return parseOSRelease(b), nil
 }

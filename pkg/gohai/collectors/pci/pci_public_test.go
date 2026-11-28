@@ -98,11 +98,11 @@ func (s *PCIPublicTestSuite) TestCollect() {
 	const ids = "10de  NVIDIA Corporation\n\t1c82  GP107\nC 03  Display controller\n\t00  VGA compatible controller\n"
 	dev := "/sys/bus/pci/devices/"
 	tests := []struct {
-		name    string
-		variant string
-		files   map[string]string
-		links   map[string]string
-		want    map[string]pci.Device
+		name         string
+		variant      string
+		files        map[string]string
+		links        map[string]string
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: each device by address; a driver named unknown is empty",
@@ -117,33 +117,42 @@ func (s *PCIPublicTestSuite) TestCollect() {
 				dev + "0000:01:00.0/driver": "../../../bus/pci/drivers/nvidia",
 				dev + "0000:02:00.0/driver": "../../../bus/pci/drivers/unknown",
 			},
-			want: map[string]pci.Device{
-				"0000:01:00.0": {
-					VendorID: "10de", VendorName: "NVIDIA Corporation",
-					DeviceID: "1c82", DeviceName: "GP107",
-					ClassID: "03", ClassName: "Display controller",
-					SubclassID: "00", SubclassName: "VGA compatible controller",
-					SubsystemID: "3764", SubsystemName: "unknown",
-					Revision: "0xa1", Driver: "nvidia",
-				},
-				"0000:02:00.0": {
-					VendorID: "10de", VendorName: "NVIDIA Corporation",
-					DeviceID: "1c82", DeviceName: "GP107",
-					ClassID: "03", ClassName: "Display controller",
-					SubclassID: "00", SubclassName: "VGA compatible controller",
-					SubsystemID: "3764", SubsystemName: "unknown",
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&pci.Info{Devices: map[string]pci.Device{
+					"0000:01:00.0": {
+						VendorID: "10de", VendorName: "NVIDIA Corporation",
+						DeviceID: "1c82", DeviceName: "GP107",
+						ClassID: "03", ClassName: "Display controller",
+						SubclassID: "00", SubclassName: "VGA compatible controller",
+						SubsystemID: "3764", SubsystemName: "unknown",
+						Revision: "0xa1", Driver: "nvidia",
+					},
+					"0000:02:00.0": {
+						VendorID: "10de", VendorName: "NVIDIA Corporation",
+						DeviceID: "1c82", DeviceName: "GP107",
+						ClassID: "03", ClassName: "Display controller",
+						SubclassID: "00", SubclassName: "VGA compatible controller",
+						SubsystemID: "3764", SubsystemName: "unknown",
+					},
+				}}, got)
 			},
 		},
 		{
 			name:    "linux: no /sys/bus/pci",
 			variant: "linux",
-			want:    map[string]pci.Device{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&pci.Info{Devices: map[string]pci.Device{}}, got)
+			},
 		},
 		{
-			name:    "darwin: no PCI",
+			name:    "darwin: no fact",
 			variant: "darwin",
-			want:    map[string]pci.Device{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -154,9 +163,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 					FS: sourcetest.Links(s.T(), sourcetest.FS(s.T(), tt.files), tt.links),
 				}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			s.Equal(&pci.Info{Devices: tt.want}, got)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }
