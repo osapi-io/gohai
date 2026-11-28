@@ -11,7 +11,9 @@ dependencies:
 - `systemd`. The `systemctl` commands, and unit files under
   `/etc/systemd/system/`.
 - `upstart`. `initctl`, and `/etc/init/*.conf`.
-- `sysvinit`. Classic `/etc/init.d/*` scripts and runlevels.
+- `init`. sysvinit, with classic `/etc/init.d/*` scripts and runlevels, or
+  upstart on an old Ubuntu, or busybox. Each runs PID 1 as `init`, so the comm
+  does not tell which one it is.
 - `openrc`. Gentoo and Alpine. `rc-service`, `/etc/init.d/` and the OpenRC
   configuration.
 - `runit`. Void Linux and Artix. The `sv` command.
@@ -84,10 +86,10 @@ None.
 On Linux:
 
 1. The collector reads `/proc/1/comm` through the injected `avfs.VFS` and
-   removes the whitespace. Then it applies a small normalization table: `init`
-   becomes `sysvinit`, and `openrc-init` becomes `openrc`. Other values do not
-   change. Ohai's `init_package.rb` reads the same file. gohai adds the
-   canonicalization step, which Ohai does not do.
+   removes the whitespace. Then `openrc-init` becomes `openrc`. Other values do
+   not change, `init` included: sysvinit, upstart and busybox all run PID 1 as
+   `init`. Ohai's `init_package.rb` reads the same file and does not change its
+   value.
 
 On macOS, the value is always `launchd`, because Darwin has no other init
 system. Ohai's `init_package.rb` is for Linux only and returns nothing on macOS.

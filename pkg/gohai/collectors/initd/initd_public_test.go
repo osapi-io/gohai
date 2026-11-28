@@ -156,14 +156,14 @@ func (s *InitPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: sysvinit (comm=init) normalized",
+			name:    "linux: comm init stays init, because sysvinit, upstart and busybox all use it",
 			variant: "linux",
 			comm:    "init\n",
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*initd.Info)
 				s.Require().True(ok)
-				s.Equal(initd.Info{Name: "sysvinit"}, *info)
+				s.Equal(initd.Info{Name: "init"}, *info)
 			},
 		},
 		{

@@ -177,7 +177,8 @@ ______________________________________________________________________
 
 ### init_system (`init.name`)
 
-- **What:** Init system name (systemd, launchd, upstart, sysvinit).
+- **What:** Init system name (systemd, launchd, openrc, runit, or `init` for
+  sysvinit, upstart and busybox).
 - **Security relevance:** Determines service management capabilities. CIS
   benchmark applicability differs by init system.
 - **OCSF object:** `device`
