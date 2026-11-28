@@ -622,6 +622,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		{
 			name:      "linux: with no package manager the list is empty",
 			variant:   "linux",
+			detect:    "debian",
 			exec:      func(*testing.T) source.Runner { return source.Commands() },
 			noManager: true,
 			validateFunc: func(got any, err error) {
