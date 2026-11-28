@@ -52,7 +52,7 @@ func (d *Darwin) Collect(
 ) (any, error) {
 	b, err := d.FS.ReadFile(etcShellsPath)
 	if err != nil {
-		return wrapReadError(err)
+		return collector.Result(wrapReadError(err))
 	}
 	return parseShells(b), nil
 }

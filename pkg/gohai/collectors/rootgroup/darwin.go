@@ -49,5 +49,5 @@ func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return resolveRootGroup(d.FS)
+	return collector.Result(resolveRootGroup(d.FS))
 }
