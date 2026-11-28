@@ -330,6 +330,12 @@ gateway. A host with no `netstat` has no counters and no routes, and a `netstat`
 that runs and fails is an error. Encapsulation and the OpenVZ merge are Linux
 only.
 
+When a read after the interfaces fails, such as `ip route`, `ethtool`,
+`ip -d link`, `ip neigh show` or a `netstat`, the collector keeps the facts of
+the other reads. It returns them with the joined error, and its status is
+`partial`. Thus a container where `ip neigh` fails still has its interfaces. A
+failed read of the interfaces themselves gives no fact.
+
 ## Backing library
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs). The virtual file

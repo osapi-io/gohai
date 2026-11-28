@@ -366,9 +366,11 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				return m
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				// The failed detail is the error, and the result is partial.
+				s.EqualError(err, "mdadm --detail /dev/md127: exit status 1")
 				info, ok := got.(*mdadm.Info)
 				s.Require().True(ok)
+				s.Require().NotNil(info)
 				s.Require().Len(info.Arrays, 2)
 				s.Equal("md0", info.Arrays[0].Device)
 				s.Equal("raid1", info.Arrays[0].Level)

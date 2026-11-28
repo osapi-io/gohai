@@ -26,6 +26,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -285,6 +286,7 @@ func collectArrays(
 	sort.Strings(names)
 
 	arrays := make([]Array, 0, len(names))
+	var errs []error
 	for _, name := range names {
 		arr := devices[name]
 		if exec != nil {
@@ -295,10 +297,14 @@ func collectArrays(
 			case ctx.Err() != nil:
 				return nil, fmt.Errorf("mdadm --detail /dev/%s: %w", name, ctx.Err())
 			case !collector.Absent(execErr):
-				arr.DetailError = fmt.Sprintf("mdadm --detail /dev/%s: %v", name, execErr)
+				err := fmt.Errorf("mdadm --detail /dev/%s: %w", name, execErr)
+				arr.DetailError = err.Error()
+				errs = append(errs, err)
 			}
 		}
 		arrays = append(arrays, *arr)
 	}
-	return arrays, nil
+	// An array whose detail failed keeps its mdstat facts and its
+	// DetailError: the result is partial, with each failure joined.
+	return arrays, errors.Join(errs...)
 }

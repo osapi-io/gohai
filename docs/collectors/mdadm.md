@@ -13,8 +13,9 @@ If `mdadm` is not installed, the collector returns the arrays with only the
 devices from `/proc/mdstat`. If `/proc/mdstat` is missing, the collector returns
 an empty array list and no error. If `mdadm --detail` fails for an array, such
 as an inactive array, that array keeps its `/proc/mdstat` devices and reports
-the failure in `detail_error`. The other arrays keep their details. A cancelled
-context is an error.
+the failure in `detail_error`. The other arrays keep their details. The
+collector returns the arrays and the joined error of each failed detail, so its
+status is `partial`. A cancelled context is an error with no fact.
 
 The method of the collector is the same as Ohai's `mdadm` plugin. It reads
 `/proc/mdstat` first. Then it calls `mdadm --detail` for each array to get the

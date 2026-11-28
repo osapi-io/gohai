@@ -670,7 +670,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "linux: an ethtool run that fails for another reason is an error",
+			name:       "linux: an ethtool run that fails for another reason keeps the interfaces",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: sourcetest.FS(s.T(), map[string]string{
@@ -680,7 +680,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
 				m.EXPECT().
-					Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Execute(gomock.Any(), "ip", gomock.Any()).
 					Return(nil, errAbsent).
 					AnyTimes()
 				m.EXPECT().
@@ -689,9 +689,20 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
 				s.ErrorContains(err, "ethtool -i eth0:")
 				s.ErrorContains(err, "Operation not permitted")
+				// The interfaces read before ethtool stay.
+				info, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().Len(info.Interfaces, 2)
+				for _, iface := range info.Interfaces {
+					s.Nil(iface.Ethtool)
+				}
+				s.Contains(
+					[]string{info.Interfaces[0].Name, info.Interfaces[1].Name},
+					"eth0",
+				)
 			},
 		},
 		{
@@ -1624,24 +1635,32 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "linux: a failed ip -4 route is an error",
+			name:       "linux: a failed ip -4 route is a partial result",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs:         sourcetest.FS(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, errors.New("exit status 2"), nil, errAbsent),
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
+				// The interfaces read before the failure stay.
+				info, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Len(info.Interfaces, 2)
 				s.EqualError(err, "ip -o -4 route show: exit status 2")
 			},
 		},
 		{
-			name:       "linux: a failed ip -6 route with IPv6 on is an error",
+			name:       "linux: a failed ip -6 route with IPv6 on is a partial result",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs:         sourcetest.FS(s.T(), map[string]string{"/proc/net/if_inet6": ""}),
 			exec:       ipRouteExec(s.T(), nil, nil, nil, errors.New("exit status 2")),
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
+				// The interfaces read before the failure stay.
+				info, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Len(info.Interfaces, 2)
 				s.EqualError(err, "ip -o -6 route show: exit status 2")
 			},
 		},
@@ -1664,7 +1683,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "linux: a failed ip -d link is an error",
+			name:       "linux: a failed ip -d link is a partial result",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs:         sourcetest.FS(s.T(), nil),
@@ -1681,12 +1700,16 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
+				// The interfaces read before the failure stay.
+				info, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Len(info.Interfaces, 2)
 				s.EqualError(err, "ip -d link: exit status 1")
 			},
 		},
 		{
-			name:       "linux: a failed ip neigh show is an error",
+			name:       "linux: a failed ip neigh show is a partial result",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs:         sourcetest.FS(s.T(), nil),
@@ -1697,7 +1720,11 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
+				// The interfaces read before the failure stay.
+				info, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Len(info.Interfaces, 2)
 				s.EqualError(err, "ip neigh show: exit status 1")
 			},
 		},
@@ -1858,7 +1885,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: a netstat -ibdnW that fails is an error",
+			name:    "darwin: a netstat -ibdnW that fails is a partial result",
 			variant: "darwin",
 			runner: &sourcetest.Commands{
 				Out: map[string]string{
@@ -1867,12 +1894,17 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				Err: map[string]error{"netstat -ibdnW": errors.New("exit status 1")},
 			},
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
+				// The interfaces read before the failure stay.
+				info, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().Len(info.Interfaces, 1)
+				s.Equal("en0", info.Interfaces[0].Name)
 				s.EqualError(err, "netstat -ibdnW: exit status 1")
 			},
 		},
 		{
-			name:    "darwin: a netstat -rn that fails is an error",
+			name:    "darwin: a netstat -rn that fails is a partial result",
 			variant: "darwin",
 			runner: &sourcetest.Commands{
 				Out: map[string]string{
@@ -1881,7 +1913,12 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				Err: map[string]error{"netstat -rn": errors.New("exit status 1")},
 			},
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
+				// The interfaces read before the failure stay.
+				info, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().Len(info.Interfaces, 1)
+				s.Equal("en0", info.Interfaces[0].Name)
 				s.EqualError(err, "netstat -rn: exit status 1")
 			},
 		},

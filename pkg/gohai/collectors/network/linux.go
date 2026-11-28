@@ -22,6 +22,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -90,8 +91,11 @@ func (l *Linux) Collect(
 	if l.Exec == nil {
 		return info, nil
 	}
+	// A read after the interfaces that fails keeps the facts of the others:
+	// the result is partial, with each failure joined.
+	var errs []error
 	if err := applyRoutes(ctx, l.FS, l.Exec, info); err != nil {
-		return nil, err
+		errs = append(errs, err)
 	}
 	budget := l.ethtoolBudget
 	if budget == 0 {
@@ -104,24 +108,23 @@ func (l *Linux) Collect(
 	}
 	cancel()
 	if err != nil {
-		return nil, err
+		errs = append(errs, err)
 	}
 	// A spent budget stops ethtool on purpose; a done ctx is an error.
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("ethtool: %w", err)
 	}
 	if err := applyIPLinkExtras(ctx, l.Exec, info); err != nil {
-		return nil, err
+		errs = append(errs, err)
 	}
 	out, err := l.Exec.Execute(ctx, "ip", "neigh", "show")
 	switch {
 	case err == nil:
 		info.Neighbours = parseIPNeigh(out)
 	case !collector.Absent(err):
-		return nil, fmt.Errorf("ip neigh show: %w", err)
+		errs = append(errs, fmt.Errorf("ip neigh show: %w", err))
 	}
-
-	return info, nil
+	return info, errors.Join(errs...)
 }
 
 // ethtoolTarget reports whether ethtool runs for the interface: an
