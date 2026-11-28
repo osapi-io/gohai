@@ -28,7 +28,8 @@ import (
 
 // Info holds the machine ID.
 type Info struct {
-	ID string `json:"id"` // stable host identifier, which a reboot does not change
+	ID     string `json:"id"`               // stable host identifier, which a reboot does not change
+	Source string `json:"source,omitempty"` // where the ID came from: a file path on Linux, IOPlatformUUID on macOS
 }
 
 // Collector is the public interface every machine_id variant satisfies.

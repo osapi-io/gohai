@@ -26,9 +26,10 @@ Limits:
 
 ## Collected fields
 
-| Field | Type   | Description                                    | Schema mapping                                                                                                                                                              |
-| ----- | ------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`  | string | The stable machine identifier, usually a UUID. | OCSF `device.uid`, the canonical OCSF host-identifier field (dictionary: "unique device identifier. Typically BIOS hardware identifier, machine id, or agent identifier."). |
+| Field    | Type   | Description                                                                | Schema mapping                                                                                                                                                              |
+| -------- | ------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`     | string | The stable machine identifier, usually a UUID.                             | OCSF `device.uid`, the canonical OCSF host-identifier field (dictionary: "unique device identifier. Typically BIOS hardware identifier, machine id, or agent identifier."). |
+| `source` | string | Where the ID came from: the file path on Linux, `IOPlatformUUID` on macOS. | None.                                                                                                                                                                       |
 
 ## Platform support
 
@@ -45,7 +46,8 @@ Limits:
 ```json
 {
   "machine_id": {
-    "id": "abc123def4567890abcdef1234567890"
+    "id": "abc123def4567890abcdef1234567890",
+    "source": "/etc/machine-id"
   }
 }
 ```
@@ -55,7 +57,8 @@ Limits:
 ```json
 {
   "machine_id": {
-    "id": "12345678-ABCD-EF01-2345-6789ABCDEF01"
+    "id": "12345678-ABCD-EF01-2345-6789ABCDEF01",
+    "source": "IOPlatformUUID"
   }
 }
 ```
@@ -90,10 +93,16 @@ None.
 
 On Linux:
 
-1. The collector reads `/etc/machine-id`. If that file is missing or empty, it
-   reads `/var/lib/dbus/machine-id`, the fallback in Ohai's `linux/machineid.rb`
-   for hosts older than systemd. Then it reads DMI
-   `/sys/class/dmi/id/product_uuid`, in lower case. The first value is `id`.
+1. The collector reads `/etc/machine-id`. If that file is missing or doesn't
+   hold an ID, it reads `/var/lib/dbus/machine-id`, the fallback in Ohai's
+   `linux/machineid.rb` for hosts older than systemd. Then it reads DMI
+   `/sys/class/dmi/id/product_uuid`, in lower case. The first valid value is
+   `id`, and its file path is `source`.
+2. A value from the two machine-id files is valid only when it has 32 hex
+   digits, as machine-id(5) says. Thus the `uninitialized` that systemd writes
+   on a first-boot image is not an ID, and the collector reads the next file.
+3. A missing file is skipped. A file that is there but can't be read, such as
+   `product_uuid` for a user that isn't root, is an error.
 
 On macOS:
 
