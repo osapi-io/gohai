@@ -21,7 +21,6 @@
 package platform
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"strings"
@@ -89,9 +88,8 @@ func applySwVers(
 	if err != nil {
 		return fmt.Errorf("sw_vers: %w", err)
 	}
-	sc := bufio.NewScanner(strings.NewReader(string(out)))
-	for sc.Scan() {
-		line := sc.Text()
+	for rawLine := range strings.Lines(string(out)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		i := strings.Index(line, ":")
 		if i < 0 {
 			continue

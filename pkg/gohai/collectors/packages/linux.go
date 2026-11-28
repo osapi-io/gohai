@@ -21,7 +21,6 @@
 package packages
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"strconv"
@@ -86,9 +85,8 @@ func collectDpkg(
 		return nil, fmt.Errorf("dpkg-query: %w", err)
 	}
 	info := &Info{Packages: []Package{}}
-	sc := bufio.NewScanner(strings.NewReader(string(out)))
-	for sc.Scan() {
-		parts := strings.Split(sc.Text(), "\t")
+	for rawLine := range strings.Lines(string(out)) {
+		parts := strings.Split(strings.TrimRight(rawLine, "\r\n"), "\t")
 		if len(parts) < 4 {
 			continue
 		}
@@ -125,15 +123,19 @@ func collectRPM(
 		return nil, fmt.Errorf("rpm -qa: %w", err)
 	}
 	info := &Info{Packages: []Package{}}
-	sc := bufio.NewScanner(strings.NewReader(string(out)))
-	for sc.Scan() {
-		parts := strings.Split(sc.Text(), "\t")
+	for rawLine := range strings.Lines(string(out)) {
+		parts := strings.Split(strings.TrimRight(rawLine, "\r\n"), "\t")
 		if len(parts) < 3 {
 			continue
 		}
 		name, version, arch := parts[0], parts[1], strings.TrimSpace(parts[2])
 		if name == "" {
 			continue
+		}
+		// rpm prints "(none)" for a package with no architecture, such
+		// as each gpg-pubkey.
+		if arch == "(none)" {
+			arch = ""
 		}
 		p := Package{Name: name, Version: version, Architecture: arch, PackageManager: "rpm"}
 		if len(parts) >= 5 {

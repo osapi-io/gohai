@@ -21,7 +21,6 @@
 package kernelmodules
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"regexp"
@@ -85,9 +84,8 @@ func parseKextstat(
 	b []byte,
 ) map[string]Module {
 	out := map[string]Module{}
-	sc := bufio.NewScanner(strings.NewReader(string(b)))
-	for sc.Scan() {
-		m := kextstatLine.FindStringSubmatch(sc.Text())
+	for rawLine := range strings.Lines(string(b)) {
+		m := kextstatLine.FindStringSubmatch(strings.TrimRight(rawLine, "\r\n"))
 		if m == nil {
 			continue
 		}

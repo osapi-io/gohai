@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"io/fs"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -150,6 +151,27 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 					{Number: "NMI", Type: "Non-maskable interrupts", CountsPerCPU: []int64{0, 0}},
 					{Number: "ERR", CountsPerCPU: []int64{0, 0}},
 				}, info.IRQs)
+			},
+		},
+		{
+			name:    "linux: a line over 64 KiB keeps the IRQs after it",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc", 0o755)
+				content := "           CPU0\n" +
+					"  0:         46   IO-APIC   2-edge      " + strings.Repeat("x", 70000) + "\n" +
+					"  1:          5   IO-APIC   1-edge      i8042\n"
+				_ = f.WriteFile("/proc/interrupts", []byte(content), fs.FileMode(0o444))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.IRQs, 2)
+				s.Equal("1", info.IRQs[1].Number)
+				s.Equal("i8042", info.IRQs[1].Device)
 			},
 		},
 		{

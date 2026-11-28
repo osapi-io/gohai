@@ -26,7 +26,6 @@
 package libvirt
 
 import (
-	"bufio"
 	"strconv"
 	"strings"
 
@@ -104,9 +103,8 @@ func parseVirshVersion(
 	output []byte,
 ) string {
 	var libraryVer string
-	sc := bufio.NewScanner(strings.NewReader(string(output)))
-	for sc.Scan() {
-		line := sc.Text()
+	for rawLine := range strings.Lines(string(output)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		if after, ok := strings.CutPrefix(line, "Running against daemon:"); ok {
 			return strings.TrimSpace(after)
 		}
@@ -144,9 +142,8 @@ func parseVirshList(
 	output []byte,
 ) []Domain {
 	var domains []Domain
-	sc := bufio.NewScanner(strings.NewReader(string(output)))
-	for sc.Scan() {
-		line := sc.Text()
+	for rawLine := range strings.Lines(string(output)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		fields := strings.Fields(line)
 		// A valid data row has at least 3 fields: id, name, state (possibly multi-word).
 		if len(fields) < 3 {
@@ -184,9 +181,8 @@ func parseVirshDominfo(
 	output []byte,
 	d *Domain,
 ) {
-	sc := bufio.NewScanner(strings.NewReader(string(output)))
-	for sc.Scan() {
-		line := sc.Text()
+	for rawLine := range strings.Lines(string(output)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		i := strings.Index(line, ":")
 		if i < 0 {
 			continue

@@ -207,11 +207,14 @@ UBUNTU_CODENAME=noble
 			},
 		},
 		{
-			name:    "linux: other read error propagated",
+			name:    "linux: other read error propagated, wrapped",
 			variant: "linux",
 			readErr: true,
 			validateFunc: func(_ any, err error) {
-				s.Error(err)
+				s.EqualError(
+					err,
+					"os-release: read /etc/os-release: read /etc/os-release: is a directory",
+				)
 			},
 		},
 		{

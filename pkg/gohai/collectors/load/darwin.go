@@ -54,5 +54,5 @@ func (d *Darwin) Collect(
 		return nil, fmt.Errorf("sysctl vm.loadavg: %w", err)
 	}
 
-	return parse(string(out))
+	return collector.Result(parse(string(out)))
 }

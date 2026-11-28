@@ -23,8 +23,6 @@
 package interrupts
 
 import (
-	"bufio"
-	"bytes"
 	"strconv"
 	"strings"
 
@@ -103,19 +101,18 @@ func NewWith(
 // in the trailing field but no vector or device.
 func parseInterrupts(
 	content []byte,
-) (*Info, error) {
-	scanner := bufio.NewScanner(bytes.NewReader(content))
-
-	// First line: "           CPU0       CPU1 ..."
-	if !scanner.Scan() {
-		return &Info{IRQs: []IRQ{}}, nil
-	}
-	header := scanner.Text()
-	cpuCount := len(strings.Fields(header))
-
+) *Info {
 	irqs := []IRQ{}
-	for scanner.Scan() {
-		line := scanner.Text()
+	// The first line is the CPU header: "           CPU0       CPU1 ...".
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB: a host with thousands of CPUs has such a line.
+	cpuCount := -1
+	for rawLine := range strings.Lines(string(content)) {
+		line := strings.TrimRight(rawLine, "\r\n")
+		if cpuCount < 0 {
+			cpuCount = len(strings.Fields(line))
+			continue
+		}
 
 		colonIdx := strings.Index(line, ":")
 		if colonIdx < 0 {
@@ -168,7 +165,7 @@ func parseInterrupts(
 		irqs = append(irqs, irq)
 	}
 
-	return &Info{IRQs: irqs}, nil
+	return &Info{IRQs: irqs}
 }
 
 // isTrigger reports whether field is the trigger word that arm64 prints

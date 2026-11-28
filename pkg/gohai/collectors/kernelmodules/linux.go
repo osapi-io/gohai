@@ -21,7 +21,6 @@
 package kernelmodules
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"strconv"
@@ -80,9 +79,8 @@ func parseProcModules(
 	b []byte,
 ) map[string]Module {
 	out := map[string]Module{}
-	sc := bufio.NewScanner(strings.NewReader(string(b)))
-	for sc.Scan() {
-		fields := strings.Fields(sc.Text())
+	for rawLine := range strings.Lines(string(b)) {
+		fields := strings.Fields(strings.TrimRight(rawLine, "\r\n"))
 		if len(fields) < 3 {
 			continue
 		}

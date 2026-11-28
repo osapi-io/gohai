@@ -21,7 +21,6 @@
 package memory
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"regexp"
@@ -120,9 +119,8 @@ func applyVMStat(
 	out []byte,
 ) {
 	pageSize := uint64(4096)
-	sc := bufio.NewScanner(strings.NewReader(string(out)))
-	for sc.Scan() {
-		line := sc.Text()
+	for rawLine := range strings.Lines(string(out)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		if m := vmStatPageSize.FindStringSubmatch(line); m != nil {
 			if ps, err := strconv.ParseUint(m[1], 10, 64); err == nil && ps > 0 {
 				pageSize = ps

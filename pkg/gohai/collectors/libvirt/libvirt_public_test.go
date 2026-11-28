@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -219,6 +220,34 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				s.Equal("11112222-3333-4444-5555-666677778888", stopped.UUID)
 				s.Equal(2, stopped.VCPUs)
 				s.False(stopped.Autostart)
+			},
+		},
+		{
+			name:    "linux: lines over 64 KiB in version, list and dominfo keep the lines after them",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				long := "Junk: " + strings.Repeat("x", 70000) + "\n"
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
+					Return([]byte(long+virshVersionOutput), nil).AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
+					Return([]byte(virshURIOutput), nil).AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
+					Return([]byte(long+virshListOutput), nil).AnyTimes()
+				m.EXPECT().
+					Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "dominfo", gomock.Any()).
+					Return([]byte(long+virshDominfoMyvm), nil).
+					AnyTimes()
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*libvirt.Info)
+				s.Require().True(ok)
+				s.Equal("10.0.0", i.Version)
+				s.Require().Len(i.Domains, 2)
+				s.Equal("aaaabbbb-cccc-dddd-eeee-ffffffffffff", i.Domains[0].UUID)
 			},
 		},
 		{

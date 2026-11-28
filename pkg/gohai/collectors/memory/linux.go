@@ -21,7 +21,6 @@
 package memory
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"strconv"
@@ -69,9 +68,8 @@ func readMeminfo(
 	raw []byte,
 ) *Info {
 	kv := map[string]uint64{}
-	sc := bufio.NewScanner(strings.NewReader(string(raw)))
-	for sc.Scan() {
-		if key, val, ok := parseMeminfoLine(sc.Text()); ok {
+	for rawLine := range strings.Lines(string(raw)) {
+		if key, val, ok := parseMeminfoLine(strings.TrimRight(rawLine, "\r\n")); ok {
 			kv[key] = val
 		}
 	}

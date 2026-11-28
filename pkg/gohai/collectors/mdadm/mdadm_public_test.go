@@ -27,6 +27,7 @@ import (
 	"io/fs"
 	"os/exec"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -238,6 +239,34 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 						Journal:      []string{},
 					},
 				}, info.Arrays)
+			},
+		},
+		{
+			name:    "linux: lines over 64 KiB in mdstat and --detail keep the lines after them",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc", 0o755)
+				content := append([]byte("junk "+strings.Repeat("x", 70000)+"\n"), mdstatRaid1...)
+				_ = f.WriteFile("/proc/mdstat", content, fs.FileMode(0o444))
+				return f
+			},
+			setupEx: func(t *testing.T) *mocks.MockRunner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				detail := append([]byte("Junk : "+strings.Repeat("x", 70000)+"\n"), detailRaid1...)
+				m.EXPECT().
+					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md0").
+					Return(detail, nil)
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Arrays, 1)
+				s.Equal("md0", info.Arrays[0].Device)
+				s.Equal("a5d3:1234:dead:beef", info.Arrays[0].UUID)
 			},
 		},
 		{

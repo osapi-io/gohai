@@ -23,8 +23,6 @@
 package mdadm
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -136,9 +134,8 @@ func parseMdstat(
 	content []byte,
 ) map[string]*Array {
 	devices := map[string]*Array{}
-	scanner := bufio.NewScanner(bytes.NewReader(content))
-	for scanner.Scan() {
-		line := scanner.Text()
+	for rawLine := range strings.Lines(string(content)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		// Lines with MD devices look like:
 		//   md0 : active raid1 sda1[0] sdb1[1]
 		//   md127 : inactive sdc1[0](S)
@@ -213,9 +210,8 @@ func applyDetail(
 	arr *Array,
 	detail []byte,
 ) {
-	scanner := bufio.NewScanner(bytes.NewReader(detail))
-	for scanner.Scan() {
-		line := scanner.Text()
+	for rawLine := range strings.Lines(string(detail)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		if m := raidLevelRE.FindStringSubmatch(line); m != nil {
 			arr.Level = m[1]
 		}

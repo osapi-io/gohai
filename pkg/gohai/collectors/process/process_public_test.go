@@ -224,11 +224,25 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			}},
 		},
 		{
+			name:    "darwin: a process in an uninterruptible wait (U) is blocked",
+			variant: "darwin",
+			runner: sourcetest.Commands{Out: map[string]string{
+				psMain: "  700     1 root     U     0.0  0.0     16 0:00.01 Thu Nov 20 12:04:00 2026\n",
+				psName: "  700 kernel_task\n",
+				psArgs: "  700 kernel_task\n",
+			}},
+			want: &process.Info{Count: 1, Processes: []process.Process{{
+				PID: 700, ParentPID: 1, Name: "kernel_task", Owner: "root", State: "blocked",
+				CmdLine: "kernel_task", CreationTime: started.Unix(), RSS: 16 * 1024,
+				CPUSeconds: 0.01,
+			}}},
+		},
+		{
 			name:    "darwin: no ps for the name and the args leaves them empty",
 			variant: "darwin",
 			runner: sourcetest.Commands{
 				Out: map[string]string{
-					psMain: "    7     1 john     U     0.0  0.0      0 x-1:00 Thu Nov 20 12:04:00 2026\n",
+					psMain: "    7     1 john     ?     0.0  0.0      0 x-1:00 Thu Nov 20 12:04:00 2026\n",
 				},
 			},
 			want: &process.Info{Count: 1, Processes: []process.Process{

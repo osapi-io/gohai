@@ -21,7 +21,6 @@
 package packages
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"strconv"
@@ -136,9 +135,8 @@ func parseBrew(
 	out string,
 ) *Info {
 	info := &Info{Packages: []Package{}}
-	sc := bufio.NewScanner(strings.NewReader(out))
-	for sc.Scan() {
-		parts := strings.Fields(sc.Text())
+	for rawLine := range strings.Lines(out) {
+		parts := strings.Fields(strings.TrimRight(rawLine, "\r\n"))
 		if len(parts) < 2 {
 			continue
 		}

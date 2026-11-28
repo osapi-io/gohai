@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -213,6 +214,36 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Exactly(nil, got)
 				s.ErrorContains(err, "read /sys/module/ipv6/version:")
+			},
+		},
+		{
+			name:    "linux: a line over 64 KiB keeps the modules after it",
+			variant: "linux",
+			fs: linuxFS(s, map[string]string{
+				"/proc/modules": "huge 1 0 " + strings.Repeat("x", 70000) + " Live 0x0\n" +
+					"ipv6 557056 24 - Live 0x0000000000000000\n",
+			}),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
+				s.Contains(i.Modules, "ipv6")
+			},
+		},
+		{
+			name:    "darwin: a kextstat line over 64 KiB keeps the kexts after it",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				out := "    1    0 0xffffff7f80000000 0x8a8      0xa8       com.example." +
+					strings.Repeat("x", 70000) + " (1.0)\n" +
+					"    2   12 0xffffff7f80001000 0x1000     0x100      com.apple.driver.AppleACPIPlatform (6.1)\n"
+				return kextstatExec(t, []byte(out), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*kernelmodules.Info)
+				s.Require().True(ok)
+				s.Equal("6.1", i.Modules["com.apple.driver.AppleACPIPlatform"].Version)
 			},
 		},
 		{
