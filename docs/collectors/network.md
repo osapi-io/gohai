@@ -245,13 +245,18 @@ On Linux:
 
 05. **Routes.** The collector runs `ip -o -4 route show table main` and
     `ip -o -6 route show table main` through the shared `source.Runner`. It
-    parses each line into a `Route` (`destination`, `gateway`, `interface`,
-    `source`, `scope`, `proto`, `metric`). A multipath entry contains `\`. The
-    collector replaces it with a space, so the entry is on one line. A route
-    with the destination `default`, `0.0.0.0/0` or `::/0` sets the related
-    top-level `default_*` fields. The collector also adds each route to the
-    `routes` slice of its interface. If `ip` is not available, the routing
-    fields stay empty. Minimal containers without iproute2 do not have `ip`.
+    parses each line into a `Route` (`destination`, `type`, `gateway`,
+    `interface`, `source`, `scope`, `proto`, `metric`). A route type that `ip`
+    prints before the destination, such as `blackhole`, `unreachable` or
+    `prohibit`, goes in `type`, and the next word is the destination. A
+    multipath entry contains `\`. The collector replaces it with a space, so the
+    entry is on one line. Of the untyped routes with the destination `default`,
+    `0.0.0.0/0` or `::/0`, the one with the lowest metric (the first, of equal
+    metrics) sets the related top-level `default_*` fields, as the kernel picks
+    it. A typed default, such as `blackhole default`, does not. The collector
+    also adds each route to the `routes` slice of its interface. If `ip` is not
+    available, the routing fields stay empty. Minimal containers without
+    iproute2 do not have `ip`.
 
 06. **Link details.** `/sys/class/net/<iface>/speed` and `/duplex` give the
     `Speed` and `Duplex` of each interface, written as ethtool writes them:

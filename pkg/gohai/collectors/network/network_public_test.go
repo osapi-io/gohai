@@ -1282,6 +1282,32 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:       "the default with the lowest metric wins, and a blackhole default is not one",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteExec(s.T(),
+				[]byte("blackhole default metric 10\n"+
+					"default via 10.0.0.9 dev lo metric 200\n"+
+					"default via 10.0.0.1 dev eth0 metric 100\n"+
+					"default via 10.0.0.2 dev lo metric 100\n"+
+					"unreachable 192.0.2.0/24\n"), nil,
+				nil, errors.New("nope")),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Equal("eth0", i.DefaultInterface)
+				s.Equal("10.0.0.1", i.DefaultGateway)
+				s.Require().Len(i.Routes, 5)
+				s.Equal("default", i.Routes[0].Destination)
+				s.Equal("blackhole", i.Routes[0].Type)
+				s.Equal("192.0.2.0/24", i.Routes[4].Destination)
+				s.Equal("unreachable", i.Routes[4].Type)
+				s.Empty(i.Routes[1].Type)
+			},
+		},
+		{
 			name:       "multipath route expands into one Route per nexthop",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
