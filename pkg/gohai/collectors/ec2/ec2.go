@@ -29,7 +29,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -585,8 +585,7 @@ func (c *Collector) negotiateAPIVersion(
 	if len(matches) == 0 {
 		return "latest"
 	}
-	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
-	return matches[0]
+	return slices.Max(matches)
 }
 
 // transformMetadata populates Info from the per-path value map.
