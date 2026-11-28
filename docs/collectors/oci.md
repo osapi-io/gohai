@@ -163,8 +163,8 @@ cancelled collection is an error, not a host without metadata.
    `/allVolumeAttachments` returns 404, as small shapes do, that section stays
    empty. When `dmi` did not run, so nothing has said the host is on OCI, any
    4xx is also "not there", because it comes from another service. Any other
-   failure of a document is an error: an HTTP 5xx, a 4xx on a host that DMI
-   says is on OCI, malformed JSON, or a cancelled context.
+   failure of a document is an error: an HTTP 5xx, a 4xx on a host that DMI says
+   is on OCI, malformed JSON, or a cancelled context.
 7. **Transformation.** The collector unmarshals the raw camelCase fields and
    maps them to snake_case in the typed Info. The instance document can have
    optional subobjects: `agent_config`, `availability_config`, `launch_options`

@@ -225,10 +225,9 @@ the HTTP request. This is how it finds an EC2 Mac instance.
       (`ami`, `root`, `ebs1` and others). The collector reads each leaf and
       stores it in `block_device_mapping[<name>] = <device-path>`. This is the
       same shape that Ohai gives under `block_device_mapping`.
-    - The collector skips a listed name, index or MAC that has a character
-      other than a letter, a digit, `_`, `.`, `:` or `-`, and the names `.`
-      and `..`. Such a name would change the path or the query of the next
-      request.
+    - The collector skips a listed name, index or MAC that has a character other
+      than a letter, a digit, `_`, `.`, `:` or `-`, and the names `.` and `..`.
+      Such a name would change the path or the query of the next request.
 
 07. **Security filter.** The collector removes
     `identity_credentials_ec2_security_credentials_ec2_instance` from all lists

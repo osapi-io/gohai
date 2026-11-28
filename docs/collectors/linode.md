@@ -81,17 +81,17 @@ signal needs `hostname`.
 1. The collector decides whether the host is a Linode host:
    - **DMI.** When the `dmi` collector ran, its `sys_vendor` decides alone. It
      is `Linode`, or `Akamai` on newer Akamai Cloud VMs. cloud-init's
-     `ds-identify` finds its Akamai data source by the same values. A host
-     with another vendor is not a Linode host, even if it uses
-     `mirrors.linode.com` or is named under `linode.com`. A DMI with no product
-     table is not a Linode host either.
-   - **apt and domain, only when `dmi` did not run.** These are best effort,
-     as in Ohai. Either one makes the host a Linode host:
-     - `/etc/apt/sources.list`, or a file in `/etc/apt/sources.list.d`,
-       contains `"linode"`. The match is not case-sensitive. Newer images, such
-       as Ubuntu 24.04 and Debian 13, keep their sources in
-       `sources.list.d/*.sources`. This is Ohai's `has_linode_apt_repos?`, with
-       the directory added. With no filesystem, apt is no signal.
+     `ds-identify` finds its Akamai data source by the same values. A host with
+     another vendor is not a Linode host, even if it uses `mirrors.linode.com`
+     or is named under `linode.com`. A DMI with no product table is not a Linode
+     host either.
+   - **apt and domain, only when `dmi` did not run.** These are best effort, as
+     in Ohai. Either one makes the host a Linode host:
+     - `/etc/apt/sources.list`, or a file in `/etc/apt/sources.list.d`, contains
+       `"linode"`. The match is not case-sensitive. Newer images, such as Ubuntu
+       24.04 and Debian 13, keep their sources in `sources.list.d/*.sources`.
+       This is Ohai's `has_linode_apt_repos?`, with the directory added. With no
+       filesystem, apt is no signal.
      - The `FQDN` or `Domain` from the `hostname` collector is `linode.com` or
        ends in `.linode.com`, such as `members.linode.com`. Ohai's
        `has_linode_domain?` matches the substring `linode`, so a name such as

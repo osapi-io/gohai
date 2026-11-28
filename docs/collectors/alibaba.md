@@ -149,11 +149,10 @@ on Alibaba Cloud, and the collector sends no request.
     has no such limit.
 04. **`/user-data` excluded:** the collector skips `/user-data`, at the root
     level only. Ohai also skips it. The cloud-init scripts in it can contain
-    credentials.
-    The walk also skips a listed name that has a character other than a
-    letter, a digit, `_`, `.`, `:` or `-`, and the names `.` and `..`. Such a
-    name would change the path or the query of the next request. Ohai does not
-    check the names.
+    credentials. The walk also skips a listed name that has a character other
+    than a letter, a digit, `_`, `.`, `:` or `-`, and the names `.` and `..`.
+    Such a name would change the path or the query of the next request. Ohai
+    does not check the names.
 05. **Leaf parsing:** the collector first tries to parse each leaf as JSON. If
     the parse fails, it keeps the raw text. This is the same as the `parse_json`
     fallback in Ohai.
