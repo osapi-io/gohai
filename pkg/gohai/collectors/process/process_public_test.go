@@ -129,9 +129,11 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 		files     map[string]string
 		runner    sourcetest.Commands
 		cancelled bool // the context is cancelled before Collect
+		nilExec   bool
 		want      *process.Info
 		wantErr   string
 	}{
+		{name: "darwin: no Exec gives no fact", variant: "darwin", nilExec: true},
 		{
 			name:    "linux: /proc, with owners and start times",
 			variant: "linux",
@@ -247,7 +249,11 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 					Now: func() time.Time { return time.Unix(1700000016, 0) },
 				}
 			case "darwin":
-				c = &process.Darwin{Exec: tt.runner.Mock(s.T())}
+				d := &process.Darwin{Exec: tt.runner.Mock(s.T())}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -261,6 +267,11 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 				return
 			}
 			s.Require().NoError(err)
+			if tt.nilExec {
+				s.Nil(got)
+
+				return
+			}
 			s.Equal(tt.want, got)
 		})
 	}
@@ -273,9 +284,16 @@ func (s *ProcessPublicTestSuite) TestRead() {
 		variant string
 		files   map[string]string
 		runner  sourcetest.Commands
+		nilExec bool
 		want    *process.Process
 		wantErr string
 	}{
+		{
+			name:    "darwin: no Exec is an error",
+			variant: "darwin",
+			nilExec: true,
+			wantErr: "no process 7: no command runner",
+		},
 		{
 			name:    "linux: one /proc directory",
 			variant: "linux",
@@ -336,7 +354,11 @@ func (s *ProcessPublicTestSuite) TestRead() {
 					Now: func() time.Time { return time.Unix(1700000020, 0) },
 				}
 			case "darwin":
-				c = &process.Darwin{Exec: tt.runner.Mock(s.T())}
+				d := &process.Darwin{Exec: tt.runner.Mock(s.T())}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 			got, err := c.Read(context.Background(), 7)
 			if tt.wantErr != "" {

@@ -129,8 +129,30 @@ func (s *ShardPublicTestSuite) TestCollect() {
 		spOut        []byte
 		spErr        error
 		noExec       bool
+		nilExec      bool
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "darwin: no Exec seeds from the machine name alone",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				// The same seed as a host with an empty serial and UUID.
+				want, wantErr := (&shard.Linux{}).Collect(
+					context.Background(),
+					collector.PriorResults{
+						"hostname": &hostname.Info{MachineName: machinename},
+						"dmi":      &dmi.Info{},
+					},
+				)
+				s.Require().NoError(wantErr)
+				s.Equal(want, got)
+			},
+		},
 		{
 			name:    "linux: gives the seed of Ohai's test input (machinename + serial + uuid)",
 			variant: "linux",
@@ -403,6 +425,10 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			case "darwin":
 				ctrl := gomock.NewController(s.T())
 				mockExec := mocks.NewMockRunner(ctrl)
+				if tt.nilExec {
+					c = &shard.Darwin{}
+					break
+				}
 				if tt.noExec {
 					c = &shard.Darwin{Exec: mockExec}
 					break
