@@ -79,7 +79,9 @@ just deps
 - **`pkg/gohai/`.** The public SDK.
   - `gohai.go`. The `Gohai` struct, `New()` and `Collect()`.
   - `facts.go`. The `Facts` struct, with typed collector fields and the JSON and
-    Flat methods.
+    Flat methods. It is the one list of the built-in collectors.
+  - `builtins.gen.go`. Generated from `Facts` by `gen/`: the built-in collector
+    list and the setter of each `Facts` field.
   - `options.go`. The functional options (`WithEnabled`, `WithDisabled`,
     `WithCollectors`, `WithSources`).
   - `source/`. `Sources`: the filesystem, the command runner, the clock, the

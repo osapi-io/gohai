@@ -156,23 +156,25 @@ cases, the generic `Linux` struct covers all hosts that are not darwin.
 Read the source the way Ohai reads it. When a fact has a value today, keep the
 arithmetic that gives that value.
 
-## Step 4: register in `pkg/gohai/gohai.go`
+## Step 4: add the `Facts` field, then generate
+
+Add one field to the `Facts` struct in `pkg/gohai/facts.go`, with the type of
+your collector's `*Info` and a JSON name equal to `Name()`:
 
 ```go
-func builtinCollectors(src source.Sources) []collector.Collector {
-    return []collector.Collector{
-        platform.NewWith(src),
-        cpu.NewWith(src), // <-- add here
-    }
-}
+CPU *cpu.Info `json:"cpu,omitempty"`
 ```
 
-Add the related `Facts` field and `set()` switch case in `pkg/gohai/facts.go`.
+Then run `go generate ./pkg/gohai/gen/...` or `just generate`. The generator in
+`pkg/gohai/gen/` reads the `Facts` struct and writes
+`pkg/gohai/builtins.gen.go`: the `builtinCollectors` list, which calls
+`NewWith(src)` for each collector, and the `set()` switch that puts each result
+into its field. Do not edit `builtins.gen.go` by hand.
 
 `registerBuiltins` returns an error when a `Register` call fails, such as on a
 duplicate name or a source field of the wrong type, and `New` and `NewRegistry`
-return it. `TestBuiltinCollectors` in `pkg/gohai` fails when your collector has
-no `Facts` field of its name, or when `set()` has no case for it.
+return it. `TestBuiltinCollectors` in `pkg/gohai` fails when a collector has no
+`Facts` field of its name, no schema property or no docs page.
 
 ## Step 5: tests (100% coverage, one test file)
 
