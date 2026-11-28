@@ -72,6 +72,11 @@ type Array struct {
 	// Journal lists the journal device names, marked (J) in /proc/mdstat.
 	// A journal device holds the write journal and is not a data member.
 	Journal []string `json:"journal"`
+	// DetailError is the failure of `mdadm --detail` for this array, such
+	// as an inactive array or a user that can't open the device. The
+	// array keeps its /proc/mdstat fields, and the --detail fields stay
+	// empty. Empty when --detail ran or mdadm is not on the host.
+	DetailError string `json:"detail_error,omitempty"`
 }
 
 // Info holds the list of MD RAID arrays found on the host.
@@ -248,7 +253,10 @@ func applyDetail(
 // collectArrays builds the full Array list by parsing /proc/mdstat and
 // running `mdadm --detail` for each array. readFn reads files; execFn runs
 // commands, and a nil execFn skips --detail. A missing /proc/mdstat or a
-// host with no mdadm gives the mdstat view; any other failure is an error.
+// host with no mdadm gives the mdstat view. A --detail that fails for one
+// array, such as an inactive one, is that array's DetailError, so the
+// other arrays keep their facts. A failed /proc/mdstat read or a done ctx
+// is an error.
 func collectArrays(
 	ctx context.Context,
 	readFn func(string) ([]byte, error),
@@ -282,8 +290,10 @@ func collectArrays(
 			switch {
 			case execErr == nil:
 				applyDetail(arr, detail)
+			case ctx.Err() != nil:
+				return nil, fmt.Errorf("mdadm --detail /dev/%s: %w", name, ctx.Err())
 			case !collector.Absent(execErr):
-				return nil, fmt.Errorf("mdadm --detail /dev/%s: %w", name, execErr)
+				arr.DetailError = fmt.Sprintf("mdadm --detail /dev/%s: %v", name, execErr)
 			}
 		}
 		arrays = append(arrays, *arr)

@@ -3026,6 +3026,9 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "detail_error": {
+          "type": "string"
         }
       },
       "additionalProperties": false,
