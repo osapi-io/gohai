@@ -55,15 +55,17 @@ reports with a filesystem type and no mountpoint. Each entry has `device`,
 usage, because `statfs` needs a mount.
 
 The top-level `zfs_datasets[]` (Linux only, when `zfs` is on the PATH) has each
-ZFS dataset that the ZFS kernel module knows: filesystems, volumes, snapshots
-and bookmarks. `zfs get -p -H all` reports them. This is the same data as Ohai's
-`zfs_properties`, `zfs_parents` and `zfs_zpool` keys.
+ZFS filesystem and volume that the ZFS kernel module knows.
+`zfs get -p -H -t filesystem,volume all` reports them. This is the same data as
+Ohai's `zfs_properties`, `zfs_parents` and `zfs_zpool` keys, without the
+snapshots and bookmarks that Ohai's `zfs get -p -H all` also lists: a host with
+a snapshot policy can have thousands of them.
 
 | Field per dataset     | Type                | Description                                                                                                                                                    |
 | --------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`                | string              | The full dataset path (`tank`, `tank/home`, `tank/home/john`).                                                                                                 |
 | `mountpoint`          | string              | The mount path, when the `mountpoint` property is absolute. Empty when the property is `none`, `legacy` or `-`, and for snapshots.                             |
-| `is_pool`             | bool                | True when this dataset IS the zpool root (it has no proper ancestors). The same as Ohai's `zfs_zpool`.                                                         |
+| `is_pool`             | bool                | True when this dataset IS the zpool root: no proper ancestors, and not a snapshot (`@`) or a bookmark (`#`). The same as Ohai's `zfs_zpool`.                   |
 | `parents`             | []string            | The paths of the proper ancestor datasets, the shallowest first. For `tank/home/john`, the value is `["tank", "tank/home"]`. The same as Ohai's `zfs_parents`. |
 | `properties`          | map[string]Property | All properties from `zfs get all`. The keys are property names. Each value has the property value and the source, as the rows below show.                      |
 | `properties.*.value`  | string              | The property value, exactly as zfs gives it.                                                                                                                   |
@@ -177,12 +179,12 @@ On Linux:
    kernels, containers without a mounted /sys), the collector skips this data
    and reports no error.
 6. **ZFS datasets**. When `zfs` is on the PATH, the collector runs
-   `zfs get -p -H all` through the shared `source.Runner`. It parses the
-   tab-separated rows (dataset, property, value, source) into `ZFSDatasets`,
-   with the dataset name as the key. `-p` gives byte values as numbers. `-H`
-   removes the header. On a host without ZFS (the binary is missing, or the run
-   fails), the collector returns zero datasets and no error. This does not
-   depend on `lsblk`.
+   `zfs get -p -H -t filesystem,volume all` through the shared `source.Runner`.
+   It parses the tab-separated rows (dataset, property, value, source) into
+   `ZFSDatasets`, with the dataset name as the key. `-p` gives byte values as
+   numbers. `-H` removes the header. On a host without ZFS (the binary is
+   missing, or the run fails), the collector returns zero datasets and no error.
+   This does not depend on `lsblk`.
 
 On macOS, `mount` gives the mount table: the device, the mount point, the type
 and the options. `df -ki` gives the capacity and the inode counts of each mount

@@ -86,7 +86,16 @@ func (l *Linux) Collect(
 	// `zfs` binary is on PATH. Any exec failure (binary missing,
 	// permission denied, module not loaded) silently skips this
 	// section, so non-ZFS hosts return zero ZFS datasets with no error.
-	if out, err := l.Exec.Execute(ctx, "zfs", "get", "-p", "-H", "all"); err == nil {
+	if out, err := l.Exec.Execute(
+		ctx,
+		"zfs",
+		"get",
+		"-p",
+		"-H",
+		"-t",
+		"filesystem,volume",
+		"all",
+	); err == nil {
 		info.ZFSDatasets = parseZFSGetAll(out)
 	}
 
