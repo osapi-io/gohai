@@ -90,7 +90,7 @@ func (s *PCIDevPublicTestSuite) TestList() {
 					ProductID: "1c82", ProductName: "GP107 [GeForce GTX 1050 Ti]",
 					ClassID: "03", ClassName: "Display controller",
 					SubclassID: "00", SubclassName: "VGA compatible controller",
-					SubsystemID: "3764", SubsystemName: "GV-N105TOC-4GD",
+					SubsystemVendorID: "1458", SubsystemID: "3764", SubsystemName: "GV-N105TOC-4GD",
 					Revision: "0xa1", Driver: "nvidia", IOMMUGroup: "14",
 					ParentAddress: "0000:00:01.0",
 				}, d[0])
@@ -193,6 +193,41 @@ func (s *PCIDevPublicTestSuite) TestRead() {
 				s.Require().True(ok)
 				s.Equal("10de", d.VendorID)
 				s.Equal("unknown", d.VendorName)
+				s.Equal("1c82", d.ProductID)
+				s.Equal("1458", d.SubsystemVendorID)
+				s.Equal("3764", d.SubsystemID)
+				s.Equal("03", d.ClassID)
+				s.Equal("00", d.SubclassID)
+			},
+		},
+		{
+			name: "a modalias of PCI length that is not PCI is not read",
+			files: map[string]string{
+				"/sys/bus/pci/devices/0000:01:00.0/modalias": strings.Repeat("x", 60),
+			},
+			address: "0000:01:00.0",
+			validateFunc: func(_ pcidev.Device, ok bool) {
+				s.False(ok)
+			},
+		},
+		{
+			name: "a PCI modalias with a non-hex ID is not read",
+			files: map[string]string{
+				"/sys/bus/pci/devices/0000:01:00.0/modalias": "pci:v0000zzzzd00001C82sv00001458sd00003764bc03sc00i00\n",
+			},
+			address: "0000:01:00.0",
+			validateFunc: func(_ pcidev.Device, ok bool) {
+				s.False(ok)
+			},
+		},
+		{
+			name: "a modalias with text after the PCI fields is not read",
+			files: map[string]string{
+				"/sys/bus/pci/devices/0000:01:00.0/modalias": "pci:v000010DEd00001C82sv00001458sd00003764bc03sc00i00junk\n",
+			},
+			address: "0000:01:00.0",
+			validateFunc: func(_ pcidev.Device, ok bool) {
+				s.False(ok)
 			},
 		},
 	}

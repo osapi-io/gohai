@@ -4225,6 +4225,9 @@
         "subclass_name": {
           "type": "string"
         },
+        "svendor_id": {
+          "type": "string"
+        },
         "sdevice_id": {
           "type": "string"
         },

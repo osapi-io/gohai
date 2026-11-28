@@ -133,7 +133,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 						DeviceID: "1c82", DeviceName: "GP107",
 						ClassID: "03", ClassName: "Display controller",
 						SubclassID: "00", SubclassName: "VGA compatible controller",
-						SubsystemID: "3764", SubsystemName: "unknown",
+						SubsystemVendorID: "1458", SubsystemID: "3764", SubsystemName: "unknown",
 						Revision: "0xa1", Driver: "nvidia",
 					},
 					"0000:02:00.0": {
@@ -141,7 +141,7 @@ func (s *PCIPublicTestSuite) TestCollect() {
 						DeviceID: "1c82", DeviceName: "GP107",
 						ClassID: "03", ClassName: "Display controller",
 						SubclassID: "00", SubclassName: "VGA compatible controller",
-						SubsystemID: "3764", SubsystemName: "unknown",
+						SubsystemVendorID: "1458", SubsystemID: "3764", SubsystemName: "unknown",
 					},
 				}}, got)
 			},

@@ -52,20 +52,21 @@ func (l *Linux) Collect(
 	info := &Info{Devices: map[string]Device{}}
 	for _, d := range pcidev.List(l.FS, pcidev.LoadDB(l.FS)) {
 		entry := Device{
-			VendorID:      d.VendorID,
-			VendorName:    d.VendorName,
-			DeviceID:      d.ProductID,
-			DeviceName:    d.ProductName,
-			ClassID:       d.ClassID,
-			ClassName:     d.ClassName,
-			SubclassID:    d.SubclassID,
-			SubclassName:  d.SubclassName,
-			SubsystemID:   d.SubsystemID,
-			SubsystemName: d.SubsystemName,
-			Revision:      d.Revision,
-			Driver:        d.Driver,
-			IOMMUGroup:    d.IOMMUGroup,
-			ParentAddress: d.ParentAddress,
+			VendorID:          d.VendorID,
+			VendorName:        d.VendorName,
+			DeviceID:          d.ProductID,
+			DeviceName:        d.ProductName,
+			ClassID:           d.ClassID,
+			ClassName:         d.ClassName,
+			SubclassID:        d.SubclassID,
+			SubclassName:      d.SubclassName,
+			SubsystemVendorID: d.SubsystemVendorID,
+			SubsystemID:       d.SubsystemID,
+			SubsystemName:     d.SubsystemName,
+			Revision:          d.Revision,
+			Driver:            d.Driver,
+			IOMMUGroup:        d.IOMMUGroup,
+			ParentAddress:     d.ParentAddress,
 		}
 		if strings.EqualFold(entry.Driver, "unknown") {
 			entry.Driver = ""
