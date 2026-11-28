@@ -138,8 +138,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
           Location: rack-42
             Kernel: Linux 5.15.0-91-generic
    Operating System: Ubuntu 22.04.3 LTS
- Operating System Pretty Name: Ubuntu 22.04.3 LTS
-   Operating System CPE Name: cpe:/o:ubuntu:ubuntu:22.04
+        CPE OS Name: cpe:/o:ubuntu:ubuntu:22.04
          Virtualization: kvm
        Hardware Vendor: QEMU
         Hardware Model: Standard PC (Q35 + ICH9, 2009)
