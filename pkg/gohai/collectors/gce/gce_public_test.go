@@ -306,7 +306,7 @@ func (s *GcePublicTestSuite) TestCollect() {
 			meta: &metadata{status: http.StatusNotFound},
 			validateFunc: func(out any, err error, m *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Len(m.requests, 1)
 			},
 		},
@@ -315,7 +315,7 @@ func (s *GcePublicTestSuite) TestCollect() {
 			meta: &metadata{status: http.StatusInternalServerError, body: "boom"},
 			validateFunc: func(out any, err error, m *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Len(m.requests, 1)
 			},
 		},
@@ -324,7 +324,7 @@ func (s *GcePublicTestSuite) TestCollect() {
 			meta: &metadata{err: errors.New("connection refused")},
 			validateFunc: func(out any, err error, m *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Len(m.requests, 1)
 			},
 		},
@@ -337,7 +337,7 @@ func (s *GcePublicTestSuite) TestCollect() {
 			validateFunc: func(out any, err error, _ *metadata) {
 				s.ErrorContains(err, "read gce metadata")
 				s.NotErrorIs(err, cloudmetadata.ErrNotAvailable)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -345,7 +345,7 @@ func (s *GcePublicTestSuite) TestCollect() {
 			meta: &metadata{status: http.StatusOK, body: "not json"},
 			validateFunc: func(out any, err error, _ *metadata) {
 				s.ErrorContains(err, "parse gce metadata: ")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -356,7 +356,7 @@ func (s *GcePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error, m *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Empty(m.requests)
 			},
 		},
@@ -366,7 +366,7 @@ func (s *GcePublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{"dmi": &dmi.Info{}},
 			validateFunc: func(out any, err error, m *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Empty(m.requests)
 			},
 		},

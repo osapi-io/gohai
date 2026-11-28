@@ -266,7 +266,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, httpCalled bool, _ string, err error) {
 				s.Require().NoError(err)
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -275,7 +275,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, httpCalled bool, _ string, err error) {
 				s.Require().NoError(err)
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -296,7 +296,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			handler: statusOn("/instance", http.StatusForbidden, ""),
 			validateFunc: func(out any, _ bool, _ string, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -305,7 +305,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			handler: failOn("/instance", ""),
 			validateFunc: func(out any, _ bool, _ string, err error) {
 				s.Require().EqualError(err, "oci: unexpected status 500 from /instance")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -313,14 +313,14 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			handler: statusOn("/instance", http.StatusForbidden, ""),
 			validateFunc: func(out any, _ bool, _ string, err error) {
 				s.Require().EqualError(err, "oci: unexpected status 403 from /instance")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
 			name: "404 on instance drops silently",
 			validateFunc: func(out any, _ bool, _ string, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -349,7 +349,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			closed: true,
 			validateFunc: func(out any, _ bool, _ string, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -403,7 +403,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			cancelOn: "/vnics",
 			validateFunc: func(out any, _ bool, _ string, err error) {
 				s.Require().ErrorIs(err, context.Canceled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -414,7 +414,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			cancelOn: "/allVolumeAttachments",
 			validateFunc: func(out any, _ bool, _ string, err error) {
 				s.Require().ErrorIs(err, context.Canceled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 	}

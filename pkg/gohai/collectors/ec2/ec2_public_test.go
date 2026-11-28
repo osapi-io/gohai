@@ -531,7 +531,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			opts: (&serverOpts{}).withDefaults(),
 			validateFunc: func(out any, httpCalled bool) {
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -570,7 +570,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			opts:       (&serverOpts{}).withDefaults(),
 			validateFunc: func(out any, httpCalled bool) {
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -591,7 +591,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			opts:  (&serverOpts{}).withDefaults(),
 			validateFunc: func(out any, httpCalled bool) {
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -631,7 +631,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				http.NotFound(w, r)
 			},
 			validateFunc: func(out any, _ bool) {
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -639,7 +639,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
 			validateFunc: func(out any, _ bool) {
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
