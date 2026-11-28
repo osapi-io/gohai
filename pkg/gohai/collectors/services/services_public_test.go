@@ -333,7 +333,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: list-unit-files fails: an error",
+			name:    "linux: list-unit-files fails: the loaded services and the error",
 			variant: "linux",
 			exec: sourcetest.Commands{
 				Out: map[string]string{unitsLine: systemctlOut},
@@ -343,7 +343,12 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "systemctl list-unit-files: boom")
-				s.Exactly(nil, got)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.NotEmpty(info.Services)
+				s.Equal("ssh", info.Services[0].Name)
+				s.False(info.Services[0].Enabled)
 			},
 		},
 		{

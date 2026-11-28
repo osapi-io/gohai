@@ -124,7 +124,9 @@ On Linux:
 6. It runs `systemctl list-unit-files --type=service --no-legend --no-pager`. A
    unit whose state is `enabled` or `enabled-runtime` is `enabled: true`. A unit
    that runs now, but is disabled, is `enabled: false`. When this command fails,
-   the collector returns an error.
+   the collector returns the loaded services from `list-units` with the error,
+   so the status is `partial`. Each service then has no unit-file state and
+   reads as `enabled: false`.
 7. A host that systemd did not boot, that is, one with no `/run/systemd/system`,
    such as most containers, has an empty list and no error. A missing
    `systemctl` is also an empty list. On a host that systemd booted, a
