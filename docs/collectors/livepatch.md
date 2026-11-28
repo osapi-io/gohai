@@ -135,7 +135,8 @@ On Linux:
      file gives `false`.
    - It reads `<patch>/transition`. `"1"` gives `transition: true`. `"0"` or a
      missing file gives `false`.
-3. The collector returns the map.
+3. The collector returns the map. A directory or a file that is there and can't
+   be read is an error.
 
 Ohai's `linux/livepatch.rb` uses the same sysfs method. It uses `dir_glob` on
 `/sys/kernel/livepatch/*` and reads `enabled` and `transition` for each entry.

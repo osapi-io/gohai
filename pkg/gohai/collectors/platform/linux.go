@@ -62,10 +62,17 @@ func (l *Linux) Collect(
 	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{OS: "linux", CPUArchitecture: unameArch(ctx, l.Exec)}
-	if l.FS != nil {
-		readOSRelease(l.FS, info)
-		applyRedhatReleaseSupplement(l.FS, info)
-		applyLegacyReleaseFallback(l.FS, info)
+	if l.FS == nil {
+		return info, nil
+	}
+	for _, step := range []func(avfs.VFS, *Info) error{
+		readOSRelease,
+		applyRedhatReleaseSupplement,
+		applyLegacyReleaseFallback,
+	} {
+		if err := step(l.FS, info); err != nil {
+			return nil, err
+		}
 	}
 	return info, nil
 }

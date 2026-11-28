@@ -23,6 +23,7 @@ package kernelmodules
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -49,19 +50,25 @@ func NewLinux() *Linux {
 }
 
 // Collect returns the loaded module map. A missing /proc/modules yields
-// an empty Info with no error, as the silent-on-miss convention used
-// across gohai collectors.
+// an empty Info with no error, as an absent source does across gohai
+// collectors. A /proc/modules, or a module version file, that is there
+// and can't be read is an error.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{}
 	b, err := l.FS.ReadFile(procModulesPath)
-	if err != nil {
+	if collector.Absent(err) {
 		return info, nil
 	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", procModulesPath, err)
+	}
 	info.Modules = parseProcModules(b)
-	enrichModuleVersions(l.FS, info.Modules)
+	if err := enrichModuleVersions(l.FS, info.Modules); err != nil {
+		return nil, err
+	}
 	return info, nil
 }
 
@@ -98,12 +105,15 @@ func parseProcModules(
 func enrichModuleVersions(
 	fs avfs.VFS,
 	modules map[string]Module,
-) {
+) error {
 	for name, m := range modules {
 		path := "/sys/module/" + name + "/version"
 		b, err := fs.ReadFile(path)
-		if err != nil {
+		if collector.Absent(err) {
 			continue
+		}
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
 		}
 		v := strings.TrimSpace(string(b))
 		if v == "" {
@@ -112,4 +122,5 @@ func enrichModuleVersions(
 		m.Version = v
 		modules[name] = m
 	}
+	return nil
 }

@@ -210,14 +210,12 @@ func (s *InitPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: read error soft-misses",
+			name:    "linux: a /proc/1/comm that can't be read is an error",
 			variant: "linux",
 			readErr: true,
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*initd.Info)
-				s.Require().True(ok)
-				s.Equal(initd.Info{}, *info)
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /proc/1/comm:")
 			},
 		},
 		{

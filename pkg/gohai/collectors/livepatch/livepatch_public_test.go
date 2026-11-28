@@ -156,6 +156,38 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a livepatch dir that can't be read is an error",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				// A file where the directory should be.
+				return fsWith(
+					s.T(),
+					[]string{"/sys/kernel"},
+					map[string]string{"/sys/kernel/livepatch": "x\n"},
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /sys/kernel/livepatch:")
+			},
+		},
+		{
+			name:    "linux: a patch file that can't be read is an error",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				// A directory where the enabled file should be.
+				return fsWith(
+					s.T(),
+					[]string{"/sys/kernel/livepatch/lp_bad/enabled"},
+					map[string]string{},
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /sys/kernel/livepatch/lp_bad/enabled:")
+			},
+		},
+		{
 			name:    "linux: livepatch dir exists but empty",
 			variant: "linux",
 			setupFS: func() avfs.VFS {

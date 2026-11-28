@@ -184,7 +184,11 @@ sequence:
 5. **Family.** `family.Of` gets the family of the name from the maintained
    table, for example `rhel` for alma and rocky, and `debian` for kali and
    raspbian.
-6. **CPU architecture.** The value comes from `runtime.GOARCH`.
+
+In each step, a missing file is skipped. A file that is there and can't be read,
+such as an `/etc/os-release` with no read permission, is an error, so the
+collector doesn't report a wrong platform from a later file. 6. **CPU
+architecture.** The value comes from `runtime.GOARCH`.
 
 On macOS:
 

@@ -25,6 +25,8 @@
 package livepatch
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -93,45 +95,55 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// collectPatches reads /sys/kernel/livepatch/ entries. Returns nil
-// when the directory does not exist, because the kernel has no livepatch support. It
-// absent. Returns an empty map when the directory exists but no patches
-// are loaded.
+// collectPatches reads /sys/kernel/livepatch/ entries. It returns nil
+// when the directory does not exist, because the kernel has no livepatch
+// support, and an empty map when the directory exists but no patches are
+// loaded. A directory or file that is there and can't be read is an
+// error.
 func collectPatches(
 	fs avfs.VFS,
-) map[string]Patch {
+) (map[string]Patch, error) {
 	entries, err := fs.ReadDir(livepatchDir)
+	if collector.Absent(err) {
+		return nil, nil
+	}
 	if err != nil {
-		// Directory absent → livepatch not supported or no patches loaded.
-		return nil
+		return nil, fmt.Errorf("read %s: %w", livepatchDir, err)
 	}
 
+	var errs []error
 	patches := map[string]Patch{}
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
-		patch := Patch{
-			Enabled:    readSysBool(fs, livepatchDir+"/"+name+"/enabled"),
-			Transition: readSysBool(fs, livepatchDir+"/"+name+"/transition"),
-		}
-		patches[name] = patch
+		enabled, err := readSysBool(fs, livepatchDir+"/"+name+"/enabled")
+		errs = append(errs, err)
+		transition, err := readSysBool(fs, livepatchDir+"/"+name+"/transition")
+		errs = append(errs, err)
+		patches[name] = Patch{Enabled: enabled, Transition: transition}
 	}
-	return patches
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	return patches, nil
 }
 
 // readSysBool reads a sysfs file that contains "0" or "1" and returns
-// the boolean value. Returns false when the file does not exist or
-// cannot be read, because absent sysfs files are normal for optional kernel
-// features.
+// the boolean value. A missing file is false, because absent sysfs files
+// are normal for optional kernel features. A file that is there and
+// can't be read is an error.
 func readSysBool(
 	fs avfs.VFS,
 	path string,
-) bool {
+) (bool, error) {
 	b, err := fs.ReadFile(path)
-	if err != nil {
-		return false
+	if collector.Absent(err) {
+		return false, nil
 	}
-	return strings.TrimSpace(string(b)) == "1"
+	if err != nil {
+		return false, fmt.Errorf("read %s: %w", path, err)
+	}
+	return strings.TrimSpace(string(b)) == "1", nil
 }

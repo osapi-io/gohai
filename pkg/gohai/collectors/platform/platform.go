@@ -29,6 +29,7 @@ package platform
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"runtime"
 	"strings"
@@ -42,14 +43,18 @@ import (
 
 // readOSRelease fills info's name, version and family from
 // /etc/os-release, as Ohai does. It leaves them empty when fs has no such
-// file, for the old release files to fill.
+// file, for the old release files to fill. A file that is there and
+// can't be read is an error.
 func readOSRelease(
 	fs avfs.VFS,
 	info *Info,
-) {
+) error {
 	b, err := family.ReadOSRelease(fs)
+	if collector.Absent(err) {
+		return nil
+	}
 	if err != nil {
-		return
+		return err
 	}
 	pairs := family.ParseOSRelease(b)
 	if id, ok := pairs["ID"]; ok {
@@ -59,6 +64,23 @@ func readOSRelease(
 		info.Version = version
 	}
 	info.Family = family.Of(info.Name)
+	return nil
+}
+
+// readOptional returns the content of path, or nil when fs has no such
+// file. A file that is there and can't be read is an error.
+func readOptional(
+	fs avfs.VFS,
+	path string,
+) ([]byte, error) {
+	b, err := fs.ReadFile(path)
+	if collector.Absent(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+	return b, nil
 }
 
 // Info holds platform identification data.
@@ -131,19 +153,24 @@ var redhatReleaseVersionRE = regexp.MustCompile(`release\s+(\d[\d.]*)`)
 func applyRedhatReleaseSupplement(
 	fs avfs.VFS,
 	info *Info,
-) {
+) error {
 	if minorVersionDistros[info.Name] && majorOnlyVersionRE.MatchString(info.Version) {
-		if b, err := fs.ReadFile("/etc/redhat-release"); err == nil {
-			if m := redhatReleaseVersionRE.FindStringSubmatch(string(b)); m != nil {
-				info.Version = m[1]
-			}
+		b, err := readOptional(fs, "/etc/redhat-release")
+		if err != nil {
+			return err
+		}
+		if m := redhatReleaseVersionRE.FindStringSubmatch(string(b)); m != nil {
+			info.Version = m[1]
 		}
 	}
 	if info.Name == "debian" && info.Version == "" {
-		if b, err := fs.ReadFile("/etc/debian_version"); err == nil {
-			info.Version = strings.TrimSpace(string(b))
+		b, err := readOptional(fs, "/etc/debian_version")
+		if err != nil {
+			return err
 		}
+		info.Version = strings.TrimSpace(string(b))
 	}
+	return nil
 }
 
 // legacyReleaseFile describes a /etc/*-release fallback parser.
@@ -232,13 +259,16 @@ var legacyReleaseFiles = []legacyReleaseFile{
 func applyLegacyReleaseFallback(
 	fs avfs.VFS,
 	info *Info,
-) {
+) error {
 	if info.Name != "" {
-		return
+		return nil
 	}
 	for _, f := range legacyReleaseFiles {
-		b, err := fs.ReadFile(f.path)
+		b, err := readOptional(fs, f.path)
 		if err != nil {
+			return err
+		}
+		if b == nil {
 			continue
 		}
 		name, version := f.parse(string(b))
@@ -251,8 +281,9 @@ func applyLegacyReleaseFallback(
 		if info.Family == "" {
 			info.Family = f.family
 		}
-		return
+		return nil
 	}
+	return nil
 }
 
 // goArch is the architecture of the gohai binary: the answer when the host
