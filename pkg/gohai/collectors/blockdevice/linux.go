@@ -22,6 +22,7 @@ package blockdevice
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 
@@ -64,31 +65,37 @@ func (l *Linux) Collect(
 		return nil, fmt.Errorf("read %s: %w", sysBlockDir, err)
 	}
 
+	// A device or an attribute that cannot be read adds its error, and the
+	// other devices are kept, so the status is partial. When no device was
+	// read and a read failed, there is no fact.
 	devices := make([]BlockDevice, 0, len(entries))
+	var errs []error
 	for _, entry := range entries {
 		name := entry.Name()
-		base := filepath.Join(sysBlockDir, name)
+		dir := filepath.Join(sysBlockDir, name)
 		// Each entry of /sys/block is a symbolic link to the device's
 		// directory under /sys/devices, so ReadDir does not report it as a
 		// directory. Stat follows the link.
-		info, err := l.FS.Stat(base)
+		info, err := l.FS.Stat(dir)
 		if collector.Absent(err) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("stat %s: %w", base, err)
+			errs = append(errs, fmt.Errorf("stat %s: %w", dir, err))
+
+			continue
 		}
 		if !info.IsDir() {
 			continue
 		}
-		dev := filepath.Join(base, "device")
-		queue := filepath.Join(base, "queue")
+		dev := filepath.Join(dir, "device")
+		queue := filepath.Join(dir, "queue")
 
 		r := sysReader{fs: l.FS}
 		bd := BlockDevice{
 			Name:              name,
-			Size:              r.read(filepath.Join(base, "size")),
-			Removable:         r.read(filepath.Join(base, "removable")),
+			Size:              r.read(filepath.Join(dir, "size")),
+			Removable:         r.read(filepath.Join(dir, "removable")),
 			Rotational:        r.read(filepath.Join(queue, "rotational")),
 			PhysicalBlockSize: r.read(filepath.Join(queue, "physical_block_size")),
 			LogicalBlockSize:  r.read(filepath.Join(queue, "logical_block_size")),
@@ -101,10 +108,14 @@ func (l *Linux) Collect(
 			FirmwareRev:       r.read(filepath.Join(dev, "firmware_rev")),
 		}
 		if r.err != nil {
-			return nil, r.err
+			errs = append(errs, r.err)
 		}
 		devices = append(devices, bd)
 	}
 
-	return &Info{Devices: devices}, nil
+	if len(devices) == 0 && len(errs) > 0 {
+		return nil, errors.Join(errs...)
+	}
+
+	return &Info{Devices: devices}, errors.Join(errs...)
 }

@@ -393,21 +393,53 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: an attribute that cannot be read is an error",
+			name:    "linux: an attribute that cannot be read keeps the device and the others",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {
 				f := memfs.New()
 				_ = f.MkdirAll("/sys/devices/block/sdf/device", 0o755)
 				_ = f.WriteFile("/sys/devices/block/sdf/size", []byte("1024\n"), fs.FileMode(0o444))
 				sourcetest.FailRead(s.T(), f, "/sys/devices/block/sdf/removable")
+				_ = f.MkdirAll("/sys/devices/block/sdg/device", 0o755)
+				_ = f.WriteFile("/sys/devices/block/sdg/size", []byte("2048\n"), fs.FileMode(0o444))
 				sourcetest.Links(s.T(), f, map[string]string{
 					"/sys/block/sdf": "/sys/devices/block/sdf",
+					"/sys/block/sdg": "/sys/devices/block/sdg",
 				})
 				return f
 			},
 			validateFunc: func(got any, err error) {
 				s.ErrorContains(err, "read /sys/block/sdf/removable: ")
-				s.Exactly(nil, got)
+				info, ok := got.(*blockdevice.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().Len(info.Devices, 2)
+				s.Equal("1024", info.Devices[0].Size)
+				s.Equal("2048", info.Devices[1].Size)
+			},
+		},
+		{
+			name:    "linux: a device that cannot be stat keeps the others",
+			variant: "linux",
+			setupFS: func() *memfs.MemFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/sys/devices", 0o755)
+				_ = f.WriteFile("/sys/devices/block", []byte("x"), fs.FileMode(0o444))
+				_ = f.MkdirAll("/sys/devices/disk/sdh/device", 0o755)
+				_ = f.WriteFile("/sys/devices/disk/sdh/size", []byte("4096\n"), fs.FileMode(0o444))
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/sde": "/sys/devices/block/sde",
+					"/sys/block/sdh": "/sys/devices/disk/sdh",
+				})
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "stat /sys/block/sde: ")
+				info, ok := got.(*blockdevice.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().Len(info.Devices, 1)
+				s.Equal("sdh", info.Devices[0].Name)
 			},
 		},
 		{

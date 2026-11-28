@@ -106,8 +106,9 @@ On Linux:
    gives that interface's name servers or domains, and the `Global: …` line
    gives `global`. A server loses its `%zone`, its `#name` and its port. Without
    that directory, or without `resolvectl`, the interfaces stay empty. If
-   `resolvectl` fails while systemd-resolved runs, the collector returns an
-   error.
+   `resolvectl` fails while systemd-resolved runs, the collector keeps the facts
+   of `/etc/resolv.conf` with the error, so the status is `partial`. A cancelled
+   context gives no fact.
 
 On macOS:
 
@@ -121,7 +122,8 @@ On macOS:
    resolver for one domain only, such as `local`) and is not `Supplemental` (a
    resolver that a VPN adds for its own names). macOS writes `resolv.conf` from
    it.
-4. If `scutil` fails, the collector returns an error.
+4. If `scutil` fails, the collector keeps the facts of `/etc/resolv.conf` with
+   the error, so the status is `partial`. A cancelled context gives no fact.
 
 Ohai has no DNS plugin. The data is configuration, not the state of a daemon, so
 it is a gohai fact.

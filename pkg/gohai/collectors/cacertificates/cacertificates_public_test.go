@@ -394,7 +394,27 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "when a CA file cannot be read, it is an error",
+			name:    "when a CA file cannot be read, the walk goes on to the next directory",
+			variant: "linux",
+			layout:  "debian",
+			files: map[string]string{
+				"/usr/share/ca-certificates/mozilla/Root_CA.crt": root.pem,
+				"/usr/local/share/ca-certificates/Local.crt":     root.pem,
+			},
+			links: map[string]string{
+				"/usr/share/ca-certificates/mozilla/Loop.crt": "/usr/share/ca-certificates/mozilla/Loop.crt",
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /usr/share/ca-certificates/mozilla/Loop.crt: ")
+				info, ok := got.(*cacertificates.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().Len(info.Certificates, 2)
+				s.Equal("local", info.Certificates[1].Source)
+			},
+		},
+		{
+			name:    "when a CA file cannot be read, the other CAs are kept",
 			variant: "linux",
 			layout:  "debian",
 			files:   map[string]string{"/usr/share/ca-certificates/mozilla/Root_CA.crt": root.pem},
@@ -403,7 +423,11 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /usr/share/ca-certificates/mozilla/Loop.crt: ")
-				s.Exactly(nil, got)
+				info, ok := got.(*cacertificates.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().Len(info.Certificates, 1)
+				s.Equal("mozilla/Root_CA", info.Certificates[0].Name)
 			},
 		},
 		{

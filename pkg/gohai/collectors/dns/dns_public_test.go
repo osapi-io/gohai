@@ -157,24 +157,51 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: systemd-resolved runs, and resolvectl fails",
+			name:    "linux: systemd-resolved runs, and resolvectl fails, keeps resolv.conf",
 			variant: "linux",
-			files:   map[string]string{"/run/systemd/resolve/resolv.conf": ""},
+			files: map[string]string{
+				"/run/systemd/resolve/resolv.conf": "",
+				"/etc/resolv.conf":                 "nameserver 1.1.1.1\n",
+			},
 			runner: sourcetest.Commands{Err: map[string]error{
 				"resolvectl dns": errors.New("exit status 1"),
 			}},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read resolvectl dns")
+				info, ok := got.(*dns.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal([]string{"1.1.1.1"}, info.Nameservers)
+			},
+		},
+		{
+			name:    "linux: a cancelled resolvectl gives no fact",
+			variant: "linux",
+			files: map[string]string{
+				"/run/systemd/resolve/resolv.conf": "",
+				"/etc/resolv.conf":                 "nameserver 1.1.1.1\n",
+			},
+			runner: sourcetest.Commands{Err: map[string]error{
+				"resolvectl dns": context.Canceled,
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
 				s.Exactly(nil, got)
 			},
 		},
 		{
-			name:    "linux: a resolved runtime directory that cannot be checked is an error",
+			name:    "linux: a resolved runtime directory that cannot be checked keeps resolv.conf",
 			variant: "linux",
-			files:   map[string]string{"/run/systemd": ""},
+			files: map[string]string{
+				"/run/systemd":     "",
+				"/etc/resolv.conf": "nameserver 1.1.1.1\n",
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "stat /run/systemd/resolve")
-				s.Exactly(nil, got)
+				info, ok := got.(*dns.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal([]string{"1.1.1.1"}, info.Nameservers)
 			},
 		},
 		{
@@ -260,11 +287,25 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: scutil fails",
+			name:    "darwin: scutil fails, keeps resolv.conf",
 			variant: "darwin",
+			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
 			runner:  sourcetest.Commands{Err: map[string]error{"scutil --dns": errors.New("boom")}},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read scutil --dns")
+				info, ok := got.(*dns.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal([]string{"1.1.1.1"}, info.Nameservers)
+			},
+		},
+		{
+			name:    "darwin: a cancelled scutil gives no fact",
+			variant: "darwin",
+			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
+			runner:  sourcetest.Commands{Err: map[string]error{"scutil --dns": context.Canceled}},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
 				s.Exactly(nil, got)
 			},
 		},

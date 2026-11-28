@@ -144,9 +144,10 @@ On Linux:
      `queue_depth` and `firmware_rev`, in the device subtree.
 3. If one file is missing, its field is an empty string. Not all devices have
    all paths. Loop devices have no `device/` subtree. NVMe devices have
-   `firmware_rev` but not `rev`. A file that is there and cannot be read is an
-   error, so that an empty field always means that the device has no such
-   attribute.
+   `firmware_rev` but not `rev`. A file or a device that is there and cannot be
+   read adds its error, and the other devices are kept, so the status is
+   `partial` and an empty field with the status `ok` always means that the
+   device has no such attribute. When no device was read, there is no fact.
 
 On macOS, the collector gives no fact, with the status `unsupported`.
 

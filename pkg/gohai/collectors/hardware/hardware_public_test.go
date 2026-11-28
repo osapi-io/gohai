@@ -217,6 +217,9 @@ func (s *HardwarePublicTestSuite) TestNew() {
 }
 
 func (s *HardwarePublicTestSuite) TestCollect() {
+	// hwModel is SPHardwareDataType with only a machine model, to show
+	// which facts a partial result keeps.
+	hwModel := []byte(`{"SPHardwareDataType": [{"machine_model": "MacBookPro11,1"}]}`)
 	tests := []struct {
 		name         string
 		variant      string
@@ -298,14 +301,57 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: a failed system_profiler call is an error",
+			name:    "darwin: a failed system_profiler call keeps the other parts",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return hwExec(t, []byte(`{}`), nil, []byte(`{}`),
+				return hwExec(t, hwModel, nil, []byte(`{}`),
 					nil, errors.New("exit status 1"), nil)
 			},
-			validateFunc: func(_ any, err error) {
+			validateFunc: func(got any, err error) {
 				s.ErrorContains(err, "read system_profiler")
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("MacBookPro11,1", info.MachineModel)
+			},
+		},
+		{
+			name:    "darwin: a storage call that is absent keeps the other parts",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				absent := fmt.Errorf("exec %s: %w", "x", exec.ErrNotFound)
+				return hwExec(t, hwModel, nil, []byte(`{}`), nil, absent, nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("MacBookPro11,1", info.MachineModel)
+			},
+		},
+		{
+			name:    "darwin: a cancelled system_profiler call gives no fact",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return hwExec(t, hwModel, nil, []byte(`{}`),
+					nil, context.Canceled, nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: every system_profiler call failing gives no fact",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				boom := errors.New("exit status 1")
+				return hwExec(t, nil, nil, nil, boom, boom, boom)
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "read system_profiler")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -383,23 +429,31 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: malformed storage JSON is an error",
+			name:    "darwin: malformed storage JSON keeps the other parts",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return hwExec(t, []byte(`{}`), []byte("not json"), []byte(`{}`), nil, nil, nil)
+				return hwExec(t, hwModel, []byte("not json"), []byte(`{}`), nil, nil, nil)
 			},
-			validateFunc: func(_ any, err error) {
+			validateFunc: func(got any, err error) {
 				s.ErrorContains(err, "parse system_profiler")
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("MacBookPro11,1", info.MachineModel)
 			},
 		},
 		{
-			name:    "darwin: malformed power JSON is an error",
+			name:    "darwin: malformed power JSON keeps the other parts",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte("not json"), nil, nil, nil)
+				return hwExec(t, hwModel, []byte(`{}`), []byte("not json"), nil, nil, nil)
 			},
-			validateFunc: func(_ any, err error) {
+			validateFunc: func(got any, err error) {
 				s.ErrorContains(err, "parse system_profiler")
+				info, ok := got.(*hardware.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("MacBookPro11,1", info.MachineModel)
 			},
 		},
 		{

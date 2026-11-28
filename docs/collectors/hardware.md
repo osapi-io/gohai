@@ -185,10 +185,11 @@ On macOS:
    `current_capacity * 100 / max_capacity`. This is the same as Ohai's
    `(current / max * 100).to_i`.
 4. A host without `system_profiler` gives an empty `Info`. A call that fails, or
-   output that does not parse as JSON, is an error for the whole collector, so a
-   caller can tell a failed read from a host that has nothing to report. A host
-   without a battery answers the power call with no battery, and that is not a
-   failure.
+   output that does not parse as JSON, adds its error, and the parts of the
+   other calls are kept, so the status is `partial` and a caller can tell a
+   failed read from a host that has nothing to report. When no call worked, or
+   the context is cancelled, there is no fact. A host without a battery answers
+   the power call with no battery, and that is not a failure.
 
 On Linux, the collector returns an empty `Info`. Ohai's `darwin/hardware.rb` is
 for Darwin only. On Linux, the `dmi`, `cpu`, `memory`, `disk` and `filesystem`

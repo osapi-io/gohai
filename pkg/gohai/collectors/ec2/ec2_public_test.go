@@ -322,7 +322,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		closed       bool
 		cancelAfter  int           // cancel the context once the server answered this many requests
 		timeout      time.Duration // the collector's walk timeout; zero is WalkTimeout
-		wantErr      string        // the error Collect returns; "" is none
+		wantErr      string        // the error Collect returns; "" is none. With validateFunc, the fact is partial
 		validateFunc func(any, bool)
 	}{
 		{
@@ -342,9 +342,16 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			wantErr:     "context canceled",
 		},
 		{
-			name:    "a leaf that is more than MaxBody is an error",
+			name:    "a leaf that is more than MaxBody keeps the metadata read before it",
 			opts:    (&serverOpts{responseMap: withBody("/meta-data/security-groups", huge)}).withDefaults(),
 			wantErr: "read ec2 metadata /meta-data/security-groups: ",
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.NotEmpty(info.ID)
+				s.Nil(info.SecurityGroups)
+			},
 		},
 		{
 			name:    "a first path that is more than MaxBody is an error",
@@ -902,7 +909,12 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			out, err := c.Collect(ctx, prior)
 			if tt.wantErr != "" {
 				s.ErrorContains(err, tt.wantErr)
-				s.Exactly(nil, out)
+				if tt.validateFunc == nil {
+					s.Exactly(nil, out)
+
+					return
+				}
+				tt.validateFunc(out, httpCalled.Load())
 
 				return
 			}

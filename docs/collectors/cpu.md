@@ -189,7 +189,8 @@ On Linux:
    through the injected `avfs.VFS`. The basename is the map key. The trimmed
    contents are the value. If the directory is missing, the output has no
    `vulnerabilities` field. A directory or a file that is there and cannot be
-   read is an error.
+   read adds its error. The collector keeps the facts of `/proc/cpuinfo`, so the
+   status is `partial`.
 
 3. If `lscpu` is on PATH, the collector runs it through the injected
    `source.Runner` and merges these fields:
@@ -205,8 +206,9 @@ On Linux:
 
    If `lscpu` is not on the PATH, the extension fields stay empty, and the
    fields from `/proc/cpuinfo` stay correct. An `lscpu` that is on the PATH and
-   fails, or a cancelled context, is an error, so that empty extension fields
-   always mean that the host has no `lscpu`.
+   fails keeps the facts of `/proc/cpuinfo` with the error, so the status is
+   `partial`, and empty extension fields with the status `ok` always mean that
+   the host has no `lscpu`. A cancelled context gives no fact.
 
 On macOS:
 

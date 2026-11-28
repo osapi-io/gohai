@@ -712,7 +712,7 @@ NUMA node0 CPU(s):   5-2
 			},
 		},
 		{
-			name:    "linux: a vulnerabilities directory that cannot be read is an error",
+			name:    "linux: a vulnerabilities directory that cannot be read is partial",
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs: sourcetest.FS(s.T(), map[string]string{
@@ -721,7 +721,11 @@ NUMA node0 CPU(s):   5-2
 			exec: noLscpuExec,
 			validateFunc: func(got any, err error) {
 				s.ErrorContains(err, "read /sys/devices/system/cpu/vulnerabilities: ")
-				s.Exactly(nil, got)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(i)
+				s.Equal(16, i.Count)
+				s.Nil(i.Vulnerabilities)
 			},
 		},
 		{
@@ -742,7 +746,7 @@ NUMA node0 CPU(s):   5-2
 			},
 		},
 		{
-			name:    "linux: a vulnerabilities file that cannot be read is an error",
+			name:    "linux: a vulnerabilities file that cannot be read is partial",
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs: sourcetest.ReadError(
@@ -755,12 +759,15 @@ NUMA node0 CPU(s):   5-2
 			exec: noLscpuExec,
 			validateFunc: func(got any, err error) {
 				s.EqualError(err, "read /sys/devices/system/cpu/vulnerabilities/bad: read fail")
-				s.Exactly(nil, got)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(i)
+				s.Equal(16, i.Count)
 			},
 		},
 
 		{
-			name:    "linux: a failed lscpu is an error",
+			name:    "linux: a failed lscpu keeps the cpuinfo facts",
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs:      newVulnFS(s, nil),
@@ -771,7 +778,10 @@ NUMA node0 CPU(s):   5-2
 			},
 			validateFunc: func(got any, err error) {
 				s.EqualError(err, "lscpu: exit status 1")
-				s.Exactly(nil, got)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(i)
+				s.Equal(16, i.Count)
 			},
 		},
 		{

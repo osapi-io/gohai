@@ -79,15 +79,22 @@ func (l *Linux) Collect(
 			return info, nil
 		}
 
-		return nil, fmt.Errorf("stat %s: %w", resolvedRuntimeDir, err)
+		// The resolv.conf facts are kept, so the status is partial.
+		return info, fmt.Errorf("stat %s: %w", resolvedRuntimeDir, err)
 	}
 	for _, kind := range []string{"dns", "domain"} {
 		out, err := l.Exec.Execute(ctx, "resolvectl", kind)
 		if collector.Absent(err) {
 			return info, nil
 		}
-		if err != nil {
+		if err != nil && collector.Cancelled(ctx, err) {
 			return nil, fmt.Errorf("read resolvectl %s: %w", kind, err)
+		}
+		if err != nil {
+			// resolvectl can fail while the runtime directory is left
+			// from a stopped resolved. The facts read so far are kept,
+			// so the status is partial.
+			return info, fmt.Errorf("read resolvectl %s: %w", kind, err)
 		}
 		for _, line := range strings.Split(string(out), "\n") {
 			line = strings.TrimSpace(line)

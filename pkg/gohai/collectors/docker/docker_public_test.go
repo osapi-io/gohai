@@ -437,7 +437,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a failed docker ps is an error",
+			name:    "linux: a failed docker ps keeps the version and images",
 			variant: "linux",
 			exec: buildMock(
 				s.T(),
@@ -447,6 +447,25 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			),
 			validateFunc: func(got any, err error) {
 				s.EqualError(err, "docker ps: ps failed")
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("24.0.5", info.Version)
+				s.Nil(info.Containers)
+				s.NotEmpty(info.Images)
+			},
+		},
+		{
+			name:    "linux: a cancelled docker ps gives no fact",
+			variant: "linux",
+			exec: buildMock(
+				s.T(),
+				[]byte(versionOut), nil,
+				nil, context.Canceled,
+				[]byte(imagesOut), nil,
+			),
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
 				s.Exactly(nil, got)
 			},
 		},
@@ -468,7 +487,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a failed docker images is an error",
+			name:    "linux: a failed docker images keeps the version and containers",
 			variant: "linux",
 			exec: buildMock(
 				s.T(),
@@ -478,6 +497,25 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			),
 			validateFunc: func(got any, err error) {
 				s.EqualError(err, "docker images: images failed")
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("24.0.5", info.Version)
+				s.NotEmpty(info.Containers)
+				s.Nil(info.Images)
+			},
+		},
+		{
+			name:    "linux: a cancelled docker images gives no fact",
+			variant: "linux",
+			exec: buildMock(
+				s.T(),
+				[]byte(versionOut), nil,
+				[]byte(containersOut), nil,
+				nil, context.Canceled,
+			),
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
 				s.Exactly(nil, got)
 			},
 		},

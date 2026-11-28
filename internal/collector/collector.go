@@ -40,6 +40,19 @@ func Absent(
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, exec.ErrNotFound)
 }
 
+// Cancelled reports whether a read stopped because the run was cancelled
+// or ran out of time: ctx is done, or err wraps context.Canceled or
+// context.DeadlineExceeded. A collector gives no fact for a cancelled run,
+// even when earlier reads worked, because the run did not finish.
+func Cancelled(
+	ctx context.Context,
+	err error,
+) bool {
+	return ctx.Err() != nil ||
+		errors.Is(err, context.Canceled) ||
+		errors.Is(err, context.DeadlineExceeded)
+}
+
 // ErrUnsupported is the error of a collector variant that has nothing to
 // read on its platform, such as the macOS variant of a Linux-only collector.
 // The registry gives it the status StatusUnsupported, not StatusFailed, and

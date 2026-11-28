@@ -142,9 +142,11 @@ On both Linux and macOS:
    extension. Ohai does not list each container.
 3. The collector runs `docker images --format '{{json .}}'` to list the local
    images. It parses the NDJSON in the same way. If `docker ps` or
-   `docker images` fails, Collect returns the error, not an empty list, because
-   an empty list says that the host has no containers or images. This is also a
-   gohai extension that Ohai does not have.
+   `docker images` fails, Collect keeps the version and the other list with the
+   error, and leaves the failed list out, not empty, because an empty list says
+   that the host has no containers or images. The status is `partial`. A
+   cancelled context gives no fact. This is also a gohai extension that Ohai
+   does not have.
 4. Docker gives the container `Names` field with a leading `/`. The collector
    removes it before it stores the name.
 

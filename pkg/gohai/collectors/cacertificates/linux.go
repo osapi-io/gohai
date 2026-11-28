@@ -23,6 +23,7 @@ package cacertificates
 import (
 	"context"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io/fs"
 	"path"
@@ -139,8 +140,11 @@ func NewLinux() *Linux {
 
 // Collect reads each CA file under the layout's directories. A directory
 // or a file that the host does not have has no CAs. One that exists and
-// cannot be read is an error, so a host does not look as if it has fewer
-// CAs. A CA that a blocklist or a p11-kit bundle distrusts is not enabled.
+// cannot be read adds its error, and the walk goes on, so the CAs that
+// were read are kept with the error and the status is partial. When no CA
+// was read and a read failed, there is no fact. A CA that a blocklist or
+// a p11-kit bundle distrusts is not enabled. A blocklist that cannot be
+// read is an error with no fact, because the enabled flags would be wrong.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
@@ -154,10 +158,18 @@ func (l *Linux) Collect(
 		return nil, err
 	}
 	info := &Info{Certificates: []Certificate{}}
+	var errs []error
 	for _, d := range l.Layout.Dirs {
-		werr := l.FS.WalkDir(d.Path, func(p string, e fs.DirEntry, err error) error {
+		// The walk function adds each error to errs and never returns one,
+		// so the walk goes on past a path it cannot read, and WalkDir
+		// returns nil.
+		_ = l.FS.WalkDir(d.Path, func(p string, e fs.DirEntry, err error) error {
 			if err != nil {
-				return walkErr(p, err)
+				if we := walkErr(p, err); !errors.Is(we, fs.SkipDir) {
+					errs = append(errs, we)
+				}
+
+				return fs.SkipDir
 			}
 			if e.IsDir() {
 				if slices.Contains(l.Layout.Blocklists, p) {
@@ -174,7 +186,9 @@ func (l *Linux) Collect(
 				return nil
 			}
 			if rerr != nil {
-				return fmt.Errorf("read %s: %w", p, rerr)
+				errs = append(errs, fmt.Errorf("read %s: %w", p, rerr))
+
+				return nil
 			}
 			info.Certificates = append(info.Certificates, entries(d, p, data, off)...)
 			if path.Ext(p) == ".p11-kit" {
@@ -185,9 +199,9 @@ func (l *Linux) Collect(
 
 			return nil
 		})
-		if werr != nil {
-			return nil, werr
-		}
+	}
+	if len(info.Certificates) == 0 && len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
 	for i, c := range info.Certificates {
 		if distrusted[c.Fingerprint] {
@@ -195,7 +209,7 @@ func (l *Linux) Collect(
 		}
 	}
 
-	return info, nil
+	return info, errors.Join(errs...)
 }
 
 // blocklisted are the fingerprints of the certificates in the layout's
@@ -310,7 +324,7 @@ func entries(
 	off map[string]bool,
 ) []Certificate {
 	name := strings.TrimSuffix(strings.TrimPrefix(p, d.Path+"/"), path.Ext(p))
-	base := Certificate{
+	tmpl := Certificate{
 		Name:    name,
 		Path:    p,
 		Source:  d.Source,
@@ -319,13 +333,13 @@ func entries(
 	cs := certs(data)
 	switch len(cs) {
 	case 0:
-		return []Certificate{base}
+		return []Certificate{tmpl}
 	case 1:
-		return []Certificate{describe(base, cs[0])}
+		return []Certificate{describe(tmpl, cs[0])}
 	}
 	out := make([]Certificate, 0, len(cs))
 	for _, c := range cs {
-		e := base
+		e := tmpl
 		e.Name = nameOf(c)
 		out = append(out, describe(e, c))
 	}
