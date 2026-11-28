@@ -217,8 +217,10 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
 			runner: sourcetest.Commands{
-				Out: map[string]string{"scutil --dns": "DNS configuration (for scoped queries)\n\n" +
-					"resolver #1\n  nameserver[0] : 9.9.9.9\n  if_index : 14 (en0)\n"},
+				Out: map[string]string{
+					"scutil --dns": "DNS configuration (for scoped queries)\n\n" +
+						"resolver #1\n  nameserver[0] : 9.9.9.9\n  if_index : 14 (en0)\n",
+				},
 			},
 			want: &dns.Info{
 				Nameservers: []string{"1.1.1.1"},
