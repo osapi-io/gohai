@@ -25,12 +25,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
@@ -49,12 +50,10 @@ func TestMemoryPublicTestSuite(
 }
 
 func (s *MemoryPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(memory.Collector)
 	}{
 		{
@@ -97,11 +96,20 @@ func (s *MemoryPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c memory.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := memory.New()
+			c := memory.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = memory.New()
+			}
 			s.Equal("memory", c.Name())
 			s.Equal("hardware", string(c.Category()))
 			s.True(c.DefaultEnabled())

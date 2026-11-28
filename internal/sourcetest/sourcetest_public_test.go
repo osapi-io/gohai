@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"testing"
 
@@ -83,6 +84,45 @@ func (s *SourcetestPublicTestSuite) TestLinks() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			tt.validateFunc(sourcetest.Links(s.T(), sourcetest.FS(s.T(), nil), tt.links))
+		})
+	}
+}
+
+func (s *SourcetestPublicTestSuite) TestFailRead() {
+	tests := []struct {
+		name         string
+		paths        []string
+		read         string
+		validateFunc func([]byte, error)
+	}{
+		{
+			name:  "a read of a path fails, with an error that is not not-exist",
+			paths: []string{"/proc/mdstat"},
+			read:  "/proc/mdstat",
+			validateFunc: func(b []byte, err error) {
+				s.Require().Error(err)
+				s.NotErrorIs(err, fs.ErrNotExist)
+				s.Empty(b)
+			},
+		},
+		{
+			name:  "a file that is not named still reads",
+			paths: []string{"/proc/mdstat"},
+			read:  "/etc/os-release",
+			validateFunc: func(b []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ID=fedora\n", string(b))
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			vfs := sourcetest.FailRead(
+				s.T(),
+				sourcetest.FS(s.T(), map[string]string{"/etc/os-release": "ID=fedora\n"}),
+				tt.paths...,
+			)
+			tt.validateFunc(vfs.ReadFile(tt.read))
 		})
 	}
 }

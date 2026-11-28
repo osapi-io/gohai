@@ -24,10 +24,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/packagemgr"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -51,12 +51,10 @@ func TestPackageMgrPublicTestSuite(
 }
 
 func (s *PackageMgrPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(packagemgr.Collector)
 	}{
 		{
@@ -99,11 +97,20 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c packagemgr.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := packagemgr.New()
+			c := packagemgr.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = packagemgr.New()
+			}
 			s.Equal("package_mgr", c.Name())
 			s.Equal("software", string(c.Category()))
 			s.True(c.DefaultEnabled())

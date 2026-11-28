@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -38,7 +39,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -64,12 +64,10 @@ func TestNetworkPublicTestSuite(
 }
 
 func (s *NetworkPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(network.Collector)
 	}{
 		{
@@ -112,11 +110,20 @@ func (s *NetworkPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c network.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := network.New()
+			c := network.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = network.New()
+			}
 			s.Equal("network", c.Name())
 			s.Equal("network", string(c.Category()))
 			s.True(c.DefaultEnabled())
@@ -124,51 +131,6 @@ func (s *NetworkPublicTestSuite) TestNew() {
 			tt.validateFunc(c)
 		})
 	}
-}
-
-// TestKind: each interface's kind comes from sysfs, which tells a bridge, a
-// bond, Wi-Fi, a VLAN and a NIC apart, although each is Ethernet.
-
-// fsWith builds a memfs containing the given (path → contents) map.
-func fsWith(
-	t require.TestingT,
-	files map[string]string,
-) avfs.VFS {
-	return fsWithSymlinks(t, files, nil)
-}
-
-// fsWithSymlinks adds symlinks (path → target) on top of regular
-// files. Used for /sys/class/net/<iface>/device/driver, which is a
-// symlink in real sysfs.
-func fsWithSymlinks(
-	t require.TestingT,
-	files map[string]string,
-	symlinks map[string]string,
-) avfs.VFS {
-	fs := memfs.New()
-	for path, content := range files {
-		require.NoError(t, fs.MkdirAll(dirOf(path), 0o755))
-		require.NoError(t, fs.WriteFile(path, []byte(content), 0o644))
-	}
-	for path, target := range symlinks {
-		require.NoError(t, fs.MkdirAll(dirOf(path), 0o755))
-		require.NoError(t, fs.Symlink(target, path))
-	}
-	return fs
-}
-
-func dirOf(
-	p string,
-) string {
-	for i := len(p) - 1; i >= 0; i-- {
-		if p[i] == '/' {
-			if i == 0 {
-				return "/"
-			}
-			return p[:i]
-		}
-	}
-	return "/"
 }
 
 // ipRouteExec returns a MockRunner that canned-answers
@@ -477,7 +439,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: addresses parsed into family/prefixlen/netmask/scope/broadcast",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/lo/type":   "772\n",
 				"/sys/class/net/eth0/type": "1\n",
 			}),
@@ -514,7 +476,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: admin-down interface reports state=down",
 			ifsFn:      adminDownInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -529,7 +491,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ethtool -i populates DriverInfo on Ethernet interfaces only",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/lo/type":            "772\n", // Loopback
 				"/sys/class/net/eth0/type":          "1\n",
 				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n", // Ethernet
@@ -580,7 +542,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/eth0/type":          "1\n",
 				"/sys/class/net/eth0/device/uevent": "DRIVER=igb\n",
 				"/sys/class/net/veth0/type":         "1\n",
@@ -606,7 +568,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}}, nil
 			},
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/bond0/type":         "1\n",
 				"/sys/class/net/bond0/bonding/mode": "active-backup 1\n",
 			}),
@@ -631,7 +593,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}}, nil
 			},
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/br0/type":             "1\n",
 				"/sys/class/net/br0/bridge/stp_state": "0\n",
 			}),
@@ -648,7 +610,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: a spent ethtool budget runs no ethtool",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/eth0/type":          "1\n",
 				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
@@ -665,7 +627,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: a budget whose deadline passed before its timer fired runs no ethtool",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/eth0/type":          "1\n",
 				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
@@ -682,7 +644,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ethtool -i error skipped silently, Ethtool stays nil",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/eth0/type":          "1\n",
 				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
@@ -700,7 +662,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ethtool empty output yields nil DriverInfo",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/eth0/type":          "1\n",
 				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
@@ -720,7 +682,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ethtool tuning bundle populates ring/channel/coalesce/offload/pause",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/eth0/type":          "1\n",
 				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
@@ -801,7 +763,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ethtool tuning malformed lines silently skipped",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/eth0/type":          "1\n",
 				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
@@ -850,7 +812,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ip -d link populates vlan + tunnel + xdp",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteAndIPLinkExec(
 				s.T(),
 				`1: lo: <LOOPBACK,UP> mtu 65536 qdisc noqueue state UNKNOWN
@@ -894,7 +856,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteAndIPLinkExec(s.T(), `1: eth0.100@eth0: <BROADCAST,MULTICAST,UP> mtu 1500
     link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff
     vlan id 100 LOOSE_BINDING REORDER_HDR
@@ -946,7 +908,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ip -d link error leaves vlan/tunnel/xdp nil",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(
 				s.T(),
 				nil,
@@ -969,7 +931,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ip -d link with no annotations matches no interfaces",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteAndIPLinkExec(s.T(), `1: lo: <LOOPBACK,UP> mtu 65536
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
 2: eth0: <BROADCAST,MULTICAST,UP> mtu 1500
@@ -995,7 +957,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteAndIPLinkExec(s.T(), `1: vlan10@eth0: <UP> mtu 1500
     vlan protocol 802.1ad id 10
 2: tun0: <NOARP> mtu 1452
@@ -1030,7 +992,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: ip -d link continuation lines before any header are dropped",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteAndIPLinkExec(s.T(), `   vlan id 999
 1: lo: <LOOPBACK,UP> mtu 65536
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
@@ -1052,7 +1014,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteAndIPLinkExec(s.T(), `1: weird: <UP> mtu 1500
     vlan
     vlan id no-digits-here
@@ -1074,7 +1036,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "ip route populates default v4 + v6, per-interface routes attach",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("default via 10.0.0.1 dev eth0 proto dhcp metric 100 \n"+
 					"10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.5\n"), nil,
@@ -1097,7 +1059,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "the default with the lowest metric wins, and a blackhole default is not one",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("blackhole default metric 10\n"+
 					"default via 10.0.0.9 dev lo metric 200\n"+
@@ -1123,7 +1085,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "multipath route expands into one Route per nexthop",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(
 				s.T(),
 				[]byte(
@@ -1154,7 +1116,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "route with src but no dev: interface inferred from local address match",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(
 				s.T(),
 				// 10.0.0.5 is owned by eth0 in canonicalInterfaces.
@@ -1173,7 +1135,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "route with src but no dev and no matching local address: interface stays empty",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(
 				s.T(),
 				[]byte("10.0.0.0/24 proto kernel scope link src 1.2.3.4\n"),
@@ -1191,7 +1153,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "ip missing: routing fields stay empty, interfaces still populated",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(
 				s.T(),
 				nil,
@@ -1220,7 +1182,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/proc/vz/version": "",
 			}),
 			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
@@ -1245,7 +1207,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/proc/vz/version": "",
 			}),
 			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
@@ -1270,7 +1232,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/proc/vz/version": "",
 				"/proc/bc/0":       "",
 			}),
@@ -1291,7 +1253,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/proc/vz/version": "",
 			}),
 			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
@@ -1307,7 +1269,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "encapsulation: invalid sysfs content skipped",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWith(s.T(), map[string]string{
+			fs: sourcetest.FS(s.T(), map[string]string{
 				"/sys/class/net/lo/type":   "not-a-number\n",
 				"/sys/class/net/eth0/type": "9999\n", // unknown ARPHRD
 			}),
@@ -1328,7 +1290,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				}, nil
 			},
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.5 metric 100\n"),
 				nil, nil, errAbsent),
@@ -1349,7 +1311,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "ip route line that's just whitespace skipped",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("   \n\n"),
 				nil, nil, errAbsent),
@@ -1364,7 +1326,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "ip route metric with non-int: silently kept zero",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("default via 10.0.0.1 dev eth0 metric oops\n"),
 				nil, nil, errAbsent),
@@ -1380,7 +1342,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "ip route attach to unknown interface: skipped silently",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("default via 10.0.0.1 dev nonexistent0\n"),
 				nil, nil, errAbsent),
@@ -1396,7 +1358,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "nil Exec: the interfaces of sysfs, and no routes",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1420,7 +1382,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "sysfs speed, duplex and driver per interface",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWithSymlinks(s.T(), nil, map[string]string{
+			fs: sourcetest.Links(s.T(), sourcetest.FS(s.T(), nil), map[string]string{
 				"/sys/class/net/eth0/device/driver": "../../../../bus/pci/drivers/e1000e",
 			}),
 			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
@@ -1438,7 +1400,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "no sysfs speed or duplex: both empty, Driver from sysfs still works",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWithSymlinks(s.T(), nil, map[string]string{
+			fs: sourcetest.Links(s.T(), sourcetest.FS(s.T(), nil), map[string]string{
 				"/sys/class/net/eth0/device/driver": "../../../../bus/pci/drivers/virtio_net",
 			}),
 			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
@@ -1456,7 +1418,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "sysfs driver symlink without slash: target used as-is",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs: fsWithSymlinks(s.T(), nil, map[string]string{
+			fs: sourcetest.Links(s.T(), sourcetest.FS(s.T(), nil), map[string]string{
 				"/sys/class/net/eth0/device/driver": "ixgbe",
 			}),
 			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
@@ -1471,7 +1433,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "neighbour list populates Info.Neighbours",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1487,7 +1449,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: a failed ip -o addr show is an error",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: func() source.Runner {
 				m := ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent).(*mocks.MockRunner)
 				m.EXPECT().Execute(gomock.Any(), "ip", "-o", "addr", "show").
@@ -1503,7 +1465,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: a failed ip -4 route is an error",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, errors.New("exit status 2"), nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Exactly(nil, got)
@@ -1514,7 +1476,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: a failed ip -6 route with IPv6 on is an error",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), map[string]string{"/proc/net/if_inet6": ""}),
+			fs:         sourcetest.FS(s.T(), map[string]string{"/proc/net/if_inet6": ""}),
 			exec:       ipRouteExec(s.T(), nil, nil, nil, errors.New("exit status 2")),
 			validateFunc: func(got any, err error) {
 				s.Exactly(nil, got)
@@ -1525,7 +1487,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: a failed ip -6 route with IPv6 off has no v6 routes",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteExec(
 				s.T(),
 				[]byte("default via 10.0.0.1 dev eth0\n"), nil,
@@ -1543,7 +1505,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: a failed ip -d link is an error",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
 				m.EXPECT().
@@ -1565,7 +1527,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			name:       "linux: a failed ip neigh show is an error",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec: func() source.Runner {
 				m := ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent).(*mocks.MockRunner)
 				m.EXPECT().Execute(gomock.Any(), "ip", "neigh", "show").
@@ -1584,7 +1546,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return nil, nil
 			},
 			fs: func() avfs.VFS {
-				f := fsWith(s.T(), nil)
+				f := sourcetest.FS(s.T(), nil)
 				require.NoError(s.T(), f.MkdirAll("/proc/net/dev", 0o755))
 				return f
 			}(),
@@ -1600,7 +1562,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				return nil, errors.New("interfaces failed")
 			},
 			countersFn: zeroCounters,
-			fs:         fsWith(s.T(), nil),
+			fs:         sourcetest.FS(s.T(), nil),
 			exec:       ipRouteExec(s.T(), nil, nil, nil, nil),
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
@@ -2079,7 +2041,7 @@ func writeSysfs(
 	nic bool,
 ) {
 	write := func(path, content string) {
-		require.NoError(t, fs.MkdirAll(dirOf(path), 0o755))
+		require.NoError(t, fs.MkdirAll(filepath.Dir(path), 0o755))
 		require.NoError(t, fs.WriteFile(path, []byte(content), 0o644))
 	}
 	require.NoError(t, fs.MkdirAll("/sys/class/net", 0o755))

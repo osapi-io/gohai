@@ -22,7 +22,6 @@ package shells_test
 
 import (
 	"context"
-	"errors"
 	"io/fs"
 	"testing"
 
@@ -31,27 +30,15 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shells"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
 	_ collector.Collector = (*shells.Linux)(nil)
 	_ collector.Collector = (*shells.Darwin)(nil)
 )
-
-// errorFS wraps a memfs and forces a non-ErrNotExist error from
-// ReadFile. Used to exercise the "other read error" branch without
-// needing real-FS permission manipulation.
-type errorFS struct {
-	avfs.VFS
-}
-
-func (errorFS) ReadFile(
-	string,
-) ([]byte, error) {
-	return nil, errors.New("permission denied")
-}
 
 type ShellsPublicTestSuite struct {
 	suite.Suite
@@ -64,12 +51,10 @@ func TestShellsPublicTestSuite(
 }
 
 func (s *ShellsPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(shells.Collector)
 	}{
 		{
@@ -114,11 +99,20 @@ func (s *ShellsPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c shells.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := shells.New()
+			c := shells.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = shells.New()
+			}
 			s.Equal("shells", c.Name())
 			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())
@@ -219,7 +213,7 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: other read error propagated",
 			variant: "linux",
-			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
+			setupFS: func() avfs.VFS { return sourcetest.FailRead(s.T(), memfs.New(), "/etc/shells") },
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
 			},

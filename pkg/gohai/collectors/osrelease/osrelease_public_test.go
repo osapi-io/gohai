@@ -22,7 +22,6 @@ package osrelease_test
 
 import (
 	"context"
-	"errors"
 	"io/fs"
 	"testing"
 
@@ -31,26 +30,15 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/osrelease"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
 	_ collector.Collector = (*osrelease.Linux)(nil)
 	_ collector.Collector = (*osrelease.Darwin)(nil)
 )
-
-// readErrorFS forces ReadFile to return a non-ErrNotExist error so the
-// "other read error propagated" branch is exercised.
-type readErrorFS struct {
-	avfs.VFS
-}
-
-func (readErrorFS) ReadFile(
-	string,
-) ([]byte, error) {
-	return nil, errors.New("permission denied")
-}
 
 type OSReleasePublicTestSuite struct {
 	suite.Suite
@@ -63,12 +51,10 @@ func TestOSReleasePublicTestSuite(
 }
 
 func (s *OSReleasePublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(osrelease.Collector)
 	}{
 		{
@@ -111,11 +97,20 @@ func (s *OSReleasePublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c osrelease.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := osrelease.New()
+			c := osrelease.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = osrelease.New()
+			}
 			s.Equal("os_release", c.Name())
 			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())
@@ -270,7 +265,7 @@ VARIANT_ID=workstation
 				var vfs avfs.VFS
 				switch {
 				case tt.readErr:
-					vfs = readErrorFS{VFS: memfs.New()}
+					vfs = sourcetest.FailRead(s.T(), memfs.New(), "/etc/os-release")
 				case tt.missing:
 					vfs = memfs.New()
 				case tt.usrLib:

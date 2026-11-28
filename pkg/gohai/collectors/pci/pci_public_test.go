@@ -24,12 +24,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/pci"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
@@ -48,12 +49,10 @@ func TestPCIPublicTestSuite(
 }
 
 func (s *PCIPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(pci.Collector)
 	}{
 		{
@@ -80,11 +79,20 @@ func (s *PCIPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c pci.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := pci.New()
+			c := pci.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = pci.New()
+			}
 			s.Equal("pci", c.Name())
 			s.Equal("hardware", string(c.Category()))
 			s.False(c.DefaultEnabled())
