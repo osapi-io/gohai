@@ -28,6 +28,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -100,8 +101,10 @@ func readPOSIX(
 	return info
 }
 
-// setCurrentUser sets CurrentUser to the user of info.Passwd whose UID is
-// the effective UID that `id -u` gives. It stays empty when exec is nil,
+// setCurrentUser sets CurrentUser to the effective user: the name that
+// `id -un` gives when info.Passwd has it, else the first name, in sorted
+// order, of the users whose UID is the one `id -u` gives, so that two names
+// on one UID give the same answer each run. It stays empty when exec is nil,
 // when id fails, or when no user has the UID.
 func setCurrentUser(
 	ctx context.Context,
@@ -111,6 +114,15 @@ func setCurrentUser(
 	if exec == nil {
 		return
 	}
+	if out, err := exec.Execute(ctx, "id", "-un"); err == nil {
+		if name := strings.TrimSpace(string(out)); name != "" {
+			if _, ok := info.Passwd[name]; ok {
+				info.CurrentUser = name
+
+				return
+			}
+		}
+	}
 	out, err := exec.Execute(ctx, "id", "-u")
 	if err != nil {
 		return
@@ -119,8 +131,13 @@ func setCurrentUser(
 	if err != nil {
 		return
 	}
-	for name, entry := range info.Passwd {
-		if entry.UID == euid {
+	names := make([]string, 0, len(info.Passwd))
+	for name := range info.Passwd {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		if info.Passwd[name].UID == euid {
 			info.CurrentUser = name
 
 			return
@@ -193,8 +210,13 @@ func parsePasswd(
 		if _, exists := out[name]; exists {
 			continue
 		}
-		uid, _ := strconv.Atoi(fields[2])
-		gid, _ := strconv.Atoi(fields[3])
+		// A line whose UID or GID is not a number, such as NIS's
+		// "+::::::", names no account.
+		uid, uidErr := strconv.Atoi(fields[2])
+		gid, gidErr := strconv.Atoi(fields[3])
+		if uidErr != nil || gidErr != nil {
+			continue
+		}
 		out[name] = PasswdEntry{
 			UID:   uid,
 			GID:   gid,
