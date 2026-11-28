@@ -186,7 +186,8 @@ fmt.Println(facts.Network.DefaultInterface)
 A collector that fails, or panics, has no typed field in Facts, the same as one
 that was not selected. `Facts.Errors` (`_errors` in the JSON) has the error of
 each collector that failed, and the others run. A cancelled context stops the
-run with an error.
+run with an error. `Collect` then returns the Facts of the collectors that
+finished with that error, so a caller with a deadline keeps what it collected.
 
 To add the timing of each collector to Facts, add `gohai.WithTimings()` to
 `gohai.New(...)`. Use this to find slow collectors. Refer to the `Timings` field

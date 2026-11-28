@@ -86,6 +86,29 @@ func newCollectorGiving(
 	return m
 }
 
+// newCancellingCollector is a collector named name whose Collect calls
+// cancel, as a deadline that passes while a run is in progress.
+func newCancellingCollector(
+	ctrl *gomock.Controller,
+	name string,
+	cancel context.CancelFunc,
+) *mocks.MockCollector {
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(false).AnyTimes()
+	m.EXPECT().Dependencies().Return(nil).AnyTimes()
+	m.EXPECT().
+		Collect(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, collector.PriorResults) (any, error) {
+			cancel()
+			return nil, nil
+		}).
+		AnyTimes()
+
+	return m
+}
+
 type GohaiPublicTestSuite struct {
 	suite.Suite
 }
@@ -363,6 +386,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 		opts          []gohai.Option
 		injectFailing bool
 		injectAs      any
+		injectCancel  bool
 		validateFunc  func(*gohai.Facts, error)
 	}{
 		{
@@ -487,6 +511,16 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:         "a cancelled run returns the facts that finished with its error",
+			opts:         []gohai.Option{gohai.WithCollectors("platform")},
+			injectCancel: true,
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
+				s.Require().NotNil(facts)
+				s.NotNil(facts.Platform)
+			},
+		},
+		{
 			name:          "failed collector surfaces in Errors without WithTimings",
 			injectFailing: true,
 			validateFunc: func(facts *gohai.Facts, err error) {
@@ -520,7 +554,15 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 				)
 				s.Require().NoError(g.Select("wrongtype"))
 			}
-			tt.validateFunc(g.Collect(context.Background()))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.injectCancel {
+				s.Require().NoError(
+					g.Register(newCancellingCollector(gomock.NewController(s.T()), "canceller", cancel)),
+				)
+				s.Require().NoError(g.Select("canceller"))
+			}
+			tt.validateFunc(g.Collect(ctx))
 		})
 	}
 }
