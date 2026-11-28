@@ -144,6 +144,14 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			},
 			want: &load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
 		},
+		{
+			name:    "darwin: a vm.loadavg that does not parse",
+			variant: "darwin",
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sysctl -n vm.loadavg": "{ 1.50 }\n"},
+			},
+			wantErr: "no load averages",
+		},
 		{name: "darwin: no Exec gives no fact", variant: "darwin", nilExec: true},
 		{
 			name:    "darwin: sysctl fails",

@@ -59,5 +59,5 @@ func (l *Linux) Collect(
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", procInterrupts, err)
 	}
-	return collector.Result(parseInterrupts(b), nil)
+	return parseInterrupts(b), nil
 }

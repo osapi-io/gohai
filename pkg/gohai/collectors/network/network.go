@@ -675,8 +675,14 @@ func parseIPLinkOutput(
 			out[currentName] = ann
 		}
 
+		// The attributes can span more than one line, so each line adds
+		// the ones it has and keeps the ones an earlier line gave.
 		if attrs := parseLinkAttrs(line); attrs != nil {
-			linkAttrs[currentName] = attrs
+			if prev := linkAttrs[currentName]; prev != nil {
+				mergeLinkAttrs(prev, attrs)
+			} else {
+				linkAttrs[currentName] = attrs
+			}
 		}
 		switch {
 		case tunnelHeaderRE.MatchString(line):
