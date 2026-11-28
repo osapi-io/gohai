@@ -528,8 +528,10 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
 				absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
+				m.EXPECT().
+					Execute(gomock.Any(), "go", "version").
+					Return([]byte("go version go1.25.4 linux/amd64\n"), nil)
 				for _, p := range [][]string{
-					{"go", "version"},
 					{"python3", "--version"},
 					{"ruby", "--version"},
 					{"node", "--version"},
@@ -546,9 +548,13 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				// The facts read before the error stay.
-				_, ok := got.(*languages.Info)
-				s.True(ok)
+				// The version read before the error stays.
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().NotNil(info.Go)
+				s.Equal("1.25.4", *info.Go)
+				s.Nil(info.Java)
 				s.EqualError(err, "sh -c java -version 2>&1: exit status 1")
 			},
 		},

@@ -192,12 +192,15 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		{
 			name:     "linux: an /etc/passwd that does not read is a partial result",
 			variant:  "linux",
+			files:    map[string]string{"/etc/group": "wheel:x:0:root\n"},
 			failRead: []string{"/etc/passwd"},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /etc/passwd")
-				// The facts read before the error stay.
-				_, ok := got.(*users.Info)
-				s.True(ok)
+				// The group read before the error stays.
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal(users.GroupEntry{GID: 0, Members: []string{"root"}}, info.Group["wheel"])
 			},
 		},
 		{
@@ -207,9 +210,11 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			failRead: []string{"/etc/group"},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /etc/group")
-				// The facts read before the error stay.
-				_, ok := got.(*users.Info)
-				s.True(ok)
+				// The user read before the error stays.
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("/root", info.Passwd["root"].Dir)
 			},
 		},
 		{
@@ -228,12 +233,15 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			name:     "darwin: an /etc/passwd that does not read is a partial result",
 			variant:  "darwin",
 			nilExec:  true,
+			files:    map[string]string{"/etc/group": "wheel:x:0:root\n"},
 			failRead: []string{"/etc/passwd"},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /etc/passwd")
-				// The facts read before the error stay.
-				_, ok := got.(*users.Info)
-				s.True(ok)
+				// The group read before the error stays.
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal(users.GroupEntry{GID: 0, Members: []string{"root"}}, info.Group["wheel"])
 			},
 		},
 		{
@@ -532,20 +540,31 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: a dscl that fails to list the users is a partial result",
 			variant: "darwin",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
+				"/etc/group":  "wheel:x:0:root\n",
+			},
 			dscl:    "root ;ShadowHash;\n",
 			dsclErrs: map[string]error{
 				"dscl . -list /Users UniqueID": errors.New("exit status 1"),
 			},
 			validateFunc: func(got any, err error) {
 				// The facts read before the error stay.
-				_, ok := got.(*users.Info)
-				s.True(ok)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Contains(info.Passwd, "root")
+				s.Contains(info.Group, "wheel")
 				s.EqualError(err, "dscl . -list /Users UniqueID: exit status 1")
 			},
 		},
 		{
 			name:    "darwin: a dscl that fails to list a user attribute is a partial result",
 			variant: "darwin",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
+				"/etc/group":  "wheel:x:0:root\n",
+			},
 			dscl:    "root ;ShadowHash;\n",
 			dsclLists: map[string]string{
 				"dscl . -list /Users UniqueID": "root 0\n",
@@ -555,28 +574,42 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				// The facts read before the error stay.
-				_, ok := got.(*users.Info)
-				s.True(ok)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Contains(info.Passwd, "root")
+				s.Contains(info.Group, "wheel")
 				s.EqualError(err, "dscl . -list /Users RealName: exit status 1")
 			},
 		},
 		{
 			name:    "darwin: a dscl that fails to list the groups is a partial result",
 			variant: "darwin",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
+				"/etc/group":  "wheel:x:0:root\n",
+			},
 			dscl:    "root ;ShadowHash;\n",
 			dsclErrs: map[string]error{
 				"dscl . -list /Groups PrimaryGroupID": errors.New("exit status 1"),
 			},
 			validateFunc: func(got any, err error) {
 				// The facts read before the error stay.
-				_, ok := got.(*users.Info)
-				s.True(ok)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Contains(info.Passwd, "root")
+				s.Contains(info.Group, "wheel")
 				s.EqualError(err, "dscl . -list /Groups PrimaryGroupID: exit status 1")
 			},
 		},
 		{
 			name:    "darwin: a dscl that fails to list the group members is a partial result",
 			variant: "darwin",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
+				"/etc/group":  "wheel:x:0:root\n",
+			},
 			dscl:    "root ;ShadowHash;\n",
 			dsclLists: map[string]string{
 				"dscl . -list /Groups PrimaryGroupID": "admin 80\n",
@@ -586,22 +619,32 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				// The facts read before the error stay.
-				_, ok := got.(*users.Info)
-				s.True(ok)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Contains(info.Passwd, "root")
+				s.Contains(info.Group, "wheel")
 				s.EqualError(err, "dscl . -list /Groups GroupMembership: exit status 1")
 			},
 		},
 		{
 			name:    "darwin: a dscl that fails to list AuthenticationAuthority is a partial result",
 			variant: "darwin",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
+				"/etc/group":  "wheel:x:0:root\n",
+			},
 			dscl:    "unused",
 			dsclErrs: map[string]error{
 				"dscl . -list /Users AuthenticationAuthority": errors.New("exit status 1"),
 			},
 			validateFunc: func(got any, err error) {
 				// The facts read before the error stay.
-				_, ok := got.(*users.Info)
-				s.True(ok)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Contains(info.Passwd, "root")
+				s.Contains(info.Group, "wheel")
 				s.EqualError(err, "dscl . -list /Users AuthenticationAuthority: exit status 1")
 			},
 		},
