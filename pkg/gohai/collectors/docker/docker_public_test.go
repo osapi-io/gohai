@@ -147,110 +147,26 @@ const inspectOut = `[
   }
 ]`
 
-func (s *DockerPublicTestSuite) TestInspect() {
-	tests := []struct {
-		name         string
-		inspectOut   []byte
-		inspectErr   error
-		validateFunc func([]docker.Container)
-	}{
-		{
-			name:       "when inspect answers, each container has its details in sorted order, and no env value",
-			inspectOut: []byte(inspectOut),
-			validateFunc: func(cs []docker.Container) {
-				s.Require().Len(cs, 2)
-				web := cs[0]
-				s.Equal("abc123", web.ID)
-				s.Equal("2026-11-22T10:00:00.123456789Z", web.Created)
-				s.Equal("healthy", web.Health)
-				s.Equal([]string{"PATH", "DB_PASSWORD", "EMPTY"}, web.EnvNames)
-				for _, n := range web.EnvNames {
-					s.NotContains(n, "hunter2")
-				}
-				s.Equal([]docker.Mount{
-					{
-						Type:        "volume",
-						Source:      "/var/lib/docker/volumes/data/_data",
-						Destination: "/data",
-					},
-					{Type: "bind", Source: "/etc/nginx", Destination: "/etc/nginx", ReadOnly: true},
-				}, web.Mounts)
-				s.Equal([]docker.Port{
-					{ContainerPort: "443/tcp"},
-					{ContainerPort: "80/tcp", HostIP: "0.0.0.0", HostPort: "8080"},
-					{ContainerPort: "80/tcp", HostIP: "::", HostPort: "8080"},
-				}, web.Ports)
-				s.Equal([]docker.Network{
-					{Name: "bridge", IPAddress: "172.17.0.2", Gateway: "172.17.0.1"},
-					{Name: "frontend", IPAddress: "172.19.0.2", Gateway: "172.19.0.1"},
-				}, web.Networks)
+// inspectMock is a runner on which docker version, ps and images answer,
+// and docker inspect answers out and err.
+func inspectMock(
+	t *testing.T,
+	out []byte,
+	err error,
+) source.Runner {
+	ctrl := gomock.NewController(t)
+	m := mocks.NewMockRunner(ctrl)
+	m.EXPECT().
+		Execute(gomock.Any(), "docker", "version", "--format", "{{.Server.Version}}").
+		Return([]byte(versionOut), nil)
+	m.EXPECT().
+		Execute(gomock.Any(), "docker", "ps", "-a", "--no-trunc", "--format", "{{json .}}").
+		Return([]byte(containersOut), nil)
+	m.EXPECT().Execute(gomock.Any(), "docker", "images", "--format", "{{json .}}").
+		Return([]byte(imagesOut), nil)
+	inspect(m, out, err)
 
-				db := cs[1]
-				s.Equal("2026-11-21T09:00:00Z", db.Created)
-				s.Empty(db.Health)
-				s.Nil(db.Ports)
-				s.Nil(db.Mounts)
-				s.Nil(db.Networks)
-				s.Nil(db.EnvNames)
-			},
-		},
-		{
-			name:       "when inspect has only one of the containers, the other is as ps gave it",
-			inspectOut: []byte(`[{"Id": "def456", "Created": "2026-11-21T09:00:00Z"}]`),
-			validateFunc: func(cs []docker.Container) {
-				s.Require().Len(cs, 2)
-				s.Empty(cs[0].Created)
-				s.Equal("2026-11-21T09:00:00Z", cs[1].Created)
-			},
-		},
-		{
-			name:       "when inspect answers with JSON that is not a list, the containers are as ps gave them",
-			inspectOut: []byte(`{"not": "a list"}`),
-			validateFunc: func(cs []docker.Container) {
-				s.Require().Len(cs, 2)
-				s.Empty(cs[0].Created)
-			},
-		},
-		{
-			name:       "when inspect fails for a container that went away, the others have their details",
-			inspectOut: []byte(`[{"Id": "def456", "Created": "2026-11-21T09:00:00Z"}]`),
-			inspectErr: errors.New("exit status 1: no such object: abc123"),
-			validateFunc: func(cs []docker.Container) {
-				s.Require().Len(cs, 2)
-				s.Empty(cs[0].Created)
-				s.Equal("2026-11-21T09:00:00Z", cs[1].Created)
-			},
-		},
-		{
-			name:       "when inspect fails, the containers are as ps gave them",
-			inspectErr: errors.New("daemon gone"),
-			validateFunc: func(cs []docker.Container) {
-				s.Require().Len(cs, 2)
-				s.Empty(cs[0].Created)
-				s.Equal("web", cs[0].Name)
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			ctrl := gomock.NewController(s.T())
-			m := mocks.NewMockRunner(ctrl)
-			m.EXPECT().
-				Execute(gomock.Any(), "docker", "version", "--format", "{{.Server.Version}}").
-				Return([]byte(versionOut), nil)
-			m.EXPECT().
-				Execute(gomock.Any(), "docker", "ps", "-a", "--no-trunc", "--format", "{{json .}}").
-				Return([]byte(containersOut), nil)
-			m.EXPECT().Execute(gomock.Any(), "docker", "images", "--format", "{{json .}}").
-				Return([]byte(imagesOut), nil)
-			inspect(m, tc.inspectOut, tc.inspectErr)
-
-			got, err := (&docker.Linux{Exec: m}).Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			tc.validateFunc(got.(*docker.Info).Containers)
-		})
-	}
+	return m
 }
 
 func (s *DockerPublicTestSuite) TestNew() {
@@ -323,6 +239,114 @@ func (s *DockerPublicTestSuite) TestCollect() {
 		exec         source.Runner
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: when inspect answers, each container has its details in sorted order, and no env value",
+			variant: "linux",
+			exec:    inspectMock(s.T(), []byte(inspectOut), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				cs := info.Containers
+				s.Require().Len(cs, 2)
+				web := cs[0]
+				s.Equal("abc123", web.ID)
+				s.Equal("2026-11-22T10:00:00.123456789Z", web.Created)
+				s.Equal("healthy", web.Health)
+				s.Equal([]string{"PATH", "DB_PASSWORD", "EMPTY"}, web.EnvNames)
+				for _, n := range web.EnvNames {
+					s.NotContains(n, "hunter2")
+				}
+				s.Equal([]docker.Mount{
+					{
+						Type:        "volume",
+						Source:      "/var/lib/docker/volumes/data/_data",
+						Destination: "/data",
+					},
+					{Type: "bind", Source: "/etc/nginx", Destination: "/etc/nginx", ReadOnly: true},
+				}, web.Mounts)
+				s.Equal([]docker.Port{
+					{ContainerPort: "443/tcp"},
+					{ContainerPort: "80/tcp", HostIP: "0.0.0.0", HostPort: "8080"},
+					{ContainerPort: "80/tcp", HostIP: "::", HostPort: "8080"},
+				}, web.Ports)
+				s.Equal([]docker.Network{
+					{Name: "bridge", IPAddress: "172.17.0.2", Gateway: "172.17.0.1"},
+					{Name: "frontend", IPAddress: "172.19.0.2", Gateway: "172.19.0.1"},
+				}, web.Networks)
+
+				db := cs[1]
+				s.Equal("2026-11-21T09:00:00Z", db.Created)
+				s.Empty(db.Health)
+				s.Nil(db.Ports)
+				s.Nil(db.Mounts)
+				s.Nil(db.Networks)
+				s.Nil(db.EnvNames)
+			},
+		},
+		{
+			name:    "linux: when inspect has only one of the containers, the other is as ps gave it",
+			variant: "linux",
+			exec: inspectMock(
+				s.T(),
+				[]byte(`[{"Id": "def456", "Created": "2026-11-21T09:00:00Z"}]`),
+				nil,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				cs := info.Containers
+				s.Require().Len(cs, 2)
+				s.Empty(cs[0].Created)
+				s.Equal("2026-11-21T09:00:00Z", cs[1].Created)
+			},
+		},
+		{
+			name:    "linux: when inspect answers with JSON that is not a list, the containers are as ps gave them",
+			variant: "linux",
+			exec:    inspectMock(s.T(), []byte(`{"not": "a list"}`), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				cs := info.Containers
+				s.Require().Len(cs, 2)
+				s.Empty(cs[0].Created)
+			},
+		},
+		{
+			name:    "linux: when inspect fails for a container that went away, the others have their details",
+			variant: "linux",
+			exec: inspectMock(
+				s.T(),
+				[]byte(`[{"Id": "def456", "Created": "2026-11-21T09:00:00Z"}]`),
+				errors.New("exit status 1: no such object: abc123"),
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				cs := info.Containers
+				s.Require().Len(cs, 2)
+				s.Empty(cs[0].Created)
+				s.Equal("2026-11-21T09:00:00Z", cs[1].Created)
+			},
+		},
+		{
+			name:    "linux: when inspect fails, the containers are as ps gave them",
+			variant: "linux",
+			exec:    inspectMock(s.T(), nil, errors.New("daemon gone")),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				cs := info.Containers
+				s.Require().Len(cs, 2)
+				s.Empty(cs[0].Created)
+				s.Equal("web", cs[0].Name)
+			},
+		},
 		{
 			name:    "linux: docker present, full result",
 			variant: "linux",
