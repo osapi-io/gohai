@@ -23,12 +23,12 @@
 package osrelease
 
 import (
-	"bufio"
 	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
 // Info holds the typed fields parsed from /etc/os-release. Unknown
@@ -80,49 +80,14 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// unquote is an os-release(5) value without its quotes: a value in one
-// matching pair of double or single quotes loses them, and in double quotes
-// a backslash escapes the next character, as in shell. A value with no
-// quotes is as it is.
-func unquote(
-	v string,
-) string {
-	if len(v) < 2 || v[0] != v[len(v)-1] || (v[0] != '"' && v[0] != '\'') {
-		return v
-	}
-	q, body := v[0], v[1:len(v)-1]
-	if q == '\'' {
-		return body
-	}
-	var b strings.Builder
-	for i := 0; i < len(body); i++ {
-		if body[i] == '\\' && i+1 < len(body) {
-			i++
-		}
-		b.WriteByte(body[i])
-	}
-
-	return b.String()
-}
-
-// parseOSRelease parses os-release(5) format. Each non-comment, non-blank
-// line is KEY=VALUE; values may be quoted. ID_LIKE is space-separated.
+// parseOSRelease is the Info of os-release content, whose pairs
+// family.ParseOSRelease reads. ID_LIKE is space-separated, and a key that
+// Info has no field for goes in Extra.
 func parseOSRelease(
-	content string,
+	content []byte,
 ) *Info {
 	info := &Info{Extra: map[string]string{}}
-	sc := bufio.NewScanner(strings.NewReader(content))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		i := strings.Index(line, "=")
-		if i < 0 {
-			continue
-		}
-		key := line[:i]
-		val := unquote(line[i+1:])
+	for key, val := range family.ParseOSRelease(content) {
 		switch key {
 		case "ID":
 			info.ID = val

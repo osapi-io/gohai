@@ -167,6 +167,54 @@ func ReadOSRelease(
 	return nil, err
 }
 
+// ParseOSRelease is the KEY=VALUE pairs of os-release content, as
+// os-release(5) writes them. A blank line, a comment and a line with no "="
+// are skipped. A value in one matching pair of double or single quotes loses
+// them, and in double quotes a backslash escapes the next character, as in
+// shell. A key that repeats keeps its last value.
+func ParseOSRelease(
+	data []byte,
+) map[string]string {
+	pairs := map[string]string{}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		pairs[key] = unquote(value)
+	}
+
+	return pairs
+}
+
+// unquote is an os-release(5) value without its quotes: a value in one
+// matching pair of double or single quotes loses them, and in double quotes
+// a backslash escapes the next character. A value with no quotes is as it is.
+func unquote(
+	v string,
+) string {
+	if len(v) < 2 || v[0] != v[len(v)-1] || (v[0] != '"' && v[0] != '\'') {
+		return v
+	}
+	q, body := v[0], v[1:len(v)-1]
+	if q == '\'' {
+		return body
+	}
+	var b strings.Builder
+	for i := 0; i < len(body); i++ {
+		if body[i] == '\\' && i+1 < len(body) {
+			i++
+		}
+		b.WriteByte(body[i])
+	}
+
+	return b.String()
+}
+
 // hostFS is the filesystem Detect reads. Swapped in tests.
 var hostFS avfs.VFS = osfs.NewWithNoIdm()
 
@@ -202,15 +250,8 @@ func FromFS(
 		}
 		return ""
 	}
-	var id, like string
-	for _, line := range strings.Split(string(data), "\n") {
-		if v, ok := strings.CutPrefix(line, "ID="); ok {
-			id = strings.Trim(strings.TrimSpace(v), `"'`)
-		}
-		if v, ok := strings.CutPrefix(line, "ID_LIKE="); ok {
-			like = strings.Trim(strings.TrimSpace(v), `"'`)
-		}
-	}
+	pairs := ParseOSRelease(data)
+	id, like := pairs["ID"], pairs["ID_LIKE"]
 	if id == "" {
 		return ""
 	}

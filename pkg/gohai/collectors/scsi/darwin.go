@@ -26,9 +26,10 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin returns an empty Info. macOS has no `lsscsi` equivalent and
-// surfaces storage topology through IOKit, not a SCSI-abstraction
-// layer. Ohai's scsi plugin is Linux-only and we match that scope.
+// Darwin returns no fact, as each collector does on a platform it does not
+// support. macOS has no `lsscsi` equivalent and surfaces storage topology
+// through IOKit, not a SCSI-abstraction layer. Ohai's scsi plugin is
+// Linux-only and we match that scope.
 type Darwin struct {
 	base
 }
@@ -38,10 +39,10 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect returns an empty Info on macOS.
+// Collect returns no fact on macOS.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return &Info{Devices: map[string]Device{}}, nil
+	return nil, nil
 }

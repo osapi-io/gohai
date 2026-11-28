@@ -8,8 +8,7 @@ The collector lists the SCSI devices that the host can see. It runs `lsscsi` and
 parses the output. The method is the same as Ohai's `linux/scsi.rb`. The
 collector reports one entry for each SCSI address. Each entry has the vendor,
 the type, the make and model name, the firmware revision and the backing device
-node. macOS has no equivalent interface, so the collector returns an empty
-`Info`.
+node. macOS has no equivalent interface, so the collector gives no fact there.
 
 Consumers use this data to make a list of the attached disks, CD-ROM drives and
 tape drives by SCSI address. Use it when you need the `lsscsi` view of the
@@ -35,10 +34,10 @@ a given drive bay of a server.
 
 ## Platform support
 
-| Platform | Supported                                                          |
-| -------- | ------------------------------------------------------------------ |
-| Linux    | ✅ (`lsscsi` must be on the PATH)                                  |
-| macOS    | ❌ (Darwin has no `lsscsi`. The collector returns an empty `Info`) |
+| Platform | Supported                                                |
+| -------- | -------------------------------------------------------- |
+| Linux    | ✅ (`lsscsi` must be on the PATH)                        |
+| macOS    | ❌ (Darwin has no `lsscsi`. The collector gives no fact) |
 
 ## Example output
 
@@ -114,10 +113,10 @@ On Linux:
    collector returns an empty `devices` map and no error. Thus a host without
    the util-linux `lsscsi` gives a clean result, not a missing-binary error.
 
-On macOS, the collector returns an empty `Info{Devices: {}}`. macOS has no
-equivalent of `lsscsi`. It shows the storage topology through IOKit, not through
-a SCSI layer. Ohai's scsi plugin is for Linux only, and gohai has the same
-scope.
+On macOS, the collector gives no fact, as each collector does on a platform that
+it does not support. macOS has no equivalent of `lsscsi`. It shows the storage
+topology through IOKit, not through a SCSI layer. Ohai's scsi plugin is for
+Linux only, and gohai has the same scope.
 
 The collector is the same as Ohai's `linux/scsi.rb`. It uses the same command,
 the same parse algorithm, the same field names and the same key for each

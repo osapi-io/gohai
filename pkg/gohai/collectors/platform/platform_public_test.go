@@ -303,6 +303,22 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: an escaped quote in VERSION_ID is read as os-release(5) says",
+			variant: "linux",
+			fs: fsWith(s.T(), map[string]string{
+				"/etc/os-release": "ID='rocky'\n" + `VERSION_ID="9.4 \"Blue\""` + "\n",
+			}),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal(platform.Info{
+					OS: "linux", Name: "rocky", Version: `9.4 "Blue"`,
+					Family: "rhel", CPUArchitecture: runtime.GOARCH,
+				}, *info)
+			},
+		},
+		{
 			name:    "linux: no os-release, legacy /etc/redhat-release from Red Hat",
 			variant: "linux",
 			fs: fsWith(s.T(), map[string]string{

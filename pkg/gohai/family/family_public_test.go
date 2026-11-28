@@ -199,6 +199,56 @@ func (s *FamilyPublicTestSuite) TestReadOSRelease() {
 	}
 }
 
+func (s *FamilyPublicTestSuite) TestParseOSRelease() {
+	tests := []struct {
+		name         string
+		data         string
+		validateFunc func(map[string]string)
+	}{
+		{
+			name: "pairs, with blank lines, comments and a line with no = skipped",
+			data: "# a comment\n\nID=ubuntu\nnot a pair\n  VERSION_ID=24.04  \n",
+			validateFunc: func(got map[string]string) {
+				s.Equal(map[string]string{"ID": "ubuntu", "VERSION_ID": "24.04"}, got)
+			},
+		},
+		{
+			name: "double quotes lose their quotes, and a backslash escapes the next character",
+			data: `PRETTY_NAME="Ubuntu \"Noble\" 24.04"` + "\n" + `HOME_URL="a\\b"` + "\n",
+			validateFunc: func(got map[string]string) {
+				s.Equal(`Ubuntu "Noble" 24.04`, got["PRETTY_NAME"])
+				s.Equal(`a\b`, got["HOME_URL"])
+			},
+		},
+		{
+			name: "single quotes lose their quotes, and a backslash is kept",
+			data: `NAME='Rocky \Linux'` + "\n",
+			validateFunc: func(got map[string]string) {
+				s.Equal(`Rocky \Linux`, got["NAME"])
+			},
+		},
+		{
+			name: "an unmatched quote is kept, and a repeated key keeps its last value",
+			data: "ID=\"fedora\nID=rocky\nVARIANT='x\n",
+			validateFunc: func(got map[string]string) {
+				s.Equal("rocky", got["ID"])
+				s.Equal("'x", got["VARIANT"])
+			},
+		},
+		{
+			name: "empty content has no pairs",
+			validateFunc: func(got map[string]string) {
+				s.Empty(got)
+			},
+		},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			tc.validateFunc(family.ParseOSRelease([]byte(tc.data)))
+		})
+	}
+}
+
 func (s *FamilyPublicTestSuite) TestFromFS() {
 	tests := []struct {
 		name  string
@@ -225,6 +275,11 @@ func (s *FamilyPublicTestSuite) TestFromFS() {
 			name:  "when the filesystem names a Linux platform",
 			files: map[string]string{"/etc/os-release": "ID=fedora\n"},
 			want:  family.Fedora,
+		},
+		{
+			name:  "when the ID is quoted with an escape, the escape is read",
+			files: map[string]string{"/etc/os-release": `ID="rock\y"` + "\n"},
+			want:  family.RHEL,
 		},
 		{
 			name:  "when only /usr/lib/os-release exists, it names the platform",
