@@ -3047,6 +3047,18 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "faulty": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "journal": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -3059,7 +3071,9 @@
         "failed_disks",
         "working_disks",
         "members",
-        "spares"
+        "spares",
+        "faulty",
+        "journal"
       ]
     },
     "MdadmInfo": {

@@ -23,7 +23,9 @@ package mdadm_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
+	"os/exec"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -217,6 +219,8 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 						WorkingDisks: 2,
 						Members:      []string{"sda1", "sdb1"},
 						Spares:       []string{},
+						Faulty:       []string{},
+						Journal:      []string{},
 					},
 				}, info.Arrays)
 			},
@@ -274,7 +278,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md1").
-					Return(nil, errors.New("mdadm not found"))
+					Return(nil, fmt.Errorf("exec mdadm: %w", exec.ErrNotFound))
 				return m
 			},
 			validateFunc: func(got any, err error) {
@@ -286,8 +290,66 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 						Device:  "md1",
 						Members: []string{"sda1", "sdb1"},
 						Spares:  []string{"sdc1"},
+						Faulty:  []string{},
+						Journal: []string{},
 					},
 				}, info.Arrays)
+			},
+		},
+		{
+			name:    "linux: faulty and journal devices are not data members",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc", 0o755)
+				_ = f.WriteFile("/proc/mdstat", []byte(
+					"md2 : active raid5 sda1[0] sdb1[1](F) sdc1[2] nvme0n1p1[3](J)\n",
+				), fs.FileMode(0o444))
+				return f
+			},
+			setupEx: func(t *testing.T) *sourcemocks.MockRunner {
+				ctrl := gomock.NewController(t)
+				m := sourcemocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md2").
+					Return(nil, fmt.Errorf("exec mdadm: %w", exec.ErrNotFound))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*mdadm.Info)
+				s.Require().True(ok)
+				s.Equal([]mdadm.Array{
+					{
+						Device:  "md2",
+						Members: []string{"sda1", "sdc1"},
+						Spares:  []string{},
+						Faulty:  []string{"sdb1"},
+						Journal: []string{"nvme0n1p1"},
+					},
+				}, info.Arrays)
+			},
+		},
+		{
+			name:    "linux: a failed mdadm --detail is an error",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc", 0o755)
+				_ = f.WriteFile("/proc/mdstat", mdstatRaid1, fs.FileMode(0o444))
+				return f
+			},
+			setupEx: func(t *testing.T) *sourcemocks.MockRunner {
+				ctrl := gomock.NewController(t)
+				m := sourcemocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md0").
+					Return(nil, errors.New("exit status 1"))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "mdadm --detail /dev/md0: exit status 1")
 			},
 		},
 		{
@@ -303,7 +365,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				ctrl := gomock.NewController(t)
 				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "mdadm", "--detail", gomock.Any()).
-					Return(nil, errors.New("not found")).AnyTimes()
+					Return(nil, fmt.Errorf("exec mdadm: %w", exec.ErrNotFound)).AnyTimes()
 				return m
 			},
 			validateFunc: func(got any, err error) {
@@ -311,8 +373,14 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				info, ok := got.(*mdadm.Info)
 				s.Require().True(ok)
 				s.Equal([]mdadm.Array{
-					{Device: "md0", Members: []string{"sda1", "sdd1"}, Spares: []string{}},
-					{Device: "md1", Members: []string{"sdb1", "sdc1"}, Spares: []string{}},
+					{
+						Device: "md0", Members: []string{"sda1", "sdd1"},
+						Spares: []string{}, Faulty: []string{}, Journal: []string{},
+					},
+					{
+						Device: "md1", Members: []string{"sdb1", "sdc1"},
+						Spares: []string{}, Faulty: []string{}, Journal: []string{},
+					},
 				}, info.Arrays)
 			},
 		},
@@ -362,7 +430,10 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				info, ok := got.(*mdadm.Info)
 				s.Require().True(ok)
 				s.Equal([]mdadm.Array{
-					{Device: "md0", Members: []string{"sda1", "sdb1"}, Spares: []string{}},
+					{
+						Device: "md0", Members: []string{"sda1", "sdb1"},
+						Spares: []string{}, Faulty: []string{}, Journal: []string{},
+					},
 				}, info.Arrays)
 			},
 		},

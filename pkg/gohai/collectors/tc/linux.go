@@ -22,6 +22,7 @@ package tc
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -41,7 +42,8 @@ func NewLinux() *Linux {
 	return &Linux{Exec: source.Commands()}
 }
 
-// Collect runs `tc -s qdisc show` and parses the output.
+// Collect runs `tc -s qdisc show` and parses the output. A host with no
+// tc gives no interfaces, and a failed run is an error.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -51,7 +53,10 @@ func (l *Linux) Collect(
 	}
 	out, err := l.Exec.Execute(ctx, "tc", "-s", "qdisc", "show")
 	if err != nil {
-		return &Info{Interfaces: []Interface{}}, nil
+		if collector.Absent(err) {
+			return &Info{Interfaces: []Interface{}}, nil
+		}
+		return nil, fmt.Errorf("tc -s qdisc show: %w", err)
 	}
 	return parseTCOutput(string(out)), nil
 }

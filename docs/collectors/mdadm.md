@@ -10,8 +10,9 @@ each array, it runs `mdadm --detail /dev/<device>` to get the RAID level, the
 health state, the UUID and the device counts.
 
 If `mdadm` is not installed, the collector returns the arrays with only the
-members and spares from `/proc/mdstat`. If `/proc/mdstat` is missing, the
-collector returns an empty array list and no error.
+devices from `/proc/mdstat`. If `/proc/mdstat` is missing, the collector returns
+an empty array list and no error. If `mdadm --detail` fails, the collector
+returns the error.
 
 The method of the collector is the same as Ohai's `mdadm` plugin. It reads
 `/proc/mdstat` first. Then it calls `mdadm --detail` for each array to get the
@@ -39,6 +40,8 @@ Consumers use this data to:
 | `arrays[].working_disks` | `int`      | The count of working member disks, from the `Working Devices` line of `mdadm --detail`.                                                       | gohai convention |
 | `arrays[].members`       | `[]string` | The device names of the active members, from `/proc/mdstat`, for example `["sda1","sdb1"]`.                                                   | gohai convention |
 | `arrays[].spares`        | `[]string` | The device names of the spare members, from `/proc/mdstat` (devices with the `(S)` tag).                                                      | gohai convention |
+| `arrays[].faulty`        | `[]string` | The device names that the kernel has failed out of the array, from `/proc/mdstat` (devices with the `(F)` tag).                               | gohai convention |
+| `arrays[].journal`       | `[]string` | The device names of the write journal, from `/proc/mdstat` (devices with the `(J)` tag). A journal device is not a data member.               | gohai convention |
 
 ## Platform support
 
@@ -66,7 +69,9 @@ macOS has no MD RAID stack. The Darwin variant returns `nil`.
         "failed_disks": 0,
         "working_disks": 2,
         "members": ["sda1", "sdb1"],
-        "spares": []
+        "spares": [],
+        "faulty": [],
+        "journal": []
       }
     ]
   }
@@ -115,9 +120,10 @@ On Linux:
 2. The collector parses `/proc/mdstat` line by line. An array line agrees with
    `<name> : active|inactive ...` and has a device name that starts with `md`.
    On each array line, a regex finds the member tokens. The form `<dev>[N]` is
-   an active member. The form `<dev>[N](S)` is a spare. The collector finds
-   journal devices (`(J)`) and skips them with no message. They are an internal
-   part of the MD layer, not a data or parity member.
+   an active member. The form `<dev>[N](S)` is a spare, `<dev>[N](F)` is a
+   faulty device, and `<dev>[N](J)` is a journal device. Only the active form is
+   in `members`, because a faulty device and a journal device hold no data or
+   parity for the array.
 3. The collector sorts the arrays by device name, so the output is always in the
    same order. For each array, it runs `mdadm --detail /dev/<device>` through
    the injected `source.Runner`. It parses these lines of the output:
@@ -126,11 +132,11 @@ On Linux:
    - `UUID : <uuid>`. The array UUID.
    - `Active Devices : <n>`, `Total Devices : <n>`, `Spare Devices : <n>`. The
      device counts.
-4. If `mdadm` is not installed or returns a non-zero exit code, the collector
-   skips the detail step for that array with no message. It still returns the
-   array with the members and spares from `/proc/mdstat`. This is the same as
+4. If `mdadm` is not installed, the collector skips the detail step. It still
+   returns each array with the devices from `/proc/mdstat`. This is the same as
    Ohai, which always reports the data from `/proc/mdstat`, also when `mdadm` is
-   missing.
+   missing. If `mdadm --detail` fails for an array, the collector returns the
+   error, so a failed read is not reported as an array with no detail.
 
 On macOS, the collector returns `nil`.
 

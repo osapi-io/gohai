@@ -64,8 +64,15 @@ type Array struct {
 	WorkingDisks int `json:"working_disks"`
 	// Members lists the active member device names (e.g. ["sda1","sdb1"]).
 	Members []string `json:"members"`
-	// Spares lists the spare member device names.
+	// Spares lists the spare member device names, marked (S) in
+	// /proc/mdstat.
 	Spares []string `json:"spares"`
+	// Faulty lists the member device names that /proc/mdstat marks (F),
+	// which the kernel has failed out of the array.
+	Faulty []string `json:"faulty"`
+	// Journal lists the journal device names, marked (J) in /proc/mdstat.
+	// A journal device holds the write journal and is not a data member.
+	Journal []string `json:"journal"`
 }
 
 // Info holds the list of MD RAID arrays found on the host.
@@ -144,6 +151,8 @@ func parseMdstat(
 			Device:  devName,
 			Members: []string{},
 			Spares:  []string{},
+			Faulty:  []string{},
+			Journal: []string{},
 		}
 
 		for _, token := range rest {
@@ -152,10 +161,14 @@ func parseMdstat(
 				continue
 			}
 			memberDev := m[1]
-			memberType := m[2] // "S" for spare, "J" for journal, "" for active
+			memberType := m[2] // "S" spare, "F" faulty, "J" journal, "" active
 			switch memberType {
 			case "S":
 				arr.Spares = append(arr.Spares, memberDev)
+			case "F":
+				arr.Faulty = append(arr.Faulty, memberDev)
+			case "J":
+				arr.Journal = append(arr.Journal, memberDev)
 			default:
 				arr.Members = append(arr.Members, memberDev)
 			}
@@ -234,10 +247,9 @@ func applyDetail(
 }
 
 // collectArrays builds the full Array list by parsing /proc/mdstat and
-// optionally running mdadm --detail. readFn reads files; execFn runs
-// commands. Both may be nil-safe-ish: readFn errors cause an empty
-// result, execFn errors on individual arrays are silently skipped
-// (mdadm may not be installed).
+// running `mdadm --detail` for each array. readFn reads files; execFn runs
+// commands, and a nil execFn skips --detail. A missing /proc/mdstat or a
+// host with no mdadm gives the mdstat view; any other failure is an error.
 func collectArrays(
 	ctx context.Context,
 	readFn func(string) ([]byte, error),
@@ -268,8 +280,11 @@ func collectArrays(
 		arr := devices[name]
 		if execFn != nil {
 			detail, execErr := execFn(ctx, "mdadm", "--detail", "/dev/"+name)
-			if execErr == nil {
+			switch {
+			case execErr == nil:
 				applyDetail(arr, detail)
+			case !collector.Absent(execErr):
+				return nil, fmt.Errorf("mdadm --detail /dev/%s: %w", name, execErr)
 			}
 		}
 		arrays = append(arrays, *arr)

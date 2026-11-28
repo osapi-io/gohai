@@ -23,6 +23,8 @@ package tc_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -172,14 +174,23 @@ func (s *TCPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: tc fails, empty list",
+			name:    "linux: no tc on the host, empty list",
 			variant: "linux",
-			exec:    tcExec(s.T(), nil, errors.New("not found")),
+			exec:    tcExec(s.T(), nil, fmt.Errorf("exec tc: %w", exec.ErrNotFound)),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
 				s.Require().True(ok)
 				s.Equal([]tc.Interface{}, info.Interfaces)
+			},
+		},
+		{
+			name:    "linux: tc fails, the error is returned",
+			variant: "linux",
+			exec:    tcExec(s.T(), nil, errors.New("exit status 2")),
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "tc -s qdisc show: exit status 2")
 			},
 		},
 		{
