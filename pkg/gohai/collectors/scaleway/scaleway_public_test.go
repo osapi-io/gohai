@@ -204,7 +204,8 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				http.NotFound(w, nil)
 			},
-			validateFunc: func(out any, _ bool, _ error) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.NoError(err)
 				s.Nil(out)
 			},
 		},
@@ -213,7 +214,20 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			cmdline: "scaleway",
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
-			validateFunc: func(out any, _ bool, _ error) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.NoError(err)
+				s.Nil(out)
+			},
+		},
+		{
+			name:    "a body that stops partway is an error",
+			cmdline: "scaleway",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Length", "100")
+				_, _ = w.Write([]byte(`{"id":`))
+			},
+			validateFunc: func(out any, _ bool, err error) {
+				s.ErrorContains(err, "scaleway metadata: read body")
 				s.Nil(out)
 			},
 		},
@@ -224,7 +238,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 				_, _ = w.Write([]byte("not json"))
 			},
 			validateFunc: func(_ any, _ bool, err error) {
-				s.Error(err)
+				s.ErrorContains(err, "decode scaleway metadata")
 			},
 		},
 		{

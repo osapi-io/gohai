@@ -28,6 +28,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -244,14 +246,18 @@ func (c *Collector) Collect(
 	}
 	body, err := c.client.Get(ctx, metadataPath)
 	if err != nil {
-		// Any fetch failure (transport, 404, body-read) means we
-		// can't determine whether we're on Scaleway. Treat it as "not
-		// on this cloud" rather than propagating noise.
-		return nil, ctx.Err()
+		// An endpoint that does not answer, or answers with a status that
+		// is not 2xx, is an absent source: no fact. Any other failure, such
+		// as a body that stops partway or a cancelled collection, is an
+		// error, as in the digitalocean collector.
+		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("scaleway metadata: %w", err)
 	}
 	var r raw
 	if err := json.Unmarshal(body, &r); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decode scaleway metadata: %w", err)
 	}
 	return transform(r), nil
 }
