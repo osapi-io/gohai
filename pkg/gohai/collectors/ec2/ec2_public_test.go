@@ -29,6 +29,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
@@ -301,10 +302,20 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		opts         *serverOpts
 		handler      http.HandlerFunc // overrides opts-based handler when set
 		closed       bool
-		cancelAfter  int    // cancel the context once the server answered this many requests
-		wantErr      string // the error Collect returns; "" is none
+		cancelAfter  int           // cancel the context once the server answered this many requests
+		timeout      time.Duration // the collector's walk timeout; zero is WalkTimeout
+		wantErr      string        // the error Collect returns; "" is none
 		validateFunc func(any, bool)
 	}{
+		{
+			name: "a walk that outlives its timeout is an error",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				time.Sleep(20 * time.Millisecond)
+				handlerFor((&serverOpts{}).withDefaults())(w, r)
+			},
+			timeout: 100 * time.Millisecond,
+			wantErr: "context deadline exceeded",
+		},
 		{
 			name:        "a context that ends during the walk is an error",
 			opts:        (&serverOpts{}).withDefaults(),
@@ -846,6 +857,9 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			prior := tt.prior
 			if prior == nil {
 				prior = ec2Prior()
+			}
+			if tt.timeout > 0 {
+				c.(*ec2.Metadata).Timeout = tt.timeout
 			}
 			out, err := c.Collect(ctx, prior)
 			if tt.wantErr != "" {

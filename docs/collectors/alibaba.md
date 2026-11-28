@@ -170,7 +170,11 @@ on Alibaba Cloud, and the collector sends no request.
 09. **User-Agent:** `gohai` (the cloudmetadata default). Alibaba's metadata
     service filters some requests by User-Agent.
 10. **Timeout:** 6 seconds for each request. This is the same as Ohai's
-    `read_timeout` + `keep_alive_timeout`.
+    `read_timeout` + `keep_alive_timeout`. The whole walk also has a deadline,
+    `alibaba.WalkTimeout` (30 seconds). Without it, a server that answers the
+    first listing and then hangs could hold the walk for 256 requests of 6
+    seconds each, about 25 minutes. When the deadline ends, the collector
+    returns the context error.
 11. **Failure handling:** a path that the server does not answer, such as a 404,
     a 5xx or no connection, is left out: if it is the root listing, the
     collector returns `(nil, nil)`, as for a host that is not on Alibaba.

@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -167,8 +168,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		tree         map[string]string
 		handler      http.HandlerFunc // overrides tree when set
 		closed       bool
-		cancelAfter  int    // cancel the context once the server answered this many requests
-		wantErr      string // the error Collect returns; "" is none
+		cancelAfter  int           // cancel the context once the server answered this many requests
+		timeout      time.Duration // the collector's walk timeout; zero is WalkTimeout
+		wantErr      string        // the error Collect returns; "" is none
 		validateFunc func(any, []string)
 	}{
 		{
@@ -266,6 +268,15 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				}
 			},
 			wantErr: "request limit reached",
+		},
+		{
+			name: "a walk that outlives its timeout is an error",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				time.Sleep(20 * time.Millisecond)
+				serve(treeResponses)(w, r)
+			},
+			timeout: 100 * time.Millisecond,
+			wantErr: "context deadline exceeded",
 		},
 		{
 			name:        "a context that ends during the walk is an error",
@@ -601,6 +612,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			prior := tt.prior
 			if prior == nil {
 				prior = aliPrior()
+			}
+			if tt.timeout > 0 {
+				c.(*alibaba.Metadata).Timeout = tt.timeout
 			}
 			out, err := c.Collect(ctx, prior)
 			if tt.wantErr != "" {

@@ -248,7 +248,11 @@ the HTTP request. This is how it finds an EC2 Mac instance.
 11. **User-Agent.** `gohai` (the cloudmetadata default).
 
 12. **Timeout.** 10 seconds for each request. This is the same as Ohai's
-    `read_timeout` and `keep_alive_timeout`.
+    `read_timeout` and `keep_alive_timeout`. The whole collection also has a
+    deadline, `ec2.WalkTimeout` (30 seconds), so an IMDS that answers the first
+    request and then hangs cannot hold it for minutes. When the deadline ends,
+    the collector returns the context error. The deadline is less than the 60
+    second life of the IMDSv2 token, so the token cannot expire during a walk.
 
 13. **Failures.** A path that the IMDS does not answer, such as a 404, a 429, a
     5xx or no connection, is left out: if it is the first request (`/ami-id`),
