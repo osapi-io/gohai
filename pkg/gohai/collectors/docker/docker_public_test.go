@@ -23,6 +23,8 @@ package docker_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -360,18 +362,45 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: docker version fails, returns nil",
+			name:    "linux: a failed docker version is an error",
 			variant: "linux",
-			exec:    buildMock(s.T(), nil, errors.New("no docker"), nil, nil, nil, nil),
+			exec: buildMock(
+				s.T(),
+				nil,
+				errors.New("permission denied while trying to connect to the Docker daemon socket"),
+				nil,
+				nil,
+				nil,
+				nil,
+			),
+			validateFunc: func(got any, err error) {
+				s.EqualError(
+					err,
+					"docker version: permission denied while trying to connect to the Docker daemon socket",
+				)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: docker not on the PATH gives no fact",
+			variant: "linux",
+			exec: buildMock(
+				s.T(),
+				nil, fmt.Errorf("docker: %w", exec.ErrNotFound),
+				nil, nil, nil, nil,
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*docker.Info)
-				s.Require().True(ok)
-				s.Equal((*docker.Info)(nil), info)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a cancelled context is an error",
+			variant: "linux",
+			exec:    buildMock(s.T(), nil, context.Canceled, nil, nil, nil, nil),
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -380,17 +409,11 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			exec:    nil,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*docker.Info)
-				s.Require().True(ok)
-				s.Equal((*docker.Info)(nil), info)
+				s.Exactly(nil, got)
 			},
 		},
 		{
-			name:    "linux: ps fails, containers empty",
+			name:    "linux: a failed docker ps is an error",
 			variant: "linux",
 			exec: buildMock(
 				s.T(),
@@ -399,17 +422,8 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				[]byte(imagesOut), nil,
 			),
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*docker.Info)
-				s.Require().True(ok)
-				s.Equal(&docker.Info{
-					Version:    "24.0.5",
-					Containers: []docker.Container{},
-					Images: []docker.Image{
-						{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
-						{ID: "sha256:def", Repository: "postgres", Tag: "15", Size: "379MB"},
-					},
-				}, info)
+				s.EqualError(err, "docker ps: ps failed")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -430,7 +444,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: images fails, images empty",
+			name:    "linux: a failed docker images is an error",
 			variant: "linux",
 			exec: buildMock(
 				s.T(),
@@ -439,29 +453,8 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				nil, errors.New("images failed"),
 			),
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*docker.Info)
-				s.Require().True(ok)
-				s.Equal(&docker.Info{
-					Version: "24.0.5",
-					Containers: []docker.Container{
-						{
-							ID:     "abc123",
-							Name:   "web",
-							Image:  "nginx:latest",
-							State:  "running",
-							Status: "Up 2 hours",
-						},
-						{
-							ID:     "def456",
-							Name:   "db",
-							Image:  "postgres:15",
-							State:  "exited",
-							Status: "Exited (0)",
-						},
-					},
-					Images: []docker.Image{},
-				}, info)
+				s.EqualError(err, "docker images: images failed")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -656,16 +649,14 @@ func (s *DockerPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: docker absent, returns nil",
 			variant: "darwin",
-			exec:    buildMock(s.T(), nil, errors.New("not found"), nil, nil, nil, nil),
+			exec: buildMock(
+				s.T(),
+				nil, fmt.Errorf("docker: %w", exec.ErrNotFound),
+				nil, nil, nil, nil,
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*docker.Info)
-				s.Require().True(ok)
-				s.Equal((*docker.Info)(nil), info)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -674,13 +665,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			exec:    nil,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*docker.Info)
-				s.Require().True(ok)
-				s.Equal((*docker.Info)(nil), info)
+				s.Exactly(nil, got)
 			},
 		},
 	}

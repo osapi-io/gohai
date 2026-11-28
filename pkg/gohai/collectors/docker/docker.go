@@ -27,6 +27,7 @@ package docker
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -181,8 +182,11 @@ type dockerJSONImage struct {
 	Size       string `json:"Size"`
 }
 
-// collectDocker queries Docker version, containers, and images.
-// Returns nil when Docker is absent (version call fails).
+// collectDocker queries Docker version, containers, and images. It
+// returns no fact when the docker command is not on the PATH. Any other
+// failure of docker version, docker ps or docker images is an error: a
+// daemon that is down or refuses the caller, a timeout, or a cancelled
+// context.
 func collectDocker(
 	ctx context.Context,
 	exec source.Runner,
@@ -192,19 +196,21 @@ func collectDocker(
 	}
 	versionOut, err := exec.Execute(ctx, "docker", "version", "--format", "{{.Server.Version}}")
 	if err != nil {
-		// Docker is not on PATH or the daemon is unreachable: a soft miss.
-		return nil, nil
+		if collector.Absent(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("docker version: %w", err)
 	}
 	version := strings.TrimSpace(string(versionOut))
 
 	containers, err := collectContainers(ctx, exec)
 	if err != nil {
-		containers = []Container{}
+		return nil, fmt.Errorf("docker ps: %w", err)
 	}
 	inspectContainers(ctx, exec, containers)
 	images, err := collectImages(ctx, exec)
 	if err != nil {
-		images = []Image{}
+		return nil, fmt.Errorf("docker images: %w", err)
 	}
 	return &Info{
 		Version:    version,

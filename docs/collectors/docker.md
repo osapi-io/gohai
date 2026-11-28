@@ -5,9 +5,12 @@
 ## Description
 
 The collector reports the Docker server version, the running and stopped
-containers, and the local images. If Docker is not on the PATH, or if the
-collector cannot connect to the daemon, Collect returns nil and no error. This
-is the same as Ohai's `docker.rb`, which does not fail when Docker is missing.
+containers, and the local images. If the `docker` command is not on the PATH,
+Collect returns nil and no error, as Ohai's `docker.rb` does when Docker is
+missing. Any other failure is an error: a daemon that does not run, a daemon
+that refuses the caller (a user outside the `docker` group), a timeout or a
+cancelled context. Thus a host with Docker installed and its daemon stopped
+gives a collector error that says why, not a missing fact.
 
 Ohai's docker plugin reports the total container counts from `docker info`.
 gohai also lists each container and each image with `docker ps -a --no-trunc`
@@ -130,17 +133,17 @@ not only the totals.
 On both Linux and macOS:
 
 1. The collector runs `docker version --format '{{.Server.Version}}'`. This
-   finds if Docker is there and gets the version. If the command fails, Collect
-   returns nil immediately and no error. The command fails when the daemon does
-   not run or when Docker is not installed. Ohai's plugin also continues only
-   when `docker info` succeeds.
+   finds if Docker is there and gets the version. If `docker` is not on the
+   PATH, Collect returns nil and no error. If the command fails for any other
+   reason, such as a daemon that does not run, Collect returns the error.
 2. The collector runs `docker ps -a --format '{{json .}}'` to list all
    containers. The output is NDJSON, one JSON object on each line. The collector
    skips lines that are not valid JSON and blank lines. This is a gohai
    extension. Ohai does not list each container.
 3. The collector runs `docker images --format '{{json .}}'` to list the local
    images. It parses the NDJSON in the same way. If `docker ps` or
-   `docker images` fails, the related field is an empty list. This is also a
+   `docker images` fails, Collect returns the error, not an empty list, because
+   an empty list says that the host has no containers or images. This is also a
    gohai extension that Ohai does not have.
 4. Docker gives the container `Names` field with a leading `/`. The collector
    removes it before it stores the name.
