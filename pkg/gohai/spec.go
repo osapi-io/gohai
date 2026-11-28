@@ -279,12 +279,12 @@ func CollectorTerms() []Term {
 		},
 		{
 			Name: "Facts field",
-			Does: "A field of gohai.Facts in pkg/gohai/facts.go whose JSON name is the collector's name. go generate ./schemas/... writes the JSON Schema from it.",
+			Does: "A field of gohai.Facts in pkg/gohai/facts.go whose JSON name is the collector's name. just generate writes the collector list, Facts.set and the JSON Schema from it.",
 			When: "For each collector.",
 		},
 		{
 			Name: "builtinCollectors",
-			Does: "Registers the collector, in pkg/gohai/gohai.go, built with NewWith(src).",
+			Does: "Registers the collector, built with NewWith(src), in pkg/gohai/builtins.gen.go, which go generate writes from Facts. Do not edit it by hand.",
 			When: "For each built-in collector. gohai collector list then shows it, and gohai collector get shows what it reads on each platform.",
 		},
 	}

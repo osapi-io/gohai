@@ -62,7 +62,7 @@ func Checks() []Check {
 		{
 			Rule:     RuleFacts,
 			Requires: "Each collector has a field of gohai.Facts whose JSON name is its name, so the schema and the docs have its facts.",
-			Fix:      "Add the field to Facts in pkg/gohai/facts.go, then run go generate ./schemas/... to write the schema.",
+			Fix:      "Add the field to Facts in pkg/gohai/facts.go, then run just generate, which writes the collector list, Facts.set and the schema.",
 		},
 		{
 			Rule:     RuleDependency,

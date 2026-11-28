@@ -99,13 +99,13 @@ func WithCategory(
 	return func(c *config) { c.categories = append(c.categories, names...) }
 }
 
-// WithTimings embeds per-collector timing + error data into Facts
-// under a top-level `_timings` object. Each entry records the
-// collector's wall-clock duration, status (`ok` / `err`), and, for
-// a failed collector, the error string. Failed collectors are still
-// dropped from the typed output; their timing entry is how the
-// failure surfaces when this option is on. It is off by default, and
-// when off, Facts contain only collector results.
+// WithTimings embeds per-collector timing data into Facts under a
+// top-level `_timings` object. Each entry records the collector's
+// wall-clock duration, its status (ok, absent, unsupported, failed or
+// partial), and the error string of a collector that has one. A failed
+// collector has no fact, and a partial one keeps the fact it read. It is
+// off by default, and Facts.Status and Facts.Errors hold the status and
+// the errors either way.
 func WithTimings() Option {
 	return func(c *config) { c.withTimings = true }
 }

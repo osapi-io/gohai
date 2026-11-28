@@ -272,7 +272,7 @@ func ClientError(
 }
 
 // Put issues a PUT against baseURL + path with per-request headers
-// merged onto the Client's default headers. Body may be nil. Used by
+// merged onto the Client's default headers. It sends no body. Used by
 // EC2's IMDSv2 token flow. EC2 is the only provider that
 // writes rather than reads the metadata endpoint.
 func (c *Client) Put(
