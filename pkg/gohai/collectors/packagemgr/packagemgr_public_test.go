@@ -22,6 +22,7 @@ package packagemgr_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"testing"
@@ -214,6 +215,43 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			wantPath: "/usr/bin/yum",
 		},
 		{
+			name: "debian: a command -v that exits 127, as dash does, is not found",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sh -c command -v apt-get": "/usr/bin/apt-get\n"},
+				Err: map[string]error{"sh -c command -v apt": exitStatusError(127)},
+			},
+			wantName: "apt-get",
+			wantPath: "/usr/bin/apt-get",
+		},
+		{
+			name: "rhel: a command -v that exits 127 is not found, and the next is tried",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.RHEL{Exec: e} },
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sh -c command -v yum": "/usr/bin/yum\n"},
+				Err: map[string]error{"sh -c command -v dnf": exitStatusError(127)},
+			},
+			wantName: "yum",
+			wantPath: "/usr/bin/yum",
+		},
+		{
+			name: "linux: on Alpine, a zypper that exits 127 in busybox ash is not found, so apk is",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sh -c command -v apk": "/sbin/apk\n"},
+				Err: map[string]error{"sh -c command -v zypper": exitStatusError(127)},
+			},
+			wantName: "apk",
+			wantPath: "/sbin/apk",
+		},
+		{
+			name: "darwin: a command -v brew that exits 127 is not found",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
+			runner: sourcetest.Commands{
+				Err: map[string]error{"sh -c command -v brew": exitStatusError(127)},
+			},
+		},
+		{
 			name: "rhel: a command -v that fails another way is an error",
 			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.RHEL{Exec: e} },
 			runner: sourcetest.Commands{
@@ -237,6 +275,14 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 				Err: map[string]error{"sh -c command -v zypper": exitStatusError(2)},
 			},
 			wantErr: "command -v zypper: exit status 2",
+		},
+		{
+			name: "linux: a command -v that does not run is an error",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			runner: sourcetest.Commands{
+				Err: map[string]error{"sh -c command -v zypper": errors.New("permission denied")},
+			},
+			wantErr: "command -v zypper: permission denied",
 		},
 		{
 			name: "darwin: a command -v that fails another way is an error",

@@ -106,12 +106,20 @@ func firstFound(
 	return "", "", nil
 }
 
-// notFound reports whether err is `command -v` not finding its name: an
-// exit status of 1, or a host with no sh at all.
+// notFound reports whether err is `command -v` not finding its name, or a
+// host with no sh at all. bash exits 1 for a name it does not find, and
+// dash (Debian, Ubuntu, Void) and busybox ash (Alpine) exit 127. Any other
+// status, such as 2, is a failure of the shell and an error.
 func notFound(
 	err error,
 ) bool {
 	var status interface{ ExitCode() int }
+	if collector.Absent(err) {
+		return true
+	}
+	if !errors.As(err, &status) {
+		return false
+	}
 
-	return collector.Absent(err) || (errors.As(err, &status) && status.ExitCode() == 1)
+	return status.ExitCode() == 1 || status.ExitCode() == 127
 }
