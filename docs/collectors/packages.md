@@ -106,7 +106,7 @@ finds:
    PATH. A launchd daemon, such as the osapi agent, has neither path on its
    PATH, so the collector does not depend on the PATH.
 2. brew refuses to run as root. When `id -u` prints `0`, the collector reads the
-   owner of the brew executable with `stat -f %u <brew>`. It then runs
+   owner of the brew executable with `stat -L -f %u <brew>`. It then runs
    `sudo -u '#<uid>' -H <brew> list --versions`, as Ohai runs brew as the brew
    owner. When the owner is root, or `stat` fails, it runs brew as it is. A user
    that is not root runs `<brew> list --versions`.

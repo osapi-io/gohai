@@ -88,7 +88,7 @@ func (d *Darwin) brewCommand(
 	if brew == "brew" || d.uid(ctx, "id", "-u") != 0 {
 		return brew, list
 	}
-	owner := d.uid(ctx, "stat", "-f", "%u", brew)
+	owner := d.uid(ctx, "stat", "-L", "-f", "%u", brew)
 	if owner <= 0 {
 		return brew, list
 	}

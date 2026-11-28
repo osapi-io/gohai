@@ -627,9 +627,35 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
 					Out: map[string]string{
-						"id -u":                             "0\n",
-						"stat -f %u /opt/homebrew/bin/brew": "501\n",
+						"id -u":                                "0\n",
+						"stat -L -f %u /opt/homebrew/bin/brew": "501\n",
 						"sudo -u #501 -H /opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: as root, a brew found only on the PATH runs as it is",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						"id -u":              "0\n",
+						"stat -L -f %u brew": "501\n",
+						brewLine:             "git 2.40.0\n",
 					},
 				}.Mock(t)
 			},
@@ -655,7 +681,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				return sourcetest.Commands{
 					Out: map[string]string{
 						"id -u":                                  "0\n",
-						"stat -f %u /opt/homebrew/bin/brew":      "0\n",
+						"stat -L -f %u /opt/homebrew/bin/brew":   "0\n",
 						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
 					},
 				}.Mock(t)
@@ -685,7 +711,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
 					},
 					Err: map[string]error{
-						"stat -f %u /opt/homebrew/bin/brew": errors.New("exit status 1"),
+						"stat -L -f %u /opt/homebrew/bin/brew": errors.New("exit status 1"),
 					},
 				}.Mock(t)
 			},
