@@ -55,7 +55,7 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	keys, err := collectHostKeys(d.FS)
+	keys, bad, err := collectHostKeys(d.FS)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,8 @@ func (d *Darwin) Collect(
 		return nil, err
 	}
 
-	return &Info{Keys: keys, AuthorizedKeys: authorized}, nil
+	// A host key file that does not parse keeps the rest, with its error.
+	return &Info{Keys: keys, AuthorizedKeys: authorized}, bad
 }
 
 // homes is the home of each user from `dscl . -list /Users

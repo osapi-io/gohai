@@ -597,7 +597,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		{
 			// A host key that does not parse does not hide the
 			// authorized keys, which do not depend on it.
-			name:    "linux: a bad host key keeps the authorized keys",
+			name:    "linux: a bad host key keeps the other keys, with its error",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return sourcetest.FS(s.T(), map[string]string{
@@ -608,10 +608,11 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				})
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.ErrorContains(err, "parse /etc/ssh/ssh_host_rsa_key.pub: base64 decode")
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
-				// The bad rsa key is left out.
+				s.Require().NotNil(info)
+				// The bad rsa key is left out, with its error.
 				s.Require().Len(info.Keys, 1)
 				s.Equal("ssh-ed25519", info.Keys[0].Type)
 				s.Require().Len(info.AuthorizedKeys["root"], 1)
@@ -786,12 +787,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
-				s.Len(info.Keys, 1)
-				if "ssh-ed25519" != "" && len(info.Keys) > 0 {
-					s.Equal("ssh-ed25519", info.Keys[0].Type)
-					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.Equal(256, info.Keys[0].KeyLength)
-				}
+				s.Require().Len(info.Keys, 1)
+				s.Equal("ssh-ed25519", info.Keys[0].Type)
+				s.NotEmpty(info.Keys[0].FingerprintSHA256)
+				s.Equal(256, info.Keys[0].KeyLength)
 			},
 		},
 		{
@@ -814,7 +813,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: malformed base64 is left out",
+			name:    "linux: malformed base64 is left out, with its error",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return sourcetest.FS(s.T(), map[string]string{
@@ -822,14 +821,15 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				})
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.ErrorContains(err, "parse /etc/ssh/ssh_host_rsa_key.pub: base64 decode")
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
+				s.Require().NotNil(info)
 				s.Empty(info.Keys)
 			},
 		},
 		{
-			name:    "linux: too few fields is left out",
+			name:    "linux: too few fields is left out, with its error",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return sourcetest.FS(s.T(), map[string]string{
@@ -837,9 +837,13 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				})
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.ErrorContains(
+					err,
+					"parse /etc/ssh/ssh_host_rsa_key.pub: malformed public key line",
+				)
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
+				s.Require().NotNil(info)
 				s.Empty(info.Keys)
 			},
 		},
@@ -855,12 +859,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
-				s.Len(info.Keys, 1)
-				if "ssh-ed25519" != "" && len(info.Keys) > 0 {
-					s.Equal("ssh-ed25519", info.Keys[0].Type)
-					s.NotEmpty(info.Keys[0].FingerprintSHA256)
-					s.Equal(256, info.Keys[0].KeyLength)
-				}
+				s.Require().Len(info.Keys, 1)
+				s.Equal("ssh-ed25519", info.Keys[0].Type)
+				s.NotEmpty(info.Keys[0].FingerprintSHA256)
+				s.Equal(256, info.Keys[0].KeyLength)
 			},
 		},
 		{
@@ -879,7 +881,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: malformed base64 is left out",
+			name:    "darwin: malformed base64 is left out, with its error",
 			variant: "darwin",
 			setupFS: func() avfs.VFS {
 				return sourcetest.FS(s.T(), map[string]string{
@@ -887,9 +889,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				})
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.ErrorContains(err, "parse /etc/ssh/ssh_host_rsa_key.pub: base64 decode")
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
+				s.Require().NotNil(info)
 				s.Empty(info.Keys)
 			},
 		},

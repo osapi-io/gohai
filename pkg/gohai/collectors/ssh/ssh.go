@@ -130,32 +130,36 @@ func NewWith(
 
 // collectHostKeys reads the well-known SSH host public key files from
 // fs and returns a slice of HostKey structs. A file that does not exist
-// or does not parse is left out: a host without a particular key type is
-// normal (e.g. RSA disabled in the sshd config), and one bad file must
-// not hide the other keys or the authorized keys. A file that exists and
-// does not read is an error, since the public keys are readable by every
-// user. Shared by Linux and Darwin because /etc/ssh is the canonical path
-// on both platforms.
+// is left out: a host without a particular key type is normal (e.g. RSA
+// disabled in the sshd config). A file that exists and does not parse is
+// left out too, so one bad file does not hide the other keys or the
+// authorized keys, and its error is in bad, which the caller returns with
+// the fact. A file that exists and does not read is err, since the public
+// keys are readable by every user. Shared by Linux and Darwin because
+// /etc/ssh is the canonical path on both platforms.
 func collectHostKeys(
 	fs avfs.VFS,
-) ([]HostKey, error) {
-	keys := []HostKey{}
+) (keys []HostKey, bad error, err error) {
+	keys = []HostKey{}
+	var parse []error
 	for _, path := range hostKeyFiles {
 		b, err := fs.ReadFile(path)
 		if collector.Absent(err) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", path, err)
+			return nil, nil, fmt.Errorf("read %s: %w", path, err)
 		}
 		key, err := parseHostKeyPub(b)
 		if err != nil {
+			parse = append(parse, fmt.Errorf("parse %s: %w", path, err))
+
 			continue
 		}
 		keys = append(keys, key)
 	}
 
-	return keys, nil
+	return keys, errors.Join(parse...), nil
 }
 
 // parseHostKeyPub parses a single line from a .pub file

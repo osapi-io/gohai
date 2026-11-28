@@ -54,7 +54,7 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	keys, err := collectHostKeys(l.FS)
+	keys, bad, err := collectHostKeys(l.FS)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,8 @@ func (l *Linux) Collect(
 		return nil, err
 	}
 
-	return &Info{Keys: keys, AuthorizedKeys: authorized}, nil
+	// A host key file that does not parse keeps the rest, with its error.
+	return &Info{Keys: keys, AuthorizedKeys: authorized}, bad
 }
 
 // homes is the home of each user of `getent passwd`, which has the users
