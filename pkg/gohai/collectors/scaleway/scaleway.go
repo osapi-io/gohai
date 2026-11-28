@@ -28,6 +28,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -303,7 +304,20 @@ func transform(
 			info.SSHPublicKeys = append(info.SSHPublicKeys, k.Key)
 		}
 	}
-	for _, v := range r.Volumes {
+	// Scaleway keys the volumes "0", "1", ...: list them in that order, so
+	// each run reports the same list.
+	keys := make([]string, 0, len(r.Volumes))
+	for k := range r.Volumes {
+		keys = append(keys, k)
+	}
+	slices.SortFunc(keys, func(a, b string) int {
+		if len(a) != len(b) {
+			return len(a) - len(b)
+		}
+		return strings.Compare(a, b)
+	})
+	for _, k := range keys {
+		v := r.Volumes[k]
 		info.Volumes = append(info.Volumes, Volume(v))
 	}
 	if r.Bootscript != nil {

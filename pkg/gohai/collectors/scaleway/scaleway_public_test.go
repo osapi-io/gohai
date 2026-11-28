@@ -49,7 +49,10 @@ const cannedResponse = `{
   "location": {"zone_id": "fr-par-1", "platform_id": "4"},
   "ssh_public_keys": [{"key": "ssh-rsa AAA..."}, {"key": "  "}],
   "volumes": {
-    "0": {"id": "vol-a", "name": "root", "volume_type": "b_ssd", "size": 50000000000, "export_uri": "nbd://..."}
+    "0": {"id": "vol-a", "name": "root", "volume_type": "b_ssd", "size": 50000000000, "export_uri": "nbd://..."},
+    "10": {"id": "vol-k", "name": "eleventh", "volume_type": "l_ssd", "size": 1, "export_uri": "nbd://..."},
+    "2": {"id": "vol-c", "name": "third", "volume_type": "l_ssd", "size": 1, "export_uri": "nbd://..."},
+    "1": {"id": "vol-b", "name": "data", "volume_type": "l_ssd", "size": 1, "export_uri": "nbd://..."}
   },
   "timezone": "Europe/Paris",
   "bootscript": {"id": "bs-1", "title": "x86_64 mainline 4.4.230 rev1", "architecture": "x86_64", "kernel": "https://s.scw.co/kernel", "initrd": "https://s.scw.co/initrd", "bootcmdargs": "LINUX_COMMON scaleway boot=local", "organization": "org-scw", "public": true}
@@ -154,8 +157,11 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 				s.Equal("fr-par-1", info.Zone)
 				s.Equal("4", info.PlatformID)
 				s.Equal([]string{"ssh-rsa AAA..."}, info.SSHPublicKeys)
-				s.Require().Len(info.Volumes, 1)
+				s.Require().Len(info.Volumes, 4)
 				s.Equal("vol-a", info.Volumes[0].ID)
+				s.Equal("vol-b", info.Volumes[1].ID)
+				s.Equal("vol-c", info.Volumes[2].ID)
+				s.Equal("vol-k", info.Volumes[3].ID)
 				s.Equal("b_ssd", info.Volumes[0].VolumeType)
 				s.Equal(int64(50000000000), info.Volumes[0].Size)
 				s.Equal("Europe/Paris", info.Timezone)

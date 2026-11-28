@@ -134,6 +134,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		files        map[string]string
 		euid         int
 		id           string // output of `id -u`; "" uses euid
+		idName       string // output of `id -un`; "" is an id -un that fails
 		idErr        error
 		nilExec      bool
 		dscl         string            // dscl output; "" is a dscl that fails
@@ -202,6 +203,65 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				info, ok := got.(*users.Info)
 				s.Require().True(ok)
 				s.Equal("", info.CurrentUser)
+			},
+		},
+		{
+			name:    "linux: two names on one UID: the first in sorted order",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "toor:x:0:0::/root:/bin/sh\nroot:x:0:0::/root:/bin/sh\n",
+			},
+			euid: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Equal("root", info.CurrentUser)
+			},
+		},
+		{
+			name:    "linux: id -un names a user: that user",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0::/root:/bin/sh\ntoor:x:0:0::/root:/bin/sh\n",
+			},
+			euid:   0,
+			idName: "toor\n",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Equal("toor", info.CurrentUser)
+			},
+		},
+		{
+			name:    "linux: id -un names no user in passwd: the UID decides",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
+			},
+			euid:   0,
+			idName: "ldapuser\n",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Equal("root", info.CurrentUser)
+			},
+		},
+		{
+			name:    "linux: a NIS line with no UID names no account",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "+::::::\njohn:x:1000:1000::/home/john:/bin/sh\nbad:x:x:0::/:/bin/sh\n",
+			},
+			euid: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Len(info.Passwd, 1)
+				s.Empty(info.CurrentUser)
 			},
 		},
 		{
@@ -379,6 +439,11 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			r := sourcetest.Commands{Out: map[string]string{"id -u": id}, Err: map[string]error{}}
 			if tt.idErr != nil {
 				r.Err["id -u"] = tt.idErr
+			}
+			if tt.idName != "" {
+				r.Out["id -un"] = tt.idName
+			} else {
+				r.Err["id -un"] = errors.New("exec id: not found")
 			}
 			const dscl = "dscl . -list /Users AuthenticationAuthority"
 			if tt.dscl != "" {

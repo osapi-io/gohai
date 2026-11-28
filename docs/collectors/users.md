@@ -17,11 +17,11 @@ Consumers use this to:
 
 ## Collected fields
 
-| Field          | Type                     | Description                                                                                        | Schema mapping            |
-| -------------- | ------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------- |
-| `passwd`       | `map[string]PasswdEntry` | The accounts, with the username as the key. If a username occurs two times, the first entry stays. | No direct schema mapping. |
-| `group`        | `map[string]GroupEntry`  | The groups, with the group name as the key.                                                        | No direct schema mapping. |
-| `current_user` | `string`                 | The username of the effective UID at the time of collection.                                       | OCSF `actor.user.name`    |
+| Field          | Type                     | Description                                                                                                    | Schema mapping            |
+| -------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `passwd`       | `map[string]PasswdEntry` | The accounts, with the username as the key. If a username occurs two times, the first entry stays.             | No direct schema mapping. |
+| `group`        | `map[string]GroupEntry`  | The groups, with the group name as the key.                                                                    | No direct schema mapping. |
+| `current_user` | `string`                 | The username of the effective UID: the name `id -un` gives, else the first name in sorted order with that UID. | OCSF `actor.user.name`    |
 
 ### PasswdEntry
 
