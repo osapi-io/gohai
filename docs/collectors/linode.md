@@ -74,8 +74,7 @@ gohai collect --category=cloud        # pulls this + all cloud collectors
 ## Dependencies
 
 `dmi` and `hostname`. The DMI vendor signal needs `dmi`. The FQDN and domain
-signal needs `hostname`. That signal is the same as Ohai's
-`has_linode_domain?`.
+signal needs `hostname`. That signal is the same as Ohai's `has_linode_domain?`.
 
 ## Data sources
 
@@ -88,8 +87,8 @@ signal needs `hostname`. That signal is the same as Ohai's
    - **apt.** `/etc/apt/sources.list`, or a file in `/etc/apt/sources.list.d`,
      contains `"linode"`. The match is not case-sensitive. Newer images, such as
      Ubuntu 24.04 and Debian 13, keep their sources in
-     `sources.list.d/*.sources`. This is Ohai's `has_linode_apt_repos?`, with the
-     directory added.
+     `sources.list.d/*.sources`. This is Ohai's `has_linode_apt_repos?`, with
+     the directory added.
    - **domain.** The `FQDN` or `Domain` from the `hostname` collector contains
      `"linode"`. The `hostname` collector runs first. This is the same as Ohai's
      `has_linode_domain?`.
@@ -101,11 +100,12 @@ signal needs `hostname`. That signal is the same as Ohai's
 
 The method is the same as Ohai's Linode plugin, with the DMI signal and the
 `sources.list.d` directory added. It uses the same domain signal and the same
-`eth0` and `eth0:1` interfaces. gohai does not query
-Linode's `metadata.linode.com` API. Ohai does not query it either.
+`eth0` and `eth0:1` interfaces. gohai does not query Linode's
+`metadata.linode.com` API. Ohai does not query it either.
 
 ## Backing library
 
 - [`source.Runner`](../../pkg/gohai/source) to run `ip -o -4 addr show`.
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read
-  `/etc/apt/sources.list` and `/etc/apt/sources.list.d`. Production uses `osfs`. Tests use `memfs`.
+  `/etc/apt/sources.list` and `/etc/apt/sources.list.d`. Production uses `osfs`.
+  Tests use `memfs`.

@@ -12,11 +12,12 @@ host's family through `family.Detect()`: collectors through
 family, and osapi for its behaviors. `package_mgr`, `shard` and the per-OS
 struct factories in all collectors use this data.
 
-The collector reads `/etc/os-release` (the systemd standard) first. If that
-gives no result, it tries old release files in sequence, for example
-`redhat-release`, `SuSE-release` and `debian_version`. Thus it also identifies
-distributions from before systemd and appliance distributions. On macOS,
-`sw_vers` gives the version, the build identifier and the Rapid Security
+The collector reads `/etc/os-release` (the systemd standard) first, or
+`/usr/lib/os-release` when `/etc/os-release` does not exist, as os-release(5)
+says. If that gives no result, it tries old release files in sequence, for
+example `redhat-release`, `SuSE-release` and `debian_version`. Thus it also
+identifies distributions from before systemd and appliance distributions. On
+macOS, `sw_vers` gives the version, the build identifier and the Rapid Security
 Response patch suffix.
 
 Consumers use this data to:

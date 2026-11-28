@@ -20,9 +20,10 @@ Detection uses three Linux signals:
 - `/var/lib/dhcp/dhclient.eth0.leases` contains the DHCP option-245 signature
   (`unknown-245`).
 
-The last two are Ohai's chain for hosts that are not Windows. The asset tag finds
-a VM that has neither, such as an image with cloud-init and systemd-networkd. If
-no signal is there, the collector stops and makes no HTTP call.
+The last two are Ohai's chain for hosts that are not Windows. The asset tag
+finds a VM that has neither, such as an image with cloud-init and
+systemd-networkd. If no signal is there, the collector stops and makes no HTTP
+call.
 
 ## Collected fields
 

@@ -1663,14 +1663,14 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: ifconfig fails",
+			name:    "darwin: ifconfig fails, and the error names the command",
 			variant: "darwin",
 			ifsFn: func() ([]tIface, error) {
 				return nil, errors.New("net error")
 			},
 			countersFn: zeroCounters,
 			validateFunc: func(_ any, err error) {
-				s.Error(err)
+				s.ErrorContains(err, "ifconfig -a -v: ")
 			},
 		},
 	}

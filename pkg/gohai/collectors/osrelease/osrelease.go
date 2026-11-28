@@ -31,8 +31,6 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-const osReleasePath = "/etc/os-release"
-
 // Info holds the typed fields parsed from /etc/os-release. Unknown
 // keys are preserved in Extra.
 type Info struct {

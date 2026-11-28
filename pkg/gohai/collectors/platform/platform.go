@@ -41,9 +41,6 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
-// osRelease names the distribution: its ID and VERSION_ID.
-const osRelease = "/etc/os-release"
-
 // readOSRelease fills info's name, version and family from
 // /etc/os-release, as Ohai does. It leaves them empty when fs has no such
 // file, for the old release files to fill.
@@ -51,7 +48,7 @@ func readOSRelease(
 	fs avfs.VFS,
 	info *Info,
 ) {
-	b, err := fs.ReadFile(osRelease)
+	b, err := family.ReadOSRelease(fs)
 	if err != nil {
 		return
 	}

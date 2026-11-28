@@ -153,13 +153,13 @@ func (s *TCPublicTestSuite) TestCollect() {
 					{
 						Name: "lo",
 						QDiscs: []tc.QDisc{
-							{Kind: "noqueue", Handle: "0"},
+							{Kind: "noqueue", Handle: "0", Parent: "root"},
 						},
 					},
 					{
 						Name: "eth0",
 						QDiscs: []tc.QDisc{
-							{Kind: "fq_codel", Handle: "0"},
+							{Kind: "fq_codel", Handle: "0", Parent: "root"},
 						},
 					},
 					{
@@ -231,7 +231,7 @@ func (s *TCPublicTestSuite) TestCollect() {
 					{
 						Name: "eth0",
 						QDiscs: []tc.QDisc{
-							{Kind: "fq_codel", Handle: "0"},
+							{Kind: "fq_codel", Handle: "0", Parent: "root"},
 						},
 					},
 				}, info.Interfaces)

@@ -287,6 +287,22 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: no /etc/os-release, so /usr/lib/os-release names the distribution",
+			variant: "linux",
+			fs: fsWith(s.T(), map[string]string{
+				"/usr/lib/os-release": "ID=fedora\nVERSION_ID=42\n",
+			}),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal(platform.Info{
+					OS: "linux", Name: "fedora", Version: "42",
+					Family: "fedora", CPUArchitecture: runtime.GOARCH,
+				}, *info)
+			},
+		},
+		{
 			name:    "linux: no os-release, legacy /etc/redhat-release from Red Hat",
 			variant: "linux",
 			fs: fsWith(s.T(), map[string]string{

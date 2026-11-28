@@ -225,8 +225,8 @@ request.
    result of the `dmi` collector. If `product.name` does not contain
    `"Google Compute Engine"`, it stops and returns `(nil, nil)`. This prevents
    the 2 s metadata-endpoint timeout on hosts that are not on GCE. If `dmi` ran
-   and has no product table, the collector also stops. If `dmi` did not run,
-   the collector sends the HTTP request.
+   and has no product table, the collector also stops. If `dmi` did not run, the
+   collector sends the HTTP request.
 2. **Endpoint.**
    `http://metadata.google.internal./computeMetadata/v1/?recursive=true`. The
    dot at the end of the hostname stops the DNS search path of the host.
@@ -249,9 +249,9 @@ request.
    zone. It moves `instance.virtualClock.driftToken` to the flat
    `virtual_clock_drift_token`. It moves `instance.remainingCpuTime` and
    `instance.partnerAttributes` to `remaining_cpu_time` and
-   `partner_attributes`. It sorts `service_accounts` by key, so the order is
-   the same on each run. The collector does not keep the full tree as GCE gives
-   it. All fields in the output are typed.
+   `partner_attributes`. It sorts `service_accounts` by key, so the order is the
+   same on each run. The collector does not keep the full tree as GCE gives it.
+   All fields in the output are typed.
 
 The method is the same as Ohai's `Ohai::Mixin::GCEMetadata`: the same URL, the
 same header, the same single recursive request, and the same full tree.

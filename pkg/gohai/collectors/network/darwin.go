@@ -22,6 +22,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"math/bits"
 	"regexp"
 	"sort"
@@ -56,7 +57,7 @@ func (d *Darwin) Collect(
 ) (any, error) {
 	out, err := d.Exec.Execute(ctx, "ifconfig", "-a", "-v")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ifconfig -a -v: %w", err)
 	}
 	ifs := parseIfconfig(out)
 	if out, err := d.Exec.Execute(ctx, "netstat", "-ibdnW"); err == nil {
