@@ -112,8 +112,13 @@ On Linux, the collector runs `hostnamectl` with no subcommand through the shared
    the kernel name (`Linux`). The second part is the release
    (`5.15.0-91-generic`).
 5. If `hostnamectl` is not on the host, the collector returns an empty `Info`
-   and no error. If `hostnamectl` gives a non-zero exit code, the collector
-   returns an error.
+   and no error. A host where `hostnamectl` is installed and systemd does not
+   run, such as a container with the systemd package and another init, is the
+   same: `hostnamectl` says `Failed to connect to bus` or
+   `System has not been booted with systemd`, and the collector returns an empty
+   `Info` and no error. Any other non-zero exit code is an error.
+6. The collector splits the output at each newline, so a line of any length,
+   such as a long location, does not stop the parse.
 
 The collector does not support macOS, because `hostnamectl` is a systemd tool
 for Linux.

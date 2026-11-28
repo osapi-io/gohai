@@ -24,7 +24,6 @@
 package hostnamectl
 
 import (
-	"bufio"
 	"regexp"
 	"strings"
 
@@ -97,9 +96,9 @@ func parseHostnamectl(
 	output string,
 ) *Info {
 	info := &Info{}
-	sc := bufio.NewScanner(strings.NewReader(output))
-	for sc.Scan() {
-		line := sc.Text()
+	// A split has no line limit, where a bufio.Scanner stops at 64 KiB
+	// and drops the rest without an error.
+	for line := range strings.SplitSeq(output, "\n") {
 		idx := strings.Index(line, ": ")
 		if idx < 0 {
 			continue

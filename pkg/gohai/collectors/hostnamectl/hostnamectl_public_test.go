@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -324,6 +325,58 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 				s.Require().Error(err)
 				s.Exactly(nil, got)
 				s.Contains(err.Error(), "read hostnamectl")
+			},
+		},
+		{
+			name:    "linux: a hostnamectl with no systemd bus yields empty Info, no error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return hostnamectlExec(t, nil, errors.New(
+					"hostnamectl: exit status 1: System has not been booted with systemd as init system (PID 1). "+
+						"Can't operate.\nFailed to connect to bus: Host is down",
+				))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{}, *info)
+			},
+		},
+		{
+			name:    "linux: a hostnamectl that cannot reach the bus yields empty Info, no error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return hostnamectlExec(
+					t,
+					nil,
+					errors.New("exit status 1: Failed to connect to bus: No such file"),
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{}, *info)
+			},
+		},
+		{
+			name:    "linux: a line after one over 64 KiB is still read",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				out := "        Location: " + strings.Repeat(
+					"x",
+					70_000,
+				) + "\n Static hostname: after\n"
+
+				return hostnamectlExec(t, []byte(out), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal("after", info.StaticHostname)
+				s.Len(info.Location, 70_000)
 			},
 		},
 		{

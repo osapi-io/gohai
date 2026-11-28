@@ -27,6 +27,7 @@ package digitalocean
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -196,7 +197,7 @@ func (c *Metadata) Collect(
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 			return nil, ctx.Err()
 		}
-		return nil, err
+		return nil, fmt.Errorf("read digitalocean metadata: %w", err)
 	}
 	return transform(r), nil
 }

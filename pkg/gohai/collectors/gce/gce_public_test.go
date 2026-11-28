@@ -344,7 +344,7 @@ func (s *GcePublicTestSuite) TestCollect() {
 			name: "malformed JSON is an error",
 			meta: &metadata{status: http.StatusOK, body: "not json"},
 			validateFunc: func(out any, err error, _ *metadata) {
-				s.Error(err)
+				s.ErrorContains(err, "parse gce metadata: ")
 				s.Nil(out)
 			},
 		},

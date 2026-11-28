@@ -213,7 +213,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 				_, _ = w.Write([]byte("not json"))
 			},
 			validateFunc: func(_ any, _ bool, err error) {
-				s.Error(err)
+				s.ErrorContains(err, "read digitalocean metadata: ")
 			},
 		},
 	}

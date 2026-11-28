@@ -21,8 +21,6 @@
 package cacertificates
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"crypto/x509"
 	"fmt"
@@ -284,9 +282,10 @@ func (l *Linux) disabled() (map[string]bool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", l.Layout.Conf, err)
 	}
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	// A split has no line limit, where a bufio.Scanner stops at 64 KiB
+	// and drops the rest without an error.
+	for raw := range strings.SplitSeq(string(data), "\n") {
+		line := strings.TrimSpace(raw)
 		if name, ok := strings.CutPrefix(line, "!"); ok {
 			off[strings.TrimSuffix(name, ".crt")] = true
 		}

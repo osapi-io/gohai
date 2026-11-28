@@ -430,7 +430,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 				instance:    answer{status: http.StatusOK, body: "not json"},
 			},
 			validateFunc: func(out any, err error, _ *metadata) {
-				s.Error(err)
+				s.ErrorContains(err, "read azure metadata: ")
 				s.Nil(out)
 			},
 		},

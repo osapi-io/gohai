@@ -23,6 +23,7 @@ package hostnamectl
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -53,11 +54,27 @@ func (l *Linux) Collect(
 		return &Info{}, nil
 	}
 	out, err := l.Exec.Execute(ctx, "hostnamectl")
-	if collector.Absent(err) {
+	if collector.Absent(err) || noSystemd(err) {
 		return &Info{}, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read hostnamectl: %w", err)
 	}
 	return parseHostnamectl(string(out)), nil
+}
+
+// noSystemd reports whether err says that hostnamectl is installed but
+// systemd does not run, as in a container with the systemd package and
+// another init. Such a host has no hostnamed to ask, the same as a host
+// without hostnamectl. The error has hostnamectl's stderr.
+func noSystemd(
+	err error,
+) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+
+	return strings.Contains(msg, "Failed to connect to bus") ||
+		strings.Contains(msg, "System has not been booted with systemd")
 }

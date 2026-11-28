@@ -319,7 +319,7 @@ func (c *Metadata) Collect(
 	}
 	var raw rawResponse
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse gce metadata: %w", err)
 	}
 	return transform(raw), nil
 }
