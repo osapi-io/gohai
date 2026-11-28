@@ -271,11 +271,12 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		},
 		{
 			name: "a walk that outlives its timeout is an error",
-			handler: func(w http.ResponseWriter, r *http.Request) {
-				time.Sleep(20 * time.Millisecond)
-				serve(treeResponses)(w, r)
+			// The server never answers, so only the walk's deadline can end
+			// the collection.
+			handler: func(_ http.ResponseWriter, r *http.Request) {
+				<-r.Context().Done()
 			},
-			timeout: 100 * time.Millisecond,
+			timeout: time.Millisecond,
 			wantErr: "context deadline exceeded",
 		},
 		{
