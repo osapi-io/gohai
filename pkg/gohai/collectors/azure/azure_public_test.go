@@ -22,17 +22,18 @@ package azure_test
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/cloudmetadata"
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
@@ -119,9 +120,73 @@ const cannedResponse = `{
 
 const negotiationBody = `{"newest-versions": ["2023-07-01", "9999-99-99"]}`
 
+// waagent is a host with the Azure Linux Agent at its canonical path.
+var waagent = map[string]string{"/usr/sbin/waagent": "#!/bin/sh\n"}
+
+// metadata is Azure's metadata service. A request with no api-version
+// is the version negotiation, and gets negotiation; a request with one
+// gets instance. err fails each request. http.RoundTripper is the
+// standard library's interface, so it has no generated mock. The
+// http.Client calls RoundTrip on the caller's goroutine, so the test
+// reads requests with no lock.
+type metadata struct {
+	negotiation answer
+	instance    answer
+	err         error
+	requests    []*http.Request
+}
+
+// answer is a status and a body.
+type answer struct {
+	status int
+	body   string
+}
+
+// RoundTrip records req and gives the canned answer.
+func (m *metadata) RoundTrip(
+	req *http.Request,
+) (*http.Response, error) {
+	m.requests = append(m.requests, req)
+	if m.err != nil {
+		return nil, m.err
+	}
+	a := m.instance
+	if req.URL.Query().Get("api-version") == "" {
+		a = m.negotiation
+	}
+
+	return &http.Response{
+		StatusCode: a.status,
+		Status:     http.StatusText(a.status),
+		Header:     http.Header{},
+		Body:       io.NopCloser(strings.NewReader(a.body)),
+		Request:    req,
+	}, nil
+}
+
+// apiVersion is the api-version of the instance read, or "" when there
+// was none.
+func (m *metadata) apiVersion() string {
+	for _, req := range m.requests {
+		if v := req.URL.Query().Get("api-version"); v != "" {
+			return v
+		}
+	}
+
+	return ""
+}
+
+// azureService answers the negotiation with negotiationBody and the
+// instance read with cannedResponse.
+func azureService() *metadata {
+	return &metadata{
+		negotiation: answer{status: http.StatusBadRequest, body: negotiationBody},
+		instance:    answer{status: http.StatusOK, body: cannedResponse},
+	}
+}
+
 type AzurePublicTestSuite struct {
 	suite.Suite
-	tmpDir string
 }
 
 func TestAzurePublicTestSuite(
@@ -130,130 +195,47 @@ func TestAzurePublicTestSuite(
 	suite.Run(t, new(AzurePublicTestSuite))
 }
 
-func (s *AzurePublicTestSuite) SetupTest() {
-	s.tmpDir = s.T().TempDir()
-}
-
-// installWaagent creates a fake waagent binary at a tmp path and
-// swaps the package var. Returns restore func.
-func (s *AzurePublicTestSuite) installWaagent() func() {
-	path := filepath.Join(s.tmpDir, "waagent")
-	s.Require().NoError(os.WriteFile(path, []byte("#!/bin/sh\n"), 0o755))
-	return azure.SetWaagentPath(path)
-}
-
-// writeLeases writes a dhclient leases file containing the given
-// content and swaps the package var.
-func (s *AzurePublicTestSuite) writeLeases(
-	content string,
-) func() {
-	path := filepath.Join(s.tmpDir, "leases")
-	s.Require().NoError(os.WriteFile(path, []byte(content), 0o644))
-	return azure.SetDhclientLeasesPath(path)
-}
-
-// pointAwayFromWaagent + pointAwayFromLeases point the package vars
-// at nonexistent paths so detection short-circuits.
-func (s *AzurePublicTestSuite) pointAwayFromWaagent() func() {
-	return azure.SetWaagentPath(filepath.Join(s.tmpDir, "no-waagent"))
-}
-
-func (s *AzurePublicTestSuite) pointAwayFromLeases() func() {
-	return azure.SetDhclientLeasesPath(filepath.Join(s.tmpDir, "no-leases"))
-}
-
-func (s *AzurePublicTestSuite) TestInterface() {
-	c := azure.New()
+func (s *AzurePublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		got          any
-		validateFunc func(any)
+		validateFunc func(*azure.Collector)
 	}{
 		{
-			name: "Name",
-			got:  c.Name(),
-			validateFunc: func(got any) {
-				s.Equal("azure", got)
-			},
-		},
-		{
-			name: "Category",
-			got:  string(c.Category()),
-			validateFunc: func(got any) {
-				s.Equal("cloud", got)
-			},
-		},
-		{
-			name: "DefaultEnabled",
-			got:  c.DefaultEnabled(),
-			validateFunc: func(got any) {
-				s.Equal(false, got)
-			},
-		},
-		{
-			name: "Dependencies",
-			got:  c.Dependencies(),
-			validateFunc: func(got any) {
-				s.Equal([]string(nil), got)
+			name: "New gives the azure cloud collector, opt-in, after dmi",
+			validateFunc: func(c *azure.Collector) {
+				s.Equal("azure", c.Name())
+				s.Equal(collector.CategoryCloud, c.Category())
+				s.False(c.DefaultEnabled())
+				s.Equal([]string{"dmi"}, c.Dependencies())
+				s.NotNil(c.FS)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			tt.validateFunc(tt.got)
+			tt.validateFunc(azure.New())
 		})
-	}
-}
-
-// handler simulates Azure's metadata service. GET /metadata/instance
-// without api-version returns 400 with newest-versions; with a known
-// api-version returns the canned response. `respOverride` lets tests
-// force a specific handler.
-func handler(
-	respOverride func(w http.ResponseWriter, r *http.Request),
-	negotiationJSON string,
-	negotiationStatus int,
-) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if respOverride != nil {
-			respOverride(w, r)
-			return
-		}
-		if r.URL.Path != "/metadata/instance" {
-			http.NotFound(w, r)
-			return
-		}
-		if r.URL.Query().Get("api-version") == "" {
-			w.WriteHeader(negotiationStatus)
-			_, _ = w.Write([]byte(negotiationJSON))
-			return
-		}
-		_, _ = w.Write([]byte(cannedResponse))
 	}
 }
 
 func (s *AzurePublicTestSuite) TestCollect() {
 	tests := []struct {
-		name              string
-		waagent           bool
-		leasesContent     string // when non-empty, writes a dhclient leases file
-		noDetection       bool   // when true, skip waagent + leases setup
-		negotiationJSON   string
-		negotiationStatus int
-		overrideHandler   func(w http.ResponseWriter, r *http.Request)
-		closed            bool
-		validateFunc      func(any, bool, string, error)
+		name         string
+		files        map[string]string
+		prior        collector.PriorResults
+		meta         *metadata
+		validateFunc func(any, error, *metadata)
 	}{
 		{
-			name:              "happy path with waagent + successful version negotiation",
-			waagent:           true,
-			negotiationJSON:   negotiationBody,
-			negotiationStatus: http.StatusBadRequest,
-			validateFunc: func(out any, _ bool, gotAPI string, _ error) {
+			name:  "happy path with waagent + successful version negotiation",
+			files: waagent,
+			meta:  azureService(),
+			validateFunc: func(out any, err error, m *metadata) {
+				s.Require().NoError(err)
+				s.Equal("2023-07-01", m.apiVersion())
+				s.Equal("true", m.requests[0].Header.Get("Metadata"))
 				info, ok := out.(*azure.Info)
 				s.Require().True(ok)
-				s.Equal("2023-07-01", gotAPI)
-				s.Require().NotNil(info)
 				s.Equal("abcd-1234", info.ID)
 				s.Equal("eastus", info.Region)
 				s.Require().Len(info.Interfaces, 1)
@@ -262,12 +244,8 @@ func (s *AzurePublicTestSuite) TestCollect() {
 				s.Require().NotNil(iface.IPv4)
 				s.Equal([]string{"10.0.0.4"}, info.LocalIPv4)
 				s.Equal([]string{"20.1.2.3"}, info.PublicIPv4)
-
-				// Newly added typed fields (Ohai-parity gap closure).
-				s.Require().NotNil(info.Host)
-				s.Equal("/hosts/host-1", info.Host.ID)
-				s.Require().NotNil(info.HostGroup)
-				s.Equal("/hostgroups/hg-1", info.HostGroup.ID)
+				s.Equal(&azure.Host{ID: "/hosts/host-1"}, info.Host)
+				s.Equal(&azure.HostGroup{ID: "/hostgroups/hg-1"}, info.HostGroup)
 				s.Require().NotNil(info.OSProfile)
 				s.Equal("azureuser", info.OSProfile.AdminUsername)
 				s.Equal("web-1", info.OSProfile.ComputerName)
@@ -280,129 +258,186 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:              "DHCP option 245 detects Azure without waagent",
-			leasesContent:     "lease {\n  option unknown-245 12:34;\n}\n",
-			negotiationJSON:   negotiationBody,
-			negotiationStatus: http.StatusBadRequest,
-			validateFunc: func(out any, _ bool, _ string, _ error) {
+			name:  "waagent at /usr/bin detects Azure",
+			files: map[string]string{"/usr/bin/waagent": "#!/bin/sh\n"},
+			meta:  azureService(),
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.Require().NoError(err)
 				info, ok := out.(*azure.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Equal("abcd-1234", info.ID)
 			},
 		},
 		{
-			name:          "DHCP leases without signature does not detect",
-			leasesContent: "lease { option routers 10.0.0.1; }\n",
-			validateFunc: func(out any, httpCalled bool, _ string, _ error) {
-				s.False(httpCalled)
-				s.Nil(out)
-			},
-		},
-		{
-			name:        "no waagent + no leases file short-circuits",
-			noDetection: true,
-			validateFunc: func(out any, httpCalled bool, _ string, _ error) {
-				s.False(httpCalled)
-				s.Nil(out)
-			},
-		},
-		{
-			name:              "version negotiation: 404 falls back to latest",
-			waagent:           true,
-			negotiationJSON:   "",
-			negotiationStatus: http.StatusNotFound,
-			validateFunc: func(out any, _ bool, gotAPI string, _ error) {
+			name: "the DMI chassis asset tag detects Azure with no agent and no lease",
+			prior: collector.PriorResults{"dmi": &dmi.Info{
+				Chassis: &dmi.Chassis{AssetTag: "7783-7084-3265-9085-8269-3286-77"},
+			}},
+			meta: azureService(),
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.Require().NoError(err)
 				info, ok := out.(*azure.Info)
 				s.Require().True(ok)
-				s.Equal("2023-07-01", gotAPI)
-				s.Require().NotNil(info)
+				s.Equal("abcd-1234", info.ID)
 			},
 		},
 		{
-			name:              "version negotiation: malformed JSON falls back to latest",
-			waagent:           true,
-			negotiationJSON:   "not json",
-			negotiationStatus: http.StatusBadRequest,
-			validateFunc: func(_ any, _ bool, gotAPI string, _ error) {
-				s.Equal("2023-07-01", gotAPI)
+			name: "another chassis asset tag does not detect",
+			prior: collector.PriorResults{"dmi": &dmi.Info{
+				Chassis: &dmi.Chassis{AssetTag: "0000-0000"},
+			}},
+			meta: azureService(),
+			validateFunc: func(out any, err error, m *metadata) {
+				s.NoError(err)
+				s.Nil(out)
+				s.Empty(m.requests)
 			},
 		},
 		{
-			name:              "version negotiation: empty newest-versions falls back",
-			waagent:           true,
-			negotiationJSON:   `{"newest-versions":[]}`,
-			negotiationStatus: http.StatusBadRequest,
-			validateFunc: func(_ any, _ bool, gotAPI string, _ error) {
-				s.Equal("2023-07-01", gotAPI)
+			name: "DHCP option 245 detects Azure without waagent",
+			files: map[string]string{
+				"/var/lib/dhcp/dhclient.eth0.leases": "lease {\n  option unknown-245 12:34;\n}\n",
+			},
+			meta: azureService(),
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.Require().NoError(err)
+				info, ok := out.(*azure.Info)
+				s.Require().True(ok)
+				s.Equal("abcd-1234", info.ID)
 			},
 		},
 		{
-			name:              "version negotiation: no intersection falls back",
-			waagent:           true,
-			negotiationJSON:   `{"newest-versions":["2099-01-01", "2099-02-01"]}`,
-			negotiationStatus: http.StatusBadRequest,
-			validateFunc: func(_ any, _ bool, gotAPI string, _ error) {
-				s.Equal("2023-07-01", gotAPI)
+			name: "DHCP leases without signature does not detect",
+			files: map[string]string{
+				"/var/lib/dhcp/dhclient.eth0.leases": "lease { option routers 10.0.0.1; }\n",
+			},
+			meta: azureService(),
+			validateFunc: func(out any, err error, m *metadata) {
+				s.NoError(err)
+				s.Nil(out)
+				s.Empty(m.requests)
 			},
 		},
 		{
-			name:              "version negotiation: intersection picks latest",
-			waagent:           true,
-			negotiationJSON:   `{"newest-versions":["2021-02-01","2023-07-01","2019-11-01"]}`,
-			negotiationStatus: http.StatusBadRequest,
-			validateFunc: func(_ any, _ bool, gotAPI string, _ error) {
-				s.Equal("2023-07-01", gotAPI)
+			name: "no signal: no request",
+			meta: azureService(),
+			validateFunc: func(out any, err error, m *metadata) {
+				s.NoError(err)
+				s.Nil(out)
+				s.Empty(m.requests)
 			},
 		},
 		{
-			name:    "404 on main fetch drops silently",
-			waagent: true,
-			overrideHandler: func(w http.ResponseWriter, _ *http.Request) {
-				http.NotFound(w, nil)
+			name:  "version negotiation: 404 falls back to latest",
+			files: waagent,
+			meta: &metadata{
+				negotiation: answer{status: http.StatusNotFound},
+				instance:    answer{status: http.StatusOK, body: cannedResponse},
 			},
-			validateFunc: func(out any, _ bool, _ string, _ error) {
+			validateFunc: func(out any, err error, m *metadata) {
+				s.Require().NoError(err)
+				s.Equal("2023-07-01", m.apiVersion())
+				s.NotNil(out)
+			},
+		},
+		{
+			name:  "version negotiation: malformed JSON falls back to latest",
+			files: waagent,
+			meta: &metadata{
+				negotiation: answer{status: http.StatusBadRequest, body: "not json"},
+				instance:    answer{status: http.StatusOK, body: cannedResponse},
+			},
+			validateFunc: func(_ any, err error, m *metadata) {
+				s.NoError(err)
+				s.Equal("2023-07-01", m.apiVersion())
+			},
+		},
+		{
+			name:  "version negotiation: empty newest-versions falls back",
+			files: waagent,
+			meta: &metadata{
+				negotiation: answer{status: http.StatusBadRequest, body: `{"newest-versions":[]}`},
+				instance:    answer{status: http.StatusOK, body: cannedResponse},
+			},
+			validateFunc: func(_ any, err error, m *metadata) {
+				s.NoError(err)
+				s.Equal("2023-07-01", m.apiVersion())
+			},
+		},
+		{
+			name:  "version negotiation: no intersection falls back",
+			files: waagent,
+			meta: &metadata{
+				negotiation: answer{
+					status: http.StatusBadRequest,
+					body:   `{"newest-versions":["2099-01-01", "2099-02-01"]}`,
+				},
+				instance: answer{status: http.StatusOK, body: cannedResponse},
+			},
+			validateFunc: func(_ any, err error, m *metadata) {
+				s.NoError(err)
+				s.Equal("2023-07-01", m.apiVersion())
+			},
+		},
+		{
+			name:  "version negotiation: the newest supported version, not the fallback",
+			files: waagent,
+			meta: &metadata{
+				negotiation: answer{
+					status: http.StatusBadRequest,
+					body:   `{"newest-versions":["2019-11-01","2021-02-01","2099-01-01"]}`,
+				},
+				instance: answer{status: http.StatusOK, body: cannedResponse},
+			},
+			validateFunc: func(_ any, err error, m *metadata) {
+				s.NoError(err)
+				s.Equal("2021-02-01", m.apiVersion())
+			},
+		},
+		{
+			name:  "404 on main fetch is not Azure",
+			files: waagent,
+			meta: &metadata{
+				negotiation: answer{status: http.StatusBadRequest, body: negotiationBody},
+				instance:    answer{status: http.StatusNotFound},
+			},
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.NoError(err)
 				s.Nil(out)
 			},
 		},
 		{
-			name:    "connection refused drops silently",
-			waagent: true,
-			closed:  true,
-			validateFunc: func(out any, _ bool, _ string, _ error) {
+			name:  "connection refused is not Azure",
+			files: waagent,
+			meta:  &metadata{err: errors.New("connection refused")},
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.NoError(err)
 				s.Nil(out)
 			},
 		},
 		{
-			name:    "malformed main JSON surfaces as error",
-			waagent: true,
-			overrideHandler: func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Query().Get("api-version") == "" {
-					w.WriteHeader(http.StatusBadRequest)
-					_, _ = w.Write([]byte(negotiationBody))
-					return
-				}
-				_, _ = w.Write([]byte("not json"))
+			name:  "malformed main JSON is an error",
+			files: waagent,
+			meta: &metadata{
+				negotiation: answer{status: http.StatusBadRequest, body: negotiationBody},
+				instance:    answer{status: http.StatusOK, body: "not json"},
 			},
-			validateFunc: func(_ any, _ bool, _ string, err error) {
+			validateFunc: func(out any, err error, _ *metadata) {
 				s.Error(err)
+				s.Nil(out)
 			},
 		},
 		{
-			name:    "empty compute and network skip transform branches",
-			waagent: true,
-			overrideHandler: func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Query().Get("api-version") == "" {
-					w.WriteHeader(http.StatusBadRequest)
-					_, _ = w.Write([]byte(negotiationBody))
-					return
-				}
-				_, _ = w.Write([]byte(`{}`))
+			name:  "empty compute and network skip transform branches",
+			files: waagent,
+			meta: &metadata{
+				negotiation: answer{status: http.StatusBadRequest, body: negotiationBody},
+				instance:    answer{status: http.StatusOK, body: `{}`},
 			},
-			validateFunc: func(out any, _ bool, _ string, _ error) {
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.Require().NoError(err)
 				info, ok := out.(*azure.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Empty(info.ID)
 				s.Empty(info.Interfaces)
 			},
@@ -411,62 +446,13 @@ func (s *AzurePublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.noDetection {
-				defer s.pointAwayFromWaagent()()
-				defer s.pointAwayFromLeases()()
-			} else if tt.waagent {
-				defer s.installWaagent()()
-				defer s.pointAwayFromLeases()()
-			} else if tt.leasesContent != "" {
-				defer s.pointAwayFromWaagent()()
-				defer s.writeLeases(tt.leasesContent)()
-			}
-
-			var httpCalled bool
-			var gotAPI string
-			srv := httptest.NewServer(http.HandlerFunc(
-				func(w http.ResponseWriter, r *http.Request) {
-					httpCalled = true
-					if r.URL.Query().Get("api-version") != "" {
-						gotAPI = r.URL.Query().Get("api-version")
-					}
-					handler(tt.overrideHandler, tt.negotiationJSON, tt.negotiationStatus)(w, r)
-				},
-			))
-			if tt.closed {
-				srv.Close()
-			} else {
-				defer srv.Close()
-			}
-
-			client := cloudmetadata.New(srv.URL,
-				cloudmetadata.WithHeader("Metadata", "true"))
-			c := azure.NewWithClient(client)
-
-			out, err := c.Collect(context.Background(), nil)
-			tt.validateFunc(out, httpCalled, gotAPI, err)
+			c := azure.NewWith(source.Sources{
+				FS:     sourcetest.FS(s.T(), tt.files),
+				Family: family.Debian,
+				HTTP:   tt.meta,
+			})
+			out, err := c.Collect(context.Background(), tt.prior)
+			tt.validateFunc(out, err, tt.meta)
 		})
 	}
-}
-
-func (s *AzurePublicTestSuite) TestNewWith() {
-	fs := memfs.New()
-	c := azure.NewWith(source.Sources{FS: fs, Family: family.Debian})
-	s.Same(fs, c.FS)
-	out, err := c.Collect(context.Background(), nil)
-	s.Require().NoError(err)
-	s.Nil(out, "the given filesystem has no waagent and no leases, so no metadata read")
-
-	s.Require().NoError(fs.MkdirAll("/usr/sbin", 0o755))
-	s.Require().NoError(fs.WriteFile("/usr/sbin/waagent", []byte("#!/bin/sh\n"), 0o755))
-	called := false
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		called = true
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer srv.Close()
-	c = azure.NewWithClient(cloudmetadata.New(srv.URL))
-	c.FS = fs
-	_, _ = c.Collect(context.Background(), nil)
-	s.True(called, "the waagent of the given filesystem says Azure")
 }

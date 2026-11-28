@@ -37,6 +37,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -75,13 +76,23 @@ const (
 
 // waagentPath is the canonical Azure Linux Agent binary path.
 // Existence of this file is Ohai's has_waagent? signal on Linux.
-// Package-level var so tests can swap it.
-var waagentPath = "/usr/sbin/waagent"
+const waagentPath = "/usr/sbin/waagent"
+
+// waagentUsrBinPath is where some images install the Azure Linux Agent.
+const waagentUsrBinPath = "/usr/bin/waagent"
 
 // dhclientLeasesPath is the ISC dhclient leases file Ohai scans for
-// Azure's DHCP option 245 (a private Azure signal). Package-level
-// var so tests can swap it. Matches Ohai's has_dhcp_option_245?.
-var dhclientLeasesPath = "/var/lib/dhcp/dhclient.eth0.leases"
+// Azure's DHCP option 245 (a private Azure signal). Matches Ohai's
+// has_dhcp_option_245?.
+const dhclientLeasesPath = "/var/lib/dhcp/dhclient.eth0.leases"
+
+// dmiChassisAssetTag is the SMBIOS chassis asset tag of each Azure VM.
+// cloud-init's DataSourceAzure detects Azure by it. It finds a VM with
+// no Azure Linux Agent and no dhclient lease, such as a cloud-init or
+// systemd-networkd image. A local Hyper-V VM has the same sys_vendor,
+// "Microsoft Corporation", but not this tag, so the vendor alone is not
+// a signal.
+const dmiChassisAssetTag = "7783-7084-3265-9085-8269-3286-77"
 
 // dhcpOption245Signature is the exact string Azure's DHCP lease
 // contains when that option is set. Found in files written by ISC
@@ -443,20 +454,20 @@ func (*Collector) Category() collector.Category { return collector.CategoryCloud
 // DefaultEnabled returns false — cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
-// Dependencies returns no dependencies. Azure's Linux detection uses
-// the waagent binary's presence; Ohai has no DMI check we mirror.
-func (*Collector) Dependencies() []string { return nil }
+// Dependencies declares dmi, for the chassis asset tag that each Azure
+// VM has.
+func (*Collector) Dependencies() []string { return []string{"dmi"} }
 
-// Collect gates the fetch on the Azure detection signals (waagent
-// binary OR DHCP option 245). Negotiates an api-version with the
+// Collect gates the fetch on the Azure detection signals (the DMI
+// chassis asset tag, the waagent binary, or DHCP option 245). Negotiates an api-version with the
 // metadata service (matches Ohai's handshake), then fetches the
 // instance document. Returns (nil, nil) when no detection signal
 // fires or the endpoint is unreachable.
 func (c *Collector) Collect(
 	ctx context.Context,
-	_ collector.PriorResults,
+	prior collector.PriorResults,
 ) (any, error) {
-	if !onAzure(c.FS) {
+	if !onAzure(c.FS, prior) {
 		return nil, nil
 	}
 	version := c.negotiateAPIVersion(ctx)
@@ -470,19 +481,26 @@ func (c *Collector) Collect(
 	return transform(r), nil
 }
 
-// onAzure returns true when any of Ohai's non-Windows detection
-// signals fire:
-//   - waagent binary at /usr/sbin/waagent exists
+// onAzure returns true when any of these detection signals fire:
+//   - dmi's chassis asset tag is Azure's (cloud-init's signal)
+//   - the waagent binary is at /usr/sbin/waagent or /usr/bin/waagent
 //   - /var/lib/dhcp/dhclient.eth0.leases contains "unknown-245"
 //
-// Matches Ohai's has_waagent? || has_dhcp_option_245? chain.
+// The last two are Ohai's has_waagent? || has_dhcp_option_245? chain.
 // Windows-specific signals (C:\WindowsAzure directory, DhcpDomain
 // registry key) are not implemented — gohai is Linux/macOS primary.
 func onAzure(
 	fs avfs.VFS,
+	prior collector.PriorResults,
 ) bool {
-	if _, err := fs.Stat(waagentPath); err == nil {
+	if info, ok := collector.GetDep[*dmi.Info](prior, "dmi"); ok && info != nil &&
+		info.Chassis != nil && info.Chassis.AssetTag == dmiChassisAssetTag {
 		return true
+	}
+	for _, path := range []string{waagentPath, waagentUsrBinPath} {
+		if _, err := fs.Stat(path); err == nil {
+			return true
+		}
 	}
 	if body, err := fs.ReadFile(dhclientLeasesPath); err == nil {
 		if bytes.Contains(body, []byte(dhcpOption245Signature)) {
