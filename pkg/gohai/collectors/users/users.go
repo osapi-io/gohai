@@ -25,8 +25,6 @@
 package users
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"slices"
 	"strconv"
@@ -196,9 +194,10 @@ func parsePasswd(
 	content []byte,
 ) map[string]PasswdEntry {
 	out := make(map[string]PasswdEntry)
-	sc := bufio.NewScanner(bytes.NewReader(content))
-	for sc.Scan() {
-		line := sc.Text()
+	// strings.Split, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB, such as a group of an LDAP-synced host with
+	// thousands of members.
+	for _, line := range strings.Split(string(content), "\n") {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -235,9 +234,10 @@ func parseGroup(
 	content []byte,
 ) map[string]GroupEntry {
 	out := make(map[string]GroupEntry)
-	sc := bufio.NewScanner(bytes.NewReader(content))
-	for sc.Scan() {
-		line := sc.Text()
+	// strings.Split, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB, such as a group of an LDAP-synced host with
+	// thousands of members.
+	for _, line := range strings.Split(string(content), "\n") {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}

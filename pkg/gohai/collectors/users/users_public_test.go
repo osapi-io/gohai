@@ -25,6 +25,7 @@ import (
 	"errors"
 	"io/fs"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -262,6 +263,45 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Len(info.Passwd, 1)
 				s.Empty(info.CurrentUser)
+			},
+		},
+		{
+			name:    "linux: a group line over 64 KiB keeps that group and the ones after it",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "root:x:0:0:root:/root:/bin/sh\n",
+				"/etc/group": "big:x:100:" + strings.TrimSuffix(
+					strings.Repeat("member,", 12000),
+					",",
+				) +
+					"\nafter:x:101:root\n",
+			},
+			euid: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Len(info.Group["big"].Members, 12000)
+				s.Equal([]string{"root"}, info.Group["after"].Members)
+			},
+		},
+		{
+			name:    "linux: a passwd line over 64 KiB keeps the users after it",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/passwd": "long:x:5:5:" + strings.Repeat(
+					"g",
+					70000,
+				) + ":/home/long:/bin/sh\n" +
+					"root:x:0:0:root:/root:/bin/sh\n",
+			},
+			euid: 0,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Contains(info.Passwd, "long")
+				s.Equal("root", info.CurrentUser)
 			},
 		},
 		{
