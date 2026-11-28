@@ -24,16 +24,18 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 const cannedResponse = `{
@@ -62,7 +64,6 @@ const cannedResponse = `{
 
 type ScalewayPublicTestSuite struct {
 	suite.Suite
-	tmpDir string
 }
 
 func TestScalewayPublicTestSuite(
@@ -71,59 +72,34 @@ func TestScalewayPublicTestSuite(
 	suite.Run(t, new(ScalewayPublicTestSuite))
 }
 
-func (s *ScalewayPublicTestSuite) SetupTest() {
-	s.tmpDir = s.T().TempDir()
-}
-
-// writeCmdline writes a /proc/cmdline replacement containing the
-// given content and swaps the package var. Returns restore func.
-func (s *ScalewayPublicTestSuite) writeCmdline(
-	content string,
-) func() {
-	path := filepath.Join(s.tmpDir, "cmdline")
-	s.Require().NoError(os.WriteFile(path, []byte(content), 0o644))
-	return scaleway.SetProcCmdlinePath(path)
-}
-
-func (s *ScalewayPublicTestSuite) TestInterface() {
-	c := scaleway.New()
+func (s *ScalewayPublicTestSuite) TestNew() {
+	fs := memfs.New()
 	tests := []struct {
 		name         string
-		got          any
-		validateFunc func(any)
+		c            *scaleway.Collector
+		validateFunc func(*scaleway.Collector)
 	}{
 		{
-			name: "Name",
-			got:  c.Name(),
-			validateFunc: func(got any) {
-				s.Equal("scaleway", got)
+			name: "New: its name, category, default and dependencies",
+			c:    scaleway.New(),
+			validateFunc: func(c *scaleway.Collector) {
+				s.Equal("scaleway", c.Name())
+				s.Equal("cloud", string(c.Category()))
+				s.False(c.DefaultEnabled())
+				s.Equal([]string{"dmi"}, c.Dependencies())
 			},
 		},
 		{
-			name: "Category",
-			got:  string(c.Category()),
-			validateFunc: func(got any) {
-				s.Equal("cloud", got)
-			},
-		},
-		{
-			name: "DefaultEnabled",
-			got:  c.DefaultEnabled(),
-			validateFunc: func(got any) {
-				s.Equal(false, got)
-			},
-		},
-		{
-			name: "Dependencies",
-			got:  c.Dependencies(),
-			validateFunc: func(got any) {
-				s.Equal([]string{"dmi"}, got)
+			name: "NewWith: reads the filesystem that it is given",
+			c:    scaleway.NewWith(source.Sources{FS: fs, Family: family.Debian}),
+			validateFunc: func(c *scaleway.Collector) {
+				s.Same(fs, c.FS)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			tt.validateFunc(tt.got)
+			tt.validateFunc(tt.c)
 		})
 	}
 }
@@ -271,10 +247,9 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.noCmdline {
-				defer scaleway.SetProcCmdlinePath(filepath.Join(s.tmpDir, "nonexistent"))()
-			} else {
-				defer s.writeCmdline(tt.cmdline)()
+			files := map[string]string{}
+			if !tt.noCmdline {
+				files["/proc/cmdline"] = tt.cmdline
 			}
 
 			var httpCalled bool
@@ -292,6 +267,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 
 			client := cloudmetadata.New(srv.URL)
 			c := scaleway.NewWithClient(client)
+			c.FS = sourcetest.FS(s.T(), files)
 
 			out, err := c.Collect(context.Background(), tt.prior)
 			tt.validateFunc(out, httpCalled, err)

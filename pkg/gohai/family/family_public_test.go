@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
+	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/pkg/gohai/family"
@@ -93,50 +94,19 @@ func (s *FamilyPublicTestSuite) TestOf() {
 
 func (s *FamilyPublicTestSuite) TestDetect() {
 	tests := []struct {
-		name      string
-		goos      string
-		osRelease string
-		want      string
+		name         string
+		validateFunc func(string)
 	}{
-		{name: "when the host is macOS", goos: "darwin", want: family.Darwin},
 		{
-			name:      "when the platform has a family",
-			goos:      "linux",
-			osRelease: "NAME=\"Amazon Linux\"\nID=\"amzn\"\nVERSION_ID=\"2023\"\n",
-			want:      family.Amazon,
+			name: "it is the family of the real filesystem",
+			validateFunc: func(got string) {
+				s.Equal(family.FromFS(osfs.NewWithNoIdm()), got)
+			},
 		},
-		{
-			name: "when the ID is not quoted", goos: "linux",
-			osRelease: "ID=ubuntu\nID_LIKE=debian\n", want: family.Debian,
-		},
-		{
-			name: "when a derivative names its parent in ID_LIKE", goos: "linux",
-			osRelease: "ID=elementary\nID_LIKE=\"ubuntu debian\"\n", want: family.Debian,
-		},
-		{
-			name: "when ID_LIKE names no parent with a family", goos: "linux",
-			osRelease: "ID=mystery\nID_LIKE=other\n", want: "mystery",
-		},
-		{
-			name: "when the platform has no family", goos: "linux",
-			osRelease: "ID=NixOS\n", want: "nixos",
-		},
-		{
-			name: "when the file has no ID", goos: "linux",
-			osRelease: "NAME=Something\n", want: "",
-		},
-		{name: "when there is no file", goos: "linux", want: ""},
 	}
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			fs := memfs.New()
-			if tc.osRelease != "" {
-				s.Require().NoError(fs.MkdirAll("/etc", 0o755))
-				s.Require().NoError(fs.WriteFile("/etc/os-release", []byte(tc.osRelease), 0o644))
-			}
-			defer family.SetGOOS(tc.goos)()
-			defer family.SetFS(fs)()
-			s.Equal(tc.want, family.Detect())
+			tc.validateFunc(family.Detect())
 		})
 	}
 }
@@ -291,6 +261,40 @@ func (s *FamilyPublicTestSuite) TestFromFS() {
 			files: map[string]string{"/usr/lib/os-release": "ID=fedora\n"},
 			dirs:  []string{"/etc/os-release"},
 			want:  "",
+		},
+		{
+			name:  "when the ID is not quoted",
+			files: map[string]string{"/etc/os-release": "ID=ubuntu\nID_LIKE=debian\n"},
+			want:  family.Debian,
+		},
+		{
+			name: "when a derivative names its parent in ID_LIKE",
+			files: map[string]string{
+				"/etc/os-release": "ID=elementary\nID_LIKE=\"ubuntu debian\"\n",
+			},
+			want: family.Debian,
+		},
+		{
+			name:  "when ID_LIKE names no parent with a family",
+			files: map[string]string{"/etc/os-release": "ID=mystery\nID_LIKE=other\n"},
+			want:  "mystery",
+		},
+		{
+			name:  "when the platform has no family",
+			files: map[string]string{"/etc/os-release": "ID=NixOS\n"},
+			want:  "nixos",
+		},
+		{
+			name:  "when the file has no ID",
+			files: map[string]string{"/etc/os-release": "NAME=Something\n"},
+			want:  "",
+		},
+		{
+			name: "when the platform has a family",
+			files: map[string]string{
+				"/etc/os-release": "NAME=\"Amazon Linux\"\nID=\"amzn\"\nVERSION_ID=\"2023\"\n",
+			},
+			want: family.Amazon,
 		},
 		{name: "when the filesystem has neither", want: ""},
 	}

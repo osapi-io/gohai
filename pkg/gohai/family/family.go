@@ -34,7 +34,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"runtime"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -215,22 +214,13 @@ func unquote(
 	return b.String()
 }
 
-// hostFS is the filesystem Detect reads. Swapped in tests.
-var hostFS avfs.VFS = osfs.NewWithNoIdm()
-
-// goos is the operating system the binary runs on. Swapped in tests.
-var goos = runtime.GOOS
-
-// Detect is the family of this host: darwin on macOS, else the family of
-// the platform that /etc/os-release names. A Linux host whose platform has
-// no family returns its platform, so a caller can still tell it is Linux,
-// and "" is a host whose /etc/os-release could not be read.
+// Detect is the family of this host: FromFS of the real filesystem. That is
+// darwin on macOS, which has SystemVersion.plist and no os-release, else the
+// family of the platform that the os-release file names. A Linux host whose
+// platform has no family returns its platform, so a caller can still tell it
+// is Linux, and "" is a host whose os-release could not be read.
 func Detect() string {
-	if goos == Darwin {
-		return Darwin
-	}
-
-	return FromFS(hostFS)
+	return FromFS(osfs.NewWithNoIdm())
 }
 
 // macOSVersion is the file that each macOS host has and no Linux host has.

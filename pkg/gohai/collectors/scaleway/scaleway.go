@@ -60,8 +60,8 @@ const metadataTimeout = 6 * time.Second
 const cmdlineSignature = "scaleway"
 
 // procCmdlinePath is the kernel command-line file read for the
-// cmdline detection signal. Package-level var so tests can swap it.
-var procCmdlinePath = "/proc/cmdline"
+// cmdline detection signal, through the collector's FS.
+const procCmdlinePath = "/proc/cmdline"
 
 // Info is the Scaleway instance view. Flat shape, same pattern as
 // every other gohai cloud collector.
