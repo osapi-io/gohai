@@ -1937,7 +1937,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
 				s.Require().True(ok)
-				names := []string{}
+				names := make([]string, 0, len(i.Interfaces))
 				for _, ifc := range i.Interfaces {
 					names = append(names, ifc.Name)
 				}
