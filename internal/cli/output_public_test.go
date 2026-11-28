@@ -163,6 +163,7 @@ func (s *OutputPublicTestSuite) TestWriteJSON() {
 func (s *OutputPublicTestSuite) TestWriteFlat() {
 	tests := []struct {
 		name         string
+		facts        *gohai.Facts
 		w            io.Writer
 		validateFunc func(io.Writer, error)
 	}{
@@ -181,11 +182,24 @@ func (s *OutputPublicTestSuite) TestWriteFlat() {
 				s.EqualError(err, "write flat output: disk full")
 			},
 		},
+		{
+			name:  "facts that do not encode",
+			facts: &gohai.Facts{Load: &load.Info{One: math.NaN()}},
+			w:     &bytes.Buffer{},
+			validateFunc: func(w io.Writer, err error) {
+				s.EqualError(err, "write flat output: flatten facts: json: unsupported value: NaN")
+				s.Empty(w.(*bytes.Buffer).String())
+			},
+		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			tc.validateFunc(tc.w, cli.WriteFlat(tc.w, facts))
+			f := facts
+			if tc.facts != nil {
+				f = tc.facts
+			}
+			tc.validateFunc(tc.w, cli.WriteFlat(tc.w, f))
 		})
 	}
 }

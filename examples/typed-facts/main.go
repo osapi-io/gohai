@@ -53,10 +53,17 @@ func main() {
 	}
 
 	// Key-path access — for keys chosen at runtime.
-	fmt.Printf("by key: platform.family = %v\n", facts.Get("platform.family"))
+	family, err := facts.Get("platform.family")
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("by key: platform.family = %v\n", family)
 
 	// Flat map — every leaf as a dotted key, for export or filtering.
-	flat := facts.Flat()
+	flat, err := facts.Flat()
+	if err != nil {
+		log.Fatal(err)
+	}
 	keys := make([]string, 0, len(flat))
 	for k := range flat {
 		keys = append(keys, k)
