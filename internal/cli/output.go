@@ -66,27 +66,17 @@ func WriteFlat(
 	return nil
 }
 
-// newRegistryFn is gohai.NewRegistry, which a test replaces.
-var newRegistryFn = gohai.NewRegistry
-
-var marshalFactsFn = func(
-	facts *gohai.Facts,
-	pretty bool,
-) ([]byte, error) {
-	if pretty {
-		return facts.PrettyJSON()
-	}
-
-	return facts.JSON()
-}
-
 // WriteJSON writes facts as JSON, optionally pretty-printed.
 func WriteJSON(
 	out io.Writer,
 	facts *gohai.Facts,
 	pretty bool,
 ) error {
-	b, err := marshalFactsFn(facts, pretty)
+	marshal := facts.JSON
+	if pretty {
+		marshal = facts.PrettyJSON
+	}
+	b, err := marshal()
 	if err != nil {
 		return fmt.Errorf("encode output: %w", err)
 	}
@@ -98,19 +88,6 @@ func WriteJSON(
 	return nil
 }
 
-var marshalOCSFFn = func(
-	facts *gohai.Facts,
-	pretty bool,
-) ([]byte, error) {
-	event := ocsf.FromFacts(facts)
-
-	if pretty {
-		return json.MarshalIndent(event, "", "  ")
-	}
-
-	return json.Marshal(event)
-}
-
 // WriteOCSF converts facts to an OCSF inventory_info event and writes
 // the JSON to out.
 func WriteOCSF(
@@ -118,7 +95,16 @@ func WriteOCSF(
 	facts *gohai.Facts,
 	pretty bool,
 ) error {
-	b, err := marshalOCSFFn(facts, pretty)
+	event := ocsf.FromFacts(facts)
+	var (
+		b   []byte
+		err error
+	)
+	if pretty {
+		b, err = json.MarshalIndent(event, "", "  ")
+	} else {
+		b, err = json.Marshal(event)
+	}
 	if err != nil {
 		return fmt.Errorf("encode ocsf output: %w", err)
 	}
@@ -130,14 +116,11 @@ func WriteOCSF(
 	return nil
 }
 
-// WriteCollectorList writes the collector registry grouped by category.
+// WriteCollectorList writes the collectors of reg grouped by category.
 func WriteCollectorList(
 	out io.Writer,
+	reg *gohai.PublicRegistry,
 ) error {
-	reg, err := newRegistryFn()
-	if err != nil {
-		return err
-	}
 	byCat := map[string][]string{}
 
 	for _, n := range reg.Names() {
@@ -168,4 +151,21 @@ func WriteCollectorList(
 	}
 
 	return nil
+}
+
+// Print writes a line to w.
+func Print(
+	w io.Writer,
+	s string,
+) {
+	_, _ = fmt.Fprintln(w, s)
+}
+
+// Printf writes a formatted string to w.
+func Printf(
+	w io.Writer,
+	format string,
+	a ...any,
+) {
+	_, _ = fmt.Fprintf(w, format, a...)
 }

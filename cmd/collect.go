@@ -41,6 +41,7 @@ func newCollectCommand() *cobra.Command {
 		noDefaults     bool
 		withTimings    bool
 		categories     []string
+		reg            *gohai.PublicRegistry
 	)
 
 	enabled := newFlagSet()
@@ -67,7 +68,7 @@ Examples:
 			_ []string,
 		) error {
 			if listCollectors {
-				return cli.WriteCollectorList(c.OutOrStdout())
+				return cli.WriteCollectorList(c.OutOrStdout(), reg)
 			}
 
 			return runCollect(
@@ -113,7 +114,7 @@ Examples:
 		nil,
 		"enable every collector in a category (repeatable): system, hardware, network, cloud, virtualization, security, software, users, linux, misc",
 	)
-	registerCollectorFlags(cmd, enabled, disabled)
+	reg = registerCollectorFlags(cmd, enabled, disabled)
 
 	return cmd
 }
@@ -137,11 +138,15 @@ func (f *flagSet) values() []string {
 	return out
 }
 
+// registerCollectorFlags adds a --collector.X and a --no-collector.X flag for
+// each collector of the registry, and returns the registry. A registry that
+// cannot be built is nil, and the command's PreRunE returns its error, so
+// RunE does not run.
 func registerCollectorFlags(
 	cmd *cobra.Command,
 	enabled, disabled *flagSet,
-) {
-	names, err := listAllCollectorNames()
+) *gohai.PublicRegistry {
+	reg, err := newRegistryFn()
 	if err != nil {
 		// The command is built before it runs, so it reports the error
 		// when it runs.
@@ -152,8 +157,10 @@ func registerCollectorFlags(
 			return err
 		}
 
-		return
+		return nil
 	}
+	names := reg.Names()
+	sort.Strings(names)
 	for _, n := range names {
 		cmd.Flags().Bool("collector."+n, false, fmt.Sprintf("Enable the %s collector", n))
 		cmd.Flags().Bool("no-collector."+n, false, fmt.Sprintf("Disable the %s collector", n))
@@ -174,21 +181,12 @@ func registerCollectorFlags(
 
 		return nil
 	}
+
+	return reg
 }
 
 // newRegistryFn is gohai.NewRegistry, which a test replaces.
 var newRegistryFn = gohai.NewRegistry
-
-func listAllCollectorNames() ([]string, error) {
-	reg, err := newRegistryFn()
-	if err != nil {
-		return nil, err
-	}
-	names := reg.Names()
-	sort.Strings(names)
-
-	return names, nil
-}
 
 func runCollect(
 	ctx context.Context,

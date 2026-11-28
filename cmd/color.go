@@ -18,46 +18,35 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-package cli
+package cmd
 
-import "github.com/osapi-io/gohai/pkg/gohai"
+import (
+	"io"
+	"os"
 
-// SetIsTerminalFn swaps the terminal-detection function for testing.
-func SetIsTerminalFn(
-	fn func(int) bool,
-) func() {
-	old := isTerminalFn
-	isTerminalFn = fn
+	"golang.org/x/term"
+)
 
-	return func() { isTerminalFn = old }
+// colorFor is whether w takes color: a terminal, by isTerminal, with NO_COLOR
+// unset and TERM not dumb (https://no-color.org). getenv reads the
+// environment.
+func colorFor(
+	w io.Writer,
+	getenv func(string) string,
+	isTerminal func(io.Writer) bool,
+) bool {
+	if getenv("NO_COLOR") != "" || getenv("TERM") == "dumb" {
+		return false
+	}
+
+	return isTerminal(w)
 }
 
-// SetMarshalFactsFn swaps the facts marshaling function for testing.
-func SetMarshalFactsFn(
-	fn func(*gohai.Facts, bool) ([]byte, error),
-) func() {
-	old := marshalFactsFn
-	marshalFactsFn = fn
+// terminal is whether w is a file that is a terminal.
+func terminal(
+	w io.Writer,
+) bool {
+	f, ok := w.(*os.File)
 
-	return func() { marshalFactsFn = old }
-}
-
-// SetMarshalOCSFFn swaps the OCSF marshaling function for testing.
-func SetMarshalOCSFFn(
-	fn func(*gohai.Facts, bool) ([]byte, error),
-) func() {
-	old := marshalOCSFFn
-	marshalOCSFFn = fn
-
-	return func() { marshalOCSFFn = old }
-}
-
-// SetNewRegistryFn swaps how WriteCollectorList builds the registry.
-func SetNewRegistryFn(
-	fn func() (*gohai.PublicRegistry, error),
-) func() {
-	old := newRegistryFn
-	newRegistryFn = fn
-
-	return func() { newRegistryFn = old }
+	return ok && term.IsTerminal(int(f.Fd()))
 }

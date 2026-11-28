@@ -90,6 +90,18 @@ func (s *CmdPublicTestSuite) TestExecute() {
 			},
 		},
 		{
+			name: "collect --list-collectors reports a registry that cannot be built",
+			args: []string{"collect", "--list-collectors"},
+			newRegistry: func() (*gohai.PublicRegistry, error) {
+				return nil, errors.New("duplicate")
+			},
+			validateFunc: func(code int, out, errOut string) {
+				s.Equal(1, code)
+				s.Empty(out)
+				s.Equal("error: duplicate\n", errOut)
+			},
+		},
+		{
 			name: "no command prints the help, with the banner",
 			args: nil,
 			validateFunc: func(code int, out, _ string) {

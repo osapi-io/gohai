@@ -49,3 +49,10 @@ func SetNewRegistryFn(
 
 	return func() { newRegistryFn = old }
 }
+
+// ColorFor is colorFor, whose rules for NO_COLOR and TERM are its own
+// contract.
+var ColorFor = colorFor
+
+// Terminal is terminal, which tells a terminal file from any other writer.
+var Terminal = terminal
