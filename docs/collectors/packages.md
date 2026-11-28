@@ -12,16 +12,17 @@ no package manager.
 
 ## Collected fields
 
-| Field                        | Type     | Description                                                                                 | Schema mapping                 |
-| ---------------------------- | -------- | ------------------------------------------------------------------------------------------- | ------------------------------ |
-| `packages`                   | `list`   | The list of installed package objects.                                                      | No direct schema mapping.      |
-| `packages[].name`            | `string` | The package name.                                                                           | OCSF `package.name`            |
-| `packages[].version`         | `string` | The installed version. For brew, the newest installed version.                              | OCSF `package.version`         |
-| `packages[].versions`        | `list`   | Each installed version, for brew, which keeps more than one. It is absent for dpkg and rpm. | No direct schema mapping       |
-| `packages[].architecture`    | `string` | The CPU architecture. It is empty for brew packages.                                        | OCSF `package.architecture`    |
-| `packages[].package_manager` | `string` | The package manager: `dpkg`, `rpm` or `brew`.                                               | OCSF `package.package_manager` |
-| `packages[].description`     | `string` | The one-line summary of the package.                                                        | OCSF `package.description`     |
-| `packages[].size`            | `int64`  | The installed size, in bytes.                                                               | No direct schema mapping       |
+| Field                        | Type     | Description                                                                                                                                 | Schema mapping                 |
+| ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| `packages`                   | `list`   | The list of installed package objects.                                                                                                      | No direct schema mapping.      |
+| `packages[].name`            | `string` | The package name.                                                                                                                           | OCSF `package.name`            |
+| `packages[].version`         | `string` | The installed version. For brew, the newest installed version.                                                                              | OCSF `package.version`         |
+| `packages[].versions`        | `list`   | Each installed version, for brew, which keeps more than one. It is absent for dpkg and rpm.                                                 | No direct schema mapping       |
+| `packages[].architecture`    | `string` | The CPU architecture. It is empty for brew packages.                                                                                        | OCSF `package.architecture`    |
+| `packages[].package_manager` | `string` | The package manager: `dpkg`, `rpm` or `brew`.                                                                                               | OCSF `package.package_manager` |
+| `packages[].kind`            | `string` | For brew, `formula` or `cask`. A formula and a cask can have the same name, and this field tells them apart. It is absent for dpkg and rpm. | No direct schema mapping       |
+| `packages[].description`     | `string` | The one-line summary of the package.                                                                                                        | OCSF `package.description`     |
+| `packages[].size`            | `int64`  | The installed size, in bytes.                                                                                                               | No direct schema mapping       |
 
 ## Platform support
 
@@ -117,7 +118,8 @@ finds:
    with status 1. With two commands, a refused cask does not hide the formulae.
    When one command fails, the collector keeps the packages of the other and
    returns the error, so the status is `partial`. When both fail, there is no
-   fact, and the status is `failed`.
+   fact, and the status is `failed`. Each package from the first command has the
+   kind `formula`, and each package from the second has the kind `cask`.
 4. The output format is `<name> <ver1> [<ver2> ...]`. Homebrew can have many
    versions of a package installed at the same time, and does not promise their
    order. `versions` lists each of them, and `version` is the newest. The

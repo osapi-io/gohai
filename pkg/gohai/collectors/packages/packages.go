@@ -39,8 +39,11 @@ type Package struct {
 	Versions       []string `json:"versions,omitempty"`
 	Architecture   string   `json:"architecture,omitempty"`
 	PackageManager string   `json:"package_manager"`
-	Description    string   `json:"description,omitempty"` // one-line summary
-	Size           int64    `json:"size,omitempty"`        // installed size, bytes
+	// Kind is what sort of brew package this is: formula or cask. It is
+	// empty, and left out, for dpkg and rpm.
+	Kind        string `json:"kind,omitempty"`
+	Description string `json:"description,omitempty"` // one-line summary
+	Size        int64  `json:"size,omitempty"`        // installed size, bytes
 }
 
 // Info holds the list of installed packages.
