@@ -213,7 +213,7 @@ func (c *Collector) Collect(
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onOpenStack(prior) {
-		return nil, nil
+		return nil, ctx.Err()
 	}
 
 	tree, err := walk(ctx, c.client, "/latest/meta-data/")
@@ -253,7 +253,7 @@ func (c *Collector) Collect(
 
 	if tree == nil && info.UUID == "" {
 		// Nothing came back from either source — not actually OpenStack.
-		return nil, nil
+		return nil, ctx.Err()
 	}
 	return info, nil
 }
@@ -413,8 +413,15 @@ func onOpenStack(
 	prior collector.PriorResults,
 ) bool {
 	info, ok := collector.GetDep[*dmi.Info](prior, "dmi")
-	if !ok || info == nil || info.Product == nil {
+	// When dmi did not run, as when a caller asked for this collector
+	// alone, only the metadata service can tell. A host whose DMI has no
+	// such table, such as a container or a host with no
+	// /sys/class/dmi, is not this cloud, so it is not probed.
+	if !ok {
 		return true
+	}
+	if info == nil || info.Product == nil {
+		return false
 	}
 	return strings.Contains(info.Product.Name, dmiProductSignature)
 }

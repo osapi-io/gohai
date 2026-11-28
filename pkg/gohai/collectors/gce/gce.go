@@ -318,7 +318,7 @@ func (c *Collector) Collect(
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onGCE(prior) {
-		return nil, nil
+		return nil, ctx.Err()
 	}
 	body, err := c.client.Get(ctx, "/?recursive=true")
 	if err != nil {

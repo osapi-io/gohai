@@ -204,12 +204,12 @@ func (c *Collector) Collect(
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onAlibaba(prior) {
-		return nil, nil
+		return nil, ctx.Err()
 	}
 	tree, err := walk(ctx, c.client, "")
 	if err != nil {
 		// First probe failed — not on Alibaba (or endpoint down).
-		return nil, nil
+		return nil, ctx.Err()
 	}
 	return transform(tree), nil
 }

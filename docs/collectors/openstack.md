@@ -90,7 +90,9 @@ gohai collect --category=cloud           # pulls this + all cloud collectors
 ## Dependencies
 
 `dmi`. OpenStack writes `"OpenStack Nova"` or a similar value as `product_name`.
-If `dmi` did not run, the collector fails open and continues.
+If `dmi` did not run, the collector fails open and continues. A host whose DMI
+has no product table, such as a container, is not OpenStack, and the collector
+does not probe it.
 
 ## Data sources
 

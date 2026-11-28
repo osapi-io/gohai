@@ -468,13 +468,13 @@ func (c *Collector) Collect(
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onAzure(c.FS, prior) {
-		return nil, nil
+		return nil, ctx.Err()
 	}
 	version := c.negotiateAPIVersion(ctx)
 	var r raw
 	if err := c.client.GetJSON(ctx, metadataPath+"?api-version="+version, &r); err != nil {
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
-			return nil, nil
+			return nil, ctx.Err()
 		}
 		return nil, err
 	}

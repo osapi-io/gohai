@@ -343,25 +343,29 @@ func (c *Collector) Collect(
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onOCI(prior) {
-		return nil, nil
+		return nil, ctx.Err()
 	}
 
 	var ri rawInstance
 	if err := c.client.GetJSON(ctx, pathInstance, &ri); err != nil {
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
-			return nil, nil
+			return nil, ctx.Err()
 		}
 		return nil, err
 	}
 	info := transformInstance(ri)
 
+	// The instance document decides that the host is on OCI. A VNIC or
+	// volume document that cannot be read or decoded leaves its part
+	// empty, and keeps the instance's facts. A cancelled context is the
+	// error of the collection.
 	var vnics []rawVNIC
 	if err := c.client.GetJSON(ctx, pathVNICs, &vnics); err == nil {
 		for _, v := range vnics {
 			info.VNICs = append(info.VNICs, VNIC(v))
 		}
-	} else if !errors.Is(err, cloudmetadata.ErrNotAvailable) {
-		return nil, err
+	} else if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
 	}
 
 	var vols []rawVolumeAttachment
@@ -375,8 +379,8 @@ func (c *Collector) Collect(
 			}
 			info.VolumeAttachments[v.ID] = VolumeAttachment(v)
 		}
-	} else if !errors.Is(err, cloudmetadata.ErrNotAvailable) {
-		return nil, err
+	} else if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
 	}
 
 	return info, nil
@@ -388,8 +392,15 @@ func onOCI(
 	prior collector.PriorResults,
 ) bool {
 	info, ok := collector.GetDep[*dmi.Info](prior, "dmi")
-	if !ok || info == nil || info.Chassis == nil {
+	// When dmi did not run, as when a caller asked for this collector
+	// alone, only the metadata service can tell. A host whose DMI has no
+	// such table, such as a container or a host with no
+	// /sys/class/dmi, is not this cloud, so it is not probed.
+	if !ok {
 		return true
+	}
+	if info == nil || info.Chassis == nil {
+		return false
 	}
 	return strings.Contains(info.Chassis.AssetTag, dmiChassisAssetTag)
 }

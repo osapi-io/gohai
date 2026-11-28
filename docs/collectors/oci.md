@@ -140,7 +140,9 @@ gohai collect --category=cloud     # pulls this + all cloud collectors
 
 `dmi`. OCI writes `"OracleCloud.com"` into the chassis asset tag. The collector
 continues only if the asset tag contains this substring. If `dmi` did not run,
-the collector fails open and continues.
+the collector fails open and continues. A host whose DMI has no such table, such
+as a container, is not this cloud, and the collector does not probe it. A
+cancelled collection is an error, not a host without metadata.
 
 ## Data sources
 

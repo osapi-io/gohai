@@ -75,6 +75,20 @@ const idleConnTimeout = 30 * time.Second
 // typed field drops from Facts without surfacing a misleading error.
 var ErrNotAvailable = errors.New("cloud metadata endpoint not available")
 
+// transportError is the error of a request that got no response. When ctx
+// ended, it is ctx's error, not ErrNotAvailable, so a cancelled collection
+// is an error and is not taken for a host with no metadata service.
+func transportError(
+	ctx context.Context,
+	err error,
+) error {
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return fmt.Errorf("metadata request: %w", ctxErr)
+	}
+
+	return fmt.Errorf("%w: %w", ErrNotAvailable, err)
+}
+
 // Client is a thin HTTP wrapper scoped to one provider's metadata
 // base URL. Construct via New; swap the base URL for tests by
 // pointing it at an httptest.Server.
@@ -209,7 +223,7 @@ func (c *Client) RawGet(
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, fmt.Errorf("%w: %v", ErrNotAvailable, err)
+		return nil, 0, transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := readBody(resp.Body)
@@ -256,7 +270,7 @@ func (c *Client) do(
 	}
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrNotAvailable, err)
+		return nil, transportError(ctx, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {

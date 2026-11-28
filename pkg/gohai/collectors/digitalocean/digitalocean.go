@@ -190,12 +190,12 @@ func (c *Collector) Collect(
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onDigitalOcean(prior) {
-		return nil, nil
+		return nil, ctx.Err()
 	}
 	var r raw
 	if err := c.client.GetJSON(ctx, metadataPath, &r); err != nil {
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
-			return nil, nil
+			return nil, ctx.Err()
 		}
 		return nil, err
 	}
