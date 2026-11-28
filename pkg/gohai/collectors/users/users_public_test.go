@@ -262,6 +262,40 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a group with a bad or empty GID is skipped, not GID 0",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/group": "broken:x:notanumber:alice\nempty:x::bob\nusers:x:100:carol\n",
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Equal(
+					map[string]users.GroupEntry{
+						"users": {GID: 100, Members: []string{"carol"}},
+					},
+					info.Group,
+				)
+			},
+		},
+		{
+			name:    "linux: a duplicate group name keeps the first entry",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/group": "users:x:100:carol\nusers:x:200:dave\n",
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Equal(
+					users.GroupEntry{GID: 100, Members: []string{"carol"}},
+					info.Group["users"],
+				)
+			},
+		},
+		{
 			name:    "linux: a group line over 64 KiB keeps that group and the ones after it",
 			variant: "linux",
 			files: map[string]string{
@@ -420,6 +454,28 @@ func (s *UsersPublicTestSuite) TestCollect() {
 					info.Group["admin"],
 				)
 				s.Equal(users.GroupEntry{GID: 20}, info.Group["staff"])
+			},
+		},
+		{
+			name:    "darwin: a user with no or a bad PrimaryGroupID is skipped, not gid 0",
+			variant: "darwin",
+			euid:    501,
+			dscl:    "john ;ShadowHash;\n",
+			dsclLists: map[string]string{
+				"dscl . -list /Users UniqueID":         "john 501\nnogid 502\nbadgid 503\n",
+				"dscl . -list /Users PrimaryGroupID":   "john 20\nbadgid x\n",
+				"dscl . -list /Users NFSHomeDirectory": "john /Users/john\n",
+				"dscl . -list /Users UserShell":        "john /bin/zsh\n",
+				"dscl . -list /Users RealName":         "john John Doe\n",
+				"dscl . -list /Groups PrimaryGroupID":  "staff 20\n",
+				"dscl . -list /Groups GroupMembership": "staff\n",
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Passwd, 1)
+				s.Equal(20, info.Passwd["john"].GID)
 			},
 		},
 		{
