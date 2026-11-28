@@ -141,7 +141,19 @@ func registerCollectorFlags(
 	cmd *cobra.Command,
 	enabled, disabled *flagSet,
 ) {
-	names := listAllCollectorNames()
+	names, err := listAllCollectorNames()
+	if err != nil {
+		// The command is built before it runs, so it reports the error
+		// when it runs.
+		cmd.PreRunE = func(
+			_ *cobra.Command,
+			_ []string,
+		) error {
+			return err
+		}
+
+		return
+	}
 	for _, n := range names {
 		cmd.Flags().Bool("collector."+n, false, fmt.Sprintf("Enable the %s collector", n))
 		cmd.Flags().Bool("no-collector."+n, false, fmt.Sprintf("Disable the %s collector", n))
@@ -164,11 +176,18 @@ func registerCollectorFlags(
 	}
 }
 
-func listAllCollectorNames() []string {
-	names := gohai.NewRegistry().Names()
+// newRegistryFn is gohai.NewRegistry, which a test replaces.
+var newRegistryFn = gohai.NewRegistry
+
+func listAllCollectorNames() ([]string, error) {
+	reg, err := newRegistryFn()
+	if err != nil {
+		return nil, err
+	}
+	names := reg.Names()
 	sort.Strings(names)
 
-	return names
+	return names, nil
 }
 
 func runCollect(

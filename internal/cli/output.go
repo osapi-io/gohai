@@ -66,6 +66,9 @@ func WriteFlat(
 	return nil
 }
 
+// newRegistryFn is gohai.NewRegistry, which a test replaces.
+var newRegistryFn = gohai.NewRegistry
+
 var marshalFactsFn = func(
 	facts *gohai.Facts,
 	pretty bool,
@@ -131,7 +134,10 @@ func WriteOCSF(
 func WriteCollectorList(
 	out io.Writer,
 ) error {
-	reg := gohai.NewRegistry()
+	reg, err := newRegistryFn()
+	if err != nil {
+		return err
+	}
 	byCat := map[string][]string{}
 
 	for _, n := range reg.Names() {

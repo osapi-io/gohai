@@ -26,13 +26,17 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sort"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
 func main() {
-	registry := gohai.NewRegistry()
+	registry, err := gohai.NewRegistry()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	byCategory := map[string][]string{}
 	for _, name := range registry.Names() {

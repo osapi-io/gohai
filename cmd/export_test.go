@@ -20,6 +20,8 @@
 
 package cmd
 
+import "github.com/osapi-io/gohai/pkg/gohai"
+
 // WriteProblems is writeProblems, for a list of problems: the built-in
 // collectors break no rule, so the CLI never reaches one.
 var WriteProblems = writeProblems
@@ -35,4 +37,15 @@ func SetBuildInfo(
 	return func() {
 		version, commit, treestate, date, builtBy = old[0], old[1], old[2], old[3], old[4]
 	}
+}
+
+// SetNewRegistryFn replaces how the collect command builds the registry, and
+// returns a func that puts it back.
+func SetNewRegistryFn(
+	fn func() (*gohai.PublicRegistry, error),
+) func() {
+	old := newRegistryFn
+	newRegistryFn = fn
+
+	return func() { newRegistryFn = old }
 }

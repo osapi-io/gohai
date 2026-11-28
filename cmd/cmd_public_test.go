@@ -75,8 +75,20 @@ func (s *CmdPublicTestSuite) TestExecute() {
 		args         []string
 		in           io.Reader
 		out          io.Writer
+		newRegistry  func() (*gohai.PublicRegistry, error)
 		validateFunc func(code int, out, errOut string)
 	}{
+		{
+			name: "collect reports a registry that cannot be built",
+			args: []string{"collect"},
+			newRegistry: func() (*gohai.PublicRegistry, error) {
+				return nil, errors.New("duplicate")
+			},
+			validateFunc: func(code int, _, errOut string) {
+				s.NotZero(code)
+				s.Contains(errOut, "duplicate")
+			},
+		},
 		{
 			name: "no command prints the help, with the banner",
 			args: nil,
@@ -339,6 +351,9 @@ func (s *CmdPublicTestSuite) TestExecute() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			if tt.newRegistry != nil {
+				defer cmd.SetNewRegistryFn(tt.newRegistry)()
+			}
 			ctx := tt.ctx
 			if ctx == nil {
 				ctx = context.Background()

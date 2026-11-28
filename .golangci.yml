@@ -10,6 +10,7 @@ linters:
   enable:
     - errcheck
     - errname
+    - forbidigo
     - govet
     - ineffassign
     - prealloc
@@ -19,6 +20,11 @@ linters:
     - unused
 
   settings:
+    forbidigo:
+      # Code that is not a test never calls panic. It returns an error.
+      forbid:
+        - pattern: ^panic$
+          msg: return an error; code that is not a test does not panic
     revive:
       # Named rules, not the whole set: these are conventions Go itself
       # has an opinion about. Rules that report a threshold are left out.
@@ -42,6 +48,10 @@ linters:
         - name: var-naming
 
   exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - forbidigo
     paths:
       # Go shipped inside a JS package. Not ours, and not tracked in git.
       - node_modules

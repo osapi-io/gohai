@@ -185,8 +185,19 @@ func (s *OutputPublicTestSuite) TestWriteCollectorList() {
 	tests := []struct {
 		name         string
 		w            io.Writer
+		newRegistry  func() (*gohai.PublicRegistry, error)
 		validateFunc func(io.Writer, error)
 	}{
+		{
+			name: "a registry that cannot be built is an error",
+			w:    &bytes.Buffer{},
+			newRegistry: func() (*gohai.PublicRegistry, error) {
+				return nil, errors.New("duplicate")
+			},
+			validateFunc: func(_ io.Writer, err error) {
+				s.EqualError(err, "duplicate")
+			},
+		},
 		{
 			name: "success",
 			w:    &bytes.Buffer{},
@@ -215,6 +226,9 @@ func (s *OutputPublicTestSuite) TestWriteCollectorList() {
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
+			if tc.newRegistry != nil {
+				defer cli.SetNewRegistryFn(tc.newRegistry)()
+			}
 			tc.validateFunc(tc.w, cli.WriteCollectorList(tc.w))
 		})
 	}

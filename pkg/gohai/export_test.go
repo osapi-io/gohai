@@ -20,7 +20,10 @@
 
 package gohai
 
-import "github.com/osapi-io/gohai/internal/collector"
+import (
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
+)
 
 // Register exposes the private registry to external tests so a test
 // can inject a custom Collector (e.g., one that always errors) to
@@ -70,4 +73,15 @@ func (f *Facts) Set(
 	result any,
 ) {
 	f.set(name, result)
+}
+
+// SetBuiltinCollectorsFn replaces the built-in collectors that New and
+// NewRegistry register, and returns a func that puts them back.
+func SetBuiltinCollectorsFn(
+	fn func(source.Sources) []collector.Collector,
+) func() {
+	old := builtinCollectorsFn
+	builtinCollectorsFn = fn
+
+	return func() { builtinCollectorsFn = old }
 }

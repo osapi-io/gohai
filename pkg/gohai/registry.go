@@ -30,11 +30,15 @@ type PublicRegistry struct {
 	reg *collector.Registry
 }
 
-// NewRegistry returns a PublicRegistry pre-populated with built-in collectors.
-func NewRegistry() *PublicRegistry {
+// NewRegistry returns a PublicRegistry pre-populated with built-in
+// collectors, or the error of a built-in collector that does not register.
+func NewRegistry() (*PublicRegistry, error) {
 	r := collector.NewRegistry()
-	registerBuiltins(r, source.Sources{})
-	return &PublicRegistry{reg: r}
+	if err := registerBuiltins(r, source.Sources{}); err != nil {
+		return nil, err
+	}
+
+	return &PublicRegistry{reg: r}, nil
 }
 
 // Names returns all registered collector names.

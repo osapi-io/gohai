@@ -35,7 +35,9 @@ type SpecPublicTestSuite struct {
 
 func (s *SpecPublicTestSuite) TestCollectors() {
 	specs := gohai.Collectors()
-	s.Len(specs, len(gohai.NewRegistry().Names()), "one spec for each registered collector")
+	reg, err := gohai.NewRegistry()
+	s.Require().NoError(err)
+	s.Len(specs, len(reg.Names()))
 
 	byName := map[string]gohai.CollectorSpec{}
 	for _, c := range specs {

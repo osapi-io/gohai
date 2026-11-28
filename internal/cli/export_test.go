@@ -51,3 +51,13 @@ func SetMarshalOCSFFn(
 
 	return func() { marshalOCSFFn = old }
 }
+
+// SetNewRegistryFn swaps how WriteCollectorList builds the registry.
+func SetNewRegistryFn(
+	fn func() (*gohai.PublicRegistry, error),
+) func() {
+	old := newRegistryFn
+	newRegistryFn = fn
+
+	return func() { newRegistryFn = old }
+}

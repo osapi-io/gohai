@@ -64,13 +64,26 @@ var (
 	resolverType = reflect.TypeFor[source.Resolver]()
 )
 
+// sourceFields are the exported fields of a collector variant that hold a
+// source, and the type each must have.
+var sourceFields = []struct {
+	name string
+	typ  reflect.Type
+}{
+	{"FS", fsType},
+	{"Exec", execType},
+	{"Now", nowType},
+	{"Resolver", resolverType},
+}
+
 // Wire gives the collector variant c the sources of src, and returns c. It
 // sets the exported fields of the variant that hold a source: FS (an
 // avfs.VFS), Exec (a source.Runner), Now (a func() time.Time) and Resolver
 // (a source.Resolver). A field the variant does not have is not set. A zero
 // source in src is the real host's. A field with one of those names and a
-// different type panics: the collector would read the real host, and
-// nothing would say so.
+// different type is not set: CheckSources reports it, and Registry.Register
+// refuses the collector, so the collector cannot read the real host with
+// nothing to say so.
 func Wire[C any](
 	c C,
 	src source.Sources,
@@ -82,21 +95,36 @@ func Wire[C any](
 	src.Family = Family(src)
 	src = src.Defaults()
 	s := v.Elem()
-	set := func(name string, t reflect.Type, value any) {
-		f := s.FieldByName(name)
-		if !f.IsValid() {
-			return
-		}
-		if f.Type() != t || !f.CanSet() {
-			panic(fmt.Sprintf("collector.Wire: %s.%s is %s, not %s",
-				s.Type(), name, f.Type(), t))
-		}
-		f.Set(reflect.ValueOf(value))
+	values := map[string]any{
+		"FS": src.FS, "Exec": src.Exec, "Now": src.Now, "Resolver": src.Resolver,
 	}
-	set("FS", fsType, src.FS)
-	set("Exec", execType, src.Exec)
-	set("Now", nowType, src.Now)
-	set("Resolver", resolverType, src.Resolver)
+	for _, sf := range sourceFields {
+		f := s.FieldByName(sf.name)
+		if !f.IsValid() || f.Type() != sf.typ || !f.CanSet() {
+			continue
+		}
+		f.Set(reflect.ValueOf(values[sf.name]))
+	}
 
 	return c
+}
+
+// CheckSources returns an error when c is a pointer to a struct with a
+// source field of the wrong type, which Wire cannot set.
+func CheckSources(
+	c any,
+) error {
+	v := reflect.ValueOf(c)
+	if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
+		return nil
+	}
+	s := v.Elem()
+	for _, sf := range sourceFields {
+		f := s.FieldByName(sf.name)
+		if f.IsValid() && (f.Type() != sf.typ || !f.CanSet()) {
+			return fmt.Errorf("%s.%s is %s, not %s", s.Type(), sf.name, f.Type(), sf.typ)
+		}
+	}
+
+	return nil
 }
