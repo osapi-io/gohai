@@ -146,14 +146,16 @@ func canned(
 
 func (s *OpenStackPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name         string
-		prior        collector.PriorResults
-		tree         map[string]string
-		novaBody     string
-		passwdLines  string // when non-empty, written before Collect
-		handler      http.HandlerFunc
-		closed       bool
-		maxRequests  int // when non-zero, the most requests the walk may make
+		name        string
+		prior       collector.PriorResults
+		tree        map[string]string
+		novaBody    string
+		passwdLines string // when non-empty, written before Collect
+		handler     http.HandlerFunc
+		closed      bool
+		maxRequests int // when non-zero, the most requests the walk may make
+		// noFS builds the collector as a bare Metadata with no FS.
+		noFS         bool
 		validateFunc func(any, bool, error)
 	}{
 		{
@@ -195,6 +197,20 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("openstack", info.Provider)
+			},
+		},
+		{
+			name:     "a bare Metadata with no FS is provider openstack, not a panic",
+			tree:     metadataTree,
+			novaBody: novaDoc,
+			noFS:     true,
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*openstack.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("openstack", info.Provider)
+				s.Equal("i-abc", info.ID)
 			},
 		},
 		{
@@ -527,6 +543,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				FS:   sourcetest.FS(s.T(), files),
 				HTTP: sourcetest.Server(srv.URL),
 			})
+			if tt.noFS {
+				c = &openstack.Metadata{HTTP: sourcetest.Server(srv.URL)}
+			}
 
 			prior := tt.prior
 			if prior == nil {

@@ -26,8 +26,6 @@
 package openstack
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -281,23 +279,22 @@ func (c *Metadata) Collect(
 
 // detectProvider checks /etc/passwd for the "dhc-user" account that
 // Dreamhost shipped in their pre-2016 OpenStack images. Matches
-// Ohai's openstack_provider.
+// Ohai's openstack_provider. With no filesystem, or no passwd to read,
+// the provider is OpenStack.
 func detectProvider(
 	fs avfs.VFS,
 ) string {
-	f, err := fs.Open(passwdPath)
+	if fs == nil {
+		return providerOpenStack
+	}
+	b, err := fs.ReadFile(passwdPath)
 	if err != nil {
 		return providerOpenStack
 	}
-	defer func() { _ = f.Close() }()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
+	for line := range strings.Lines(string(b)) {
 		// passwd entries: username:x:uid:gid:gecos:home:shell
-		line := sc.Bytes()
-		if i := bytes.IndexByte(line, ':'); i >= 0 {
-			if string(line[:i]) == dreamhostUser {
-				return providerDreamhost
-			}
+		if name, _, ok := strings.Cut(line, ":"); ok && name == dreamhostUser {
+			return providerDreamhost
 		}
 	}
 	return providerOpenStack
