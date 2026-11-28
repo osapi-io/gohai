@@ -98,9 +98,18 @@ func (l *Linux) Collect(
 		budget = defaultEthtoolBudget
 	}
 	ectx, cancel := context.WithTimeout(ctx, budget)
-	applyEthtoolDriverInfo(ectx, l.FS, l.Exec, info)
-	applyEthtoolTuning(ectx, l.FS, l.Exec, info)
+	err = applyEthtoolDriverInfo(ectx, l.FS, l.Exec, info)
+	if err == nil {
+		err = applyEthtoolTuning(ectx, l.FS, l.Exec, info)
+	}
 	cancel()
+	if err != nil {
+		return nil, err
+	}
+	// A spent budget stops ethtool on purpose; a done ctx is an error.
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("ethtool: %w", err)
+	}
 	if err := applyIPLinkExtras(ctx, l.Exec, info); err != nil {
 		return nil, err
 	}
@@ -157,25 +166,28 @@ func driverInfoTarget(
 // interface that driverInfoTarget names, and attaches the parsed driver info
 // under `Interface.Ethtool.DriverInfo`. Mirrors Ohai's
 // ethernet_driver_info, but skips virtual interfaces (see
-// ethtoolTarget), as well as loopback, tunnels and the like. An ethtool failure
-// (binary missing, unsupported by the driver) silently leaves Ethtool
-// nil for that interface; non-Ethernet hosts get no Ethtool data at
-// all, matching Ohai's behaviour.
+// ethtoolTarget), as well as loopback, tunnels and the like. A host with
+// no ethtool, a driver that doesn't support the query, or a spent ethtool
+// budget leaves Ethtool nil; any other ethtool failure is an error.
+// Non-Ethernet hosts get no Ethtool data at all, matching Ohai's behaviour.
 func applyEthtoolDriverInfo(
 	ctx context.Context,
 	fs avfs.VFS,
 	exec source.Runner,
 	info *Info,
-) {
+) error {
 	for i := range info.Interfaces {
 		if spent(ctx) {
-			return
+			return nil
 		}
 		if !driverInfoTarget(fs, info.Interfaces[i]) {
 			continue
 		}
-		out, err := exec.Execute(ctx, "ethtool", "-i", info.Interfaces[i].Name)
-		if err != nil {
+		out, ok, err := runEthtool(ctx, exec, "-i", info.Interfaces[i].Name)
+		if err != nil || !ok {
+			return err
+		}
+		if out == nil {
 			continue
 		}
 		di := parseEthtoolDriverInfo(out)
@@ -187,6 +199,37 @@ func applyEthtoolDriverInfo(
 		}
 		info.Interfaces[i].Ethtool.DriverInfo = di
 	}
+	return nil
+}
+
+// ethtoolUnsupported reports whether err is ethtool saying that the
+// driver doesn't support the query, which is usual per NIC and not a
+// failure of the host's ethtool.
+func ethtoolUnsupported(
+	err error,
+) bool {
+	return strings.Contains(err.Error(), "Operation not supported")
+}
+
+// runEthtool runs `ethtool <flag> <iface>`. ok is false when ethtool is
+// not on the host or the budget in ctx is spent, so the caller stops
+// asking. A nil out with ok true is a query the driver doesn't support.
+// Any other failure is an error.
+func runEthtool(
+	ctx context.Context,
+	exec source.Runner,
+	flag, iface string,
+) ([]byte, bool, error) {
+	out, err := exec.Execute(ctx, "ethtool", flag, iface)
+	switch {
+	case err == nil:
+		return out, true, nil
+	case collector.Absent(err), spent(ctx):
+		return nil, false, nil
+	case ethtoolUnsupported(err):
+		return nil, true, nil
+	}
+	return nil, false, fmt.Errorf("ethtool %s %s: %w", flag, iface, err)
 }
 
 // applyIPLinkExtras runs `ip -d link` once and merges per-interface
@@ -229,18 +272,19 @@ func applyIPLinkExtras(
 // subcommands (ring, channel, coalesce, offload, pause) per Ethernet
 // interface that a device backs (see ethtoolTarget), and attaches each parsed result to the corresponding
 // EthtoolInfo field. Mirrors Ohai's ethernet_{ring,channel,coalesce,
-// offload,pause}_parameters block. Each subcommand is independent:
-// a failure of one doesn't suppress the others, and any per-call
-// error or empty parse silently skips that field.
+// offload,pause}_parameters block. Each subcommand is independent: a
+// query the driver doesn't support, or an empty parse, skips that field.
+// A host with no ethtool or a spent budget stops; any other failure is
+// an error.
 func applyEthtoolTuning(
 	ctx context.Context,
 	fs avfs.VFS,
 	exec source.Runner,
 	info *Info,
-) {
+) error {
 	for i := range info.Interfaces {
 		if spent(ctx) {
-			return
+			return nil
 		}
 		if !ethtoolTarget(fs, info.Interfaces[i]) {
 			continue
@@ -252,32 +296,47 @@ func applyEthtoolTuning(
 			}
 			return info.Interfaces[i].Ethtool
 		}
-		if out, err := exec.Execute(ctx, "ethtool", "-g", name); err == nil {
-			if v := parseEthtoolSectionedInts(out, "Ring parameters for"); v != nil {
-				ensureEthtool().RingParams = v
-			}
+		queries := []struct {
+			flag  string
+			apply func([]byte)
+		}{
+			{"-g", func(out []byte) {
+				if v := parseEthtoolSectionedInts(out, "Ring parameters for"); v != nil {
+					ensureEthtool().RingParams = v
+				}
+			}},
+			{"-l", func(out []byte) {
+				if v := parseEthtoolSectionedInts(out, "Channel parameters for"); v != nil {
+					ensureEthtool().ChannelParams = v
+				}
+			}},
+			{"-c", func(out []byte) {
+				if v := parseEthtoolCoalesceParams(out); v != nil {
+					ensureEthtool().CoalesceParams = v
+				}
+			}},
+			{"-k", func(out []byte) {
+				if v := parseEthtoolOffloadParams(out); v != nil {
+					ensureEthtool().OffloadParams = v
+				}
+			}},
+			{"-a", func(out []byte) {
+				if v := parseEthtoolPauseParams(out); v != nil {
+					ensureEthtool().PauseParams = v
+				}
+			}},
 		}
-		if out, err := exec.Execute(ctx, "ethtool", "-l", name); err == nil {
-			if v := parseEthtoolSectionedInts(out, "Channel parameters for"); v != nil {
-				ensureEthtool().ChannelParams = v
+		for _, q := range queries {
+			out, ok, err := runEthtool(ctx, exec, q.flag, name)
+			if err != nil || !ok {
+				return err
 			}
-		}
-		if out, err := exec.Execute(ctx, "ethtool", "-c", name); err == nil {
-			if v := parseEthtoolCoalesceParams(out); v != nil {
-				ensureEthtool().CoalesceParams = v
-			}
-		}
-		if out, err := exec.Execute(ctx, "ethtool", "-k", name); err == nil {
-			if v := parseEthtoolOffloadParams(out); v != nil {
-				ensureEthtool().OffloadParams = v
-			}
-		}
-		if out, err := exec.Execute(ctx, "ethtool", "-a", name); err == nil {
-			if v := parseEthtoolPauseParams(out); v != nil {
-				ensureEthtool().PauseParams = v
+			if out != nil {
+				q.apply(out)
 			}
 		}
 	}
+	return nil
 }
 
 // applyNICStats fills each interface's speed and duplex, and its driver,

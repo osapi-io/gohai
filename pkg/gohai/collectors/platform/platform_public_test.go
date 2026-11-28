@@ -645,14 +645,10 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: sw_vers error, no version or build",
+			name:    "darwin: no sw_vers, no version or build",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return sourcetest.Commands{
-					Err: map[string]error{swVersLine: errors.New("not found")},
-				}.Mock(
-					t,
-				)
+				return sourcetest.Commands{}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -662,6 +658,46 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 					OS: "darwin", Name: "darwin",
 					Family: "darwin", CPUArchitecture: runtime.GOARCH,
 				}, *info)
+			},
+		},
+		{
+			name:    "darwin: a sw_vers that fails is an error",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Err: map[string]error{swVersLine: errors.New("exit status 1")},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.EqualError(err, "sw_vers: exit status 1")
+			},
+		},
+		{
+			name:    "darwin: a uname that fails is an error",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Err: map[string]error{"uname -m": errors.New("exit status 1")},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.EqualError(err, "uname -m: exit status 1")
+			},
+		},
+		{
+			name:    "linux: a uname that fails is an error",
+			variant: "linux",
+			fs:      sourcetest.FS(s.T(), nil),
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Err: map[string]error{"uname -m": errors.New("exit status 1")},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.EqualError(err, "uname -m: exit status 1")
 			},
 		},
 		{

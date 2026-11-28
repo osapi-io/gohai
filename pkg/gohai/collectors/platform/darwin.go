@@ -23,6 +23,7 @@ package platform
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -57,26 +58,36 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	arch, err := darwinArch(ctx, d.Exec)
+	if err != nil {
+		return nil, err
+	}
 	info := &Info{
 		OS: family.Darwin, Name: family.Darwin, Family: family.Darwin,
-		CPUArchitecture: darwinArch(ctx, d.Exec),
+		CPUArchitecture: arch,
 	}
 	if d.Exec != nil {
-		applySwVers(ctx, d.Exec, info)
+		if err := applySwVers(ctx, d.Exec, info); err != nil {
+			return nil, err
+		}
 	}
 	return info, nil
 }
 
 // applySwVers parses `sw_vers` output (key: value lines) and
-// supplements info with Build + VersionExtra. Silent on exec failure.
+// supplements info with Build + VersionExtra. A host with no sw_vers
+// leaves them empty; a sw_vers that runs and fails is an error.
 func applySwVers(
 	ctx context.Context,
 	exec source.Runner,
 	info *Info,
-) {
+) error {
 	out, err := exec.Execute(ctx, "sw_vers")
+	if collector.Absent(err) {
+		return nil
+	}
 	if err != nil {
-		return
+		return fmt.Errorf("sw_vers: %w", err)
 	}
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
 	for sc.Scan() {
@@ -100,4 +111,5 @@ func applySwVers(
 			}
 		}
 	}
+	return nil
 }

@@ -22,6 +22,8 @@ package packagemgr_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"runtime"
 	"testing"
 
@@ -123,6 +125,19 @@ func (s *PackageMgrPublicTestSuite) TestNew() {
 	}
 }
 
+// exitStatusError is the error of a command that exited by itself with a
+// status, as an *exec.ExitError of a finished process is.
+type exitStatusError int
+
+func (e exitStatusError) Error() string {
+	return fmt.Sprintf("exit status %d", int(e))
+}
+
+// ExitCode is the status the command exited with.
+func (e exitStatusError) ExitCode() int {
+	return int(e)
+}
+
 func (s *PackageMgrPublicTestSuite) TestCollect() {
 	found := func(paths map[string]string) sourcetest.Commands {
 		out := map[string]string{}
@@ -136,8 +151,10 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 		c        func(source.Runner) packagemgr.Collector
 		runner   sourcetest.Commands
 		nilExec  bool
+		cancel   bool
 		wantName string
 		wantPath string
+		wantErr  string
 	}{
 		{
 			name: "debian: apt",
@@ -188,6 +205,94 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
 		},
 		{
+			name: "rhel: a command -v that exits 1 is not found, and the next is tried",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.RHEL{Exec: e} },
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sh -c command -v yum": "/usr/bin/yum\n"},
+				Err: map[string]error{"sh -c command -v dnf": exitStatusError(1)},
+			},
+			wantName: "yum",
+			wantPath: "/usr/bin/yum",
+		},
+		{
+			name: "debian: a command -v that exits 127, as dash does, is not found",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sh -c command -v apt-get": "/usr/bin/apt-get\n"},
+				Err: map[string]error{"sh -c command -v apt": exitStatusError(127)},
+			},
+			wantName: "apt-get",
+			wantPath: "/usr/bin/apt-get",
+		},
+		{
+			name: "rhel: a command -v that exits 127 is not found, and the next is tried",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.RHEL{Exec: e} },
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sh -c command -v yum": "/usr/bin/yum\n"},
+				Err: map[string]error{"sh -c command -v dnf": exitStatusError(127)},
+			},
+			wantName: "yum",
+			wantPath: "/usr/bin/yum",
+		},
+		{
+			name: "linux: on Alpine, a zypper that exits 127 in busybox ash is not found, so apk is",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			runner: sourcetest.Commands{
+				Out: map[string]string{"sh -c command -v apk": "/sbin/apk\n"},
+				Err: map[string]error{"sh -c command -v zypper": exitStatusError(127)},
+			},
+			wantName: "apk",
+			wantPath: "/sbin/apk",
+		},
+		{
+			name: "darwin: a command -v brew that exits 127 is not found",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
+			runner: sourcetest.Commands{
+				Err: map[string]error{"sh -c command -v brew": exitStatusError(127)},
+			},
+		},
+		{
+			name: "rhel: a command -v that fails another way is an error",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.RHEL{Exec: e} },
+			runner: sourcetest.Commands{
+				Err: map[string]error{"sh -c command -v dnf": exitStatusError(2)},
+			},
+			wantErr: "command -v dnf: exit status 2",
+		},
+		{
+			name:   "debian: a cancelled context is an error",
+			c:      func(e source.Runner) packagemgr.Collector { return &packagemgr.Debian{Exec: e} },
+			cancel: true,
+			runner: sourcetest.Commands{
+				Err: map[string]error{"sh -c command -v apt": exitStatusError(1)},
+			},
+			wantErr: "command -v apt: exit status 1",
+		},
+		{
+			name: "linux: a command -v that fails another way is an error",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			runner: sourcetest.Commands{
+				Err: map[string]error{"sh -c command -v zypper": exitStatusError(2)},
+			},
+			wantErr: "command -v zypper: exit status 2",
+		},
+		{
+			name: "linux: a command -v that does not run is an error",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
+			runner: sourcetest.Commands{
+				Err: map[string]error{"sh -c command -v zypper": errors.New("permission denied")},
+			},
+			wantErr: "command -v zypper: permission denied",
+		},
+		{
+			name: "darwin: a command -v that fails another way is an error",
+			c:    func(e source.Runner) packagemgr.Collector { return &packagemgr.Darwin{Exec: e} },
+			runner: sourcetest.Commands{
+				Err: map[string]error{"sh -c command -v brew": exitStatusError(2)},
+			},
+			wantErr: "command -v brew: exit status 2",
+		},
+		{
 			name:    "linux: nil Exec",
 			c:       func(e source.Runner) packagemgr.Collector { return &packagemgr.Linux{Exec: e} },
 			nilExec: true,
@@ -199,7 +304,18 @@ func (s *PackageMgrPublicTestSuite) TestCollect() {
 			if tt.nilExec {
 				exec = nil
 			}
-			got, err := tt.c(exec).Collect(context.Background(), nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancel {
+				cancel()
+			}
+			got, err := tt.c(exec).Collect(ctx, nil)
+			if tt.wantErr != "" {
+				s.Exactly(nil, got)
+				s.EqualError(err, tt.wantErr)
+
+				return
+			}
 			s.Require().NoError(err)
 			s.Equal(&packagemgr.Info{Name: tt.wantName, Path: tt.wantPath}, got)
 		})

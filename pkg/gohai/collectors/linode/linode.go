@@ -29,6 +29,7 @@ package linode
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"net"
 	"slices"
 	"strings"
@@ -131,8 +132,11 @@ func (c *Host) Collect(
 		return info, nil
 	}
 	out, err := c.Exec.Execute(ctx, "ip", "-o", "-4", "addr", "show")
-	if err != nil {
+	if collector.Absent(err) {
 		return info, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("linode: ip addr: %w", err)
 	}
 	addrs := ipv4ByLabel(out)
 	info.PublicIP = addrs["eth0"]

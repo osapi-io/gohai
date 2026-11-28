@@ -128,4 +128,7 @@ None. The collector runs `sh -c 'command -v <name>'` through its command runner.
 `command -v` is the POSIX form of Ohai's `which`. The host's shell finds the
 name on its own `PATH`, so a manager in a home directory, such as
 `~/.homebrew/bin/brew`, is found. Output that is not a path, such as an alias,
-does not count.
+does not count. For a name that it doesn't find, `command -v` exits 1 in bash
+and 127 in dash (Debian, Ubuntu, Void) and busybox ash (Alpine). Either status
+means "not found", and the collector tries the next name. Any other failure,
+such as another exit status or a cancelled context, is an error.

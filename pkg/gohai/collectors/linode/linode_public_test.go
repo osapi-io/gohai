@@ -23,6 +23,7 @@ package linode_test
 import (
 	"context"
 	"errors"
+	"os/exec"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -105,7 +106,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 		ip           string // the output of ip -o -4 addr show
 		ipErr        error
 		nilExec      bool
-		validateFunc func(any)
+		validateFunc func(any, error)
 	}{
 		{
 			name:  "with no Exec, a Linode has no addresses",
@@ -114,7 +115,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				"hostname": &hostname.Info{FQDN: "myhost.members.linode.com"},
 			},
 			nilExec: true,
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				s.Equal(&linode.Info{}, out)
 			},
 		},
@@ -125,7 +127,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				"hostname": &hostname.Info{FQDN: "myhost.members.linode.com"},
 			},
 			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Equal("50.1.2.3", info.PublicIP)
@@ -138,7 +141,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				"hostname": &hostname.Info{Domain: "members.linode.com"},
 			},
 			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Equal("50.1.2.3", info.PublicIP)
@@ -150,7 +154,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{FQDN: "host.example.com", Domain: "example.com"},
 			},
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
@@ -158,7 +163,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			name:  "a nil hostname Info is no signal",
 			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
 			prior: collector.PriorResults{"hostname": (*hostname.Info)(nil)},
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
@@ -168,7 +174,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "Linode"}},
 			},
 			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Equal("50.1.2.3", info.PublicIP)
@@ -179,7 +186,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "QEMU"}},
 			},
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
@@ -190,7 +198,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				"/etc/apt/sources.list.d/linode.sources": "Types: deb\nURIs: http://mirrors.linode.com/ubuntu\n",
 			},
 			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Equal("50.1.2.3", info.PublicIP)
@@ -202,7 +211,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				"/etc/apt/sources.list.d/ubuntu.sources": "Types: deb\nURIs: http://archive.ubuntu.com/ubuntu\n",
 				"/etc/apt/sources.list.d/sub/x.list":     "deb http://mirrors.linode.com/ focal main",
 			},
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
@@ -216,7 +226,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				ipLine("eth0", "eth0", "50.1.2.3/24") +
 				ipLine("eth0", "eth0:1", "10.0.0.5/17") +
 				ipLine("eth0", "eth0", "50.1.2.4/24"),
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Equal("50.1.2.3", info.PublicIP)
@@ -226,13 +237,15 @@ func (s *LinodePublicTestSuite) TestCollect() {
 		{
 			name:  "no linode in apt → nil",
 			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
 		{
 			name: "missing apt file → nil",
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
@@ -240,7 +253,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			name:  "eth0 missing produces empty public_ip",
 			files: linodeApt,
 			ip:    ipLine("eth0", "eth0:1", "10.0.0.5/17"),
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Empty(info.PublicIP)
@@ -254,7 +268,8 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				"1: lo    inet\n" +
 				"2: eth0    inet not-a-cidr scope global eth0\\ valid_lft forever\n" +
 				"2: eth0    inet6 fe80::1/64 scope link\\ valid_lft forever\n",
-			validateFunc: func(out any) {
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Empty(info.PublicIP)
@@ -262,14 +277,24 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:  "an ip error returns empty IPs",
+			name:  "an absent ip gives empty IPs",
 			files: linodeApt,
-			ipErr: errors.New("ip: not found"),
-			validateFunc: func(out any) {
+			ipErr: &exec.Error{Name: "ip", Err: exec.ErrNotFound},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
 				s.Empty(info.PublicIP)
 				s.Empty(info.PrivateIP)
+			},
+		},
+		{
+			name:  "an ip that runs and fails is an error",
+			files: linodeApt,
+			ipErr: errors.New("exit status 1"),
+			validateFunc: func(out any, err error) {
+				s.EqualError(err, "linode: ip addr: exit status 1")
+				s.Nil(out)
 			},
 		},
 	}
@@ -291,8 +316,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				c = &linode.Host{FS: sourcetest.FS(s.T(), tt.files)}
 			}
 			out, err := c.Collect(context.Background(), tt.prior)
-			s.Require().NoError(err)
-			tt.validateFunc(out)
+			tt.validateFunc(out, err)
 		})
 	}
 }

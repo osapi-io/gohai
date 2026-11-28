@@ -26,6 +26,8 @@ package packagemgr
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -77,21 +79,47 @@ func NewWith(
 
 // firstFound is the first of names that the host's shell finds on its
 // PATH, and its path: `sh -c "command -v <name>"`, the POSIX form of
-// Ohai's `which`. Both are "" when exec is nil or none is found.
+// Ohai's `which`. Both are "" when exec is nil or none is found. A
+// `command -v` exits 1 for a name it doesn't find; any other failure,
+// such as a done ctx, is an error.
 func firstFound(
 	ctx context.Context,
 	exec source.Runner,
 	names ...string,
-) (string, string) {
+) (string, string, error) {
 	if exec == nil {
-		return "", ""
+		return "", "", nil
 	}
 	for _, n := range names {
 		out, err := exec.Execute(ctx, "sh", "-c", "command -v "+n)
-		if p := strings.TrimSpace(string(out)); err == nil && strings.HasPrefix(p, "/") {
-			return n, p
+		if err != nil {
+			if notFound(err) && ctx.Err() == nil {
+				continue
+			}
+			return "", "", fmt.Errorf("command -v %s: %w", n, err)
+		}
+		if p := strings.TrimSpace(string(out)); strings.HasPrefix(p, "/") {
+			return n, p, nil
 		}
 	}
 
-	return "", ""
+	return "", "", nil
+}
+
+// notFound reports whether err is `command -v` not finding its name, or a
+// host with no sh at all. bash exits 1 for a name it does not find, and
+// dash (Debian, Ubuntu, Void) and busybox ash (Alpine) exit 127. Any other
+// status, such as 2, is a failure of the shell and an error.
+func notFound(
+	err error,
+) bool {
+	var status interface{ ExitCode() int }
+	if collector.Absent(err) {
+		return true
+	}
+	if !errors.As(err, &status) {
+		return false
+	}
+
+	return status.ExitCode() == 1 || status.ExitCode() == 127
 }

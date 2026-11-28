@@ -45,6 +45,9 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, path := firstFound(ctx, d.Exec, "brew", "port")
+	name, path, err := firstFound(ctx, d.Exec, "brew", "port")
+	if err != nil {
+		return nil, err
+	}
 	return &Info{Name: name, Path: path}, nil
 }

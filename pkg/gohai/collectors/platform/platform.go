@@ -330,40 +330,46 @@ var machineArch = map[string]string{
 
 // unameArch is the Go name of the host's architecture, from `uname -m`.
 // A machine name with no Go name is reported as uname gives it. When exec
-// is nil or uname fails, it is the binary's architecture.
+// is nil, uname is not on the host or prints nothing, it is the binary's
+// architecture. A uname that runs and fails is an error, as the binary's
+// architecture can differ from the host's.
 func unameArch(
 	ctx context.Context,
 	exec source.Runner,
-) string {
+) (string, error) {
 	if exec == nil {
-		return goArch
+		return goArch, nil
 	}
 	out, err := exec.Execute(ctx, "uname", "-m")
+	if collector.Absent(err) {
+		return goArch, nil
+	}
 	if err != nil {
-		return goArch
+		return "", fmt.Errorf("uname -m: %w", err)
 	}
 	m := strings.TrimSpace(string(out))
 	if m == "" {
-		return goArch
+		return goArch, nil
 	}
 	if a, ok := machineArch[m]; ok {
-		return a
+		return a, nil
 	}
 
-	return m
+	return m, nil
 }
 
 // darwinArch is the Go name of a Mac's architecture. `sysctl -n
 // hw.optional.arm64` is 1 on Apple silicon, also for a process that Rosetta
-// translates, where `uname -m` says x86_64. Otherwise it is uname's answer.
+// translates, where `uname -m` says x86_64. An Intel Mac has no such key,
+// and its sysctl fails, so any other answer means uname's answer.
 func darwinArch(
 	ctx context.Context,
 	exec source.Runner,
-) string {
+) (string, error) {
 	if exec != nil {
 		if out, err := exec.Execute(ctx, "sysctl", "-n", "hw.optional.arm64"); err == nil &&
 			strings.TrimSpace(string(out)) == "1" {
-			return "arm64"
+			return "arm64", nil
 		}
 	}
 

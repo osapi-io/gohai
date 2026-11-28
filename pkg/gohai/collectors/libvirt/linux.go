@@ -23,6 +23,7 @@ package libvirt
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -45,8 +46,9 @@ func NewLinux() *Linux {
 }
 
 // Collect queries virsh for version, URI, and full domain list. Returns nil
-// (no error) when virsh is absent or cannot connect to the daemon, and an
-// error when the URI or the domain list cannot be read after that.
+// (no error) when virsh is absent or the daemon is not running, and an
+// error when virsh fails another way, such as no permission on the
+// daemon's socket, or when the URI or the domain list cannot be read.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -55,10 +57,14 @@ func (l *Linux) Collect(
 		return nil, nil
 	}
 
-	// Probe: if virsh version fails, virsh is absent or the daemon is down.
+	// Probe: virsh absent or the daemon down gives no fact; any other
+	// failure, such as no permission on the daemon's socket, is an error.
 	verOut, err := l.virsh(ctx, "version")
 	if err != nil {
-		return nil, nil
+		if noHypervisor(err) && ctx.Err() == nil {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read virsh version: %w", err)
 	}
 
 	info := &Info{
@@ -97,6 +103,19 @@ func (l *Linux) Collect(
 // -c connects to qemu:///session for a user who is not root, which has
 // other domains, usually none, than qemu:///system for root.
 const systemURI = "qemu:///system"
+
+// noHypervisor reports whether err from `virsh version` says that there
+// is no hypervisor to ask: virsh is not on the host, or its daemon is not
+// running, so its socket is missing or refuses the connection.
+func noHypervisor(
+	err error,
+) bool {
+	msg := err.Error()
+
+	return collector.Absent(err) ||
+		strings.Contains(msg, "No such file or directory") ||
+		strings.Contains(msg, "Connection refused")
+}
 
 // virsh runs virsh against the system daemon with args.
 func (l *Linux) virsh(

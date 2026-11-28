@@ -61,7 +61,11 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info := &Info{OS: "linux", CPUArchitecture: unameArch(ctx, l.Exec)}
+	arch, err := unameArch(ctx, l.Exec)
+	if err != nil {
+		return nil, err
+	}
+	info := &Info{OS: "linux", CPUArchitecture: arch}
 	if l.FS == nil {
 		return info, nil
 	}
