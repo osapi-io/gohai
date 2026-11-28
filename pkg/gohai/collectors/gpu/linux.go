@@ -22,6 +22,7 @@ package gpu
 
 import (
 	"context"
+	"fmt"
 	"path"
 	"regexp"
 	"strings"
@@ -60,8 +61,11 @@ func (l *Linux) Collect(
 ) (any, error) {
 	info := &Info{}
 	entries, err := l.FS.ReadDir(drmDir)
-	if err != nil {
+	if collector.Absent(err) {
 		return info, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", drmDir, err)
 	}
 	var db *pcidev.DB
 	for _, e := range entries {
@@ -69,6 +73,8 @@ func (l *Linux) Collect(
 		if !strings.HasPrefix(n, "card") || strings.Contains(n, "-") {
 			continue
 		}
+		// Each card of /sys/class/drm is a link to its device. An entry
+		// that is not a link has no device to read.
 		target, err := l.FS.Readlink(drmDir + "/" + n)
 		if err != nil {
 			continue

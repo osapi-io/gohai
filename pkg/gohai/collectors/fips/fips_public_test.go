@@ -317,26 +317,18 @@ func (s *FipsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: policy read error ignored (Policy omitted)",
+			name:    "linux: a policy file that cannot be read is an error",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				base := newFipsFS(map[string]string{"/proc/sys/crypto/fips_enabled": "1\n"})
 				return pathErrorFS{VFS: base, failPath: "/etc/crypto-policies/config"}
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*fips.Info)
-				s.Require().True(ok)
-				s.Equal(true, info.Kernel.Enabled)
-				if true {
-					s.Nil(info.Policy)
-					return
-				}
-				s.Require().NotNil(info.Policy)
-				s.Equal("", info.Policy.Name)
-				s.Equal(false, info.Policy.FIPSEffective)
+				s.EqualError(err, "read /etc/crypto-policies/config: permission denied")
+				s.Exactly(nil, got)
 			},
 		},
+
 		{
 			name:    "darwin returns nil (no :darwin handler in Ohai)",
 			variant: "darwin",

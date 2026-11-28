@@ -127,7 +127,7 @@ On Linux:
    them.
 3. If `/sys/class/drm` is missing (a headless server, a minimal container, a VM
    without a virtual display), the collector returns an empty `cards` slice and
-   no error.
+   no error. A `/sys/class/drm` that is there and cannot be read is an error.
 
 On macOS:
 

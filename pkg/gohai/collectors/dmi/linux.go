@@ -22,6 +22,9 @@ package dmi
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"io/fs"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -59,13 +62,19 @@ func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	r := &reader{fs: l.FS}
 	if !l.isDir(dmiDir) && l.isDir(deviceTreeDir) {
-		return l.deviceTree(), nil
+		info := deviceTree(r)
+		if r.err != nil {
+			return nil, r.err
+		}
+
+		return info, nil
 	}
-	item := func(name string) string { return l.read(dmiDir+"/"+name, unknown) }
+	item := func(name string) string { return r.read(dmiDir+"/"+name, unknown) }
 	chassisType := item("chassis_type")
 
-	return &Info{
+	info := &Info{
 		BIOS: &BIOS{
 			Manufacturer: item("bios_vendor"),
 			Ver:          item("bios_version"),
@@ -95,19 +104,26 @@ func (l *Linux) Collect(
 			UUID:         item("product_uuid"),
 			SKU:          item("product_sku"),
 		},
-	}, nil
+	}
+	if r.err != nil {
+		return nil, r.err
+	}
+
+	return info, nil
 }
 
 // deviceTree is the Info of a board with a device tree: the model, the
 // serial number, the vendor of the first "compatible" entry, the chassis
 // type, and U-Boot as the firmware when it booted the board.
-func (l *Linux) deviceTree() *Info {
+func deviceTree(
+	r *reader,
+) *Info {
 	prop := func(name string) string {
-		return strings.TrimSpace(strings.Trim(l.read(deviceTreeDir+"/"+name, unknown), "\x00"))
+		return strings.TrimSpace(strings.Trim(r.read(deviceTreeDir+"/"+name, unknown), "\x00"))
 	}
 	model, serial := prop("model"), prop("serial-number")
 	vendor := unknown
-	compatible := strings.Split(l.read(deviceTreeDir+"/compatible", ""), "\x00")
+	compatible := strings.Split(r.read(deviceTreeDir+"/compatible", ""), "\x00")
 	if v, _, _ := strings.Cut(strings.TrimSpace(compatible[0]), ","); v != "" {
 		vendor = v
 	}
@@ -138,13 +154,29 @@ func (l *Linux) deviceTree() *Info {
 	}
 }
 
-// read is the trimmed content of path, or def when it cannot be read.
-func (l *Linux) read(
+// reader reads the files of one collection, and keeps the first read
+// that failed.
+type reader struct {
+	fs  avfs.VFS
+	err error
+}
+
+// read is the trimmed content of path. A file the host does not have,
+// or a root-only file such as product_serial for a caller that is not
+// root, gives def. Any other failure gives def and is kept in r.err.
+func (r *reader) read(
 	path string,
 	def string,
 ) string {
-	b, err := l.FS.ReadFile(path)
+	b, err := r.fs.ReadFile(path)
+	if collector.Absent(err) || errors.Is(err, fs.ErrPermission) {
+		return def
+	}
 	if err != nil {
+		if r.err == nil {
+			r.err = fmt.Errorf("read %s: %w", path, err)
+		}
+
 		return def
 	}
 

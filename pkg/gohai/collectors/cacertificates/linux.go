@@ -25,6 +25,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/x509"
+	"fmt"
 	"io/fs"
 	"path"
 	"slices"
@@ -139,20 +140,26 @@ func NewLinux() *Linux {
 }
 
 // Collect reads each CA file under the layout's directories. A directory
-// that the host does not have has no CAs. A CA that a blocklist or a
-// p11-kit bundle distrusts is not enabled.
+// or a file that the host does not have has no CAs. One that exists and
+// cannot be read is an error, so a host does not look as if it has fewer
+// CAs. A CA that a blocklist or a p11-kit bundle distrusts is not enabled.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	off := l.disabled()
-	distrusted := l.blocklisted()
+	off, err := l.disabled()
+	if err != nil {
+		return nil, err
+	}
+	distrusted, err := l.blocklisted()
+	if err != nil {
+		return nil, err
+	}
 	info := &Info{Certificates: []Certificate{}}
 	for _, d := range l.Layout.Dirs {
-		_ = l.FS.WalkDir(d.Path, func(p string, e fs.DirEntry, err error) error {
-			// A directory the host lacks, or cannot read, has no CAs.
+		werr := l.FS.WalkDir(d.Path, func(p string, e fs.DirEntry, err error) error {
 			if err != nil {
-				return fs.SkipDir
+				return walkErr(p, err)
 			}
 			if e.IsDir() {
 				if slices.Contains(l.Layout.Blocklists, p) {
@@ -164,18 +171,25 @@ func (l *Linux) Collect(
 			if !caFile(p) {
 				return nil
 			}
-			// An unreadable file is left out.
-			if data, rerr := l.FS.ReadFile(p); rerr == nil {
-				info.Certificates = append(info.Certificates, entries(d, p, data, off)...)
-				if path.Ext(p) == ".p11-kit" {
-					for _, c := range p11kitDistrusted(data) {
-						distrusted[fingerprint(c)] = true
-					}
+			data, rerr := l.FS.ReadFile(p)
+			if collector.Absent(rerr) {
+				return nil
+			}
+			if rerr != nil {
+				return fmt.Errorf("read %s: %w", p, rerr)
+			}
+			info.Certificates = append(info.Certificates, entries(d, p, data, off)...)
+			if path.Ext(p) == ".p11-kit" {
+				for _, c := range p11kitDistrusted(data) {
+					distrusted[fingerprint(c)] = true
 				}
 			}
 
 			return nil
 		})
+		if werr != nil {
+			return nil, werr
+		}
 	}
 	for i, c := range info.Certificates {
 		if distrusted[c.Fingerprint] {
@@ -187,30 +201,50 @@ func (l *Linux) Collect(
 }
 
 // blocklisted are the fingerprints of the certificates in the layout's
-// blocklists.
-func (l *Linux) blocklisted() map[string]bool {
+// blocklists. A blocklist the host lacks distrusts nothing. One that
+// exists and cannot be read is an error.
+func (l *Linux) blocklisted() (map[string]bool, error) {
 	out := map[string]bool{}
 	for _, dir := range l.Layout.Blocklists {
-		_ = l.FS.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
-			// A blocklist the host lacks, or cannot read, distrusts nothing.
+		werr := l.FS.WalkDir(dir, func(p string, e fs.DirEntry, err error) error {
 			if err != nil {
-				return fs.SkipDir
+				return walkErr(p, err)
 			}
 			if e.IsDir() || !caFile(p) {
 				return nil
 			}
-			// An unreadable file is left out.
-			if data, rerr := l.FS.ReadFile(p); rerr == nil {
-				for _, c := range certs(data) {
-					out[fingerprint(c)] = true
-				}
+			data, rerr := l.FS.ReadFile(p)
+			if collector.Absent(rerr) {
+				return nil
+			}
+			if rerr != nil {
+				return fmt.Errorf("read %s: %w", p, rerr)
+			}
+			for _, c := range certs(data) {
+				out[fingerprint(c)] = true
 			}
 
 			return nil
 		})
+		if werr != nil {
+			return nil, werr
+		}
 	}
 
-	return out
+	return out, nil
+}
+
+// walkErr is what a WalkDir function returns for the error of the path
+// p: a path the host lacks is skipped, and any other error stops the walk.
+func walkErr(
+	p string,
+	err error,
+) error {
+	if collector.Absent(err) {
+		return fs.SkipDir
+	}
+
+	return fmt.Errorf("read %s: %w", p, err)
 }
 
 // p11kitDistrusted are the certificates of the objects of a p11-kit file
@@ -236,15 +270,19 @@ func p11kitDistrusted(
 }
 
 // disabled are the names of the system CAs that the layout's conf file
-// turns off.
-func (l *Linux) disabled() map[string]bool {
+// turns off. A conf file the host lacks turns off nothing. One that exists
+// and cannot be read is an error.
+func (l *Linux) disabled() (map[string]bool, error) {
 	off := map[string]bool{}
 	if l.Layout.Conf == "" {
-		return off
+		return off, nil
 	}
 	data, err := l.FS.ReadFile(l.Layout.Conf)
+	if collector.Absent(err) {
+		return off, nil
+	}
 	if err != nil {
-		return off
+		return nil, fmt.Errorf("read %s: %w", l.Layout.Conf, err)
 	}
 	sc := bufio.NewScanner(bytes.NewReader(data))
 	for sc.Scan() {
@@ -254,7 +292,7 @@ func (l *Linux) disabled() map[string]bool {
 		}
 	}
 
-	return off
+	return off, nil
 }
 
 // caFile reports whether p is a file that holds CAs.

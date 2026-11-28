@@ -107,7 +107,9 @@ func (s *DmiPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		files   map[string]string
+		fail    []string // paths whose read fails, as for a file the host cannot read
 		want    *dmi.Info
+		wantErr string
 	}{
 		{
 			name:    "linux: each DMI string; an unreadable one is unknown",
@@ -179,6 +181,20 @@ func (s *DmiPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a DMI string that cannot be read is an error",
+			variant: "linux",
+			files:   dmiFiles,
+			fail:    []string{"/sys/class/dmi/id/product_serial"},
+			wantErr: "read /sys/class/dmi/id/product_serial: ",
+		},
+		{
+			name:    "linux: a device tree property that cannot be read is an error",
+			variant: "linux",
+			files:   map[string]string{"/sys/firmware/devicetree/base/serial-number": "1\x00"},
+			fail:    []string{"/sys/firmware/devicetree/base/model"},
+			wantErr: "read /sys/firmware/devicetree/base/model: ",
+		},
+		{
 			name:    "darwin: no DMI",
 			variant: "darwin",
 			want:    &dmi.Info{},
@@ -188,9 +204,16 @@ func (s *DmiPublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			var c dmi.Collector = &dmi.Darwin{}
 			if tt.variant == "linux" {
-				c = &dmi.Linux{FS: sourcetest.FS(s.T(), tt.files)}
+				fs := sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), tt.files), tt.fail...)
+				c = &dmi.Linux{FS: fs}
 			}
 			got, err := c.Collect(context.Background(), nil)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+				s.Exactly(nil, got)
+
+				return
+			}
 			s.Require().NoError(err)
 			s.Equal(tt.want, got)
 		})

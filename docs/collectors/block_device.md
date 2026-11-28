@@ -131,7 +131,8 @@ On Linux:
 1. The collector reads the `/sys/block` directory through the injected
    `avfs.VFS`. If the directory is not there, the collector returns an empty
    device list and no error. Containers that do not bind-mount `/sys` and
-   minimal images have no `/sys/block`.
+   minimal images have no `/sys/block`. A `/sys/block` that is there and cannot
+   be read is an error.
 2. For each device subdirectory, the collector reads the sysfs attributes in
    this layout. It skips regular files. The read order is the same as in Ohai's
    `block_device` plugin:
@@ -142,7 +143,9 @@ On Linux:
      `queue_depth` and `firmware_rev`, in the device subtree.
 3. If one file is missing, its field is an empty string. Not all devices have
    all paths. Loop devices have no `device/` subtree. NVMe devices have
-   `firmware_rev` but not `rev`.
+   `firmware_rev` but not `rev`. A file that is there and cannot be read is an
+   error, so that an empty field always means that the device has no such
+   attribute.
 
 On macOS, the collector returns `nil`.
 

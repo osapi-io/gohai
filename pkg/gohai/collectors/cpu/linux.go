@@ -75,8 +75,12 @@ func (l *Linux) Collect(
 		count = countStatCPUs(l.FS)
 	}
 	info := summarize(count, cpus)
-	if v := readVulnerabilities(l.FS); v != nil {
-		info.Vulnerabilities = v
+	vulns, err := readVulnerabilities(l.FS)
+	if err != nil {
+		return nil, err
+	}
+	if vulns != nil {
+		info.Vulnerabilities = vulns
 	}
 	if l.Exec == nil {
 		return info, nil

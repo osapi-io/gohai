@@ -52,12 +52,17 @@ func NewLinux() *Linux {
 }
 
 // Collect returns per-device I/O counters, in the order of
-// /proc/diskstats.
+// /proc/diskstats. A host with no /proc/diskstats, such as gVisor or
+// some containers, has no devices. A /proc/diskstats that cannot be read
+// is an error.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	b, err := l.FS.ReadFile(procDiskstats)
+	if collector.Absent(err) {
+		return &Info{Devices: []Device{}}, nil
+	}
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", procDiskstats, err)
 	}

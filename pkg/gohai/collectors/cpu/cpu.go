@@ -23,6 +23,7 @@
 package cpu
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -198,32 +199,40 @@ func summarize(
 }
 
 // readVulnerabilities walks /sys/devices/system/cpu/vulnerabilities/
-// via the injected avfs and returns a mitigation-name → status map.
+// via the injected avfs and returns a mitigation-name to status map.
 // A missing directory yields nil. Most modern Linux kernels have it,
 // but containers / stripped /sys do not, and an absent directory is
-// not an error.
+// not an error. A directory or file that exists and cannot be read is
+// an error.
 func readVulnerabilities(
 	fs avfs.VFS,
-) map[string]string {
+) (map[string]string, error) {
 	entries, err := fs.ReadDir(vulnerabilitiesDir)
+	if collector.Absent(err) {
+		return nil, nil
+	}
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("read %s: %w", vulnerabilitiesDir, err)
 	}
 	out := map[string]string{}
 	for _, e := range entries {
 		if e.IsDir() {
 			continue
 		}
-		b, err := fs.ReadFile(vulnerabilitiesDir + "/" + e.Name())
-		if err != nil {
+		path := vulnerabilitiesDir + "/" + e.Name()
+		b, err := fs.ReadFile(path)
+		if collector.Absent(err) {
 			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", path, err)
 		}
 		out[e.Name()] = strings.TrimSpace(string(b))
 	}
 	if len(out) == 0 {
-		return nil
+		return nil, nil
 	}
-	return out
+	return out, nil
 }
 
 // lscpuSummary holds the fields we care about from `lscpu` output.

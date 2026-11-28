@@ -68,7 +68,11 @@ func (l *Linux) Collect(
 	}
 	info.Kernel = kernel
 
-	info.Policy = readCryptoPolicy(l.FS)
+	policy, err := readCryptoPolicy(l.FS)
+	if err != nil {
+		return nil, err
+	}
+	info.Policy = policy
 
 	return info, nil
 }
@@ -87,17 +91,20 @@ func readKernelFlag(
 }
 
 // readCryptoPolicy returns nil on hosts without /etc/crypto-policies
-// (Debian/Ubuntu, older RHEL, Alpine, etc.). Missing or unreadable
-// file → nil (we'd rather omit the field than fail the whole
-// collector).
+// (Debian/Ubuntu, older RHEL, Alpine, etc.). A policy file that exists
+// and cannot be read is an error: a host with fips_enabled=1 and no
+// policy would otherwise look the same as one with no policy file.
 func readCryptoPolicy(
 	fs avfs.VFS,
-) *Policy {
+) (*Policy, error) {
 	b, err := fs.ReadFile(policyPath)
-	if err != nil {
-		return nil
+	if collector.Absent(err) {
+		return nil, nil
 	}
-	return parsePolicy(string(b))
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", policyPath, err)
+	}
+	return parsePolicy(string(b)), nil
 }
 
 func parsePolicy(

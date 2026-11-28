@@ -727,7 +727,37 @@ NUMA node0 CPU(s):   5-2
 			},
 		},
 		{
-			name:    "linux: vulnerabilities dir with unreadable file skipped",
+			name:    "linux: a vulnerabilities directory that cannot be read is an error",
+			variant: "linux",
+			cpuinfo: linuxCPUInfo,
+			fs: sourcetest.FS(s.T(), map[string]string{
+				"/sys/devices/system/cpu/vulnerabilities": "not a directory",
+			}),
+			exec: noLscpuExec,
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "read /sys/devices/system/cpu/vulnerabilities: ")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a vulnerabilities link that points at nothing is left out",
+			variant: "linux",
+			cpuinfo: linuxCPUInfo,
+			fs: sourcetest.Links(
+				s.T(),
+				newVulnFS(s, map[string]string{"meltdown": "Mitigation: PTI\n"}),
+				map[string]string{"/sys/devices/system/cpu/vulnerabilities/gone": "/nowhere"},
+			),
+			exec: noLscpuExec,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"meltdown": "Mitigation: PTI"}, i.Vulnerabilities)
+			},
+		},
+		{
+			name:    "linux: a vulnerabilities file that cannot be read is an error",
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
 			fs: vulnReadErrorFS{
@@ -738,13 +768,11 @@ NUMA node0 CPU(s):   5-2
 			},
 			exec: noLscpuExec,
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				i, ok := got.(*cpu.Info)
-				s.Require().True(ok)
-				s.Equal("Mitigation: PTI", i.Vulnerabilities["meltdown"])
-				s.NotContains(i.Vulnerabilities, "bad")
+				s.EqualError(err, "read /sys/devices/system/cpu/vulnerabilities/bad: read fail")
+				s.Exactly(nil, got)
 			},
 		},
+
 		{
 			name:    "linux: lscpu with empty-value line skipped",
 			variant: "linux",

@@ -190,6 +190,15 @@ func (s *GPUPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a /sys/class/drm that cannot be read is an error",
+			variant: "linux",
+			files:   map[string]string{"/sys/class/drm": "x"},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "read /sys/class/drm: ")
+				s.Exactly(nil, got)
+			},
+		},
+		{
 			name:    "linux: no /sys/class/drm yields empty Info",
 			variant: "linux",
 			validateFunc: func(got any, err error) {

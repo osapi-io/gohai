@@ -86,6 +86,8 @@ On Linux:
    write counts, the bytes (sectors × 512) and the time in milliseconds as a
    `Device` row. A device with no reads and no writes, such as an unused loop
    device, is left out.
+2. A host with no `/proc/diskstats`, such as gVisor or some containers, has no
+   devices and no error. A `/proc/diskstats` that cannot be read is an error.
 
 On macOS:
 
