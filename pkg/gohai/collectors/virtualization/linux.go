@@ -80,8 +80,7 @@ func cascadeLinux(
 	//    runtime: a container image can hold the docker CLI. docker is a
 	//    host when its daemon's socket is there. podman has no daemon, so
 	//    it is a host when its binary is there outside a podman container.
-	if execBinaryOnPath(ctx, exec, "docker") &&
-		(fileExists(fs, "/var/run/docker.sock") || fileExists(fs, "/run/docker.sock")) {
+	if execBinaryOnPath(ctx, exec, "docker") && dockerSocket(fs) {
 		addSystem(info, "docker", "host", false)
 	}
 	if execBinaryOnPath(ctx, exec, "podman") && !fileExists(fs, "/run/.containerenv") {
@@ -408,6 +407,27 @@ func fileExists(
 ) bool {
 	_, err := fs.Stat(path)
 	return err == nil
+}
+
+// dockerSocket reports whether a docker daemon's socket is there: the
+// system daemon's, or a rootless daemon's under /run/user/<uid>.
+func dockerSocket(
+	fs avfs.VFS,
+) bool {
+	if fileExists(fs, "/var/run/docker.sock") || fileExists(fs, "/run/docker.sock") {
+		return true
+	}
+	users, err := fs.ReadDir("/run/user")
+	if err != nil {
+		return false
+	}
+	for _, u := range users {
+		if fileExists(fs, "/run/user/"+u.Name()+"/docker.sock") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // fileContains reports whether path's contents include needle.

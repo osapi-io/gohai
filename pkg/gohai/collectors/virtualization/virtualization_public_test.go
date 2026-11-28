@@ -291,6 +291,42 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: docker CLI and a rootless daemon socket: a docker host",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{"/run/user/1000/docker.sock": ""})
+			},
+			exec: func(t *testing.T) source.Runner {
+				return virtExec(t, map[string][]byte{
+					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("host", i.Systems["docker"])
+			},
+		},
+		{
+			name:    "linux: docker CLI and a user dir with no socket: not a host",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{"/run/user/1000/bus": ""})
+			},
+			exec: func(t *testing.T) source.Runner {
+				return virtExec(t, map[string][]byte{
+					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.NotContains(i.Systems, "docker")
+			},
+		},
+		{
 			name:    "linux: docker CLI with no daemon socket, as in a CI image: not a host",
 			variant: "linux",
 			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },

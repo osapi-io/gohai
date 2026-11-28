@@ -140,7 +140,7 @@ for the primary `system`, so the two never disagree:
 02. **Container-runtime hosts.** A CLI on the PATH is not a runtime, because a
     container image can hold the docker CLI. `command -v docker` → host only
     when the daemon's socket, `/var/run/docker.sock` or `/run/docker.sock`, is
-    there. `command -v podman` → host only outside a podman container, that is,
+    there, or a rootless daemon's socket, `/run/user/<uid>/docker.sock`. `command -v podman` → host only outside a podman container, that is,
     with no `/run/.containerenv`. `command -v nova` → host.
 
 03. **Xen.** `/proc/xen` is there → guest. `/proc/xen/capabilities` has
