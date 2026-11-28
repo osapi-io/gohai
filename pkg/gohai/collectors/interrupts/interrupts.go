@@ -145,13 +145,18 @@ func parseInterrupts(
 		// Fields after the CPU counts are the chip, the hwirq, and the
 		// device. On x86 the hwirq carries its trigger ("2-edge"). On arm64
 		// the trigger is a word of its own ("27 Level"), which is not part
-		// of the device. For non-numeric IRQs the trailing content is just a
-		// type label.
+		// of the device. Kernels before 4.x on x86 print no hwirq: the
+		// trigger is part of the chip ("IO-APIC-edge timer"), so the device
+		// starts at the second word. For non-numeric IRQs the trailing
+		// content is just a type label.
 		extra := fields[extraStart:]
 		isNumeric := isNumericIRQ(number)
 		if isNumeric && len(extra) >= 1 {
 			irq.Type = extra[0]
 			device := 2
+			if len(extra) > 1 && !isHwirq(extra[1]) {
+				device = 1
+			}
 			if len(extra) > device && isTrigger(extra[device]) {
 				device++
 			}
@@ -174,6 +179,14 @@ func isTrigger(
 	field string,
 ) bool {
 	return field == "Level" || field == "Edge"
+}
+
+// isHwirq reports whether field is the hwirq word that newer kernels print
+// after the chip: a number, alone ("27") or with its trigger ("2-edge").
+func isHwirq(
+	field string,
+) bool {
+	return field != "" && field[0] >= '0' && field[0] <= '9'
 }
 
 // isNumericIRQ reports whether the IRQ number string is a decimal integer.
