@@ -603,7 +603,12 @@ All CLI output style and format is in `internal/cli/`:
 - **`theme.go`.** The maxheadroom palette, `Banner()`, and the color helpers for
   each role (`Mute`, `Accent`, `OK`, `Err`, `Info`, `Success`, `Failure`).
 - **`output.go`.** `WriteOutput`, `WriteJSON`, `WriteFlat` and
-  `WriteCollectorList` for the collect subcommand.
+  `WriteCollectorList` for the collect subcommand, and `Print` and `Printf`.
+
+`cmd.Execute` decides color for each stream and wraps it with `cli.Colored`. A
+stream takes color when it is a terminal, `NO_COLOR` is not set, and `TERM` is
+not `dumb`. The helpers of `theme.go` paint only for a stream that `cli.Colored`
+turned on.
 
 The `cmd/` files are thin. They parse flags, call the SDK, and send all output
 to `internal/cli/`. Do not use raw `fmt.Fprintf` with color codes in `cmd/`.

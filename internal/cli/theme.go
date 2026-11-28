@@ -27,9 +27,6 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
-
-	"golang.org/x/term"
 )
 
 const (
@@ -76,16 +73,29 @@ var ThemeMaxheadroom = Theme{
 
 var active = &ThemeMaxheadroom
 
-var isTerminalFn = term.IsTerminal
+// colored is a writer with its color decided.
+type colored struct {
+	io.Writer
+	on bool
+}
 
+// Colored is w with its color decided: when on, the role helpers paint the
+// text they give for w; when off, they give it plain. cmd decides from the
+// terminal and NO_COLOR, because a writer cannot tell the CLI's environment.
+func Colored(
+	w io.Writer,
+	on bool,
+) io.Writer {
+	return colored{Writer: w, on: on}
+}
+
+// isTTY is whether w takes color: only a writer that Colored made on.
 func isTTY(
 	w io.Writer,
 ) bool {
-	if f, ok := w.(*os.File); ok {
-		return isTerminalFn(int(f.Fd()))
-	}
+	c, ok := w.(colored)
 
-	return false
+	return ok && c.on
 }
 
 func colorize(
@@ -174,21 +184,4 @@ func Failure(
 	}
 
 	return Err(w, "✗") + " " + msg
-}
-
-// Print writes a line to w.
-func Print(
-	w io.Writer,
-	s string,
-) {
-	_, _ = fmt.Fprintln(w, s)
-}
-
-// Printf writes a formatted string to w.
-func Printf(
-	w io.Writer,
-	format string,
-	a ...any,
-) {
-	_, _ = fmt.Fprintf(w, format, a...)
 }

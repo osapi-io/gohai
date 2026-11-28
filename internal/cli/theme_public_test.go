@@ -23,7 +23,6 @@ package cli_test
 import (
 	"bytes"
 	"io"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -41,49 +40,41 @@ func TestThemePublicTestSuite(
 	suite.Run(t, new(ThemePublicTestSuite))
 }
 
+// reset ends a colored span.
+const reset = "\033[0m"
+
 func (s *ThemePublicTestSuite) TestMute() {
 	tests := []struct {
 		name         string
 		w            io.Writer
-		tty          bool
 		validateFunc func(string)
 	}{
 		{
-			name: "non-file writer returns plain",
+			name: "a writer with color on gets secondary text",
+			w:    cli.Colored(&bytes.Buffer{}, true),
+			validateFunc: func(got string) {
+				s.Equal("\033[0;2mhello"+reset, got)
+			},
+		},
+		{
+			name: "a writer with color off gets plain text",
+			w:    cli.Colored(&bytes.Buffer{}, false),
+			validateFunc: func(got string) {
+				s.Equal("hello", got)
+			},
+		},
+		{
+			name: "a writer that Colored did not make gets plain text",
 			w:    &bytes.Buffer{},
-			tty:  false,
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
 				s.Equal("hello", got)
-			},
-		},
-		{
-			name: "file non-TTY returns plain",
-			w:    devNull(s.T()),
-			tty:  false,
-			validateFunc: func(got string) {
-				s.Contains(got, "hello")
-				s.Equal("hello", got)
-			},
-		},
-		{
-			name: "file TTY wraps with ANSI",
-			w:    devNull(s.T()),
-			tty:  true,
-			validateFunc: func(got string) {
-				s.Contains(got, "hello")
-				s.Contains(got, "\033[")
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			restore := cli.SetIsTerminalFn(func(_ int) bool { return tc.tty })
-			got := cli.Mute(tc.w, "hello")
-			restore()
-
-			tc.validateFunc(got)
+			tc.validateFunc(cli.Mute(tc.w, "hello"))
 		})
 	}
 }
@@ -91,34 +82,35 @@ func (s *ThemePublicTestSuite) TestMute() {
 func (s *ThemePublicTestSuite) TestAccent() {
 	tests := []struct {
 		name         string
-		tty          bool
+		w            io.Writer
 		validateFunc func(string)
 	}{
 		{
-			name: "non-TTY returns plain text",
-			tty:  false,
+			name: "a writer with color on gets the lavender accent",
+			w:    cli.Colored(&bytes.Buffer{}, true),
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
+				s.Equal("\033[38;2;180;167;214mhello"+reset, got)
+			},
+		},
+		{
+			name: "a writer with color off gets plain text",
+			w:    cli.Colored(&bytes.Buffer{}, false),
+			validateFunc: func(got string) {
 				s.Equal("hello", got)
 			},
 		},
 		{
-			name: "TTY wraps with ANSI",
-			tty:  true,
+			name: "a writer that Colored did not make gets plain text",
+			w:    &bytes.Buffer{},
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
-				s.Contains(got, "\033[")
+				s.Equal("hello", got)
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			restore := cli.SetIsTerminalFn(func(_ int) bool { return tc.tty })
-			got := cli.Accent(devNull(s.T()), "hello")
-			restore()
-
-			tc.validateFunc(got)
+			tc.validateFunc(cli.Accent(tc.w, "hello"))
 		})
 	}
 }
@@ -126,34 +118,35 @@ func (s *ThemePublicTestSuite) TestAccent() {
 func (s *ThemePublicTestSuite) TestOK() {
 	tests := []struct {
 		name         string
-		tty          bool
+		w            io.Writer
 		validateFunc func(string)
 	}{
 		{
-			name: "non-TTY returns plain text",
-			tty:  false,
+			name: "a writer with color on gets the success green",
+			w:    cli.Colored(&bytes.Buffer{}, true),
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
+				s.Equal("\033[38;2;80;250;123mhello"+reset, got)
+			},
+		},
+		{
+			name: "a writer with color off gets plain text",
+			w:    cli.Colored(&bytes.Buffer{}, false),
+			validateFunc: func(got string) {
 				s.Equal("hello", got)
 			},
 		},
 		{
-			name: "TTY wraps with ANSI",
-			tty:  true,
+			name: "a writer that Colored did not make gets plain text",
+			w:    &bytes.Buffer{},
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
-				s.Contains(got, "\033[")
+				s.Equal("hello", got)
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			restore := cli.SetIsTerminalFn(func(_ int) bool { return tc.tty })
-			got := cli.OK(devNull(s.T()), "hello")
-			restore()
-
-			tc.validateFunc(got)
+			tc.validateFunc(cli.OK(tc.w, "hello"))
 		})
 	}
 }
@@ -161,34 +154,35 @@ func (s *ThemePublicTestSuite) TestOK() {
 func (s *ThemePublicTestSuite) TestErr() {
 	tests := []struct {
 		name         string
-		tty          bool
+		w            io.Writer
 		validateFunc func(string)
 	}{
 		{
-			name: "non-TTY returns plain text",
-			tty:  false,
+			name: "a writer with color on gets the error pink",
+			w:    cli.Colored(&bytes.Buffer{}, true),
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
+				s.Equal("\033[38;2;255;110;199mhello"+reset, got)
+			},
+		},
+		{
+			name: "a writer with color off gets plain text",
+			w:    cli.Colored(&bytes.Buffer{}, false),
+			validateFunc: func(got string) {
 				s.Equal("hello", got)
 			},
 		},
 		{
-			name: "TTY wraps with ANSI",
-			tty:  true,
+			name: "a writer that Colored did not make gets plain text",
+			w:    &bytes.Buffer{},
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
-				s.Contains(got, "\033[")
+				s.Equal("hello", got)
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			restore := cli.SetIsTerminalFn(func(_ int) bool { return tc.tty })
-			got := cli.Err(devNull(s.T()), "hello")
-			restore()
-
-			tc.validateFunc(got)
+			tc.validateFunc(cli.Err(tc.w, "hello"))
 		})
 	}
 }
@@ -196,71 +190,71 @@ func (s *ThemePublicTestSuite) TestErr() {
 func (s *ThemePublicTestSuite) TestInfo() {
 	tests := []struct {
 		name         string
-		tty          bool
+		w            io.Writer
 		validateFunc func(string)
 	}{
 		{
-			name: "non-TTY returns plain text",
-			tty:  false,
+			name: "a writer with color on gets the info cyan",
+			w:    cli.Colored(&bytes.Buffer{}, true),
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
+				s.Equal("\033[38;2;0;212;255mhello"+reset, got)
+			},
+		},
+		{
+			name: "a writer with color off gets plain text",
+			w:    cli.Colored(&bytes.Buffer{}, false),
+			validateFunc: func(got string) {
 				s.Equal("hello", got)
 			},
 		},
 		{
-			name: "TTY wraps with ANSI",
-			tty:  true,
+			name: "a writer that Colored did not make gets plain text",
+			w:    &bytes.Buffer{},
 			validateFunc: func(got string) {
-				s.Contains(got, "hello")
-				s.Contains(got, "\033[")
+				s.Equal("hello", got)
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			restore := cli.SetIsTerminalFn(func(_ int) bool { return tc.tty })
-			got := cli.Info(devNull(s.T()), "hello")
-			restore()
-
-			tc.validateFunc(got)
+			tc.validateFunc(cli.Info(tc.w, "hello"))
 		})
 	}
 }
 
 func (s *ThemePublicTestSuite) TestBanner() {
+	const (
+		top = "█▀▀ █▀█ █░█ █▀█ █"
+		bot = "█▄█ █▄█ █▀█ █░█ █"
+	)
 	tests := []struct {
 		name         string
-		tty          bool
+		w            io.Writer
 		validateFunc func(string)
 	}{
 		{
-			name: "non-TTY plain text",
-			tty:  false,
+			name: "color on paints the top faint and the bottom lavender",
+			w:    cli.Colored(&bytes.Buffer{}, true),
 			validateFunc: func(got string) {
-				s.Contains(got, "█▀▀ █▀█ █░█ █▀█ █")
-				s.Contains(got, "█▄█ █▄█ █▀█ █░█ █")
-				s.NotContains(got, "\033[")
+				s.Equal(
+					"\033[0;2m"+top+reset+"\n\033[38;2;180;167;214m"+bot+reset+"\n",
+					got,
+				)
 			},
 		},
 		{
-			name: "TTY with ANSI colors",
-			tty:  true,
+			name: "color off is the plain logo",
+			w:    cli.Colored(&bytes.Buffer{}, false),
 			validateFunc: func(got string) {
-				s.Contains(got, "█▀▀ █▀█ █░█ █▀█ █")
-				s.Contains(got, "█▄█ █▄█ █▀█ █░█ █")
-				s.Contains(got, "\033[")
+				s.Equal(top+"\n"+bot+"\n", got)
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			restore := cli.SetIsTerminalFn(func(_ int) bool { return tc.tty })
-			got := cli.Banner(devNull(s.T()))
-			restore()
-
-			tc.validateFunc(got)
+			tc.validateFunc(cli.Banner(tc.w))
 		})
 	}
 }
@@ -268,34 +262,28 @@ func (s *ThemePublicTestSuite) TestBanner() {
 func (s *ThemePublicTestSuite) TestSuccess() {
 	tests := []struct {
 		name         string
-		tty          bool
+		w            io.Writer
 		validateFunc func(string)
 	}{
 		{
-			name: "non-TTY prefix",
-			tty:  false,
+			name: "color on gives a colored mark",
+			w:    cli.Colored(&bytes.Buffer{}, true),
 			validateFunc: func(got string) {
-				s.Contains(got, "[ok] done")
+				s.Equal("\033[38;2;80;250;123m✓"+reset+" done", got)
 			},
 		},
 		{
-			name: "TTY colored mark",
-			tty:  true,
+			name: "color off gives a text prefix",
+			w:    cli.Colored(&bytes.Buffer{}, false),
 			validateFunc: func(got string) {
-				s.Contains(got, "done")
-				s.Contains(got, "\033[")
-				s.Contains(got, "✓")
+				s.Equal("[ok] done", got)
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			restore := cli.SetIsTerminalFn(func(_ int) bool { return tc.tty })
-			got := cli.Success(devNull(s.T()), "done")
-			restore()
-
-			tc.validateFunc(got)
+			tc.validateFunc(cli.Success(tc.w, "done"))
 		})
 	}
 }
@@ -303,63 +291,61 @@ func (s *ThemePublicTestSuite) TestSuccess() {
 func (s *ThemePublicTestSuite) TestFailure() {
 	tests := []struct {
 		name         string
-		tty          bool
+		w            io.Writer
 		validateFunc func(string)
 	}{
 		{
-			name: "non-TTY prefix",
-			tty:  false,
+			name: "color on gives a colored mark",
+			w:    cli.Colored(&bytes.Buffer{}, true),
 			validateFunc: func(got string) {
-				s.Contains(got, "[err] broken")
+				s.Equal("\033[38;2;255;110;199m✗"+reset+" broken", got)
 			},
 		},
 		{
-			name: "TTY colored mark",
-			tty:  true,
+			name: "color off gives a text prefix",
+			w:    cli.Colored(&bytes.Buffer{}, false),
 			validateFunc: func(got string) {
-				s.Contains(got, "broken")
-				s.Contains(got, "\033[")
-				s.Contains(got, "✗")
+				s.Equal("[err] broken", got)
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			restore := cli.SetIsTerminalFn(func(_ int) bool { return tc.tty })
-			got := cli.Failure(devNull(s.T()), "broken")
-			restore()
-
-			tc.validateFunc(got)
+			tc.validateFunc(cli.Failure(tc.w, "broken"))
 		})
 	}
 }
 
-func (s *ThemePublicTestSuite) TestPrint() {
-	var buf bytes.Buffer
-	cli.Print(&buf, "hello")
-
-	s.Equal("hello\n", buf.String())
-}
-
-func (s *ThemePublicTestSuite) TestPrintf() {
-	var buf bytes.Buffer
-	cli.Printf(&buf, "count: %d", 42)
-
-	s.Equal("count: 42", buf.String())
-}
-
-func devNull(
-	t *testing.T,
-) *os.File {
-	t.Helper()
-
-	f, err := os.Open(os.DevNull)
-	if err != nil {
-		t.Fatal(err)
+func (s *ThemePublicTestSuite) TestColored() {
+	tests := []struct {
+		name         string
+		on           bool
+		validateFunc func(*bytes.Buffer, io.Writer)
+	}{
+		{
+			name: "it writes through to the writer it wraps",
+			on:   true,
+			validateFunc: func(buf *bytes.Buffer, w io.Writer) {
+				_, err := io.WriteString(w, "text")
+				s.Require().NoError(err)
+				s.Equal("text", buf.String())
+			},
+		},
+		{
+			name: "off, it writes through too",
+			validateFunc: func(buf *bytes.Buffer, w io.Writer) {
+				_, err := io.WriteString(w, "text")
+				s.Require().NoError(err)
+				s.Equal("text", buf.String())
+			},
+		},
 	}
 
-	t.Cleanup(func() { _ = f.Close() })
-
-	return f
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			var buf bytes.Buffer
+			tc.validateFunc(&buf, cli.Colored(&buf, tc.on))
+		})
+	}
 }

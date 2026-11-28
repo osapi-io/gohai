@@ -25,6 +25,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -34,13 +35,16 @@ import (
 // Execute runs the gohai CLI with args, the words after the binary's name,
 // and returns the exit code: 0, or 1 after it prints the error to errOut.
 // main.go gives it the process's arguments and streams, and a ctx that a
-// signal cancels.
+// signal cancels. A stream takes color when it is a terminal and NO_COLOR is
+// unset.
 func Execute(
 	ctx context.Context,
 	args []string,
 	in io.Reader,
 	out, errOut io.Writer,
 ) int {
+	out = cli.Colored(out, colorFor(out, os.Getenv, terminal))
+	errOut = cli.Colored(errOut, colorFor(errOut, os.Getenv, terminal))
 	cmd := newRootCommand()
 	cmd.SetArgs(args)
 	cmd.SetIn(in)
