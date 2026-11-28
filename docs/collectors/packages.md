@@ -131,9 +131,10 @@ with no package manager.
 `${Installed-Size}` (KiB) of `dpkg-query`, or `%{SUMMARY}` and `%{SIZE}` (bytes)
 of `rpm`. The family of the collector's sources picks the database: `debian`
 reads dpkg; `rhel`, `fedora`, `amazon`, `suse` and `mandriva` read rpm. A family
-with neither database, such as `arch` or `alpine`, gives an empty list. A
-derivative that names its parent in `ID_LIKE`, such as elementary or zorin, has
-its parent's family.
+with neither database, such as `arch` or `alpine`, gives no fact, with the
+status `unsupported`: this collector reads no package list there. A derivative
+that names its parent in `ID_LIKE`, such as elementary or zorin, has its
+parent's family.
 
 ## Backing library
 

@@ -88,7 +88,8 @@ func NewWith(
 		l.Manager = "rpm"
 	default:
 		// A family with neither database, such as arch or alpine, has no
-		// package list that this collector reads.
+		// package list that this collector reads, so Collect reports it
+		// unsupported.
 		l.Manager = ""
 	}
 

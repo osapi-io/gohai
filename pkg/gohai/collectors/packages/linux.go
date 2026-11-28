@@ -50,13 +50,16 @@ func NewLinux() *Linux {
 
 // Collect queries the installed-package database and returns the
 // package list. It returns an empty list when the query tool is not on
-// the host, and the error when the tool fails.
+// the host, and the error when the tool fails. A family with neither
+// dpkg nor rpm, such as Alpine or Arch, is not supported: it returns
+// collector.ErrUnsupported, not an empty list. With no Exec there is no
+// fact.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	if l.Exec == nil {
-		return &Info{Packages: []Package{}}, nil
+		return nil, nil
 	}
 	switch l.Manager {
 	case "rpm":
@@ -64,7 +67,7 @@ func (l *Linux) Collect(
 	case "dpkg":
 		return collector.Result(collectDpkg(ctx, l.Exec))
 	default:
-		return &Info{Packages: []Package{}}, nil
+		return nil, collector.ErrUnsupported
 	}
 }
 
