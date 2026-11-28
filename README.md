@@ -197,6 +197,17 @@ cancelled context stops the run with an error. `Collect` then returns the Facts
 of the collectors that finished with that error, so a caller with a deadline
 keeps what it collected.
 
+`Facts.Err(name)` returns the error value of a collector, not only its text. For
+a collector that panicked, it is a `*gohai.PanicError`, whose `Stack` has the
+stack at the panic:
+
+```go
+var p *gohai.PanicError
+if errors.As(facts.Err("cpu"), &p) {
+	log.Printf("%s\n%s", p, p.Stack)
+}
+```
+
 To add the timing of each collector to Facts, add `gohai.WithTimings()` to
 `gohai.New(...)`. Use this to find slow collectors. Refer to the `Timings` field
 on [pkg.go.dev][package documentation].
