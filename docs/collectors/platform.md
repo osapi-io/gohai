@@ -29,15 +29,15 @@ Consumers use this data to:
 
 ## Collected fields
 
-| Field              | Type   | Description                                                                                                | Schema mapping                                              |
-| ------------------ | ------ | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `os`               | string | `runtime.GOOS`: `"linux"`, `"darwin"`, `"windows"`.                                                        | `os.type`.                                                  |
-| `name`             | string | The canonical distribution or product ID, for example `"ubuntu"`, `"redhat"`, `"darwin"`.                  | `os.name`.                                                  |
-| `version`          | string | The distribution version, for example `"24.04"`, `"7.9.2009"`, `"14.4.1"`.                                 | `os.version`.                                               |
-| `version_extra`    | string | The macOS RSR patch suffix, for example `"(a)"`. It is empty if no RSR is applied.                         | No direct schema mapping.                                   |
-| `family`           | string | The family, as Ohai names it: `"debian"`, `"rhel"`, `"fedora"`, `"amazon"`, `"suse"`; `"darwin"` on macOS. | No direct schema mapping. Packaging logic uses it as input. |
-| `cpu_architecture` | string | The hardware architecture, for example `"amd64"`, `"arm64"`.                                               | `device.hw_info.cpu_bits` is the nearest match.             |
-| `build`            | string | The macOS build identifier, from `sw_vers` `BuildVersion`, for example `"23E224"`.                         | `os.build`.                                                 |
+| Field              | Type   | Description                                                                                                                                                                                                                                                                  | Schema mapping                                              |
+| ------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `os`               | string | `runtime.GOOS`: `"linux"`, `"darwin"`, `"windows"`.                                                                                                                                                                                                                          | `os.type`.                                                  |
+| `name`             | string | The canonical distribution or product ID, for example `"ubuntu"`, `"redhat"`, `"darwin"`.                                                                                                                                                                                    | `os.name`.                                                  |
+| `version`          | string | The distribution version, for example `"24.04"`, `"7.9.2009"`, `"14.4.1"`.                                                                                                                                                                                                   | `os.version`.                                               |
+| `version_extra`    | string | The macOS RSR patch suffix, for example `"(a)"`. It is empty if no RSR is applied.                                                                                                                                                                                           | No direct schema mapping.                                   |
+| `family`           | string | The family, as Ohai names it: `"debian"`, `"rhel"`, `"fedora"`, `"amazon"`, `"suse"`; `"darwin"` on macOS.                                                                                                                                                                   | No direct schema mapping. Packaging logic uses it as input. |
+| `cpu_architecture` | string | The host's architecture, by its Go name, for example `"amd64"`, `"arm64"`: from `uname -m`, and on macOS from `sysctl -n hw.optional.arm64` first, so a process under Rosetta still reports `arm64`. It is the binary's own architecture only when the host cannot be asked. | `device.hw_info.cpu_bits` is the nearest match.             |
+| `build`            | string | The macOS build identifier, from `sw_vers` `BuildVersion`, for example `"23E224"`.                                                                                                                                                                                           | `os.build`.                                                 |
 
 The collector maps each `name` value through `family.Platform`, which is Ohai's
 `platform_id_remap`. It changes common variants to the canonical name of their
@@ -98,7 +98,7 @@ One difference from Ohai is on purpose: on macOS, the name and the family are
     "name": "centos",
     "version": "7.9.2009",
     "family": "rhel",
-    "cpu_architecture": "x86_64"
+    "cpu_architecture": "amd64"
   }
 }
 ```

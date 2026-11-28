@@ -47,12 +47,5 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	if d.Exec == nil {
-		return &Info{Params: make(map[string]string)}, nil
-	}
-	out, err := d.Exec.Execute(ctx, "sysctl", "-a")
-	if err != nil {
-		return &Info{Params: make(map[string]string)}, nil
-	}
-	return parseSysctl(string(out)), nil
+	return run(ctx, d.Exec, darwinSep)
 }
