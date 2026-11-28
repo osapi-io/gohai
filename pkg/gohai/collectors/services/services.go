@@ -136,14 +136,15 @@ func parseSystemctlOutput(
 		}
 		name := strings.TrimSuffix(fields[0], ".service")
 		seen[name] = true
+		fileState := unitFileState(state, name)
 		// fields[1] = LOAD, fields[2] = ACTIVE, fields[3] = SUB, then the
 		// description, which can have spaces.
 		info.Services = append(info.Services, Service{
 			Name:          name,
 			State:         fields[3],
 			Loaded:        fields[1] == "loaded",
-			Enabled:       enabled(state[name]),
-			UnitFileState: state[name],
+			Enabled:       enabled(fileState),
+			UnitFileState: fileState,
 			Description:   strings.Join(fields[4:], " "),
 		})
 	}
@@ -189,6 +190,24 @@ func parseUnitFiles(
 	}
 
 	return files
+}
+
+// unitFileState returns the state of a unit's file. An instance of a
+// template, such as getty@tty1, has no file of its own unless somebody
+// made one, so it takes the state of its template's file, getty@: the
+// same answer that `systemctl is-enabled` gives.
+func unitFileState(
+	state map[string]string,
+	name string,
+) string {
+	if s, ok := state[name]; ok {
+		return s
+	}
+	if i := strings.Index(name, "@"); i > 0 {
+		return state[name[:i+1]]
+	}
+
+	return ""
 }
 
 // enabled reports whether a unit file state starts the unit at boot,

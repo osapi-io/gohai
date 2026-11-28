@@ -238,6 +238,83 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: an instance takes the state of its template's unit file",
+			variant: "linux",
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine: "getty@tty1.service       loaded    active   running Getty on tty1\n",
+					unitFilesLine: "getty@.service           enabled   enabled\n" +
+						"serial-getty@.service    disabled  enabled\n",
+				},
+			}.Mock(
+				s.T(),
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{
+					{
+						Name:          "getty@tty1",
+						State:         "running",
+						Enabled:       true,
+						Loaded:        true,
+						UnitFileState: "enabled",
+						Description:   "Getty on tty1",
+					},
+				}, info.Services)
+			},
+		},
+		{
+			name:    "linux: an instance with its own unit file keeps its own state",
+			variant: "linux",
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine: "getty@tty2.service       loaded    inactive dead    Getty on tty2\n",
+					unitFilesLine: "getty@.service           enabled   enabled\n" +
+						"getty@tty2.service       masked    enabled\n",
+				},
+			}.Mock(
+				s.T(),
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Services, 1)
+				s.Equal("getty@tty2", info.Services[0].Name)
+				s.False(info.Services[0].Enabled)
+				s.Equal("masked", info.Services[0].UnitFileState)
+			},
+		},
+		{
+			name:    "linux: an instance whose template is not listed has no unit-file state",
+			variant: "linux",
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine: "user@1000.service        loaded    active   running User Manager for UID 1000\n",
+					unitFilesLine: "getty@.service           enabled   enabled\n" +
+						"ssh.service              enabled   enabled\n",
+				},
+			}.Mock(
+				s.T(),
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				var user services.Service
+				for _, svc := range info.Services {
+					if svc.Name == "user@1000" {
+						user = svc
+					}
+				}
+				s.Equal("running", user.State)
+				s.False(user.Enabled)
+				s.Empty(user.UnitFileState)
+			},
+		},
+		{
 			name:    "linux: a unit whose LOAD is not loaded is not loaded",
 			variant: "linux",
 			exec: sourcetest.Commands{
