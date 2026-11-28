@@ -58,8 +58,9 @@ func (l *Linux) Collect(
 	_ collector.PriorResults,
 ) (any, error) {
 	arrays, err := collectArrays(ctx, l.FS, l.Exec)
-	if err != nil {
+	if arrays == nil {
 		return nil, err
 	}
-	return &Info{Arrays: arrays}, nil
+	// The arrays whose detail failed are partial, with the joined error.
+	return &Info{Arrays: arrays}, err
 }

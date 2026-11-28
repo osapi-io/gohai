@@ -22,6 +22,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/bits"
 	"regexp"
@@ -65,6 +66,9 @@ func (d *Darwin) Collect(
 		return nil, fmt.Errorf("ifconfig -a -v: %w", err)
 	}
 	ifs := parseIfconfig(out)
+	// A netstat that fails keeps the interfaces: the result is partial,
+	// with each failure joined.
+	var errs []error
 	out, err = d.Exec.Execute(ctx, "netstat", "-ibdnW")
 	switch {
 	case err == nil:
@@ -75,7 +79,7 @@ func (d *Darwin) Collect(
 			}
 		}
 	case !collector.Absent(err):
-		return nil, fmt.Errorf("netstat -ibdnW: %w", err)
+		errs = append(errs, fmt.Errorf("netstat -ibdnW: %w", err))
 	}
 	sort.SliceStable(ifs, func(i, j int) bool { return ifs[i].Number < ifs[j].Number })
 	info := &Info{Interfaces: ifs}
@@ -84,10 +88,9 @@ func (d *Darwin) Collect(
 	case err == nil:
 		applyNetstatRoutes(info, out)
 	case !collector.Absent(err):
-		return nil, fmt.Errorf("netstat -rn: %w", err)
+		errs = append(errs, fmt.Errorf("netstat -rn: %w", err))
 	}
-
-	return info, nil
+	return info, errors.Join(errs...)
 }
 
 // ifconfigHeadRE is the first line of an interface in `ifconfig -a`:
