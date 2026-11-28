@@ -178,7 +178,12 @@ func (d *Darwin) dsclPasswd(
 		if err != nil {
 			continue
 		}
-		gid, _ := strconv.Atoi(gids[name])
+		// A user with no PrimaryGroupID, or a bad one, would read as gid
+		// 0, the wheel group, so the user is skipped.
+		gid, err := strconv.Atoi(gids[name])
+		if err != nil {
+			continue
+		}
 		out[name] = PasswdEntry{
 			UID:   uid,
 			GID:   gid,

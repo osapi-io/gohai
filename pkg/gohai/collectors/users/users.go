@@ -244,7 +244,16 @@ func parseGroup(
 		if len(fields) < 4 {
 			continue
 		}
-		gid, _ := strconv.Atoi(fields[2])
+		// A bad or empty GID would read as 0, the root group, so the entry
+		// is skipped, as parsePasswd skips a bad UID or GID. The first entry
+		// for a name wins, as in parsePasswd.
+		gid, err := strconv.Atoi(fields[2])
+		if err != nil {
+			continue
+		}
+		if _, exists := out[fields[0]]; exists {
+			continue
+		}
 		var members []string
 		if m := strings.TrimSpace(fields[3]); m != "" {
 			for _, part := range strings.Split(m, ",") {
