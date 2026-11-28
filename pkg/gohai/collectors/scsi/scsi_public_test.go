@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -125,6 +126,24 @@ malformed
 		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: a line over 64 KiB keeps the devices after it",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Out: map[string]string{
+					lsscsiLine: strings.Repeat(
+						"x",
+						70000,
+					) + "\n[0:0:0:0]    disk    ATA      ST500DM002-1BD14 KC48  /dev/sda\n",
+				}}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*scsi.Info)
+				s.Require().True(ok)
+				s.Equal("/dev/sda", info.Devices["0:0:0:0"].Device)
+			},
+		},
 		{
 			name:    "linux: happy path parses lsscsi output",
 			variant: "linux",

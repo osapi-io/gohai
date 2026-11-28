@@ -25,7 +25,6 @@
 package systemdpaths
 
 import (
-	"bufio"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -74,9 +73,10 @@ func parseSystemdPath(
 	output string,
 ) *Info {
 	info := &Info{Paths: make(map[string]string)}
-	sc := bufio.NewScanner(strings.NewReader(output))
-	for sc.Scan() {
-		line := sc.Text()
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(output) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		idx := strings.Index(line, ": ")
 		if idx < 0 {
 			continue

@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -205,6 +206,33 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 				s.Equal("targeted", info.LoadedPolicyName)
 				s.Equal("", info.MaxKernelPolicyVersion)
 				s.Equal("", info.PolicyVersion)
+			},
+		},
+		{
+			name:    "linux: a line over 64 KiB keeps the config and sestatus lines after it",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/sys/fs/selinux/enforce": "1\n",
+					"/etc/selinux/config": "# " + strings.Repeat(
+						"x",
+						70000,
+					) + "\nSELINUX=enforcing\nSELINUXTYPE=targeted\n",
+				})
+			},
+			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "sestatus").
+					Return([]byte("Note: "+strings.Repeat("x", 70000)+"\n"+sestatusEnforcing), nil)
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("targeted", info.LoadedPolicyName)
+				s.Equal("33", info.PolicyVersion)
 			},
 		},
 		{

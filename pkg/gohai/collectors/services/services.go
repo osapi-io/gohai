@@ -24,7 +24,6 @@
 package services
 
 import (
-	"bufio"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -117,9 +116,10 @@ func parseSystemctlOutput(
 	}
 	info := &Info{Services: []Service{}}
 	seen := map[string]bool{}
-	sc := bufio.NewScanner(strings.NewReader(output))
-	for sc.Scan() {
-		line := sc.Text()
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(output) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		// Skip header, blank lines, and legend lines that start with spaces
 		// or contain "UNIT".
 		trimmed := strings.TrimSpace(line)

@@ -27,7 +27,6 @@
 package virtualbox
 
 import (
-	"bufio"
 	"regexp"
 	"strings"
 
@@ -104,9 +103,10 @@ func parseVBoxControlOutput(
 	output []byte,
 ) *Info {
 	info := &Info{}
-	sc := bufio.NewScanner(strings.NewReader(string(output)))
-	for sc.Scan() {
-		line := sc.Text()
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(string(output)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		if m := reLanguageID.FindStringSubmatch(line); m != nil {
 			info.LanguageID = m[1]
 			continue

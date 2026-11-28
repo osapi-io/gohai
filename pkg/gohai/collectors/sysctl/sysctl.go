@@ -86,13 +86,33 @@ func run(
 	}
 	out, err := exec.Execute(ctx, "sysctl", "-a")
 	switch {
-	case err == nil, len(out) > 0:
-		return parseSysctl(string(out), sep), nil
+	case err == nil:
 	case errors.Is(err, osexec.ErrNotFound):
 		return &Info{Params: make(map[string]string)}, nil
+	case len(out) > 0 && exitedWithStatus(err) && ctx.Err() == nil:
+		// A non-root sysctl -a exits non-zero after it prints the keys it
+		// can read. That output is the table it can give, so it is kept.
+		// A run that a timeout, a cancel or the output limit stopped is
+		// cut short, and its output is not kept.
 	default:
 		return nil, fmt.Errorf("sysctl -a: %w", err)
 	}
+	info, err := parseSysctl(string(out), sep)
+	if err != nil {
+		return nil, fmt.Errorf("sysctl -a: %w", err)
+	}
+	return info, nil
+}
+
+// exitedWithStatus reports whether err is a command that exited by itself
+// with a status. A command that a signal or a timeout killed has no status,
+// and its ExitCode is -1.
+func exitedWithStatus(
+	err error,
+) bool {
+	var status interface{ ExitCode() int }
+
+	return errors.As(err, &status) && status.ExitCode() >= 0
 }
 
 // Separators of `sysctl -a`: Linux prints "key = value", macOS prints
@@ -105,11 +125,12 @@ const (
 )
 
 // parseSysctl parses `sysctl -a` output, one pair for each line, split at
-// the first sep. Lines without sep, or with an empty key, are skipped.
+// the first sep. Lines without sep, or with an empty key, are skipped. A
+// line longer than the scanner's 1 MiB limit is an error.
 func parseSysctl(
 	output string,
 	sep string,
-) *Info {
+) (*Info, error) {
 	info := &Info{Params: make(map[string]string)}
 	sc := bufio.NewScanner(strings.NewReader(output))
 	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
@@ -124,5 +145,8 @@ func parseSysctl(
 		}
 		info.Params[key] = strings.TrimSpace(val)
 	}
-	return info
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("parse: %w", err)
+	}
+	return info, nil
 }

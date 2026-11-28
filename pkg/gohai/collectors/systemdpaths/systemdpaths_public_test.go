@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -140,6 +141,28 @@ user-runtime: /run/user/1000
 		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: a line over 64 KiB keeps the paths after it",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						systemdPathLine: "long: /" + strings.Repeat(
+							"x",
+							70000,
+						) + "\nsystemd: /usr/lib/systemd\n",
+					},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*systemdpaths.Info)
+				s.Require().True(ok)
+				s.Equal("/usr/lib/systemd", info.Paths["systemd"])
+			},
+		},
 		{
 			name:    "linux: full output parsed",
 			variant: "linux",

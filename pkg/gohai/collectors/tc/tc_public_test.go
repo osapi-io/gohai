@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -141,6 +142,25 @@ func (s *TCPublicTestSuite) TestCollect() {
 		exec         source.Runner
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: a line over 64 KiB keeps the qdiscs after it",
+			variant: "linux",
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					tcLine: "qdisc htb 1: dev eth0 root " + strings.Repeat("x", 70000) + "\n" +
+						"qdisc fq_codel 10: dev eth1 parent 1:10 limit 10240p\n",
+				},
+			}.Mock(
+				s.T(),
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*tc.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Interfaces, 2)
+				s.Equal("eth1", info.Interfaces[1].Name)
+			},
+		},
 		{
 			name:    "linux: statistics and backlog of each qdisc",
 			variant: "linux",

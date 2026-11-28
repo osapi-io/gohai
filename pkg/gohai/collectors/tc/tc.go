@@ -25,7 +25,6 @@
 package tc
 
 import (
-	"bufio"
 	"strconv"
 	"strings"
 
@@ -122,9 +121,10 @@ func parseTCOutput(
 	// last is the qdisc that the statistics lines belong to.
 	var last *QDisc
 
-	sc := bufio.NewScanner(strings.NewReader(output))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(output) {
+		line := strings.TrimSpace(strings.TrimRight(rawLine, "\r\n"))
 		if last != nil {
 			words := strings.Fields(line)
 			if len(words) > 0 && words[0] == "Sent" {
