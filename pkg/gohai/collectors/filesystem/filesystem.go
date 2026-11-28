@@ -572,18 +572,22 @@ func mergeLsblkIntoMounts(
 	for _, e := range entries {
 		byDevice[e.Device] = e
 	}
+	// mounted records each device that has a mount. A device can have
+	// more than one mount, such as btrfs subvolumes or bind mounts, so
+	// byDevice keeps every entry and each mount gets its fields.
+	mounted := map[string]bool{}
 	for i, m := range mounts {
 		if e, ok := byDevice[m.Device]; ok {
 			mounts[i].UUID = e.UUID
 			mounts[i].Label = e.Label
 			mounts[i].PartUUID = e.PartUUID
 			mounts[i].PartLabel = e.PartLabel
-			delete(byDevice, m.Device)
+			mounted[m.Device] = true
 		}
 	}
 	var unmounted []Filesystem
 	for _, e := range entries {
-		if _, still := byDevice[e.Device]; !still {
+		if mounted[e.Device] {
 			continue
 		}
 		if e.Mountpoint != "" {
