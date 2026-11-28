@@ -24,18 +24,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	osexec "os/exec"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/users"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -62,17 +59,6 @@ staff:x:20:
 users:x:1000:john,daemon
 malformed:x:`
 
-func newFS(
-	files map[string]string,
-) avfs.VFS {
-	f := memfs.New()
-	_ = f.MkdirAll("/etc", 0o755)
-	for path, content := range files {
-		_ = f.WriteFile(path, []byte(content), fs.FileMode(0o644))
-	}
-	return f
-}
-
 type UsersPublicTestSuite struct {
 	suite.Suite
 }
@@ -84,12 +70,10 @@ func TestUsersPublicTestSuite(
 }
 
 func (s *UsersPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(users.Collector)
 	}{
 		{
@@ -116,11 +100,20 @@ func (s *UsersPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c users.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := users.New()
+			c := users.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = users.New()
+			}
 			s.Equal("users", c.Name())
 			s.Equal("users", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -577,9 +570,9 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			var c users.Collector
 			switch tt.variant {
 			case "linux":
-				c = &users.Linux{FS: newFS(tt.files), Exec: exec}
+				c = &users.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: exec}
 			case "darwin":
-				c = &users.Darwin{FS: newFS(tt.files), Exec: exec}
+				c = &users.Darwin{FS: sourcetest.FS(s.T(), tt.files), Exec: exec}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

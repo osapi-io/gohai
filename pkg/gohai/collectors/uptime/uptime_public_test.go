@@ -26,12 +26,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
@@ -50,12 +51,10 @@ func TestUptimePublicTestSuite(
 }
 
 func (s *UptimePublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(uptime.Collector)
 	}{
 		{
@@ -98,11 +97,20 @@ func (s *UptimePublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c uptime.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := uptime.New()
+			c := uptime.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = uptime.New()
+			}
 			s.Equal("uptime", c.Name())
 			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())

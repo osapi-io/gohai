@@ -27,14 +27,13 @@ import (
 	osexec "os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -42,20 +41,10 @@ var (
 	_ collector.Collector = (*zpools.Darwin)(nil)
 )
 
-// zpoolExec returns a MockRunner that canned-answers `zpool list ...`.
-func zpoolExec(
-	t *testing.T,
-	out []byte,
-	err error,
-) source.Runner {
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().
-		Execute(gomock.Any(), "zpool", "list", "-H", "-o", "name,size,alloc,free,health,altroot").
-		Return(out, err).
-		AnyTimes()
-	return m
-}
+// The command lines that the rows answer, as sourcetest.Commands keys them.
+const (
+	zpoolLine = "zpool list -H -o name,size,alloc,free,health,altroot"
+)
 
 type ZpoolsPublicTestSuite struct {
 	suite.Suite
@@ -68,12 +57,10 @@ func TestZpoolsPublicTestSuite(
 }
 
 func (s *ZpoolsPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(zpools.Collector)
 	}{
 		{
@@ -116,11 +103,20 @@ func (s *ZpoolsPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c zpools.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := zpools.New()
+			c := zpools.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = zpools.New()
+			}
 			s.Equal("zpools", c.Name())
 			s.Equal("linux", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -150,7 +146,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: single pool all fields populated",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, onePool, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{zpoolLine: string(onePool)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -163,7 +165,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: two pools returned in order",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, twoPools, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{zpoolLine: string(twoPools)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -184,7 +192,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: dash fields sanitized to empty strings",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, dashFields, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{zpoolLine: string(dashFields)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -197,7 +211,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: altroot present",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, altRootPool, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{zpoolLine: string(altRootPool)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -217,7 +237,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: malformed line skipped",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, malformedLine, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{zpoolLine: string(malformedLine)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -228,7 +254,9 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: empty output returns empty list",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, []byte{}, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Out: map[string]string{zpoolLine: ""}}.Mock(t)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -240,7 +268,11 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 			name:    "linux: zpool not installed returns empty list",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return zpoolExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{zpoolLine: fmt.Errorf("exec: %w", osexec.ErrNotFound)},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -253,7 +285,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 			name:    "linux: a failed run is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return zpoolExec(t, nil, errors.New("exit status 1: permission denied"))
+				return sourcetest.Commands{
+					Err: map[string]error{
+						zpoolLine: errors.New("exit status 1: permission denied"),
+					},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
@@ -275,7 +313,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: single pool",
 			variant: "darwin",
-			exec:    func(t *testing.T) source.Runner { return zpoolExec(t, onePool, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{zpoolLine: string(onePool)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
@@ -289,7 +333,11 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 			name:    "darwin: zpool not installed returns empty list",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return zpoolExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{zpoolLine: fmt.Errorf("exec: %w", osexec.ErrNotFound)},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -302,7 +350,13 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 			name:    "darwin: a failed run is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return zpoolExec(t, nil, errors.New("exit status 1: permission denied"))
+				return sourcetest.Commands{
+					Err: map[string]error{
+						zpoolLine: errors.New("exit status 1: permission denied"),
+					},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)

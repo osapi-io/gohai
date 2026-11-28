@@ -27,14 +27,13 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/tc"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -50,6 +49,11 @@ qdisc fq_codel 0: dev eth0 root refcnt 2 limit 10240p flows 1024 quantum 1514
 qdisc pfifo_fast 0: dev eth1 parent 1:1 bands 3 priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1
 `
 
+// The command lines that the rows answer, as sourcetest.Commands keys them.
+const (
+	tcLine = "tc -s qdisc show"
+)
+
 type TCPublicTestSuite struct {
 	suite.Suite
 }
@@ -60,26 +64,11 @@ func TestTCPublicTestSuite(
 	suite.Run(t, new(TCPublicTestSuite))
 }
 
-func tcExec(
-	t *testing.T,
-	out []byte,
-	err error,
-) source.Runner {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().Execute(gomock.Any(), "tc", "-s", "qdisc", "show").
-		Return(out, err).AnyTimes()
-	return m
-}
-
 func (s *TCPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(tc.Collector)
 	}{
 		{
@@ -122,11 +111,20 @@ func (s *TCPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c tc.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := tc.New()
+			c := tc.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = tc.New()
+			}
 			s.Equal("tc", c.Name())
 			s.Equal("linux", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -146,14 +144,20 @@ func (s *TCPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: statistics and backlog of each qdisc",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc htb 1: dev eth0 root refcnt 2 r2q 10 default 0x30
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					tcLine: `qdisc htb 1: dev eth0 root refcnt 2 r2q 10 default 0x30
  Sent 98765 bytes 432 pkt (dropped 7, overlimits 21 requeues 3)
  backlog 1514b 1p requeues 3
 qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
  Sent 1024 bytes 8 pkt (dropped 0, overlimits 0 requeues 0)
  backlog 10Kb 7p requeues 0
   maxpacket 1514 drop_overlimit 0 new_flow_count 4 ecn_mark 0
-`), nil),
+`,
+				},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -195,9 +199,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: a sent count that is not a number is 0",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  Sent x bytes 2 pkt (dropped 1, overlimits 0 requeues 0)
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -210,9 +214,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: a backlog in Mb is in bytes",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  backlog 2Mb 0p
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -228,9 +232,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: a backlog in Gb is in bytes",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  backlog 1Gb 3p
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -246,9 +250,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: backlog packets that are not a number are 0",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  backlog 9b zp
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -261,9 +265,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: a backlog size with an unknown unit is 0",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  backlog 5Tb 2p
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -276,9 +280,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: a negative backlog size is 0",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  backlog -2b -1p
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -291,9 +295,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: a backlog size with no unit is 0",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  backlog 12 4p
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -306,9 +310,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: a backlog line with no size gives empty stats",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  backlog
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -321,9 +325,9 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: a backlog line with no packets keeps its size",
 			variant: "linux",
-			exec: tcExec(s.T(), []byte(`qdisc pfifo 1: dev eth0 root
+			exec: sourcetest.Commands{Out: map[string]string{tcLine: `qdisc pfifo 1: dev eth0 root
  backlog 9b
-`), nil),
+`}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -336,7 +340,7 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: tc returns qdisc data",
 			variant: "linux",
-			exec:    tcExec(s.T(), []byte(tcOut), nil),
+			exec:    sourcetest.Commands{Out: map[string]string{tcLine: tcOut}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -376,7 +380,11 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: no tc on the host, empty list",
 			variant: "linux",
-			exec:    tcExec(s.T(), nil, fmt.Errorf("exec tc: %w", exec.ErrNotFound)),
+			exec: sourcetest.Commands{
+				Err: map[string]error{tcLine: fmt.Errorf("exec tc: %w", exec.ErrNotFound)},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -387,7 +395,11 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: tc fails, the error is returned",
 			variant: "linux",
-			exec:    tcExec(s.T(), nil, errors.New("exit status 2")),
+			exec: sourcetest.Commands{
+				Err: map[string]error{tcLine: errors.New("exit status 2")},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Exactly(nil, got)
 				s.EqualError(err, "tc -s qdisc show: exit status 2")
@@ -407,7 +419,7 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: empty output returns empty list",
 			variant: "linux",
-			exec:    tcExec(s.T(), []byte(""), nil),
+			exec:    sourcetest.Commands{Out: map[string]string{tcLine: ""}}.Mock(s.T()),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -418,7 +430,11 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: short qdisc lines skipped",
 			variant: "linux",
-			exec:    tcExec(s.T(), []byte("qdisc noqueue 0:\n"), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{tcLine: "qdisc noqueue 0:\n"},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)
@@ -429,10 +445,12 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: non-qdisc lines and blank lines skipped",
 			variant: "linux",
-			exec: tcExec(
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					tcLine: "\n Sent 0 bytes\nqdisc fq_codel 0: dev eth0 root\n",
+				},
+			}.Mock(
 				s.T(),
-				[]byte("\n Sent 0 bytes\nqdisc fq_codel 0: dev eth0 root\n"),
-				nil,
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -451,7 +469,11 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 		{
 			name:    "linux: qdisc line without dev keyword skipped",
 			variant: "linux",
-			exec:    tcExec(s.T(), []byte("qdisc noqueue 0: root refcnt 2\n"), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{tcLine: "qdisc noqueue 0: root refcnt 2\n"},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*tc.Info)

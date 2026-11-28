@@ -27,14 +27,13 @@ import (
 	osexec "os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualbox"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -52,6 +51,11 @@ Name: /VirtualBox/GuestAdd/Revision, value: 161095, timestamp: 0, flags:
 Name: /VirtualBox/HostInfo/LanguageID, value: en_US, timestamp: 0, flags:
 `
 
+// The command lines that the rows answer, as sourcetest.Commands keys them.
+const (
+	vboxLine = "VBoxControl guestproperty enumerate"
+)
+
 type VirtualBoxPublicTestSuite struct {
 	suite.Suite
 }
@@ -62,29 +66,11 @@ func TestVirtualBoxPublicTestSuite(
 	suite.Run(t, new(VirtualBoxPublicTestSuite))
 }
 
-// vboxExec returns a MockRunner that answers `VBoxControl guestproperty enumerate`
-// with the supplied output/error pair.
-func vboxExec(
-	t *testing.T,
-	out []byte,
-	err error,
-) source.Runner {
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().
-		Execute(gomock.Any(), "VBoxControl", "guestproperty", "enumerate").
-		Return(out, err).
-		AnyTimes()
-	return m
-}
-
 func (s *VirtualBoxPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(virtualbox.Collector)
 	}{
 		{
@@ -119,11 +105,20 @@ func (s *VirtualBoxPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c virtualbox.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := virtualbox.New()
+			c := virtualbox.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = virtualbox.New()
+			}
 			s.Equal("virtualbox", c.Name())
 			s.Equal("virtualization", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -145,7 +140,11 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "linux: canonical guestproperty output parsed",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(t, []byte(vboxControlOutput), nil)
+				return sourcetest.Commands{
+					Out: map[string]string{vboxLine: vboxControlOutput},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -162,7 +161,11 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "linux: VBoxControl not found returns nil",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{vboxLine: fmt.Errorf("exec: %w", osexec.ErrNotFound)},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -173,7 +176,11 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "linux: a failed run is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(t, nil, errors.New("exit status 1: permission denied"))
+				return sourcetest.Commands{
+					Err: map[string]error{vboxLine: errors.New("exit status 1: permission denied")},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
@@ -194,10 +201,12 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "linux: output with no matching lines yields empty Info",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(
+				return sourcetest.Commands{
+					Out: map[string]string{
+						vboxLine: "Name: /VirtualBox/GuestInfo/OS/Product, value: Linux\n",
+					},
+				}.Mock(
 					t,
-					[]byte("Name: /VirtualBox/GuestInfo/OS/Product, value: Linux\n"),
-					nil,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -212,13 +221,9 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "linux: partial output with only VBoxVer",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(
-					t,
-					[]byte(
-						"Name: /VirtualBox/HostInfo/VBoxVer, value: 6.1.0, timestamp: 0, flags:\n",
-					),
-					nil,
-				)
+				return sourcetest.Commands{Out: map[string]string{
+					vboxLine: "Name: /VirtualBox/HostInfo/VBoxVer, value: 6.1.0, timestamp: 0, flags:\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -234,7 +239,11 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "darwin: canonical guestproperty output parsed",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(t, []byte(vboxControlOutput), nil)
+				return sourcetest.Commands{
+					Out: map[string]string{vboxLine: vboxControlOutput},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -249,7 +258,11 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "darwin: VBoxControl not found returns nil",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{vboxLine: fmt.Errorf("exec: %w", osexec.ErrNotFound)},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -260,7 +273,11 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "darwin: a failed run is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(t, nil, errors.New("exit status 1: permission denied"))
+				return sourcetest.Commands{
+					Err: map[string]error{vboxLine: errors.New("exit status 1: permission denied")},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
