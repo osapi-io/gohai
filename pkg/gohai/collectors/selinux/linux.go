@@ -88,7 +88,7 @@ func (l *Linux) Collect(
 		case err == nil:
 			parseSestatus(out, info)
 		case !collector.Absent(err):
-			return nil, fmt.Errorf("sestatus: %w", err)
+			return info, fmt.Errorf("sestatus: %w", err)
 		}
 	}
 

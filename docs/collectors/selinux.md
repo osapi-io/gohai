@@ -152,7 +152,8 @@ On Linux:
 
    It does not take the status or the mode from `sestatus`: the kernel gives
    them. A missing `sestatus` leaves the versions empty. A `sestatus` that is
-   installed and fails is an error.
+   installed and fails returns the kernel and config facts with the error, so
+   the status is `partial`.
 
 Note: Ohai uses `sestatus -v -b`, which also collects policy booleans and
 process contexts. gohai uses plain `sestatus` and collects only the status, mode
