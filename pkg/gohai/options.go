@@ -71,7 +71,8 @@ func WithEnabled(
 
 // WithDisabled explicitly disables one or more collectors. Subtracts
 // from the WithDefaults / WithEnabled set. New refuses it with
-// WithCollectors.
+// WithCollectors, and when a selected collector depends on a disabled
+// one: the registry would run the dependency anyway.
 func WithDisabled(
 	names ...string,
 ) Option {

@@ -96,7 +96,9 @@ The command refuses both flags for one collector. It also refuses `--flat` and
 `--with-timings` with `--format ocsf`, because the OCSF event has no place for
 either. SDK consumers use `gohai.WithEnabled(...)` / `gohai.WithDisabled(...)` /
 `gohai.WithCollectors(...)`. `WithCollectors` names each collector to run, so
-`gohai.New` refuses it with `WithDisabled`.
+`gohai.New` refuses it with `WithDisabled`. `gohai.New` also refuses to disable
+a collector that a selected collector depends on, such as `dmi` with `ec2`,
+because the run needs the dependency. The error names both collectors.
 
 The defaults are optional. `gohai.New()` returns an empty registry. Pass
 `gohai.WithDefaults()` to get the recommended set. This set has collectors that

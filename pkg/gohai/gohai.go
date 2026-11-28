@@ -23,6 +23,7 @@ package gohai
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -198,7 +199,52 @@ func selectCollectors(
 	if err != nil {
 		return nil, fmt.Errorf("select collectors: %w", err)
 	}
+	if err := disabledDependency(reg, sel, cfg.disabled); err != nil {
+		return nil, err
+	}
 	return sel, nil
+}
+
+// disabledDependency is the error of a disabled collector that a selected
+// one depends on, directly or through another dependency, or nil. The
+// registry adds each dependency to a run, so without this check the disabled
+// collector would run and fill its Facts field: the caller asked for no read
+// of it. The error names both, so that the caller can change the options.
+func disabledDependency(
+	reg *collector.Registry,
+	sel []collector.Collector,
+	disabled []string,
+) error {
+	if len(disabled) == 0 {
+		return nil
+	}
+	off := make(map[string]bool, len(disabled))
+	for _, n := range disabled {
+		off[n] = true
+	}
+	for _, c := range sel {
+		seen := map[string]bool{}
+		queue := slices.Clone(c.Dependencies())
+		for len(queue) > 0 {
+			dep := queue[0]
+			queue = queue[1:]
+			if seen[dep] {
+				continue
+			}
+			seen[dep] = true
+			if off[dep] {
+				return fmt.Errorf(
+					"collector %q is disabled, but %q depends on it: enable it, or disable %q too",
+					dep, c.Name(), c.Name(),
+				)
+			}
+			if d, ok := reg.Get(dep); ok {
+				queue = append(queue, d.Dependencies()...)
+			}
+		}
+	}
+
+	return nil
 }
 
 // registerBuiltins registers every built-in collector. A registration error
