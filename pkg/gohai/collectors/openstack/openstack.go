@@ -30,6 +30,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -216,7 +217,7 @@ func (c *Collector) Collect(
 	}
 
 	tree, err := walk(ctx, c.client, "/latest/meta-data/")
-	if err != nil {
+	if err != nil && !errors.Is(err, errWalkLimit) {
 		// Even if EC2-mirror walk fails, try the Nova doc — some
 		// minimal Nova deployments only serve the JSON. Don't drop
 		// detection just because /latest 404s.
@@ -281,16 +282,48 @@ func detectProvider(
 	return providerOpenStack
 }
 
+// Limits of the metadata walk. The EC2-compatible tree is about four levels
+// deep and a few hundred entries, so these stop only a service whose listing
+// names itself or that never ends.
+const (
+	maxWalkDepth    = 8
+	maxWalkRequests = 1000
+)
+
+// errWalkLimit is the error of a walk that reached maxWalkRequests.
+var errWalkLimit = errors.New("metadata walk limit reached")
+
 // walk fetches a directory listing at path and recurses into entries
 // ending with "/". Leaf entries are fetched as values. Matches the
 // recursive style Ohai's ec2_metadata mixin uses for OpenStack's
-// EC2-compatible tree.
+// EC2-compatible tree. A directory deeper than maxWalkDepth is not read,
+// and the walk stops with errWalkLimit after maxWalkRequests requests.
 func walk(
 	ctx context.Context,
 	c *cloudmetadata.Client,
 	path string,
 ) (map[string]any, error) {
-	listing, err := c.Get(ctx, path)
+	requests := 0
+	return walkDir(ctx, c, path, 0, &requests)
+}
+
+// walkDir is walk at depth, counting each request in requests, so the
+// limits hold across the whole tree.
+func walkDir(
+	ctx context.Context,
+	c *cloudmetadata.Client,
+	path string,
+	depth int,
+	requests *int,
+) (map[string]any, error) {
+	get := func(p string) ([]byte, error) {
+		if *requests >= maxWalkRequests {
+			return nil, errWalkLimit
+		}
+		*requests++
+		return c.Get(ctx, p)
+	}
+	listing, err := get(path)
 	if err != nil {
 		return nil, err
 	}
@@ -303,13 +336,22 @@ func walk(
 		key := sanitizeKey(line)
 		child := path + line
 		if strings.HasSuffix(line, "/") {
-			sub, err := walk(ctx, c, child)
+			if depth+1 >= maxWalkDepth {
+				continue
+			}
+			sub, err := walkDir(ctx, c, child, depth+1, requests)
+			if errors.Is(err, errWalkLimit) {
+				return result, err
+			}
 			if err != nil {
 				continue
 			}
 			result[key] = sub
 		} else {
-			leaf, err := c.Get(ctx, child)
+			leaf, err := get(child)
+			if errors.Is(err, errWalkLimit) {
+				return result, err
+			}
 			if err != nil {
 				continue
 			}

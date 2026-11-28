@@ -4647,12 +4647,19 @@
       "properties": {
         "seed": {
           "type": "integer"
+        },
+        "inputs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
-        "seed"
+        "seed",
+        "inputs"
       ]
     },
     "ShellsInfo": {

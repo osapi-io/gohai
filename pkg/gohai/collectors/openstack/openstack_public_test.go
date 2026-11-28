@@ -26,6 +26,8 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -181,6 +183,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 		passwdLines  string // when non-empty, written before Collect
 		handler      http.HandlerFunc
 		closed       bool
+		maxRequests  int // when non-zero, the most requests the walk may make
 		validateFunc func(any, bool)
 	}{
 		{
@@ -366,6 +369,32 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				s.Equal("nova", info.Zone) // from Nova doc
 			},
 		},
+		{
+			name:        "a directory that lists itself stops at the depth limit",
+			handler:     endlessTree("loop/\nleaf\n"),
+			maxRequests: 2*openstack.MaxWalkDepth + 2,
+			validateFunc: func(out any, _ bool) {
+				s.NotNil(out)
+			},
+		},
+		{
+			name: "the request limit reached inside a subdirectory stops the whole walk",
+			handler: endlessTree(
+				"sub/\n" + strings.Repeat("leaf\n", openstack.MaxWalkRequests/4),
+			),
+			maxRequests: openstack.MaxWalkRequests + 2,
+			validateFunc: func(out any, _ bool) {
+				s.NotNil(out)
+			},
+		},
+		{
+			name:        "a directory with too many leaves stops at the request limit",
+			handler:     endlessTree(strings.Repeat("leaf\n", openstack.MaxWalkRequests+50)),
+			maxRequests: openstack.MaxWalkRequests + 2,
+			validateFunc: func(out any, _ bool) {
+				s.NotNil(out)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -375,6 +404,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			}
 
 			var httpCalled bool
+			var requests atomic.Int64
 			h := tt.handler
 			if h == nil {
 				h = canned(tt.tree, tt.novaBody)
@@ -382,6 +412,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					httpCalled = true
+					requests.Add(1)
 					h(w, r)
 				},
 			))
@@ -400,9 +431,30 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			}
 			out, err := c.Collect(context.Background(), prior)
 			s.Require().NoError(err)
+			if tt.maxRequests > 0 {
+				s.LessOrEqual(int(requests.Load()), tt.maxRequests)
+			}
 
 			tt.validateFunc(out, httpCalled)
 		})
+	}
+}
+
+// endlessTree serves listing for each directory of the EC2-compatible tree,
+// and "v" for each leaf, so the tree never ends.
+func endlessTree(
+	listing string,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/latest/meta-data/") &&
+			strings.HasSuffix(r.URL.Path, "/"):
+			_, _ = w.Write([]byte(listing))
+		case strings.HasPrefix(r.URL.Path, "/latest/meta-data/"):
+			_, _ = w.Write([]byte("v"))
+		default:
+			http.NotFound(w, r)
+		}
 	}
 }
 

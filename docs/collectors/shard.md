@@ -24,9 +24,10 @@ Consumers use this data to:
 
 ## Collected fields
 
-| Field  | Type  | Description                                                                                                                                                             | Schema mapping                                                  |
-| ------ | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `seed` | `int` | The first 7 hex characters of SHA-256(`machinename + serial + uuid`), read as a base-16 integer. It does not change across reboots if the DMI identity does not change. | No direct schema mapping. Shard is a gohai and Ohai convention. |
+| Field    | Type       | Description                                                                                                                                                                                                                                                                           | Schema mapping                                                  |
+| -------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `seed`   | `int`      | The first 7 hex characters of SHA-256(`machinename + serial + uuid`), read as a base-16 integer. It does not change across reboots if the DMI identity does not change.                                                                                                               | No direct schema mapping. Shard is a gohai and Ohai convention. |
+| `inputs` | `[]string` | The sources that went into `seed`: `machinename`, then `serial` and `uuid` when the collector could read them. On Linux, DMI serial and UUID are readable only by root, so a non-root run seeds from fewer inputs and gives a different seed. Compare `inputs` to tell the two apart. | No direct schema mapping.                                       |
 
 ## Platform support
 
@@ -40,7 +41,8 @@ Consumers use this data to:
 ```json
 {
   "shard": {
-    "seed": 27767217
+    "seed": 27767217,
+    "inputs": ["machinename", "serial", "uuid"]
   }
 }
 ```
