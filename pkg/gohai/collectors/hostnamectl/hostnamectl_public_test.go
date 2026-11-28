@@ -260,6 +260,47 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: UTF-8 in a location or a vendor name is kept",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return hostnamectlExec(
+					t,
+					[]byte(
+						" Static hostname: node1\n        Location: Büro München\n Hardware Vendor: Société Générale\n",
+					),
+					nil,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(hostnamectl.Info{
+					StaticHostname: "node1",
+					Location:       "Büro München",
+					HardwareVendor: "Société Générale",
+				}, *info)
+			},
+		},
+		{
+			name:    "linux: the transient hostname is read",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return hostnamectlExec(t,
+					[]byte(" Static hostname: n/a\nTransient hostname: dhcp-42\n"),
+					nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostnamectl.Info)
+				s.Require().True(ok)
+				s.Equal(
+					hostnamectl.Info{StaticHostname: "n/a", TransientHostname: "dhcp-42"},
+					*info,
+				)
+			},
+		},
+		{
 			name:    "linux: exec error yields empty Info, no error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {

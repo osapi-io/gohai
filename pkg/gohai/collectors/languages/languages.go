@@ -184,17 +184,18 @@ func parseJavaVersion(
 }
 
 // parsePerlVersion extracts the version from `This is perl 5, version 36 ...`
-// or the `v5.36.0` form.
+// or the `v5.36.0` form, as "5.36.0".
 func parsePerlVersion(
 	out string,
 ) *string {
 	out = strings.TrimSpace(out)
 	// `perl --version` first line: "This is perl 5, version 36, subversion 0 (v5.36.0)"
-	// Extract the "(v…)" portion if present.
+	// Extract the version inside "(v…)" without its v, as the go and
+	// node versions drop their prefix.
 	start := strings.Index(out, "(v")
 	end := strings.Index(out, ")")
 	if start >= 0 && end > start {
-		return strPtr(out[start+1 : end])
+		return strPtr(out[start+2 : end])
 	}
 	// Fallback: first line.
 	return strPtr(strings.SplitN(out, "\n", 2)[0])

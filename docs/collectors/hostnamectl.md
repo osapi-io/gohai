@@ -18,6 +18,7 @@ systemd tool for Linux.
 | Field                          | Type   | Description                                                                | Schema mapping                                                                                  |
 | ------------------------------ | ------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | `static_hostname`              | string | The static hostname that `hostnamectl` sets.                               | `device.hostname` (OCSF). The redundant-prefix rule removes the leaf, which gives `hostname`.   |
+| `transient_hostname`           | string | The hostname that DHCP or mDNS set, when it differs from the static one.   | No direct OCSF/OTel mapping.                                                                    |
 | `icon_name`                    | string | The Freedesktop icon name for the chassis class.                           | gohai convention.                                                                               |
 | `chassis`                      | string | The chassis type, for example `vm`, `container`, `desktop` or `server`.    | `device_hw_info.chassis` (OCSF).                                                                |
 | `deployment`                   | string | The deployment environment, for example `production` or `staging`.         | gohai convention.                                                                               |
@@ -102,10 +103,11 @@ On Linux, the collector runs `hostnamectl` with no subcommand through the shared
    changes the key to lowercase and replaces spaces with underscores. This is
    the same as Ohai's `key.downcase.tr(" ", "_")` transform in
    `linux/hostnamectl.rb`.
-3. A regex removes non-ASCII characters from the values. These are the Unicode
-   decorators and emoji that systemd v250 and later add. Then the collector
-   changes each double space that remains to one space. This is the same as
-   Ohai's `/[^\p{ASCII}]/u` regex.
+3. A regex removes non-ASCII characters from the `Chassis` value. This is the
+   icon that systemd v250 and later adds, such as `vm 🖴`. Then the collector
+   changes each double space that remains to one space. Ohai's `/[^\p{ASCII}]/u`
+   regex runs on every value. gohai runs it on the chassis only, because a
+   location, a deployment or a vendor name can be UTF-8 text.
 4. The collector splits the `Kernel` value at the first space. The first part is
    the kernel name (`Linux`). The second part is the release
    (`5.15.0-91-generic`).
