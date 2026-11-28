@@ -352,10 +352,13 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				info, ok := got.(*users.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info.Passwd["root"].Locked)
-				s.True(*info.Passwd["root"].Locked, "!")
-				s.True(*info.Passwd["daemon"].Locked, "*")
+				// A shadow password that starts with ! or * is locked: root
+				// has !, and daemon has *.
+				s.True(*info.Passwd["root"].Locked)
+				s.True(*info.Passwd["daemon"].Locked)
 				s.False(*info.Passwd["john"].Locked)
-				s.Nil(info.Passwd["noshadow"].Locked, "no shadow line")
+				// No shadow line.
+				s.Nil(info.Passwd["noshadow"].Locked)
 			},
 		},
 		{
@@ -408,7 +411,8 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				s.Equal("/Users/john", john.Dir)
 				s.Equal("/bin/zsh", john.Shell)
 				s.Equal("John Doe", john.GECOS)
-				s.Equal("/var/root", info.Passwd["root"].Dir, "the first home")
+				// The first home.
+				s.Equal("/var/root", info.Passwd["root"].Dir)
 				s.Equal(201, info.Passwd["guest"].GID)
 				s.Empty(info.Passwd["guest"].Dir)
 				s.True(*info.Passwd["guest"].Locked)
