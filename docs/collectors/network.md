@@ -286,8 +286,10 @@ On Linux:
     hundreds of veths, and ethtool would run six times for each one. Ohai does
     not skip them. If the binary is missing, or the driver doesn't support the
     query ("Operation not supported"), the field stays empty. Any other ethtool
-    failure is an error. All the ethtool runs share one time budget, and a spent
-    budget stops them on purpose; a cancelled context is an error.
+    failure, such as an interface that goes away during the run, is an error for
+    that interface: the collector still reads the next interfaces, and joins the
+    errors. All the ethtool runs share one time budget, and a spent budget stops
+    them on purpose; a cancelled context is an error.
 
 08. **Ethtool tuning set.** For the same interfaces, the collector runs five
     more ethtool probes through the executor. It parses each probe into a typed
