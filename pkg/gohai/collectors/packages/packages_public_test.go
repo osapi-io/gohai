@@ -200,7 +200,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "arch",
 			exec: func(t *testing.T) source.Runner {
-				return sourcemocks.NewMockRunner(gomock.NewController(t))
+				return mocks.NewMockRunner(gomock.NewController(t))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
