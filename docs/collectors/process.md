@@ -6,7 +6,7 @@
 
 The collector lists the running processes with their PID, parent PID, name,
 owner, command line, state and start time. The data is a snapshot of
-`/proc/<pid>/*` (Linux) or `kinfo_proc` (macOS) at one point in time.
+`/proc/<pid>/*` (Linux) or of the output of `ps` (macOS) at one point in time.
 
 A read error on one field does not remove the entry. The field gets its zero
 value. These errors occur, for example, if access is denied to a process of a
@@ -69,7 +69,7 @@ Enable it only where its facts can hold such values.
         "name": "systemd",
         "owner": "root",
         "cmd_line": "/sbin/init",
-        "state": "S",
+        "state": "sleep",
         "creation_time": 1712064000
       },
       {
@@ -78,7 +78,7 @@ Enable it only where its facts can hold such values.
         "name": "sshd",
         "owner": "root",
         "cmd_line": "/usr/sbin/sshd -D",
-        "state": "S",
+        "state": "sleep",
         "creation_time": 1712064010
       }
     ]
