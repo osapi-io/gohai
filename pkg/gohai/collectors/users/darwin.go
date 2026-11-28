@@ -117,14 +117,26 @@ func (d *Darwin) list(
 	return out, nil
 }
 
-// values is the value of attr for each record of path, by record name. A
-// record with many values, such as two homes, keeps the first, unless all
-// is true, as for a RealName with spaces. Its error is the run's.
+// dsclValue is how values reads the value of one dscl line.
+type dsclValue int
+
+const (
+	// firstWord is the first value, for a number such as a UniqueID.
+	firstWord dsclValue = iota
+	// allWords is the whole rest of the line, for a RealName with spaces.
+	allWords
+	// firstPath is the first path, kept whole when it has a space, for a
+	// home or a shell (collector.DsclPath).
+	firstPath
+)
+
+// values is the value of attr for each record of path, by record name,
+// read as how says. Its error is the run's.
 func (d *Darwin) values(
 	ctx context.Context,
 	path string,
 	attr string,
-	all bool,
+	how dsclValue,
 ) (map[string]string, error) {
 	out := map[string]string{}
 	b, err := d.list(ctx, path, attr)
@@ -132,11 +144,18 @@ func (d *Darwin) values(
 		return nil, err
 	}
 	for _, line := range strings.Split(string(b), "\n") {
+		if how == firstPath {
+			if name, p, ok := collector.DsclPath(line); ok {
+				out[name] = p
+			}
+
+			continue
+		}
 		f := strings.Fields(line)
 		if len(f) < 2 {
 			continue
 		}
-		if all {
+		if how == allWords {
 			out[f[0]] = strings.Join(f[1:], " ")
 		} else {
 			out[f[0]] = f[1]
@@ -152,21 +171,21 @@ func (d *Darwin) values(
 func (d *Darwin) dsclPasswd(
 	ctx context.Context,
 ) (map[string]PasswdEntry, error) {
-	uids, err := d.values(ctx, "/Users", "UniqueID", false)
+	uids, err := d.values(ctx, "/Users", "UniqueID", firstWord)
 	if err != nil || len(uids) == 0 {
 		return nil, err
 	}
 	attrs := map[string]map[string]string{}
 	for _, a := range []struct {
 		name string
-		all  bool
+		how  dsclValue
 	}{
-		{"PrimaryGroupID", false},
-		{"NFSHomeDirectory", false},
-		{"UserShell", false},
-		{"RealName", true},
+		{"PrimaryGroupID", firstWord},
+		{"NFSHomeDirectory", firstPath},
+		{"UserShell", firstPath},
+		{"RealName", allWords},
 	} {
-		v, err := d.values(ctx, "/Users", a.name, a.all)
+		v, err := d.values(ctx, "/Users", a.name, a.how)
 		if err != nil && !collector.Absent(err) {
 			return nil, err
 		}
@@ -204,11 +223,11 @@ func (d *Darwin) dsclPasswd(
 func (d *Darwin) dsclGroup(
 	ctx context.Context,
 ) (map[string]GroupEntry, error) {
-	gids, err := d.values(ctx, "/Groups", "PrimaryGroupID", false)
+	gids, err := d.values(ctx, "/Groups", "PrimaryGroupID", firstWord)
 	if err != nil || len(gids) == 0 {
 		return nil, err
 	}
-	members, err := d.values(ctx, "/Groups", "GroupMembership", true)
+	members, err := d.values(ctx, "/Groups", "GroupMembership", allWords)
 	if err != nil && !collector.Absent(err) {
 		return nil, err
 	}

@@ -399,11 +399,11 @@ func dsclHomes(
 ) []home {
 	var homes []home
 	for _, line := range strings.Split(string(out), "\n") {
-		f := strings.Fields(line)
-		if len(f) < 2 {
+		user, dir, ok := collector.DsclPath(line)
+		if !ok {
 			continue
 		}
-		homes = append(homes, home{user: f[0], dir: f[1]})
+		homes = append(homes, home{user: user, dir: dir})
 	}
 
 	return homes

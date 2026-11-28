@@ -419,14 +419,16 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			setupFS: func() avfs.VFS {
 				return sourcetest.FS(s.T(), map[string]string{
-					"/etc/passwd":                      "root:*:0:0::/var/root:/bin/sh\n",
-					"/Users/john/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@mac\n",
-					"/var/root/.ssh/authorized_keys":   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 root@mac\n",
+					"/etc/passwd":                          "root:*:0:0::/var/root:/bin/sh\n",
+					"/Users/john/.ssh/authorized_keys":     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 john@mac\n",
+					"/var/root/.ssh/authorized_keys":       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 root@mac\n",
+					"/Users/Jo Smith/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 jo@mac\n",
 				})
 			},
 			commands: sourcetest.Commands{Out: map[string]string{
 				dsclHomes: "_www                     /Library/WebServer\n" +
 					"daemon                   /var/root\n" +
+					"jo                       /Users/Jo Smith\n" +
 					"john                     /Users/john/\n" +
 					"nobody                   /var/empty\n" +
 					"nohome\n" +
@@ -437,9 +439,12 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
-				// The users john, root and daemon, which shares the home of root.
+				// The users john, jo, root and daemon, which shares the home
+				// of root. jo's home has a space.
 				s.Require().
-					Len(info.AuthorizedKeys, 3)
+					Len(info.AuthorizedKeys, 4)
+				s.Require().Len(info.AuthorizedKeys["jo"], 1)
+				s.Equal("jo@mac", info.AuthorizedKeys["jo"][0].Comment)
 				s.Require().Len(info.AuthorizedKeys["john"], 1)
 				s.Equal("john@mac", info.AuthorizedKeys["john"][0].Comment)
 				s.Require().Len(info.AuthorizedKeys["root"], 1)
