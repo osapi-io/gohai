@@ -137,10 +137,15 @@ func (g *Gohai) Collect(
 		}
 		// A collector that gives a type its Facts field doesn't hold would
 		// lose its fact with no word, so the mismatch is its error.
+		mismatch := fmt.Errorf("gave a %T, which its Facts field does not hold", result)
 		if facts.Errors == nil {
 			facts.Errors = make(map[string]string)
 		}
-		facts.Errors[name] = fmt.Sprintf("gave a %T, which its Facts field does not hold", result)
+		if facts.errs == nil {
+			facts.errs = make(map[string]error)
+		}
+		facts.Errors[name] = mismatch.Error()
+		facts.errs[name] = mismatch
 		facts.Status[name] = StatusFailed
 	}
 	if g.withTimings {

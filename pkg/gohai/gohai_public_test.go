@@ -666,7 +666,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:     "a result that no Facts field holds surfaces in Errors",
+			name:     "a result that no Facts field holds surfaces in Errors and Err",
 			injectAs: "x",
 			validateFunc: func(facts *gohai.Facts, err error) {
 				s.Require().NoError(err)
@@ -676,6 +676,11 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 						"wrongtype": "gave a string, which its Facts field does not hold",
 					},
 					facts.Errors,
+				)
+				s.Equal(gohai.StatusFailed, facts.Status["wrongtype"])
+				s.EqualError(
+					facts.Err("wrongtype"),
+					"gave a string, which its Facts field does not hold",
 				)
 			},
 		},

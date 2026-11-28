@@ -482,11 +482,12 @@ func (s *FactsPublicTestSuite) TestErr() {
 		{
 			name: "a collector with no error has none",
 			collectors: func(ctrl *gomock.Controller) []collector.Collector {
-				return []collector.Collector{newCollectorGiving(ctrl, "fine", &platform.Info{})}
+				return []collector.Collector{newCollectorGiving(ctrl, "fine", nil)}
 			},
 			ask: "fine",
-			validateFunc: func(_ *gohai.Facts, err error) {
+			validateFunc: func(facts *gohai.Facts, err error) {
 				s.NoError(err)
+				s.Equal(gohai.StatusAbsent, facts.Status["fine"])
 			},
 		},
 		{
