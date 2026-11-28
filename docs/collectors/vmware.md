@@ -7,7 +7,8 @@
 The collector reports the VMware Tools statistics from inside a VMware guest VM.
 VMware Tools (`vmware-toolbox-cmd`) must be installed on the guest. If the host
 is not a VMware guest, or if VMware Tools is missing, `Collect` returns `nil`
-and no error.
+and no error. If a call to `vmware-toolbox-cmd` does not finish, for example
+because it times out, `Collect` returns the error.
 
 The collector tells VMware Workstation/Fusion (desktop) from vSphere with the
 raw session JSON query. This method comes directly from Ohai's `vmware.rb`
@@ -130,20 +131,27 @@ On Linux, the collector does two checks in sequence before it collects data:
    empty shows that the guest is VMware. This check finds special cases, for
    example guests that have only NVMe disks and no SCSI controller.
 
-If the two checks do not find VMware, `Collect` returns `nil` immediately.
+If the two checks do not find VMware, `Collect` returns `nil` immediately. A
+`-v` that exits with an error is not VMware. A `-v` that does not finish is an
+error. The collector finds `vmware-toolbox-cmd` on the `PATH`, so an install
+outside `/usr/bin` is found.
 
 If the guest is VMware, the collector runs `vmware-toolbox-cmd stat <param>` for
 each of these values: `hosttime`, `speed`, `sessionid`, `balloon`, `swap`,
 `memlimit`, `memres`, `cpures`, `cpulimit`. Then it runs
 `vmware-toolbox-cmd upgrade status` and `vmware-toolbox-cmd timesync status`.
 The collector changes each "UpdateInfo failed" response to an empty string.
-Ohai's `vmware.rb` uses the same filter.
+Ohai's `vmware.rb` uses the same filter. A stat that the guest does not offer
+exits with an error, and its field is empty, as Ohai's `rescue` allows. A call
+that does not finish is an error, and the collector stops.
 
 To tell desktop from vSphere, the collector runs
-`vmware-toolbox-cmd stat raw json session`. An empty response shows VMware
-Workstation/Fusion (`host_type: "vmware_desktop"`). A JSON object with a
-`"version"` key shows vSphere (`host_type: "vmware_vsphere"`). The collector
-sets `host_version` from the JSON. This logic is the same as Ohai's.
+`vmware-toolbox-cmd stat raw json session`. An empty response, or an exit with
+an error, shows VMware Workstation/Fusion (`host_type: "vmware_desktop"`). A
+query that does not finish is an error, so a vSphere guest is not named a
+desktop guest because its query timed out. A JSON object with a `"version"` key
+shows vSphere (`host_type: "vmware_vsphere"`). The collector sets `host_version`
+from the JSON. This logic is the same as Ohai's.
 
 On macOS (VMware Fusion guest), the collector runs `vmware-toolbox-cmd -v`
 directly. If the command is missing, the collector returns `nil`. If it is

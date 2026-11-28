@@ -24,14 +24,20 @@
 package vmware
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os/exec"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// vmwareToolboxCmdPath is the canonical path for vmware-toolbox-cmd on Linux.
-const vmwareToolboxCmdPath = "/usr/bin/vmware-toolbox-cmd"
+// toolboxCmd is the VMware Tools command. It is found on the PATH, so an
+// install outside /usr/bin, such as /usr/sbin or /usr/local/bin, is found.
+const toolboxCmd = "vmware-toolbox-cmd"
 
 // Info holds VMware guest tools data. All fields are empty strings when
 // VMware Tools is absent or the collector is not running in a VMware guest.
@@ -100,4 +106,87 @@ func trimStat(
 		return ""
 	}
 	return v
+}
+
+// probeToolbox reports whether `vmware-toolbox-cmd -v` names a VMware Tools
+// version. A host without the command, or one where the command exits with
+// an error, has no tools to read. A call that does not finish, such as one
+// that times out, is an error.
+func probeToolbox(
+	ctx context.Context,
+	runner source.Runner,
+) (bool, error) {
+	out, err := runner.Execute(ctx, toolboxCmd, "-v")
+	var exitErr *exec.ExitError
+	switch {
+	case err == nil:
+		return strings.TrimSpace(string(out)) != "", nil
+	case collector.Absent(err), errors.As(err, &exitErr):
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s -v: %w", toolboxCmd, err)
+	}
+}
+
+// collectVMwareTools runs vmware-toolbox-cmd for each stat and status that
+// Ohai's vmware.rb reads, and assembles an Info. A stat that the guest does
+// not offer exits with an error, as Ohai's rescue allows, and leaves its
+// field empty. Any other failure, such as a timeout, is an error, so a
+// vSphere guest whose call did not finish is not named a desktop guest.
+func collectVMwareTools(
+	ctx context.Context,
+	runner source.Runner,
+) (*Info, error) {
+	var runErr error
+	run := func(args ...string) string {
+		if runErr != nil {
+			return ""
+		}
+		out, err := runner.Execute(ctx, toolboxCmd, args...)
+		var exitErr *exec.ExitError
+		switch {
+		case err == nil:
+			return trimStat(string(out))
+		case errors.As(err, &exitErr):
+			return ""
+		default:
+			runErr = fmt.Errorf("%s %s: %w", toolboxCmd, strings.Join(args, " "), err)
+			return ""
+		}
+	}
+
+	info := &Info{
+		Version:        run("-v"),
+		Hosttime:       run("stat", "hosttime"),
+		Speed:          run("stat", "speed"),
+		SessionID:      run("stat", "sessionid"),
+		Balloon:        run("stat", "balloon"),
+		Swap:           run("stat", "swap"),
+		MemLimit:       run("stat", "memlimit"),
+		MemRes:         run("stat", "memres"),
+		CPURes:         run("stat", "cpures"),
+		CPULimit:       run("stat", "cpulimit"),
+		UpgradeStatus:  run("upgrade", "status"),
+		TimesyncStatus: run("timesync", "status"),
+	}
+
+	// vSphere answers the raw session query with JSON that has a version;
+	// Workstation and Fusion (desktop) answer with an error or nothing.
+	rawSession := run("stat", "raw", "json", "session")
+	if runErr != nil {
+		return nil, runErr
+	}
+	if rawSession == "" {
+		info.HostType = "vmware_desktop"
+		return info, nil
+	}
+	info.HostType = "vmware_vsphere"
+	var sess struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal([]byte(rawSession), &sess); err == nil {
+		info.HostVersion = sess.Version
+	}
+
+	return info, nil
 }

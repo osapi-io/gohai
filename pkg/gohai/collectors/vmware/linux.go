@@ -22,7 +22,7 @@ package vmware
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -57,85 +57,43 @@ func NewLinux() *Linux {
 	}
 }
 
-// Collect gathers VMware Tools statistics. Returns nil (no error) when not
-// running on a VMware guest or when VMware Tools is not installed.
+// Collect gathers VMware Tools statistics. It returns no fact when the
+// host is not a VMware guest or VMware Tools is not installed, and an error
+// when vmware-toolbox-cmd is there but a call to it fails.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	if !l.isVMwareGuest(ctx) {
-		return nil, nil
+	guest, err := l.isVMwareGuest(ctx)
+	if err != nil || !guest {
+		return nil, err
 	}
-	return collectVMwareTools(ctx, l.Exec), nil
+
+	info, err := collectVMwareTools(ctx, l.Exec)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
 }
 
-// isVMwareGuest returns true if running inside a VMware guest. It checks
-// /proc/scsi/scsi for a VMware SCSI controller first (no exec needed),
-// then falls back to testing whether vmware-toolbox-cmd is present by
-// running `vmware-toolbox-cmd -v`. Either signal is sufficient.
+// isVMwareGuest reports whether the host is a VMware guest with VMware
+// Tools. /proc/scsi/scsi naming a VMware controller is the fast signal, and
+// `vmware-toolbox-cmd -v` the other. A host with no tools is not a guest
+// for this collector. A tools command that fails is an error.
 func (l *Linux) isVMwareGuest(
 	ctx context.Context,
-) bool {
+) (bool, error) {
 	b, err := l.FS.ReadFile(procScsiPath)
 	if err == nil && strings.Contains(string(b), "VMware") {
-		return true
+		return l.Exec != nil, nil
+	}
+	if err != nil && !collector.Absent(err) {
+		return false, fmt.Errorf("read %s: %w", procScsiPath, err)
 	}
 	if l.Exec == nil {
-		return false
-	}
-	out, err := l.Exec.Execute(ctx, vmwareToolboxCmdPath, "-v")
-	return err == nil && len(out) > 0
-}
-
-// collectVMwareTools runs vmware-toolbox-cmd for each stat/status and
-// assembles an Info struct. Errors from individual commands are silently
-// ignored — partial data is still useful and matches Ohai's rescue-based
-// approach.
-func collectVMwareTools(
-	ctx context.Context,
-	exec source.Runner,
-) *Info {
-	info := &Info{}
-
-	run := func(args ...string) string {
-		out, err := exec.Execute(ctx, vmwareToolboxCmdPath, args...)
-		if err != nil {
-			return ""
-		}
-		return trimStat(string(out))
+		return false, nil
 	}
 
-	// stat subcommand parameters — mirrors Ohai's iteration.
-	info.Version = run("-v")
-	info.Hosttime = run("stat", "hosttime")
-	info.Speed = run("stat", "speed")
-	info.SessionID = run("stat", "sessionid")
-	info.Balloon = run("stat", "balloon")
-	info.Swap = run("stat", "swap")
-	info.MemLimit = run("stat", "memlimit")
-	info.MemRes = run("stat", "memres")
-	info.CPURes = run("stat", "cpures")
-	info.CPULimit = run("stat", "cpulimit")
-
-	// status subcommand parameters.
-	info.UpgradeStatus = run("upgrade", "status")
-	info.TimesyncStatus = run("timesync", "status")
-
-	// Distinguish desktop vs vSphere by querying the raw session JSON.
-	// An empty response means VMware Workstation/Fusion (desktop).
-	// A JSON response with a "version" key means vSphere.
-	rawSession := run("stat", "raw", "json", "session")
-	if rawSession == "" {
-		info.HostType = "vmware_desktop"
-	} else {
-		info.HostType = "vmware_vsphere"
-		var sess struct {
-			Version string `json:"version"`
-		}
-		if err := json.Unmarshal([]byte(rawSession), &sess); err == nil {
-			info.HostVersion = sess.Version
-		}
-	}
-
-	return info
+	return probeToolbox(ctx, l.Exec)
 }
