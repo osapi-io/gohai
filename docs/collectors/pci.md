@@ -38,6 +38,7 @@ filesystem.
 | `class_name`     | `string` | The class name.                                                                    |
 | `subclass_id`    | `string` | The subclass code in 2 hex digits.                                                 |
 | `subclass_name`  | `string` | The subclass name.                                                                 |
+| `svendor_id`     | `string` | The subsystem vendor ID in 4 hex digits. With `sdevice_id`, it names the board.    |
 | `sdevice_id`     | `string` | The subsystem device ID in 4 hex digits.                                           |
 | `sdevice_name`   | `string` | The subsystem name.                                                                |
 | `revision`       | `string` | The PCI revision register, for example `0x01`.                                     |
@@ -124,10 +125,10 @@ the same scope.
 gohai reports the same fields as Ohai's `linux/lspci.rb`: `vendor_id`,
 `vendor_name`, `device_id`, `device_name`, `class_id`, `class_name`,
 `sdevice_id`, `sdevice_name`, `driver` and `revision`. gohai also reports some
-fields that Ohai does not: `subclass_id`, `subclass_name`, `iommu_group` and
-`parent_address`. gohai does not report Ohai's `module` array, which lists the
-kernel modules that _can_ bind. `driver` reports only the kernel module that is
-bound now. Inventory consumers usually need only that value.
+fields that Ohai does not: `svendor_id`, `subclass_id`, `subclass_name`,
+`iommu_group` and `parent_address`. gohai does not report Ohai's `module` array,
+which lists the kernel modules that _can_ bind. `driver` reports only the kernel
+module that is bound now. Inventory consumers usually need only that value.
 
 ## Backing library
 

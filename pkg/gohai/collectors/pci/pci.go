@@ -41,20 +41,21 @@ type Info struct {
 // Device is one PCI device entry. Matches the shape Ohai's
 // linux/lspci.rb emits under node['pci'][<address>].
 type Device struct {
-	VendorID      string `json:"vendor_id,omitempty"`
-	VendorName    string `json:"vendor_name,omitempty"`
-	DeviceID      string `json:"device_id,omitempty"`
-	DeviceName    string `json:"device_name,omitempty"`
-	ClassID       string `json:"class_id,omitempty"`
-	ClassName     string `json:"class_name,omitempty"`
-	SubclassID    string `json:"subclass_id,omitempty"`
-	SubclassName  string `json:"subclass_name,omitempty"`
-	SubsystemID   string `json:"sdevice_id,omitempty"`
-	SubsystemName string `json:"sdevice_name,omitempty"`
-	Revision      string `json:"revision,omitempty"`
-	Driver        string `json:"driver,omitempty"`
-	IOMMUGroup    string `json:"iommu_group,omitempty"`
-	ParentAddress string `json:"parent_address,omitempty"`
+	VendorID          string `json:"vendor_id,omitempty"`
+	VendorName        string `json:"vendor_name,omitempty"`
+	DeviceID          string `json:"device_id,omitempty"`
+	DeviceName        string `json:"device_name,omitempty"`
+	ClassID           string `json:"class_id,omitempty"`
+	ClassName         string `json:"class_name,omitempty"`
+	SubclassID        string `json:"subclass_id,omitempty"`
+	SubclassName      string `json:"subclass_name,omitempty"`
+	SubsystemVendorID string `json:"svendor_id,omitempty"`
+	SubsystemID       string `json:"sdevice_id,omitempty"`
+	SubsystemName     string `json:"sdevice_name,omitempty"`
+	Revision          string `json:"revision,omitempty"`
+	Driver            string `json:"driver,omitempty"`
+	IOMMUGroup        string `json:"iommu_group,omitempty"`
+	ParentAddress     string `json:"parent_address,omitempty"`
 }
 
 // Collector is the public interface every pci variant satisfies.

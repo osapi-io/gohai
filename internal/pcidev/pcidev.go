@@ -59,24 +59,35 @@ var idsPaths = []string{
 // addressRE is a PCI address: domain, bus, device and function.
 var addressRE = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]$`)
 
+// modaliasRE is a PCI modalias, lower-cased: the vendor, device, subsystem
+// vendor and subsystem device in 8 hex digits each, then the class,
+// subclass and programming interface in 2 each. The IDs are the low 4
+// digits of each 8-digit field.
+var modaliasRE = regexp.MustCompile(
+	`^pci:v[0-9a-f]{4}([0-9a-f]{4})d[0-9a-f]{4}([0-9a-f]{4})` +
+		`sv[0-9a-f]{4}([0-9a-f]{4})sd[0-9a-f]{4}([0-9a-f]{4})` +
+		`bc([0-9a-f]{2})sc([0-9a-f]{2})i[0-9a-f]{2}$`,
+)
+
 // Device is one PCI device. Each ID is lower-case hex; each name is from
 // pci.ids, or "unknown".
 type Device struct {
-	Address       string
-	VendorID      string
-	VendorName    string
-	ProductID     string
-	ProductName   string
-	ClassID       string
-	ClassName     string
-	SubclassID    string
-	SubclassName  string
-	SubsystemID   string
-	SubsystemName string
-	Revision      string
-	Driver        string
-	IOMMUGroup    string
-	ParentAddress string
+	Address           string
+	VendorID          string
+	VendorName        string
+	ProductID         string
+	ProductName       string
+	ClassID           string
+	ClassName         string
+	SubclassID        string
+	SubclassName      string
+	SubsystemVendorID string
+	SubsystemID       string
+	SubsystemName     string
+	Revision          string
+	Driver            string
+	IOMMUGroup        string
+	ParentAddress     string
 }
 
 // DB is the names of pci.ids.
@@ -205,7 +216,8 @@ func List(
 }
 
 // Read is the device at a PCI address. Its IDs come from the modalias,
-// "pci:v000010DEd00001C82sv00001458sd00003764bc03sc00i00".
+// "pci:v000010DEd00001C82sv00001458sd00003764bc03sc00i00". A modalias that
+// is not in that form is not read.
 func Read(
 	fs avfs.VFS,
 	db *DB,
@@ -216,25 +228,28 @@ func Read(
 	}
 	dir := devicesDir + "/" + address
 	b, err := fs.ReadFile(dir + "/modalias")
-	m := strings.ToLower(strings.TrimSpace(string(b)))
-	if err != nil || len(m) < 53 {
+	if err != nil {
 		return Device{}, false
 	}
-	vendor, product := m[9:13], m[18:22]
-	subvendor, subdevice := m[28:32], m[38:42]
-	class, subclass := m[44:46], m[48:50]
+	m := modaliasRE.FindStringSubmatch(strings.ToLower(strings.TrimSpace(string(b))))
+	if m == nil {
+		return Device{}, false
+	}
+	vendor, product, subvendor, subdevice := m[1], m[2], m[3], m[4]
+	class, subclass := m[5], m[6]
 	d := Device{
-		Address:       address,
-		VendorID:      vendor,
-		VendorName:    name(db.vendors, vendor),
-		ProductID:     product,
-		ProductName:   name(db.products, vendor+product),
-		ClassID:       class,
-		ClassName:     name(db.classes, class),
-		SubclassID:    subclass,
-		SubclassName:  name(db.subclasses, class+subclass),
-		SubsystemID:   subdevice,
-		SubsystemName: name(db.subsystems, vendor+product+subvendor+subdevice),
+		Address:           address,
+		VendorID:          vendor,
+		VendorName:        name(db.vendors, vendor),
+		ProductID:         product,
+		ProductName:       name(db.products, vendor+product),
+		ClassID:           class,
+		ClassName:         name(db.classes, class),
+		SubclassID:        subclass,
+		SubclassName:      name(db.subclasses, class+subclass),
+		SubsystemVendorID: subvendor,
+		SubsystemID:       subdevice,
+		SubsystemName:     name(db.subsystems, vendor+product+subvendor+subdevice),
 	}
 	if b, err := fs.ReadFile(dir + "/revision"); err == nil {
 		d.Revision = strings.TrimSpace(string(b))
