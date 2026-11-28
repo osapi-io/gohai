@@ -303,6 +303,9 @@ func (w *walker) walk(
 		if line == "" {
 			continue
 		}
+		if !cloudmetadata.SafeName(line) {
+			continue
+		}
 		// Replicate Ohai's root-level "/user-data" skip.
 		if path == "" && strings.TrimRight(line, "/") == "user-data" {
 			continue

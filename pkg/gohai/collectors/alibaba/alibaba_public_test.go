@@ -22,6 +22,7 @@ package alibaba_test
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -173,6 +174,26 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		wantErr      string        // the error Collect returns; "" is none
 		validateFunc func(any, []string)
 	}{
+		{
+			name: "a listed name that would change the request path is skipped",
+			tree: func() map[string]string {
+				m := maps.Clone(treeResponses)
+				m["/meta-data/"] = "hostname\ninstance-id\n../\nevil?x=1\nx y\nregion-id"
+				return m
+			}(),
+			validateFunc: func(out any, paths []string) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("i-abc", info.ID)
+				s.Equal("cn-hangzhou", info.Region)
+				for _, p := range paths {
+					s.NotContains(p, "..")
+					s.NotContains(p, "evil")
+					s.NotContains(p, "x y")
+				}
+			},
+		},
 		{
 			name: "happy path populates every typed field + skips user-data",
 			tree: treeResponses,

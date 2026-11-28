@@ -472,6 +472,9 @@ func fetchBlockDeviceMapping(
 	}
 	out := map[string]string{}
 	for _, name := range splitLines(string(listing)) {
+		if !cloudmetadata.SafeName(name) {
+			continue
+		}
 		body, err := get(blockDeviceMappingPath + "/" + name)
 		if err != nil {
 			continue
@@ -498,6 +501,9 @@ func fetchPublicKeys(
 		idx, _, ok := strings.Cut(line, "=")
 		if !ok {
 			idx = line
+		}
+		if !cloudmetadata.SafeName(idx) {
+			continue
 		}
 		body, err := get(publicKeysPath + "/" + idx + "/openssh-key")
 		if err != nil {
@@ -676,6 +682,9 @@ func fetchENIs(
 	for _, line := range strings.Split(string(body), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
+			continue
+		}
+		if !cloudmetadata.SafeName(line) {
 			continue
 		}
 		// Each entry is "<mac>/". Strip trailing slash for the key.
