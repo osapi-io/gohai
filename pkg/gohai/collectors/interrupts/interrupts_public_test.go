@@ -282,6 +282,48 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: kernels before 4.x print the trigger in the chip and no hwirq",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc", 0o755)
+				_ = f.WriteFile("/proc/interrupts",
+					[]byte(
+						"           CPU0       CPU1\n"+
+							"  0:         10          2   IO-APIC-edge      timer\n"+
+							" 16:          5          0   IO-APIC-fasteoi   ehci_hcd:usb1\n"+
+							" 24:          0          0   PCI-MSI-edge      eth0\n",
+					),
+					fs.FileMode(0o444))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*interrupts.Info)
+				s.Require().True(ok)
+				s.Equal([]interrupts.IRQ{
+					{
+						Number:       "0",
+						Type:         "IO-APIC-edge",
+						Device:       "timer",
+						CountsPerCPU: []int64{10, 2},
+					},
+					{
+						Number:       "16",
+						Type:         "IO-APIC-fasteoi",
+						Device:       "ehci_hcd:usb1",
+						CountsPerCPU: []int64{5, 0},
+					},
+					{
+						Number:       "24",
+						Type:         "PCI-MSI-edge",
+						Device:       "eth0",
+						CountsPerCPU: []int64{0, 0},
+					},
+				}, info.IRQs)
+			},
+		},
+		{
 			name:    "linux: line without colon is skipped",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
