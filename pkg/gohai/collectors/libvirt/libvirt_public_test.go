@@ -354,6 +354,22 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a daemon that refuses the connection gives no fact",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
+					Return(nil, errors.New("exec virsh: exit status 1: error: failed to connect to the hypervisor\n"+
+						"error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': Connection refused"))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, got)
+			},
+		},
+		{
 			name:    "linux: no permission on the daemon's socket is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
