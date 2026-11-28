@@ -22,6 +22,7 @@ package libvirt
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -91,19 +92,26 @@ func (l *Linux) Collect(
 	domains := parseVirshList(listOut)
 
 	// Enrich each domain with UUID, vCPUs, memory, and autostart via
-	// dominfo. A domain can go away between the list and its dominfo, so
-	// a failed dominfo keeps the domain with its name and state only.
+	// dominfo. A failed dominfo keeps the domain with its name and state
+	// only, and its error goes into the joined error, so the result is
+	// partial. A context that is done stops the collection.
+	var errs []error
 	for i := range domains {
 		diOut, diErr := l.virsh(ctx, "dominfo", domains[i].Name)
-		if diErr == nil {
-			parseVirshDominfo(diOut, &domains[i])
+		if diErr != nil {
+			errs = append(errs, fmt.Errorf("read virsh dominfo %s: %w", domains[i].Name, diErr))
+			continue
 		}
+		parseVirshDominfo(diOut, &domains[i])
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("read virsh dominfo: %w", err)
 	}
 
 	if len(domains) > 0 {
 		info.Domains = domains
 	}
-	return info, nil
+	return info, errors.Join(errs...)
 }
 
 // systemURI is the libvirt connection of the system daemon. virsh with no

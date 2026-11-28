@@ -143,8 +143,10 @@ daemon is down.
 4. **`virsh dominfo <name>`**. The collector adds the UUID, the vCPU count, the
    maximum memory and the autostart status to each domain. A domain can go away
    between the list and its `dominfo`. Thus, if `dominfo` fails, the domain
-   stays in the list with only its name and state. The collector skips lines
-   that have no colon separator.
+   stays in the list with only its name and state, and the failure is in the
+   error. The result is then partial. A context that is done stops the
+   collection with an error. The collector skips lines that have no colon
+   separator.
 
 Ohai's libvirt plugin uses the `ruby-libvirt` gem for direct API access. gohai
 uses the `virsh` CLI. `virsh` is always there when libvirt is installed, and it

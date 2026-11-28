@@ -194,7 +194,9 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		exec    func(*testing.T) source.Runner
 		// files, when not nil, is the host's filesystem, where the
 		// collector looks for the daemons' sockets.
-		files        map[string]string
+		files map[string]string
+		// cancel, when true, runs Collect with a context that is done.
+		cancel       bool
 		validateFunc func(any, error)
 	}{
 		// ----- Linux -----
@@ -502,7 +504,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: when virsh dominfo fails keeps the domain with its name and state only",
+			name:    "linux: a failed virsh dominfo keeps the domain with its name and state, and is a partial result",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
@@ -521,13 +523,39 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				return m
 			},
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.EqualError(err, "read virsh dominfo myvm: permission denied")
 				i, ok := got.(*libvirt.Info)
 				s.Require().True(ok)
+				s.Require().NotNil(i)
 				s.Len(i.Domains, 1)
 				s.Equal("myvm", i.Domains[0].Name)
 				s.Equal("running", i.Domains[0].State)
 				s.Empty(i.Domains[0].UUID)
+			},
+		},
+		{
+			name:    "linux: a context that is done during the dominfo reads is an error, not a partial list",
+			variant: "linux",
+			cancel:  true,
+			exec: func(t *testing.T) source.Runner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
+					Return([]byte(virshVersionOutput), nil).AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
+					Return([]byte(virshURIOutput), nil).AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
+					Return([]byte(" Id   Name   State\n-----------\n 1    myvm   running\n"), nil).
+					AnyTimes()
+				m.EXPECT().
+					Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "dominfo", "myvm").
+					Return(nil, context.Canceled).
+					AnyTimes()
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -575,7 +603,13 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = libvirt.NewDarwin()
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			ctx := context.Background()
+			if tt.cancel {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+			tt.validateFunc(c.Collect(ctx, nil))
 		})
 	}
 }
