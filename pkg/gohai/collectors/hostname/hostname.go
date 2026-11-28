@@ -115,15 +115,19 @@ func collectWithExec(
 	machine, machineOK := "", false
 
 	if exec != nil {
-		if out, err := exec.Execute(ctx, "hostname", "-s"); err == nil {
-			if trimmed := strings.TrimSpace(string(out)); trimmed != "" {
-				short, shortOK = trimmed, true
-			}
+		out, err := runHostname(ctx, exec, "-s")
+		if err != nil {
+			return nil, err
 		}
-		if out, err := exec.Execute(ctx, "hostname"); err == nil {
-			if trimmed := strings.TrimSpace(string(out)); trimmed != "" {
-				machine, machineOK = trimmed, true
-			}
+		if trimmed := strings.TrimSpace(string(out)); trimmed != "" {
+			short, shortOK = trimmed, true
+		}
+		out, err = runHostname(ctx, exec)
+		if err != nil {
+			return nil, err
+		}
+		if trimmed := strings.TrimSpace(string(out)); trimmed != "" {
+			machine, machineOK = trimmed, true
 		}
 	}
 
@@ -141,6 +145,26 @@ func collectWithExec(
 	info := &Info{Name: short, MachineName: machine}
 	info.FQDN, info.Domain = canonicalFQDN(ctx, resolver, short)
 	return info, nil
+}
+
+// runHostname runs hostname with args. A hostname that is not on the
+// PATH gives no output and no error, so the collector falls back to the
+// kernel's name. Any other failure, such as a cancelled context, is an
+// error.
+func runHostname(
+	ctx context.Context,
+	exec source.Runner,
+	args ...string,
+) ([]byte, error) {
+	out, err := exec.Execute(ctx, "hostname", args...)
+	if collector.Absent(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("hostname %s: %w", strings.Join(args, " "), err)
+	}
+
+	return out, nil
 }
 
 // canonicalFQDN resolves short hostname → IP → PTR (reverse DNS) to

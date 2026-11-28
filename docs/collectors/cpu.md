@@ -203,8 +203,10 @@ On Linux:
    - On `s390x` and `ppc64le`, the socket and logical CPU counts too. These
      replace the numbers from `/proc/cpuinfo`, which are wrong there.
 
-   If `lscpu` fails, the extension fields stay empty. The fields from
-   `/proc/cpuinfo` stay correct.
+   If `lscpu` is not on the PATH, the extension fields stay empty, and the
+   fields from `/proc/cpuinfo` stay correct. An `lscpu` that is on the PATH and
+   fails, or a cancelled context, is an error, so that empty extension fields
+   always mean that the host has no `lscpu`.
 
 On macOS:
 

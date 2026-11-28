@@ -54,16 +54,21 @@ func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
-// Collect returns filesystem Info. Optional lsblk enrichment is
-// attempted when Exec is configured; any lsblk error (binary missing,
-// malformed JSON) silently skips the enrichment and leaves
-// the mount table's fields intact.
+// Collect returns filesystem Info. The df sizes and the lsblk and zfs
+// enrichments are best-effort: a df that does not answer for a mount, an
+// lsblk that fails (as in a container without /sys/dev/block) and a zfs
+// that refuses a caller who is not root leave those fields empty, and
+// docs/collectors/filesystem.md says which. A cancelled or expired
+// context is an error, so a stopped collection never looks complete.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	mounts, err := l.mounts(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	info := &Info{Mounts: mounts}
@@ -97,6 +102,9 @@ func (l *Linux) Collect(
 		"all",
 	); err == nil {
 		info.ZFSDatasets = parseZFSGetAll(out)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	// Btrfs allocation enrichment: only mounts identified as btrfs

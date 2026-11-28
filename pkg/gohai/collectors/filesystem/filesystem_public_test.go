@@ -253,6 +253,11 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			"/dev/disk3s1 500 200 300 40% 10 90 10% /\n",
 	}
 
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	duringZFS, cancelDuringZFS := context.WithCancel(context.Background())
+	defer cancelDuringZFS()
+
 	tests := []struct {
 		name         string
 		variant      string
@@ -260,9 +265,50 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 		out          map[string]string // df on Linux; mount and df on macOS
 		errs         map[string]error
 		exec         func(*testing.T) source.Runner
-		fs           avfs.VFS // optional; nil → btrfs sysfs reads short-circuit
+		fs           avfs.VFS        // optional; nil → btrfs sysfs reads short-circuit
+		ctx          context.Context // optional; nil is context.Background()
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: a cancelled context is an error",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
+			exec:    func(t *testing.T) source.Runner { return noLsblkExec(t) },
+			ctx:     cancelled,
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a context that ends during zfs is an error",
+			variant: "linux",
+			mounts:  baseMounts,
+			out:     baseDF,
+			exec: func(t *testing.T) source.Runner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "lsblk", "-J", "-p", "-o", lsblkColumns).
+					Return(nil, errors.New("not found")).
+					AnyTimes()
+				m.EXPECT().
+					Execute(gomock.Any(), "zfs", "get", "-p", "-H", "-t", "filesystem,volume", "all").
+					DoAndReturn(func(context.Context, string, ...string) ([]byte, error) {
+						cancelDuringZFS()
+
+						return nil, context.Canceled
+					}).
+					AnyTimes()
+				return m
+			},
+			ctx: duringZFS,
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
+			},
+		},
 		{
 			name:    "linux: no lsblk, mounts unchanged no unmounted",
 			variant: "linux",
@@ -865,7 +911,11 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				}
 				c = d
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			ctx := tt.ctx
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			tt.validateFunc(c.Collect(ctx, nil))
 		})
 	}
 }
