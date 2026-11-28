@@ -26,6 +26,7 @@ package tc
 
 import (
 	"bufio"
+	"strconv"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -37,6 +38,21 @@ type QDisc struct {
 	Kind   string `json:"kind"`
 	Handle string `json:"handle,omitempty"`
 	Parent string `json:"parent,omitempty"`
+	// Stats holds the counters that `tc -s` prints under the qdisc. It is
+	// nil when tc prints no statistics for the qdisc.
+	Stats *Stats `json:"stats,omitempty"`
+}
+
+// Stats holds the counters of one qdisc, from its "Sent" and "backlog"
+// lines in `tc -s qdisc show` output.
+type Stats struct {
+	SentBytes      uint64 `json:"sent_bytes"`
+	SentPackets    uint64 `json:"sent_packets"`
+	Dropped        uint64 `json:"dropped"`
+	Overlimits     uint64 `json:"overlimits"`
+	Requeues       uint64 `json:"requeues"`
+	BacklogBytes   uint64 `json:"backlog_bytes"`
+	BacklogPackets uint64 `json:"backlog_packets"`
 }
 
 // Interface holds the list of qdiscs for a single network interface.
@@ -93,7 +109,8 @@ func NewWith(
 //
 //	qdisc <kind> <handle>: dev <iface> [parent <parent>] [root] ...
 //
-// Mirrors Ohai's linux/tc.rb parsing strategy.
+// The "Sent" and "backlog" lines that follow a qdisc line hold its
+// statistics.
 func parseTCOutput(
 	output string,
 ) *Info {
@@ -102,13 +119,27 @@ func parseTCOutput(
 	ifaceMap := map[string]*Interface{}
 	// Track insertion order so output is deterministic.
 	var order []string
+	// last is the qdisc that the statistics lines belong to.
+	var last *QDisc
 
 	sc := bufio.NewScanner(strings.NewReader(output))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
+		if last != nil {
+			words := strings.Fields(line)
+			if len(words) > 0 && words[0] == "Sent" {
+				parseSent(statsOf(last), words)
+				continue
+			}
+			if len(words) > 0 && words[0] == "backlog" {
+				parseBacklog(statsOf(last), words)
+				continue
+			}
+		}
 		if line == "" || !strings.HasPrefix(line, "qdisc ") {
 			continue
 		}
+		last = nil
 		fields := strings.Fields(line)
 		// Minimum: "qdisc" <kind> <handle> "dev" <iface>
 		if len(fields) < 5 {
@@ -152,9 +183,107 @@ func parseTCOutput(
 			Handle: handle,
 			Parent: parent,
 		})
+		qdiscs := ifaceMap[iface].QDiscs
+		last = &qdiscs[len(qdiscs)-1]
 	}
 	for _, name := range order {
 		info.Interfaces = append(info.Interfaces, *ifaceMap[name])
 	}
 	return info
+}
+
+// statsOf returns the statistics of q, and makes them when q has none.
+func statsOf(
+	q *QDisc,
+) *Stats {
+	if q.Stats == nil {
+		q.Stats = &Stats{}
+	}
+
+	return q.Stats
+}
+
+// parseSent reads a line such as
+//
+//	Sent 4096 bytes 32 pkt (dropped 1, overlimits 2 requeues 3)
+//
+// into st. A value that does not parse stays 0.
+func parseSent(
+	st *Stats,
+	fields []string,
+) {
+	for i := 0; i+1 < len(fields); i++ {
+		v := strings.Trim(fields[i+1], "(),")
+		switch strings.Trim(fields[i], "(),") {
+		case "Sent":
+			st.SentBytes = parseCount(v)
+		case "bytes":
+			st.SentPackets = parseCount(v)
+		case "dropped":
+			st.Dropped = parseCount(v)
+		case "overlimits":
+			st.Overlimits = parseCount(v)
+		case "requeues":
+			st.Requeues = parseCount(v)
+		}
+	}
+}
+
+// parseBacklog reads a line such as
+//
+//	backlog 1514b 1p requeues 3
+//
+// into st. tc prints the bytes with a b, Kb, Mb or Gb suffix in powers of
+// 1024, and the packets with a p suffix.
+func parseBacklog(
+	st *Stats,
+	fields []string,
+) {
+	if len(fields) > 1 {
+		st.BacklogBytes = parseSize(fields[1])
+	}
+	if len(fields) > 2 {
+		st.BacklogPackets = parseCount(strings.TrimSuffix(fields[2], "p"))
+	}
+}
+
+// parseSize converts a tc size such as 1514b, 10Kb or 2Mb to bytes. A size
+// that does not parse is 0.
+func parseSize(
+	s string,
+) uint64 {
+	units := []struct {
+		suffix string
+		mult   float64
+	}{
+		{"Gb", 1 << 30},
+		{"Mb", 1 << 20},
+		{"Kb", 1 << 10},
+		{"b", 1},
+	}
+	for _, u := range units {
+		if n, ok := strings.CutSuffix(s, u.suffix); ok {
+			f, err := strconv.ParseFloat(n, 64)
+			if err != nil || f < 0 {
+				return 0
+			}
+
+			return uint64(f * u.mult)
+		}
+	}
+
+	return 0
+}
+
+// parseCount converts a decimal counter to a number. A counter that does
+// not parse is 0.
+func parseCount(
+	s string,
+) uint64 {
+	n, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	return n
 }

@@ -4879,12 +4879,51 @@
         },
         "parent": {
           "type": "string"
+        },
+        "stats": {
+          "$ref": "#/$defs/TcStats"
         }
       },
       "additionalProperties": false,
       "type": "object",
       "required": [
         "kind"
+      ]
+    },
+    "TcStats": {
+      "properties": {
+        "sent_bytes": {
+          "type": "integer"
+        },
+        "sent_packets": {
+          "type": "integer"
+        },
+        "dropped": {
+          "type": "integer"
+        },
+        "overlimits": {
+          "type": "integer"
+        },
+        "requeues": {
+          "type": "integer"
+        },
+        "backlog_bytes": {
+          "type": "integer"
+        },
+        "backlog_packets": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "sent_bytes",
+        "sent_packets",
+        "dropped",
+        "overlimits",
+        "requeues",
+        "backlog_bytes",
+        "backlog_packets"
       ]
     },
     "TimezoneInfo": {
