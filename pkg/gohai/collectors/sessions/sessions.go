@@ -170,7 +170,7 @@ func cString(
 func parseLoginctlSessions(
 	raw []byte,
 ) []Session {
-	var out []Session
+	out := []Session{}
 	sc := bufio.NewScanner(strings.NewReader(string(raw)))
 	for sc.Scan() {
 		fields := strings.Fields(sc.Text())

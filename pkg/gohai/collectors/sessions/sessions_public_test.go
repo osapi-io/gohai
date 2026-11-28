@@ -23,6 +23,7 @@ package sessions_test
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -206,7 +207,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: loginctl returns empty output, empty session list not fallback",
+			name:    "linux: loginctl returns empty output, an empty list, not null, and no fallback",
 			variant: "linux",
 			exec:    func(t *testing.T) source.Runner { return loginctlExec(t, []byte(""), nil) },
 			files:   utmp,
@@ -214,7 +215,10 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
 				s.Require().True(ok)
-				s.Empty(i.LoggedIn)
+				s.Equal([]sessions.Session{}, i.LoggedIn)
+				b, err := json.Marshal(i)
+				s.Require().NoError(err)
+				s.Contains(string(b), `"logged_in":[]`)
 			},
 		},
 		{
