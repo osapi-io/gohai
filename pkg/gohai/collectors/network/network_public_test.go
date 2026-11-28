@@ -809,18 +809,51 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "linux: ip -d link populates vlan + tunnel + xdp",
+			name:       "linux: ip -d link reads the xdp mode from the header line",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs:         sourcetest.FS(s.T(), nil),
 			exec: ipRouteAndIPLinkExec(
 				s.T(),
-				`1: lo: <LOOPBACK,UP> mtu 65536 qdisc noqueue state UNKNOWN
-    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-2: eth0: <BROADCAST,MULTICAST,UP> mtu 1500 qdisc mq state UP
-    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff
-    prog/xdpgeneric id 17 tag 4d0e1f3a
-    xdpgeneric  prog/xdp id 18 tag cafebabe
+				`1: lo: <LOOPBACK,UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00 promiscuity 0
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 xdp qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff promiscuity 0
+    prog/xdp id 41 tag 3b185187f1855c4c jited
+`,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				var eth0 *network.Interface
+				for j := range i.Interfaces {
+					if i.Interfaces[j].Name == "eth0" {
+						eth0 = &i.Interfaces[j]
+						break
+					}
+				}
+				s.Require().NotNil(eth0)
+				s.Require().NotNil(eth0.XDP)
+				s.Require().Len(eth0.XDP.Attached, 1)
+				// The bare `xdp` header token is native mode, xdpdrv,
+				// and the `prog/xdp` line takes it.
+				s.Equal("xdpdrv", eth0.XDP.Attached[0].Mode)
+				s.Equal("41", eth0.XDP.Attached[0].ID)
+				s.Equal("3b185187f1855c4c", eth0.XDP.Attached[0].Tag)
+			},
+		},
+		{
+			name:       "linux: ip -d link reads xdpmulti programs with their own modes",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         sourcetest.FS(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(
+				s.T(),
+				`2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 xdpmulti qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff promiscuity 0
+    prog/xdpgeneric id 17 tag 4d0e1f3a jited
+    prog/xdpdrv id 18 tag cafebabe jited
 `,
 			),
 			validateFunc: func(got any, err error) {
@@ -837,14 +870,39 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().NotNil(eth0)
 				s.Require().NotNil(eth0.XDP)
 				s.Require().Len(eth0.XDP.Attached, 2)
-				// First prog line: direct mode token, no normalization.
 				s.Equal("xdpgeneric", eth0.XDP.Attached[0].Mode)
 				s.Equal("17", eth0.XDP.Attached[0].ID)
-				s.Equal("4d0e1f3a", eth0.XDP.Attached[0].Tag)
-				// Second prog line: xdpgeneric header set the mode, the
-				// bare `xdp` in `prog/xdp` normalises to it.
-				s.Equal("xdpgeneric", eth0.XDP.Attached[1].Mode)
+				s.Equal("xdpdrv", eth0.XDP.Attached[1].Mode)
 				s.Equal("18", eth0.XDP.Attached[1].ID)
+			},
+		},
+		{
+			name:       "linux: ip -d link keeps a prog line that has no xdp header token",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         sourcetest.FS(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(
+				s.T(),
+				`2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP
+    link/ether 52:54:00:12:34:56 brd ff:ff:ff:ff:ff:ff
+    prog/xdpgeneric id 17 tag 4d0e1f3a
+`,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				var eth0 *network.Interface
+				for j := range i.Interfaces {
+					if i.Interfaces[j].Name == "eth0" {
+						eth0 = &i.Interfaces[j]
+						break
+					}
+				}
+				s.Require().NotNil(eth0)
+				s.Require().NotNil(eth0.XDP)
+				s.Require().Len(eth0.XDP.Attached, 1)
+				s.Equal("xdpgeneric", eth0.XDP.Attached[0].Mode)
 			},
 		},
 		{
