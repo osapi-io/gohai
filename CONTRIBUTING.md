@@ -126,7 +126,7 @@ just deps
   - `schema.go`. The `//go:embed` of `gohai.schema.json` for the validate
     subcommand.
   - `field-mapping.md`. The tier mapping of each field (OCSF/OTel/ convention),
-    with citations. It has 960 rows.
+    with citations. It has 961 rows.
   - `ocsf-gaps.md`. The candidates for upstream OCSF PRs, from the audit that
     the page gives the date of.
 - **`internal/platform/`.** `Detect()`, a `var` that tests can replace, which is
