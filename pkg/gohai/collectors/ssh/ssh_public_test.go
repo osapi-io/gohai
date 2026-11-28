@@ -31,7 +31,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"io/fs"
 	"strings"
 	"testing"
 
@@ -42,7 +41,6 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	gohaisssh "github.com/osapi-io/gohai/pkg/gohai/collectors/ssh"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -55,42 +53,6 @@ var (
 	_ collector.Collector = (*gohaisssh.Linux)(nil)
 	_ collector.Collector = (*gohaisssh.Darwin)(nil)
 )
-
-// malformFS returns a file with malformed base64 content.
-type malformFS struct {
-	avfs.VFS
-}
-
-func (m malformFS) ReadFile(
-	_ string,
-) ([]byte, error) {
-	return []byte("ssh-rsa !!!notbase64!!! comment\n"), nil
-}
-
-// badFieldsFS returns a file with only one whitespace-separated field.
-type badFieldsFS struct {
-	avfs.VFS
-}
-
-func (b badFieldsFS) ReadFile(
-	_ string,
-) ([]byte, error) {
-	return []byte("ssh-rsa\n"), nil
-}
-
-// fsWith builds a memfs with the given path→content entries. The
-// /etc/ssh directory is created once regardless of the supplied paths.
-func fsWith(
-	t require.TestingT,
-	files map[string][]byte,
-) avfs.VFS {
-	f := memfs.New()
-	_ = f.MkdirAll("/etc/ssh", 0o755)
-	for path, content := range files {
-		require.NoError(t, f.WriteFile(path, content, fs.FileMode(0o644)))
-	}
-	return f
-}
 
 // encodeSSHPublicKey encodes a crypto public key as an OpenSSH
 // authorized_keys line.
@@ -158,12 +120,10 @@ func TestSSHPublicTestSuite(
 }
 
 func (s *SSHPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(gohaisssh.Collector)
 	}{
 		{
@@ -206,11 +166,20 @@ func (s *SSHPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c gohaisssh.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := gohaisssh.New()
+			c := gohaisssh.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = gohaisssh.New()
+			}
 			s.Equal("ssh", c.Name())
 			s.Equal("security", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -570,8 +539,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "linux: rsa-2048 key",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub": generateRSAKey(s.T(), 2048),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(generateRSAKey(s.T(), 2048)),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -590,8 +559,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "linux: rsa-4096 key",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub": generateRSAKey(s.T(), 4096),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(generateRSAKey(s.T(), 4096)),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -610,8 +579,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "linux: truncated rsa wire blob — key length 0",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(truncatedRSABlob),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(pubLineFromBlob(truncatedRSABlob)),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -630,8 +599,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "linux: ecdsa-p256 key",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P256()),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_ecdsa_key.pub": string(
+						generateECDSAKey(s.T(), elliptic.P256()),
+					),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -650,8 +621,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "linux: ecdsa-p384 key",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P384()),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_ecdsa_key.pub": string(
+						generateECDSAKey(s.T(), elliptic.P384()),
+					),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -670,8 +643,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "linux: ecdsa-p521 key",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_ecdsa_key.pub": generateECDSAKey(s.T(), elliptic.P521()),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_ecdsa_key.pub": string(
+						generateECDSAKey(s.T(), elliptic.P521()),
+					),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -690,8 +665,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "linux: ed25519 key",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_ed25519_key.pub": generateEd25519Key(s.T()),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_ed25519_key.pub": string(generateEd25519Key(s.T())),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -710,10 +685,12 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "linux: all three key types",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub":     generateRSAKey(s.T(), 2048),
-					"/etc/ssh/ssh_host_ecdsa_key.pub":   generateECDSAKey(s.T(), elliptic.P256()),
-					"/etc/ssh/ssh_host_ed25519_key.pub": generateEd25519Key(s.T()),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(generateRSAKey(s.T(), 2048)),
+					"/etc/ssh/ssh_host_ecdsa_key.pub": string(
+						generateECDSAKey(s.T(), elliptic.P256()),
+					),
+					"/etc/ssh/ssh_host_ed25519_key.pub": string(generateEd25519Key(s.T())),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -726,7 +703,11 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: malformed base64 is left out",
 			variant: "linux",
-			setupFS: func() avfs.VFS { return malformFS{memfs.New()} },
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": "ssh-rsa !!!notbase64!!! comment\n",
+				})
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
@@ -737,7 +718,11 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: too few fields is left out",
 			variant: "linux",
-			setupFS: func() avfs.VFS { return badFieldsFS{memfs.New()} },
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": "ssh-rsa\n",
+				})
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
@@ -749,8 +734,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			name:    "darwin: ed25519 key",
 			variant: "darwin",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_ed25519_key.pub": generateEd25519Key(s.T()),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_ed25519_key.pub": string(generateEd25519Key(s.T())),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -783,7 +768,11 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: malformed base64 is left out",
 			variant: "darwin",
-			setupFS: func() avfs.VFS { return malformFS{memfs.New()} },
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": "ssh-rsa !!!notbase64!!! comment\n",
+				})
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
@@ -798,8 +787,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				// Build a blob whose type field is not rsa/ecdsa/ed25519 to
 				// exercise the default branch in deriveKeyLength.
 				unknownBlob := marshalWireString([]byte("ssh-unknown"))
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(unknownBlob),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(pubLineFromBlob(unknownBlob)),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -821,8 +810,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				// 3-byte blob: too short for even the first 4-byte length
 				// header. skipWireString returns nil (len < 4 branch).
 				shortBlob := []byte{0x00, 0x01, 0x02}
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(shortBlob),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(pubLineFromBlob(shortBlob)),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -844,8 +833,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				// Length header claims 100 bytes but only 2 follow — the
 				// len(b) < 4+n branch in skipWireString.
 				tooShort := []byte{0, 0, 0, 100, 0x01, 0x02}
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(tooShort),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(pubLineFromBlob(tooShort)),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -872,8 +861,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				// Modulus header claims 100 bytes but only 2 bytes follow.
 				modHeader := []byte{0, 0, 0, 100, 0x00, 0x00}
 				blob := append(append(algoField, expField...), modHeader...)
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub": pubLineFromBlob(blob),
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(pubLineFromBlob(blob)),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -900,8 +889,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					[]byte("ssh-dss "),
 					[]byte(base64.StdEncoding.EncodeToString(blob)+"\n")...,
 				)
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_rsa_key.pub": line,
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_rsa_key.pub": string(line),
 				})
 			},
 			validateFunc: func(got any, err error) {
@@ -928,8 +917,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 					[]byte("ecdsa-sha2-unknown "),
 					[]byte(base64.StdEncoding.EncodeToString(blob)+"\n")...,
 				)
-				return fsWith(s.T(), map[string][]byte{
-					"/etc/ssh/ssh_host_ecdsa_key.pub": line,
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/ssh/ssh_host_ecdsa_key.pub": string(line),
 				})
 			},
 			validateFunc: func(got any, err error) {

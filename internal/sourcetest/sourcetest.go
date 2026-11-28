@@ -115,6 +115,23 @@ func Links(
 	return fs
 }
 
+// FailRead makes a read of each of paths in fs fail with an error that is
+// not fs.ErrNotExist, as a host gives for a file that it cannot read: it
+// makes a directory at each path, and a read of a directory fails. It
+// returns fs.
+func FailRead(
+	t testing.TB,
+	fs avfs.VFS,
+	paths ...string,
+) avfs.VFS {
+	t.Helper()
+	for _, path := range paths {
+		require.NoError(t, fs.MkdirAll(path, 0o755))
+	}
+
+	return fs
+}
+
 // HTTP is a transport that answers each URL of bodies, such as
 // "http://169.254.169.254/latest/meta-data/instance-id", with 200 and
 // its body. Any other URL answers 404, as a metadata service does for a

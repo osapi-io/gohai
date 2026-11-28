@@ -27,11 +27,12 @@ import (
 	osexec "os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/packages"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -52,31 +53,11 @@ func TestPackagesPublicTestSuite(
 	suite.Run(t, new(PackagesPublicTestSuite))
 }
 
-func mockExec(
-	t *testing.T,
-	cmd string,
-	args []string,
-	out []byte,
-	execErr error,
-) source.Runner {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	extraArgs := make([]any, len(args))
-	for i, a := range args {
-		extraArgs[i] = a
-	}
-	m.EXPECT().Execute(gomock.Any(), cmd, extraArgs...).Return(out, execErr).AnyTimes()
-	return m
-}
-
 func (s *PackagesPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(packages.Collector)
 	}{
 		{
@@ -159,11 +140,20 @@ func (s *PackagesPublicTestSuite) TestNew() {
 				s.Equal("", l.Manager)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c packages.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := packages.New()
+			c := packages.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = packages.New()
+			}
 			s.Equal("packages", c.Name())
 			s.Equal("software", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -174,9 +164,12 @@ func (s *PackagesPublicTestSuite) TestNew() {
 }
 
 func (s *PackagesPublicTestSuite) TestCollect() {
-	origDetect := platform.Detect
-	defer func() { platform.Detect = origDetect }()
-
+	// The command lines of the package databases, as Commands keys them.
+	const (
+		dpkgLine = "dpkg-query -W -f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n"
+		rpmLine  = "rpm -qa --qf %{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n"
+		brewLine = "brew list --versions"
+	)
 	dpkgOut := []byte(
 		"bash\t5.1-6\tamd64\tinstalled\tGNU Bourne Again SHell\t7164\nlibc6\t2.35-0\tamd64\tinstalled\n",
 	)
@@ -214,15 +207,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "debian",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Out: map[string]string{dpkgLine: string(dpkgOut)},
+				}.Mock(
 					t,
-					"dpkg-query",
-					[]string{
-						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
-					},
-					dpkgOut,
-					nil,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -252,15 +240,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "debian",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Out: map[string]string{dpkgLine: string(dpkgWithSkipped)},
+				}.Mock(
 					t,
-					"dpkg-query",
-					[]string{
-						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
-					},
-					dpkgWithSkipped,
-					nil,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -277,15 +260,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "debian",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Out: map[string]string{dpkgLine: string([]byte("bash\t5.1\n"))},
+				}.Mock(
 					t,
-					"dpkg-query",
-					[]string{
-						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
-					},
-					[]byte("bash\t5.1\n"),
-					nil,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -300,15 +278,14 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "debian",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
-					t,
-					"dpkg-query",
-					[]string{
-						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
+				return sourcetest.Commands{
+					Out: map[string]string{
+						dpkgLine: string(
+							[]byte("\t1.0\tamd64\tinstalled\nbash\t5.1\tamd64\tinstalled\n"),
+						),
 					},
-					[]byte("\t1.0\tamd64\tinstalled\nbash\t5.1\tamd64\tinstalled\n"),
-					nil,
+				}.Mock(
+					t,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -325,15 +302,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "debian",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Err: map[string]error{dpkgLine: fmt.Errorf("exec: %w", osexec.ErrNotFound)},
+				}.Mock(
 					t,
-					"dpkg-query",
-					[]string{
-						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
-					},
-					nil,
-					fmt.Errorf("exec: %w", osexec.ErrNotFound),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -348,15 +320,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "debian",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Err: map[string]error{dpkgLine: errors.New("exit status 1: permission denied")},
+				}.Mock(
 					t,
-					"dpkg-query",
-					[]string{
-						"-W",
-						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
-					},
-					nil,
-					errors.New("exit status 1: permission denied"),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -370,17 +337,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "rhel",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
-					t,
-					"rpm",
-					[]string{
-						"-qa",
-						"--qf",
-						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
-					},
-					rpmOut,
-					nil,
-				)
+				return sourcetest.Commands{Out: map[string]string{rpmLine: string(rpmOut)}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -409,16 +366,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "rhel",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Err: map[string]error{rpmLine: fmt.Errorf("exec: %w", osexec.ErrNotFound)},
+				}.Mock(
 					t,
-					"rpm",
-					[]string{
-						"-qa",
-						"--qf",
-						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
-					},
-					nil,
-					fmt.Errorf("exec: %w", osexec.ErrNotFound),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -433,16 +384,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "rhel",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Err: map[string]error{rpmLine: errors.New("exit status 1: permission denied")},
+				}.Mock(
 					t,
-					"rpm",
-					[]string{
-						"-qa",
-						"--qf",
-						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
-					},
-					nil,
-					errors.New("exit status 1: permission denied"),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -456,16 +401,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "rhel",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Out: map[string]string{rpmLine: string([]byte("bash\n"))},
+				}.Mock(
 					t,
-					"rpm",
-					[]string{
-						"-qa",
-						"--qf",
-						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
-					},
-					[]byte("bash\n"),
-					nil,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -480,16 +419,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			detect:  "rhel",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
-					t,
-					"rpm",
-					[]string{
-						"-qa",
-						"--qf",
-						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+				return sourcetest.Commands{
+					Out: map[string]string{
+						rpmLine: string([]byte("\t1.0-1.fc36\tx86_64\nbash\t5.1-6.fc36\tx86_64\n")),
 					},
-					[]byte("\t1.0-1.fc36\tx86_64\nbash\t5.1-6.fc36\tx86_64\n"),
-					nil,
+				}.Mock(
+					t,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -522,7 +457,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "darwin: brew list returns packages",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(t, "brew", []string{"list", "--versions"}, brewOut, nil)
+				return sourcetest.Commands{
+					Out: map[string]string{brewLine: string(brewOut)},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -539,12 +478,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "darwin: brew output with blank lines skipped",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Out: map[string]string{brewLine: string([]byte("\ngit 2.40.0\n\n"))},
+				}.Mock(
 					t,
-					"brew",
-					[]string{"list", "--versions"},
-					[]byte("\ngit 2.40.0\n\n"),
-					nil,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -560,7 +497,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "darwin: brew output with only-name line skipped",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(t, "brew", []string{"list", "--versions"}, []byte("git\n"), nil)
+				return sourcetest.Commands{
+					Out: map[string]string{brewLine: string([]byte("git\n"))},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -573,12 +514,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "darwin: brew fails, empty list",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Err: map[string]error{brewLine: fmt.Errorf("exec: %w", osexec.ErrNotFound)},
+				}.Mock(
 					t,
-					"brew",
-					[]string{"list", "--versions"},
-					nil,
-					fmt.Errorf("exec: %w", osexec.ErrNotFound),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -592,12 +531,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			name:    "darwin: a failed run is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return mockExec(
+				return sourcetest.Commands{
+					Err: map[string]error{brewLine: errors.New("exit status 1: permission denied")},
+				}.Mock(
 					t,
-					"brew",
-					[]string{"list", "--versions"},
-					nil,
-					errors.New("exit status 1: permission denied"),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -620,15 +557,11 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.detect != "" {
-				platform.Detect = func() string { return tt.detect }
-			} else {
-				platform.Detect = origDetect
-			}
 			var c packages.Collector
 			switch tt.variant {
 			case "linux":
-				l, ok := packages.New().(*packages.Linux)
+				src := source.Sources{Family: tt.detect, FS: memfs.New()}
+				l, ok := packages.NewWith(src).(*packages.Linux)
 				s.Require().True(ok)
 				l.Exec = tt.exec(s.T())
 				c = l

@@ -34,8 +34,9 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/mdadm"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
@@ -43,17 +44,6 @@ var (
 	_ collector.Collector = (*mdadm.Linux)(nil)
 	_ collector.Collector = (*mdadm.Darwin)(nil)
 )
-
-// errorFS forces a non-ErrNotExist read error from ReadFile.
-type errorFS struct {
-	avfs.VFS
-}
-
-func (errorFS) ReadFile(
-	string,
-) ([]byte, error) {
-	return nil, errors.New("permission denied")
-}
 
 // mdstatRaid1 is a minimal /proc/mdstat with one RAID-1 array.
 var mdstatRaid1 = []byte(
@@ -114,12 +104,10 @@ func TestMdadmPublicTestSuite(
 }
 
 func (s *MdadmPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(mdadm.Collector)
 	}{
 		{
@@ -162,11 +150,20 @@ func (s *MdadmPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c mdadm.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := mdadm.New()
+			c := mdadm.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = mdadm.New()
+			}
 			s.Equal("mdadm", c.Name())
 			s.Equal("linux", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -440,7 +437,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: read error on /proc/mdstat propagates",
 			variant: "linux",
-			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
+			setupFS: func() avfs.VFS { return sourcetest.FailRead(s.T(), memfs.New(), "/proc/mdstat") },
 			setupEx: func(_ *testing.T) *mocks.MockRunner { return nil },
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
