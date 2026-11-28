@@ -23,6 +23,7 @@ package shells_test
 import (
 	"context"
 	"io/fs"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -143,6 +144,24 @@ func (s *ShellsPublicTestSuite) TestCollect() {
 				info, ok := got.(*shells.Info)
 				s.Require().True(ok)
 				s.Equal([]string{"/bin/sh", "/bin/bash", "/usr/bin/zsh"}, info.Paths)
+			},
+		},
+		{
+			name:    "linux: a line over 64 KiB keeps the shells after it",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/etc", 0o755)
+				_ = f.WriteFile("/etc/shells",
+					[]byte("/bin/sh\n# "+strings.Repeat("x", 70000)+"\n/bin/bash\n/bin/zsh\n"),
+					fs.FileMode(0o644))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*shells.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"/bin/sh", "/bin/bash", "/bin/zsh"}, info.Paths)
 			},
 		},
 		{

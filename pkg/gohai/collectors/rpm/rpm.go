@@ -28,8 +28,7 @@
 package rpm
 
 import (
-	"bufio"
-	"bytes"
+	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/pattern"
@@ -145,9 +144,10 @@ func splitLines(
 	b []byte,
 ) []string {
 	var lines []string
-	sc := bufio.NewScanner(bytes.NewReader(b))
-	for sc.Scan() {
-		lines = append(lines, sc.Text())
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for line := range strings.Lines(string(b)) {
+		lines = append(lines, strings.TrimRight(line, "\r\n"))
 	}
 	return lines
 }

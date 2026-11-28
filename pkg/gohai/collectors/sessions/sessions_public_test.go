@@ -27,6 +27,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -185,6 +186,27 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 				s.Empty(i.LoggedIn[1].Seat)
 				s.Equal("jane", i.LoggedIn[2].User)
 				s.Empty(i.LoggedIn[2].Seat)
+			},
+		},
+		{
+			name:    "linux: a loginctl line over 64 KiB keeps the sessions after it",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{loginctlLine: "   1 1000 john seat0\n" +
+						"   2 1001 " + strings.Repeat("x", 70000) + "\n" +
+						"   3 0    root\n"},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*sessions.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.LoggedIn, 3)
+				s.Equal("john", i.LoggedIn[0].User)
+				s.Equal("root", i.LoggedIn[2].User)
 			},
 		},
 		{

@@ -133,6 +133,6 @@ uses them.
 
 - `source.Runner` to run `zpool list`. Production uses `source.Commands()`.
   Tests use a gomock mock.
-- The Go standard library `bufio` and `strings` to parse the output.
+- The Go standard library `strings` to parse the output.
 
 [openzfs]: https://openzfs.org/

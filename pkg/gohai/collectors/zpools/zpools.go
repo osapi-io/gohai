@@ -24,8 +24,6 @@
 package zpools
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -120,9 +118,10 @@ func parseZpoolList(
 	out []byte,
 ) []Pool {
 	pools := []Pool{}
-	scanner := bufio.NewScanner(bytes.NewReader(out))
-	for scanner.Scan() {
-		line := scanner.Text()
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(string(out)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		fields := strings.Split(line, "\t")
 		if len(fields) != 6 {
 			continue

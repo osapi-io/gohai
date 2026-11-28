@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -173,6 +174,31 @@ func (s *RPMPublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().EqualError(err, "rpm --showrc: exec rpm: exit status 1")
 				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a macro body over 64 KiB keeps the macros after it",
+			variant: "linux",
+			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
+				long := strings.Repeat("x", 70000)
+				out := "=====\n-13: first\tone\n-13: long\t" + long +
+					"\n-13: last\ttwo\n=====\n"
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "rpm", "--showrc").
+					Return([]byte(out), nil)
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*rpm.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"first": "one",
+					"long":  strings.Repeat("x", 70000),
+					"last":  "two",
+				}, info.Macros)
 			},
 		},
 		{
