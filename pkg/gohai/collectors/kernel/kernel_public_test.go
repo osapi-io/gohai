@@ -190,9 +190,13 @@ func (s *KernelPublicTestSuite) TestNewWith() {
 	}
 }
 
-func (s *KernelPublicTestSuite) TestCollectLinux() {
+func (s *KernelPublicTestSuite) TestCollect() {
+	arm := "Darwin\n23.4.0\nDarwin Kernel Version 23.4.0: Wed Feb 21 21:44:31 PST 2024\narm64\n"
+	intel := "Darwin\n22.6.0\nDarwin Kernel Version 22.6.0\nx86_64\n"
+
 	tests := []struct {
 		name         string
+		variant      string
 		files        func() map[string]string
 		failRead     []string
 		answers      []answer
@@ -200,7 +204,8 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 		validateFunc func(any, error)
 	}{
 		{
-			name: "when arch has the machine",
+			name:    "when arch has the machine",
+			variant: "linux",
 			files: func() map[string]string {
 				f := ubuntu()
 				f["/proc/sys/kernel/arch"] = "x86_64\n"
@@ -219,6 +224,7 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 		},
 		{
 			name:    "when the kernel has no arch, uname -m has the machine",
+			variant: "linux",
 			files:   ubuntu,
 			answers: []answer{{args: []string{"uname", "-m"}, out: "x86_64\n"}},
 			validateFunc: func(got any, err error) {
@@ -227,7 +233,8 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 			},
 		},
 		{
-			name: "when there is no version, it is empty",
+			name:    "when there is no version, it is empty",
+			variant: "linux",
 			files: func() map[string]string {
 				f := ubuntu()
 				delete(f, "/proc/sys/kernel/version")
@@ -241,7 +248,8 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 			},
 		},
 		{
-			name: "when the version can't be read, it is an error",
+			name:    "when the version can't be read, it is an error",
+			variant: "linux",
 			files: func() map[string]string {
 				f := ubuntu()
 				delete(f, "/proc/sys/kernel/version")
@@ -256,7 +264,8 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 			},
 		},
 		{
-			name: "when there is no ostype, it is an error",
+			name:    "when there is no ostype, it is an error",
+			variant: "linux",
 			files: func() map[string]string {
 				f := ubuntu()
 				delete(f, "/proc/sys/kernel/ostype")
@@ -268,7 +277,8 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 			},
 		},
 		{
-			name: "when there is no osrelease, it is an error",
+			name:    "when there is no osrelease, it is an error",
+			variant: "linux",
 			files: func() map[string]string {
 				f := ubuntu()
 				delete(f, "/proc/sys/kernel/osrelease")
@@ -281,6 +291,7 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 		},
 		{
 			name:    "when the kernel has no arch and there is no Exec, the machine is empty",
+			variant: "linux",
 			files:   ubuntu,
 			nilExec: true,
 			validateFunc: func(got any, err error) {
@@ -292,39 +303,16 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 		},
 		{
 			name:    "when uname -m fails, it is an error",
+			variant: "linux",
 			files:   ubuntu,
 			answers: []answer{{args: []string{"uname", "-m"}, err: errors.New("no uname")}},
 			validateFunc: func(_ any, err error) {
 				s.ErrorContains(err, "uname -m")
 			},
 		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			c := &kernel.Linux{
-				FS:   sourcetest.FailRead(s.T(), s.hostFS(tt.files()), tt.failRead...),
-				Exec: s.exec(tt.answers...),
-			}
-			if tt.nilExec {
-				c.Exec = nil
-			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
-		})
-	}
-}
-
-func (s *KernelPublicTestSuite) TestCollectDarwin() {
-	arm := "Darwin\n23.4.0\nDarwin Kernel Version 23.4.0: Wed Feb 21 21:44:31 PST 2024\narm64\n"
-	intel := "Darwin\n22.6.0\nDarwin Kernel Version 22.6.0\nx86_64\n"
-
-	tests := []struct {
-		name         string
-		answers      []answer
-		nilExec      bool
-		validateFunc func(any, error)
-	}{
 		{
 			name:    "when there is no Exec, there is no fact",
+			variant: "darwin",
 			nilExec: true,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -333,6 +321,7 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 		},
 		{
 			name:    "when it runs on Apple Silicon, with no Rosetta",
+			variant: "darwin",
 			answers: []answer{sysctlKernel(arm, nil)},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -347,7 +336,8 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 			},
 		},
 		{
-			name: "when it runs on an Intel Mac, which has no sysctl.proc_translated, there is no Rosetta",
+			name:    "when it runs on an Intel Mac, which has no sysctl.proc_translated, there is no Rosetta",
+			variant: "darwin",
 			answers: []answer{
 				sysctlKernel(intel, nil),
 				rosetta("", errors.New("unknown oid 'sysctl.proc_translated'")),
@@ -361,6 +351,7 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 		},
 		{
 			name:    "when the Rosetta sysctl fails, there is no Rosetta",
+			variant: "darwin",
 			answers: []answer{sysctlKernel(intel, nil), rosetta("", errors.New("no sysctl"))},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -369,6 +360,7 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 		},
 		{
 			name:    "when it runs under Rosetta, the machine is arm64",
+			variant: "darwin",
 			answers: []answer{sysctlKernel(intel, nil), rosetta("1\n", nil)},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -380,6 +372,7 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 		},
 		{
 			name:    "when sysctl fails, it is an error",
+			variant: "darwin",
 			answers: []answer{sysctlKernel("", errors.New("no sysctl"))},
 			validateFunc: func(_ any, err error) {
 				s.ErrorContains(err, "sysctl")
@@ -387,6 +380,7 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 		},
 		{
 			name:    "when sysctl gives too few values, it is an error",
+			variant: "darwin",
 			answers: []answer{sysctlKernel("Darwin\n23.4.0\n", nil)},
 			validateFunc: func(_ any, err error) {
 				s.ErrorContains(err, "not 4")
@@ -395,9 +389,23 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &kernel.Darwin{Exec: s.exec(tt.answers...)}
-			if tt.nilExec {
-				c.Exec = nil
+			var c kernel.Collector
+			switch tt.variant {
+			case "linux":
+				l := &kernel.Linux{
+					FS:   sourcetest.FailRead(s.T(), s.hostFS(tt.files()), tt.failRead...),
+					Exec: s.exec(tt.answers...),
+				}
+				if tt.nilExec {
+					l.Exec = nil
+				}
+				c = l
+			case "darwin":
+				d := &kernel.Darwin{Exec: s.exec(tt.answers...)}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

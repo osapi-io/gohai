@@ -23,6 +23,7 @@ package machineid_test
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -100,7 +101,9 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 			name: "New reads the real host",
 			real: true,
 			validateFunc: func(c machineid.Collector) {
-				s.NotNil(c)
+				// New picks the variant for the host the test runs on.
+				_, darwin := c.(*machineid.Darwin)
+				s.Equal(runtime.GOOS == "darwin", darwin)
 			},
 		},
 	}

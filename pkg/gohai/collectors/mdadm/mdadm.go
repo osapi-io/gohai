@@ -32,6 +32,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/avfs/avfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
@@ -251,18 +253,18 @@ func applyDetail(
 }
 
 // collectArrays builds the full Array list by parsing /proc/mdstat and
-// running `mdadm --detail` for each array. readFn reads files; execFn runs
-// commands, and a nil execFn skips --detail. A missing /proc/mdstat or a
+// running `mdadm --detail` for each array. fs is the host's filesystem;
+// exec runs its commands, and a nil exec skips --detail. A missing /proc/mdstat or a
 // host with no mdadm gives the mdstat view. A --detail that fails for one
 // array, such as an inactive one, is that array's DetailError, so the
 // other arrays keep their facts. A failed /proc/mdstat read or a done ctx
 // is an error.
 func collectArrays(
 	ctx context.Context,
-	readFn func(string) ([]byte, error),
-	execFn func(context.Context, string, ...string) ([]byte, error),
+	fs avfs.VFS,
+	exec source.Runner,
 ) ([]Array, error) {
-	b, err := readFn("/proc/mdstat")
+	b, err := fs.ReadFile("/proc/mdstat")
 	if err != nil {
 		if collector.Absent(err) {
 			return []Array{}, nil
@@ -285,8 +287,8 @@ func collectArrays(
 	arrays := make([]Array, 0, len(names))
 	for _, name := range names {
 		arr := devices[name]
-		if execFn != nil {
-			detail, execErr := execFn(ctx, "mdadm", "--detail", "/dev/"+name)
+		if exec != nil {
+			detail, execErr := exec.Execute(ctx, "mdadm", "--detail", "/dev/"+name)
 			switch {
 			case execErr == nil:
 				applyDetail(arr, detail)

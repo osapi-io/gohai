@@ -52,17 +52,17 @@ var (
 	_ collector.Collector = (*initd.Darwin)(nil)
 )
 
-type InitPublicTestSuite struct {
+type InitdPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestInitPublicTestSuite(
+func TestInitdPublicTestSuite(
 	t *testing.T,
 ) {
-	suite.Run(t, new(InitPublicTestSuite))
+	suite.Run(t, new(InitdPublicTestSuite))
 }
 
-func (s *InitPublicTestSuite) TestNew() {
+func (s *InitdPublicTestSuite) TestNew() {
 	orig := platform.Detect
 	defer func() { platform.Detect = orig }()
 
@@ -125,7 +125,7 @@ func (s *InitPublicTestSuite) TestNew() {
 	}
 }
 
-func (s *InitPublicTestSuite) TestCollect() {
+func (s *InitdPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
 		variant      string // "linux" | "darwin"
