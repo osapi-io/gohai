@@ -146,7 +146,8 @@ then uses the well-known paths.
    `<type> <base64-wire-blob> [comment]`. It splits the line at the whitespace.
    The line must have at least two fields. If a file has fewer fields, or the
    base64 does not decode, the collector does not report that key. The other
-   host keys and the authorized keys stay in the output.
+   host keys and the authorized keys stay in the output, with the error, so the
+   status is `partial`.
 3. The collector calculates the SHA-256 fingerprint over the raw wire bytes.
    These bytes are in RFC 4251 format: the blob decoded from the base64 field.
    The format is `SHA256:<base64-without-trailing-=>`, the same as the
