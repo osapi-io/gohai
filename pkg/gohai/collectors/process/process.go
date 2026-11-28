@@ -99,10 +99,11 @@ func NewWith(
 }
 
 // states are the words for a process state letter, as gopsutil names
-// them: R is running, S is sleep, and so on.
+// them: R is running, S is sleep, and so on. D (Linux) and U (macOS) are
+// both an uninterruptible wait.
 var states = map[byte]string{
-	'R': "running", 'S': "sleep", 'I': "idle", 'D': "blocked", 'T': "stop",
-	't': "stop", 'W': "wait", 'Z': "zombie", 'L': "lock",
+	'R': "running", 'S': "sleep", 'I': "idle", 'D': "blocked", 'U': "blocked",
+	'T': "stop", 't': "stop", 'W': "wait", 'Z': "zombie", 'L': "lock",
 }
 
 // state is the word for the first letter of s, which is not empty, or ""

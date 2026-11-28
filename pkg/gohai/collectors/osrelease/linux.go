@@ -22,8 +22,7 @@ package osrelease
 
 import (
 	"context"
-	"errors"
-	"io/fs"
+	"fmt"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -52,11 +51,11 @@ func (l *Linux) Collect(
 	_ collector.PriorResults,
 ) (any, error) {
 	b, err := family.ReadOSRelease(l.FS)
+	if collector.Absent(err) {
+		return &Info{}, nil
+	}
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return &Info{}, nil
-		}
-		return nil, err
+		return nil, fmt.Errorf("os-release: %w", err)
 	}
 	return parseOSRelease(b), nil
 }

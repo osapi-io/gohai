@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -143,6 +144,20 @@ Codename:	noble
 		exec         func(*testing.T) source.Runner
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: a line over 64 KiB keeps the fields after it",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				out := "Description:\t" + strings.Repeat("x", 70000) + "\nRelease:\t24.04\n"
+				return lsbReleaseExec(t, []byte(out), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*lsb.Info)
+				s.Require().True(ok)
+				s.Equal("24.04", info.Release)
+			},
+		},
 		{
 			name:    "linux: CLI succeeds, four fields populated",
 			variant: "linux",

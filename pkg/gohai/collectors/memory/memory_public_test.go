@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -231,6 +232,31 @@ Pages bogus:                         lots.
 					UsedPercent: 75,
 					Cached:      5 * kb,
 				}, i.Swap)
+			},
+		},
+		{
+			name:    "linux: a line over 64 KiB keeps the fields after it",
+			variant: "linux",
+			files: map[string]string{
+				"/proc/meminfo": "Junk: " + strings.Repeat("x", 70000) + "\nMemTotal: 1000 kB\n",
+			},
+			check: func(i *memory.Info) {
+				s.Equal(uint64(1000*kb), i.Total)
+			},
+		},
+		{
+			name:    "darwin: a vm_stat line over 64 KiB keeps the lines after it",
+			variant: "darwin",
+			runner: sourcetest.Commands{Out: map[string]string{
+				"sysctl -n hw.memsize": "409600\n",
+				"vm_stat": "Junk: " + strings.Repeat(
+					"x",
+					70000,
+				) + "\nPages free: 10.\n",
+				"sysctl -n vm.swapusage": swapUsage,
+			}},
+			check: func(i *memory.Info) {
+				s.Equal(uint64(10*4096), i.Free)
 			},
 		},
 		{

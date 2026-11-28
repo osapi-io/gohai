@@ -25,7 +25,6 @@
 package lsb
 
 import (
-	"bufio"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -75,9 +74,8 @@ func parseLsbReleaseCLI(
 	content string,
 ) *Info {
 	info := &Info{}
-	sc := bufio.NewScanner(strings.NewReader(content))
-	for sc.Scan() {
-		line := sc.Text()
+	for rawLine := range strings.Lines(content) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		i := strings.Index(line, ":")
 		if i < 0 {
 			continue

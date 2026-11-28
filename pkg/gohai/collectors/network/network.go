@@ -29,6 +29,7 @@ package network
 import (
 	"net"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -646,6 +647,10 @@ func parseIPLinkOutput(
 	raw []byte,
 ) map[string]*ipLinkAnnotations {
 	out := map[string]*ipLinkAnnotations{}
+	// linkAttrs holds, for each interface, the link attributes that some
+	// iproute2 versions print on a line of their own in the block, not
+	// on the tunnel line: addrgenmode, numtxqueues and the like.
+	linkAttrs := map[string]*TunnelInfo{}
 	var currentName string
 	var xdpMode string
 	for _, line := range strings.Split(string(raw), "\n") {
@@ -670,6 +675,9 @@ func parseIPLinkOutput(
 			out[currentName] = ann
 		}
 
+		if attrs := parseLinkAttrs(line); attrs != nil {
+			linkAttrs[currentName] = attrs
+		}
 		switch {
 		case tunnelHeaderRE.MatchString(line):
 			ann.TunnelInfo = parseTunnelLine(line)
@@ -678,6 +686,11 @@ func parseIPLinkOutput(
 			ann.VLAN = parseVLANLine(line)
 		case strings.Contains(line, "xdp"):
 			parseXDPLine(line, ann, &xdpMode)
+		}
+	}
+	for name, ann := range out {
+		if ann.TunnelInfo != nil && linkAttrs[name] != nil {
+			mergeLinkAttrs(ann.TunnelInfo, linkAttrs[name])
 		}
 	}
 	// Drop interfaces with no annotations so callers can range over a
@@ -774,6 +787,65 @@ func parseTunnelLine(
 		return nil
 	}
 	return t
+}
+
+// linkAttrKeys are the link attributes of a tunnel's block that iproute2
+// prints on the tunnel line in some versions and on a line of their own
+// in others.
+var linkAttrKeys = []string{
+	"addrgenmode", "numtxqueues", "numrxqueues", "gso_max_size", "gso_max_segs",
+}
+
+// parseLinkAttrs reads the link attributes of linkAttrKeys from any line
+// of an interface's block, or returns nil when the line has none.
+func parseLinkAttrs(
+	line string,
+) *TunnelInfo {
+	words := strings.Fields(line)
+	found := false
+	t := &TunnelInfo{}
+	for i, w := range words {
+		if !slices.Contains(linkAttrKeys, w) || i+1 >= len(words) {
+			continue
+		}
+		found = true
+		val := words[i+1]
+		switch w {
+		case "addrgenmode":
+			t.AddrGenMode = val
+		case "numtxqueues":
+			t.NumTxQueues = val
+		case "numrxqueues":
+			t.NumRxQueues = val
+		case "gso_max_size":
+			t.GsoMaxSize = val
+		case "gso_max_segs":
+			t.GsoMaxSegs = val
+		}
+	}
+	if !found {
+		return nil
+	}
+	return t
+}
+
+// mergeLinkAttrs sets each link attribute of t that the tunnel line did
+// not give from attrs, read elsewhere in the interface's block.
+func mergeLinkAttrs(
+	t *TunnelInfo,
+	attrs *TunnelInfo,
+) {
+	for _, f := range []struct{ dst, src *string }{
+		{&t.AddrGenMode, &attrs.AddrGenMode},
+		{&t.NumTxQueues, &attrs.NumTxQueues},
+		{&t.NumRxQueues, &attrs.NumRxQueues},
+		{&t.GsoMaxSize, &attrs.GsoMaxSize},
+		{&t.GsoMaxSegs, &attrs.GsoMaxSegs},
+	} {
+		if *f.dst == "" {
+			*f.dst = *f.src
+		}
+	}
 }
 
 // parseXDPLine handles the two XDP line shapes: a mode-announcing

@@ -22,9 +22,7 @@ package interrupts
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -55,11 +53,11 @@ func (l *Linux) Collect(
 	_ collector.PriorResults,
 ) (any, error) {
 	b, err := l.FS.ReadFile(procInterrupts)
+	if collector.Absent(err) {
+		return &Info{IRQs: []IRQ{}}, nil
+	}
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return &Info{IRQs: []IRQ{}}, nil
-		}
 		return nil, fmt.Errorf("read %s: %w", procInterrupts, err)
 	}
-	return parseInterrupts(b)
+	return collector.Result(parseInterrupts(b), nil)
 }

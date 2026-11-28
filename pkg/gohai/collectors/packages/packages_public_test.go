@@ -26,6 +26,7 @@ import (
 	"fmt"
 	osexec "os/exec"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -370,6 +371,63 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux rhel: a gpg-pubkey, whose architecture is (none), has none",
+			variant: "linux",
+			detect:  "rhel",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Out: map[string]string{
+					rpmLine: "gpg-pubkey\t8b1220fd-61c44f9c\t(none)\tgpg(Fedora (36) <fedora-36-primary@fedoraproject.org>)\t0\n",
+				}}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{{
+					Name:           "gpg-pubkey",
+					Version:        "8b1220fd-61c44f9c",
+					PackageManager: "rpm",
+					Description:    "gpg(Fedora (36) <fedora-36-primary@fedoraproject.org>)",
+				}}, info.Packages)
+			},
+		},
+		{
+			name:    "linux rhel: a line over 64 KiB keeps the packages after it",
+			variant: "linux",
+			detect:  "rhel",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Out: map[string]string{
+					rpmLine: "huge\t1.0\tx86_64\t" + strings.Repeat("x", 70000) + "\t1\n" +
+						"bash\t5.1-6.fc36\tx86_64\tshell\t2\n",
+				}}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Packages, 2)
+				s.Equal("bash", info.Packages[1].Name)
+			},
+		},
+		{
+			name:    "linux debian: a line over 64 KiB keeps the packages after it",
+			variant: "linux",
+			detect:  "debian",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Out: map[string]string{
+					dpkgLine: "huge\t1.0\tamd64\tinstalled\t" + strings.Repeat("x", 70000) + "\n" +
+						"bash\t5.1-6\tamd64\tinstalled\n",
+				}}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Packages, 2)
+				s.Equal("bash", info.Packages[1].Name)
+			},
+		},
+		{
 			name:    "linux rhel: rpm fails, empty list",
 			variant: "linux",
 			detect:  "rhel",
@@ -495,6 +553,24 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						PackageManager: "brew",
 					},
 				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a brew line over 64 KiB keeps the packages after it",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "huge " + strings.Repeat("1.", 35000) + "0\ngit 2.40.0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.Packages, 2)
+				s.Equal("git", info.Packages[1].Name)
 			},
 		},
 		{

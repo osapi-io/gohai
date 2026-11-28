@@ -55,5 +55,5 @@ func (l *Linux) Collect(
 		return nil, fmt.Errorf("read %s: %w", procLoadavg, err)
 	}
 
-	return parse(string(b))
+	return collector.Result(parse(string(b)))
 }

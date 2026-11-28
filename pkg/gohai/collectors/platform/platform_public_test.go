@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -626,6 +627,26 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 					VersionExtra: "(a)", Family: "darwin",
 					CPUArchitecture: runtime.GOARCH, Build: "23E224",
 				}, *info)
+			},
+		},
+		{
+			name:    "darwin: a sw_vers line over 64 KiB keeps the lines after it",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						swVersLine: "Junk:\t" + strings.Repeat(
+							"x",
+							70000,
+						) + "\nProductVersion:\t14.4.1\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal("14.4.1", info.Version)
 			},
 		},
 		{

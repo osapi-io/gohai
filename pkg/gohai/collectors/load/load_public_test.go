@@ -170,6 +170,9 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
 				s.ErrorContains(err, tt.wantErr)
+				// A failed parse gives no fact: an untyped nil, not a nil
+				// *Info in an any.
+				s.Exactly(nil, got)
 
 				return
 			}

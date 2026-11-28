@@ -1103,6 +1103,38 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name: "linux: an ip6tnl whose link attributes are on their own line keeps them",
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
+					{Index: 5, Name: "ip6tnl0", MTU: 1452, Flags: []string{}},
+				}, nil
+			},
+			countersFn: zeroCounters,
+			fs:         sourcetest.FS(s.T(), nil),
+			exec: ipRouteAndIPLinkExec(
+				s.T(),
+				`5: ip6tnl0@NONE: <NOARP> mtu 1452 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/tunnel6 :: brd :: promiscuity 0 minmtu 68 maxmtu 65407
+    ip6tnl ip6ip6 remote :: local :: hoplimit 0 encaplimit 0 tclass 0x00 flowlabel 0x00000 (flowinfo 0x00000000)
+    addrgenmode eui64 numtxqueues 1 numrxqueues 1 gso_max_size 65536 gso_max_segs 65535
+`,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				t := i.Interfaces[0].TunnelInfo
+				s.Require().NotNil(t)
+				s.Equal("ip6ip6", t.Proto)
+				s.Equal("eui64", t.AddrGenMode)
+				s.Equal("1", t.NumTxQueues)
+				s.Equal("1", t.NumRxQueues)
+				s.Equal("65536", t.GsoMaxSize)
+				s.Equal("65535", t.GsoMaxSegs)
+			},
+		},
+		{
 			name:       "linux: ip -d link continuation lines before any header are dropped",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
