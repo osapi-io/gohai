@@ -58,8 +58,9 @@ func NewLinux() *Linux {
 }
 
 // Collect gathers VMware Tools statistics. It returns no fact when the
-// host is not a VMware guest or VMware Tools is not installed, and an error
-// when vmware-toolbox-cmd is there but a call to it fails.
+// host is not a VMware guest or VMware Tools is not installed. When a call
+// to vmware-toolbox-cmd does not finish, it returns the values read before
+// that call with the error.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -69,12 +70,7 @@ func (l *Linux) Collect(
 		return nil, err
 	}
 
-	info, err := collectVMwareTools(ctx, l.Exec)
-	if err != nil {
-		return nil, err
-	}
-
-	return info, nil
+	return collectVMwareTools(ctx, l.Exec)
 }
 
 // isVMwareGuest reports whether the host is a VMware guest with VMware

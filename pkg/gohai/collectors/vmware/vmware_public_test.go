@@ -505,7 +505,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a raw session query that does not finish is an error, not a desktop guest",
+			name:    "linux: a raw session query that does not finish keeps the stats, with the error",
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				f := memfs.New()
@@ -521,11 +521,15 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				}
 			},
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
 				s.EqualError(
 					err,
 					"vmware-toolbox-cmd stat raw json session: context deadline exceeded",
 				)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(i)
+				s.Equal("2600 MHz", i.Speed)
+				s.Empty(i.HostType)
 			},
 		},
 		{
@@ -554,7 +558,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a raw session query that its timeout killed is an error, not a desktop guest",
+			name:    "linux: a killed raw session query keeps the stats, not a desktop guest",
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				f := memfs.New()
@@ -570,8 +574,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				}
 			},
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
 				s.ErrorIs(err, errKilled)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(i)
+				s.Equal("2600 MHz", i.Speed)
+				s.Empty(i.HostType)
 			},
 		},
 		{
@@ -590,7 +598,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a stat that does not finish is an error",
+			name:    "linux: a stat that does not finish keeps the earlier stats",
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				f := memfs.New()
@@ -606,8 +614,13 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				}
 			},
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
 				s.EqualError(err, "vmware-toolbox-cmd stat speed: signal: killed")
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(i)
+				s.Equal("01 Jan 2026 12:00:00", i.Hosttime)
+				s.Empty(i.Speed)
+				s.Empty(i.HostType)
 			},
 		},
 		{
@@ -748,7 +761,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: a stat that does not finish is an error",
+			name:    "darwin: a stat that does not finish keeps the version",
 			variant: "darwin",
 			setupDarwin: func() *vmware.Darwin {
 				return &vmware.Darwin{
@@ -760,8 +773,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				}
 			},
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
 				s.EqualError(err, "vmware-toolbox-cmd stat hosttime: context deadline exceeded")
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(i)
+				s.NotEmpty(i.Version)
+				s.Empty(i.Hosttime)
 			},
 		},
 		{
