@@ -41,9 +41,7 @@ type CloudPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestCloudPublicTestSuite(
-	t *testing.T,
-) {
+func TestCloudPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CloudPublicTestSuite))
 }
 

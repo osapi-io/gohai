@@ -52,9 +52,7 @@ type LinodePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestLinodePublicTestSuite(
-	t *testing.T,
-) {
+func TestLinodePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(LinodePublicTestSuite))
 }
 

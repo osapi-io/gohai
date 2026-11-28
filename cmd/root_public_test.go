@@ -38,9 +38,7 @@ type RootPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestRootPublicTestSuite(
-	t *testing.T,
-) {
+func TestRootPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(RootPublicTestSuite))
 }
 

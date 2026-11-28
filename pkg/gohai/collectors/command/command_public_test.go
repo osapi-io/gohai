@@ -47,9 +47,7 @@ type CommandPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestCommandPublicTestSuite(
-	t *testing.T,
-) {
+func TestCommandPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CommandPublicTestSuite))
 }
 

@@ -340,8 +340,6 @@ func (s *FamilyPublicTestSuite) TestFromFS() {
 	}
 }
 
-func TestFamilyPublicTestSuite(
-	t *testing.T,
-) {
+func TestFamilyPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(FamilyPublicTestSuite))
 }

@@ -42,9 +42,7 @@ type DNSPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestDNSPublicTestSuite(
-	t *testing.T,
-) {
+func TestDNSPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(DNSPublicTestSuite))
 }
 

@@ -70,9 +70,7 @@ type ShardPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestShardPublicTestSuite(
-	t *testing.T,
-) {
+func TestShardPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ShardPublicTestSuite))
 }
 

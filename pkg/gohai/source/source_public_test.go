@@ -246,8 +246,6 @@ func (s *SourcePublicTestSuite) TestCommandsWith() {
 	}
 }
 
-func TestSourcePublicTestSuite(
-	t *testing.T,
-) {
+func TestSourcePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SourcePublicTestSuite))
 }

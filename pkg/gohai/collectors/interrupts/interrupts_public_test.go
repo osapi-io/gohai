@@ -56,9 +56,7 @@ type InterruptsPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestInterruptsPublicTestSuite(
-	t *testing.T,
-) {
+func TestInterruptsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(InterruptsPublicTestSuite))
 }
 

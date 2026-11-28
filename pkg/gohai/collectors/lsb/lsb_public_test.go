@@ -47,9 +47,7 @@ type LSBPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestLSBPublicTestSuite(
-	t *testing.T,
-) {
+func TestLSBPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(LSBPublicTestSuite))
 }
 

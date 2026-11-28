@@ -136,9 +136,7 @@ type EC2PublicTestSuite struct {
 	suite.Suite
 }
 
-func TestEC2PublicTestSuite(
-	t *testing.T,
-) {
+func TestEC2PublicTestSuite(t *testing.T) {
 	suite.Run(t, new(EC2PublicTestSuite))
 }
 

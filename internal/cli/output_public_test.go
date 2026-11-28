@@ -40,9 +40,7 @@ type OutputPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestOutputPublicTestSuite(
-	t *testing.T,
-) {
+func TestOutputPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(OutputPublicTestSuite))
 }
 

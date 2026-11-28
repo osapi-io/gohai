@@ -45,9 +45,7 @@ type MemoryPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestMemoryPublicTestSuite(
-	t *testing.T,
-) {
+func TestMemoryPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(MemoryPublicTestSuite))
 }
 

@@ -78,9 +78,7 @@ type DigitalOceanPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestDigitalOceanPublicTestSuite(
-	t *testing.T,
-) {
+func TestDigitalOceanPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(DigitalOceanPublicTestSuite))
 }
 

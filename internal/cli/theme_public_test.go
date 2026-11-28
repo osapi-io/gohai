@@ -34,9 +34,7 @@ type ThemePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestThemePublicTestSuite(
-	t *testing.T,
-) {
+func TestThemePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ThemePublicTestSuite))
 }
 

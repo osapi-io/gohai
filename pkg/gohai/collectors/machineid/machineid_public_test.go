@@ -45,9 +45,7 @@ type MachineIDPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestMachineIDPublicTestSuite(
-	t *testing.T,
-) {
+func TestMachineIDPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(MachineIDPublicTestSuite))
 }
 

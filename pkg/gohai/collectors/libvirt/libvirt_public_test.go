@@ -106,9 +106,7 @@ type LibvirtPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestLibvirtPublicTestSuite(
-	t *testing.T,
-) {
+func TestLibvirtPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(LibvirtPublicTestSuite))
 }
 

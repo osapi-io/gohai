@@ -51,9 +51,7 @@ type SystemdPathsPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestSystemdPathsPublicTestSuite(
-	t *testing.T,
-) {
+func TestSystemdPathsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SystemdPathsPublicTestSuite))
 }
 

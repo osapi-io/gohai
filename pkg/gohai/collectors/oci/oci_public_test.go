@@ -93,9 +93,7 @@ type OCIPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestOCIPublicTestSuite(
-	t *testing.T,
-) {
+func TestOCIPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(OCIPublicTestSuite))
 }
 

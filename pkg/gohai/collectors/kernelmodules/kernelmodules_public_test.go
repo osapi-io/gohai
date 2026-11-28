@@ -50,9 +50,7 @@ type KernelModulesPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestKernelModulesPublicTestSuite(
-	t *testing.T,
-) {
+func TestKernelModulesPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(KernelModulesPublicTestSuite))
 }
 

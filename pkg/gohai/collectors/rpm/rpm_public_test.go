@@ -53,9 +53,7 @@ type RPMPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestRPMPublicTestSuite(
-	t *testing.T,
-) {
+func TestRPMPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(RPMPublicTestSuite))
 }
 

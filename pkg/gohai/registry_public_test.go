@@ -36,9 +36,7 @@ type RegistryPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestRegistryPublicTestSuite(
-	t *testing.T,
-) {
+func TestRegistryPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(RegistryPublicTestSuite))
 }
 

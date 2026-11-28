@@ -36,9 +36,7 @@ type ColorPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestColorPublicTestSuite(
-	t *testing.T,
-) {
+func TestColorPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ColorPublicTestSuite))
 }
 

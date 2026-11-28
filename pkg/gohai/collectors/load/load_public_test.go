@@ -42,9 +42,7 @@ type LoadPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestLoadPublicTestSuite(
-	t *testing.T,
-) {
+func TestLoadPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(LoadPublicTestSuite))
 }
 

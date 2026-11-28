@@ -50,9 +50,7 @@ type ZpoolsPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestZpoolsPublicTestSuite(
-	t *testing.T,
-) {
+func TestZpoolsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ZpoolsPublicTestSuite))
 }
 

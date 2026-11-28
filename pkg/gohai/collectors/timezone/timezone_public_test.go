@@ -46,9 +46,7 @@ type TimezonePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestTimezonePublicTestSuite(
-	t *testing.T,
-) {
+func TestTimezonePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(TimezonePublicTestSuite))
 }
 

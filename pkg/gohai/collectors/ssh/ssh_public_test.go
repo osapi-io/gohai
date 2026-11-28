@@ -113,9 +113,7 @@ type SSHPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestSSHPublicTestSuite(
-	t *testing.T,
-) {
+func TestSSHPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SSHPublicTestSuite))
 }
 

@@ -74,9 +74,7 @@ type ServicesPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestServicesPublicTestSuite(
-	t *testing.T,
-) {
+func TestServicesPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ServicesPublicTestSuite))
 }
 

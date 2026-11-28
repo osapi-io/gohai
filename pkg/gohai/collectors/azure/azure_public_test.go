@@ -190,9 +190,7 @@ type AzurePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestAzurePublicTestSuite(
-	t *testing.T,
-) {
+func TestAzurePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(AzurePublicTestSuite))
 }
 

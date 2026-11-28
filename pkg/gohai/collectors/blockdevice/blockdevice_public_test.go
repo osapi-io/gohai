@@ -43,9 +43,7 @@ type BlockDevicePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestBlockDevicePublicTestSuite(
-	t *testing.T,
-) {
+func TestBlockDevicePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(BlockDevicePublicTestSuite))
 }
 

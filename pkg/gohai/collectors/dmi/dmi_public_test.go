@@ -35,9 +35,7 @@ type DmiPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestDmiPublicTestSuite(
-	t *testing.T,
-) {
+func TestDmiPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(DmiPublicTestSuite))
 }
 

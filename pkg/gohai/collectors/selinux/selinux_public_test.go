@@ -75,9 +75,7 @@ type SelinuxPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestSelinuxPublicTestSuite(
-	t *testing.T,
-) {
+func TestSelinuxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SelinuxPublicTestSuite))
 }
 

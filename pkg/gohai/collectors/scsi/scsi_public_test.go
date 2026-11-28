@@ -51,9 +51,7 @@ type SCSIPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestSCSIPublicTestSuite(
-	t *testing.T,
-) {
+func TestSCSIPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SCSIPublicTestSuite))
 }
 

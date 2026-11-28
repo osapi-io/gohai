@@ -35,9 +35,7 @@ type CollectPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestCollectPublicTestSuite(
-	t *testing.T,
-) {
+func TestCollectPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CollectPublicTestSuite))
 }
 

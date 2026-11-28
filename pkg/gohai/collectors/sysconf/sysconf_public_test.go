@@ -43,9 +43,7 @@ type SysconfPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestSysconfPublicTestSuite(
-	t *testing.T,
-) {
+func TestSysconfPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SysconfPublicTestSuite))
 }
 

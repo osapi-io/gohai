@@ -45,9 +45,7 @@ type OSReleasePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestOSReleasePublicTestSuite(
-	t *testing.T,
-) {
+func TestOSReleasePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(OSReleasePublicTestSuite))
 }
 

@@ -120,9 +120,7 @@ type AlibabaPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestAlibabaPublicTestSuite(
-	t *testing.T,
-) {
+func TestAlibabaPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(AlibabaPublicTestSuite))
 }
 

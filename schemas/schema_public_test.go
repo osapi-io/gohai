@@ -127,8 +127,6 @@ func (s *SchemaPublicTestSuite) TestFieldMappingRows() {
 	}
 }
 
-func TestSchemaPublicTestSuite(
-	t *testing.T,
-) {
+func TestSchemaPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SchemaPublicTestSuite))
 }

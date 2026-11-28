@@ -33,9 +33,7 @@ type SpecPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestSpecPublicTestSuite(
-	t *testing.T,
-) {
+func TestSpecPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SpecPublicTestSuite))
 }
 

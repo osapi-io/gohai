@@ -65,9 +65,7 @@ type CloudMetadataPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestCloudMetadataPublicTestSuite(
-	t *testing.T,
-) {
+func TestCloudMetadataPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CloudMetadataPublicTestSuite))
 }
 

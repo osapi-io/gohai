@@ -60,9 +60,7 @@ type LivepatchPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestLivepatchPublicTestSuite(
-	t *testing.T,
-) {
+func TestLivepatchPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(LivepatchPublicTestSuite))
 }
 

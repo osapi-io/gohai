@@ -47,9 +47,7 @@ type PackageMgrPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestPackageMgrPublicTestSuite(
-	t *testing.T,
-) {
+func TestPackageMgrPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(PackageMgrPublicTestSuite))
 }
 
