@@ -489,7 +489,7 @@ func NewDarwin() *Darwin {
 
 ```go
 ctrl := gomock.NewController(t)
-mockExec := sourcemocks.NewMockRunner(ctrl)
+mockExec := mocks.NewMockRunner(ctrl)
 mockExec.EXPECT().
     Execute(gomock.Any(), "sw_vers", "-productVersionExtra").
     Return([]byte("(a)\n"), nil)
