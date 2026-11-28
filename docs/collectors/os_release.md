@@ -101,9 +101,8 @@ None.
 | Linux    | `/etc/os-release` | [`linux/os_release.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/os_release.rb) parses the same file into `os_release`. | **Equivalent.** The file is the same, and both read all keys. gohai keeps the known keys as typed fields and puts the unknown keys in `extra`. |
 | macOS    | None              | Ohai has no handler.                                                                                                                         | Parity. gohai gives no fact, with the status `unsupported`.                                                                                    |
 
-**Known gaps:** None. Ohai also reports some old aliases for backward
-compatibility, for example `lsb.id`. In gohai, the `lsb` collector reports those
-aliases, not this collector.
+Ohai also reports some old aliases, for example `lsb.id`. In gohai, the `lsb`
+collector reports those aliases, not this collector.
 
 ## Backing library
 

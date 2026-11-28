@@ -41,6 +41,11 @@ Consumers use this data to:
 The field name `cmd_line` comes from OCSF (`process.cmd_line`), not from Ohai's
 `command`. If OCSF and Ohai both name a field, the OCSF name is used.
 
+`cmd_line` holds the full command line of each process, with its arguments. Thus
+it can contain a secret that a program gets as an argument, such as a password
+or a token. The collector is opt-in, so it does not run unless you enable it.
+Enable it only where its facts can hold such values.
+
 ## Platform support
 
 | Platform | Supported                                |
@@ -126,11 +131,8 @@ directory on Linux, and `ps -p <pid>` on macOS. It is an error when there is no
 such process. A caller that watches one process, such as its own, uses it on
 each sample, not `Collect`.
 
-**Known gaps vs. Ohai:** gohai does not report the `tty` and `stime` columns of
-`ps`. It also does not report threads, the file descriptor count or the
-environment of each process. These are planned extensions, if consumers need
-them. For parity with Ohai, the gohai `command` collector reports the raw
-`ps -ef` text block separately.
+For parity with Ohai, the gohai `command` collector reports the raw `ps -ef`
+text block separately.
 
 ## Backing library
 
