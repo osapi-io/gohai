@@ -189,10 +189,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 	brewOut := []byte("git 2.40.0\nzsh 5.9\ncurl 8.1.2 8.1.1\n")
 
 	tests := []struct {
-		name         string
-		variant      string
-		detect       string
-		exec         func(*testing.T) source.Runner
+		name    string
+		variant string
+		detect  string
+		exec    func(*testing.T) source.Runner
+		// noManager runs the Linux variant with no package manager.
+		noManager    bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -617,6 +619,18 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				s.Equal([]packages.Package{}, info.Packages)
 			},
 		},
+		{
+			name:      "linux: with no package manager the list is empty",
+			variant:   "linux",
+			exec:      func(*testing.T) source.Runner { return source.Commands() },
+			noManager: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{}, info.Packages)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -631,6 +645,9 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				l, ok := packages.New().(*packages.Linux)
 				s.Require().True(ok)
 				l.Exec = tt.exec(s.T())
+				if tt.noManager {
+					l.Manager = ""
+				}
 				c = l
 			case "darwin":
 				c = &packages.Darwin{Exec: tt.exec(s.T())}

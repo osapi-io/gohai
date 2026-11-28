@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/avfs/avfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/sourcetest"
@@ -37,36 +38,97 @@ type SourcetestPublicTestSuite struct {
 }
 
 func (s *SourcetestPublicTestSuite) TestFS() {
-	fs := sourcetest.FS(s.T(), map[string]string{"/proc/loadavg": "0.1 0.2 0.3"})
-	b, err := fs.ReadFile("/proc/loadavg")
-	s.Require().NoError(err)
-	s.Equal("0.1 0.2 0.3", string(b))
+	tests := []struct {
+		name         string
+		files        map[string]string
+		validateFunc func(avfs.VFS)
+	}{
+		{
+			name:  "holds each file it is given, at its path",
+			files: map[string]string{"/proc/loadavg": "0.1 0.2 0.3"},
+			validateFunc: func(fs avfs.VFS) {
+				b, err := fs.ReadFile("/proc/loadavg")
+				s.Require().NoError(err)
+				s.Equal("0.1 0.2 0.3", string(b))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(sourcetest.FS(s.T(), tt.files))
+		})
+	}
 }
 
 func (s *SourcetestPublicTestSuite) TestLinks() {
-	fs := sourcetest.Links(s.T(), sourcetest.FS(s.T(), nil), map[string]string{
-		"/sys/bus/pci/devices/0000:00:02.0/driver": "../../../bus/pci/drivers/i915",
-	})
-	target, err := fs.Readlink("/sys/bus/pci/devices/0000:00:02.0/driver")
-	s.Require().NoError(err)
-	s.Equal("../../../bus/pci/drivers/i915", target)
+	tests := []struct {
+		name         string
+		links        map[string]string
+		validateFunc func(avfs.VFS)
+	}{
+		{
+			name: "makes each link it is given, to its target",
+			links: map[string]string{
+				"/sys/bus/pci/devices/0000:00:02.0/driver": "../../../bus/pci/drivers/i915",
+			},
+			validateFunc: func(fs avfs.VFS) {
+				target, err := fs.Readlink("/sys/bus/pci/devices/0000:00:02.0/driver")
+				s.Require().NoError(err)
+				s.Equal("../../../bus/pci/drivers/i915", target)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(sourcetest.Links(s.T(), sourcetest.FS(s.T(), nil), tt.links))
+		})
+	}
 }
 
 func (s *SourcetestPublicTestSuite) TestCommands() {
-	r := sourcetest.Commands{
+	cmds := sourcetest.Commands{
 		Out: map[string]string{"sysctl -n vm.loadavg": "{ 1 2 3 }", "df -kP": "partial"},
 		Err: map[string]error{"df -kP": errors.New("exit status 1")},
-	}.Mock(s.T())
-	out, err := r.Execute(context.Background(), "sysctl", "-n", "vm.loadavg")
-	s.Require().NoError(err)
-	s.Equal("{ 1 2 3 }", string(out))
+	}
 
-	out, err = r.Execute(context.Background(), "df", "-kP")
-	s.EqualError(err, "exit status 1")
-	s.Equal("partial", string(out))
+	tests := []struct {
+		name         string
+		cmd          []string
+		validateFunc func([]byte, error)
+	}{
+		{
+			name: "a command with output answers it",
+			cmd:  []string{"sysctl", "-n", "vm.loadavg"},
+			validateFunc: func(out []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("{ 1 2 3 }", string(out))
+			},
+		},
+		{
+			name: "a command with output and an error answers both",
+			cmd:  []string{"df", "-kP"},
+			validateFunc: func(out []byte, err error) {
+				s.EqualError(err, "exit status 1")
+				s.Equal("partial", string(out))
+			},
+		},
+		{
+			name: "a command it does not hold is an error",
+			cmd:  []string{"nope"},
+			validateFunc: func(_ []byte, err error) {
+				s.ErrorContains(err, "exec nope")
+			},
+		},
+	}
 
-	_, err = r.Execute(context.Background(), "nope")
-	s.ErrorContains(err, "exec nope")
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			r := cmds.Mock(s.T())
+			tt.validateFunc(r.Execute(context.Background(), tt.cmd[0], tt.cmd[1:]...))
+		})
+	}
 }
 
 func (s *SourcetestPublicTestSuite) TestHTTP() {

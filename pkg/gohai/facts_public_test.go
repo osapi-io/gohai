@@ -313,5 +313,21 @@ func (s *FactsPublicTestSuite) TestGet() {
 }
 
 func (s *FactsPublicTestSuite) TestString() {
-	s.Contains(s.facts.String(), "Facts{")
+	tests := []struct {
+		name         string
+		validateFunc func(string)
+	}{
+		{
+			name: "names the Facts type",
+			validateFunc: func(got string) {
+				s.Contains(got, "Facts{")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(s.facts.String())
+		})
+	}
 }

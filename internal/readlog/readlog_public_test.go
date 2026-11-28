@@ -30,6 +30,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/readlog"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 type ReadlogPublicTestSuite struct {
@@ -37,41 +38,73 @@ type ReadlogPublicTestSuite struct {
 }
 
 func (s *ReadlogPublicTestSuite) TestSources() {
-	src, log := readlog.Sources(family.Darwin)
-	s.Equal(family.Darwin, src.Family)
-	s.Equal(int64(0), src.Now().Unix())
+	tests := []struct {
+		name         string
+		validateFunc func(source.Sources, *readlog.Log)
+	}{
+		{
+			name: "gives the family, and a clock at zero",
+			validateFunc: func(src source.Sources, _ *readlog.Log) {
+				s.Equal(family.Darwin, src.Family)
+				s.Equal(int64(0), src.Now().Unix())
+			},
+		},
+		{
+			name: "the filesystem holds nothing, and logs each path once, sorted",
+			validateFunc: func(src source.Sources, log *readlog.Log) {
+				_, err := src.FS.Open("/a")
+				s.ErrorIs(err, fs.ErrNotExist)
+				_, _ = src.FS.OpenFile("/b", os.O_RDONLY, 0)
+				_, _ = src.FS.ReadFile("/c")
+				_, _ = src.FS.ReadDir("/d")
+				_, _ = src.FS.Stat("/e")
+				_, _ = src.FS.Lstat("/f")
+				_, _ = src.FS.Readlink("/g")
+				_, _ = src.FS.EvalSymlinks("/h")
+				_, _ = src.FS.Glob("/i/*")
+				_ = src.FS.WalkDir("/j", func(string, fs.DirEntry, error) error { return nil })
+				_, _ = src.FS.ReadFile("/c")
 
-	_, err := src.FS.Open("/a")
-	s.ErrorIs(err, fs.ErrNotExist)
-	_, _ = src.FS.OpenFile("/b", os.O_RDONLY, 0)
-	_, _ = src.FS.ReadFile("/c")
-	_, _ = src.FS.ReadDir("/d")
-	_, _ = src.FS.Stat("/e")
-	_, _ = src.FS.Lstat("/f")
-	_, _ = src.FS.Readlink("/g")
-	_, _ = src.FS.EvalSymlinks("/h")
-	_, _ = src.FS.Glob("/i/*")
-	_ = src.FS.WalkDir("/j", func(string, fs.DirEntry, error) error { return nil })
-	_, _ = src.FS.ReadFile("/c")
+				s.Equal(
+					[]string{"/a", "/b", "/c", "/d", "/e", "/f", "/g", "/h", "/i/*", "/j"},
+					log.Files(),
+				)
+			},
+		},
+		{
+			name: "a command answers with no output, and is logged",
+			validateFunc: func(src source.Sources, log *readlog.Log) {
+				out, err := src.Exec.Execute(
+					context.Background(),
+					"systemctl",
+					"list-units",
+					"--all",
+				)
+				s.NoError(err)
+				s.Nil(out)
+				_, _ = src.Exec.Execute(context.Background(), "hostname")
 
-	out, err := src.Exec.Execute(context.Background(), "systemctl", "list-units", "--all")
-	s.NoError(err)
-	s.Nil(out)
-	_, _ = src.Exec.Execute(context.Background(), "hostname")
+				s.Equal([]string{"hostname", "systemctl list-units --all"}, log.Commands())
+			},
+		},
+		{
+			name: "the resolver resolves nothing",
+			validateFunc: func(src source.Sources, _ *readlog.Log) {
+				addrs, err := src.Resolver.LookupHost(context.Background(), "x")
+				s.NoError(err)
+				s.Nil(addrs)
+				names, err := src.Resolver.LookupAddr(context.Background(), "1.2.3.4")
+				s.NoError(err)
+				s.Nil(names)
+			},
+		},
+	}
 
-	addrs, err := src.Resolver.LookupHost(context.Background(), "x")
-	s.NoError(err)
-	s.Nil(addrs)
-	names, err := src.Resolver.LookupAddr(context.Background(), "1.2.3.4")
-	s.NoError(err)
-	s.Nil(names)
-
-	s.Equal(
-		[]string{"/a", "/b", "/c", "/d", "/e", "/f", "/g", "/h", "/i/*", "/j"},
-		log.Files(),
-		"each path once, sorted",
-	)
-	s.Equal([]string{"hostname", "systemctl list-units --all"}, log.Commands())
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(readlog.Sources(family.Darwin))
+		})
+	}
 }
 
 func TestReadlogPublicTestSuite(
