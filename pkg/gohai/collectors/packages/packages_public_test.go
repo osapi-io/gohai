@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"runtime"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -144,7 +145,9 @@ func (s *PackagesPublicTestSuite) TestNew() {
 			name: "New reads the real host",
 			real: true,
 			validateFunc: func(c packages.Collector) {
-				s.NotNil(c)
+				// New picks the variant for the host the test runs on.
+				_, darwin := c.(*packages.Darwin)
+				s.Equal(runtime.GOOS == "darwin", darwin)
 			},
 		},
 	}

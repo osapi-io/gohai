@@ -27,6 +27,7 @@ import (
 	"net"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -114,7 +115,9 @@ func (s *NetworkPublicTestSuite) TestNew() {
 			name: "New reads the real host",
 			real: true,
 			validateFunc: func(c network.Collector) {
-				s.NotNil(c)
+				// New picks the variant for the host the test runs on.
+				_, darwin := c.(*network.Darwin)
+				s.Equal(runtime.GOOS == "darwin", darwin)
 			},
 		},
 	}

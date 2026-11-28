@@ -23,6 +23,7 @@ package osrelease_test
 import (
 	"context"
 	"io/fs"
+	"runtime"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -101,7 +102,9 @@ func (s *OSReleasePublicTestSuite) TestNew() {
 			name: "New reads the real host",
 			real: true,
 			validateFunc: func(c osrelease.Collector) {
-				s.NotNil(c)
+				// New picks the variant for the host the test runs on.
+				_, darwin := c.(*osrelease.Darwin)
+				s.Equal(runtime.GOOS == "darwin", darwin)
 			},
 		},
 	}

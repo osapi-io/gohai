@@ -22,6 +22,7 @@ package pci_test
 
 import (
 	"context"
+	"runtime"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -83,7 +84,9 @@ func (s *PCIPublicTestSuite) TestNew() {
 			name: "New reads the real host",
 			real: true,
 			validateFunc: func(c pci.Collector) {
-				s.NotNil(c)
+				// New picks the variant for the host the test runs on.
+				_, darwin := c.(*pci.Darwin)
+				s.Equal(runtime.GOOS == "darwin", darwin)
 			},
 		},
 	}

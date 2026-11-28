@@ -23,6 +23,7 @@ package process_test
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -101,7 +102,9 @@ func (s *ProcessPublicTestSuite) TestNew() {
 			name: "New reads the real host",
 			real: true,
 			validateFunc: func(c process.Collector) {
-				s.NotNil(c)
+				// New picks the variant for the host the test runs on.
+				_, darwin := c.(*process.Darwin)
+				s.Equal(runtime.GOOS == "darwin", darwin)
 			},
 		},
 	}

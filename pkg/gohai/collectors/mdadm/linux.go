@@ -57,16 +57,7 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	readFn := func(path string) ([]byte, error) {
-		return l.FS.ReadFile(path)
-	}
-
-	var execFn func(context.Context, string, ...string) ([]byte, error)
-	if l.Exec != nil {
-		execFn = l.Exec.Execute
-	}
-
-	arrays, err := collectArrays(ctx, readFn, execFn)
+	arrays, err := collectArrays(ctx, l.FS, l.Exec)
 	if err != nil {
 		return nil, err
 	}
