@@ -22,9 +22,10 @@ package gce_test
 
 import (
 	"context"
+	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
-	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -33,6 +34,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // gcePrior builds a PriorResults containing a dmi.Info whose product
@@ -122,6 +124,36 @@ const cannedResponse = `{
   }
 }`
 
+// metadata answers each request with status and body, or with err, and
+// keeps the requests that it saw. http.RoundTripper is the standard
+// library's interface, so it has no generated mock. The http.Client
+// calls RoundTrip on the caller's goroutine, so the test reads requests
+// with no lock.
+type metadata struct {
+	status   int
+	body     string
+	err      error
+	requests []*http.Request
+}
+
+// RoundTrip records req and gives the canned answer.
+func (m *metadata) RoundTrip(
+	req *http.Request,
+) (*http.Response, error) {
+	m.requests = append(m.requests, req)
+	if m.err != nil {
+		return nil, m.err
+	}
+
+	return &http.Response{
+		StatusCode: m.status,
+		Status:     http.StatusText(m.status),
+		Header:     http.Header{},
+		Body:       io.NopCloser(strings.NewReader(m.body)),
+		Request:    req,
+	}, nil
+}
+
 type GcePublicTestSuite struct {
 	suite.Suite
 }
@@ -133,27 +165,47 @@ func TestGcePublicTestSuite(
 }
 
 func (s *GcePublicTestSuite) TestNew() {
-	s.NotNil(gce.New())
-}
-
-func (s *GcePublicTestSuite) TestMetadata() {
 	tests := []struct {
 		name         string
-		handler      func(w http.ResponseWriter, r *http.Request)
-		closed       bool                   // if true, close server before calling Collect
+		validateFunc func(*gce.Collector)
+	}{
+		{
+			name: "New gives the gce cloud collector, opt-in, after dmi",
+			validateFunc: func(c *gce.Collector) {
+				s.Equal("gce", c.Name())
+				s.Equal(collector.CategoryCloud, c.Category())
+				s.False(c.DefaultEnabled())
+				s.Equal([]string{"dmi"}, c.Dependencies())
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(gce.New())
+		})
+	}
+}
+
+func (s *GcePublicTestSuite) TestCollect() {
+	tests := []struct {
+		name         string
+		meta         *metadata
 		prior        collector.PriorResults // defaults to gcePrior() when nil
-		validateFunc func(any, bool, string, error)
+		validateFunc func(any, error, *metadata)
 	}{
 		{
 			name: "happy path transforms raw response",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write([]byte(cannedResponse))
-			},
-			validateFunc: func(out any, _ bool, hdrGot string, _ error) {
+			meta: &metadata{status: http.StatusOK, body: cannedResponse},
+			validateFunc: func(out any, err error, m *metadata) {
+				s.Require().NoError(err)
+				s.Require().Len(m.requests, 1)
+				s.Equal("Google", m.requests[0].Header.Get("Metadata-Flavor"))
+				s.Equal(
+					"http://metadata.google.internal./computeMetadata/v1/?recursive=true",
+					m.requests[0].URL.String(),
+				)
 				info, ok := out.(*gce.Info)
 				s.Require().True(ok)
-				s.Equal("Google", hdrGot)
-				s.Require().NotNil(info)
 				s.Equal(int64(1234567890123), info.ID)
 				s.Equal("my-vm", info.Name)
 				s.Equal("my-vm.c.my-project.internal", info.Hostname)
@@ -179,12 +231,13 @@ func (s *GcePublicTestSuite) TestMetadata() {
 				s.Contains(info.Attributes, "startup-script")
 				s.Contains(info.ProjectAttributes, "ssh-keys")
 
-				s.Require().Len(info.Disks, 1)
-				d := info.Disks[0]
-				s.Equal("boot", d.DeviceName)
-				s.Equal("PERSISTENT", d.Type)
-				s.Equal("SCSI", d.Interface)
-				s.True(d.Encrypted)
+				s.Equal([]gce.Disk{{
+					DeviceName: "boot",
+					Type:       "PERSISTENT",
+					Mode:       "READ_WRITE",
+					Interface:  "SCSI",
+					Encrypted:  true,
+				}}, info.Disks)
 
 				s.Require().Len(info.NetworkInterfaces, 1)
 				iface := info.NetworkInterfaces[0]
@@ -193,120 +246,134 @@ func (s *GcePublicTestSuite) TestMetadata() {
 				s.Equal([]string{"10.132.0.0/20"}, iface.IPAliases)
 				s.Equal([]string{"34.102.0.1"}, iface.ForwardedIPs)
 				s.Equal(1460, iface.MTU)
-				s.Require().Len(iface.AccessConfigs, 2)
-				s.Equal("34.123.45.67", iface.AccessConfigs[0].ExternalIP)
-				s.Equal("34.123.45.68", iface.AccessConfigs[1].ExternalIP)
+				s.Equal([]gce.AccessConfig{
+					{ExternalIP: "34.123.45.67", Type: "ONE_TO_ONE_NAT"},
+					{ExternalIP: "34.123.45.68", Type: "ONE_TO_ONE_NAT"},
+				}, iface.AccessConfigs)
 
-				s.Require().Len(info.ServiceAccounts, 1)
-				sa := info.ServiceAccounts[0]
-				s.Equal("default", sa.Key)
-				s.Equal("default@my-project.iam.gserviceaccount.com", sa.Email)
-				s.Equal([]string{"alt"}, sa.Aliases)
-				s.Len(sa.Scopes, 2)
+				s.Equal([]gce.ServiceAccount{{
+					Key:     "default",
+					Email:   "default@my-project.iam.gserviceaccount.com",
+					Aliases: []string{"alt"},
+					Scopes: []string{
+						"https://www.googleapis.com/auth/cloud-platform",
+						"https://www.googleapis.com/auth/logging.write",
+					},
+				}}, info.ServiceAccounts)
 			},
 		},
 		{
 			name: "preemptible TRUE parses as bool",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write(
-					[]byte(`{"instance":{"scheduling":{"preemptible":"TRUE"}},"project":{}}`),
-				)
+			meta: &metadata{
+				status: http.StatusOK,
+				body:   `{"instance":{"scheduling":{"preemptible":"TRUE"}},"project":{}}`,
 			},
-			validateFunc: func(out any, _ bool, _ string, _ error) {
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.Require().NoError(err)
 				info, ok := out.(*gce.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.True(info.Preemptible)
 			},
 		},
 		{
-			name: "multiple service accounts collected",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write([]byte(`{"instance":{"serviceAccounts":{
-					"default":{"email":"a@x.iam.gserviceaccount.com"},
-					"extra":{"email":"b@x.iam.gserviceaccount.com"}
-				}},"project":{}}`))
+			name: "service accounts are in key order",
+			meta: &metadata{
+				status: http.StatusOK,
+				body: `{"instance":{"serviceAccounts":{
+					"zeta":{"email":"z@x.iam.gserviceaccount.com"},
+					"alpha":{"email":"a@x.iam.gserviceaccount.com"},
+					"mid":{"email":"m@x.iam.gserviceaccount.com"}
+				}},"project":{}}`,
 			},
-			validateFunc: func(out any, _ bool, _ string, _ error) {
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.Require().NoError(err)
 				info, ok := out.(*gce.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
-				emails := make([]string, 0, len(info.ServiceAccounts))
-				for _, sa := range info.ServiceAccounts {
-					emails = append(emails, sa.Email)
-				}
-				sort.Strings(emails)
-				s.Equal([]string{
-					"a@x.iam.gserviceaccount.com",
-					"b@x.iam.gserviceaccount.com",
-				}, emails)
+				s.Equal([]gce.ServiceAccount{
+					{Key: "alpha", Email: "a@x.iam.gserviceaccount.com"},
+					{Key: "mid", Email: "m@x.iam.gserviceaccount.com"},
+					{Key: "zeta", Email: "z@x.iam.gserviceaccount.com"},
+				}, info.ServiceAccounts)
 			},
 		},
 		{
-			name: "404 drops silently",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				http.NotFound(w, nil)
+			name: "404 is not GCE",
+			meta: &metadata{status: http.StatusNotFound},
+			validateFunc: func(out any, err error, m *metadata) {
+				s.NoError(err)
+				s.Nil(out)
+				s.Len(m.requests, 1)
 			},
-			validateFunc: func(out any, _ bool, _ string, _ error) {
+		},
+		{
+			name: "500 is not GCE",
+			meta: &metadata{status: http.StatusInternalServerError, body: "boom"},
+			validateFunc: func(out any, err error, m *metadata) {
+				s.NoError(err)
+				s.Nil(out)
+				s.Len(m.requests, 1)
+			},
+		},
+		{
+			name: "connection refused is not GCE",
+			meta: &metadata{err: errors.New("connection refused")},
+			validateFunc: func(out any, err error, m *metadata) {
+				s.NoError(err)
+				s.Nil(out)
+				s.Len(m.requests, 1)
+			},
+		},
+		{
+			name: "a body over the limit is an error, not an absent fact",
+			meta: &metadata{
+				status: http.StatusOK,
+				body:   strings.Repeat("x", cloudmetadata.MaxBody+1),
+			},
+			validateFunc: func(out any, err error, _ *metadata) {
+				s.ErrorContains(err, "read gce metadata")
+				s.NotErrorIs(err, cloudmetadata.ErrNotAvailable)
 				s.Nil(out)
 			},
 		},
 		{
-			name: "500 drops silently",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				http.Error(w, "boom", http.StatusInternalServerError)
-			},
-			validateFunc: func(out any, _ bool, _ string, _ error) {
-				s.Nil(out)
-			},
-		},
-		{
-			name:    "connection refused drops silently",
-			handler: func(http.ResponseWriter, *http.Request) {},
-			closed:  true,
-			validateFunc: func(out any, _ bool, _ string, _ error) {
-				s.Nil(out)
-			},
-		},
-		{
-			name: "malformed JSON surfaces as error",
-			handler: func(w http.ResponseWriter, _ *http.Request) {
-				_, _ = w.Write([]byte("not json"))
-			},
-			validateFunc: func(_ any, _ bool, _ string, err error) {
+			name: "malformed JSON is an error",
+			meta: &metadata{status: http.StatusOK, body: "not json"},
+			validateFunc: func(out any, err error, _ *metadata) {
 				s.Error(err)
+				s.Nil(out)
 			},
 		},
 		{
-			name:    "dmi says not GCE short-circuits without HTTP call",
-			handler: func(http.ResponseWriter, *http.Request) {},
+			name: "dmi says not GCE: no request",
+			meta: &metadata{status: http.StatusOK, body: cannedResponse},
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Product: &dmi.Product{Name: "OptiPlex 3070"}},
 			},
-			validateFunc: func(out any, httpCalled bool, _ string, _ error) {
-				s.False(httpCalled)
+			validateFunc: func(out any, err error, m *metadata) {
+				s.NoError(err)
 				s.Nil(out)
+				s.Empty(m.requests)
 			},
 		},
 		{
-			name:    "empty dmi product fails open and tries HTTP",
-			handler: func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(cannedResponse)) },
-			prior:   collector.PriorResults{"dmi": &dmi.Info{}},
-			validateFunc: func(out any, _ bool, _ string, _ error) {
-				info, ok := out.(*gce.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Equal("my-vm", info.Name)
+			name:  "dmi with no product table is not GCE: no request",
+			meta:  &metadata{status: http.StatusOK, body: cannedResponse},
+			prior: collector.PriorResults{"dmi": &dmi.Info{}},
+			validateFunc: func(out any, err error, m *metadata) {
+				s.NoError(err)
+				s.Nil(out)
+				s.Empty(m.requests)
 			},
 		},
 		{
-			name:    "no dmi in prior fails open and tries HTTP",
-			handler: func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(cannedResponse)) },
-			prior:   collector.PriorResults{},
-			validateFunc: func(out any, _ bool, _ string, _ error) {
+			name:  "dmi that did not run: the metadata service decides",
+			meta:  &metadata{status: http.StatusOK, body: cannedResponse},
+			prior: collector.PriorResults{},
+			validateFunc: func(out any, err error, m *metadata) {
+				s.Require().NoError(err)
+				s.Len(m.requests, 1)
 				info, ok := out.(*gce.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Equal("my-vm", info.Name)
 			},
 		},
@@ -314,74 +381,13 @@ func (s *GcePublicTestSuite) TestMetadata() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var hdrGot string
-			var httpCalled bool
-			srv := httptest.NewServer(http.HandlerFunc(
-				func(w http.ResponseWriter, r *http.Request) {
-					httpCalled = true
-					hdrGot = r.Header.Get("Metadata-Flavor")
-					tt.handler(w, r)
-				},
-			))
-			if tt.closed {
-				srv.Close()
-			} else {
-				defer srv.Close()
-			}
-
-			client := cloudmetadata.New(srv.URL,
-				cloudmetadata.WithHeader("Metadata-Flavor", "Google"))
-			c := gce.NewWithClient(client)
-
+			c := gce.NewWith(source.Sources{HTTP: tt.meta})
 			prior := tt.prior
 			if prior == nil {
 				prior = gcePrior()
 			}
 			out, err := c.Collect(context.Background(), prior)
-			tt.validateFunc(out, httpCalled, hdrGot, err)
-		})
-	}
-}
-
-func (s *GcePublicTestSuite) TestMetadataInterface() {
-	c := gce.New()
-	tests := []struct {
-		name         string
-		got          any
-		validateFunc func(any)
-	}{
-		{
-			name: "Name",
-			got:  c.Name(),
-			validateFunc: func(got any) {
-				s.Equal("gce", got)
-			},
-		},
-		{
-			name: "Category",
-			got:  string(c.Category()),
-			validateFunc: func(got any) {
-				s.Equal("cloud", got)
-			},
-		},
-		{
-			name: "DefaultEnabled",
-			got:  c.DefaultEnabled(),
-			validateFunc: func(got any) {
-				s.Equal(false, got)
-			},
-		},
-		{
-			name: "Dependencies",
-			got:  c.Dependencies(),
-			validateFunc: func(got any) {
-				s.Equal([]string{"dmi"}, got)
-			},
-		},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			tt.validateFunc(tt.got)
+			tt.validateFunc(out, err, tt.meta)
 		})
 	}
 }

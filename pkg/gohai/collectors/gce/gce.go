@@ -27,6 +27,9 @@ package gce
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -306,8 +309,10 @@ func (*Collector) Dependencies() []string { return []string{"dmi"} }
 // twice — once into the typed rawResponse for the curated Info, and
 // once into a generic map[string]any for the Raw forward-compat
 // escape hatch (matches Ohai's full-tree dump). Returns (nil, nil)
-// when we're not on GCE or when the endpoint is unreachable —
-// either way the Gce field drops cleanly from Facts.
+// when we're not on GCE or when the endpoint is unreachable, so the
+// Gce field drops from Facts. A read that fails for another reason,
+// such as a body over cloudmetadata.MaxBody, is an error, so the
+// facts are not lost with no word.
 func (c *Collector) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -317,10 +322,12 @@ func (c *Collector) Collect(
 	}
 	body, err := c.client.Get(ctx, "/?recursive=true")
 	if err != nil {
-		// Any fetch failure (transport, 404, body-read) means we
-		// can't determine whether we're on GCE — treat as "not on
-		// this cloud" rather than propagating noise.
-		return nil, nil
+		// A transport failure or a non-2xx answer means the host is
+		// not on GCE. Any other failure is the error of the read.
+		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read gce metadata: %w", err)
 	}
 	var raw rawResponse
 	if err := json.Unmarshal(body, &raw); err != nil {
@@ -330,16 +337,20 @@ func (c *Collector) Collect(
 }
 
 // onGCE returns true when the dmi collector's product.name indicates
-// Google Compute Engine. When dmi is absent from prior (disabled by
-// the user, or the dep chain otherwise skipped it) we fail open and
-// try the metadata endpoint — the endpoint probe is itself a valid
-// detection, just slower on non-GCE hosts.
+// Google Compute Engine. When dmi did not run, as when a caller asked
+// for this collector alone, only the metadata service can tell, so the
+// collector probes it. A host whose DMI has no product table, such as
+// a container or a host with no /sys/class/dmi, is not GCE, so it is
+// not probed.
 func onGCE(
 	prior collector.PriorResults,
 ) bool {
 	info, ok := collector.GetDep[*dmi.Info](prior, "dmi")
-	if !ok || info == nil || info.Product == nil {
+	if !ok {
 		return true
+	}
+	if info == nil || info.Product == nil {
+		return false
 	}
 	return strings.Contains(info.Product.Name, dmiProductName)
 }
@@ -408,7 +419,15 @@ func transform(
 		}
 		info.NetworkInterfaces = append(info.NetworkInterfaces, iface)
 	}
-	for key, sa := range r.Instance.ServiceAccounts {
+	// The service accounts are a map in the response. Sort them by key,
+	// so the facts are the same on each run.
+	keys := make([]string, 0, len(r.Instance.ServiceAccounts))
+	for key := range r.Instance.ServiceAccounts {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		sa := r.Instance.ServiceAccounts[key]
 		info.ServiceAccounts = append(info.ServiceAccounts, ServiceAccount{
 			Key:     key,
 			Email:   sa.Email,

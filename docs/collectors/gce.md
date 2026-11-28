@@ -213,17 +213,20 @@ endpoint. The collector skips the HTTP request when `dmi.Product.Name` does not
 contain `"Google Compute Engine"`. This is the same optimization as Ohai's
 `has_gce_dmi?`. When you enable `gce`, the dependency resolution of the registry
 enables `dmi` automatically. You do not have to enable it. If `dmi` is not in
-the prior results (because the user disabled it), the collector fails open and
-sends the HTTP request. This is slower on hosts that are not on GCE, but the
-result is still correct.
+the prior results (because the user disabled it), the collector sends the HTTP
+request. This is slower on hosts that are not on GCE, but the result is still
+correct. If `dmi` ran and found no product table, as in a container or on a host
+with no `/sys/class/dmi`, the host is not on GCE, and the collector sends no
+request.
 
 ## Data sources
 
 1. **DMI check** (refer to [dmi.md](dmi.md)). The collector reads the prior
    result of the `dmi` collector. If `product.name` does not contain
    `"Google Compute Engine"`, it stops and returns `(nil, nil)`. This prevents
-   the 2 s metadata-endpoint timeout on hosts that are not on GCE. If `dmi` did
-   not run, the check fails open and the collector sends the HTTP request.
+   the 2 s metadata-endpoint timeout on hosts that are not on GCE. If `dmi` ran
+   and has no product table, the collector also stops. If `dmi` did not run,
+   the collector sends the HTTP request.
 2. **Endpoint.**
    `http://metadata.google.internal./computeMetadata/v1/?recursive=true`. The
    dot at the end of the hostname stops the DNS search path of the host.
@@ -234,10 +237,11 @@ result is still correct.
 5. **Timeout.** 6 seconds. This is the same as Ohai's `read_timeout` in
    `mixin/gce_metadata.rb`. When the GCE link-local endpoint is reachable, it
    answers in milliseconds.
-6. **Failures.** If a read fails (transport, a status that is not 2xx, the body
-   read), the collector returns `(nil, nil)`. Then the `gce` field is not in
-   Facts, and there is no error. Only JSON that is not valid in the response
-   gives an error.
+6. **Failures.** If the endpoint cannot be reached, or answers with a status
+   that is not 2xx, the collector returns `(nil, nil)`. Then the `gce` field is
+   not in Facts, and there is no error. Any other failed read gives an error,
+   such as a body larger than the 1 MiB limit of `cloudmetadata`. JSON that is
+   not valid also gives an error.
 7. **Changes to the data.** The collector changes the resource paths
    (`machineType`, `zone`, `image`, `network`) to their last segment. It changes
    `scheduling.preemptible` from `"TRUE"` or `"FALSE"` to a real `bool`. It gets
@@ -245,7 +249,8 @@ result is still correct.
    zone. It moves `instance.virtualClock.driftToken` to the flat
    `virtual_clock_drift_token`. It moves `instance.remainingCpuTime` and
    `instance.partnerAttributes` to `remaining_cpu_time` and
-   `partner_attributes`. The collector does not keep the full tree as GCE gives
+   `partner_attributes`. It sorts `service_accounts` by key, so the order is
+   the same on each run. The collector does not keep the full tree as GCE gives
    it. All fields in the output are typed.
 
 The method is the same as Ohai's `Ohai::Mixin::GCEMetadata`: the same URL, the
