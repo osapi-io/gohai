@@ -35,7 +35,7 @@ import (
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -61,7 +61,7 @@ func displayExec(
 	err error,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "system_profiler", "SPDisplaysDataType", "-json").
 		Return(out, err).

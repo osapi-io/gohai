@@ -37,7 +37,7 @@ import (
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -96,7 +96,7 @@ func noLscpuExec(
 	t *testing.T,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lscpu").
 		Return(nil, errors.New("not found")).
@@ -109,7 +109,7 @@ func lscpuExec(
 	out string,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lscpu").
 		Return([]byte(out), nil).

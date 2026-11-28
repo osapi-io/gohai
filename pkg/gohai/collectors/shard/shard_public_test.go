@@ -33,7 +33,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/shard"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -402,7 +402,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				c = &shard.Linux{}
 			case "darwin":
 				ctrl := gomock.NewController(s.T())
-				mockExec := sourcemocks.NewMockRunner(ctrl)
+				mockExec := mocks.NewMockRunner(ctrl)
 				if tt.noExec {
 					c = &shard.Darwin{Exec: mockExec}
 					break

@@ -34,7 +34,7 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -49,7 +49,7 @@ func zpoolExec(
 	err error,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "zpool", "list", "-H", "-o", "name,size,alloc,free,health,altroot").
 		Return(out, err).

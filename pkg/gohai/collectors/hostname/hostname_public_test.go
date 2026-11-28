@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -62,7 +62,7 @@ func hostnameExec(
 	bareOut []byte, bareErr error,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "hostname", "-s").
 		Return(shortOut, shortErr).
@@ -507,7 +507,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 		s.Run(tt.name, func() {
 			fs := sourcetest.FS(s.T(), tt.files)
 			// The generated resolver answers with the row's lookups.
-			resolver := sourcemocks.NewMockResolver(gomock.NewController(s.T()))
+			resolver := mocks.NewMockResolver(gomock.NewController(s.T()))
 			resolver.EXPECT().
 				LookupHost(gomock.Any(), gomock.Any()).
 				DoAndReturn(func(_ context.Context, host string) ([]string, error) { return tt.lookupHost(host) }).
@@ -534,7 +534,7 @@ func (s *HostnamePublicTestSuite) TestCollectCancelledStopsRetries() {
 	// cancel would hang the test.
 	defer hostname.SetResolverBackoff(time.Hour)()
 	calls := 0
-	resolver := sourcemocks.NewMockResolver(gomock.NewController(s.T()))
+	resolver := mocks.NewMockResolver(gomock.NewController(s.T()))
 	resolver.EXPECT().
 		LookupHost(gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, _ string) ([]string, error) {

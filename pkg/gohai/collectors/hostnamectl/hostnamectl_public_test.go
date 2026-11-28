@@ -32,7 +32,7 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostnamectl"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -58,7 +58,7 @@ func hostnamectlExec(
 	err error,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "hostnamectl").
 		Return(out, err).

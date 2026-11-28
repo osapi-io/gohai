@@ -34,7 +34,7 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hardware"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -143,7 +143,7 @@ func hwExec(
 	hwErr, storageErr, powerErr error,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "system_profiler", "SPHardwareDataType", "-json").
 		Return(hwOut, hwErr).

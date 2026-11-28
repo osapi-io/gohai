@@ -35,7 +35,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -85,7 +85,7 @@ type answer struct {
 func (s *KernelPublicTestSuite) exec(
 	answers ...answer,
 ) source.Runner {
-	m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
+	m := mocks.NewMockRunner(gomock.NewController(s.T()))
 	for _, a := range answers {
 		rest := make([]any, 0, len(a.args)-1)
 		for _, x := range a.args[1:] {

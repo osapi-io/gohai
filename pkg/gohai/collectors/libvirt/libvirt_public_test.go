@@ -32,7 +32,7 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/libvirt"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -114,7 +114,7 @@ func fullVirshMock(
 	t *testing.T,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 		Return([]byte(virshVersionOutput), nil).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -224,7 +224,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionNoDeamon), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -246,7 +246,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				// "Using library:" with a value that does NOT start with "libvirt "
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte("Using library: somevendor 9.0.0\n"), nil).AnyTimes()
@@ -268,7 +268,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -296,7 +296,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -323,7 +323,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return(nil, errors.New("virsh: command not found")).AnyTimes()
 				return m
@@ -347,7 +347,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -369,7 +369,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -391,7 +391,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
@@ -418,7 +418,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").

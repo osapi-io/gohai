@@ -36,7 +36,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 // ubuntuApt is a sources.list that does not name linode.
@@ -80,13 +80,13 @@ func (s *LinodePublicTestSuite) TestNew() {
 			collector: func() *linode.Collector {
 				return linode.NewWith(source.Sources{
 					FS:     memfs.New(),
-					Exec:   sourcemocks.NewMockRunner(gomock.NewController(s.T())),
+					Exec:   mocks.NewMockRunner(gomock.NewController(s.T())),
 					Family: family.Debian,
 				})
 			},
 			validateFunc: func(c *linode.Collector) {
 				s.IsType(&memfs.MemFS{}, c.FS)
-				s.IsType(&sourcemocks.MockRunner{}, c.Exec)
+				s.IsType(&mocks.MockRunner{}, c.Exec)
 			},
 		},
 	}
@@ -264,7 +264,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
+			m := mocks.NewMockRunner(gomock.NewController(s.T()))
 			m.EXPECT().
 				Execute(gomock.Any(), "ip", "-o", "-4", "addr", "show").
 				Return([]byte(tt.ip), tt.ipErr).
