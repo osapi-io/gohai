@@ -292,6 +292,12 @@ func applyDisabled(
 		if !ok {
 			continue
 		}
+		// An account with no AuthenticationAuthority, as many _service
+		// accounts have, does not say whether it is locked, so Locked stays
+		// unset.
+		if strings.TrimSpace(authority) == "" {
+			continue
+		}
 		locked := strings.Contains(authority, "DisabledUser")
 		e.Locked = &locked
 		users[name] = e

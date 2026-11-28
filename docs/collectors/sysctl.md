@@ -96,30 +96,26 @@ macOS prints `key: value`, and each line splits at the first separator of its
 own host. Thus a Linux value that contains `: `, such as `dev.cdrom.info`, and a
 macOS value that contains `=`, such as `vm.swapusage`, keep their text.
 
-A host with no `sysctl` gives an empty table. When `sysctl -a` fails but prints
-part of the table, as it does for a user who cannot read some keys, the
-collector keeps that part. A run that fails and prints nothing is an error.
+A host with no `sysctl` gives an empty table. When `sysctl -a` exits with a
+status that is not zero but prints part of the table, as it does for a user who
+cannot read some keys, the collector keeps that part. Any other failure is an
+error: a run that prints nothing, and a run that a timeout, a cancel or the
+output limit stops, since its output is cut short.
 
 On Linux and macOS, the collector runs `sysctl -a` through the shared
 `source.Runner`:
 
-1. The collector looks for a separator in each output line. It tries `": "`
-   first. This is the native macOS format, and it is also used when values
-   contain `" = "`. Then it tries `" = "`, the standard Linux format. It skips
-   lines that have neither separator.
-2. The collector removes the whitespace around the key. It skips lines with an
-   empty key.
-3. The collector keeps the key and the value unchanged in the `Params` map.
-4. When `sysctl` is missing or returns an error, the collector returns an empty
-   `Params` map and no error. This is the same as Ohai, which does not panic.
-   Ohai's `linux/sysctl.rb` fills the mash only when `exitstatus == 0`.
+1. The collector splits each output line at the first separator of its host:
+   `" = "` on Linux and `": "` on macOS. It skips lines that do not have that
+   separator.
+2. The collector removes the whitespace around the key and the value. It skips
+   lines with an empty key.
+3. The collector keeps each key and its value in the `Params` map.
+4. A line longer than 1 MiB is an error, not a short table.
 
-**Why the collector tries `": "` first:** macOS values such as `vm.swapusage`
-contain `" = "` in the value, for example
-`vm.swapusage: total = 1024.00M used = ...`. When the collector tries `": "`
-first, it splits at the colon after the key name, and the full value stays
-complete. On Linux, sysctl keys never contain `": "`. Thus the `": "` check
-finds no match, and the collector correctly uses `" = "`.
+Ohai's `linux/sysctl.rb` fills the mash only when `exitstatus == 0`. gohai keeps
+the partial table of a run that exits with a status, because a host where
+gohai is not root gives the keys that it can read.
 
 ## Backing library
 

@@ -361,15 +361,18 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			name:    "darwin: locked from dscl's DisabledUser",
 			variant: "darwin",
 			files: map[string]string{
-				"/etc/passwd": "root:*:0:0::/var/root:/bin/sh\nguest:*:201:201::/Users/Guest:/bin/bash\n",
+				"/etc/passwd": "root:*:0:0::/var/root:/bin/sh\nguest:*:201:201::/Users/Guest:/bin/bash\n" +
+					"_svc:*:250:250::/var/empty:/usr/bin/false\n",
 			},
-			dscl: "root ;ShadowHash;\nguest ;DisabledUser; ;ShadowHash;\nnobody-in-passwd ;ShadowHash;\n",
+			dscl: "root ;ShadowHash;\nguest ;DisabledUser; ;ShadowHash;\nnobody-in-passwd ;ShadowHash;\n_svc\n",
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*users.Info)
 				s.Require().True(ok)
 				s.False(*info.Passwd["root"].Locked)
 				s.True(*info.Passwd["guest"].Locked)
+				// _svc has no AuthenticationAuthority, so it does not say.
+				s.Nil(info.Passwd["_svc"].Locked)
 			},
 		},
 		{

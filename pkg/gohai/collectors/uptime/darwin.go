@@ -68,7 +68,10 @@ func (d *Darwin) Collect(
 	if m == nil {
 		return nil, fmt.Errorf("sysctl kern.boottime: no seconds in %q", out)
 	}
-	boot, _ := strconv.ParseInt(string(m[1]), 10, 64)
+	boot, err := strconv.ParseInt(string(m[1]), 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("sysctl kern.boottime: %w", err)
+	}
 	up := d.Now().Unix() - boot
 	if up < 0 {
 		up = 0

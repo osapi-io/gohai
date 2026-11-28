@@ -23,6 +23,7 @@ package uptime
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -67,7 +68,9 @@ func (l *Linux) Collect(
 		return nil, fmt.Errorf("%s is empty", procUptimePath)
 	}
 	up, err := strconv.ParseFloat(fields[0], 64)
-	if err != nil || up < 0 {
+	// NaN and +Inf parse as floats, and their uint64 conversion is not
+	// defined, so they are refused with a negative value.
+	if err != nil || up < 0 || math.IsNaN(up) || math.IsInf(up, 0) {
 		return nil, fmt.Errorf(
 			"%s: uptime %q is not a number of seconds",
 			procUptimePath,
@@ -77,7 +80,8 @@ func (l *Linux) Collect(
 	out := &Info{Seconds: uint64(up), Human: HumanDuration(uint64(up))}
 	out.BootTime = readBootTime(l.FS)
 	if len(fields) > 1 {
-		if idle, err := strconv.ParseFloat(fields[1], 64); err == nil && idle >= 0 {
+		if idle, err := strconv.ParseFloat(fields[1], 64); err == nil && idle >= 0 &&
+			!math.IsNaN(idle) && !math.IsInf(idle, 0) {
 			out.IdleSeconds = uint64(idle)
 			out.IdleHuman = HumanDuration(out.IdleSeconds)
 		}

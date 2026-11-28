@@ -277,7 +277,8 @@ func detectViaDMI(
 
 // cgroupContainerRE matches Docker / LXC / containerd cgroup paths
 // that sit directly under the cgroup root (classic docker/lxc layout).
-var cgroupContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]+:/(docker|lxc|containerd)/`)
+// The controller list is empty on the cgroup v2 line, "0::/docker/<id>".
+var cgroupContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]*:/(docker|lxc|containerd)/`)
 
 // cgroupNestedContainerRE matches systemd-managed and docker-ce layouts
 // where the runtime appears as a named cgroup under a parent slice:
