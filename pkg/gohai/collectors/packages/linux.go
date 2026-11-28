@@ -38,8 +38,8 @@ type Linux struct {
 	base
 
 	Exec source.Runner
-	// Manager is the package database: dpkg, or rpm. NewWith picks it
-	// from the family of its sources.
+	// Manager is the package database: dpkg, rpm, or "" for a family
+	// with neither. NewWith picks it from the family of its sources.
 	Manager string
 }
 
@@ -58,11 +58,14 @@ func (l *Linux) Collect(
 	if l.Exec == nil {
 		return &Info{Packages: []Package{}}, nil
 	}
-	if l.Manager == "rpm" {
+	switch l.Manager {
+	case "rpm":
 		return collectRPM(ctx, l.Exec)
+	case "dpkg":
+		return collectDpkg(ctx, l.Exec)
+	default:
+		return &Info{Packages: []Package{}}, nil
 	}
-
-	return collectDpkg(ctx, l.Exec)
 }
 
 // collectDpkg queries dpkg-query on Debian/Ubuntu hosts. Format

@@ -109,6 +109,14 @@ func (s *FamilyPublicTestSuite) TestDetect() {
 			osRelease: "ID=ubuntu\nID_LIKE=debian\n", want: family.Debian,
 		},
 		{
+			name: "when a derivative names its parent in ID_LIKE", goos: "linux",
+			osRelease: "ID=elementary\nID_LIKE=\"ubuntu debian\"\n", want: family.Debian,
+		},
+		{
+			name: "when ID_LIKE names no parent with a family", goos: "linux",
+			osRelease: "ID=mystery\nID_LIKE=other\n", want: "mystery",
+		},
+		{
 			name: "when the platform has no family", goos: "linux",
 			osRelease: "ID=NixOS\n", want: "nixos",
 		},

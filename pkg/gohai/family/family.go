@@ -174,10 +174,13 @@ func FromFS(
 		}
 		return ""
 	}
-	var id string
+	var id, like string
 	for _, line := range strings.Split(string(data), "\n") {
 		if v, ok := strings.CutPrefix(line, "ID="); ok {
 			id = strings.Trim(strings.TrimSpace(v), `"'`)
+		}
+		if v, ok := strings.CutPrefix(line, "ID_LIKE="); ok {
+			like = strings.Trim(strings.TrimSpace(v), `"'`)
 		}
 	}
 	if id == "" {
@@ -186,6 +189,14 @@ func FromFS(
 	p := Platform(id)
 	if f := Of(p); f != "" {
 		return f
+	}
+	// A derivative that Ohai's table does not name, such as elementary or
+	// zorin, names its parents in ID_LIKE: the first parent with a family
+	// gives it.
+	for _, parent := range strings.Fields(like) {
+		if f := Of(Platform(parent)); f != "" {
+			return f
+		}
 	}
 
 	return p

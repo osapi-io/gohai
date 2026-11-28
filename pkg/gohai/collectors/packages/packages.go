@@ -25,6 +25,7 @@ package packages
 
 import (
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -78,8 +79,14 @@ func NewWith(
 	}
 
 	l := NewLinux()
-	if collector.Family(src) != "debian" {
+	switch collector.Family(src) {
+	case family.Debian:
+	case family.RHEL, family.Fedora, family.Amazon, family.SUSE, family.Mandriva:
 		l.Manager = "rpm"
+	default:
+		// A family with neither database, such as arch or alpine, has no
+		// package list that this collector reads.
+		l.Manager = ""
 	}
 
 	return collector.Wire(l, src)
