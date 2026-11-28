@@ -307,9 +307,9 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				), fs.FileMode(0o444))
 				return f
 			},
-			setupEx: func(t *testing.T) *sourcemocks.MockRunner {
+			setupEx: func(t *testing.T) *mocks.MockRunner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md2").
 					Return(nil, fmt.Errorf("exec mdadm: %w", exec.ErrNotFound))
@@ -339,9 +339,9 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/mdstat", mdstatRaid1, fs.FileMode(0o444))
 				return f
 			},
-			setupEx: func(t *testing.T) *sourcemocks.MockRunner {
+			setupEx: func(t *testing.T) *mocks.MockRunner {
 				ctrl := gomock.NewController(t)
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "mdadm", "--detail", "/dev/md0").
 					Return(nil, errors.New("exit status 1"))
