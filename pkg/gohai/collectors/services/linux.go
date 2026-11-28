@@ -94,7 +94,10 @@ func (l *Linux) Collect(
 		"--no-pager",
 	)
 	if err != nil {
-		return nil, fmt.Errorf("systemctl list-unit-files: %w", err)
+		// The loaded services are good. Without the unit-file states each
+		// reads as not enabled, so the result is partial.
+		return parseSystemctlOutput(string(out), nil),
+			fmt.Errorf("systemctl list-unit-files: %w", err)
 	}
 	return parseSystemctlOutput(string(out), parseUnitFiles(string(files))), nil
 }
