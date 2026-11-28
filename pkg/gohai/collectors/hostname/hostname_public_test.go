@@ -136,6 +136,10 @@ func (s *HostnamePublicTestSuite) TestNew() {
 }
 
 func (s *HostnamePublicTestSuite) TestCollect() {
+	// cancelledCalls counts the lookups of the cancelled row. A retry that
+	// sleeps through the cancel calls LookupHost again.
+	cancelledCalls := 0
+
 	kernelName := map[string]string{"/proc/sys/kernel/hostname": "kernel-short.example.com\n"}
 	okLookupHost := func(string) ([]string, error) { return []string{"10.0.0.5"}, nil }
 	okLookupAddr := func(string) ([]string, error) { return []string{"web01.example.com."}, nil }
@@ -147,12 +151,14 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 	failLookupAddr := func(string) ([]string, error) { return nil, errors.New("unused") }
 
 	tests := []struct {
-		name         string
-		variant      string
-		files        map[string]string
-		lookupHost   func(string) ([]string, error)
-		lookupAddr   func(string) ([]string, error)
-		exec         func(*testing.T) source.Runner
+		name       string
+		variant    string
+		files      map[string]string
+		lookupHost func(string) ([]string, error)
+		lookupAddr func(string) ([]string, error)
+		exec       func(*testing.T) source.Runner
+		// cancelled runs Collect with a ctx that has already ended.
+		cancelled    bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -498,6 +504,36 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				s.Equal(hostname.Info{}, *info)
 			},
 		},
+		{
+			// With an hour between retries, a retry that sleeps through the
+			// cancel would hang the test.
+			name:    "darwin: a cancelled ctx stops the resolver retries",
+			variant: "darwin",
+			files:   map[string]string{"/proc/sys/kernel/hostname": "kernel-short\n"},
+			lookupHost: func(string) ([]string, error) {
+				cancelledCalls++
+
+				return nil, context.Canceled
+			},
+			lookupAddr: emptyLookupAddr,
+			exec: func(t *testing.T) source.Runner {
+				return hostnameExec(
+					t,
+					nil,
+					errors.New("no hostname -s"),
+					[]byte("Friendly Name\n"),
+					nil,
+				)
+			},
+			cancelled: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*hostname.Info)
+				s.Require().True(ok)
+				s.Equal("kernel-short", info.FQDN)
+				s.Equal(1, cancelledCalls)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -520,42 +556,12 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &hostname.Darwin{Exec: tt.exec(s.T()), FS: fs, Resolver: resolver}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancelled {
+				cancel()
+			}
+			tt.validateFunc(c.Collect(ctx, nil))
 		})
 	}
-}
-
-func (s *HostnamePublicTestSuite) TestCollectCancelledStopsRetries() {
-	// A retry that sleeps through the cancel calls LookupHost again.
-	calls := 0
-	resolver := mocks.NewMockResolver(gomock.NewController(s.T()))
-	resolver.EXPECT().
-		LookupHost(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(ctx context.Context, _ string) ([]string, error) {
-			calls++
-
-			return nil, ctx.Err()
-		}).
-		AnyTimes()
-	c := &hostname.Darwin{
-		Exec: hostnameExec(
-			s.T(),
-			nil,
-			errors.New("no hostname -s"),
-			[]byte("Friendly Name\n"),
-			nil,
-		),
-		FS: sourcetest.FS(s.T(), map[string]string{
-			"/proc/sys/kernel/hostname": "kernel-short\n",
-		}),
-		Resolver: resolver,
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	got, err := c.Collect(ctx, nil)
-	s.Require().NoError(err)
-	info, ok := got.(*hostname.Info)
-	s.Require().True(ok)
-	s.Equal("kernel-short", info.FQDN)
-	s.Equal(1, calls)
 }

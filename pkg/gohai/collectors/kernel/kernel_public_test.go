@@ -153,21 +153,40 @@ func (s *KernelPublicTestSuite) TestNew() {
 
 // TestNewWithReadsTheGivenHost: a fake host gives the collector its
 // kernel, not the kernel of the machine that runs the test.
-func (s *KernelPublicTestSuite) TestNewWithReadsTheGivenHost() {
-	files := ubuntu()
-	files["/proc/sys/kernel/arch"] = "aarch64\n"
-	c := kernel.NewWith(source.Sources{FS: s.hostFS(files), Family: family.Debian})
+func (s *KernelPublicTestSuite) TestNewWith() {
+	tests := []struct {
+		name         string
+		files        func() map[string]string
+		validateFunc func(any, error)
+	}{
+		{
+			name: "reads the host that its sources give",
+			files: func() map[string]string {
+				files := ubuntu()
+				files["/proc/sys/kernel/arch"] = "aarch64\n"
 
-	got, err := c.Collect(context.Background(), nil)
-	s.Require().NoError(err)
-	s.Equal(&kernel.Info{
-		Name:      "Linux",
-		Release:   "5.15.0-47-generic",
-		Version:   "#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022",
-		Machine:   "aarch64",
-		Processor: "aarch64",
-		OS:        "GNU/Linux",
-	}, got)
+				return files
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&kernel.Info{
+					Name:      "Linux",
+					Release:   "5.15.0-47-generic",
+					Version:   "#51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022",
+					Machine:   "aarch64",
+					Processor: "aarch64",
+					OS:        "GNU/Linux",
+				}, got)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			c := kernel.NewWith(source.Sources{FS: s.hostFS(tt.files()), Family: family.Debian})
+			tt.validateFunc(c.Collect(context.Background(), nil))
+		})
+	}
 }
 
 func (s *KernelPublicTestSuite) TestCollectLinux() {

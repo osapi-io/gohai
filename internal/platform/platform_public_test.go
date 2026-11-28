@@ -42,12 +42,37 @@ func TestPlatformPublicTestSuite(
 // TestDetect: Detect is the family package's, and a caller can swap it.
 // The families themselves are tested in pkg/gohai/family.
 func (s *PlatformPublicTestSuite) TestDetect() {
-	s.Equal(family.Detect(), platform.Detect())
+	tests := []struct {
+		name         string
+		detect       func() string
+		validateFunc func(string)
+	}{
+		{
+			name: "by default is the family that family.Detect finds",
+			validateFunc: func(got string) {
+				s.Equal(family.Detect(), got)
+			},
+		},
+		{
+			name:   "a test can replace it",
+			detect: func() string { return "custom" },
+			validateFunc: func(got string) {
+				s.Equal("custom", got)
+			},
+		},
+	}
 
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-	platform.Detect = func() string { return "custom" }
-	s.Equal("custom", platform.Detect())
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			if tt.detect != nil {
+				orig := platform.Detect
+				defer func() { platform.Detect = orig }()
+				platform.Detect = tt.detect
+			}
+
+			tt.validateFunc(platform.Detect())
+		})
+	}
 }
 
 func (s *PlatformPublicTestSuite) TestIsLinux() {

@@ -82,6 +82,10 @@ func newServer(
 }
 
 func (s *CloudMetadataPublicTestSuite) TestGet() {
+	// hits and gotToken record what reaches the host that a redirect names.
+	var hits int
+	var gotToken string
+
 	tests := []struct {
 		name         string
 		setup        func() (baseURL string, opts []cloudmetadata.Option, cleanup func())
@@ -369,6 +373,36 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				s.Require().Error(err)
 			},
 		},
+		{
+			name: "a redirect is not followed, so the token does not leave the metadata host",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				other := httptest.NewServer(
+					http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+						hits++
+						gotToken = r.Header.Get("X-aws-ec2-metadata-token")
+					}),
+				)
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/latest/meta-data/instance-id": func(w http.ResponseWriter, r *http.Request) {
+						http.Redirect(w, r, other.URL+"/steal", http.StatusFound)
+					},
+				})
+				opts := []cloudmetadata.Option{
+					cloudmetadata.WithHeader("X-aws-ec2-metadata-token", "secret-token"),
+				}
+
+				return srv.URL, opts, func() {
+					srv.Close()
+					other.Close()
+				}
+			},
+			path: "/latest/meta-data/instance-id",
+			validateFunc: func(_ []byte, err error) {
+				s.ErrorIs(err, cloudmetadata.ErrNotAvailable)
+				s.Zero(hits)
+				s.Empty(gotToken)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -388,14 +422,43 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 	}
 }
 
-func (s *CloudMetadataPublicTestSuite) TestNewSharesOneTransport() {
-	a := cloudmetadata.TransportOf(cloudmetadata.New("http://a.invalid"))
-	b := cloudmetadata.TransportOf(cloudmetadata.New("http://b.invalid"))
-	s.Same(a, b)
-	t, ok := a.(*http.Transport)
-	s.Require().True(ok)
-	s.Nil(t.Proxy)
-	s.Positive(t.IdleConnTimeout)
+func (s *CloudMetadataPublicTestSuite) TestNew() {
+	tests := []struct {
+		name         string
+		validateFunc func(a, b http.RoundTripper)
+	}{
+		{
+			name: "the clients of the cloud collectors share their connections",
+			validateFunc: func(a, b http.RoundTripper) {
+				s.Same(a, b)
+			},
+		},
+		{
+			name: "the shared transport uses no proxy, because metadata IPs are link-local",
+			validateFunc: func(a, _ http.RoundTripper) {
+				t, ok := a.(*http.Transport)
+				s.Require().True(ok)
+				s.Nil(t.Proxy)
+			},
+		},
+		{
+			name: "an idle connection of the shared transport closes",
+			validateFunc: func(a, _ http.RoundTripper) {
+				t, ok := a.(*http.Transport)
+				s.Require().True(ok)
+				s.Positive(t.IdleConnTimeout)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(
+				cloudmetadata.TransportOf(cloudmetadata.New("http://a.invalid")),
+				cloudmetadata.TransportOf(cloudmetadata.New("http://b.invalid")),
+			)
+		})
+	}
 }
 
 func (s *CloudMetadataPublicTestSuite) TestWithTransport() {
@@ -418,26 +481,45 @@ func (s *CloudMetadataPublicTestSuite) TestWithTransport() {
 }
 
 func (s *CloudMetadataPublicTestSuite) TestGetWithHeaders() {
-	var got http.Header
-	srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-		"/x": func(w http.ResponseWriter, r *http.Request) {
-			got = r.Header.Clone()
-			_, _ = w.Write([]byte("ok"))
+	tests := []struct {
+		name         string
+		headers      map[string]string
+		validateFunc func(body []byte, got http.Header, err error)
+	}{
+		{
+			name:    "sends the headers of the call with the default User-Agent",
+			headers: map[string]string{"X-Token": "abc123"},
+			validateFunc: func(body []byte, got http.Header, err error) {
+				s.Require().NoError(err)
+				s.Equal("ok", string(body))
+				s.Equal("abc123", got.Get("X-Token"))
+				s.Equal(cloudmetadata.DefaultUserAgent, got.Get("User-Agent"))
+			},
 		},
-	})
-	defer srv.Close()
+	}
 
-	client := cloudmetadata.New(srv.URL)
-	body, err := client.GetWithHeaders(context.Background(), "/x", map[string]string{
-		"X-Token": "abc123",
-	})
-	s.Require().NoError(err)
-	s.Equal("ok", string(body))
-	s.Equal("abc123", got.Get("X-Token"))
-	s.Equal(cloudmetadata.DefaultUserAgent, got.Get("User-Agent"))
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			var got http.Header
+			srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+				"/x": func(w http.ResponseWriter, r *http.Request) {
+					got = r.Header.Clone()
+					_, _ = w.Write([]byte("ok"))
+				},
+			})
+			defer srv.Close()
+
+			body, err := cloudmetadata.New(srv.URL).
+				GetWithHeaders(context.Background(), "/x", tt.headers)
+			tt.validateFunc(body, got, err)
+		})
+	}
 }
 
 func (s *CloudMetadataPublicTestSuite) TestRawGet() {
+	// hits counts the requests that reach the host that a redirect names.
+	var hits int
+
 	tests := []struct {
 		name         string
 		setup        func() (baseURL string, cleanup func())
@@ -527,6 +609,32 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 				s.Require().NoError(err)
 				s.Equal(http.StatusOK, status)
 				s.Equal("relative-ok", string(body))
+			},
+		},
+		{
+			name: "a redirect returns its status, and is not followed",
+			setup: func() (string, func()) {
+				other := httptest.NewServer(
+					http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+						hits++
+					}),
+				)
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/latest/meta-data/instance-id": func(w http.ResponseWriter, r *http.Request) {
+						http.Redirect(w, r, other.URL+"/steal", http.StatusFound)
+					},
+				})
+
+				return srv.URL, func() {
+					srv.Close()
+					other.Close()
+				}
+			},
+			path: "/latest/meta-data/instance-id",
+			validateFunc: func(_ []byte, status int, err error) {
+				s.Require().NoError(err)
+				s.Equal(http.StatusFound, status)
+				s.Zero(hits)
 			},
 		},
 	}
@@ -667,32 +775,4 @@ func (s *CloudMetadataPublicTestSuite) TestGetJSON() {
 			tt.validateFunc(got, err)
 		})
 	}
-}
-
-func (s *CloudMetadataPublicTestSuite) TestRedirectIsNotFollowed() {
-	var hits int
-	var gotToken string
-	other := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
-		hits++
-		gotToken = r.Header.Get("X-aws-ec2-metadata-token")
-	}))
-	defer other.Close()
-	srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-		"/latest/meta-data/instance-id": func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, other.URL+"/steal", http.StatusFound)
-		},
-	})
-	defer srv.Close()
-
-	client := cloudmetadata.New(
-		srv.URL,
-		cloudmetadata.WithHeader("X-aws-ec2-metadata-token", "secret-token"),
-	)
-	_, err := client.Get(context.Background(), "/latest/meta-data/instance-id")
-	s.ErrorIs(err, cloudmetadata.ErrNotAvailable)
-	_, status, err := client.RawGet(context.Background(), "/latest/meta-data/instance-id")
-	s.Require().NoError(err)
-	s.Equal(http.StatusFound, status)
-	s.Zero(hits)
-	s.Empty(gotToken)
 }

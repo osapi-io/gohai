@@ -235,21 +235,40 @@ func (s *GohaiPublicTestSuite) TestRegisterBuiltins() {
 }
 
 func (s *GohaiPublicTestSuite) TestWithSources() {
-	fs := memfs.New()
-	s.Require().NoError(fs.MkdirAll("/etc", 0o755))
-	s.Require().NoError(fs.WriteFile("/etc/os-release",
-		[]byte("ID=gohaitest\nNAME=\"Gohai Test\"\nVERSION_ID=\"1.0\"\n"), 0o644))
+	tests := []struct {
+		name         string
+		src          func() source.Sources
+		validateFunc func(*gohai.Facts, error)
+	}{
+		{
+			name: "a collector reads the filesystem it is given",
+			src: func() source.Sources {
+				fs := memfs.New()
+				s.Require().NoError(fs.MkdirAll("/etc", 0o755))
+				s.Require().NoError(fs.WriteFile("/etc/os-release",
+					[]byte("ID=gohaitest\nNAME=\"Gohai Test\"\nVERSION_ID=\"1.0\"\n"), 0o644))
 
-	g, err := gohai.New(
-		gohai.WithSources(source.Sources{FS: fs, Family: family.Debian}),
-		gohai.WithCollectors("os_release"),
-	)
-	s.Require().NoError(err)
-	facts, err := g.Collect(context.Background())
-	s.Require().NoError(err)
-	s.Require().NotNil(facts.OSRelease)
-	s.Equal("gohaitest", facts.OSRelease.ID)
-	s.Equal("1.0", facts.OSRelease.VersionID)
+				return source.Sources{FS: fs, Family: family.Debian}
+			},
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts.OSRelease)
+				s.Equal("gohaitest", facts.OSRelease.ID)
+				s.Equal("1.0", facts.OSRelease.VersionID)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			g, err := gohai.New(
+				gohai.WithSources(tt.src()),
+				gohai.WithCollectors("os_release"),
+			)
+			s.Require().NoError(err)
+			tt.validateFunc(g.Collect(context.Background()))
+		})
+	}
 }
 
 // hosts is a transport that records the host of each request and answers

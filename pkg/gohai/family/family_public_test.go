@@ -57,37 +57,64 @@ func (s *FamilyPublicTestSuite) TestPlatform() {
 // TestOf holds the table to Ohai's platform_family_from_platform: one
 // platform per match, and the cases where Ohai's order decides.
 func (s *FamilyPublicTestSuite) TestOf() {
-	tests := map[string]string{
-		"ubuntu": family.Debian, "debian": family.Debian, "linuxmint": family.Debian,
-		"raspbian": family.Debian, "cumulus": family.Debian, "kali": family.Debian,
-		"pop":    family.Debian,
-		"centos": family.RHEL, "redhat": family.RHEL, "oracle": family.RHEL,
-		"almalinux": family.RHEL, "rocky": family.RHEL, "scientific": family.RHEL,
-		"enterpriseenterprise": family.RHEL, "xenserver": family.RHEL,
-		"xcp-ng": family.RHEL, "cloudlinux": family.RHEL, "alibabalinux": family.RHEL,
-		"sangoma": family.RHEL, "clearos": family.RHEL, "parallels": family.RHEL,
-		"ibm_powerkvm": family.RHEL, "bigip": family.RHEL, "virtuozzo": family.RHEL,
+	tests := []struct {
+		platform string
+		want     string
+	}{
+		{platform: "ubuntu", want: family.Debian},
+		{platform: "debian", want: family.Debian},
+		{platform: "linuxmint", want: family.Debian},
+		{platform: "raspbian", want: family.Debian},
+		{platform: "cumulus", want: family.Debian},
+		{platform: "kali", want: family.Debian},
+		{platform: "pop", want: family.Debian},
+		{platform: "centos", want: family.RHEL},
+		{platform: "redhat", want: family.RHEL},
+		{platform: "oracle", want: family.RHEL},
+		{platform: "almalinux", want: family.RHEL},
+		{platform: "rocky", want: family.RHEL},
+		{platform: "scientific", want: family.RHEL},
+		{platform: "enterpriseenterprise", want: family.RHEL},
+		{platform: "xenserver", want: family.RHEL},
+		{platform: "xcp-ng", want: family.RHEL},
+		{platform: "cloudlinux", want: family.RHEL},
+		{platform: "alibabalinux", want: family.RHEL},
+		{platform: "sangoma", want: family.RHEL},
+		{platform: "clearos", want: family.RHEL},
+		{platform: "parallels", want: family.RHEL},
+		{platform: "ibm_powerkvm", want: family.RHEL},
+		{platform: "bigip", want: family.RHEL},
+		{platform: "virtuozzo", want: family.RHEL},
 		// centos comes before nexus in Ohai's order.
-		"nexus_centos": family.RHEL,
-		"amazon":       family.Amazon,
-		"suse":         family.SUSE, "opensuseleap": family.SUSE, "sles": family.SUSE,
-		"sled": family.SUSE, "sle-micro": family.SUSE, "sle_hpc": family.SUSE,
-		"fedora": family.Fedora, "arista_eos": family.Fedora,
-		"nexus": family.WRLinux, "ios_xr": family.WRLinux,
-		"gentoo": family.Gentoo,
-		"arch":   family.Arch, "manjaro": family.Arch,
-		"exherbo":    family.Exherbo,
-		"alpine":     family.Alpine,
-		"clearlinux": family.ClearLinux,
-		"mangeia":    family.Mandriva, "mageia": family.Mandriva,
-		"slackware": family.Slackware,
-		"darwin":    family.Darwin,
-		"Ubuntu":    family.Debian,
-		"nixos":     "",
+		{platform: "nexus_centos", want: family.RHEL},
+		{platform: "amazon", want: family.Amazon},
+		{platform: "suse", want: family.SUSE},
+		{platform: "opensuseleap", want: family.SUSE},
+		{platform: "sles", want: family.SUSE},
+		{platform: "sled", want: family.SUSE},
+		{platform: "sle-micro", want: family.SUSE},
+		{platform: "sle_hpc", want: family.SUSE},
+		{platform: "fedora", want: family.Fedora},
+		{platform: "arista_eos", want: family.Fedora},
+		{platform: "nexus", want: family.WRLinux},
+		{platform: "ios_xr", want: family.WRLinux},
+		{platform: "gentoo", want: family.Gentoo},
+		{platform: "arch", want: family.Arch},
+		{platform: "manjaro", want: family.Arch},
+		{platform: "exherbo", want: family.Exherbo},
+		{platform: "alpine", want: family.Alpine},
+		{platform: "clearlinux", want: family.ClearLinux},
+		{platform: "mangeia", want: family.Mandriva},
+		{platform: "mageia", want: family.Mandriva},
+		{platform: "slackware", want: family.Slackware},
+		{platform: "darwin", want: family.Darwin},
+		{platform: "Ubuntu", want: family.Debian},
+		{platform: "nixos", want: ""},
 	}
-	for platform, want := range tests {
-		s.Run(platform, func() {
-			s.Equal(want, family.Of(platform))
+
+	for _, tt := range tests {
+		s.Run(tt.platform, func() {
+			s.Equal(tt.want, family.Of(tt.platform))
 		})
 	}
 }

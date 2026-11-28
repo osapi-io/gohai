@@ -128,10 +128,25 @@ func newFailingCollector(
 }
 
 func (s *RegistryPublicTestSuite) TestCategories() {
-	cats := collector.Categories()
-	s.Len(cats, 10)
-	s.Contains(cats, collector.CategoryCloud)
-	s.Contains(cats, collector.CategoryMisc)
+	tests := []struct {
+		name         string
+		validateFunc func([]collector.Category)
+	}{
+		{
+			name: "lists the ten categories, cloud and misc among them",
+			validateFunc: func(cats []collector.Category) {
+				s.Len(cats, 10)
+				s.Contains(cats, collector.CategoryCloud)
+				s.Contains(cats, collector.CategoryMisc)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(collector.Categories())
+		})
+	}
 }
 
 // badSources is a collector with an FS field that Wire cannot set.
@@ -327,11 +342,37 @@ func (s *RegistryPublicTestSuite) TestGetDep() {
 }
 
 func (s *RegistryPublicTestSuite) TestNames() {
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "b", "", true)))
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "a", "", true)))
-	names := s.reg.Names()
-	sort.Strings(names)
-	s.Equal([]string{"a", "b"}, names)
+	tests := []struct {
+		name         string
+		register     []string
+		validateFunc func([]string)
+	}{
+		{
+			name: "an empty registry has no names",
+			validateFunc: func(names []string) {
+				s.Empty(names)
+			},
+		},
+		{
+			name:     "returns the name of each registered collector",
+			register: []string{"b", "a"},
+			validateFunc: func(names []string) {
+				sort.Strings(names)
+				s.Equal([]string{"a", "b"}, names)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			reg := collector.NewRegistry()
+			for _, n := range tt.register {
+				s.Require().NoError(reg.Register(newCollector(s.ctrl, n, "", true)))
+			}
+
+			tt.validateFunc(reg.Names())
+		})
+	}
 }
 
 func (s *RegistryPublicTestSuite) TestSelected() {
