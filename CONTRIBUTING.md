@@ -410,9 +410,9 @@ gohai version                      # build info
 
 ## VFS and executor abstractions
 
-A collector that reads files or runs commands **MUST** use two shared
-abstractions. Inject them as struct fields on the variant for each OS. This is
-the same pattern as the Agent struct of osapi.
+A collector that reads files or runs commands uses two shared abstractions. It
+does not read the host in a different way. Inject them as struct fields on the
+variant for each OS. This is the same pattern as the Agent struct of osapi.
 
 ### `avfs.VFS`: filesystem
 
