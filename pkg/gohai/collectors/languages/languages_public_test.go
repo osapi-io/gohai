@@ -374,7 +374,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			name:    "linux: java 8 has no --version, so java -version gives it",
 			variant: "linux",
 			exec: func() source.Runner {
-				m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
 				absent := errors.New("not found")
 				for _, p := range [][]string{
 					{"go", "version"},
@@ -402,7 +402,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			name:    "darwin: the python3 and java stubs do not run without the tools and a JDK",
 			variant: "darwin",
 			exec: func() source.Runner {
-				m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
 				absent := errors.New("not found")
 				for _, p := range [][]string{
 					{"go", "version"}, {"ruby", "--version"}, {"node", "--version"}, {"perl", "--version"},
@@ -430,7 +430,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			name:    "darwin: a python3 from Homebrew runs without the tools",
 			variant: "darwin",
 			exec: func() source.Runner {
-				m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
 				absent := errors.New("not found")
 				for _, p := range [][]string{
 					{"go", "version"}, {"ruby", "--version"}, {"node", "--version"}, {"perl", "--version"},
