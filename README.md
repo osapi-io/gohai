@@ -92,7 +92,9 @@ no implementation.
 
 You enable or disable each collector with flags in the node_exporter style.
 `--collector.<name>` enables a collector. `--no-collector.<name>` disables it.
-SDK consumers use `gohai.WithEnabled(...)` / `gohai.WithDisabled(...)` /
+The command refuses both flags for one collector. It also refuses `--flat` and
+`--with-timings` with `--format ocsf`, because the OCSF event has no place for
+either. SDK consumers use `gohai.WithEnabled(...)` / `gohai.WithDisabled(...)` /
 `gohai.WithCollectors(...)`. `WithCollectors` names each collector to run, so
 `gohai.New` refuses it with `WithDisabled`.
 

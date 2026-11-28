@@ -184,6 +184,55 @@ func (s *RootPublicTestSuite) TestExecute() {
 			},
 		},
 		{
+			name: "collect refuses --flat with --format ocsf",
+			args: []string{
+				"collect",
+				"--no-defaults",
+				"--collector.uptime",
+				"--format",
+				"ocsf",
+				"--flat",
+			},
+			validateFunc: func(code int, out, errOut string) {
+				s.Equal(1, code)
+				s.Empty(out)
+				s.Contains(errOut, "--flat does not apply to --format ocsf")
+			},
+		},
+		{
+			name: "collect refuses --with-timings with --format ocsf",
+			args: []string{
+				"collect",
+				"--no-defaults",
+				"--collector.uptime",
+				"--format",
+				"ocsf",
+				"--with-timings",
+			},
+			validateFunc: func(code int, out, errOut string) {
+				s.Equal(1, code)
+				s.Empty(out)
+				s.Contains(errOut, "--with-timings does not apply to --format ocsf")
+			},
+		},
+		{
+			name: "collect refuses a collector both enabled and disabled",
+			args: []string{
+				"collect",
+				"--no-defaults",
+				"--collector.uptime",
+				"--no-collector.uptime",
+			},
+			validateFunc: func(code int, out, errOut string) {
+				s.Equal(1, code)
+				s.Empty(out)
+				s.Contains(
+					errOut,
+					"--collector.uptime and --no-collector.uptime cannot both be set",
+				)
+			},
+		},
+		{
 			name: "collect refuses an unknown category",
 			args: []string{"collect", "--no-defaults", "--category", "nope"},
 			validateFunc: func(code int, _, errOut string) {
