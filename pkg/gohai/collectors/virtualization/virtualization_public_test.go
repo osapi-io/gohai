@@ -22,21 +22,17 @@ package virtualization_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -52,56 +48,6 @@ func TestVirtualizationPublicTestSuite(
 	t *testing.T,
 ) {
 	suite.Run(t, new(VirtualizationPublicTestSuite))
-}
-
-// fsWith builds a memfs containing the given (path → contents) map.
-func fsWith(
-	t require.TestingT,
-	files map[string]string,
-) avfs.VFS {
-	fs := memfs.New()
-	for path, content := range files {
-		require.NoError(t, fs.MkdirAll(dirOf(path), 0o755))
-		require.NoError(t, fs.WriteFile(path, []byte(content), 0o644))
-	}
-	return fs
-}
-
-func dirOf(
-	p string,
-) string {
-	for i := len(p) - 1; i >= 0; i-- {
-		if p[i] == '/' {
-			if i == 0 {
-				return "/"
-			}
-			return p[:i]
-		}
-	}
-	return "/"
-}
-
-// virtExec returns a MockRunner that maps argv → (output, error).
-func virtExec(
-	t *testing.T,
-	answers map[string][]byte,
-) source.Runner {
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().
-		Execute(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, name string, args ...string) ([]byte, error) {
-			key := name
-			for _, a := range args {
-				key += " " + a
-			}
-			if out, ok := answers[key]; ok {
-				return out, nil
-			}
-			return nil, errors.New("not found")
-		}).
-		AnyTimes()
-	return m
 }
 
 const sysProfilerVBox = `Hardware:
@@ -171,12 +117,10 @@ func (s *VirtualizationPublicTestSuite) TestInContainer() {
 }
 
 func (s *VirtualizationPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(virtualization.Collector)
 	}{
 		{
@@ -219,11 +163,20 @@ func (s *VirtualizationPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c virtualization.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := virtualization.New()
+			c := virtualization.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = virtualization.New()
+			}
 			s.Equal("virtualization", c.Name())
 			s.Equal("virtualization", string(c.Category()))
 			s.True(c.DefaultEnabled())
@@ -245,8 +198,8 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: bare metal empty Systems",
 			variant: "linux",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
-			exec:    func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
+			exec:    func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -258,11 +211,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: systemd-detect-virt --vm reports kvm",
 			variant: "linux",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"systemd-detect-virt --vm": []byte("kvm\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"systemd-detect-virt --vm": "kvm\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -276,12 +229,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: docker CLI and its daemon socket: a docker host",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/var/run/docker.sock": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/var/run/docker.sock": ""})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh docker": "/usr/bin/docker\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -294,12 +247,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: docker CLI and a rootless daemon socket: a docker host",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/run/user/1000/docker.sock": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/run/user/1000/docker.sock": ""})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh docker": "/usr/bin/docker\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -312,12 +265,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: docker CLI and a user dir with no socket: not a host",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/run/user/1000/bus": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/run/user/1000/bus": ""})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh docker": "/usr/bin/docker\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -329,11 +282,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: docker CLI with no daemon socket, as in a CI image: not a host",
 			variant: "linux",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh docker": "/usr/bin/docker\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -346,12 +299,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: podman CLI inside a podman container: a guest, not a host",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/run/.containerenv": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/run/.containerenv": ""})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh podman": []byte("/usr/bin/podman\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh podman": "/usr/bin/podman\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -365,12 +318,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: a kvm host that is also a kvm guest keeps one role in Systems and Role",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/devices/virtual/misc/kvm": "",
 					"/proc/cpuinfo":                 "model name : QEMU Virtual CPU\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -382,12 +335,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: podman + nova hosts",
 			variant: "linux",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh podman": []byte("/usr/bin/podman\n"),
-					"sh -c command -v \"$1\" sh nova":   []byte("/usr/bin/nova\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh podman": "/usr/bin/podman\n",
+					"sh -c command -v \"$1\" sh nova":   "/usr/bin/nova\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -401,11 +354,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: xen guest then host (control_d) overrides",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/xen/capabilities": "control_d\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -417,11 +370,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: vbox host via /proc/modules",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/modules": "vboxdrv 524288 0 - Live 0x0\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -433,11 +386,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: vbox guest via /proc/modules",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/modules": "vboxguest 360448 1 - Live 0x0\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -449,11 +402,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: kvm guest via /proc/cpuinfo QEMU string",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/cpuinfo": "model name : QEMU Virtual CPU version 2.5+\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -465,12 +418,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: kvm host via /sys/devices/virtual/misc/kvm without hypervisor flag",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/cpuinfo":                 "flags : vmx\n",
 					"/sys/devices/virtual/misc/kvm": "",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -482,12 +435,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: kvm guest via hypervisor flag",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/cpuinfo":                 "flags : vmx hypervisor lm\n",
 					"/sys/devices/virtual/misc/kvm": "",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -499,12 +452,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI vmware",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor":   "VMware, Inc.\n",
 					"/sys/class/dmi/id/product_name": "VMware Virtual Platform\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -516,12 +469,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI hyperv",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor":   "Microsoft Corporation\n",
 					"/sys/class/dmi/id/product_name": "Virtual Machine\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -533,12 +486,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI parallels",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor":   "Parallels Software International Inc.\n",
 					"/sys/class/dmi/id/product_name": "Parallels Virtual Platform\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -550,12 +503,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI xen",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/product_name": "HVM domU\n",
 					"/sys/class/dmi/id/sys_vendor":   "Xen\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -567,12 +520,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI qemu/kvm",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/product_name": "Standard PC (Q35 + ICH9, 2009)\n",
 					"/sys/class/dmi/id/sys_vendor":   "QEMU\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -584,12 +537,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI openstack via sys_vendor",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor":   "OpenStack Foundation\n",
 					"/sys/class/dmi/id/product_name": "OpenStack Nova\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -601,12 +554,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI openstack via product_name (Red Hat variant)",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor":   "Red Hat\n",
 					"/sys/class/dmi/id/product_name": "OpenStack Compute\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -618,11 +571,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI amazonec2",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor": "Amazon EC2\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -634,11 +587,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI veertu",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor": "Veertu, Inc.\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -650,12 +603,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI virtualbox via product_name",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor":   "innotek GmbH\n",
 					"/sys/class/dmi/id/product_name": "VirtualBox\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -667,12 +620,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI kvm via RHEV product",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/sys_vendor":   "Red Hat\n",
 					"/sys/class/dmi/id/product_name": "RHEV Hypervisor\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -684,11 +637,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: DMI bhyve via product_name",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/class/dmi/id/product_name": "BHYVE\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -700,11 +653,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: cpuinfo Common 32-bit KVM processor → kvm guest",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/cpuinfo": "model name : Common 32-bit KVM processor\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -716,11 +669,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: cgroup nested docker (systemd /system.slice/docker-*.scope)",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "0::/system.slice/docker-47341cd3bba14d17d3d67e6b4bd3b46f.scope\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -732,11 +685,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: cgroup nested docker (docker-ce layout)",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "0::/docker-ce/docker/b15b851234abcdef\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -748,9 +701,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: kvm via cpu prior (nested VM without /sys/devices/virtual/misc/kvm)",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{})
+				return sourcetest.FS(s.T(), map[string]string{})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			prior: collector.PriorResults{
 				"cpu": &cpu.Info{HypervisorVendor: "KVM", VirtualizationType: "full"},
 			},
@@ -765,15 +718,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: lxc host missing cgroup file → no lxc",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{})
+				return sourcetest.FS(s.T(), map[string]string{})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(
-					t,
-					map[string][]byte{
-						"sh -c command -v \"$1\" sh lxc-start": []byte("/usr/bin/lxc-start\n"),
-					},
-				)
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh lxc-start": "/usr/bin/lxc-start\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -786,17 +736,14 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: lxc host cgroup root not / → no lxc",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "0::/some/subpath\n",
 				})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(
-					t,
-					map[string][]byte{
-						"sh -c command -v \"$1\" sh lxc-start": []byte("/usr/bin/lxc-start\n"),
-					},
-				)
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh lxc-start": "/usr/bin/lxc-start\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -809,17 +756,14 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: lxc host cgroup malformed line → no lxc",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "malformed\n",
 				})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(
-					t,
-					map[string][]byte{
-						"sh -c command -v \"$1\" sh lxc-start": []byte("/usr/bin/lxc-start\n"),
-					},
-				)
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh lxc-start": "/usr/bin/lxc-start\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -832,17 +776,14 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: lxc host via lxc-start on PATH + cgroup roots all /",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "0::/\n",
 				})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(
-					t,
-					map[string][]byte{
-						"sh -c command -v \"$1\" sh lxc-start": []byte("/usr/bin/lxc-start\n"),
-					},
-				)
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh lxc-start": "/usr/bin/lxc-start\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -855,9 +796,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: openvz host then guest precedence (host wins)",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/proc/bc/0": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/proc/bc/0": ""})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -869,9 +810,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: openvz guest",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/proc/vz": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/proc/vz": ""})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -887,9 +828,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 				// "HostName" and "HostingSystemEditionId". Embed NULs and
 				// mixed case so printable-filter + lowercasing both run.
 				blob := "junk\x00HostName\x00\x00HyperV-Host-01\x00\x00HostingSystemEditionId\x00more"
-				return fsWith(s.T(), map[string]string{"/var/lib/hyperv/.kvp_pool_3": blob})
+				return sourcetest.FS(s.T(), map[string]string{"/var/lib/hyperv/.kvp_pool_3": blob})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -902,9 +843,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: hyperv kvp_pool_3 without HostName leaves hypervisor_host empty",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/var/lib/hyperv/.kvp_pool_3": "empty-pool"})
+				return sourcetest.FS(
+					s.T(),
+					map[string]string{"/var/lib/hyperv/.kvp_pool_3": "empty-pool"},
+				)
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -917,11 +861,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: linux-vserver host via s_context: 0",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/status": "Name: bash\ns_context: 0\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -933,11 +877,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: linux-vserver guest via VxID",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/status": "Name: bash\nVxID: 42\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -949,11 +893,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: cgroup docker container",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "12:devices:/docker/abc123\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -965,11 +909,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: cgroup containerd remaps to docker",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "12:devices:/containerd/xyz\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -981,11 +925,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: cgroup lxc",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "12:devices:/lxc/c1\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -997,11 +941,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: cgroup v2 Kubernetes pod with containerd",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "0::/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod1a2b.slice/cri-containerd-0123abcd.scope\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1014,11 +958,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: cgroup v2 Kubernetes pod with CRI-O",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup": "0::/kubepods.slice/kubepods-besteffort.slice/kubepods-besteffort-pod9f.slice/crio-89abcdef.scope\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1031,12 +975,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: a pod with a cgroup namespace is found by its environment",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup":  "0::/\n",
 					"/proc/self/environ": "PATH=/usr/bin\x00KUBERNETES_SERVICE_HOST=10.96.0.1\x00",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1049,12 +993,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: Kubernetes is a layer when the runtime is known",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/cgroup":  "0::/kubepods.slice/kubepods-pod1.slice/cri-containerd-0123.scope\n",
 					"/proc/self/environ": "KUBERNETES_SERVICE_HOST=10.96.0.1\x00",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1067,11 +1011,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: a non-root agent reads container= from its own environment",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/self/environ": "container=lxc-libvirt\x00",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1083,11 +1027,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: /run/.containerenv is a podman container",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/run/.containerenv": "engine=\"podman-5.2.0\"\n",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1100,11 +1044,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: environ container=lxc",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/1/environ": "PATH=/usr/bin\x00container=lxc\x00",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1116,11 +1060,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: environ container=systemd-nspawn",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/1/environ": "container=systemd-nspawn\x00",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1132,11 +1076,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: environ container=podman",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/1/environ": "container=podman\x00",
 				})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1148,9 +1092,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: /.dockerenv override forces docker guest",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/.dockerenv": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/.dockerenv": ""})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1162,9 +1106,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: /.dockerinit alternate",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/.dockerinit": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/.dockerinit": ""})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1176,9 +1120,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: lxd guest via /dev/lxd/sock",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/dev/lxd/sock": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/dev/lxd/sock": ""})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1190,9 +1134,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: lxd host via /var/lib/lxd/devlxd",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/var/lib/lxd/devlxd": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/var/lib/lxd/devlxd": ""})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1204,9 +1148,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: lxd snap host path",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/var/snap/lxd/common/lxd/devlxd": ""})
+				return sourcetest.FS(
+					s.T(),
+					map[string]string{"/var/snap/lxd/common/lxd/devlxd": ""},
+				)
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1218,15 +1165,15 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: nested kvm guest + docker host",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/proc/cpuinfo":        "model name : QEMU Virtual CPU\n",
 					"/var/run/docker.sock": "",
 				})
 			},
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh docker": []byte("/usr/bin/docker\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh docker": "/usr/bin/docker\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1241,7 +1188,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: nil Exec, no exec-based detections file-based still work",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/.dockerenv": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/.dockerenv": ""})
 			},
 			exec: func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
@@ -1255,9 +1202,9 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: xen guest only (no /proc/xen/capabilities)",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/proc/xen/other": ""})
+				return sourcetest.FS(s.T(), map[string]string{"/proc/xen/other": ""})
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1268,9 +1215,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: systemd-detect-virt empty output skipped",
 			variant: "linux",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{"systemd-detect-virt --vm": []byte("\n")})
+				return sourcetest.Commands{Out: map[string]string{
+					"systemd-detect-virt --vm": "\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1282,8 +1231,8 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: bare metal Mac empty",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
-			exec:    func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
+			exec:    func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1294,11 +1243,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: docker host on PATH",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh docker": []byte("/usr/local/bin/docker\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh docker": "/usr/local/bin/docker\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1310,11 +1259,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: VBoxManage host on PATH",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh VBoxManage": []byte("/usr/local/bin/VBoxManage\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh VBoxManage": "/usr/local/bin/VBoxManage\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1326,11 +1275,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: prlctl host on PATH",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sh -c command -v \"$1\" sh prlctl": []byte("/usr/local/bin/prlctl\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sh -c command -v \"$1\" sh prlctl": "/usr/local/bin/prlctl\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1343,9 +1292,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "darwin: VMware Fusion app present",
 			variant: "darwin",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/Applications/VMware Fusion.app": ""})
+				return sourcetest.FS(
+					s.T(),
+					map[string]string{"/Applications/VMware Fusion.app": ""},
+				)
 			},
-			exec: func(t *testing.T) source.Runner { return virtExec(t, nil) },
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*virtualization.Info)
@@ -1356,11 +1308,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: QEMU/Virtualization.framework guest via sysctl",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sysctl -n kern.hv_vmm_present": []byte("1\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sysctl -n kern.hv_vmm_present": "1\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1372,12 +1324,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: a VMware Fusion guest also has hv_vmm_present, and is vmware, not qemu",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sysctl -n kern.hv_vmm_present":      []byte("1\n"),
-					"system_profiler SPHardwareDataType": []byte(sysProfilerVMware),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sysctl -n kern.hv_vmm_present":      "1\n",
+					"system_profiler SPHardwareDataType": sysProfilerVMware,
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1390,11 +1342,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: sysctl returns 0, no qemu detection",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"sysctl -n kern.hv_vmm_present": []byte("0\n"),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"sysctl -n kern.hv_vmm_present": "0\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1406,13 +1358,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: Parallels guest via ioreg",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"ioreg -n pci1ab8,4000": []byte(
-						"    | |   \"compatible\" = <\"pci1ab8,4000\">\n",
-					),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"ioreg -n pci1ab8,4000": "    | |   \"compatible\" = <\"pci1ab8,4000\">\n",
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1424,11 +1374,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: VirtualBox guest via system_profiler Boot ROM",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"system_profiler SPHardwareDataType": []byte(sysProfilerVBox),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"system_profiler SPHardwareDataType": sysProfilerVBox,
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1440,11 +1390,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: VMware guest via system_profiler Boot ROM",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"system_profiler SPHardwareDataType": []byte(sysProfilerVMware),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"system_profiler SPHardwareDataType": sysProfilerVMware,
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1456,11 +1406,11 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: Apple VM via Model Identifier",
 			variant: "darwin",
-			fs:      func() avfs.VFS { return fsWith(s.T(), nil) },
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
 			exec: func(t *testing.T) source.Runner {
-				return virtExec(t, map[string][]byte{
-					"system_profiler SPHardwareDataType": []byte(sysProfilerAppleVM),
-				})
+				return sourcetest.Commands{Out: map[string]string{
+					"system_profiler SPHardwareDataType": sysProfilerAppleVM,
+				}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1473,7 +1423,10 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "darwin: nil Exec no exec detections file-based still works",
 			variant: "darwin",
 			fs: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/Applications/VMware Fusion.app": ""})
+				return sourcetest.FS(
+					s.T(),
+					map[string]string{"/Applications/VMware Fusion.app": ""},
+				)
 			},
 			exec: func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {

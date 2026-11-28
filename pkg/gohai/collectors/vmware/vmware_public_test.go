@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os/exec"
-	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -34,7 +33,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/vmware"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -59,95 +58,15 @@ func TestVMwarePublicTestSuite(
 	suite.Run(t, new(VMwarePublicTestSuite))
 }
 
-// toolboxExec returns a MockRunner whose Execute expectations are set by
-// the caller via the returned recorder, which helps with multi-call mocks.
-func toolboxExec(
-	t *testing.T,
-) (*mocks.MockRunner, *gomock.Controller) {
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	return m, ctrl
-}
-
-// fullToolboxMock sets up a mock executor that answers all the
-// vmware-toolbox-cmd calls made by collectVMwareTools, plus the
-// initial -v probe used by the darwin/linux variants.
-func fullToolboxMock(
-	t *testing.T,
-) source.Runner {
-	m, _ := toolboxExec(t)
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
-		Return([]byte("12.3.0 build-21581411\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "hosttime").
-		Return([]byte("01 Jan 2026 12:00:00\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "speed").
-		Return([]byte("2600 MHz\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "sessionid").
-		Return([]byte("1\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "balloon").
-		Return([]byte("0 MB\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "swap").
-		Return([]byte("0 MB\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "memlimit").
-		Return([]byte("4096 MB\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "memres").
-		Return([]byte("0 MB\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "cpures").
-		Return([]byte("0 MHz\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "cpulimit").
-		Return([]byte("unlimited\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "upgrade", "status").
-		Return([]byte("VMware Tools are up-to-date\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "timesync", "status").
-		Return([]byte("Timesync is disabled\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "raw", "json", "session").
-		Return([]byte(""), nil).AnyTimes()
-	return m
-}
-
-// vsphereMock is like fullToolboxMock but returns a vSphere session JSON.
-func vsphereMock(
-	t *testing.T,
-) source.Runner {
-	m, _ := toolboxExec(t)
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
-		Return([]byte("12.3.0 build-21581411\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "hosttime").
-		Return([]byte("01 Jan 2026 12:00:00\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "speed").
-		Return([]byte("2600 MHz\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "sessionid").
-		Return([]byte("1\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "balloon").
-		Return([]byte("0 MB\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "swap").
-		Return([]byte("0 MB\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "memlimit").
-		Return([]byte("4096 MB\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "memres").
-		Return([]byte("0 MB\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "cpures").
-		Return([]byte("0 MHz\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "cpulimit").
-		Return([]byte("unlimited\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "upgrade", "status").
-		Return([]byte("VMware Tools are up-to-date\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "timesync", "status").
-		Return([]byte("Timesync is disabled\n"), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "raw", "json", "session").
-		Return([]byte(`{"version":"7.0.3"}`), nil).AnyTimes()
-	return m
-}
-
-// failingToolboxMock answers each vmware-toolbox-cmd call as
-// fullToolboxMock does, but the call whose args join to failing returns
-// err.
-func failingToolboxMock(
-	t *testing.T,
+// toolboxCommands is the output of each vmware-toolbox-cmd call of a VMware
+// guest, as sourcetest.Commands. session is the answer of `stat raw json
+// session`, which only vSphere gives. The call whose args are failing, if
+// any, returns err and no output.
+func toolboxCommands(
+	session string,
 	failing string,
 	err error,
-) source.Runner {
-	m, _ := toolboxExec(t)
+) sourcetest.Commands {
 	answers := map[string]string{
 		"-v":                    "12.3.0 build-21581411\n",
 		"stat hosttime":         "01 Jan 2026 12:00:00\n",
@@ -161,17 +80,19 @@ func failingToolboxMock(
 		"stat cpulimit":         "unlimited\n",
 		"upgrade status":        "VMware Tools are up-to-date\n",
 		"timesync status":       "Timesync is disabled\n",
-		"stat raw json session": `{"version":"7.0.3"}`,
+		"stat raw json session": session,
 	}
+	c := sourcetest.Commands{Out: map[string]string{}, Err: map[string]error{}}
 	for args, out := range answers {
-		call := m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, strings.Fields(args)).AnyTimes()
+		line := vmwareToolboxPath + " " + args
 		if args == failing {
-			call.Return(nil, err)
+			c.Err[line] = err
 			continue
 		}
-		call.Return([]byte(out), nil)
+		c.Out[line] = out
 	}
-	return m
+
+	return c
 }
 
 // exitStatusError is the error of a command that exited by itself with a
@@ -192,12 +113,10 @@ func (e exitStatusError) ExitCode() int {
 var errKilled = fmt.Errorf("exec vmware-toolbox-cmd: stopped after 10s: %w", &exec.ExitError{})
 
 func (s *VMwarePublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(vmware.Collector)
 	}{
 		{
@@ -232,11 +151,20 @@ func (s *VMwarePublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c vmware.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := vmware.New()
+			c := vmware.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = vmware.New()
+			}
 			s.Equal("vmware", c.Name())
 			s.Equal("virtualization", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -268,7 +196,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					),
 					fs.FileMode(0o444),
 				)
-				return &vmware.Linux{FS: f, Exec: fullToolboxMock(s.T())}
+				return &vmware.Linux{FS: f, Exec: toolboxCommands("", "", nil).Mock(s.T())}
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -288,7 +216,10 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/scsi/scsi",
 					[]byte("VMware SCSI\n"),
 					fs.FileMode(0o444))
-				return &vmware.Linux{FS: f, Exec: vsphereMock(s.T())}
+				return &vmware.Linux{
+					FS:   f,
+					Exec: toolboxCommands(`{"version":"7.0.3"}`, "", nil).Mock(s.T()),
+				}
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -536,7 +467,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			setupLinux: func() *vmware.Linux {
 				f := memfs.New()
 				_ = f.MkdirAll("/proc/scsi/scsi", 0o755)
-				return &vmware.Linux{FS: f, Exec: fullToolboxMock(s.T())}
+				return &vmware.Linux{FS: f, Exec: toolboxCommands("", "", nil).Mock(s.T())}
 			},
 			validateFunc: func(got any, err error) {
 				s.Exactly(nil, got)
@@ -582,11 +513,11 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
 				return &vmware.Linux{
 					FS: f,
-					Exec: failingToolboxMock(
-						s.T(),
+					Exec: toolboxCommands(
+						`{"version":"7.0.3"}`,
 						"stat raw json session",
 						context.DeadlineExceeded,
-					),
+					).Mock(s.T()),
 				}
 			},
 			validateFunc: func(got any, err error) {
@@ -605,8 +536,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.MkdirAll("/proc/scsi", 0o755)
 				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
 				return &vmware.Linux{
-					FS:   f,
-					Exec: failingToolboxMock(s.T(), "stat raw json session", exitStatusError(1)),
+					FS: f,
+					Exec: toolboxCommands(
+						`{"version":"7.0.3"}`,
+						"stat raw json session",
+						exitStatusError(1),
+					).Mock(s.T()),
 				}
 			},
 			validateFunc: func(got any, err error) {
@@ -626,8 +561,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.MkdirAll("/proc/scsi", 0o755)
 				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
 				return &vmware.Linux{
-					FS:   f,
-					Exec: failingToolboxMock(s.T(), "stat raw json session", errKilled),
+					FS: f,
+					Exec: toolboxCommands(
+						`{"version":"7.0.3"}`,
+						"stat raw json session",
+						errKilled,
+					).Mock(s.T()),
 				}
 			},
 			validateFunc: func(got any, err error) {
@@ -658,8 +597,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.MkdirAll("/proc/scsi", 0o755)
 				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
 				return &vmware.Linux{
-					FS:   f,
-					Exec: failingToolboxMock(s.T(), "stat speed", errors.New("signal: killed")),
+					FS: f,
+					Exec: toolboxCommands(
+						`{"version":"7.0.3"}`,
+						"stat speed",
+						errors.New("signal: killed"),
+					).Mock(s.T()),
 				}
 			},
 			validateFunc: func(got any, err error) {
@@ -683,7 +626,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			name:    "darwin: toolbox-cmd present returns Info",
 			variant: "darwin",
 			setupDarwin: func() *vmware.Darwin {
-				return &vmware.Darwin{Exec: fullToolboxMock(s.T())}
+				return &vmware.Darwin{Exec: toolboxCommands("", "", nil).Mock(s.T())}
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -809,7 +752,11 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "darwin",
 			setupDarwin: func() *vmware.Darwin {
 				return &vmware.Darwin{
-					Exec: failingToolboxMock(s.T(), "stat hosttime", context.DeadlineExceeded),
+					Exec: toolboxCommands(
+						`{"version":"7.0.3"}`,
+						"stat hosttime",
+						context.DeadlineExceeded,
+					).Mock(s.T()),
 				}
 			},
 			validateFunc: func(got any, err error) {

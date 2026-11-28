@@ -80,58 +80,6 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
 )
 
-func hostnameInfoPtr() *hostname.Info             { return &hostname.Info{} }
-func kernelInfoPtr() *kernel.Info                 { return &kernel.Info{} }
-func uptimeInfoPtr() *uptime.Info                 { return &uptime.Info{} }
-func virtInfoPtr() *virtualization.Info           { return &virtualization.Info{} }
-func machineIDInfoPtr() *machineid.Info           { return &machineid.Info{} }
-func cpuInfoPtr() *cpu.Info                       { return &cpu.Info{} }
-func memoryInfoPtr() *memory.Info                 { return &memory.Info{} }
-func filesystemInfoPtr() *filesystem.Info         { return &filesystem.Info{} }
-func diskInfoPtr() *disk.Info                     { return &disk.Info{} }
-func networkInfoPtr() *network.Info               { return &network.Info{} }
-func processInfoPtr() *process.Info               { return &process.Info{} }
-func usersInfoPtr() *users.Info                   { return &users.Info{} }
-func timezoneInfoPtr() *timezone.Info             { return &timezone.Info{} }
-func dnsInfoPtr() *dns.Info                       { return &dns.Info{} }
-func rootGroupInfoPtr() *rootgroup.Info           { return &rootgroup.Info{} }
-func shellsInfoPtr() *shells.Info                 { return &shells.Info{} }
-func fipsInfoPtr() *fips.Info                     { return &fips.Info{} }
-func loadInfoPtr() *load.Info                     { return &load.Info{} }
-func osReleaseInfoPtr() *osrelease.Info           { return &osrelease.Info{} }
-func lsbInfoPtr() *lsb.Info                       { return &lsb.Info{} }
-func initInfoPtr() *initd.Info                    { return &initd.Info{} }
-func shardInfoPtr() *shard.Info                   { return &shard.Info{} }
-func packageMgrInfoPtr() *packagemgr.Info         { return &packagemgr.Info{} }
-func sessionsInfoPtr() *sessions.Info             { return &sessions.Info{} }
-func pciInfoPtr() *pci.Info                       { return &pci.Info{} }
-func scsiInfoPtr() *scsi.Info                     { return &scsi.Info{} }
-func hardwareInfoPtr() *hardware.Info             { return &hardware.Info{} }
-func blockDeviceInfoPtr() *blockdevice.Info       { return &blockdevice.Info{} }
-func commandInfoPtr() *command.Info               { return &command.Info{} }
-func dockerInfoPtr() *docker.Info                 { return &docker.Info{} }
-func grub2InfoPtr() *grub2.Info                   { return &grub2.Info{} }
-func hostnamectlInfoPtr() *hostnamectl.Info       { return &hostnamectl.Info{} }
-func interruptsInfoPtr() *interrupts.Info         { return &interrupts.Info{} }
-func ipcInfoPtr() *ipc.Info                       { return &ipc.Info{} }
-func languagesInfoPtr() *languages.Info           { return &languages.Info{} }
-func libvirtInfoPtr() *libvirt.Info               { return &libvirt.Info{} }
-func livepatchInfoPtr() *livepatch.Info           { return &livepatch.Info{} }
-func mdadmInfoPtr() *mdadm.Info                   { return &mdadm.Info{} }
-func packagesInfoPtr() *packages.Info             { return &packages.Info{} }
-func rpmInfoPtr() *rpm.Info                       { return &rpm.Info{} }
-func selinuxInfoPtr() *selinux.Info               { return &selinux.Info{} }
-func servicesInfoPtr() *services.Info             { return &services.Info{} }
-func sshInfoPtr() *ssh.Info                       { return &ssh.Info{} }
-func sysconfInfoPtr() *sysconf.Info               { return &sysconf.Info{} }
-func sysctlInfoPtr() *sysctl.Info                 { return &sysctl.Info{} }
-func systemdPathsInfoPtr() *systemdpaths.Info     { return &systemdpaths.Info{} }
-func tcInfoPtr() *tc.Info                         { return &tc.Info{} }
-func virtualboxInfoPtr() *virtualbox.Info         { return &virtualbox.Info{} }
-func vmwareInfoPtr() *vmware.Info                 { return &vmware.Info{} }
-func zpoolsInfoPtr() *zpools.Info                 { return &zpools.Info{} }
-func caCertificatesInfoPtr() *cacertificates.Info { return &cacertificates.Info{} }
-
 type FactsTestSuite struct {
 	suite.Suite
 }
@@ -239,307 +187,307 @@ func (s *FactsTestSuite) TestSet() {
 		{
 			name:     "hostname",
 			collName: "hostname",
-			result:   hostnameInfoPtr(),
+			result:   new(hostname.Info),
 			check:    func(f *Facts) bool { return f.Hostname != nil },
 		},
 		{
 			name:     "kernel",
 			collName: "kernel",
-			result:   kernelInfoPtr(),
+			result:   new(kernel.Info),
 			check:    func(f *Facts) bool { return f.Kernel != nil },
 		},
 		{
 			name:     "uptime",
 			collName: "uptime",
-			result:   uptimeInfoPtr(),
+			result:   new(uptime.Info),
 			check:    func(f *Facts) bool { return f.Uptime != nil },
 		},
 		{
 			name:     "virtualization",
 			collName: "virtualization",
-			result:   virtInfoPtr(),
+			result:   new(virtualization.Info),
 			check:    func(f *Facts) bool { return f.Virtualization != nil },
 		},
 		{
 			name:     "machine_id",
 			collName: "machine_id",
-			result:   machineIDInfoPtr(),
+			result:   new(machineid.Info),
 			check:    func(f *Facts) bool { return f.MachineID != nil },
 		},
 		{
 			name:     "cpu",
 			collName: "cpu",
-			result:   cpuInfoPtr(),
+			result:   new(cpu.Info),
 			check:    func(f *Facts) bool { return f.CPU != nil },
 		},
 		{
 			name:     "load",
 			collName: "load",
-			result:   loadInfoPtr(),
+			result:   new(load.Info),
 			check:    func(f *Facts) bool { return f.Load != nil },
 		},
 		{
 			name:     "memory",
 			collName: "memory",
-			result:   memoryInfoPtr(),
+			result:   new(memory.Info),
 			check:    func(f *Facts) bool { return f.Memory != nil },
 		},
 		{
 			name:     "filesystem",
 			collName: "filesystem",
-			result:   filesystemInfoPtr(),
+			result:   new(filesystem.Info),
 			check:    func(f *Facts) bool { return f.Filesystem != nil },
 		},
 		{
 			name:     "disk",
 			collName: "disk",
-			result:   diskInfoPtr(),
+			result:   new(disk.Info),
 			check:    func(f *Facts) bool { return f.Disk != nil },
 		},
 		{
 			name:     "network",
 			collName: "network",
-			result:   networkInfoPtr(),
+			result:   new(network.Info),
 			check:    func(f *Facts) bool { return f.Network != nil },
 		},
 		{
 			name:     "process",
 			collName: "process",
-			result:   processInfoPtr(),
+			result:   new(process.Info),
 			check:    func(f *Facts) bool { return f.Process != nil },
 		},
 		{
 			name:     "users",
 			collName: "users",
-			result:   usersInfoPtr(),
+			result:   new(users.Info),
 			check:    func(f *Facts) bool { return f.Users != nil },
 		},
 		{
 			name:     "timezone",
 			collName: "timezone",
-			result:   timezoneInfoPtr(),
+			result:   new(timezone.Info),
 			check:    func(f *Facts) bool { return f.Timezone != nil },
 		},
 		{
 			name:     "dns",
 			collName: "dns",
-			result:   dnsInfoPtr(),
+			result:   new(dns.Info),
 			check:    func(f *Facts) bool { return f.DNS != nil },
 		},
 		{
 			name:     "root_group",
 			collName: "root_group",
-			result:   rootGroupInfoPtr(),
+			result:   new(rootgroup.Info),
 			check:    func(f *Facts) bool { return f.RootGroup != nil },
 		},
 		{
 			name:     "shells",
 			collName: "shells",
-			result:   shellsInfoPtr(),
+			result:   new(shells.Info),
 			check:    func(f *Facts) bool { return f.Shells != nil },
 		},
 		{
 			name:     "fips",
 			collName: "fips",
-			result:   fipsInfoPtr(),
+			result:   new(fips.Info),
 			check:    func(f *Facts) bool { return f.Fips != nil },
 		},
 		{
 			name:     "os_release",
 			collName: "os_release",
-			result:   osReleaseInfoPtr(),
+			result:   new(osrelease.Info),
 			check:    func(f *Facts) bool { return f.OSRelease != nil },
 		},
 		{
 			name:     "lsb",
 			collName: "lsb",
-			result:   lsbInfoPtr(),
+			result:   new(lsb.Info),
 			check:    func(f *Facts) bool { return f.LSB != nil },
 		},
 		{
 			name:     "init",
 			collName: "init",
-			result:   initInfoPtr(),
+			result:   new(initd.Info),
 			check:    func(f *Facts) bool { return f.Init != nil },
 		},
 		{
 			name:     "shard",
 			collName: "shard",
-			result:   shardInfoPtr(),
+			result:   new(shard.Info),
 			check:    func(f *Facts) bool { return f.Shard != nil },
 		},
 		{
 			name:     "package_mgr",
 			collName: "package_mgr",
-			result:   packageMgrInfoPtr(),
+			result:   new(packagemgr.Info),
 			check:    func(f *Facts) bool { return f.PackageMgr != nil },
 		},
 		{
 			name:     "sessions",
 			collName: "sessions",
-			result:   sessionsInfoPtr(),
+			result:   new(sessions.Info),
 			check:    func(f *Facts) bool { return f.Sessions != nil },
 		},
 		{
 			name:     "pci",
 			collName: "pci",
-			result:   pciInfoPtr(),
+			result:   new(pci.Info),
 			check:    func(f *Facts) bool { return f.PCI != nil },
 		},
 		{
 			name:     "scsi",
 			collName: "scsi",
-			result:   scsiInfoPtr(),
+			result:   new(scsi.Info),
 			check:    func(f *Facts) bool { return f.SCSI != nil },
 		},
 		{
 			name:     "hardware",
 			collName: "hardware",
-			result:   hardwareInfoPtr(),
+			result:   new(hardware.Info),
 			check:    func(f *Facts) bool { return f.Hardware != nil },
 		},
 		{
 			name:     "block_device",
 			collName: "block_device",
-			result:   blockDeviceInfoPtr(),
+			result:   new(blockdevice.Info),
 			check:    func(f *Facts) bool { return f.BlockDevice != nil },
 		},
 		{
 			name:     "command",
 			collName: "command",
-			result:   commandInfoPtr(),
+			result:   new(command.Info),
 			check:    func(f *Facts) bool { return f.Command != nil },
 		},
 		{
 			name:     "docker",
 			collName: "docker",
-			result:   dockerInfoPtr(),
+			result:   new(docker.Info),
 			check:    func(f *Facts) bool { return f.Docker != nil },
 		},
 		{
 			name:     "grub2",
 			collName: "grub2",
-			result:   grub2InfoPtr(),
+			result:   new(grub2.Info),
 			check:    func(f *Facts) bool { return f.Grub2 != nil },
 		},
 		{
 			name:     "hostnamectl",
 			collName: "hostnamectl",
-			result:   hostnamectlInfoPtr(),
+			result:   new(hostnamectl.Info),
 			check:    func(f *Facts) bool { return f.Hostnamectl != nil },
 		},
 		{
 			name:     "interrupts",
 			collName: "interrupts",
-			result:   interruptsInfoPtr(),
+			result:   new(interrupts.Info),
 			check:    func(f *Facts) bool { return f.Interrupts != nil },
 		},
 		{
 			name:     "ipc",
 			collName: "ipc",
-			result:   ipcInfoPtr(),
+			result:   new(ipc.Info),
 			check:    func(f *Facts) bool { return f.IPC != nil },
 		},
 		{
 			name:     "languages",
 			collName: "languages",
-			result:   languagesInfoPtr(),
+			result:   new(languages.Info),
 			check:    func(f *Facts) bool { return f.Languages != nil },
 		},
 		{
 			name:     "libvirt",
 			collName: "libvirt",
-			result:   libvirtInfoPtr(),
+			result:   new(libvirt.Info),
 			check:    func(f *Facts) bool { return f.Libvirt != nil },
 		},
 		{
 			name:     "livepatch",
 			collName: "livepatch",
-			result:   livepatchInfoPtr(),
+			result:   new(livepatch.Info),
 			check:    func(f *Facts) bool { return f.Livepatch != nil },
 		},
 		{
 			name:     "mdadm",
 			collName: "mdadm",
-			result:   mdadmInfoPtr(),
+			result:   new(mdadm.Info),
 			check:    func(f *Facts) bool { return f.Mdadm != nil },
 		},
 		{
 			name:     "packages",
 			collName: "packages",
-			result:   packagesInfoPtr(),
+			result:   new(packages.Info),
 			check:    func(f *Facts) bool { return f.Packages != nil },
 		},
 		{
 			name:     "rpm",
 			collName: "rpm",
-			result:   rpmInfoPtr(),
+			result:   new(rpm.Info),
 			check:    func(f *Facts) bool { return f.RPM != nil },
 		},
 		{
 			name:     "selinux",
 			collName: "selinux",
-			result:   selinuxInfoPtr(),
+			result:   new(selinux.Info),
 			check:    func(f *Facts) bool { return f.SELinux != nil },
 		},
 		{
 			name:     "services",
 			collName: "services",
-			result:   servicesInfoPtr(),
+			result:   new(services.Info),
 			check:    func(f *Facts) bool { return f.Services != nil },
 		},
 		{
 			name:     "ssh",
 			collName: "ssh",
-			result:   sshInfoPtr(),
+			result:   new(ssh.Info),
 			check:    func(f *Facts) bool { return f.SSH != nil },
 		},
 		{
 			name:     "sysconf",
 			collName: "sysconf",
-			result:   sysconfInfoPtr(),
+			result:   new(sysconf.Info),
 			check:    func(f *Facts) bool { return f.Sysconf != nil },
 		},
 		{
 			name:     "sysctl",
 			collName: "sysctl",
-			result:   sysctlInfoPtr(),
+			result:   new(sysctl.Info),
 			check:    func(f *Facts) bool { return f.Sysctl != nil },
 		},
 		{
 			name:     "systemd_paths",
 			collName: "systemd_paths",
-			result:   systemdPathsInfoPtr(),
+			result:   new(systemdpaths.Info),
 			check:    func(f *Facts) bool { return f.SystemdPaths != nil },
 		},
 		{
 			name:     "tc",
 			collName: "tc",
-			result:   tcInfoPtr(),
+			result:   new(tc.Info),
 			check:    func(f *Facts) bool { return f.TC != nil },
 		},
 		{
 			name:     "virtualbox",
 			collName: "virtualbox",
-			result:   virtualboxInfoPtr(),
+			result:   new(virtualbox.Info),
 			check:    func(f *Facts) bool { return f.VirtualBox != nil },
 		},
 		{
 			name:     "vmware",
 			collName: "vmware",
-			result:   vmwareInfoPtr(),
+			result:   new(vmware.Info),
 			check:    func(f *Facts) bool { return f.VMware != nil },
 		},
 		{
 			name:     "zpools",
 			collName: "zpools",
-			result:   zpoolsInfoPtr(),
+			result:   new(zpools.Info),
 			check:    func(f *Facts) bool { return f.Zpools != nil },
 		},
 		{
 			name:     "ca_certificates",
 			collName: "ca_certificates",
-			result:   caCertificatesInfoPtr(),
+			result:   new(cacertificates.Info),
 			check:    func(f *Facts) bool { return f.CACertificates != nil },
 		},
 	}
@@ -564,53 +512,53 @@ func (s *FactsTestSuite) TestCountPopulated() {
 			name: "all fields populated",
 			facts: &Facts{
 				Platform:       &platform.Info{},
-				Hostname:       hostnameInfoPtr(),
-				Kernel:         kernelInfoPtr(),
-				Uptime:         uptimeInfoPtr(),
-				Virtualization: virtInfoPtr(),
-				MachineID:      machineIDInfoPtr(),
-				CPU:            cpuInfoPtr(),
-				Memory:         memoryInfoPtr(),
-				Filesystem:     filesystemInfoPtr(),
-				Disk:           diskInfoPtr(),
-				Network:        networkInfoPtr(),
-				Process:        processInfoPtr(),
-				Users:          usersInfoPtr(),
-				Timezone:       timezoneInfoPtr(),
-				DNS:            dnsInfoPtr(),
-				RootGroup:      rootGroupInfoPtr(),
-				Shells:         shellsInfoPtr(),
-				Fips:           fipsInfoPtr(),
-				Load:           loadInfoPtr(),
-				OSRelease:      osReleaseInfoPtr(),
-				LSB:            lsbInfoPtr(),
-				Init:           initInfoPtr(),
-				Shard:          shardInfoPtr(),
-				PackageMgr:     packageMgrInfoPtr(),
-				BlockDevice:    blockDeviceInfoPtr(),
-				Command:        commandInfoPtr(),
-				Docker:         dockerInfoPtr(),
-				Grub2:          grub2InfoPtr(),
-				Hostnamectl:    hostnamectlInfoPtr(),
-				Interrupts:     interruptsInfoPtr(),
-				IPC:            ipcInfoPtr(),
-				Languages:      languagesInfoPtr(),
-				Libvirt:        libvirtInfoPtr(),
-				Livepatch:      livepatchInfoPtr(),
-				Mdadm:          mdadmInfoPtr(),
-				Packages:       packagesInfoPtr(),
-				RPM:            rpmInfoPtr(),
-				SELinux:        selinuxInfoPtr(),
-				Services:       servicesInfoPtr(),
-				SSH:            sshInfoPtr(),
-				Sysconf:        sysconfInfoPtr(),
-				Sysctl:         sysctlInfoPtr(),
-				SystemdPaths:   systemdPathsInfoPtr(),
-				TC:             tcInfoPtr(),
-				VirtualBox:     virtualboxInfoPtr(),
-				VMware:         vmwareInfoPtr(),
-				Zpools:         zpoolsInfoPtr(),
-				CACertificates: caCertificatesInfoPtr(),
+				Hostname:       new(hostname.Info),
+				Kernel:         new(kernel.Info),
+				Uptime:         new(uptime.Info),
+				Virtualization: new(virtualization.Info),
+				MachineID:      new(machineid.Info),
+				CPU:            new(cpu.Info),
+				Memory:         new(memory.Info),
+				Filesystem:     new(filesystem.Info),
+				Disk:           new(disk.Info),
+				Network:        new(network.Info),
+				Process:        new(process.Info),
+				Users:          new(users.Info),
+				Timezone:       new(timezone.Info),
+				DNS:            new(dns.Info),
+				RootGroup:      new(rootgroup.Info),
+				Shells:         new(shells.Info),
+				Fips:           new(fips.Info),
+				Load:           new(load.Info),
+				OSRelease:      new(osrelease.Info),
+				LSB:            new(lsb.Info),
+				Init:           new(initd.Info),
+				Shard:          new(shard.Info),
+				PackageMgr:     new(packagemgr.Info),
+				BlockDevice:    new(blockdevice.Info),
+				Command:        new(command.Info),
+				Docker:         new(docker.Info),
+				Grub2:          new(grub2.Info),
+				Hostnamectl:    new(hostnamectl.Info),
+				Interrupts:     new(interrupts.Info),
+				IPC:            new(ipc.Info),
+				Languages:      new(languages.Info),
+				Libvirt:        new(libvirt.Info),
+				Livepatch:      new(livepatch.Info),
+				Mdadm:          new(mdadm.Info),
+				Packages:       new(packages.Info),
+				RPM:            new(rpm.Info),
+				SELinux:        new(selinux.Info),
+				Services:       new(services.Info),
+				SSH:            new(ssh.Info),
+				Sysconf:        new(sysconf.Info),
+				Sysctl:         new(sysctl.Info),
+				SystemdPaths:   new(systemdpaths.Info),
+				TC:             new(tc.Info),
+				VirtualBox:     new(virtualbox.Info),
+				VMware:         new(vmware.Info),
+				Zpools:         new(zpools.Info),
+				CACertificates: new(cacertificates.Info),
 			},
 			want: 48,
 		},
