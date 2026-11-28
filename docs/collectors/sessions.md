@@ -122,8 +122,10 @@ On Linux:
    which the collector keeps the user processes. `who` and `w` read the same
    file.
 3. If neither `loginctl` nor `/var/run/utmp` is on the host, there are no
-   sessions. If `loginctl` failed and there is no utmp file, the collector
-   returns the `loginctl` error. A utmp file that cannot be read is an error.
+   sessions. A `loginctl` that exits with a status, such as one with no systemd
+   to connect to in a container, and no utmp file also means there are no
+   sessions. A `loginctl` that does not finish, such as a timeout, and no utmp
+   file is an error. A utmp file that cannot be read is an error.
 
 On macOS:
 
