@@ -61,9 +61,9 @@ func (l *Linux) Collect(
 	}
 	switch l.Manager {
 	case "rpm":
-		return collectRPM(ctx, l.Exec)
+		return collector.Result(collectRPM(ctx, l.Exec))
 	case "dpkg":
-		return collectDpkg(ctx, l.Exec)
+		return collector.Result(collectDpkg(ctx, l.Exec))
 	default:
 		return &Info{Packages: []Package{}}, nil
 	}

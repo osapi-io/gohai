@@ -351,7 +351,7 @@ func (s *GohaiPublicTestSuite) TestWithSourcesHTTP() {
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
 			// A metadata service that answers 404 is no cloud.
-			s.Nil(got)
+			s.Exactly(nil, got)
 			s.Equal(map[string]bool{tt.host: true}, rt.seen)
 		})
 	}
