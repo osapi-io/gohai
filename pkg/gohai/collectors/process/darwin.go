@@ -48,11 +48,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect returns a process snapshot.
+// Collect returns a process snapshot. With no Exec it gives no fact, as
+// the processes come from ps.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	procs, err := d.list(ctx, "-ax")
 	if err != nil {
 		return nil, err
@@ -61,11 +65,15 @@ func (d *Darwin) Collect(
 	return &Info{Count: len(procs), Processes: procs}, nil
 }
 
-// Read is the process pid, from `ps -p <pid>` alone.
+// Read is the process pid, from `ps -p <pid>` alone. With no Exec it is
+// an error, as no command can read the process.
 func (d *Darwin) Read(
 	ctx context.Context,
 	pid int32,
 ) (*Process, error) {
+	if d.Exec == nil {
+		return nil, fmt.Errorf("no process %d: no command runner", pid)
+	}
 	procs, err := d.list(ctx, "-p", strconv.Itoa(int(pid)))
 	if err != nil {
 		return nil, err

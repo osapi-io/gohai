@@ -50,11 +50,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect returns network Info.
+// Collect returns network Info. With no Exec it gives no fact, as every
+// value comes from ifconfig and netstat.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	out, err := d.Exec.Execute(ctx, "ifconfig", "-a", "-v")
 	if err != nil {
 		return nil, fmt.Errorf("ifconfig -a -v: %w", err)

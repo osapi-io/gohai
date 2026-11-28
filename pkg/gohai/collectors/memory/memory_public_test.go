@@ -183,9 +183,11 @@ Pages bogus:                         lots.
 		variant string
 		files   map[string]string
 		runner  sourcetest.Commands
+		nilExec bool
 		check   func(*memory.Info)
 		wantErr string
 	}{
+		{name: "darwin: no Exec gives no fact", variant: "darwin", nilExec: true},
 		{
 			name:    "linux: every field of /proc/meminfo",
 			variant: "linux",
@@ -328,7 +330,11 @@ Pages bogus:                         lots.
 			case "linux":
 				c = &memory.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &memory.Darwin{Exec: tt.runner.Mock(s.T())}
+				d := &memory.Darwin{Exec: tt.runner.Mock(s.T())}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
@@ -337,6 +343,11 @@ Pages bogus:                         lots.
 				return
 			}
 			s.Require().NoError(err)
+			if tt.nilExec {
+				s.Nil(got)
+
+				return
+			}
 			info, ok := got.(*memory.Info)
 			s.Require().True(ok)
 			tt.check(info)

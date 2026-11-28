@@ -459,8 +459,20 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		// does not use the interface seams above.
 		files        map[string]string
 		runner       *sourcetest.Commands
+		nilExec      bool
 		validateFunc func(any, error)
 	}{
+		{
+			name:       "darwin: no Exec gives no fact",
+			variant:    "darwin",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			nilExec:    true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
+		},
 		{
 			name:       "linux: addresses parsed into family/prefixlen/netmask/scope/broadcast",
 			ifsFn:      canonicalInterfaces,
@@ -1974,7 +1986,11 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				if ifsErr != nil {
 					r.Err = map[string]error{"ifconfig -a -v": ifsErr}
 				}
-				c = &network.Darwin{Exec: r.Mock(s.T())}
+				d := &network.Darwin{Exec: r.Mock(s.T())}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			default:
 				if tt.fs != nil && ifsErr == nil {
 					writeSysfs(

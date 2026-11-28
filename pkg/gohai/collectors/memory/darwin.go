@@ -48,11 +48,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect returns the memory Info.
+// Collect returns the memory Info. With no Exec it gives no fact, as
+// every value comes from sysctl and vm_stat.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	out, err := d.Exec.Execute(ctx, "sysctl", "-n", "hw.memsize")
 	if err != nil {
 		return nil, fmt.Errorf("sysctl hw.memsize: %w", err)

@@ -48,7 +48,8 @@ func NewDarwin() *Darwin {
 
 // Collect derives the shard seed. On macOS, Ohai uses
 // hardware["serial_number"] and hardware["platform_UUID"] — we read
-// the same sources via system_profiler and ioreg.
+// the same sources via system_profiler and ioreg. With no Exec the
+// seed comes from the machine name alone.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -56,6 +57,9 @@ func (d *Darwin) Collect(
 	machinename, err := getMachineName(prior)
 	if err != nil {
 		return nil, err
+	}
+	if d.Exec == nil {
+		return newInfo(machinename, "", ""), nil
 	}
 	serial := readDarwinSerial(ctx, d.Exec)
 	uuid := readDarwinUUID(ctx, d.Exec)
