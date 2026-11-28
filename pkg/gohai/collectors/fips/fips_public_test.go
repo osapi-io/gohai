@@ -160,13 +160,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 				info, ok := got.(*fips.Info)
 				s.Require().True(ok)
 				s.Equal(true, info.Kernel.Enabled)
-				if true {
-					s.Nil(info.Policy)
-					return
-				}
-				s.Require().NotNil(info.Policy)
-				s.Equal("", info.Policy.Name)
-				s.Equal(false, info.Policy.FIPSEffective)
+				s.Nil(info.Policy)
 			},
 		},
 		{
@@ -259,13 +253,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 				info, ok := got.(*fips.Info)
 				s.Require().True(ok)
 				s.Equal(true, info.Kernel.Enabled)
-				if true {
-					s.Nil(info.Policy)
-					return
-				}
-				s.Require().NotNil(info.Policy)
-				s.Equal("", info.Policy.Name)
-				s.Equal(false, info.Policy.FIPSEffective)
+				s.Nil(info.Policy)
 			},
 		},
 		{
@@ -279,13 +267,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 				info, ok := got.(*fips.Info)
 				s.Require().True(ok)
 				s.Equal(false, info.Kernel.Enabled)
-				if true {
-					s.Nil(info.Policy)
-					return
-				}
-				s.Require().NotNil(info.Policy)
-				s.Equal("", info.Policy.Name)
-				s.Equal(false, info.Policy.FIPSEffective)
+				s.Nil(info.Policy)
 			},
 		},
 		{
@@ -297,13 +279,7 @@ func (s *FipsPublicTestSuite) TestCollect() {
 				info, ok := got.(*fips.Info)
 				s.Require().True(ok)
 				s.Equal(false, info.Kernel.Enabled)
-				if true {
-					s.Nil(info.Policy)
-					return
-				}
-				s.Require().NotNil(info.Policy)
-				s.Equal("", info.Policy.Name)
-				s.Equal(false, info.Policy.FIPSEffective)
+				s.Nil(info.Policy)
 			},
 		},
 		{
