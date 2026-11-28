@@ -22,6 +22,7 @@ package rpm
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -54,8 +55,13 @@ func (l *Linux) Collect(
 	}
 	out, err := l.Exec.Execute(ctx, "rpm", "--showrc")
 	if err != nil {
-		// rpm is not installed or the host is not RPM-based: return empty, no error.
-		return info, nil
+		// rpm is not installed, so the host is not RPM-based: the source
+		// is absent and the macros are empty. Any other failure of rpm is
+		// an error.
+		if collector.Absent(err) {
+			return info, nil
+		}
+		return nil, fmt.Errorf("rpm --showrc: %w", err)
 	}
 	info.Macros = parseShowrc(out)
 	return info, nil

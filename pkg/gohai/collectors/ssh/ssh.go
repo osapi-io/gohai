@@ -29,7 +29,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	iofs "io/fs"
 	"regexp"
 	"strings"
 
@@ -130,16 +132,21 @@ func NewWith(
 // fs and returns a slice of HostKey structs. A file that does not exist
 // or does not parse is left out: a host without a particular key type is
 // normal (e.g. RSA disabled in the sshd config), and one bad file must
-// not hide the other keys or the authorized keys. Shared by Linux and
-// Darwin because /etc/ssh is the canonical path on both platforms.
+// not hide the other keys or the authorized keys. A file that exists and
+// does not read is an error, since the public keys are readable by every
+// user. Shared by Linux and Darwin because /etc/ssh is the canonical path
+// on both platforms.
 func collectHostKeys(
 	fs avfs.VFS,
-) []HostKey {
+) ([]HostKey, error) {
 	keys := []HostKey{}
 	for _, path := range hostKeyFiles {
 		b, err := fs.ReadFile(path)
-		if err != nil {
+		if collector.Absent(err) {
 			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", path, err)
 		}
 		key, err := parseHostKeyPub(b)
 		if err != nil {
@@ -148,7 +155,7 @@ func collectHostKeys(
 		keys = append(keys, key)
 	}
 
-	return keys
+	return keys, nil
 }
 
 // parseHostKeyPub parses a single line from a .pub file
@@ -275,16 +282,20 @@ type home struct {
 	uid  string
 }
 
-// passwdHomes is the home of each user of /etc/passwd.
+// passwdHomes is the home of each user of /etc/passwd. A host with no
+// /etc/passwd has no users; an /etc/passwd that does not read is an error.
 func passwdHomes(
 	fs avfs.VFS,
-) []home {
+) ([]home, error) {
 	b, err := fs.ReadFile("/etc/passwd")
+	if collector.Absent(err) {
+		return nil, nil
+	}
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("read /etc/passwd: %w", err)
 	}
 
-	return parsePasswd(b)
+	return parsePasswd(b), nil
 }
 
 // parsePasswd is the home of each line of passwd(5) format, as
@@ -399,12 +410,16 @@ func dsclHomes(
 }
 
 // collectAuthorizedKeys is the keys of each file of patterns for each
-// user of homes. A line that is not a key is left out.
+// user of homes. A line that is not a key is left out. A file that does
+// not exist is no keys. A file that the collector may not read, as each
+// other user's file is to a collector that is not root, is left out, as
+// the users collector leaves out /etc/shadow. Any other read failure is
+// an error.
 func collectAuthorizedKeys(
 	fs avfs.VFS,
 	homes []home,
 	patterns []string,
-) map[string][]AuthorizedKey {
+) (map[string][]AuthorizedKey, error) {
 	out := map[string][]AuthorizedKey{}
 	for _, h := range homes {
 		read := map[string]bool{}
@@ -415,8 +430,11 @@ func collectAuthorizedKeys(
 			}
 			read[path] = true
 			keys, err := fs.ReadFile(path)
-			if err != nil {
+			if collector.Absent(err) || errors.Is(err, iofs.ErrPermission) {
 				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("read %s: %w", path, err)
 			}
 			for _, l := range strings.Split(string(keys), "\n") {
 				if k, ok := parseAuthorizedKey(strings.TrimSpace(l)); ok {
@@ -426,10 +444,10 @@ func collectAuthorizedKeys(
 		}
 	}
 	if len(out) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	return out
+	return out, nil
 }
 
 // parseAuthorizedKey is one authorized_keys line: options, then the key

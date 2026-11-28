@@ -56,7 +56,10 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info := readPOSIX(d.FS)
+	info, err := readPOSIX(d.FS)
+	if err != nil {
+		return nil, err
+	}
 	if d.Exec != nil {
 		if err := d.applyDscl(ctx, info); err != nil {
 			return nil, err

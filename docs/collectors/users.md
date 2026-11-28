@@ -110,11 +110,14 @@ On Linux, the collector reads the POSIX flat files:
    `uid`, `gid`, `dir`, `shell` and `gecos`. It does not keep the placeholder of
    the password hash. If a username occurs two times, the first entry stays.
    This is the same as the C-library loop of `Etc.passwd`. The collector skips
-   comments (`#`) and lines that are not valid (fewer than 7 fields).
+   comments (`#`) and lines that are not valid (fewer than 7 fields). A missing
+   `/etc/passwd` gives an empty map. One that exists and does not read is an
+   error.
 2. The collector reads `/etc/group` through the same VFS. Each line has four
    fields with colons between them: `name:password:gid:members`, with commas
    between the members. The collector keeps `gid` and the `members` slice that
-   it splits on the commas. The skip rules are the same.
+   it splits on the commas. The skip rules are the same, and so are the rules
+   for a missing file and a file that does not read.
 3. The collector gets `current_user`. It runs `id -u` through its command runner
    for the effective UID. Then it finds the entry with that UID in the parsed
    `passwd` map. This is the same as Ohai's `Etc.getpwuid(Process.euid).name`.

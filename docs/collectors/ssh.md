@@ -140,7 +140,8 @@ then uses the well-known paths.
    order: `/etc/ssh/ssh_host_rsa_key.pub`, `/etc/ssh/ssh_host_ecdsa_key.pub`,
    `/etc/ssh/ssh_host_ed25519_key.pub`. It skips a file that does not exist, and
    gives no message. A host without one key type is normal, for example when RSA
-   is disabled in the sshd config.
+   is disabled in the sshd config. A host public key file is readable by each
+   user, so a file that exists and does not read is an error.
 2. For each file that it finds, the collector parses the single-line format:
    `<type> <base64-wire-blob> [comment]`. It splits the line at the whitespace.
    The line must have at least two fields. If a file has fewer fields, or the
@@ -172,7 +173,8 @@ filesystem:
 1. **The users.** On Linux, the users and their homes come from `getent passwd`.
    It has the users of LDAP and sssd when their service lists them. sssd does
    not list them when `enumerate` is off, which is its default. If `getent`
-   fails or gives no user, the collector uses `/etc/passwd`. On macOS,
+   fails or gives no user, the collector uses `/etc/passwd`. An `/etc/passwd`
+   that exists and does not read is an error. On macOS,
    `/etc/passwd` has only the system users, and the other users are in the
    directory service. Thus the collector runs
    `dscl . -list /Users NFSHomeDirectory`, and uses the first home of each user.
@@ -193,6 +195,10 @@ filesystem:
    its text, and a key type in an option value is not the key. A comment line,
    an empty line and a line with no key or a bad key are left out. A user with
    no file is not in the map.
+4. **The read failures.** A file that the collector may not read is left out,
+   as each other user's file is to a collector that is not root. Any other read
+   failure of a file that exists is an error. A cancelled collection is an
+   error.
 
 The collector does not run an `AuthorizedKeysCommand`, and does not read the
 `Match` blocks of `sshd_config`.
