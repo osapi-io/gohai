@@ -22,6 +22,7 @@ package gohai_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"reflect"
@@ -31,6 +32,7 @@ import (
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
+	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -121,12 +123,14 @@ func TestGohaiPublicTestSuite(
 
 // TestWithSources: a collector reads the host that WithSources gives, not
 // the machine the test runs on.
-// TestBuiltinCollectors checks two things of each built-in collector, for
-// each family. Each field that holds a source has the source that was given:
-// a field that collector.Wire does not set reads the real host under a
-// caller's fake host, and nothing else would say so. And Facts has a field of
-// the collector's name, which Facts.set fills: a collector that is missing
-// from the switch of Facts.set would lose its data with no signal.
+// TestBuiltinCollectors checks that the lists which describe the built-in
+// collectors agree. Each field that holds a source has the source that was
+// given: a field that collector.Wire does not set reads the real host under a
+// caller's fake host, and nothing else would say so. Facts has a field of each
+// collector's name, which Facts.set fills, and each such field of Facts has a
+// collector: a collector missing from Facts.set loses its data with no signal.
+// Collectors describes each one with its fields, the schema has a property for
+// each one, and each one has a page under docs/collectors.
 func (s *GohaiPublicTestSuite) TestBuiltinCollectors() {
 	ctrl := gomock.NewController(s.T())
 	fs := memfs.New()
@@ -183,39 +187,122 @@ func (s *GohaiPublicTestSuite) TestBuiltinCollectors() {
 		facts.Set(c.Name(), result.Interface())
 		s.Equal(result.Pointer(), reflect.ValueOf(facts).Elem().FieldByIndex(field.Index).Pointer())
 	}
+	// each runs fn for each collector, as a subtest named for it.
+	each := func(fn func(collector.Collector)) func([]collector.Collector) {
+		return func(cs []collector.Collector) {
+			for _, c := range cs {
+				s.Run(c.Name(), func() {
+					fn(c)
+				})
+			}
+		}
+	}
+	// names is the set of names of cs.
+	names := func(cs []collector.Collector) map[string]bool {
+		out := map[string]bool{}
+		for _, c := range cs {
+			out[c.Name()] = true
+		}
 
+		return out
+	}
+	// repo reads the repository root, which is two levels above this package.
+	repo := osfs.New()
+	root := repo.Join("..", "..")
+
+	debian := source.Sources{Family: family.Debian, FS: memfs.New()}
 	tests := []struct {
 		name         string
 		src          source.Sources
-		validateFunc func(collector.Collector)
+		validateFunc func([]collector.Collector)
 	}{
 		{
 			name: "debian: each source field has the source that was given",
 			src: source.Sources{
 				FS: fs, Exec: exec, Now: now, Resolver: resolver, Family: family.Debian,
 			},
-			validateFunc: takesSources,
+			validateFunc: each(takesSources),
 		},
 		{
 			name: "darwin: each source field has the source that was given",
 			src: source.Sources{
 				FS: fs, Exec: exec, Now: now, Resolver: resolver, Family: family.Darwin,
 			},
-			validateFunc: takesSources,
+			validateFunc: each(takesSources),
 		},
 		{
 			name:         "each collector has a Facts field that Facts.set fills",
-			src:          source.Sources{Family: family.Debian, FS: memfs.New()},
-			validateFunc: setsFacts,
+			src:          debian,
+			validateFunc: each(setsFacts),
+		},
+		{
+			name: "each collector field of Facts has a collector",
+			src:  debian,
+			validateFunc: func(cs []collector.Collector) {
+				have := names(cs)
+				for name, field := range byName {
+					if field.Type.Kind() != reflect.Pointer ||
+						field.Type.Elem().Kind() != reflect.Struct ||
+						field.Type.Elem() == reflect.TypeFor[gohai.Timings]() {
+						continue
+					}
+					s.Run(name, func() {
+						s.True(have[name])
+					})
+				}
+			},
+		},
+		{
+			name: "Collectors describes each collector with its fields",
+			src:  debian,
+			validateFunc: func(cs []collector.Collector) {
+				specs := map[string]gohai.CollectorSpec{}
+				for _, spec := range gohai.Collectors() {
+					specs[spec.Name] = spec
+				}
+				s.Len(specs, len(cs))
+				for _, c := range cs {
+					s.Run(c.Name(), func() {
+						spec, ok := specs[c.Name()]
+						s.Require().True(ok)
+						s.NotEmpty(spec.Fields)
+					})
+				}
+			},
+		},
+		{
+			name: "the schema has a property for each collector",
+			src:  debian,
+			validateFunc: func(cs []collector.Collector) {
+				data, err := repo.ReadFile(repo.Join(root, "schemas", "gohai.schema.json"))
+				s.Require().NoError(err)
+				var schema struct {
+					Defs struct {
+						Facts struct {
+							Properties map[string]json.RawMessage `json:"properties"`
+						} `json:"Facts"`
+					} `json:"$defs"`
+				}
+				s.Require().NoError(json.Unmarshal(data, &schema))
+				for _, c := range cs {
+					s.Run(c.Name(), func() {
+						s.Contains(schema.Defs.Facts.Properties, c.Name())
+					})
+				}
+			},
+		},
+		{
+			name: "each collector has a page under docs/collectors",
+			src:  debian,
+			validateFunc: each(func(c collector.Collector) {
+				_, err := repo.Stat(repo.Join(root, "docs", "collectors", c.Name()+".md"))
+				s.NoError(err)
+			}),
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			for _, c := range gohai.BuiltinCollectors(tt.src) {
-				s.Run(c.Name(), func() {
-					tt.validateFunc(c)
-				})
-			}
+			tt.validateFunc(gohai.BuiltinCollectors(tt.src))
 		})
 	}
 }
