@@ -40,14 +40,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector/mocks"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -121,6 +114,26 @@ func TestGohaiPublicTestSuite(
 	suite.Run(t, new(GohaiPublicTestSuite))
 }
 
+// newCycleCollector returns a generated Collector mock that declares deps,
+// for a dependency cycle. Collect returns nothing.
+func newCycleCollector(
+	ctrl *gomock.Controller,
+	name string,
+	deps ...string,
+) *mocks.MockCollector {
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(true).AnyTimes()
+	m.EXPECT().Dependencies().Return(deps).AnyTimes()
+	m.EXPECT().
+		Collect(gomock.Any(), gomock.Any()).
+		Return(nil, nil).
+		AnyTimes()
+
+	return m
+}
+
 // TestWithSources: a collector reads the host that WithSources gives, not
 // the machine the test runs on.
 // TestBuiltinCollectors checks that the lists which describe the built-in
@@ -131,6 +144,25 @@ func TestGohaiPublicTestSuite(
 // collector: a collector missing from Facts.set loses its data with no signal.
 // Collectors describes each one with its fields, the schema has a property for
 // each one, and each one has a page under docs/collectors.
+// hosts is a transport that records the host of each request and answers
+// it with the metadata of a host that is on no cloud. http.RoundTripper is
+// the standard library's interface, so it has no generated mock.
+type hosts struct {
+	mu   sync.Mutex
+	seen map[string]bool
+	next http.RoundTripper
+}
+
+func (h *hosts) RoundTrip(
+	req *http.Request,
+) (*http.Response, error) {
+	h.mu.Lock()
+	h.seen[req.URL.Hostname()] = true
+	h.mu.Unlock()
+
+	return h.next.RoundTrip(req)
+}
+
 func (s *GohaiPublicTestSuite) TestBuiltinCollectors() {
 	ctrl := gomock.NewController(s.T())
 	fs := memfs.New()
@@ -211,6 +243,19 @@ func (s *GohaiPublicTestSuite) TestBuiltinCollectors() {
 	root := repo.Join("..", "..")
 
 	debian := source.Sources{Family: family.Debian, FS: memfs.New()}
+	// cloudFS is a fake host with the hints of Azure (waagent) and Scaleway
+	// (its kernel command line). The other clouds probe when no DMI says
+	// otherwise. cloudHTTP records the hosts that each cloud collector asks.
+	cloudFS := sourcetest.FS(s.T(), map[string]string{
+		"/usr/sbin/waagent": "",
+		"/proc/cmdline":     "BOOT_IMAGE=/vmlinuz scaleway",
+	})
+	cloudHTTP := map[string]*hosts{}
+	for _, name := range []string{
+		"gce", "ec2", "azure", "digital_ocean", "oci", "alibaba", "openstack", "scaleway",
+	} {
+		cloudHTTP[name] = &hosts{seen: map[string]bool{}, next: sourcetest.HTTP(nil)}
+	}
 	tests := []struct {
 		name         string
 		src          source.Sources
@@ -299,6 +344,138 @@ func (s *GohaiPublicTestSuite) TestBuiltinCollectors() {
 				s.NoError(err)
 			}),
 		},
+		{
+			name: "gce reads its metadata service through src.HTTP",
+			src:  source.Sources{FS: cloudFS, Family: family.Debian, HTTP: cloudHTTP["gce"]},
+			validateFunc: func(cs []collector.Collector) {
+				for _, c := range cs {
+					if c.Name() != "gce" {
+						continue
+					}
+					got, err := c.Collect(context.Background(), nil)
+					s.Require().NoError(err)
+					// A metadata service that answers 404 is no cloud.
+					s.Exactly(nil, got)
+				}
+				s.Equal(map[string]bool{"metadata.google.internal.": true}, cloudHTTP["gce"].seen)
+			},
+		},
+		{
+			name: "ec2 reads its metadata service through src.HTTP",
+			src:  source.Sources{FS: cloudFS, Family: family.Debian, HTTP: cloudHTTP["ec2"]},
+			validateFunc: func(cs []collector.Collector) {
+				for _, c := range cs {
+					if c.Name() != "ec2" {
+						continue
+					}
+					got, err := c.Collect(context.Background(), nil)
+					s.Require().NoError(err)
+					// A metadata service that answers 404 is no cloud.
+					s.Exactly(nil, got)
+				}
+				s.Equal(map[string]bool{"169.254.169.254": true}, cloudHTTP["ec2"].seen)
+			},
+		},
+		{
+			name: "azure reads its metadata service through src.HTTP",
+			src:  source.Sources{FS: cloudFS, Family: family.Debian, HTTP: cloudHTTP["azure"]},
+			validateFunc: func(cs []collector.Collector) {
+				for _, c := range cs {
+					if c.Name() != "azure" {
+						continue
+					}
+					got, err := c.Collect(context.Background(), nil)
+					s.Require().NoError(err)
+					// A metadata service that answers 404 is no cloud.
+					s.Exactly(nil, got)
+				}
+				s.Equal(map[string]bool{"169.254.169.254": true}, cloudHTTP["azure"].seen)
+			},
+		},
+		{
+			name: "digital_ocean reads its metadata service through src.HTTP",
+			src: source.Sources{
+				FS:     cloudFS,
+				Family: family.Debian,
+				HTTP:   cloudHTTP["digital_ocean"],
+			},
+			validateFunc: func(cs []collector.Collector) {
+				for _, c := range cs {
+					if c.Name() != "digital_ocean" {
+						continue
+					}
+					got, err := c.Collect(context.Background(), nil)
+					s.Require().NoError(err)
+					// A metadata service that answers 404 is no cloud.
+					s.Exactly(nil, got)
+				}
+				s.Equal(map[string]bool{"169.254.169.254": true}, cloudHTTP["digital_ocean"].seen)
+			},
+		},
+		{
+			name: "oci reads its metadata service through src.HTTP",
+			src:  source.Sources{FS: cloudFS, Family: family.Debian, HTTP: cloudHTTP["oci"]},
+			validateFunc: func(cs []collector.Collector) {
+				for _, c := range cs {
+					if c.Name() != "oci" {
+						continue
+					}
+					got, err := c.Collect(context.Background(), nil)
+					s.Require().NoError(err)
+					// A metadata service that answers 404 is no cloud.
+					s.Exactly(nil, got)
+				}
+				s.Equal(map[string]bool{"169.254.169.254": true}, cloudHTTP["oci"].seen)
+			},
+		},
+		{
+			name: "alibaba reads its metadata service through src.HTTP",
+			src:  source.Sources{FS: cloudFS, Family: family.Debian, HTTP: cloudHTTP["alibaba"]},
+			validateFunc: func(cs []collector.Collector) {
+				for _, c := range cs {
+					if c.Name() != "alibaba" {
+						continue
+					}
+					got, err := c.Collect(context.Background(), nil)
+					s.Require().NoError(err)
+					// A metadata service that answers 404 is no cloud.
+					s.Exactly(nil, got)
+				}
+				s.Equal(map[string]bool{"100.100.100.200": true}, cloudHTTP["alibaba"].seen)
+			},
+		},
+		{
+			name: "openstack reads its metadata service through src.HTTP",
+			src:  source.Sources{FS: cloudFS, Family: family.Debian, HTTP: cloudHTTP["openstack"]},
+			validateFunc: func(cs []collector.Collector) {
+				for _, c := range cs {
+					if c.Name() != "openstack" {
+						continue
+					}
+					got, err := c.Collect(context.Background(), nil)
+					s.Require().NoError(err)
+					// A metadata service that answers 404 is no cloud.
+					s.Exactly(nil, got)
+				}
+				s.Equal(map[string]bool{"169.254.169.254": true}, cloudHTTP["openstack"].seen)
+			},
+		},
+		{
+			name: "scaleway reads its metadata service through src.HTTP",
+			src:  source.Sources{FS: cloudFS, Family: family.Debian, HTTP: cloudHTTP["scaleway"]},
+			validateFunc: func(cs []collector.Collector) {
+				for _, c := range cs {
+					if c.Name() != "scaleway" {
+						continue
+					}
+					got, err := c.Collect(context.Background(), nil)
+					s.Require().NoError(err)
+					// A metadata service that answers 404 is no cloud.
+					s.Exactly(nil, got)
+				}
+				s.Equal(map[string]bool{"169.254.42.42": true}, cloudHTTP["scaleway"].seen)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
@@ -344,129 +521,6 @@ func (s *GohaiPublicTestSuite) TestRegisterBuiltins() {
 	}
 }
 
-func (s *GohaiPublicTestSuite) TestWithSources() {
-	tests := []struct {
-		name         string
-		src          func() source.Sources
-		validateFunc func(*gohai.Facts, error)
-	}{
-		{
-			name: "a collector reads the filesystem it is given",
-			src: func() source.Sources {
-				fs := memfs.New()
-				s.Require().NoError(fs.MkdirAll("/etc", 0o755))
-				s.Require().NoError(fs.WriteFile("/etc/os-release",
-					[]byte("ID=gohaitest\nNAME=\"Gohai Test\"\nVERSION_ID=\"1.0\"\n"), 0o644))
-
-				return source.Sources{FS: fs, Family: family.Debian}
-			},
-			validateFunc: func(facts *gohai.Facts, err error) {
-				s.Require().NoError(err)
-				s.Require().NotNil(facts.OSRelease)
-				s.Equal("gohaitest", facts.OSRelease.ID)
-				s.Equal("1.0", facts.OSRelease.VersionID)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			g, err := gohai.New(
-				gohai.WithSources(tt.src()),
-				gohai.WithCollectors("os_release"),
-			)
-			s.Require().NoError(err)
-			tt.validateFunc(g.Collect(context.Background()))
-		})
-	}
-}
-
-// hosts is a transport that records the host of each request and answers
-// it with the metadata of a host that is on no cloud. http.RoundTripper is
-// the standard library's interface, so it has no generated mock.
-type hosts struct {
-	mu   sync.Mutex
-	seen map[string]bool
-	next http.RoundTripper
-}
-
-func (h *hosts) RoundTrip(
-	req *http.Request,
-) (*http.Response, error) {
-	h.mu.Lock()
-	h.seen[req.URL.Hostname()] = true
-	h.mu.Unlock()
-
-	return h.next.RoundTrip(req)
-}
-
-func (s *GohaiPublicTestSuite) TestWithSourcesHTTP() {
-	// A fake host with the hints of Azure (waagent) and Scaleway (its
-	// kernel command line). The others probe when no DMI says otherwise.
-	fs := sourcetest.FS(s.T(), map[string]string{
-		"/usr/sbin/waagent": "",
-		"/proc/cmdline":     "BOOT_IMAGE=/vmlinuz scaleway",
-	})
-	tests := []struct {
-		name string
-		new  func(source.Sources) collector.Collector
-		host string
-	}{
-		{
-			name: "gce",
-			new:  func(src source.Sources) collector.Collector { return gce.NewWith(src) },
-			host: "metadata.google.internal.",
-		},
-		{
-			name: "ec2",
-			new:  func(src source.Sources) collector.Collector { return ec2.NewWith(src) },
-			host: "169.254.169.254",
-		},
-		{
-			name: "azure",
-			new:  func(src source.Sources) collector.Collector { return azure.NewWith(src) },
-			host: "169.254.169.254",
-		},
-		{
-			name: "digital_ocean",
-			new:  func(src source.Sources) collector.Collector { return digitalocean.NewWith(src) },
-			host: "169.254.169.254",
-		},
-		{
-			name: "oci",
-			new:  func(src source.Sources) collector.Collector { return oci.NewWith(src) },
-			host: "169.254.169.254",
-		},
-		{
-			name: "alibaba",
-			new:  func(src source.Sources) collector.Collector { return alibaba.NewWith(src) },
-			host: "100.100.100.200",
-		},
-		{
-			name: "openstack",
-			new:  func(src source.Sources) collector.Collector { return openstack.NewWith(src) },
-			host: "169.254.169.254",
-		},
-		{
-			name: "scaleway",
-			new:  func(src source.Sources) collector.Collector { return scaleway.NewWith(src) },
-			host: "169.254.42.42",
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name+" reads its metadata service through src.HTTP", func() {
-			rt := &hosts{seen: map[string]bool{}, next: sourcetest.HTTP(nil)}
-			c := tt.new(source.Sources{FS: fs, Family: family.Debian, HTTP: rt})
-			got, err := c.Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			// A metadata service that answers 404 is no cloud.
-			s.Exactly(nil, got)
-			s.Equal(map[string]bool{tt.host: true}, rt.seen)
-		})
-	}
-}
-
 func (s *GohaiPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name          string
@@ -474,6 +528,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 		injectFailing bool
 		injectAs      any
 		injectCancel  bool
+		injectCycle   bool
 		validateFunc  func(*gohai.Facts, error)
 	}{
 		{
@@ -608,6 +663,13 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:        "a run error, such as a dependency cycle, is returned",
+			injectCycle: true,
+			validateFunc: func(_ *gohai.Facts, err error) {
+				s.ErrorContains(err, "dependency cycle")
+			},
+		},
+		{
 			name:          "failed collector surfaces in Errors without WithTimings",
 			injectFailing: true,
 			validateFunc: func(facts *gohai.Facts, err error) {
@@ -649,7 +711,119 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 				)
 				s.Require().NoError(g.Select("canceller"))
 			}
+			if tt.injectCycle {
+				ctrl := gomock.NewController(s.T())
+				s.Require().NoError(g.Register(newCycleCollector(ctrl, "cycle-a", "cycle-b")))
+				s.Require().NoError(g.Register(newCycleCollector(ctrl, "cycle-b", "cycle-a")))
+				s.Require().NoError(g.Select("cycle-a"))
+				s.Require().NoError(g.Select("cycle-b"))
+			}
 			tt.validateFunc(g.Collect(ctx))
+		})
+	}
+}
+
+func (s *GohaiPublicTestSuite) TestNew() {
+	tests := []struct {
+		name         string
+		opts         []gohai.Option
+		builtins     func(source.Sources) []collector.Collector
+		validateFunc func(any, error)
+	}{
+		{
+			name: "a built-in collector that does not register errors",
+			builtins: func(src source.Sources) []collector.Collector {
+				return []collector.Collector{platform.NewWith(src), platform.NewWith(src)}
+			},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, `register built-in collector "platform"`)
+			},
+		},
+		{
+			name: "defaults",
+			opts: nil,
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "with disabled",
+			opts: []gohai.Option{gohai.WithDisabled("platform")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "with collectors only",
+			opts: []gohai.Option{gohai.WithCollectors("platform")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "unknown enabled errors",
+			opts: []gohai.Option{gohai.WithEnabled("nope")},
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
+		},
+		{
+			name: "unknown disabled errors",
+			opts: []gohai.Option{gohai.WithDisabled("nope")},
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
+		},
+		{
+			name: "with collectors and disabled together errors",
+			opts: []gohai.Option{
+				gohai.WithCollectors("platform"),
+				gohai.WithDisabled("hostname"),
+			},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "WithCollectors and WithDisabled together")
+			},
+		},
+		{
+			name: "unknown only errors",
+			opts: []gohai.Option{gohai.WithCollectors("nope")},
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
+		},
+		{
+			name: "with category cloud",
+			opts: []gohai.Option{gohai.WithCategory("cloud")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "with category hardware stacks",
+			opts: []gohai.Option{gohai.WithCategory("hardware", "cloud")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "unknown category errors",
+			opts: []gohai.Option{gohai.WithCategory("nope")},
+			validateFunc: func(_ any, err error) {
+				s.Error(err)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			if tt.builtins != nil {
+				defer gohai.SetBuiltinCollectorsFn(tt.builtins)()
+			}
+			tt.validateFunc(gohai.New(tt.opts...))
 		})
 	}
 }

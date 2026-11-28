@@ -128,3 +128,74 @@ func TestCollectorPublicTestSuite(
 ) {
 	suite.Run(t, new(CollectorPublicTestSuite))
 }
+
+func (s *CollectorPublicTestSuite) TestCategories() {
+	tests := []struct {
+		name         string
+		validateFunc func([]collector.Category)
+	}{
+		{
+			name: "lists the ten categories, cloud and misc among them",
+			validateFunc: func(cats []collector.Category) {
+				s.Len(cats, 10)
+				s.Contains(cats, collector.CategoryCloud)
+				s.Contains(cats, collector.CategoryMisc)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(collector.Categories())
+		})
+	}
+}
+
+func (s *CollectorPublicTestSuite) TestGetDep() {
+	prior := collector.PriorResults{
+		"typed":    "hello",
+		"wrong":    42,
+		"nil-slot": nil,
+	}
+
+	tests := []struct {
+		name         string
+		lookup       string
+		validateFunc func(string, bool)
+	}{
+		{
+			name:   "matching type returns the value",
+			lookup: "typed",
+			validateFunc: func(got string, ok bool) {
+				s.True(ok)
+				s.Equal("hello", got)
+			},
+		},
+		{
+			name:   "missing key returns ok=false",
+			lookup: "missing",
+			validateFunc: func(_ string, ok bool) {
+				s.False(ok)
+			},
+		},
+		{
+			name:   "type mismatch returns ok=false",
+			lookup: "wrong",
+			validateFunc: func(_ string, ok bool) {
+				s.False(ok)
+			},
+		},
+		{
+			name:   "nil-valued any does not type-assert",
+			lookup: "nil-slot",
+			validateFunc: func(_ string, ok bool) {
+				s.False(ok)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(collector.GetDep[string](prior, tt.lookup))
+		})
+	}
+}

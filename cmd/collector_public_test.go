@@ -22,6 +22,8 @@ package cmd_test
 
 import (
 	"bytes"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -73,4 +75,174 @@ func (s *CollectorPublicTestSuite) TestWriteProblems() {
 			tt.validateFunc(out.String(), err)
 		})
 	}
+}
+
+func (s *CollectorPublicTestSuite) TestNewCollectorCommand() {
+	tests := []executeCase{
+		{
+			name: "collector validate passes every collector",
+			args: []string{"collector", "validate"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				s.Contains(out, "Every collector passes each rule.")
+			},
+		},
+		{
+			name: "collector validate --json prints no problems",
+			args: []string{"collector", "validate", "--json"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				s.Equal("[]", strings.TrimSpace(out))
+			},
+		},
+		{
+			name: "collector validate --json fails when its output fails",
+			args: []string{"collector", "validate", "--json"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+	}
+
+	runExecute(&s.Suite, tests)
+}
+
+func (s *CollectorPublicTestSuite) TestWriteCollectorList() {
+	tests := []executeCase{
+		{
+			name: "collector list prints a table",
+			args: []string{"collector", "list"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				s.Contains(out, "NAME")
+				s.Contains(out, "DEPENDS ON")
+				s.Contains(out, "none")
+			},
+		},
+		{
+			name: "collector list --json prints each collector",
+			args: []string{"collector", "list", "--json"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				var specs []gohai.CollectorSpec
+				s.Require().NoError(json.Unmarshal([]byte(out), &specs))
+				s.NotEmpty(specs)
+			},
+		},
+		{
+			name: "collector list fails when its output fails",
+			args: []string{"collector", "list"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+		{
+			name: "collector list --json fails when its output fails",
+			args: []string{"collector", "list", "--json"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+	}
+
+	runExecute(&s.Suite, tests)
+}
+
+func (s *CollectorPublicTestSuite) TestWriteCollector() {
+	tests := []executeCase{
+		{
+			name: "collector get shows the fields and the reads",
+			args: []string{"collector", "get", "--name", "uptime"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				s.Contains(out, "Collector:    uptime")
+				s.Contains(out, "Reads on")
+			},
+		},
+		{
+			name: "collector get of a cloud collector names its network",
+			args: []string{"collector", "get", "--name", "ec2"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				s.Contains(out, "Network:")
+				s.Contains(out, "nothing")
+			},
+		},
+		{
+			name: "collector get --json",
+			args: []string{"collector", "get", "--name", "uptime", "--json"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				s.Contains(out, `"name": "uptime"`)
+			},
+		},
+		{
+			name: "collector get refuses an unknown name",
+			args: []string{"collector", "get", "--name", "nope"},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, `no collector named "nope"`)
+			},
+		},
+		{
+			name: "collector get fails when its output fails",
+			args: []string{"collector", "get", "--name", "uptime"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+	}
+
+	runExecute(&s.Suite, tests)
+}
+
+func (s *CollectorPublicTestSuite) TestWriteTerms() {
+	tests := []executeCase{
+		{
+			name: "collector spec get prints each part",
+			args: []string{"collector", "spec", "get"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				s.Contains(out, "Use:")
+			},
+		},
+		{
+			name: "collector spec get --json",
+			args: []string{"collector", "spec", "get", "--json"},
+			validateFunc: func(code int, out, errOut string) {
+				s.Zero(code)
+				s.Empty(errOut)
+				var terms []gohai.Term
+				s.Require().NoError(json.Unmarshal([]byte(out), &terms))
+				s.NotEmpty(terms)
+			},
+		},
+		{
+			name: "collector spec get fails when its output fails",
+			args: []string{"collector", "spec", "get"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+	}
+
+	runExecute(&s.Suite, tests)
 }

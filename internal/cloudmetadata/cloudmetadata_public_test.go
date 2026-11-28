@@ -149,32 +149,6 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			},
 		},
 		{
-			name: "headers are sent on every request",
-			setup: func() (string, []cloudmetadata.Option, func()) {
-				var got http.Header
-				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-					"/h": func(w http.ResponseWriter, r *http.Request) {
-						got = r.Header.Clone()
-						_, _ = w.Write([]byte("ok"))
-					},
-				})
-				opts := []cloudmetadata.Option{
-					cloudmetadata.WithHeader("Metadata", "true"),
-					cloudmetadata.WithHeader("Authorization", "Bearer Oracle"),
-				}
-				return srv.URL, opts, func() {
-					srv.Close()
-					s.Equal("true", got.Get("Metadata"))
-					s.Equal("Bearer Oracle", got.Get("Authorization"))
-				}
-			},
-			path: "/h",
-			validateFunc: func(body []byte, err error) {
-				s.Require().NoError(err)
-				s.Equal("ok", string(body))
-			},
-		},
-		{
 			name: "default User-Agent is sent when caller doesn't override",
 			setup: func() (string, []cloudmetadata.Option, func()) {
 				var got http.Header
@@ -187,30 +161,6 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				return srv.URL, nil, func() {
 					srv.Close()
 					s.Equal(cloudmetadata.DefaultUserAgent, got.Get("User-Agent"))
-				}
-			},
-			path: "/ua",
-			validateFunc: func(body []byte, err error) {
-				s.Require().NoError(err)
-				s.Equal("ok", string(body))
-			},
-		},
-		{
-			name: "WithHeader overrides the default User-Agent",
-			setup: func() (string, []cloudmetadata.Option, func()) {
-				var got http.Header
-				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-					"/ua": func(w http.ResponseWriter, r *http.Request) {
-						got = r.Header.Clone()
-						_, _ = w.Write([]byte("ok"))
-					},
-				})
-				opts := []cloudmetadata.Option{
-					cloudmetadata.WithHeader("User-Agent", "custom/1.0"),
-				}
-				return srv.URL, opts, func() {
-					srv.Close()
-					s.Equal("custom/1.0", got.Get("User-Agent"))
 				}
 			},
 			path: "/ua",
@@ -286,25 +236,6 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				return url, nil, func() {}
 			},
 			path: "/anything",
-			validateFunc: func(_ []byte, err error) {
-				s.Require().Error(err)
-				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
-			},
-		},
-		{
-			name: "timeout wraps ErrNotAvailable",
-			setup: func() (string, []cloudmetadata.Option, func()) {
-				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
-					"/slow": func(_ http.ResponseWriter, r *http.Request) {
-						<-r.Context().Done()
-					},
-				})
-				opts := []cloudmetadata.Option{
-					cloudmetadata.WithTimeout(50 * time.Millisecond),
-				}
-				return srv.URL, opts, srv.Close
-			},
-			path: "/slow",
 			validateFunc: func(_ []byte, err error) {
 				s.Require().Error(err)
 				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
@@ -472,6 +403,115 @@ func (s *CloudMetadataPublicTestSuite) TestNew() {
 				cloudmetadata.TransportOf(cloudmetadata.New("http://a.invalid")),
 				cloudmetadata.TransportOf(cloudmetadata.New("http://b.invalid")),
 			)
+		})
+	}
+}
+
+func (s *CloudMetadataPublicTestSuite) TestWithHeader() {
+	tests := []struct {
+		name         string
+		setup        func() (baseURL string, opts []cloudmetadata.Option, cleanup func())
+		path         string
+		validateFunc func([]byte, error)
+	}{
+		{
+			name: "each header is sent on every request, and the calls add up",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				var got http.Header
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/h": func(w http.ResponseWriter, r *http.Request) {
+						got = r.Header.Clone()
+						_, _ = w.Write([]byte("ok"))
+					},
+				})
+				opts := []cloudmetadata.Option{
+					cloudmetadata.WithHeader("Metadata", "true"),
+					cloudmetadata.WithHeader("Authorization", "Bearer Oracle"),
+				}
+				return srv.URL, opts, func() {
+					srv.Close()
+					s.Equal("true", got.Get("Metadata"))
+					s.Equal("Bearer Oracle", got.Get("Authorization"))
+				}
+			},
+			path: "/h",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ok", string(body))
+			},
+		},
+		{
+			name: "a header overrides the default User-Agent",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				var got http.Header
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/ua": func(w http.ResponseWriter, r *http.Request) {
+						got = r.Header.Clone()
+						_, _ = w.Write([]byte("ok"))
+					},
+				})
+				opts := []cloudmetadata.Option{
+					cloudmetadata.WithHeader("User-Agent", "custom/1.0"),
+				}
+				return srv.URL, opts, func() {
+					srv.Close()
+					s.Equal("custom/1.0", got.Get("User-Agent"))
+				}
+			},
+			path: "/ua",
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ok", string(body))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			baseURL, opts, cleanup := tt.setup()
+			defer cleanup()
+
+			client := cloudmetadata.New(baseURL, opts...)
+			tt.validateFunc(client.Get(context.Background(), tt.path))
+		})
+	}
+}
+
+func (s *CloudMetadataPublicTestSuite) TestWithTimeout() {
+	tests := []struct {
+		name         string
+		setup        func() (baseURL string, opts []cloudmetadata.Option, cleanup func())
+		path         string
+		validateFunc func([]byte, error)
+	}{
+		{
+			name: "a request that passes the timeout wraps ErrNotAvailable",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/slow": func(_ http.ResponseWriter, r *http.Request) {
+						<-r.Context().Done()
+					},
+				})
+				opts := []cloudmetadata.Option{
+					cloudmetadata.WithTimeout(50 * time.Millisecond),
+				}
+				return srv.URL, opts, srv.Close
+			},
+			path: "/slow",
+			validateFunc: func(_ []byte, err error) {
+				s.Require().Error(err)
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			baseURL, opts, cleanup := tt.setup()
+			defer cleanup()
+
+			client := cloudmetadata.New(baseURL, opts...)
+			tt.validateFunc(client.Get(context.Background(), tt.path))
 		})
 	}
 }
