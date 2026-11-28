@@ -31,6 +31,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -212,8 +213,10 @@ func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 // EC2-compatible /latest/meta-data tree recursively, and fetches the
 // Nova-specific meta_data.json. The provider field is populated
 // independently from /etc/passwd ("dreamhost" if dhc-user is present,
-// "openstack" otherwise, as Ohai does). First-call failure returns
-// (nil, nil); per-path failures are tolerated.
+// "openstack" otherwise, as Ohai does). A document that is not there (no
+// answer, or a 404) is skipped, and with neither source there the host is
+// not on OpenStack (nil, nil). Any other failure, such as an HTTP 500,
+// malformed JSON or a cancelled context, is an error.
 func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -222,12 +225,20 @@ func (c *Metadata) Collect(
 		return nil, ctx.Err()
 	}
 
-	tree, err := walk(ctx, c.client(), "/latest/meta-data/")
-	if err != nil && !errors.Is(err, errWalkLimit) {
-		// Even if the EC2-mirror walk fails, try the Nova doc, because some
-		// minimal Nova deployments only serve the JSON. Don't drop
-		// detection just because /latest 404s.
+	// When dmi did not run, nothing has said the host is on OpenStack, so
+	// any 4xx is another service, not OpenStack's: the document is not
+	// there. On a host that DMI confirmed, only a 404 means that.
+	_, dmiRan := collector.GetDep[*dmi.Info](prior, "dmi")
+	get := c.lookup(!dmiRan)
+
+	tree, err := walk(ctx, get, "/latest/meta-data/")
+	switch {
+	case errors.Is(err, cloudmetadata.ErrNotAvailable):
+		// The EC2-mirror tree is not there. Try the Nova doc, because some
+		// minimal Nova deployments only serve the JSON.
 		tree = nil
+	case err != nil && !errors.Is(err, errWalkLimit):
+		return nil, fmt.Errorf("openstack: %w", err)
 	}
 	info := &Info{
 		Provider: detectProvider(c.FS),
@@ -236,23 +247,28 @@ func (c *Metadata) Collect(
 		populateFromTree(info, tree)
 	}
 
-	if body, err := c.fetchNovaDoc(ctx); err == nil {
+	body, err := get(ctx, "/openstack/latest/meta_data.json")
+	if err != nil && !errors.Is(err, cloudmetadata.ErrNotAvailable) {
+		return nil, fmt.Errorf("openstack: %w", err)
+	}
+	if err == nil {
 		var doc openStackMetaDoc
-		if jerr := json.Unmarshal(body, &doc); jerr == nil {
-			info.UUID = doc.UUID
-			info.Name = doc.Name
-			info.ProjectUID = doc.ProjectID
-			info.LaunchIndex = doc.LaunchIndex
-			info.PublicKeys = doc.PublicKeys
-			for _, d := range doc.Devices {
-				info.Devices = append(info.Devices, Device(d))
-			}
-			if info.Zone == "" {
-				info.Zone = doc.AvailabilityZone
-			}
-			if info.Hostname == "" {
-				info.Hostname = doc.Hostname
-			}
+		if err := json.Unmarshal(body, &doc); err != nil {
+			return nil, fmt.Errorf("openstack: decode meta_data.json: %w", err)
+		}
+		info.UUID = doc.UUID
+		info.Name = doc.Name
+		info.ProjectUID = doc.ProjectID
+		info.LaunchIndex = doc.LaunchIndex
+		info.PublicKeys = doc.PublicKeys
+		for _, d := range doc.Devices {
+			info.Devices = append(info.Devices, Device(d))
+		}
+		if info.Zone == "" {
+			info.Zone = doc.AvailabilityZone
+		}
+		if info.Hostname == "" {
+			info.Hostname = doc.Hostname
 		}
 	}
 
@@ -305,7 +321,7 @@ var errWalkLimit = errors.New("metadata walk limit reached")
 // and the walk stops with errWalkLimit after maxWalkRequests requests.
 func walk(
 	ctx context.Context,
-	c *cloudmetadata.Client,
+	c getFunc,
 	path string,
 ) (map[string]any, error) {
 	requests := 0
@@ -316,7 +332,7 @@ func walk(
 // limits hold across the whole tree.
 func walkDir(
 	ctx context.Context,
-	c *cloudmetadata.Client,
+	c getFunc,
 	path string,
 	depth int,
 	requests *int,
@@ -326,7 +342,7 @@ func walkDir(
 			return nil, errWalkLimit
 		}
 		*requests++
-		return c.Get(ctx, p)
+		return c(ctx, p)
 	}
 	listing, err := get(path)
 	if err != nil {
@@ -345,20 +361,20 @@ func walkDir(
 				continue
 			}
 			sub, err := walkDir(ctx, c, child, depth+1, requests)
-			if errors.Is(err, errWalkLimit) {
-				return result, err
+			if errors.Is(err, cloudmetadata.ErrNotAvailable) {
+				continue
 			}
 			if err != nil {
-				continue
+				return result, err
 			}
 			result[key] = sub
 		} else {
 			leaf, err := get(child)
-			if errors.Is(err, errWalkLimit) {
-				return result, err
+			if errors.Is(err, cloudmetadata.ErrNotAvailable) {
+				continue
 			}
 			if err != nil {
-				continue
+				return result, err
 			}
 			result[key] = strings.TrimSpace(string(leaf))
 		}
@@ -431,10 +447,23 @@ func onOpenStack(
 	return strings.Contains(info.Product.Name, dmiProductSignature)
 }
 
-// fetchNovaDoc fetches Nova's enriched meta_data.json, which sits
-// outside the EC2-mirror tree.
-func (c *Metadata) fetchNovaDoc(
-	ctx context.Context,
-) ([]byte, error) {
-	return c.client().Get(ctx, "/openstack/latest/meta_data.json")
+// getFunc fetches one metadata path, as cloudmetadata.Client.Lookup does.
+type getFunc func(ctx context.Context, path string) ([]byte, error)
+
+// lookup returns the getFunc of the collector's client. While probing a
+// host that DMI did not confirm, a 4xx also wraps ErrNotAvailable, so it
+// is "not there" and not an error.
+func (c *Metadata) lookup(
+	probing bool,
+) getFunc {
+	client := c.client()
+
+	return func(ctx context.Context, path string) ([]byte, error) {
+		body, err := client.Lookup(ctx, path)
+		if probing && cloudmetadata.ClientError(err) {
+			return nil, fmt.Errorf("%w: %w", cloudmetadata.ErrNotAvailable, err)
+		}
+
+		return body, err
+	}
 }

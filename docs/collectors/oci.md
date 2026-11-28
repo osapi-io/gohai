@@ -158,10 +158,13 @@ cancelled collection is an error, not a host without metadata.
 4. **User-Agent.** The User-Agent is `gohai`, the cloudmetadata default.
 5. **Timeout.** The timeout is 6 seconds. This is the same as Ohai's
    `read_timeout` in `mixin/oci_metadata.rb`.
-6. **Failures.** If the instance document fails, the collector returns
-   `(nil, nil)`. If `/vnics` or `/allVolumeAttachments` fails, the collector
-   continues, because small shapes correctly return 404 for those paths. Those
-   sections stay empty in the Info struct.
+6. **Failures.** If the instance document gets no answer or a 404, the host is
+   not on OCI, and the collector returns `(nil, nil)`. If `/vnics` or
+   `/allVolumeAttachments` returns 404, as small shapes do, that section stays
+   empty. When `dmi` did not run, so nothing has said the host is on OCI, any
+   4xx is also "not there", because it comes from another service. Any other
+   failure of a document is an error: an HTTP 5xx, a 4xx on a host that DMI
+   says is on OCI, malformed JSON, or a cancelled context.
 7. **Transformation.** The collector unmarshals the raw camelCase fields and
    maps them to snake_case in the typed Info. The instance document can have
    optional subobjects: `agent_config`, `availability_config`, `launch_options`

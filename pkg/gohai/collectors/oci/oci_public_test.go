@@ -157,6 +157,34 @@ func handler(
 	}
 }
 
+// failOn answers path with a 500, the instance with instance, and every
+// other path with "[]".
+func failOn(
+	path string,
+	instance string,
+) http.HandlerFunc {
+	return statusOn(path, http.StatusInternalServerError, instance)
+}
+
+// statusOn answers path with status, the instance with instance, and
+// every other path with "[]".
+func statusOn(
+	path string,
+	status int,
+	instance string,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case path:
+			w.WriteHeader(status)
+		case "/instance":
+			_, _ = w.Write([]byte(instance))
+		default:
+			_, _ = w.Write([]byte("[]"))
+		}
+	}
+}
+
 func (s *OCIPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
@@ -263,6 +291,32 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "no dmi in prior: a 403 on the instance is another service, not OCI",
+			prior:   collector.PriorResults{},
+			handler: statusOn("/instance", http.StatusForbidden, ""),
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
+				s.Nil(out)
+			},
+		},
+		{
+			name:    "no dmi in prior: a 500 on the instance is still an error",
+			prior:   collector.PriorResults{},
+			handler: failOn("/instance", ""),
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 500 from /instance")
+				s.Nil(out)
+			},
+		},
+		{
+			name:    "dmi says OCI: a 403 on the instance is an error",
+			handler: statusOn("/instance", http.StatusForbidden, ""),
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 403 from /instance")
+				s.Nil(out)
+			},
+		},
+		{
 			name: "404 on instance drops silently",
 			validateFunc: func(out any, _ bool, _ string, err error) {
 				s.Require().NoError(err)
@@ -283,6 +337,14 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "a 500 on the instance is an error",
+			handler: failOn("/instance", ""),
+			validateFunc: func(got any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 500 from /instance")
+				s.Nil(got)
+			},
+		},
+		{
 			name:   "connection refused drops silently",
 			closed: true,
 			validateFunc: func(out any, _ bool, _ string, err error) {
@@ -298,27 +360,39 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:     "malformed vnics JSON keeps the instance, with no VNICs",
+			name:     "malformed vnics JSON is an error",
 			instance: instanceResponse,
 			vnics:    "not json",
 			validateFunc: func(got any, _ bool, _ string, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*oci.Info)
-				s.Require().True(ok)
-				s.NotEmpty(info.ID)
-				s.Empty(info.VNICs)
+				s.Require().ErrorContains(err, "oci: decode /vnics")
+				s.Nil(got)
 			},
 		},
 		{
-			name:     "malformed volumes JSON keeps the instance, with no volumes",
+			name:     "a 500 on /vnics is an error",
+			instance: instanceResponse,
+			handler:  failOn("/vnics", instanceResponse),
+			validateFunc: func(got any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 500 from /vnics")
+				s.Nil(got)
+			},
+		},
+		{
+			name:     "malformed volumes JSON is an error",
 			instance: instanceResponse,
 			volumes:  "not json",
 			validateFunc: func(got any, _ bool, _ string, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*oci.Info)
-				s.Require().True(ok)
-				s.NotEmpty(info.ID)
-				s.Empty(info.VolumeAttachments)
+				s.Require().ErrorContains(err, "oci: decode /allVolumeAttachments")
+				s.Nil(got)
+			},
+		},
+		{
+			name:     "a 500 on /allVolumeAttachments is an error",
+			instance: instanceResponse,
+			handler:  failOn("/allVolumeAttachments", instanceResponse),
+			validateFunc: func(got any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 500 from /allVolumeAttachments")
+				s.Nil(got)
 			},
 		},
 		{

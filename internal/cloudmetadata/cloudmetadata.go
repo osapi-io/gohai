@@ -223,6 +223,54 @@ func (c *Client) RawGet(
 	return body, resp.StatusCode, nil
 }
 
+// Lookup fetches baseURL + path and returns the body on 2xx. Only a
+// request with no answer, or a 404, wraps ErrNotAvailable: the document
+// is not there. Any other non-2xx, such as a 500, is an error of its own,
+// so a metadata service that answers with a failure is not taken for a
+// host with no such document. A cancelled context is its own error.
+func (c *Client) Lookup(
+	ctx context.Context,
+	path string,
+) ([]byte, error) {
+	body, status, err := c.RawGet(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	if status == http.StatusNotFound {
+		return nil, fmt.Errorf("%w: status 404 from %s", ErrNotAvailable, path)
+	}
+	if status < 200 || status >= 300 {
+		return nil, &StatusError{Status: status, Path: path}
+	}
+
+	return body, nil
+}
+
+// StatusError is the error of a Lookup whose answer was a non-2xx status
+// other than 404. A collector that probes a host which DMI did not
+// confirm can tell a 4xx (another service, not this cloud) from a 5xx (a
+// metadata service that failed) by Status.
+type StatusError struct {
+	// Status is the HTTP status code of the answer.
+	Status int
+	// Path is the path that was asked for.
+	Path string
+}
+
+// Error returns "unexpected status <status> from <path>".
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("unexpected status %d from %s", e.Status, e.Path)
+}
+
+// ClientError reports whether err is a StatusError with a 4xx status.
+func ClientError(
+	err error,
+) bool {
+	var se *StatusError
+
+	return errors.As(err, &se) && se.Status >= 400 && se.Status < 500
+}
+
 // Put issues a PUT against baseURL + path with per-request headers
 // merged onto the Client's default headers. Body may be nil. Used by
 // EC2's IMDSv2 token flow. EC2 is the only provider that

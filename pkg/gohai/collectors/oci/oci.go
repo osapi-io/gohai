@@ -26,7 +26,9 @@ package oci
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -333,11 +335,13 @@ func (*Metadata) DefaultEnabled() bool { return false }
 func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the fetch on a DMI chassis.asset_tag match, then
-// fetches the three OCI metadata documents. Any per-endpoint failure
-// that wraps ErrNotAvailable (404 on /vnics or /allVolumeAttachments
-// on lightweight shapes) is tolerated, and we populate what we can.
-// Returns (nil, nil) when the instance doc fetch fails, matching
-// "not on OCI" semantics.
+// fetches the three OCI metadata documents. An instance document with no
+// answer, or a 404, means the host is not on OCI, and gives (nil, nil). A
+// VNIC or volume document that is not there (a 404 on a lightweight
+// shape) leaves its part empty. When dmi did not run, so nothing has said
+// the host is on OCI, any 4xx is also "not there": it is another service,
+// not OCI's. Any other failure of a document, such as an HTTP 5xx,
+// malformed JSON or a cancelled context, is an error.
 func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -346,44 +350,64 @@ func (c *Metadata) Collect(
 		return nil, ctx.Err()
 	}
 
+	_, dmiRan := collector.GetDep[*dmi.Info](prior, "dmi")
+	probing := !dmiRan
+
 	var ri rawInstance
-	if err := c.client().GetJSON(ctx, pathInstance, &ri); err != nil {
-		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
-			return nil, ctx.Err()
-		}
+	found, err := c.document(ctx, pathInstance, &ri, probing)
+	if err != nil || !found {
 		return nil, err
 	}
 	info := transformInstance(ri)
 
-	// The instance document decides that the host is on OCI. A VNIC or
-	// volume document that cannot be read or decoded leaves its part
-	// empty, and keeps the instance's facts. A cancelled context is the
-	// error of the collection.
 	var vnics []rawVNIC
-	if err := c.client().GetJSON(ctx, pathVNICs, &vnics); err == nil {
-		for _, v := range vnics {
-			info.VNICs = append(info.VNICs, VNIC(v))
-		}
-	} else if ctxErr := ctx.Err(); ctxErr != nil {
-		return nil, ctxErr
+	if _, err := c.document(ctx, pathVNICs, &vnics, probing); err != nil {
+		return nil, err
+	}
+	for _, v := range vnics {
+		info.VNICs = append(info.VNICs, VNIC(v))
 	}
 
 	var vols []rawVolumeAttachment
-	if err := c.client().GetJSON(ctx, pathVolumes, &vols); err == nil {
-		if len(vols) > 0 {
-			info.VolumeAttachments = make(map[string]VolumeAttachment, len(vols))
+	if _, err := c.document(ctx, pathVolumes, &vols, probing); err != nil {
+		return nil, err
+	}
+	if len(vols) > 0 {
+		info.VolumeAttachments = make(map[string]VolumeAttachment, len(vols))
+	}
+	for _, v := range vols {
+		if v.ID == "" {
+			continue
 		}
-		for _, v := range vols {
-			if v.ID == "" {
-				continue
-			}
-			info.VolumeAttachments[v.ID] = VolumeAttachment(v)
-		}
-	} else if ctxErr := ctx.Err(); ctxErr != nil {
-		return nil, ctxErr
+		info.VolumeAttachments[v.ID] = VolumeAttachment(v)
 	}
 
 	return info, nil
+}
+
+// document reads the JSON document at path into out. It reports false
+// with no error when the document is not there: no answer, a 404, or,
+// while probing a host that DMI did not confirm, any 4xx. Any other
+// failure is an error.
+func (c *Metadata) document(
+	ctx context.Context,
+	path string,
+	out any,
+	probing bool,
+) (bool, error) {
+	body, err := c.client().Lookup(ctx, path)
+	if errors.Is(err, cloudmetadata.ErrNotAvailable) ||
+		(probing && cloudmetadata.ClientError(err)) {
+		return false, ctx.Err()
+	}
+	if err != nil {
+		return false, fmt.Errorf("oci: %w", err)
+	}
+	if err := json.Unmarshal(body, out); err != nil {
+		return false, fmt.Errorf("oci: decode %s: %w", path, err)
+	}
+
+	return true, nil
 }
 
 // onOCI checks the dmi collector's chassis.asset_tag for the
