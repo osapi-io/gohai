@@ -434,7 +434,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a sestatus that is installed and fails is an error",
+			name:    "linux: a sestatus that fails keeps the kernel and config facts",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return sourcetest.FS(s.T(), map[string]string{"/sys/fs/selinux/enforce": "1\n"})
@@ -448,7 +448,11 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "sestatus: signal: killed")
-				s.Exactly(nil, got)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("enabled", info.Status)
+				s.Equal("enforcing", info.CurrentMode)
 			},
 		},
 		{
