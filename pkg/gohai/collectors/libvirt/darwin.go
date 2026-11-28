@@ -24,7 +24,6 @@ import (
 	"context"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Darwin is a no-op libvirt collector for macOS. KVM requires Linux; libvirt
@@ -33,14 +32,11 @@ import (
 // nil — matching Ohai's approach of only implementing the Linux branch.
 type Darwin struct {
 	base
-
-	Exec source.Runner
 }
 
-// NewDarwin returns a Darwin variant. The Exec field is wired to the
-// production Executor for structural consistency but is never invoked.
+// NewDarwin returns a Darwin variant.
 func NewDarwin() *Darwin {
-	return &Darwin{Exec: source.Commands()}
+	return &Darwin{}
 }
 
 // Collect always returns nil on macOS — libvirt is not supported on Darwin.

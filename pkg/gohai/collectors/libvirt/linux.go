@@ -29,8 +29,8 @@ import (
 )
 
 // Linux collects libvirt domain data on Linux hosts via the virsh CLI. virsh
-// must be on PATH and able to connect to the libvirt daemon (typically
-// qemu:///system). When virsh is absent or `virsh version` does not
+// must be on PATH and able to connect to the system daemon, qemu:///system,
+// which every call names, so root and other users see the same domains. When virsh is absent or `virsh version` does not
 // answer, Collect returns nil with no error: not every Linux host is a
 // KVM hypervisor. Once the daemon answers, a failed read is an error.
 type Linux struct {
@@ -56,7 +56,7 @@ func (l *Linux) Collect(
 	}
 
 	// Probe: if virsh version fails, virsh is absent or the daemon is down.
-	verOut, err := l.Exec.Execute(ctx, "virsh", "version")
+	verOut, err := l.virsh(ctx, "version")
 	if err != nil {
 		return nil, nil
 	}
@@ -65,13 +65,13 @@ func (l *Linux) Collect(
 		Version: parseVirshVersion(verOut),
 	}
 
-	uriOut, err := l.Exec.Execute(ctx, "virsh", "uri")
+	uriOut, err := l.virsh(ctx, "uri")
 	if err != nil {
 		return nil, fmt.Errorf("read virsh uri: %w", err)
 	}
 	info.URI = parseVirshURI(uriOut)
 
-	listOut, err := l.Exec.Execute(ctx, "virsh", "list", "--all")
+	listOut, err := l.virsh(ctx, "list", "--all")
 	if err != nil {
 		return nil, fmt.Errorf("read virsh list: %w", err)
 	}
@@ -81,7 +81,7 @@ func (l *Linux) Collect(
 	// dominfo. A domain can go away between the list and its dominfo, so
 	// a failed dominfo keeps the domain with its name and state only.
 	for i := range domains {
-		diOut, diErr := l.Exec.Execute(ctx, "virsh", "dominfo", domains[i].Name)
+		diOut, diErr := l.virsh(ctx, "dominfo", domains[i].Name)
 		if diErr == nil {
 			parseVirshDominfo(diOut, &domains[i])
 		}
@@ -91,4 +91,17 @@ func (l *Linux) Collect(
 		info.Domains = domains
 	}
 	return info, nil
+}
+
+// systemURI is the libvirt connection of the system daemon. virsh with no
+// -c connects to qemu:///session for a user who is not root, which has
+// other domains, usually none, than qemu:///system for root.
+const systemURI = "qemu:///system"
+
+// virsh runs virsh against the system daemon with args.
+func (l *Linux) virsh(
+	ctx context.Context,
+	args ...string,
+) ([]byte, error) {
+	return l.Exec.Execute(ctx, "virsh", append([]string{"-c", systemURI}, args...)...)
 }

@@ -109,7 +109,11 @@ None.
 
 ## Data sources
 
-On Linux, the collector runs four `virsh` commands in sequence:
+On Linux, the collector runs four `virsh` commands in sequence. Each one has
+`-c qemu:///system`, so the collector reads the system daemon for root and for
+other users. Without `-c`, `virsh` connects a user who is not root to
+`qemu:///session`, which usually has no domains. A user who cannot connect to
+the system daemon gets no fact, the same as a host where the daemon is down.
 
 1. **`virsh version`**. The probe, and the source of the version. If this
    command fails, `Collect` returns `nil` immediately. The command fails if

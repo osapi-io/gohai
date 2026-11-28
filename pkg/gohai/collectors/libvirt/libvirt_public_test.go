@@ -115,15 +115,15 @@ func fullVirshMock(
 ) source.Runner {
 	ctrl := gomock.NewController(t)
 	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+	m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 		Return([]byte(virshVersionOutput), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+	m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 		Return([]byte(virshURIOutput), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+	m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 		Return([]byte(virshListOutput), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "virsh", "dominfo", "myvm").
+	m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "dominfo", "myvm").
 		Return([]byte(virshDominfoMyvm), nil).AnyTimes()
-	m.EXPECT().Execute(gomock.Any(), "virsh", "dominfo", "stopped-vm").
+	m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "dominfo", "stopped-vm").
 		Return([]byte(virshDominfoStopped), nil).AnyTimes()
 	return m
 }
@@ -225,11 +225,11 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return([]byte(virshVersionNoDeamon), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 					Return([]byte(virshURIOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 					Return([]byte(virshListEmptyOutput), nil).AnyTimes()
 				return m
 			},
@@ -248,11 +248,11 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
 				// "Using library:" with a value that does NOT start with "libvirt "
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return([]byte("Using library: somevendor 9.0.0\n"), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 					Return([]byte(virshURIOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 					Return([]byte(virshListEmptyOutput), nil).AnyTimes()
 				return m
 			},
@@ -269,15 +269,16 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 					Return([]byte(virshURIOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 					Return([]byte(" Id   Name   State\n-----------\n 1    testvm   running\n"), nil).
 					AnyTimes()
 				// dominfo with a no-colon line mixed in
-				m.EXPECT().Execute(gomock.Any(), "virsh", "dominfo", "testvm").
+				m.EXPECT().
+					Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "dominfo", "testvm").
 					Return([]byte("no colon line here\nUUID: deadbeef-dead-beef-dead-beefdeadbeef\nAutostart: enable\n"), nil).
 					AnyTimes()
 				return m
@@ -297,14 +298,15 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 					Return([]byte(virshURIOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 					Return([]byte(" Id   Name   State\n-----------\n 1    testvm   running\n"), nil).
 					AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "dominfo", "testvm").
+				m.EXPECT().
+					Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "dominfo", "testvm").
 					Return([]byte("CPU(s):\nAutostart: enable\n"), nil).
 					AnyTimes()
 				return m
@@ -324,7 +326,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return(nil, errors.New("virsh: command not found")).AnyTimes()
 				return m
 			},
@@ -348,11 +350,11 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 					Return(nil, errors.New("connection refused")).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 					Return([]byte(virshListEmptyOutput), nil).AnyTimes()
 				return m
 			},
@@ -367,11 +369,11 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 					Return([]byte(virshURIOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 					Return(nil, errors.New("permission denied")).AnyTimes()
 				return m
 			},
@@ -386,15 +388,17 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 					Return([]byte(virshURIOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 					Return([]byte(" Id   Name   State\n-----------\n 1    myvm   running\n"), nil).
 					AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "dominfo", "myvm").
-					Return(nil, errors.New("permission denied")).AnyTimes()
+				m.EXPECT().
+					Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "dominfo", "myvm").
+					Return(nil, errors.New("permission denied")).
+					AnyTimes()
 				return m
 			},
 			validateFunc: func(got any, err error) {
@@ -413,11 +417,11 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
-				m.EXPECT().Execute(gomock.Any(), "virsh", "version").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
 					Return([]byte(virshVersionOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "uri").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "uri").
 					Return([]byte(virshURIOutput), nil).AnyTimes()
-				m.EXPECT().Execute(gomock.Any(), "virsh", "list", "--all").
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "list", "--all").
 					Return([]byte(virshListEmptyOutput), nil).AnyTimes()
 				return m
 			},
