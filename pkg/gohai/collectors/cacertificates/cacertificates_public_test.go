@@ -228,9 +228,13 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 						NotAfter:    other.notAfter,
 					},
 					{
-						Name: "mozilla/Root_CA", Path: "/usr/share/ca-certificates/mozilla/Root_CA.crt",
-						Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
-						Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+						Name:        "mozilla/Root_CA",
+						Path:        "/usr/share/ca-certificates/mozilla/Root_CA.crt",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "CN=Root CA,O=Test",
+						Fingerprint: root.fingerprint,
+						NotAfter:    root.notAfter,
 					},
 					{
 						Name: "osapi-ours", Path: "/usr/local/share/ca-certificates/osapi-ours.crt",
@@ -252,14 +256,22 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				s.Equal([]cacertificates.Certificate{
 					{
-						Name: "Root CA", Path: "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
-						Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
-						Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+						Name:        "Root CA",
+						Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "CN=Root CA,O=Test",
+						Fingerprint: root.fingerprint,
+						NotAfter:    root.notAfter,
 					},
 					{
-						Name: "O=No CN", Path: "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
-						Source: "system", Enabled: true, Subject: "O=No CN",
-						Fingerprint: noCN.fingerprint, NotAfter: noCN.notAfter,
+						Name:        "O=No CN",
+						Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "O=No CN",
+						Fingerprint: noCN.fingerprint,
+						NotAfter:    noCN.notAfter,
 					},
 					{
 						Name: "broken", Path: "/etc/pki/ca-trust/source/anchors/broken.pem",
@@ -288,9 +300,13 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				s.Equal([]cacertificates.Certificate{
 					{
-						Name: "Root CA", Path: "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
-						Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
-						Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+						Name:        "Root CA",
+						Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "CN=Root CA,O=Test",
+						Fingerprint: root.fingerprint,
+						NotAfter:    root.notAfter,
 					},
 					{
 						Name:        "Other CA",
@@ -374,6 +390,7 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			files:   map[string]string{"/usr/share": "not a directory"},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /usr/share/ca-certificates: ")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -386,6 +403,7 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /usr/share/ca-certificates/mozilla/Loop.crt: ")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -412,6 +430,7 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			links:   map[string]string{"/etc/ca-certificates.conf": "/etc/ca-certificates.conf"},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /etc/ca-certificates.conf: ")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -421,6 +440,7 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			files:   map[string]string{"/usr/share/pki/ca-trust-source": "not a directory"},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /usr/share/pki/ca-trust-source/blocklist: ")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -432,6 +452,7 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /etc/pki/ca-trust/source/blocklist/bad.crt: ")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -461,6 +482,7 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			}},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read keychain")
+				s.Exactly(nil, got)
 			},
 		},
 		{
