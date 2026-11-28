@@ -61,7 +61,7 @@ Enable it only where its facts can hold such values.
 ```json
 {
   "process": {
-    "count": 3,
+    "count": 2,
     "processes": [
       {
         "pid": 1,
