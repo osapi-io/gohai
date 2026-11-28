@@ -112,20 +112,25 @@ On Linux:
 1. If `loginctl` is on the PATH, the collector runs
    `loginctl --no-pager --no-legend --no-ask-password list-sessions` through the
    shared `source.Runner`. It splits each line that is not empty at the
-   whitespace into `session_id uid user [seat]`. It adds the result to
+   whitespace into `session_id uid user [seat]`. A seat of `-`, which loginctl
+   prints for a session with no seat, is empty. It adds the result to
    `logged_in[]`. Empty output means that there are no active sessions. This is
    a valid result, and the collector does not try utmp in that case.
 2. If `loginctl` is missing or fails, the collector reads `/var/run/utmp`. This
    occurs on a host without systemd or in a minimal container without systemd.
-   The file is glibc's `utmp(5)`: 384-byte records, of which the collector keeps
-   the user processes. `who` and `w` read the same file. An error goes back to
-   the caller as a real failure.
+   The file is glibc's `utmp(5)`: 384-byte records in the host's byte order, of
+   which the collector keeps the user processes. `who` and `w` read the same
+   file.
+3. If neither `loginctl` nor `/var/run/utmp` is on the host, there are no
+   sessions. If `loginctl` failed and there is no utmp file, the collector
+   returns the `loginctl` error. A utmp file that cannot be read is an error.
 
 On macOS:
 
 1. The collector reads `/var/run/utmpx`: 628-byte records after a header record,
    of which it keeps the user processes. This is the only source, because Darwin
-   has no systemd. Errors go back to the caller.
+   has no systemd. A host with no utmpx file has no sessions, and a file that
+   cannot be read is an error.
 
 Ohai has no equivalent plugin. gohai added this collector for consumers that
 audit sessions across a fleet. Current Linux distributions document `loginctl`

@@ -25,6 +25,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -142,6 +144,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 	loginctlOutput := []byte(
 		"   c1   1000 john     seat0\n" +
 			"   2    0    root\n" +
+			"   3    1001 jane     -     pts/1\n" +
 			"\n" +
 			"  bad-line\n",
 	)
@@ -155,6 +158,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		variant      string
 		exec         func(*testing.T) source.Runner
 		files        map[string]string
+		dirs         []string
 		validateFunc func(any, error)
 	}{
 		{
@@ -166,7 +170,7 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
 				s.Require().True(ok)
-				s.Require().Len(i.LoggedIn, 2)
+				s.Require().Len(i.LoggedIn, 3)
 				s.Equal("c1", i.LoggedIn[0].SessionID)
 				s.Equal("1000", i.LoggedIn[0].UID)
 				s.Equal("john", i.LoggedIn[0].User)
@@ -174,13 +178,15 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 				s.Equal("2", i.LoggedIn[1].SessionID)
 				s.Equal("root", i.LoggedIn[1].User)
 				s.Empty(i.LoggedIn[1].Seat)
+				s.Equal("jane", i.LoggedIn[2].User)
+				s.Empty(i.LoggedIn[2].Seat)
 			},
 		},
 		{
 			name:    "linux: loginctl missing, falls back to utmp",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return loginctlExec(t, nil, errors.New("not found"))
+				return loginctlExec(t, nil, fmt.Errorf("exec loginctl: %w", exec.ErrNotFound))
 			},
 			files: utmp,
 			validateFunc: func(got any, err error) {
@@ -222,13 +228,50 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: loginctl missing AND no utmp file",
+			name:    "linux: a failed loginctl falls back to utmp",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return loginctlExec(t, nil, errors.New("not found"))
+				return loginctlExec(t, nil, errors.New("exit status 1"))
 			},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			files: utmp,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*sessions.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.LoggedIn, 1)
+				s.Equal("fallback", i.LoggedIn[0].User)
+			},
+		},
+		{
+			name:    "linux: no loginctl and no utmp file, no sessions",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return loginctlExec(t, nil, fmt.Errorf("exec loginctl: %w", exec.ErrNotFound))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&sessions.Info{LoggedIn: []sessions.Session{}}, got)
+			},
+		},
+		{
+			name:    "linux: a failed loginctl and no utmp file, the loginctl error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return loginctlExec(t, nil, errors.New("exit status 1"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "loginctl list-sessions: exit status 1")
+			},
+		},
+		{
+			name:    "linux: a utmp file that cannot be read is an error",
+			variant: "linux",
+			exec:    func(*testing.T) source.Runner { return nil },
+			dirs:    []string{"/var/run/utmp"},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.ErrorContains(err, "read /var/run/utmp")
 			},
 		},
 		{
@@ -249,16 +292,29 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: no utmpx file",
+			name:    "darwin: no utmpx file, no sessions",
 			variant: "darwin",
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&sessions.Info{LoggedIn: []sessions.Session{}}, got)
+			},
+		},
+		{
+			name:    "darwin: a utmpx file that cannot be read is an error",
+			variant: "darwin",
+			dirs:    []string{"/var/run/utmpx"},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.ErrorContains(err, "read /var/run/utmpx")
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			fs := sourcetest.FS(s.T(), tt.files)
+			for _, dir := range tt.dirs {
+				s.Require().NoError(fs.MkdirAll(dir, 0o755))
+			}
 			var c sessions.Collector
 			switch tt.variant {
 			case "linux":
@@ -284,11 +340,11 @@ func record(
 	size, typ, line, user, host, sec int,
 ) []byte {
 	b := make([]byte, size)
-	binary.LittleEndian.PutUint16(b[typ:], r.typ)
+	binary.NativeEndian.PutUint16(b[typ:], r.typ)
 	copy(b[line:], r.line)
 	copy(b[user:], r.user)
 	copy(b[host:], r.host)
-	binary.LittleEndian.PutUint32(b[sec:], r.sec)
+	binary.NativeEndian.PutUint32(b[sec:], r.sec)
 
 	return b
 }

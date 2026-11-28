@@ -138,14 +138,14 @@ func readUtmp(
 	out := []Session{}
 	for ; len(buf) >= l.size; buf = buf[l.size:] {
 		r := buf[:l.size]
-		if binary.LittleEndian.Uint16(r[l.typ:]) != userProcess {
+		if binary.NativeEndian.Uint16(r[l.typ:]) != userProcess {
 			continue
 		}
 		out = append(out, Session{
 			User:     cString(r[l.user : l.user+l.userLen]),
 			Terminal: cString(r[l.line : l.line+l.lineLen]),
 			Host:     cString(r[l.host : l.host+l.hostLen]),
-			Started:  uint64(binary.LittleEndian.Uint32(r[l.sec:])),
+			Started:  uint64(binary.NativeEndian.Uint32(r[l.sec:])),
 		})
 	}
 
@@ -182,7 +182,7 @@ func parseLoginctlSessions(
 			UID:       fields[1],
 			User:      fields[2],
 		}
-		if len(fields) >= 4 {
+		if len(fields) >= 4 && fields[3] != "-" {
 			s.Seat = fields[3]
 		}
 		out = append(out, s)

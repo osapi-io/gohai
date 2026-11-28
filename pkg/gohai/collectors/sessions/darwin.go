@@ -42,13 +42,17 @@ func NewDarwin() *Darwin {
 	return &Darwin{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns logged-in session Info.
+// Collect returns logged-in session Info from the utmpx file. A host with
+// no utmpx file has no sessions, and one that cannot be read is an error.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	ss, err := readUtmp(d.FS, utmpxPath, darwinUtmpx)
 	if err != nil {
+		if collector.Absent(err) {
+			return &Info{LoggedIn: []Session{}}, nil
+		}
 		return nil, err
 	}
 	return &Info{LoggedIn: ss}, nil

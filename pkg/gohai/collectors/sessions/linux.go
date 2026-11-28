@@ -22,6 +22,7 @@ package sessions
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -48,21 +49,34 @@ func NewLinux() *Linux {
 	return &Linux{Exec: source.Commands(), FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns logged-in session Info.
+// Collect returns logged-in session Info: loginctl's sessions, or the utmp
+// file's when loginctl does not answer. A host with neither has no
+// sessions. A failed loginctl with no utmp file, or a utmp file that
+// cannot be read, is an error.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	var loginctlErr error
 	if l.Exec != nil {
 		out, err := l.Exec.Execute(ctx,
 			"loginctl", "--no-pager", "--no-legend", "--no-ask-password", "list-sessions")
 		if err == nil {
 			return &Info{LoggedIn: parseLoginctlSessions(out)}, nil
 		}
+		if !collector.Absent(err) {
+			loginctlErr = fmt.Errorf("loginctl list-sessions: %w", err)
+		}
 	}
 	ss, err := readUtmp(l.FS, utmpPath, linuxUtmp)
-	if err != nil {
+	switch {
+	case err == nil:
+		return &Info{LoggedIn: ss}, nil
+	case !collector.Absent(err):
 		return nil, err
+	case loginctlErr != nil:
+		return nil, loginctlErr
+	default:
+		return &Info{LoggedIn: []Session{}}, nil
 	}
-	return &Info{LoggedIn: ss}, nil
 }

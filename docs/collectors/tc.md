@@ -94,9 +94,9 @@ On Linux:
    removes the trailing `:` from `handle`. This parse is the same as in Ohai's
    `tc.rb`.
 5. It skips lines that have fewer than 5 fields or no `dev` keyword.
-6. If `tc` is missing, the collector returns an empty list, not an error.
-   Minimal container images and non-Linux kernels without iproute2 often have no
-   `tc`.
+6. If `tc` is missing, the collector returns an empty list, not an error. If
+   `tc` fails, the collector returns the error. Minimal container images and
+   non-Linux kernels without iproute2 often have no `tc`.
 
 The interfaces are in the order of their first line in the `tc` output. This
 order is the same as the internal order of the kernel.
