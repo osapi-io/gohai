@@ -877,6 +877,7 @@ func (s *GohaiPublicTestSuite) TestStatusFrom() {
 }
 
 func (s *GohaiPublicTestSuite) TestNew() {
+	ctrl := gomock.NewController(s.T())
 	tests := []struct {
 		name         string
 		opts         []gohai.Option
@@ -958,6 +959,59 @@ func (s *GohaiPublicTestSuite) TestNew() {
 		{
 			name: "with category hardware stacks",
 			opts: []gohai.Option{gohai.WithCategory("hardware", "cloud")},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "a disabled collector that a selected one depends on errors",
+			opts: []gohai.Option{gohai.WithEnabled("ec2"), gohai.WithDisabled("dmi")},
+			validateFunc: func(g any, err error) {
+				s.Nil(g)
+				s.EqualError(
+					err,
+					`collector "dmi" is disabled, but "ec2" depends on it: enable it, or disable "ec2" too`,
+				)
+			},
+		},
+		{
+			name: "a disabled collector that a selected one needs through another errors",
+			opts: []gohai.Option{gohai.WithDefaults(), gohai.WithDisabled("c")},
+			builtins: func(source.Sources) []collector.Collector {
+				return []collector.Collector{
+					newCycleCollector(ctrl, "a", "b"),
+					newCycleCollector(ctrl, "b", "c"),
+					newCycleCollector(ctrl, "c"),
+				}
+			},
+			validateFunc: func(_ any, err error) {
+				s.EqualError(
+					err,
+					`collector "c" is disabled, but "a" depends on it: enable it, or disable "a" too`,
+				)
+			},
+		},
+		{
+			name: "a dependency reached twice is checked once, and a disabled other is fine",
+			opts: []gohai.Option{gohai.WithDefaults(), gohai.WithDisabled("e")},
+			builtins: func(source.Sources) []collector.Collector {
+				return []collector.Collector{
+					newCycleCollector(ctrl, "a", "b", "c"),
+					newCycleCollector(ctrl, "b", "d"),
+					newCycleCollector(ctrl, "c", "d"),
+					newCycleCollector(ctrl, "d"),
+					newCycleCollector(ctrl, "e"),
+				}
+			},
+			validateFunc: func(g any, err error) {
+				s.Require().NoError(err)
+				s.NotNil(g)
+			},
+		},
+		{
+			name: "a disabled collector that no selected one depends on is fine",
+			opts: []gohai.Option{gohai.WithEnabled("ec2"), gohai.WithDisabled("cpu")},
 			validateFunc: func(g any, err error) {
 				s.Require().NoError(err)
 				s.NotNil(g)
