@@ -42,13 +42,16 @@ func TestSpecPublicTestSuite(
 func (s *SpecPublicTestSuite) TestProblems() {
 	fields := []gohai.Field{{Name: "x", Type: "string"}}
 	tests := []struct {
-		name      string
-		specs     []gohai.CollectorSpec
-		wantRules []string
+		name         string
+		specs        []gohai.CollectorSpec
+		validateFunc func(rules []string)
 	}{
 		{
 			name:  "when the built-in collectors break no rule",
 			specs: gohai.Collectors(),
+			validateFunc: func(rules []string) {
+				s.Empty(rules)
+			},
 		},
 		{
 			name: "when two collectors have one name",
@@ -56,7 +59,9 @@ func (s *SpecPublicTestSuite) TestProblems() {
 				{Name: "a", Category: "system", Fields: fields},
 				{Name: "a", Category: "system", Fields: fields},
 			},
-			wantRules: []string{spec.RuleName},
+			validateFunc: func(rules []string) {
+				s.Equal([]string{spec.RuleName}, rules)
+			},
 		},
 		{
 			name: "when a name is not lowercase letters, digits and underscores",
@@ -66,17 +71,23 @@ func (s *SpecPublicTestSuite) TestProblems() {
 				{Name: "has-dash", Category: "system", Fields: fields},
 				{Name: "", Category: "system", Fields: fields},
 			},
-			wantRules: []string{spec.RuleName, spec.RuleName, spec.RuleName, spec.RuleName},
+			validateFunc: func(rules []string) {
+				s.Equal([]string{spec.RuleName, spec.RuleName, spec.RuleName, spec.RuleName}, rules)
+			},
 		},
 		{
-			name:      "when the category is not one of the categories",
-			specs:     []gohai.CollectorSpec{{Name: "a", Category: "kitchen", Fields: fields}},
-			wantRules: []string{spec.RuleCategory},
+			name:  "when the category is not one of the categories",
+			specs: []gohai.CollectorSpec{{Name: "a", Category: "kitchen", Fields: fields}},
+			validateFunc: func(rules []string) {
+				s.Equal([]string{spec.RuleCategory}, rules)
+			},
 		},
 		{
-			name:      "when gohai.Facts has no field for it",
-			specs:     []gohai.CollectorSpec{{Name: "a", Category: "system"}},
-			wantRules: []string{spec.RuleFacts},
+			name:  "when gohai.Facts has no field for it",
+			specs: []gohai.CollectorSpec{{Name: "a", Category: "system"}},
+			validateFunc: func(rules []string) {
+				s.Equal([]string{spec.RuleFacts}, rules)
+			},
 		},
 		{
 			name: "when a dependency is itself or not registered",
@@ -88,7 +99,9 @@ func (s *SpecPublicTestSuite) TestProblems() {
 					Dependencies: []string{"a", "missing"},
 				},
 			},
-			wantRules: []string{spec.RuleDependency, spec.RuleDependency},
+			validateFunc: func(rules []string) {
+				s.Equal([]string{spec.RuleDependency, spec.RuleDependency}, rules)
+			},
 		},
 	}
 
@@ -103,7 +116,7 @@ func (s *SpecPublicTestSuite) TestProblems() {
 				// Every rule has a fix.
 				s.NotEmpty(p.Fix)
 			}
-			s.Equal(tc.wantRules, rules)
+			tc.validateFunc(rules)
 		})
 	}
 

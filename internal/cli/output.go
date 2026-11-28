@@ -24,7 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/ocsf"
@@ -60,7 +60,7 @@ func WriteFlat(
 		keys = append(keys, k)
 	}
 
-	sort.Strings(keys)
+	slices.Sort(keys)
 
 	for _, k := range keys {
 		if _, err := fmt.Fprintf(out, "%s=%v\n", k, flatMap[k]); err != nil {
@@ -138,11 +138,11 @@ func WriteCollectorList(
 		cats = append(cats, c)
 	}
 
-	sort.Strings(cats)
+	slices.Sort(cats)
 
 	for _, cat := range cats {
 		names := byCat[cat]
-		sort.Strings(names)
+		slices.Sort(names)
 
 		if _, err := fmt.Fprintf(out, "[%s]\n", cat); err != nil {
 			return fmt.Errorf("write collector list: %w", err)
