@@ -117,6 +117,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 		variant string
 		files   map[string]string
 		runner  sourcetest.Commands
+		nilExec bool
 		want    *load.Info
 		wantErr string
 	}{
@@ -143,6 +144,7 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			},
 			want: &load.Info{One: 1.5, Five: 2.0, Fifteen: 2.5},
 		},
+		{name: "darwin: no Exec gives no fact", variant: "darwin", nilExec: true},
 		{
 			name:    "darwin: sysctl fails",
 			variant: "darwin",
@@ -159,7 +161,11 @@ func (s *LoadPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &load.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &load.Darwin{Exec: tt.runner.Mock(s.T())}
+				d := &load.Darwin{Exec: tt.runner.Mock(s.T())}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
@@ -168,6 +174,11 @@ func (s *LoadPublicTestSuite) TestCollect() {
 				return
 			}
 			s.Require().NoError(err)
+			if tt.want == nil {
+				s.Nil(got)
+
+				return
+			}
 			s.Equal(tt.want, got)
 		})
 	}
