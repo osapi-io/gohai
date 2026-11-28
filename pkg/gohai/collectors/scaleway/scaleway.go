@@ -36,6 +36,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -225,27 +226,28 @@ func (*Collector) Category() collector.Category { return collector.CategoryCloud
 // DefaultEnabled returns false — cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
-// Dependencies returns no dependencies. Scaleway has no DMI signature
-// exposed via sysfs, so we can't gate on dmi like gce/ec2 do.
-// Detection falls back to the kernel cmdline signature instead.
-func (*Collector) Dependencies() []string { return nil }
+// Dependencies returns dmi: a Scaleway instance's DMI sys_vendor is
+// Scaleway. The kernel cmdline signature of the old bootscript boot is a
+// second signal.
+func (*Collector) Dependencies() []string { return []string{"dmi"} }
 
-// Collect probes /proc/cmdline for Scaleway's signature, then fetches
-// the single /conf?format=json document. Returns (nil, nil) when the
-// signature is missing or the endpoint is unreachable.
+// Collect checks DMI sys_vendor, then /proc/cmdline, for Scaleway, then
+// fetches the single /conf?format=json document. Returns (nil, nil) when
+// neither signal names Scaleway or the endpoint is unreachable, and the
+// context's error when the collection was cancelled.
 func (c *Collector) Collect(
 	ctx context.Context,
-	_ collector.PriorResults,
+	prior collector.PriorResults,
 ) (any, error) {
-	if !onScaleway(c.FS) {
-		return nil, nil
+	if !onScaleway(c.FS, prior) {
+		return nil, ctx.Err()
 	}
 	body, err := c.client.Get(ctx, metadataPath)
 	if err != nil {
 		// Any fetch failure (transport, 404, body-read) means we
 		// can't determine whether we're on Scaleway — treat as "not
 		// on this cloud" rather than propagating noise.
-		return nil, nil
+		return nil, ctx.Err()
 	}
 	var r raw
 	if err := json.Unmarshal(body, &r); err != nil {
@@ -254,13 +256,19 @@ func (c *Collector) Collect(
 	return transform(r), nil
 }
 
-// onScaleway returns true when /proc/cmdline contains Scaleway's
-// boot signature. Matches Ohai's has_scaleway_cmdline? check. The
-// signature is stable across Scaleway's instance types — their kernel
-// always announces the platform on the command line.
+// onScaleway reports whether the host is a Scaleway instance: its DMI
+// sys_vendor is Scaleway, as on instances that boot through UEFI or GRUB,
+// or /proc/cmdline has Scaleway's signature, as Ohai's has_scaleway_cmdline?
+// checks, from the old bootscript boot.
 func onScaleway(
 	fs avfs.VFS,
+	prior collector.PriorResults,
 ) bool {
+	if info, ok := collector.GetDep[*dmi.Info](prior, "dmi"); ok && info != nil &&
+		info.Product != nil &&
+		strings.Contains(strings.ToLower(info.Product.VendorName), cmdlineSignature) {
+		return true
+	}
 	b, err := fs.ReadFile(procCmdlinePath)
 	if err != nil {
 		return false

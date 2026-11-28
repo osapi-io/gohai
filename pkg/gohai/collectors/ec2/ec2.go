@@ -354,7 +354,7 @@ func (c *Collector) Collect(
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onEC2(c.FS, prior) {
-		return nil, nil
+		return nil, ctx.Err()
 	}
 
 	token := c.fetchIMDSv2Token(ctx)
@@ -369,7 +369,7 @@ func (c *Collector) Collect(
 		body, err := versionedGet(p)
 		if err != nil {
 			if i == 0 {
-				return nil, nil
+				return nil, ctx.Err()
 			}
 			continue
 		}

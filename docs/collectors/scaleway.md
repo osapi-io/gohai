@@ -9,9 +9,9 @@ The collector reads the Scaleway instance metadata from the link-local server at
 more common `169.254.169.254`. If `facts.Scaleway != nil`, the host is a
 Scaleway instance. On other hosts, the collector gives no data and no error.
 
-For the detection, the collector looks for the substring `"scaleway"` in
-`/proc/cmdline`. The Scaleway boot environment always puts its name in the
-kernel command line.
+For the detection, the collector looks for `Scaleway` in the DMI `sys_vendor`,
+which instances that boot through UEFI or GRUB have, then for the substring
+`"scaleway"` in `/proc/cmdline`, which the old bootscript boot has.
 
 ## Collected fields
 
@@ -112,15 +112,16 @@ gohai collect --category=cloud          # pulls this + all cloud collectors
 
 ## Dependencies
 
-None. The detection uses `/proc/cmdline`, not DMI. Scaleway has no stable DMI
-signature, but its kernel command line always contains `"scaleway"`.
+`dmi`, for the `sys_vendor` of the instance. `/proc/cmdline` is the second
+signal.
 
 ## Data sources
 
-1. **cmdline gate.** The collector reads `/proc/cmdline` through `FS` and looks
-   for the substring `"scaleway"`. The check is not case-sensitive. If the file
-   or the substring is missing, the collector stops and returns `(nil, nil)`.
-   This is the same as Ohai's `has_scaleway_cmdline?`.
+1. **Gate.** The collector continues when `dmi.Product.VendorName` contains
+   `scaleway`, or when `/proc/cmdline`, read through `FS`, contains
+   `"scaleway"`. Both checks are not case-sensitive. The cmdline check is the
+   same as Ohai's `has_scaleway_cmdline?`. Otherwise the collector stops and
+   returns `(nil, nil)`.
 
 2. **Endpoint.** The collector reads one JSON document from
    `http://169.254.42.42/conf?format=json`.

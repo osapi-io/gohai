@@ -395,6 +395,14 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				s.NotNil(out)
 			},
 		},
+		{
+			name:  "dmi with no product table is not OpenStack, and is not probed",
+			prior: collector.PriorResults{"dmi": &dmi.Info{}},
+			validateFunc: func(out any, httpCalled bool) {
+				s.Nil(out)
+				s.False(httpCalled)
+			},
+		},
 	}
 
 	for _, tt := range tests {

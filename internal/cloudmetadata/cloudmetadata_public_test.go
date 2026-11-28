@@ -272,7 +272,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			},
 		},
 		{
-			name: "context cancellation propagates",
+			name: "a cancelled context is its own error, not ErrNotAvailable",
 			setup: func() (string, []cloudmetadata.Option, func()) {
 				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
 					"/slow": func(_ http.ResponseWriter, r *http.Request) {
@@ -288,8 +288,8 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 				return ctx, func() {}
 			},
 			validateFunc: func(_ []byte, err error) {
-				s.Require().Error(err)
-				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+				s.Require().ErrorIs(err, context.Canceled)
+				s.NotErrorIs(err, cloudmetadata.ErrNotAvailable)
 			},
 		},
 		{

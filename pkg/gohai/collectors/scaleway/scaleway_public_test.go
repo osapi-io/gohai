@@ -31,6 +31,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
+	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
 )
 
@@ -115,7 +117,7 @@ func (s *ScalewayPublicTestSuite) TestInterface() {
 			name: "Dependencies",
 			got:  c.Dependencies(),
 			validateFunc: func(got any) {
-				s.Equal([]string(nil), got)
+				s.Equal([]string{"dmi"}, got)
 			},
 		},
 	}
@@ -131,10 +133,41 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 		name         string
 		cmdline      string
 		noCmdline    bool // if true, point at a nonexistent file
+		prior        collector.PriorResults
 		handler      func(w http.ResponseWriter, r *http.Request)
 		closed       bool
 		validateFunc func(any, bool, error)
 	}{
+		{
+			name:      "DMI sys_vendor Scaleway, with no cmdline signature, is detected",
+			noCmdline: true,
+			prior: collector.PriorResults{
+				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "Scaleway"}},
+			},
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(cannedResponse))
+			},
+			validateFunc: func(out any, httpCalled bool, err error) {
+				s.Require().NoError(err)
+				s.True(httpCalled)
+				s.NotNil(out)
+			},
+		},
+		{
+			name:      "DMI of another vendor and no cmdline signature is not Scaleway",
+			noCmdline: true,
+			prior: collector.PriorResults{
+				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "QEMU"}},
+			},
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(cannedResponse))
+			},
+			validateFunc: func(out any, httpCalled bool, err error) {
+				s.Require().NoError(err)
+				s.False(httpCalled)
+				s.Nil(out)
+			},
+		},
 		{
 			name:    "happy path transforms canned response",
 			cmdline: "LABEL=cloudinit scaleway boot=local",
@@ -260,7 +293,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			client := cloudmetadata.New(srv.URL)
 			c := scaleway.NewWithClient(client)
 
-			out, err := c.Collect(context.Background(), nil)
+			out, err := c.Collect(context.Background(), tt.prior)
 			tt.validateFunc(out, httpCalled, err)
 		})
 	}

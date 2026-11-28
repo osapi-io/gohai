@@ -116,7 +116,7 @@ func (c *Collector) Collect(
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onLinode(c.FS, prior) {
-		return nil, nil
+		return nil, ctx.Err()
 	}
 	info := &Info{}
 	out, err := c.Exec.Execute(ctx, "ip", "-o", "-4", "addr", "show")

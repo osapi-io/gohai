@@ -183,6 +183,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 		volumes      string
 		handler      http.HandlerFunc // overrides the default when set
 		closed       bool
+		cancelOn     string // a path whose request cancels the collection
 		validateFunc func(any, bool, string, error)
 	}{
 		{
@@ -252,6 +253,15 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:  "dmi with no chassis table is not OCI, and is not probed",
+			prior: collector.PriorResults{"dmi": &dmi.Info{}},
+			validateFunc: func(out any, httpCalled bool, _ string, err error) {
+				s.Require().NoError(err)
+				s.False(httpCalled)
+				s.Nil(out)
+			},
+		},
+		{
 			name:     "no dmi in prior fails open",
 			prior:    collector.PriorResults{},
 			instance: instanceResponse,
@@ -299,19 +309,49 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:     "malformed vnics JSON surfaces error",
+			name:     "malformed vnics JSON keeps the instance, with no VNICs",
 			instance: instanceResponse,
 			vnics:    "not json",
-			validateFunc: func(_ any, _ bool, _ string, err error) {
-				s.Require().Error(err)
+			validateFunc: func(got any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*oci.Info)
+				s.Require().True(ok)
+				s.NotEmpty(info.ID)
+				s.Empty(info.VNICs)
 			},
 		},
 		{
-			name:     "malformed volumes JSON surfaces error",
+			name:     "malformed volumes JSON keeps the instance, with no volumes",
 			instance: instanceResponse,
 			volumes:  "not json",
-			validateFunc: func(_ any, _ bool, _ string, err error) {
-				s.Require().Error(err)
+			validateFunc: func(got any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*oci.Info)
+				s.Require().True(ok)
+				s.NotEmpty(info.ID)
+				s.Empty(info.VolumeAttachments)
+			},
+		},
+		{
+			name:     "cancelled while vnics is read: the cancellation is the error",
+			instance: instanceResponse,
+			vnics:    "[]",
+			volumes:  "[]",
+			cancelOn: "/vnics",
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
+				s.Nil(out)
+			},
+		},
+		{
+			name:     "cancelled while allVolumeAttachments is read: the cancellation is the error",
+			instance: instanceResponse,
+			vnics:    "[]",
+			volumes:  "[]",
+			cancelOn: "/allVolumeAttachments",
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
+				s.Nil(out)
 			},
 		},
 	}
@@ -323,10 +363,17 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			if h == nil {
 				h = handler(tt.instance, tt.vnics, tt.volumes, &gotAuth)
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			var httpCalled bool
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					httpCalled = true
+					if tt.cancelOn != "" && r.URL.Path == tt.cancelOn {
+						cancel()
+						<-r.Context().Done()
+						return
+					}
 					h(w, r)
 				},
 			))
@@ -344,7 +391,7 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			if prior == nil {
 				prior = ociPrior()
 			}
-			out, err := c.Collect(context.Background(), prior)
+			out, err := c.Collect(ctx, prior)
 
 			tt.validateFunc(out, httpCalled, gotAuth, err)
 		})
