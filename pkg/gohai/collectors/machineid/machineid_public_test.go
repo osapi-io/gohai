@@ -23,6 +23,7 @@ package machineid_test
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"runtime"
 	"testing"
 
@@ -129,6 +130,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 		variant  string
 		files    map[string]string
 		failRead []string
+		denied   []string
 		runner   sourcetest.Commands
 		nilExec  bool
 		want     *machineid.Info
@@ -185,6 +187,18 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a product_uuid that only root may read, as for a non-root run, gives no ID",
+			variant: "linux",
+			denied:  []string{"/sys/class/dmi/id/product_uuid"},
+			want:    &machineid.Info{},
+		},
+		{
+			name:    "linux: a machine-id that may not be read is still an error",
+			variant: "linux",
+			denied:  []string{"/etc/machine-id"},
+			wantErr: "read /etc/machine-id: permission denied",
+		},
+		{
 			name: "linux: an unreadable product_uuid is an error", variant: "linux",
 			failRead: []string{"/sys/class/dmi/id/product_uuid"},
 			wantErr:  "read /sys/class/dmi/id/product_uuid:",
@@ -223,7 +237,11 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			switch tt.variant {
 			case "linux":
 				c = &machineid.Linux{
-					FS: sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), tt.files), tt.failRead...),
+					FS: sourcetest.ReadError(
+						sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), tt.files), tt.failRead...),
+						fs.ErrPermission,
+						tt.denied...,
+					),
 				}
 			case "darwin":
 				d := &machineid.Darwin{Exec: tt.runner.Mock(s.T())}
