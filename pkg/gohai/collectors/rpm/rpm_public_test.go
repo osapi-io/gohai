@@ -25,6 +25,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -38,31 +39,6 @@ var (
 	_ collector.Collector = (*rpm.Linux)(nil)
 	_ collector.Collector = (*rpm.Darwin)(nil)
 )
-
-// showrcOutput is a trimmed but structurally representative sample of
-// `rpm --showrc` output. The two `=====` lines bracket the macros
-// section. Macro definitions start with `-`, continuations have no
-// prefix.
-const showrcOutput = `ARCHITECTURE AND OS:
-build arch            : x86_64
-Compatible build archs: x86_64 noarch
-build os              : Linux
-Compatible build os's : Linux
-install arch          : x86_64
-install os            : Linux
-platform string       : x86_64-redhat-linux-gnu
-====================================
-- %_topdir /root/rpmbuild
-- %_builddir %{_topdir}/BUILD
-- %_rpmdir %{_topdir}/RPMS
-- %_sourcedir %{_topdir}/SOURCES
-- %_specdir %{_topdir}/SPECS
-- %_srcrpmdir %{_topdir}/SRPMS
-- %__cc gcc
-  -m64 -mtune=generic
-- %buildroot %{_buildrootdir}/%{NAME}-%{VERSION}-%{RELEASE}.%{_arch}
-====================================
-`
 
 // showrcNoMarker has no `=====` marker lines — parseShowrc returns empty.
 const showrcNoMarker = `ARCHITECTURE AND OS:
@@ -177,13 +153,15 @@ func (s *RPMPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: rpm --showrc parsed correctly",
+			name:    "linux: rpm --showrc, as Fedora prints it, parsed correctly",
 			variant: "linux",
 			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				out, err := osfs.NewWithNoIdm().ReadFile("testdata/showrc-fedora.txt")
+				s.Require().NoError(err)
 				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "rpm", "--showrc").
-					Return([]byte(showrcOutput), nil)
+					Return(out, nil)
 				return m
 			},
 			validateFunc: func(got any, err error) {
@@ -192,14 +170,23 @@ func (s *RPMPublicTestSuite) TestCollect() {
 				info, ok := got.(*rpm.Info)
 				s.Require().True(ok)
 				s.Equal(map[string]string{
-					"%_topdir":    "/root/rpmbuild",
-					"%_builddir":  "%{_topdir}/BUILD",
-					"%_rpmdir":    "%{_topdir}/RPMS",
-					"%_sourcedir": "%{_topdir}/SOURCES",
-					"%_specdir":   "%{_topdir}/SPECS",
-					"%_srcrpmdir": "%{_topdir}/SRPMS",
-					"%__cc":       "gcc\n  -m64 -mtune=generic",
-					"%buildroot":  "%{_buildrootdir}/%{NAME}-%{VERSION}-%{RELEASE}.%{_arch}",
+					"P":             "<builtin>",
+					"S":             "<builtin>",
+					"__7zip":        "/usr/bin/7za",
+					"___build_args": "-e",
+					"___build_cmd": "%{?_sudo:%{_sudo} }%{?_remsh:%{_remsh} %{_remhost} }" +
+						"%{?_remsudo:%{_remsudo} }%{?_remchroot:%{_remchroot} %{_remroot} }" +
+						"%{___build_shell} %{___build_args}",
+					"___build_post": "",
+					"__spec_install_pre": "%{___build_pre}\n" +
+						"    %{__rm} -rf \"%{buildroot}\"\n" +
+						"    %{__mkdir_p} \"%{dirname:%{buildroot}}\"\n" +
+						"    %{__mkdir} \"%{buildroot}\"\n" +
+						"%{nil}",
+					"_target": "aarch64-linux",
+					"with":    "%{expand:%%{?with_%{1}:1}%%{!?with_%{1}:0}}",
+					"without": "%{expand:%%{?with_%{1}:0}%%{!?with_%{1}:1}}",
+					"x86_64":  "x86_64 x86_64_v2 x86_64_v3 x86_64_v4 amd64 em64t",
 				}, info.Macros)
 			},
 		},
@@ -241,13 +228,9 @@ func (s *RPMPublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
 				m := sourcemocks.NewMockRunner(ctrl)
-				// "-" alone: len(SplitN("-", " ", 3)) == 1 → skip.
-				// "- %novalue": len == 2 → name="%novalue", value="".
-				out := `=====
--
-- %novalue
-=====
-`
+				// A continuation before any macro is dropped. A macro with no
+				// tab has an empty body. A run-time macro has level 0 or more.
+				out := "=====\nstray\n-13: novalue\n  0: runtime\tset\n 12: nested\tdeep\n=====\n"
 				m.EXPECT().
 					Execute(gomock.Any(), "rpm", "--showrc").
 					Return([]byte(out), nil)
@@ -259,7 +242,9 @@ func (s *RPMPublicTestSuite) TestCollect() {
 				info, ok := got.(*rpm.Info)
 				s.Require().True(ok)
 				s.Equal(map[string]string{
-					"%novalue": "",
+					"novalue": "",
+					"runtime": "set",
+					"nested":  "deep",
 				}, info.Macros)
 			},
 		},

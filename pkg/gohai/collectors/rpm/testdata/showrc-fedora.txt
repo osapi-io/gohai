@@ -1,0 +1,24 @@
+ARCHITECTURE AND OS:
+build arch            : aarch64
+compatible build archs: aarch64 noarch
+    rpmlib(VersionedDependencies) = 3.0.3-1
+
+Macro path: /usr/lib/rpm/macros:/usr/lib/rpm/macros.d/macros.*:/usr/lib/rpm/platform/%{_target}/macros:/usr/lib/rpm/fileattrs/*.attr:/usr/lib/rpm/redhat/macros:/etc/rpm/macros.*:/etc/rpm/macros:/etc/rpm/%{_target}/macros:~/.config/rpm/macros
+
+========================
+-20: P	<builtin>
+-20: S	<builtin>
+-13: __7zip	/usr/bin/7za
+-13: ___build_args	-e
+-13: ___build_cmd	%{?_sudo:%{_sudo} }%{?_remsh:%{_remsh} %{_remhost} }%{?_remsudo:%{_remsudo} }%{?_remchroot:%{_remchroot} %{_remroot} }%{___build_shell} %{___build_args}
+-13: ___build_post	
+-13: __spec_install_pre	%{___build_pre}
+    %{__rm} -rf "%{buildroot}"
+    %{__mkdir_p} "%{dirname:%{buildroot}}"
+    %{__mkdir} "%{buildroot}"
+%{nil}
+-11: _target	aarch64-linux
+-13: with	%{expand:%%{?with_%{1}:1}%%{!?with_%{1}:0}}
+-13: without	%{expand:%%{?with_%{1}:0}%%{!?with_%{1}:1}}
+-13: x86_64	x86_64 x86_64_v2 x86_64_v3 x86_64_v4 amd64 em64t
+======================== active 396 empty 0
