@@ -35,8 +35,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/osapi-io/gohai/internal/sourcetest"
-
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/require"
@@ -45,6 +43,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	gohaisssh "github.com/osapi-io/gohai/pkg/gohai/collectors/ssh"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )

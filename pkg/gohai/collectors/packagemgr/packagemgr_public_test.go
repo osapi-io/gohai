@@ -24,14 +24,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/osapi-io/gohai/internal/sourcetest"
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/packagemgr"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (

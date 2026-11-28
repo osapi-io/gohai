@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/collector/mocks"
@@ -40,7 +41,6 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
-	"go.uber.org/mock/gomock"
 )
 
 type GohaiTestSuite struct {

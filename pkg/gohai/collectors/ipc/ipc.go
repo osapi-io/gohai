@@ -28,9 +28,8 @@ import (
 
 	"github.com/avfs/avfs"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // SemLimits holds the kernel semaphore configuration from

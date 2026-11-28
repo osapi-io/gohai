@@ -24,9 +24,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // The keychains of macOS that hold CAs: the roots that Apple ships, and the

@@ -30,9 +30,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Domain describes a single libvirt domain (virtual machine).

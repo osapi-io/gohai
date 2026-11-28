@@ -35,8 +35,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/avfs/avfs"
-	"github.com/osapi-io/gohai/internal/cloudmetadata"
 
+	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/source"

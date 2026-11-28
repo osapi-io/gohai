@@ -28,10 +28,8 @@ import (
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
-	"github.com/osapi-io/gohai/pkg/gohai/family"
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/collector/mocks"
@@ -45,7 +43,8 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
-	"go.uber.org/mock/gomock"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // failingCollector is a test double that always returns a canned error

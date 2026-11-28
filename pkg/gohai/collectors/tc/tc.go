@@ -28,9 +28,8 @@ import (
 	"bufio"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // QDisc holds metadata for a single queuing discipline entry.

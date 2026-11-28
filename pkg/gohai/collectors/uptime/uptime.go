@@ -25,9 +25,8 @@ package uptime
 import (
 	"fmt"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds uptime and boot time data.

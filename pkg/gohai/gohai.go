@@ -26,8 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
@@ -93,6 +91,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/vmware"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/zpools"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Gohai is the SDK entry point for collecting system facts.

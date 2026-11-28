@@ -27,8 +27,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
-
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -37,6 +35,7 @@ import (
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (

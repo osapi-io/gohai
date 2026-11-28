@@ -28,9 +28,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // etcShellsPath is the canonical location of the installed-shells list.
