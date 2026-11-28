@@ -24,15 +24,16 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/collector/mocks"
-	"go.uber.org/mock/gomock"
 )
 
 type RegistryPublicTestSuite struct {
@@ -320,13 +321,14 @@ func (s *RegistryPublicTestSuite) TestNames() {
 func (s *RegistryPublicTestSuite) TestSelected() {
 	tests := []struct {
 		name         string
+		useDefaults  bool
 		enable       []string
 		disable      []string
-		unknown      bool
 		validateFunc func([]collector.Collector, error)
 	}{
 		{
-			name: "defaults: core+extended on, opt-in off",
+			name:        "defaults: core+extended on, opt-in off",
+			useDefaults: true,
 			validateFunc: func(got []collector.Collector, err error) {
 				s.Require().NoError(err)
 				names := make([]string, 0, len(got))
@@ -338,8 +340,9 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 			},
 		},
 		{
-			name:    "disable a default-on collector",
-			disable: []string{"core1"},
+			name:        "disable a default-on collector",
+			useDefaults: true,
+			disable:     []string{"core1"},
 			validateFunc: func(got []collector.Collector, err error) {
 				s.Require().NoError(err)
 				names := make([]string, 0, len(got))
@@ -351,8 +354,9 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 			},
 		},
 		{
-			name:   "enable an opt-in collector",
-			enable: []string{"opt"},
+			name:        "enable an opt-in collector",
+			useDefaults: true,
+			enable:      []string{"opt"},
 			validateFunc: func(got []collector.Collector, err error) {
 				s.Require().NoError(err)
 				names := make([]string, 0, len(got))
@@ -364,9 +368,10 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 			},
 		},
 		{
-			name:    "disable wins over enable for same name",
-			enable:  []string{"opt"},
-			disable: []string{"opt"},
+			name:        "disable wins over enable for same name",
+			useDefaults: true,
+			enable:      []string{"opt"},
+			disable:     []string{"opt"},
 			validateFunc: func(got []collector.Collector, err error) {
 				s.Require().NoError(err)
 				names := make([]string, 0, len(got))
@@ -378,17 +383,39 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 			},
 		},
 		{
-			name:   "unknown in enable list errors",
-			enable: []string{"missing"},
+			name:        "unknown in enable list errors",
+			useDefaults: true,
+			enable:      []string{"missing"},
 			validateFunc: func(_ []collector.Collector, err error) {
-				s.Error(err)
+				s.EqualError(err, `unknown collector "missing" in enable list`)
 			},
 		},
 		{
-			name:    "unknown in disable list errors",
-			disable: []string{"missing"},
+			name:        "unknown in disable list errors",
+			useDefaults: true,
+			disable:     []string{"missing"},
 			validateFunc: func(_ []collector.Collector, err error) {
-				s.Error(err)
+				s.EqualError(err, `unknown collector "missing" in disable list`)
+			},
+		},
+		{
+			name:   "no defaults: only the enable list runs",
+			enable: []string{"opt", "core1"},
+			validateFunc: func(got []collector.Collector, err error) {
+				s.Require().NoError(err)
+				names := make([]string, 0, len(got))
+				for _, c := range got {
+					names = append(names, c.Name())
+				}
+				sort.Strings(names)
+				s.Equal([]string{"core1", "opt"}, names)
+			},
+		},
+		{
+			name: "no defaults and no enable list runs nothing",
+			validateFunc: func(got []collector.Collector, err error) {
+				s.Require().NoError(err)
+				s.Empty(got)
 			},
 		},
 	}
@@ -405,7 +432,7 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 			s.Require().
 				NoError(reg.Register(newCollector(s.ctrl, "opt", "", false)))
 
-			tt.validateFunc(reg.SelectedWith(true, tt.enable, tt.disable))
+			tt.validateFunc(reg.SelectedWith(tt.useDefaults, tt.enable, tt.disable))
 		})
 	}
 }
@@ -420,24 +447,40 @@ func (s *RegistryPublicTestSuite) TestRun() {
 		validateFunc func(map[string]any, []string, []string, error)
 	}
 	tests := []runCase{
-		{
-			name: "orders by dependency",
-			setup: func(reg *collector.Registry) {
-				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "a", "", true)))
-				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "b", "", true, "a")))
-				s.Require().
-					NoError(reg.Register(newCollector(s.ctrl, "c", "", true, "b")))
-			},
-			names: []string{"a", "b", "c"},
-			validateFunc: func(results map[string]any, _, _ []string, err error) {
-				s.Require().NoError(err)
-				s.Contains(results, "a")
-				s.Contains(results, "b")
-				s.Contains(results, "c")
-			},
-		},
+		func() runCase {
+			var order []string
+
+			return runCase{
+				name: "orders by dependency",
+				setup: func(reg *collector.Registry) {
+					for _, c := range []struct{ name, dep string }{
+						{"c", "b"}, {"b", "a"}, {"a", ""},
+					} {
+						var deps []string
+						if c.dep != "" {
+							deps = []string{c.dep}
+						}
+						m := newCollectorWith(s.ctrl, c.name, deps...)
+						m.EXPECT().
+							Collect(gomock.Any(), gomock.Any()).
+							DoAndReturn(func(context.Context, collector.PriorResults) (any, error) {
+								order = append(order, c.name)
+
+								return c.name + "-result", nil
+							})
+						s.Require().NoError(reg.Register(m))
+					}
+				},
+				names: []string{"c", "b", "a"},
+				validateFunc: func(results map[string]any, _, _ []string, err error) {
+					s.Require().NoError(err)
+					s.Equal([]string{"a", "b", "c"}, order)
+					s.Equal(map[string]any{
+						"a": "a-result", "b": "b-result", "c": "c-result",
+					}, results)
+				},
+			}
+		}(),
 		{
 			name: "auto-includes dependencies",
 			setup: func(reg *collector.Registry) {
@@ -463,7 +506,7 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			},
 			names: []string{"a", "b"},
 			validateFunc: func(_ map[string]any, _, _ []string, err error) {
-				s.Error(err)
+				s.EqualError(err, "dependency cycle detected among collectors")
 			},
 		},
 		{
@@ -511,6 +554,12 @@ func (s *RegistryPublicTestSuite) TestRun() {
 					OnError: func(_ string, err error) {
 						mu.Lock()
 						defer mu.Unlock()
+						var pe *collector.PanicError
+						if errors.As(err, &pe) && strings.Contains(string(pe.Stack), "goroutine") {
+							*onErr = append(*onErr, err.Error()+" (with stack)")
+
+							return
+						}
 						*onErr = append(*onErr, err.Error())
 					},
 				}
@@ -519,7 +568,7 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.Require().NoError(err)
 				s.Contains(results, "good")
 				s.NotContains(results, "bad")
-				s.Equal([]string{"collector bad panicked: index out of range"}, errs)
+				s.Equal([]string{"collector bad panicked: index out of range (with stack)"}, errs)
 			},
 		},
 		func() runCase {
@@ -543,8 +592,9 @@ func (s *RegistryPublicTestSuite) TestRun() {
 					s.Require().NoError(reg.Register(b))
 				},
 				names: []string{"b"},
-				validateFunc: func(_ map[string]any, _, _ []string, err error) {
+				validateFunc: func(results map[string]any, _, _ []string, err error) {
 					s.ErrorIs(err, context.Canceled)
+					s.Equal(map[string]any{"a": "a-result"}, results)
 				},
 			}
 		}(),
@@ -552,7 +602,7 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			ctx, cancel := context.WithCancel(context.Background())
 
 			return runCase{
-				name: "a run cancelled during its last level is an error",
+				name: "a run cancelled during its last level is an error, with what finished",
 				ctx:  ctx,
 				setup: func(reg *collector.Registry) {
 					a := newCollectorWith(s.ctrl, "a")
@@ -568,7 +618,7 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				names: []string{"a"},
 				validateFunc: func(results map[string]any, _, _ []string, err error) {
 					s.ErrorIs(err, context.Canceled)
-					s.Nil(results)
+					s.Equal(map[string]any{"a": "a-result"}, results)
 				},
 			}
 		}(),
