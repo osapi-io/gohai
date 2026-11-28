@@ -63,8 +63,9 @@ PR that updates this table and gives the reason.
 
 The PR of a new collector must give the reason for its source. A migration (for
 example from a file to a command) needs its own issue with the labels
-`library-migration` + `collector:<name>`. The issue gives the current coverage,
-the coverage of the candidate, and the migration plan.
+`enhancement` and `component/collectors`, with the name of the collector in the
+title. The issue gives the current coverage, the coverage of the candidate, and
+the migration plan.
 
 ## What a collector's own page must contain
 
@@ -83,11 +84,12 @@ use the same legacy `/etc/*-release` fallback chain as Ohai"). The section is a
 spec of OUR behavior, not a diff against Ohai.
 
 **`Known gaps vs. Ohai` is NOT a permanent section.** Methodology gaps are
-GitHub issues with the labels `methodology-gap` and `collector:<name>`. Each
-issue has a "Doc after this fix lands" block. This block has the exact text that
-the fix PR pastes into the Data Sources section. When all open methodology
-issues of a collector close, the page has no Ohai comparisons that remain. For
-the full workflow, refer to the "Methodology work" section below.
+GitHub issues with the labels `methodology-gap` and `component/collectors`, with
+the name of the collector in the title. Each issue has a "Doc after this fix
+lands" block. This block has the exact text that the fix PR pastes into the Data
+Sources section. When all open methodology issues of a collector close, the page
+has no Ohai comparisons that remain. For the full workflow, refer to the
+"Methodology work" section below.
 
 **Signals**. A complex collector such as `fips` must have this section, because
 its fields answer different questions of consumers. A simple collector such as
@@ -117,8 +119,9 @@ the same PR or open a tracked issue. Do not remove it without a record.
 ## Methodology work
 
 Methodology gaps between gohai and Ohai are GitHub issues with the labels
-`methodology-gap` and `collector:<name>`. To list them, run
-`gh issue list --label methodology-gap`. Each issue has:
+`methodology-gap` and `component/collectors`, with the name of the collector in
+the title. To list them, run `gh issue list --label methodology-gap`. For one
+collector, add `--search "<name> in:title"`. Each issue has:
 
 - The full Ohai methodology, with the source file and line ranges.
 - Our current implementation and what it does not do.

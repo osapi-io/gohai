@@ -257,7 +257,8 @@ must have these sections, in this order:
 - **Backing library**. The Go library or libraries that we wrap.
 
 **No "Known gaps vs. Ohai" section.** Methodology gaps are GitHub issues with
-the labels `methodology-gap` / `collector:<name>`.
+the labels `methodology-gap` and `component/collectors`, with the name of the
+collector in the title.
 
 Use `docs/collectors/shells.md` as the canonical template.
 
