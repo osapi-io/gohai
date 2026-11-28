@@ -101,8 +101,9 @@ On Linux:
 2. A value from the two machine-id files is valid only when it has 32 hex
    digits, as machine-id(5) says. Thus the `uninitialized` that systemd writes
    on a first-boot image is not an ID, and the collector reads the next file.
-3. A missing file is skipped. A file that is there but can't be read, such as
-   `product_uuid` for a user that isn't root, is an error.
+3. A missing file is skipped. Only root can read `product_uuid`, so for a user
+   that isn't root a permission error there is skipped too, and the result has
+   no ID. Any other file that is there but can't be read is an error.
 
 On macOS:
 

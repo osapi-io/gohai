@@ -22,7 +22,9 @@ package machineid
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -33,10 +35,13 @@ import (
 )
 
 // idSource is one place Linux keeps a machine ID. valid says whether the
-// trimmed, lower-case value is a real ID.
+// trimmed, lower-case value is a real ID. rootOnly says the file is
+// readable only by root, so a permission error there means a run that
+// isn't root, not a failed read.
 type idSource struct {
-	path  string
-	valid func(id string) bool
+	path     string
+	valid    func(id string) bool
+	rootOnly bool
 }
 
 // machineIDRE is the machine-id(5) format: 32 lower-case hex digits. It
@@ -49,7 +54,11 @@ var machineIDRE = pattern.New(`^[0-9a-f]{32}$`)
 var idSources = []idSource{
 	{path: "/etc/machine-id", valid: machineIDRE.MatchString},
 	{path: "/var/lib/dbus/machine-id", valid: machineIDRE.MatchString},
-	{path: "/sys/class/dmi/id/product_uuid", valid: func(id string) bool { return id != "" }},
+	{
+		path:     "/sys/class/dmi/id/product_uuid",
+		valid:    func(id string) bool { return id != "" },
+		rootOnly: true,
+	},
 }
 
 // Linux reads the machine ID from the first of idSources that has one.
@@ -65,7 +74,8 @@ func NewLinux() *Linux {
 }
 
 // Collect returns the machine ID and the file it came from, or an empty
-// one when no file has a valid ID. A missing file is skipped, and a file
+// one when no file has a valid ID. A missing file is skipped, and so is a
+// root-only file that a run as another user may not read. Any other file
 // that can't be read is an error.
 func (l *Linux) Collect(
 	_ context.Context,
@@ -73,7 +83,7 @@ func (l *Linux) Collect(
 ) (any, error) {
 	for _, src := range idSources {
 		b, err := l.FS.ReadFile(src.path)
-		if collector.Absent(err) {
+		if collector.Absent(err) || (src.rootOnly && errors.Is(err, fs.ErrPermission)) {
 			continue
 		}
 		if err != nil {
