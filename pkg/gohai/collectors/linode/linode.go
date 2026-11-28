@@ -36,6 +36,7 @@ import (
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
@@ -47,8 +48,18 @@ const ProviderName = "linode"
 
 // aptSourcesPath is the file read for the has_linode_apt_repos? signal.
 // Linode's official images ship an apt source referencing linode.com;
-// custom-built images often do too. Package-level var for tests.
-var aptSourcesPath = "/etc/apt/sources.list"
+// custom-built images often do too.
+const aptSourcesPath = "/etc/apt/sources.list"
+
+// aptSourcesDir holds the apt source files of newer images, such as
+// Ubuntu 24.04 and Debian 13, which keep their sources in
+// sources.list.d/*.sources and not in sources.list.
+const aptSourcesDir = "/etc/apt/sources.list.d"
+
+// dmiVendorName is the SMBIOS sys_vendor of a Linode (Akamai) VM.
+// cloud-init's ds-identify finds its Akamai datasource by it. It finds
+// a Linode on an image with no apt file, such as an RPM distribution.
+const dmiVendorName = "Linode"
 
 // linodeSignature is the substring we look for in apt sources.
 const linodeSignature = "linode"
@@ -91,14 +102,15 @@ func (*Collector) Category() collector.Category { return collector.CategoryCloud
 // DefaultEnabled returns false — cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
-// Dependencies declares hostname so the FQDN/Domain check can run
-// against the host's resolved name (matches Ohai's has_linode_domain?
-// signal which reads node['domain']).
-func (*Collector) Dependencies() []string { return []string{"hostname"} }
+// Dependencies declares dmi, for the vendor of a Linode VM, and hostname
+// so the FQDN/Domain check can run against the host's resolved name
+// (matches Ohai's has_linode_domain? signal which reads node['domain']).
+func (*Collector) Dependencies() []string { return []string{"dmi", "hostname"} }
 
 // Collect returns the Linode Info when any detection signal fires
-// (apt-sources OR domain contains "linode"), else (nil, nil).
-// Mirrors Ohai's looks_like_linode? OR chain.
+// (the DMI vendor is Linode, an apt source names linode, or the domain
+// contains "linode"), else (nil, nil). The apt and domain signals are
+// Ohai's looks_like_linode? OR chain.
 func (c *Collector) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -117,22 +129,50 @@ func (c *Collector) Collect(
 	return info, nil
 }
 
-// onLinode runs Ohai's full non-hint detection chain:
-//   - /etc/apt/sources.list contains "linode" (has_linode_apt_repos?)
+// onLinode runs these detection signals:
+//   - dmi's sys_vendor is "Linode" (cloud-init's Akamai signal)
+//   - /etc/apt/sources.list, or a file in /etc/apt/sources.list.d,
+//     contains "linode" (Ohai's has_linode_apt_repos?, with the
+//     directory of newer images added)
 //   - The host's FQDN or Domain contains "linode" (has_linode_domain?,
 //     e.g. members.linode.com)
 func onLinode(
 	fs avfs.VFS,
 	prior collector.PriorResults,
 ) bool {
-	if b, err := fs.ReadFile(aptSourcesPath); err == nil {
-		if bytes.Contains(bytes.ToLower(b), []byte(linodeSignature)) {
-			return true
-		}
+	if d, ok := collector.GetDep[*dmi.Info](prior, "dmi"); ok && d != nil &&
+		d.Product != nil && d.Product.VendorName == dmiVendorName {
+		return true
+	}
+	if aptNamesLinode(fs) {
+		return true
 	}
 	if h, ok := collector.GetDep[*hostname.Info](prior, "hostname"); ok && h != nil {
 		if strings.Contains(strings.ToLower(h.FQDN), linodeSignature) ||
 			strings.Contains(strings.ToLower(h.Domain), linodeSignature) {
+			return true
+		}
+	}
+	return false
+}
+
+// aptNamesLinode reports whether /etc/apt/sources.list or a file in
+// /etc/apt/sources.list.d contains "linode". A file that cannot be read
+// is no signal.
+func aptNamesLinode(
+	fs avfs.VFS,
+) bool {
+	paths := []string{aptSourcesPath}
+	if entries, err := fs.ReadDir(aptSourcesDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				paths = append(paths, aptSourcesDir+"/"+e.Name())
+			}
+		}
+	}
+	for _, path := range paths {
+		b, err := fs.ReadFile(path)
+		if err == nil && bytes.Contains(bytes.ToLower(b), []byte(linodeSignature)) {
 			return true
 		}
 	}

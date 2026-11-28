@@ -23,8 +23,6 @@ package linode_test
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -32,6 +30,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/sourcetest"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
@@ -39,9 +39,16 @@ import (
 	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
+// ubuntuApt is a sources.list that does not name linode.
+const ubuntuApt = "deb http://archive.ubuntu.com/ubuntu focal main"
+
+// linodeApt is a sources.list with Linode's mirror.
+var linodeApt = map[string]string{
+	"/etc/apt/sources.list": "deb http://mirrors.linode.com/ focal main",
+}
+
 type LinodePublicTestSuite struct {
 	suite.Suite
-	tmpDir string
 }
 
 func TestLinodePublicTestSuite(
@@ -50,59 +57,42 @@ func TestLinodePublicTestSuite(
 	suite.Run(t, new(LinodePublicTestSuite))
 }
 
-func (s *LinodePublicTestSuite) SetupTest() {
-	s.tmpDir = s.T().TempDir()
-}
-
-// writeApt writes a sources.list replacement and swaps the package
-// var.
-func (s *LinodePublicTestSuite) writeApt(
-	content string,
-) func() {
-	path := filepath.Join(s.tmpDir, "sources.list")
-	s.Require().NoError(os.WriteFile(path, []byte(content), 0o644))
-	return linode.SetAptSourcesPath(path)
-}
-
-func (s *LinodePublicTestSuite) TestInterface() {
-	c := linode.New()
+func (s *LinodePublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		got          any
-		validateFunc func(any)
+		collector    func() *linode.Collector
+		validateFunc func(*linode.Collector)
 	}{
 		{
-			name: "Name",
-			got:  c.Name(),
-			validateFunc: func(got any) {
-				s.Equal("linode", got)
+			name:      "New gives the linode cloud collector, opt-in, after dmi and hostname",
+			collector: linode.New,
+			validateFunc: func(c *linode.Collector) {
+				s.Equal("linode", c.Name())
+				s.Equal(collector.CategoryCloud, c.Category())
+				s.False(c.DefaultEnabled())
+				s.Equal([]string{"dmi", "hostname"}, c.Dependencies())
+				s.NotNil(c.FS)
+				s.NotNil(c.Exec)
 			},
 		},
 		{
-			name: "Category",
-			got:  string(c.Category()),
-			validateFunc: func(got any) {
-				s.Equal("cloud", got)
+			name: "NewWith reads through the given sources",
+			collector: func() *linode.Collector {
+				return linode.NewWith(source.Sources{
+					FS:     memfs.New(),
+					Exec:   sourcemocks.NewMockRunner(gomock.NewController(s.T())),
+					Family: family.Debian,
+				})
 			},
-		},
-		{
-			name: "DefaultEnabled",
-			got:  c.DefaultEnabled(),
-			validateFunc: func(got any) {
-				s.Equal(false, got)
-			},
-		},
-		{
-			name: "Dependencies",
-			got:  c.Dependencies(),
-			validateFunc: func(got any) {
-				s.Equal([]string{"hostname"}, got)
+			validateFunc: func(c *linode.Collector) {
+				s.IsType(&memfs.MemFS{}, c.FS)
+				s.IsType(&sourcemocks.MockRunner{}, c.Exec)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			tt.validateFunc(tt.got)
+			tt.validateFunc(tt.collector())
 		})
 	}
 }
@@ -110,50 +100,62 @@ func (s *LinodePublicTestSuite) TestInterface() {
 func (s *LinodePublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
-		apt          string
-		noApt        bool
-		hostname     *hostname.Info // when set, added to prior under "hostname"
-		ip           string         // the output of ip -o -4 addr show
+		files        map[string]string
+		prior        collector.PriorResults
+		ip           string // the output of ip -o -4 addr show
 		ipErr        error
 		validateFunc func(any)
 	}{
 		{
-			name:     "FQDN contains 'linode' triggers detection without apt",
-			apt:      "deb http://archive.ubuntu.com/ubuntu focal main",
-			hostname: &hostname.Info{FQDN: "myhost.members.linode.com"},
-			ip:       ipLine("eth0", "eth0", "50.1.2.3/24"),
+			name:  "FQDN contains 'linode' triggers detection without apt",
+			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{FQDN: "myhost.members.linode.com"},
+			},
+			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
 			validateFunc: func(out any) {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Equal("50.1.2.3", info.PublicIP)
 			},
 		},
 		{
-			name:     "Domain contains 'linode' triggers detection",
-			apt:      "deb http://archive.ubuntu.com/ubuntu focal main",
-			hostname: &hostname.Info{Domain: "members.linode.com"},
-			ip:       ipLine("eth0", "eth0", "50.1.2.3/24"),
+			name:  "Domain contains 'linode' triggers detection",
+			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{Domain: "members.linode.com"},
+			},
+			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
 			validateFunc: func(out any) {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Equal("50.1.2.3", info.PublicIP)
 			},
 		},
 		{
-			name:     "hostname without linode + no apt → nil",
-			apt:      "deb http://archive.ubuntu.com/ubuntu focal main",
-			hostname: &hostname.Info{FQDN: "host.example.com", Domain: "example.com"},
+			name:  "hostname without linode + no apt → nil",
+			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{FQDN: "host.example.com", Domain: "example.com"},
+			},
 			validateFunc: func(out any) {
 				s.Nil(out)
 			},
 		},
 		{
-			name:     "nil hostname Info is tolerated",
-			apt:      "linode",
-			hostname: nil,
-			ip:       ipLine("eth0", "eth0", "50.1.2.3/24"),
+			name:  "a nil hostname Info is no signal",
+			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
+			prior: collector.PriorResults{"hostname": (*hostname.Info)(nil)},
+			validateFunc: func(out any) {
+				s.Nil(out)
+			},
+		},
+		{
+			name: "the DMI vendor Linode triggers detection with no apt file",
+			prior: collector.PriorResults{
+				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "Linode"}},
+			},
+			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
 			validateFunc: func(out any) {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
@@ -161,8 +163,40 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name: "apt says linode, eth0 and the eth0:1 alias populated (link-local skipped)",
-			apt:  "deb http://mirrors.linode.com/ focal main",
+			name: "another DMI vendor is no signal",
+			prior: collector.PriorResults{
+				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "QEMU"}},
+			},
+			validateFunc: func(out any) {
+				s.Nil(out)
+			},
+		},
+		{
+			name: "a deb822 file in sources.list.d that names linode triggers detection",
+			files: map[string]string{
+				"/etc/apt/sources.list.d/ubuntu.sources": "Types: deb\nURIs: http://archive.ubuntu.com/ubuntu\n",
+				"/etc/apt/sources.list.d/linode.sources": "Types: deb\nURIs: http://mirrors.linode.com/ubuntu\n",
+			},
+			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
+			validateFunc: func(out any) {
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
+				s.Equal("50.1.2.3", info.PublicIP)
+			},
+		},
+		{
+			name: "sources.list.d without linode is no signal",
+			files: map[string]string{
+				"/etc/apt/sources.list.d/ubuntu.sources": "Types: deb\nURIs: http://archive.ubuntu.com/ubuntu\n",
+				"/etc/apt/sources.list.d/sub/x.list":     "deb http://mirrors.linode.com/ focal main",
+			},
+			validateFunc: func(out any) {
+				s.Nil(out)
+			},
+		},
+		{
+			name:  "apt says linode, eth0 and the eth0:1 alias populated (link-local skipped)",
+			files: linodeApt,
 			// Link-local comes first: it must be skipped for the routable
 			// address that follows. The alias is a label of eth0, not an
 			// interface of its own.
@@ -173,40 +207,37 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			validateFunc: func(out any) {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Equal("50.1.2.3", info.PublicIP)
 				s.Equal("10.0.0.5", info.PrivateIP)
 			},
 		},
 		{
-			name: "no linode in apt → nil",
-			apt:  "deb http://archive.ubuntu.com/ubuntu focal main",
+			name:  "no linode in apt → nil",
+			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
 			validateFunc: func(out any) {
 				s.Nil(out)
 			},
 		},
 		{
-			name:  "missing apt file → nil",
-			noApt: true,
+			name: "missing apt file → nil",
 			validateFunc: func(out any) {
 				s.Nil(out)
 			},
 		},
 		{
-			name: "eth0 missing produces empty public_ip",
-			apt:  "linode",
-			ip:   ipLine("eth0", "eth0:1", "10.0.0.5/17"),
+			name:  "eth0 missing produces empty public_ip",
+			files: linodeApt,
+			ip:    ipLine("eth0", "eth0:1", "10.0.0.5/17"),
 			validateFunc: func(out any) {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Empty(info.PublicIP)
 				s.Equal("10.0.0.5", info.PrivateIP)
 			},
 		},
 		{
-			name: "lines that are not an IPv4 address are skipped",
-			apt:  "linode",
+			name:  "lines that are not an IPv4 address are skipped",
+			files: linodeApt,
 			ip: "\n" +
 				"1: lo    inet\n" +
 				"2: eth0    inet not-a-cidr scope global eth0\\ valid_lft forever\n" +
@@ -214,19 +245,17 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			validateFunc: func(out any) {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Empty(info.PublicIP)
 				s.Empty(info.PrivateIP)
 			},
 		},
 		{
 			name:  "an ip error returns empty IPs",
-			apt:   "linode",
+			files: linodeApt,
 			ipErr: errors.New("ip: not found"),
 			validateFunc: func(out any) {
 				info, ok := out.(*linode.Info)
 				s.Require().True(ok)
-				s.Require().NotNil(info)
 				s.Empty(info.PublicIP)
 				s.Empty(info.PrivateIP)
 			},
@@ -235,57 +264,30 @@ func (s *LinodePublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.noApt {
-				defer linode.SetAptSourcesPath(filepath.Join(s.tmpDir, "missing"))()
-			} else {
-				defer s.writeApt(tt.apt)()
-			}
-
 			m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
 			m.EXPECT().
 				Execute(gomock.Any(), "ip", "-o", "-4", "addr", "show").
 				Return([]byte(tt.ip), tt.ipErr).
 				AnyTimes()
 
-			var prior collector.PriorResults
-			if tt.hostname != nil {
-				prior = collector.PriorResults{"hostname": tt.hostname}
-			}
-			c := linode.NewWith(source.Sources{Exec: m, Family: family.Debian})
-			out, err := c.Collect(context.Background(), prior)
+			c := linode.NewWith(source.Sources{
+				FS:     sourcetest.FS(s.T(), tt.files),
+				Exec:   m,
+				Family: family.Debian,
+			})
+			out, err := c.Collect(context.Background(), tt.prior)
 			s.Require().NoError(err)
 			tt.validateFunc(out)
 		})
 	}
 }
 
-func (s *LinodePublicTestSuite) TestNewWith() {
-	fs := memfs.New()
-	s.Require().NoError(fs.MkdirAll("/etc/apt", 0o755))
-	s.Require().NoError(fs.WriteFile(
-		"/etc/apt/sources.list",
-		[]byte("deb http://mirrors.linode.com/debian bookworm main\n"),
-		0o644,
-	))
-	m := sourcemocks.NewMockRunner(gomock.NewController(s.T()))
-	m.EXPECT().
-		Execute(gomock.Any(), "ip", "-o", "-4", "addr", "show").
-		Return([]byte(ipLine("eth0", "eth0", "50.1.2.3/24")), nil)
-
-	c := linode.NewWith(source.Sources{FS: fs, Exec: m, Family: family.Debian})
-	s.Same(fs, c.FS)
-	s.Same(m, c.Exec)
-	out, err := c.Collect(context.Background(), nil)
-	s.Require().NoError(err)
-	info, ok := out.(*linode.Info)
-	s.Require().True(ok, "the apt sources of the given filesystem name linode")
-	s.Equal("50.1.2.3", info.PublicIP, "the address comes from the given runner")
-}
-
 // ipLine is one line of `ip -o -4 addr show`: the address cidr on dev,
 // with label, which is dev or an alias such as eth0:1.
 func ipLine(
-	dev, label, cidr string,
+	dev string,
+	label string,
+	cidr string,
 ) string {
 	return "2: " + dev + "    inet " + cidr + " scope global " + label +
 		"\\       valid_lft forever preferred_lft forever\n"
