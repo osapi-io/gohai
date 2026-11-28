@@ -292,7 +292,7 @@ func (s *FactsPublicTestSuite) TestGet() {
 			path:  "missing",
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -300,7 +300,7 @@ func (s *FactsPublicTestSuite) TestGet() {
 			facts: &gohai.Facts{Load: &load.Info{One: math.NaN()}},
 			path:  "load.one",
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "flatten facts: json: unsupported value: NaN")
 			},
 		},
