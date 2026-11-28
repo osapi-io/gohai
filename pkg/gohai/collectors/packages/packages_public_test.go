@@ -186,6 +186,9 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 		variant string
 		detect  string
 		exec    func(*testing.T) source.Runner
+		// files are the files of the Darwin variant's host, such as a brew
+		// executable at one of its install paths.
+		files map[string]string
 		// noManager runs the Linux variant with no package manager.
 		noManager    bool
 		validateFunc func(any, error)
@@ -470,9 +473,24 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				info, ok := got.(*packages.Info)
 				s.Require().True(ok)
 				s.Equal([]packages.Package{
-					{Name: "git", Version: "2.40.0", PackageManager: "brew"},
-					{Name: "zsh", Version: "5.9", PackageManager: "brew"},
-					{Name: "curl", Version: "8.1.1", PackageManager: "brew"},
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+					{
+						Name:           "zsh",
+						Version:        "5.9",
+						Versions:       []string{"5.9"},
+						PackageManager: "brew",
+					},
+					{
+						Name:           "curl",
+						Version:        "8.1.2",
+						Versions:       []string{"8.1.2", "8.1.1"},
+						PackageManager: "brew",
+					},
 				}, info.Packages)
 			},
 		},
@@ -491,7 +509,12 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				info, ok := got.(*packages.Info)
 				s.Require().True(ok)
 				s.Equal([]packages.Package{
-					{Name: "git", Version: "2.40.0", PackageManager: "brew"},
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
 				}, info.Packages)
 			},
 		},
@@ -546,6 +569,359 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "darwin: brew at the Apple silicon path, not on the PATH",
+			variant: "darwin",
+			files:   map[string]string{"/opt/homebrew/bin/brew": ""},
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+						"id -u":                                  "501\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: brew at the Intel path, not on the PATH",
+			variant: "darwin",
+			files:   map[string]string{"/usr/local/bin/brew": ""},
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						"/usr/local/bin/brew list --versions": "git 2.40.0\n",
+						"id -u":                               "501\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: as root, brew runs as the owner of its executable",
+			variant: "darwin",
+			files:   map[string]string{"/opt/homebrew/bin/brew": ""},
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						"id -u":                             "0\n",
+						"stat -f %u /opt/homebrew/bin/brew": "501\n",
+						"sudo -u #501 -H /opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: as root, a root-owned brew runs as it is",
+			variant: "darwin",
+			files:   map[string]string{"/opt/homebrew/bin/brew": ""},
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						"id -u":                                  "0\n",
+						"stat -f %u /opt/homebrew/bin/brew":      "0\n",
+						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: as root, an owner that stat cannot read runs brew as it is",
+			variant: "darwin",
+			files:   map[string]string{"/opt/homebrew/bin/brew": ""},
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						"id -u":                                  "0\n",
+						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+					},
+					Err: map[string]error{
+						"stat -f %u /opt/homebrew/bin/brew": errors.New("exit status 1"),
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a user ID that is not a number runs brew as it is",
+			variant: "darwin",
+			files:   map[string]string{"/opt/homebrew/bin/brew": ""},
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						"id -u":                                  "nobody\n",
+						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: the newest version is the version, in any order",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git 2.9.1 2.40.0 2.10\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.9.1", "2.40.0", "2.10"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a release is newer than its pre-release",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git 1.2.0 1.2.0rc1\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "1.2.0",
+						Versions:       []string{"1.2.0", "1.2.0rc1"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a pre-release is older than its release",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git 1.2.0rc1 1.2.0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "1.2.0",
+						Versions:       []string{"1.2.0rc1", "1.2.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a longer version is newer",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git 1.2 1.2.1\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "1.2.1",
+						Versions:       []string{"1.2", "1.2.1"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a shorter version is older",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git 1.2.1 1.2\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "1.2.1",
+						Versions:       []string{"1.2.1", "1.2"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a number is newer than letters",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git a1 1a b2\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "1a",
+						Versions:       []string{"a1", "1a", "b2"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: letters compare in order",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git 1b 1a_2 1c\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "1c",
+						Versions:       []string{"1b", "1a_2", "1c"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: equal versions keep the first",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git 1.0 1_0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "1.0",
+						Versions:       []string{"1.0", "1_0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
 			name:    "darwin: nil Exec returns empty list",
 			variant: "darwin",
 			exec:    func(*testing.T) source.Runner { return nil },
@@ -584,7 +960,10 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				}
 				c = l
 			case "darwin":
-				c = &packages.Darwin{Exec: tt.exec(s.T())}
+				c = &packages.Darwin{
+					FS:   sourcetest.FS(s.T(), tt.files),
+					Exec: tt.exec(s.T()),
+				}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

@@ -31,12 +31,15 @@ import (
 
 // Package holds metadata for a single installed package.
 type Package struct {
-	Name           string `json:"name"`
-	Version        string `json:"version"`
-	Architecture   string `json:"architecture,omitempty"`
-	PackageManager string `json:"package_manager"`
-	Description    string `json:"description,omitempty"` // one-line summary
-	Size           int64  `json:"size,omitempty"`        // installed size, bytes
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	// Versions lists each installed version, for a manager that keeps
+	// more than one, such as brew. Version is the newest of them.
+	Versions       []string `json:"versions,omitempty"`
+	Architecture   string   `json:"architecture,omitempty"`
+	PackageManager string   `json:"package_manager"`
+	Description    string   `json:"description,omitempty"` // one-line summary
+	Size           int64    `json:"size,omitempty"`        // installed size, bytes
 }
 
 // Info holds the list of installed packages.

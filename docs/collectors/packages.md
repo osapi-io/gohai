@@ -12,15 +12,16 @@ no package manager.
 
 ## Collected fields
 
-| Field                        | Type     | Description                                          | Schema mapping                 |
-| ---------------------------- | -------- | ---------------------------------------------------- | ------------------------------ |
-| `packages`                   | `list`   | The list of installed package objects.               | No direct schema mapping.      |
-| `packages[].name`            | `string` | The package name.                                    | OCSF `package.name`            |
-| `packages[].version`         | `string` | The installed version.                               | OCSF `package.version`         |
-| `packages[].architecture`    | `string` | The CPU architecture. It is empty for brew packages. | OCSF `package.architecture`    |
-| `packages[].package_manager` | `string` | The package manager: `dpkg`, `rpm` or `brew`.        | OCSF `package.package_manager` |
-| `packages[].description`     | `string` | The one-line summary of the package.                 | OCSF `package.description`     |
-| `packages[].size`            | `int64`  | The installed size, in bytes.                        | No direct schema mapping       |
+| Field                        | Type     | Description                                                                                 | Schema mapping                 |
+| ---------------------------- | -------- | ------------------------------------------------------------------------------------------- | ------------------------------ |
+| `packages`                   | `list`   | The list of installed package objects.                                                      | No direct schema mapping.      |
+| `packages[].name`            | `string` | The package name.                                                                           | OCSF `package.name`            |
+| `packages[].version`         | `string` | The installed version. For brew, the newest installed version.                              | OCSF `package.version`         |
+| `packages[].versions`        | `list`   | Each installed version, for brew, which keeps more than one. It is absent for dpkg and rpm. | No direct schema mapping       |
+| `packages[].architecture`    | `string` | The CPU architecture. It is empty for brew packages.                                        | OCSF `package.architecture`    |
+| `packages[].package_manager` | `string` | The package manager: `dpkg`, `rpm` or `brew`.                                               | OCSF `package.package_manager` |
+| `packages[].description`     | `string` | The one-line summary of the package.                                                        | OCSF `package.description`     |
+| `packages[].size`            | `int64`  | The installed size, in bytes.                                                               | No direct schema mapping       |
 
 ## Platform support
 
@@ -100,11 +101,24 @@ finds:
 
 **On macOS:**
 
-1. The collector runs `brew list --versions`.
-2. The output format is `<name> <ver1> [<ver2> ...]`. Homebrew can have many
-   versions of a package installed at the same time. The collector records the
-   last version token, which is the most recently installed version.
-3. If Homebrew is not on PATH, the collector returns an empty list, not an
+1. The collector finds brew at `/opt/homebrew/bin/brew` (Apple silicon) or
+   `/usr/local/bin/brew` (Intel). If neither exists, it runs `brew` from the
+   PATH. A launchd daemon, such as the osapi agent, has neither path on its
+   PATH, so the collector does not depend on the PATH.
+2. brew refuses to run as root. When `id -u` prints `0`, the collector reads the
+   owner of the brew executable with `stat -f %u <brew>`. It then runs
+   `sudo -u '#<uid>' -H <brew> list --versions`, as Ohai runs brew as the brew
+   owner. When the owner is root, or `stat` fails, it runs brew as it is. A user
+   that is not root runs `<brew> list --versions`.
+3. The output format is `<name> <ver1> [<ver2> ...]`. Homebrew can have many
+   versions of a package installed at the same time, and does not promise their
+   order. `versions` lists each of them, and `version` is the newest. The
+   collector compares two versions as Homebrew does in outline. Each version
+   splits into runs of digits and runs of letters. Digit runs compare as
+   numbers, and a digit run is newer than a letter run. When one version is a
+   prefix of the other, the longer one is newer, unless its next run is letters,
+   which marks a pre-release such as `1.2.0rc1`.
+4. If Homebrew is not on the host, the collector returns an empty list, not an
    error.
 
 **Errors:** If the command is not on the host, the collector returns an empty
