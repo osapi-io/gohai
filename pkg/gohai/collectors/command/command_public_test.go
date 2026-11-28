@@ -223,23 +223,55 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			},
 		},
 		{
-			name:    "linux: a line with fewer columns than the header keeps no command",
+			name:    "linux: a line with no field at the command column is dropped",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return psExec(
-					t,
-					[]byte("UID PID PPID C STIME TTY TIME CMD\nroot 1 0 0 10:00 ?\n"),
-					nil,
-				)
+				return psExec(t, []byte("UID PID PPID C STIME TTY TIME CMD\n"+
+					"root 1 0 0 10:00 ?\n"+
+					"app 7 1 0 10:02 ? 00:00:00 app --note\n"+
+					"fake-pw-123 rest of an argument that held a newline\n"+
+					"x fake-tok-456\n"+
+					"root 8 1 0 10:03 ? 00:00:00 sshd\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
 				s.Require().True(ok)
-				s.Equal(
-					[]string{"UID PID PPID C STIME TTY TIME CMD", "root 1 0 0 10:00 ?"},
-					info.PS,
-				)
+				s.Equal([]string{
+					"UID PID PPID C STIME TTY TIME CMD",
+					"app 7 1 0 10:02 ? 00:00:00 app",
+					"root 8 1 0 10:03 ? 00:00:00 sshd",
+				}, info.PS)
+				facts, err := json.Marshal(got)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "fake-pw-123")
+				s.NotContains(string(facts), "fake-tok-456")
+			},
+		},
+		{
+			name:    "linux: a header with no PID column gives no lines",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, []byte("USER TIME CMD\nroot 0:00 init --fake-pw-123\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
+			},
+		},
+		{
+			name:    "linux: a header with the command before another column gives no lines",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, []byte("PID CMD TIME\n1 init --fake-pw-123 0:00\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
 			},
 		},
 		{

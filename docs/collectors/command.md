@@ -90,10 +90,12 @@ On Linux and on macOS, the collector runs `ps -ef` through the shared
 
 1. The collector removes the whitespace at the end of each output line.
 2. The collector skips blank lines.
-3. The collector reads the header row and finds its `CMD` or `COMMAND` column.
-   This finds the command in the GNU, BSD and BusyBox layouts of `ps`. Output
-   with no such header gives an empty `PS`, so an unknown layout cannot leak an
-   argument.
+3. The collector reads the header row and finds its `PID` column and its `CMD`
+   or `COMMAND` column, which is the last one. This finds the command in the
+   GNU, BSD and BusyBox layouts of `ps`. Output with no such header gives an
+   empty `PS`. A process row with no field at the command column, or with a
+   `PID` that is not a number, is dropped. That covers the rest of an argument
+   that held a newline. Thus an unknown layout cannot leak an argument.
 4. The collector stores the header row, and each process row cut after the first
    word of its command, in `PS`.
 5. If `ps` is not on the host, the collector returns an empty `PS` slice and no

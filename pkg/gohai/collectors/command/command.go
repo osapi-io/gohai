@@ -76,15 +76,18 @@ func NewWith(
 // parsePSOutput splits ps output into its lines, trims trailing
 // whitespace, skips blank lines and removes the arguments of each
 // command. Shared by both Linux and Darwin. The first line is the
-// header, and its CMD or COMMAND column tells where each command
-// starts, so the layout of `ps -ef` on GNU, BSD and BusyBox all work.
-// Output with no such header gives no lines, so an unknown layout can
-// never leak an argument.
+// header. Its CMD or COMMAND column tells where each command starts,
+// and its PID column tells a process row from the rest of an argument
+// that held a newline, so the GNU, BSD and BusyBox layouts of `ps -ef`
+// all work. Output with no such header gives no lines, and a line that
+// does not fit the header is dropped, so the fix fails closed and does
+// not rely on ps to clean its output.
 func parsePSOutput(
 	output string,
 ) *Info {
 	info := &Info{PS: []string{}}
-	cmd := -1
+	var cols psColumns
+	header := true
 	// Split, not bufio.Scanner: ps -ef prints a whole command line when
 	// stdout is not a tty, and a line can pass the Scanner's 64 KiB limit.
 	for _, raw := range strings.Split(output, "\n") {
@@ -92,55 +95,92 @@ func parsePSOutput(
 		if line == "" {
 			continue
 		}
-		if cmd < 0 {
-			cmd = cmdColumn(line)
-			if cmd < 0 {
+		if header {
+			header = false
+			var ok bool
+			if cols, ok = headerColumns(line); !ok {
 				return info
 			}
 			info.PS = append(info.PS, line)
 			continue
 		}
-		info.PS = append(info.PS, withoutArgs(line, cmd))
+		if kept, ok := withoutArgs(line, cols); ok {
+			info.PS = append(info.PS, kept)
+		}
 	}
 	return info
 }
 
-// cmdColumn returns the number of columns before the CMD or COMMAND
-// column of a ps header, or -1 when the header has neither.
-func cmdColumn(
-	header string,
-) int {
-	for i, name := range strings.Fields(header) {
-		if name == "CMD" || name == "COMMAND" {
-			return i
-		}
-	}
-	return -1
+// psColumns holds where the PID and the command start in a ps line,
+// counted in columns from the left.
+type psColumns struct {
+	pid int
+	cmd int
 }
 
-// withoutArgs returns line cut after the first word of its command,
-// which starts after the given number of columns, so the arguments of a
-// process never reach the facts. A line with no command, or a command
-// with no arguments, comes back as it is. A program path that holds a
-// space is cut at the space too, which keeps less than the path but
-// never an argument.
+// headerColumns finds the PID and the CMD or COMMAND columns of a ps
+// header. It gives false when the header has either one missing, or
+// when the command is not the last column.
+func headerColumns(
+	header string,
+) (psColumns, bool) {
+	cols := psColumns{pid: -1, cmd: -1}
+	names := strings.Fields(header)
+	for i, name := range names {
+		switch name {
+		case "PID":
+			cols.pid = i
+		case "CMD", "COMMAND":
+			cols.cmd = i
+		}
+	}
+	if cols.pid < 0 || cols.cmd != len(names)-1 {
+		return cols, false
+	}
+	return cols, true
+}
+
+// withoutArgs returns line cut after the first word of its command, so
+// the arguments of a process never reach the facts. It gives false,
+// and the line is dropped, when the line does not fit the header: it
+// has no field at the command column, or its PID column is not a
+// number, as for the rest of an argument that held a newline. A program
+// path that holds a space is cut at the space too, which keeps less
+// than the path but never an argument.
 func withoutArgs(
 	line string,
-	columns int,
-) string {
+	cols psColumns,
+) (string, bool) {
 	rest := line
-	for range columns {
+	for col := range cols.cmd {
 		rest = strings.TrimLeft(rest, " \t")
 		i := strings.IndexAny(rest, " \t")
 		if i < 0 {
-			return line
+			return "", false
+		}
+		if col == cols.pid && !digits(rest[:i]) {
+			return "", false
 		}
 		rest = rest[i:]
 	}
+	// line has no trailing whitespace, so rest holds the command here.
 	rest = strings.TrimLeft(rest, " \t")
 	i := strings.IndexAny(rest, " \t")
 	if i < 0 {
-		return line
+		return line, true
 	}
-	return line[:len(line)-len(rest)+i]
+	return line[:len(line)-len(rest)+i], true
+}
+
+// digits reports whether s, which is never empty here, is all ASCII
+// digits.
+func digits(
+	s string,
+) bool {
+	for _, c := range []byte(s) {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }
