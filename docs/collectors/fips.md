@@ -138,7 +138,9 @@ On Linux:
 2. The collector reads `/etc/crypto-policies/config` through the same VFS. The
    trimmed first line is the policy name. `policy.fips_effective` is `true` when
    the name starts with `FIPS`. The check is case-sensitive, the same as the
-   convention of the file. If the file is missing, `policy` stays nil.
+   convention of the file. If the file is missing, `policy` stays nil. A policy
+   file that is there and cannot be read is an error, so that a host with
+   `fips_enabled=1` does not look as if it has no policy.
 
 The kernel-flag signal is the same as in Ohai's `fips.rb`. gohai adds the
 `crypto-policies` check. This check finds the FIPS 140-3 drift after boot. Ohai

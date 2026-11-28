@@ -120,7 +120,10 @@ None.
 
 1. The collector selects the directories of the host's family (the table above).
    It walks each directory, and reads each file with the extension `.crt`,
-   `.pem`, `.cer` or `.p11-kit`.
+   `.pem`, `.cer` or `.p11-kit`. A directory or a file that the host does not
+   have, such as a link that points at nothing, has no CAs. A directory, a file,
+   a blocklist or the conf file that is there and cannot be read is an error, so
+   that the host does not look as if it has fewer CAs.
 2. It decodes each PEM block of type `CERTIFICATE`, and parses it with
    `crypto/x509`. A block of a different type, or a block that does not parse,
    is left out. A file that holds no certificate that parses gives one entry

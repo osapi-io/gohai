@@ -150,7 +150,17 @@ func (s *DiskPublicTestSuite) TestCollect() {
 				},
 			}},
 		},
-		{name: "linux: no /proc/diskstats", variant: "linux", wantErr: "read /proc/diskstats"},
+		{
+			name:    "linux: no /proc/diskstats gives no devices",
+			variant: "linux",
+			want:    &disk.Info{Devices: []disk.Device{}},
+		},
+		{
+			name:    "linux: a /proc/diskstats that cannot be read is an error",
+			variant: "linux",
+			files:   map[string]string{"/proc/diskstats/x": ""},
+			wantErr: "read /proc/diskstats: ",
+		},
 		{
 			name:    "darwin: drivers with media, times in ms",
 			variant: "darwin",

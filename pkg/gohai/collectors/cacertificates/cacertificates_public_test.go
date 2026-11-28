@@ -307,6 +307,74 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "when a CA directory cannot be read, it is an error",
+			variant: "linux",
+			layout:  "debian",
+			files:   map[string]string{"/usr/share": "not a directory"},
+			wantErr: "read /usr/share/ca-certificates: ",
+		},
+		{
+			name:    "when a CA file cannot be read, it is an error",
+			variant: "linux",
+			layout:  "debian",
+			files:   map[string]string{"/usr/share/ca-certificates/mozilla/Root_CA.crt": root.pem},
+			links: map[string]string{
+				"/usr/share/ca-certificates/mozilla/Loop.crt": "/usr/share/ca-certificates/mozilla/Loop.crt",
+			},
+			wantErr: "read /usr/share/ca-certificates/mozilla/Loop.crt: ",
+		},
+		{
+			name:    "when a CA link points at nothing, the CA is left out",
+			variant: "linux",
+			layout:  "debian",
+			files:   map[string]string{"/usr/share/ca-certificates/mozilla/Root_CA.crt": root.pem},
+			links: map[string]string{
+				"/usr/share/ca-certificates/mozilla/Gone.crt": "/nowhere/Gone.crt",
+			},
+			want: []cacertificates.Certificate{{
+				Name: "mozilla/Root_CA", Path: "/usr/share/ca-certificates/mozilla/Root_CA.crt",
+				Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
+				Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+			}},
+		},
+		{
+			name:    "when the conf file cannot be read, it is an error",
+			variant: "linux",
+			layout:  "debian",
+			links:   map[string]string{"/etc/ca-certificates.conf": "/etc/ca-certificates.conf"},
+			wantErr: "read /etc/ca-certificates.conf: ",
+		},
+		{
+			name:    "when a blocklist directory cannot be read, it is an error",
+			variant: "linux",
+			layout:  "rhel",
+			files:   map[string]string{"/usr/share/pki/ca-trust-source": "not a directory"},
+			wantErr: "read /usr/share/pki/ca-trust-source/blocklist: ",
+		},
+		{
+			name:    "when a blocklist file cannot be read, it is an error",
+			variant: "linux",
+			layout:  "rhel",
+			links: map[string]string{
+				"/etc/pki/ca-trust/source/blocklist/bad.crt": "/etc/pki/ca-trust/source/blocklist/bad.crt",
+			},
+			wantErr: "read /etc/pki/ca-trust/source/blocklist/bad.crt: ",
+		},
+		{
+			name:    "when a blocklist link points at nothing, it distrusts nothing",
+			variant: "linux",
+			layout:  "rhel",
+			files:   map[string]string{"/etc/pki/ca-trust/source/anchors/ours.pem": root.pem},
+			links: map[string]string{
+				"/etc/pki/ca-trust/source/blocklist/gone.crt": "/nowhere/gone.crt",
+			},
+			want: []cacertificates.Certificate{{
+				Name: "ours", Path: "/etc/pki/ca-trust/source/anchors/ours.pem",
+				Source: "local", Enabled: true, Subject: "CN=Root CA,O=Test",
+				Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+			}},
+		},
+		{
 			name:    "when security fails to read a keychain, it is an error",
 			variant: "darwin",
 			runner: sourcetest.Commands{Err: map[string]error{

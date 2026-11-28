@@ -362,6 +362,55 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a /sys/block that cannot be read is an error",
+			variant: "linux",
+			setupFS: func() *memfs.MemFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/sys", 0o755)
+				_ = f.WriteFile("/sys/block", []byte("x"), fs.FileMode(0o444))
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "read /sys/block: ")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a device that cannot be stat is an error",
+			variant: "linux",
+			setupFS: func() *memfs.MemFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/sys/devices", 0o755)
+				_ = f.WriteFile("/sys/devices/block", []byte("x"), fs.FileMode(0o444))
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/sde": "/sys/devices/block/sde",
+				})
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "stat /sys/block/sde: ")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: an attribute that cannot be read is an error",
+			variant: "linux",
+			setupFS: func() *memfs.MemFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/sys/devices/block/sdf/device", 0o755)
+				_ = f.WriteFile("/sys/devices/block/sdf/size", []byte("1024\n"), fs.FileMode(0o444))
+				sourcetest.FailRead(s.T(), f, "/sys/devices/block/sdf/removable")
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/sdf": "/sys/devices/block/sdf",
+				})
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "read /sys/block/sdf/removable: ")
+				s.Exactly(nil, got)
+			},
+		},
+		{
 			name:    "darwin returns nil",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {

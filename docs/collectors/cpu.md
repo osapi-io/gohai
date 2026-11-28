@@ -188,7 +188,8 @@ On Linux:
 2. The collector reads each file in `/sys/devices/system/cpu/vulnerabilities/`
    through the injected `avfs.VFS`. The basename is the map key. The trimmed
    contents are the value. If the directory is missing, the output has no
-   `vulnerabilities` field.
+   `vulnerabilities` field. A directory or a file that is there and cannot be
+   read is an error.
 
 3. If `lscpu` is on PATH, the collector runs it through the injected
    `source.Runner` and merges these fields:

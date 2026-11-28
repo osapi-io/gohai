@@ -23,6 +23,7 @@
 package blockdevice
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -109,15 +110,28 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// readSysFile reads a sysfs file from fs and returns its
-// trimmed content. Returns empty string on any error (sysfs files may not
-// exist for all devices).
-func readSysFile(
-	fs avfs.VFS,
+// sysReader reads sysfs attribute files and keeps the first error that
+// is not an absent file, so a device's attributes read in one place.
+type sysReader struct {
+	fs  avfs.VFS
+	err error
+}
+
+// read returns the trimmed contents of the file at path. An absent file
+// gives "", as many devices have no model or vendor. Any other failure
+// is kept in r.err, and later reads return "".
+func (r *sysReader) read(
 	path string,
 ) string {
-	b, err := fs.ReadFile(path)
+	if r.err != nil {
+		return ""
+	}
+	b, err := r.fs.ReadFile(path)
+	if collector.Absent(err) {
+		return ""
+	}
 	if err != nil {
+		r.err = fmt.Errorf("read %s: %w", path, err)
 		return ""
 	}
 	return strings.TrimSpace(string(b))

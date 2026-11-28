@@ -163,10 +163,12 @@ On Linux:
 
 1. The collector reads each `/sys/class/dmi/id/*` file (`bios_vendor`,
    `bios_version`, `bios_date`, `board_*`, `chassis_*`, `product_*`,
-   `sys_vendor`) through its filesystem. A file it cannot read, for example a
+   `sys_vendor`) through its filesystem. A file that is not there, or a
    root-only field (`product_serial`, `product_uuid`) for a caller that is not
-   root, gives `"unknown"`. `chassis_type` is an SMBIOS code, and the SMBIOS
-   table gives its `type_description`, for example `10` → `Notebook`.
+   root, gives `"unknown"`. A file that fails to read for any other reason is an
+   error, so that `"unknown"` does not stand for a read that failed.
+   `chassis_type` is an SMBIOS code, and the SMBIOS table gives its
+   `type_description`, for example `10` → `Notebook`.
 2. A board with no `/sys/class/dmi/id` but a device tree under
    `/sys/firmware/devicetree/base`, such as a Raspberry Pi, gets what the tree
    has: `model`, `serial-number`, the vendor of the first `compatible` entry,

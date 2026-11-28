@@ -22,6 +22,7 @@ package blockdevice
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 
 	"github.com/avfs/avfs"
@@ -48,15 +49,19 @@ func NewLinux() *Linux {
 
 // Collect reads /sys/block and returns one BlockDevice per entry. The
 // sysfs directory may be absent on container-only or embedded hosts;
-// those return an empty device list without error.
+// those return an empty device list without error. A read that fails
+// for any other reason is an error.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	entries, err := l.FS.ReadDir(sysBlockDir)
-	if err != nil {
+	if collector.Absent(err) {
 		// /sys/block is absent: a container or an unsupported host.
 		return &Info{Devices: []BlockDevice{}}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", sysBlockDir, err)
 	}
 
 	devices := make([]BlockDevice, 0, len(entries))
@@ -67,26 +72,36 @@ func (l *Linux) Collect(
 		// directory under /sys/devices, so ReadDir does not report it as a
 		// directory. Stat follows the link.
 		info, err := l.FS.Stat(base)
-		if err != nil || !info.IsDir() {
+		if collector.Absent(err) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("stat %s: %w", base, err)
+		}
+		if !info.IsDir() {
 			continue
 		}
 		dev := filepath.Join(base, "device")
 		queue := filepath.Join(base, "queue")
 
+		r := sysReader{fs: l.FS}
 		bd := BlockDevice{
 			Name:              name,
-			Size:              readSysFile(l.FS, filepath.Join(base, "size")),
-			Removable:         readSysFile(l.FS, filepath.Join(base, "removable")),
-			Rotational:        readSysFile(l.FS, filepath.Join(queue, "rotational")),
-			PhysicalBlockSize: readSysFile(l.FS, filepath.Join(queue, "physical_block_size")),
-			LogicalBlockSize:  readSysFile(l.FS, filepath.Join(queue, "logical_block_size")),
-			Model:             readSysFile(l.FS, filepath.Join(dev, "model")),
-			Vendor:            readSysFile(l.FS, filepath.Join(dev, "vendor")),
-			Rev:               readSysFile(l.FS, filepath.Join(dev, "rev")),
-			State:             readSysFile(l.FS, filepath.Join(dev, "state")),
-			Timeout:           readSysFile(l.FS, filepath.Join(dev, "timeout")),
-			QueueDepth:        readSysFile(l.FS, filepath.Join(dev, "queue_depth")),
-			FirmwareRev:       readSysFile(l.FS, filepath.Join(dev, "firmware_rev")),
+			Size:              r.read(filepath.Join(base, "size")),
+			Removable:         r.read(filepath.Join(base, "removable")),
+			Rotational:        r.read(filepath.Join(queue, "rotational")),
+			PhysicalBlockSize: r.read(filepath.Join(queue, "physical_block_size")),
+			LogicalBlockSize:  r.read(filepath.Join(queue, "logical_block_size")),
+			Model:             r.read(filepath.Join(dev, "model")),
+			Vendor:            r.read(filepath.Join(dev, "vendor")),
+			Rev:               r.read(filepath.Join(dev, "rev")),
+			State:             r.read(filepath.Join(dev, "state")),
+			Timeout:           r.read(filepath.Join(dev, "timeout")),
+			QueueDepth:        r.read(filepath.Join(dev, "queue_depth")),
+			FirmwareRev:       r.read(filepath.Join(dev, "firmware_rev")),
+		}
+		if r.err != nil {
+			return nil, r.err
 		}
 		devices = append(devices, bd)
 	}
