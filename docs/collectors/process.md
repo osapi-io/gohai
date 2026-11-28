@@ -41,6 +41,11 @@ Consumers use this data to:
 The field name `cmd_line` comes from OCSF (`process.cmd_line`), not from Ohai's
 `command`. If OCSF and Ohai both name a field, the OCSF name is used.
 
+`cmd_line` holds the full command line of each process, with its arguments. Thus
+it can contain a secret that a program gets as an argument, such as a password
+or a token. The collector is opt-in, so it does not run unless you enable it.
+Enable it only where its facts can hold such values.
+
 ## Platform support
 
 | Platform | Supported                                |
