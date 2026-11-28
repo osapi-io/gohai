@@ -23,7 +23,10 @@ package vmware_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -42,8 +45,9 @@ var (
 	_ collector.Collector = (*vmware.Darwin)(nil)
 )
 
-// vmwareToolboxPath is duplicated here to avoid exporting the private const.
-const vmwareToolboxPath = "/usr/bin/vmware-toolbox-cmd"
+// vmwareToolboxPath is the command name the collector runs, duplicated to
+// keep the const private.
+const vmwareToolboxPath = "vmware-toolbox-cmd"
 
 type VMwarePublicTestSuite struct {
 	suite.Suite
@@ -134,6 +138,58 @@ func vsphereMock(
 		Return([]byte(`{"version":"7.0.3"}`), nil).AnyTimes()
 	return m
 }
+
+// failingToolboxMock answers each vmware-toolbox-cmd call as
+// fullToolboxMock does, but the call whose args join to failing returns
+// err.
+func failingToolboxMock(
+	t *testing.T,
+	failing string,
+	err error,
+) source.Runner {
+	m, _ := toolboxExec(t)
+	answers := map[string]string{
+		"-v":                    "12.3.0 build-21581411\n",
+		"stat hosttime":         "01 Jan 2026 12:00:00\n",
+		"stat speed":            "2600 MHz\n",
+		"stat sessionid":        "1\n",
+		"stat balloon":          "0 MB\n",
+		"stat swap":             "0 MB\n",
+		"stat memlimit":         "4096 MB\n",
+		"stat memres":           "0 MB\n",
+		"stat cpures":           "0 MHz\n",
+		"stat cpulimit":         "unlimited\n",
+		"upgrade status":        "VMware Tools are up-to-date\n",
+		"timesync status":       "Timesync is disabled\n",
+		"stat raw json session": `{"version":"7.0.3"}`,
+	}
+	for args, out := range answers {
+		call := m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, strings.Fields(args)).AnyTimes()
+		if args == failing {
+			call.Return(nil, err)
+			continue
+		}
+		call.Return([]byte(out), nil)
+	}
+	return m
+}
+
+// exitStatusError is the error of a command that exited by itself with a
+// status, as an *exec.ExitError of a finished process is.
+type exitStatusError int
+
+func (e exitStatusError) Error() string {
+	return fmt.Sprintf("exit status %d", int(e))
+}
+
+// ExitCode is the status the command exited with.
+func (e exitStatusError) ExitCode() int {
+	return int(e)
+}
+
+// errKilled is the error that source.Commands returns for a command that its
+// timeout killed: an *exec.ExitError with no exit status.
+var errKilled = fmt.Errorf("exec vmware-toolbox-cmd: stopped after 10s: %w", &exec.ExitError{})
 
 func (s *VMwarePublicTestSuite) TestNew() {
 	orig := platform.Detect
@@ -452,12 +508,163 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				ctrl := gomock.NewController(s.T())
 				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
-					Return(nil, errors.New("not found")).AnyTimes()
+					Return(nil, fmt.Errorf("exec: %w", exec.ErrNotFound)).AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				s.Nil(got)
+			},
+		},
+		{
+			name:    "linux: a VMware controller but no executor, no fact",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc/scsi", 0o755)
+				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
+				return &vmware.Linux{FS: f}
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
+		},
+		{
+			name:    "linux: /proc/scsi/scsi that cannot be read is an error",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc/scsi/scsi", 0o755)
+				return &vmware.Linux{FS: f, Exec: fullToolboxMock(s.T())}
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.ErrorContains(err, "read /proc/scsi/scsi")
+			},
+		},
+		{
+			name:    "linux: vmware-toolbox-cmd -v exits with an error, no fact",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				ctrl := gomock.NewController(s.T())
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
+					Return(nil, exitStatusError(1)).AnyTimes()
+				return &vmware.Linux{FS: memfs.New(), Exec: m}
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
+		},
+		{
+			name:    "linux: vmware-toolbox-cmd -v that does not finish is an error",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				ctrl := gomock.NewController(s.T())
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
+					Return(nil, context.DeadlineExceeded).AnyTimes()
+				return &vmware.Linux{FS: memfs.New(), Exec: m}
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "vmware-toolbox-cmd -v: context deadline exceeded")
+			},
+		},
+		{
+			name:    "linux: a raw session query that does not finish is an error, not a desktop guest",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc/scsi", 0o755)
+				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
+				return &vmware.Linux{
+					FS: f,
+					Exec: failingToolboxMock(
+						s.T(),
+						"stat raw json session",
+						context.DeadlineExceeded,
+					),
+				}
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(
+					err,
+					"vmware-toolbox-cmd stat raw json session: context deadline exceeded",
+				)
+			},
+		},
+		{
+			name:    "linux: a raw session query that exits with an error is a desktop guest",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc/scsi", 0o755)
+				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
+				return &vmware.Linux{
+					FS:   f,
+					Exec: failingToolboxMock(s.T(), "stat raw json session", exitStatusError(1)),
+				}
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*vmware.Info)
+				s.Require().True(ok)
+				s.Equal("vmware_desktop", i.HostType)
+				s.Empty(i.HostVersion)
+				s.Equal("2600 MHz", i.Speed)
+			},
+		},
+		{
+			name:    "linux: a raw session query that its timeout killed is an error, not a desktop guest",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc/scsi", 0o755)
+				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
+				return &vmware.Linux{
+					FS:   f,
+					Exec: failingToolboxMock(s.T(), "stat raw json session", errKilled),
+				}
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.ErrorIs(err, errKilled)
+			},
+		},
+		{
+			name:    "linux: a -v that its timeout killed is an error, not a host with no tools",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				ctrl := gomock.NewController(s.T())
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
+					Return(nil, errKilled).AnyTimes()
+				return &vmware.Linux{FS: memfs.New(), Exec: m}
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.ErrorIs(err, errKilled)
+			},
+		},
+		{
+			name:    "linux: a stat that does not finish is an error",
+			variant: "linux",
+			setupLinux: func() *vmware.Linux {
+				f := memfs.New()
+				_ = f.MkdirAll("/proc/scsi", 0o755)
+				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
+				return &vmware.Linux{
+					FS:   f,
+					Exec: failingToolboxMock(s.T(), "stat speed", errors.New("signal: killed")),
+				}
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "vmware-toolbox-cmd stat speed: signal: killed")
 			},
 		},
 		{
@@ -494,13 +701,14 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return([]byte("12.3.0\n"), nil).AnyTimes()
-				// speed fails — field should be empty string.
+				// speed exits with an error, as a stat the guest does not
+				// offer does, so its field is empty.
 				m.EXPECT().
 					Execute(gomock.Any(), vmwareToolboxPath, "stat", "hosttime").
 					Return([]byte(""), nil).
 					AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "speed").
-					Return(nil, errors.New("exec error")).AnyTimes()
+					Return(nil, exitStatusError(1)).AnyTimes()
 				m.EXPECT().
 					Execute(gomock.Any(), vmwareToolboxPath, "stat", "sessionid").
 					Return([]byte(""), nil).
@@ -558,7 +766,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				ctrl := gomock.NewController(s.T())
 				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
-					Return(nil, errors.New("not found")).AnyTimes()
+					Return(nil, fmt.Errorf("exec: %w", exec.ErrNotFound)).AnyTimes()
 				return &vmware.Darwin{Exec: m}
 			},
 			validateFunc: func(got any, err error) {
@@ -579,6 +787,34 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				s.Nil(got)
+			},
+		},
+		{
+			name:    "darwin: vmware-toolbox-cmd -v that does not finish is an error",
+			variant: "darwin",
+			setupDarwin: func() *vmware.Darwin {
+				ctrl := gomock.NewController(s.T())
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
+					Return(nil, context.DeadlineExceeded).AnyTimes()
+				return &vmware.Darwin{Exec: m}
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "vmware-toolbox-cmd -v: context deadline exceeded")
+			},
+		},
+		{
+			name:    "darwin: a stat that does not finish is an error",
+			variant: "darwin",
+			setupDarwin: func() *vmware.Darwin {
+				return &vmware.Darwin{
+					Exec: failingToolboxMock(s.T(), "stat hosttime", context.DeadlineExceeded),
+				}
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "vmware-toolbox-cmd stat hosttime: context deadline exceeded")
 			},
 		},
 		{

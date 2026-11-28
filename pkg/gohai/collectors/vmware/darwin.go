@@ -42,8 +42,9 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect gathers VMware Tools statistics on macOS. Returns nil (no error)
-// when not running inside a VMware guest or when VMware Tools is absent.
+// Collect gathers VMware Tools statistics on macOS. It returns no fact
+// when the host is not a VMware guest or VMware Tools is absent, and an
+// error when a call to vmware-toolbox-cmd does not finish.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -51,10 +52,15 @@ func (d *Darwin) Collect(
 	if d.Exec == nil {
 		return nil, nil
 	}
-	// Probe: if the binary is absent or returns an error we're not a guest.
-	out, err := d.Exec.Execute(ctx, vmwareToolboxCmdPath, "-v")
-	if err != nil || len(out) == 0 {
-		return nil, nil
+	guest, err := probeToolbox(ctx, d.Exec)
+	if err != nil || !guest {
+		return nil, err
 	}
-	return collectVMwareTools(ctx, d.Exec), nil
+
+	info, err := collectVMwareTools(ctx, d.Exec)
+	if err != nil {
+		return nil, err
+	}
+
+	return info, nil
 }
