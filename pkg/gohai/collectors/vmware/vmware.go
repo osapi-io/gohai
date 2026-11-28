@@ -171,7 +171,9 @@ func collectVMwareTools(
 	// Workstation and Fusion (desktop) answer with an error or nothing.
 	rawSession := run("stat", "raw", "json", "session")
 	if runErr != nil {
-		return nil, runErr
+		// The calls before the failure are good, so they stay, with the
+		// error. HostType stays empty: the raw session query did not answer.
+		return info, runErr
 	}
 	if rawSession == "" {
 		info.HostType = "vmware_desktop"

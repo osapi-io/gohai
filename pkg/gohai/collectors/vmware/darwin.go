@@ -43,8 +43,9 @@ func NewDarwin() *Darwin {
 }
 
 // Collect gathers VMware Tools statistics on macOS. It returns no fact
-// when the host is not a VMware guest or VMware Tools is absent, and an
-// error when a call to vmware-toolbox-cmd does not finish.
+// when the host is not a VMware guest or VMware Tools is absent. When a
+// call to vmware-toolbox-cmd does not finish, it returns the values read
+// before that call with the error.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -57,10 +58,5 @@ func (d *Darwin) Collect(
 		return nil, err
 	}
 
-	info, err := collectVMwareTools(ctx, d.Exec)
-	if err != nil {
-		return nil, err
-	}
-
-	return info, nil
+	return collectVMwareTools(ctx, d.Exec)
 }
