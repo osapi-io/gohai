@@ -131,10 +131,11 @@ signal.
 4. **Timeout.** The timeout is 6 seconds. This is the same as Ohai's
    `read_timeout` in `mixin/scaleway_metadata.rb`.
 
-5. **Failures.** If the read fails (transport, a status that is not 2xx, or the
-   body read), the collector returns `(nil, nil)`. Then `Facts.Scaleway` is
-   empty and there is no error. Only malformed JSON in the response gives an
-   error.
+5. **Failures.** If the endpoint does not answer, or answers with a status that
+   is not 2xx, the source is absent. The collector returns `(nil, nil)`, so
+   `Facts.Scaleway` is empty and there is no error. Any other failure is an
+   error: a body that stops partway, malformed JSON, or a cancelled collection.
+   The digitalocean collector uses the same rule.
 
 6. **Transformation.** The collector changes the response in these ways:
 
