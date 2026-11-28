@@ -30,7 +30,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/avfs/avfs"
@@ -543,8 +543,7 @@ func (c *Collector) negotiateAPIVersion(
 	if len(matches) == 0 {
 		return fallback
 	}
-	sort.Sort(sort.Reverse(sort.StringSlice(matches)))
-	return matches[0]
+	return slices.Max(matches)
 }
 
 // transform reshapes Azure's two-section response into the flat Info,

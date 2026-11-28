@@ -32,10 +32,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-const (
-	procModulesPath     = "/proc/modules"
-	sysModuleVersionFmt = "/sys/module/%s/version"
-)
+const procModulesPath = "/proc/modules"
 
 // Linux reads /proc/modules and enriches each entry with the version
 // published under /sys/module/<name>/version. Mirrors Ohai's kernel
