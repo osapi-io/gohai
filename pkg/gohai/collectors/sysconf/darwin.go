@@ -30,7 +30,7 @@ import (
 // Darwin collects POSIX sysconf values on macOS. macOS fully supports
 // the same four SC_* constants as Linux (CLK_TCK, PAGESIZE,
 // NPROCESSORS_CONF, NPROCESSORS_ONLN), so Darwin delegates to the
-// shared collectSysconf helper which uses the same sysconfFn seam.
+// shared collectSysconf helper, which runs getconf through Exec.
 type Darwin struct {
 	base
 
