@@ -22,14 +22,15 @@ package scsi
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux runs `lsscsi` through the shared executor and parses its
-// output. Missing binary or exec error yields an empty Info — hosts
-// without util-linux or without SCSI devices return cleanly.
+// output. A host without lsscsi gives an empty Info. A failed lsscsi
+// run is an error.
 type Linux struct {
 	base
 	Exec source.Runner
@@ -51,7 +52,10 @@ func (l *Linux) Collect(
 	}
 	out, err := l.Exec.Execute(ctx, "lsscsi")
 	if err != nil {
-		return info, nil
+		if collector.Absent(err) {
+			return info, nil
+		}
+		return nil, fmt.Errorf("lsscsi: %w", err)
 	}
 	info.Devices = parseLsscsi(out)
 	return info, nil

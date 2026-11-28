@@ -107,9 +107,11 @@ finds:
 3. If Homebrew is not on PATH, the collector returns an empty list, not an
    error.
 
-**Errors:** If a command fails (command not found, exit error), the collector
-returns an empty package list and no error. This is the same as Ohai's
-`packages.rb`, which also continues after errors.
+**Errors:** If the command is not on the host, the collector returns an empty
+package list and no error. If the command is there and fails, for example with
+a non-zero exit or a timeout, the collector returns the error. Ohai's
+`packages.rb` continues after both, but then a failure looks the same as a host
+with no package manager.
 
 `description` and `size` come from the same run: `${binary:Summary}` and
 `${Installed-Size}` (KiB) of `dpkg-query`, or `%{SUMMARY}` and `%{SIZE}` (bytes)

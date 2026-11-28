@@ -23,6 +23,8 @@ package zpools_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -238,13 +240,25 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 			name:    "linux: zpool not installed returns empty list",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return zpoolExec(t, nil, errors.New("exec: zpool not found"))
+				return zpoolExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
 				s.Require().True(ok)
 				s.Equal([]zpools.Pool{}, info.Pools)
+			},
+		},
+		{
+			name:    "linux: a failed run is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return zpoolExec(t, nil, errors.New("exit status 1: permission denied"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				s.Nil(got)
 			},
 		},
 		{
@@ -275,13 +289,25 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 			name:    "darwin: zpool not installed returns empty list",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return zpoolExec(t, nil, errors.New("exec: zpool not found"))
+				return zpoolExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*zpools.Info)
 				s.Require().True(ok)
 				s.Equal([]zpools.Pool{}, info.Pools)
+			},
+		},
+		{
+			name:    "darwin: a failed run is an error",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return zpoolExec(t, nil, errors.New("exit status 1: permission denied"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				s.Nil(got)
 			},
 		},
 	}

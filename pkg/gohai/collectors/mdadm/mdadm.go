@@ -245,8 +245,7 @@ func collectArrays(
 ) ([]Array, error) {
 	b, err := readFn("/proc/mdstat")
 	if err != nil {
-		if strings.Contains(err.Error(), "no such file or directory") ||
-			strings.Contains(err.Error(), "file does not exist") {
+		if collector.Absent(err) {
 			return []Array{}, nil
 		}
 		return nil, fmt.Errorf("read /proc/mdstat: %w", err)

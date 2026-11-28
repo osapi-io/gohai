@@ -23,6 +23,7 @@ package packages
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -43,7 +44,8 @@ func NewDarwin() *Darwin {
 }
 
 // Collect runs `brew list --versions` and parses its output. Returns
-// an empty list (not an error) if Homebrew is absent.
+// an empty list (not an error) if Homebrew is absent, and the error if
+// brew fails.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -53,7 +55,10 @@ func (d *Darwin) Collect(
 	}
 	out, err := d.Exec.Execute(ctx, "brew", "list", "--versions")
 	if err != nil {
-		return &Info{Packages: []Package{}}, nil
+		if collector.Absent(err) {
+			return &Info{Packages: []Package{}}, nil
+		}
+		return nil, fmt.Errorf("brew list: %w", err)
 	}
 	info := &Info{Packages: []Package{}}
 	sc := bufio.NewScanner(strings.NewReader(string(out)))

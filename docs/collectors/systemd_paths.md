@@ -95,9 +95,9 @@ On Linux, the collector runs `systemd-path` with no arguments through the shared
    that do not have this separator.
 2. It skips lines that have an empty key.
 3. It stores the key and the path in the `Paths` map with no change.
-4. If `systemd-path` is missing or returns an error, the collector returns an
-   empty `Paths` map and no error. This is the same as Ohai, which does not
-   panic in this condition.
+4. If `systemd-path` is missing, the collector returns an empty `Paths` map and
+   no error. If `systemd-path` is there and fails, the collector returns the
+   error.
 
 The collector does not support macOS, because `systemd-path` is a Linux systemd
 utility. Ohai's plugin is only `collect_data(:linux)`.

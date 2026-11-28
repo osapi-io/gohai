@@ -23,6 +23,8 @@ package virtualbox_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -160,10 +162,22 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "linux: VBoxControl not found returns nil",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(t, nil, errors.New("exec: not found"))
+				return vboxExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
+				s.Nil(got)
+			},
+		},
+		{
+			name:    "linux: a failed run is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return vboxExec(t, nil, errors.New("exit status 1: permission denied"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
 				s.Nil(got)
 			},
 		},
@@ -235,10 +249,22 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			name:    "darwin: VBoxControl not found returns nil",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return vboxExec(t, nil, errors.New("exec: not found"))
+				return vboxExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
+				s.Nil(got)
+			},
+		},
+		{
+			name:    "darwin: a failed run is an error",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return vboxExec(t, nil, errors.New("exit status 1: permission denied"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
 				s.Nil(got)
 			},
 		},

@@ -23,6 +23,8 @@ package scsi_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -166,13 +168,25 @@ malformed
 			name:    "linux: missing lsscsi binary yields empty info, no error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return lsscsiExec(t, nil, errors.New("not found"))
+				return lsscsiExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*scsi.Info)
 				s.Require().True(ok)
 				s.Empty(info.Devices)
+			},
+		},
+		{
+			name:    "linux: a failed run is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return lsscsiExec(t, nil, errors.New("exit status 1: permission denied"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				s.Nil(got)
 			},
 		},
 		{
