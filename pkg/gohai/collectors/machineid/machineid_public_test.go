@@ -122,34 +122,69 @@ func (s *MachineIDPublicTestSuite) TestNew() {
 func (s *MachineIDPublicTestSuite) TestCollect() {
 	const ioregLine = "ioreg -rd1 -c IOPlatformExpertDevice"
 	tests := []struct {
-		name    string
-		variant string
-		files   map[string]string
-		runner  sourcetest.Commands
-		nilExec bool
-		want    *machineid.Info
-		wantErr string
+		name     string
+		variant  string
+		files    map[string]string
+		failRead []string
+		runner   sourcetest.Commands
+		nilExec  bool
+		want     *machineid.Info
+		wantErr  string
 	}{
 		{
 			name: "linux: /etc/machine-id first", variant: "linux",
 			files: map[string]string{
-				"/etc/machine-id":          "abc123\n",
-				"/var/lib/dbus/machine-id": "dbus456\n",
+				"/etc/machine-id":          "3b185187f1855c4c3b185187f1855c4c\n",
+				"/var/lib/dbus/machine-id": "4d0e1f3a4d0e1f3a4d0e1f3a4d0e1f3a\n",
 			},
-			want: &machineid.Info{ID: "abc123"},
+			want: &machineid.Info{
+				ID:     "3b185187f1855c4c3b185187f1855c4c",
+				Source: "/etc/machine-id",
+			},
 		},
 		{
 			name: "linux: an empty /etc/machine-id falls to dbus", variant: "linux",
 			files: map[string]string{
 				"/etc/machine-id":          "\n",
-				"/var/lib/dbus/machine-id": "dbus456\n",
+				"/var/lib/dbus/machine-id": "4d0e1f3a4d0e1f3a4d0e1f3a4d0e1f3a\n",
 			},
-			want: &machineid.Info{ID: "dbus456"},
+			want: &machineid.Info{
+				ID:     "4d0e1f3a4d0e1f3a4d0e1f3a4d0e1f3a",
+				Source: "/var/lib/dbus/machine-id",
+			},
+		},
+		{
+			name:    "linux: a first-boot uninitialized /etc/machine-id falls to dbus",
+			variant: "linux",
+			files: map[string]string{
+				"/etc/machine-id":          "uninitialized\n",
+				"/var/lib/dbus/machine-id": "4d0e1f3a4d0e1f3a4d0e1f3a4d0e1f3a\n",
+			},
+			want: &machineid.Info{
+				ID:     "4d0e1f3a4d0e1f3a4d0e1f3a4d0e1f3a",
+				Source: "/var/lib/dbus/machine-id",
+			},
+		},
+		{
+			name: "linux: a machine-id that is not 32 hex digits is skipped", variant: "linux",
+			files: map[string]string{
+				"/etc/machine-id":          "abc123\n",
+				"/var/lib/dbus/machine-id": "uninitialized\n",
+			},
+			want: &machineid.Info{},
 		},
 		{
 			name: "linux: the DMI product UUID, in lower case", variant: "linux",
 			files: map[string]string{"/sys/class/dmi/id/product_uuid": "4C4C4544-0042\n"},
-			want:  &machineid.Info{ID: "4c4c4544-0042"},
+			want: &machineid.Info{
+				ID:     "4c4c4544-0042",
+				Source: "/sys/class/dmi/id/product_uuid",
+			},
+		},
+		{
+			name: "linux: an unreadable product_uuid is an error", variant: "linux",
+			failRead: []string{"/sys/class/dmi/id/product_uuid"},
+			wantErr:  "read /sys/class/dmi/id/product_uuid:",
 		},
 		{name: "linux: no ID anywhere", variant: "linux", want: &machineid.Info{}},
 		{
@@ -159,7 +194,10 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 				Out: map[string]string{ioregLine: "+-o J316sAP  <class IOPlatformExpertDevice>\n" +
 					"    {\n      \"IOPlatformUUID\" = \"052A2E50-1749-5FAA-0000-000000000000\"\n    }\n"},
 			},
-			want: &machineid.Info{ID: "052A2E50-1749-5FAA-0000-000000000000"},
+			want: &machineid.Info{
+				ID:     "052A2E50-1749-5FAA-0000-000000000000",
+				Source: "IOPlatformUUID",
+			},
 		},
 		{
 			name: "darwin: no UUID in the output", variant: "darwin",
@@ -181,7 +219,9 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			var c machineid.Collector
 			switch tt.variant {
 			case "linux":
-				c = &machineid.Linux{FS: sourcetest.FS(s.T(), tt.files)}
+				c = &machineid.Linux{
+					FS: sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), tt.files), tt.failRead...),
+				}
 			case "darwin":
 				d := &machineid.Darwin{Exec: tt.runner.Mock(s.T())}
 				if tt.nilExec {

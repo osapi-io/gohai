@@ -63,5 +63,5 @@ func (d *Darwin) Collect(
 		return &Info{}, nil
 	}
 
-	return &Info{ID: string(m[1])}, nil
+	return &Info{ID: string(m[1]), Source: "IOPlatformUUID"}, nil
 }

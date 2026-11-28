@@ -22,6 +22,8 @@ package machineid
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -30,16 +32,27 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// idPaths are where Linux keeps a stable machine ID, in the order Ohai reads
-// them: systemd's, then the dbus one of hosts before systemd, then the DMI
-// product UUID, which only root can read on most hosts.
-var idPaths = []string{
-	"/etc/machine-id",
-	"/var/lib/dbus/machine-id",
-	"/sys/class/dmi/id/product_uuid",
+// idSource is one place Linux keeps a machine ID. valid says whether the
+// trimmed, lower-case value is a real ID.
+type idSource struct {
+	path  string
+	valid func(id string) bool
 }
 
-// Linux reads the machine ID from the first of idPaths that has one.
+// machineIDRE is the machine-id(5) format: 32 lower-case hex digits. It
+// rules out the `uninitialized` that systemd writes on a first-boot image.
+var machineIDRE = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+// idSources are where Linux keeps a stable machine ID, in the order Ohai
+// reads them: systemd's, then the dbus one of hosts before systemd, then
+// the DMI product UUID, which only root can read on most hosts.
+var idSources = []idSource{
+	{path: "/etc/machine-id", valid: machineIDRE.MatchString},
+	{path: "/var/lib/dbus/machine-id", valid: machineIDRE.MatchString},
+	{path: "/sys/class/dmi/id/product_uuid", valid: func(id string) bool { return id != "" }},
+}
+
+// Linux reads the machine ID from the first of idSources that has one.
 type Linux struct {
 	base
 
@@ -51,16 +64,23 @@ func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect returns the machine ID, or an empty one when no file has it.
+// Collect returns the machine ID and the file it came from, or an empty
+// one when no file has a valid ID. A missing file is skipped, and a file
+// that can't be read is an error.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	for _, p := range idPaths {
-		if b, err := l.FS.ReadFile(p); err == nil {
-			if id := strings.ToLower(strings.TrimSpace(string(b))); id != "" {
-				return &Info{ID: id}, nil
-			}
+	for _, src := range idSources {
+		b, err := l.FS.ReadFile(src.path)
+		if collector.Absent(err) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", src.path, err)
+		}
+		if id := strings.ToLower(strings.TrimSpace(string(b))); src.valid(id) {
+			return &Info{ID: id, Source: src.path}, nil
 		}
 	}
 
