@@ -32,7 +32,7 @@ import (
 // Info holds uptime and boot time data.
 type Info struct {
 	Seconds     uint64 `json:"seconds"`                // seconds since boot
-	BootTime    uint64 `json:"boot_time"`              // unix timestamp of boot
+	BootTime    uint64 `json:"boot_time,omitempty"`    // unix timestamp of boot; left out when unknown
 	Human       string `json:"human"`                  // human-readable uptime (e.g., "3d 4h 12m 5s")
 	IdleSeconds uint64 `json:"idle_seconds,omitempty"` // aggregate CPU idle seconds (Linux only)
 	IdleHuman   string `json:"idle_human,omitempty"`   // human-readable idle time (Linux only)

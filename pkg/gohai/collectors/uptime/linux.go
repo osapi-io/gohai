@@ -78,7 +78,6 @@ func (l *Linux) Collect(
 		)
 	}
 	out := &Info{Seconds: uint64(up), Human: HumanDuration(uint64(up))}
-	out.BootTime = readBootTime(l.FS)
 	if len(fields) > 1 {
 		if idle, err := strconv.ParseFloat(fields[1], 64); err == nil && idle >= 0 &&
 			!math.IsNaN(idle) && !math.IsInf(idle, 0) {
@@ -86,27 +85,37 @@ func (l *Linux) Collect(
 			out.IdleHuman = HumanDuration(out.IdleSeconds)
 		}
 	}
+	// The uptime is good, so a boot time that does not read leaves
+	// boot_time out and the result is partial.
+	out.BootTime, err = readBootTime(l.FS)
 
-	return out, nil
+	return out, err
 }
 
-// readBootTime is the btime line of /proc/stat, or 0 when it cannot be
-// read.
+// readBootTime is the btime line of /proc/stat. It is 0 with no error
+// when /proc/stat is not there or has no btime line, as in some
+// containers, and 0 with the error when /proc/stat does not read or its
+// btime is not a number.
 func readBootTime(
 	fs avfs.VFS,
-) uint64 {
+) (uint64, error) {
 	b, err := fs.ReadFile(procStatPath)
+	if collector.Absent(err) {
+		return 0, nil
+	}
 	if err != nil {
-		return 0
+		return 0, fmt.Errorf("read %s: %w", procStatPath, err)
 	}
 	for _, line := range strings.Split(string(b), "\n") {
 		if v, ok := strings.CutPrefix(line, "btime "); ok {
 			n, err := strconv.ParseUint(strings.TrimSpace(v), 10, 64)
-			if err == nil {
-				return n
+			if err != nil {
+				return 0, fmt.Errorf("%s: btime: %w", procStatPath, err)
 			}
+
+			return n, nil
 		}
 	}
 
-	return 0
+	return 0, nil
 }

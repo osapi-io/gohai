@@ -123,13 +123,13 @@ func (s *UptimePublicTestSuite) TestNew() {
 func (s *UptimePublicTestSuite) TestCollect() {
 	now := func() time.Time { return time.Unix(1767322845, 0) }
 	tests := []struct {
-		name    string
-		variant string
-		files   map[string]string
-		runner  sourcetest.Commands
-		nilExec bool
-		want    *uptime.Info
-		wantErr string
+		name         string
+		variant      string
+		files        map[string]string
+		failRead     []string
+		runner       sourcetest.Commands
+		nilExec      bool
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: uptime, idle and boot time",
@@ -138,48 +138,118 @@ func (s *UptimePublicTestSuite) TestCollect() {
 				"/proc/uptime": "93900.42 180001.15\n",
 				"/proc/stat":   "cpu  1 2 3\nbtime 1767229145\nprocesses 9\n",
 			},
-			want: &uptime.Info{
-				Seconds: 93900, BootTime: 1767229145, Human: "1d 2h 5m 0s",
-				IdleSeconds: 180001, IdleHuman: "2d 2h 0m 1s",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&uptime.Info{
+					Seconds: 93900, BootTime: 1767229145, Human: "1d 2h 5m 0s",
+					IdleSeconds: 180001, IdleHuman: "2d 2h 0m 1s",
+				}, got)
 			},
 		},
 		{
-			name:    "linux: no idle field, and no /proc/stat",
+			name:    "linux: no idle field, and no /proc/stat leaves boot_time out",
 			variant: "linux",
 			files:   map[string]string{"/proc/uptime": "65\n"},
-			want:    &uptime.Info{Seconds: 65, Human: "1m 5s"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&uptime.Info{Seconds: 65, Human: "1m 5s"}, got)
+			},
 		},
 		{
-			name:    "linux: an idle field and a btime that are not numbers",
+			name:    "linux: a /proc/stat with no btime leaves boot_time out",
+			variant: "linux",
+			files: map[string]string{
+				"/proc/uptime": "65\n",
+				"/proc/stat":   "cpu  1 2 3\n",
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&uptime.Info{Seconds: 65, Human: "1m 5s"}, got)
+			},
+		},
+		{
+			name:    "linux: a btime that is not a number keeps the uptime, with the error",
 			variant: "linux",
 			files: map[string]string{
 				"/proc/uptime": "65 x\n",
 				"/proc/stat":   "btime soon\n",
 			},
-			want: &uptime.Info{Seconds: 65, Human: "1m 5s"},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "/proc/stat: btime:")
+				info, ok := got.(*uptime.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal(uint64(65), info.Seconds)
+				s.Zero(info.BootTime)
+			},
 		},
-		{name: "linux: no /proc/uptime", variant: "linux", wantErr: "read /proc/uptime"},
+		{
+			name:     "linux: a /proc/stat that does not read keeps the uptime, with the error",
+			variant:  "linux",
+			files:    map[string]string{"/proc/uptime": "93900.42 180001.15\n"},
+			failRead: []string{"/proc/stat"},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "read /proc/stat")
+				info, ok := got.(*uptime.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal("1d 2h 5m 0s", info.Human)
+				s.Equal(uint64(180001), info.IdleSeconds)
+				s.Zero(info.BootTime)
+			},
+		},
+		{name: "linux: no /proc/uptime", variant: "linux", validateFunc: func(got any, err error) {
+			s.ErrorContains(err, "read /proc/uptime")
+			s.Exactly(nil, got)
+		}},
 		{
 			name: "linux: empty /proc/uptime", variant: "linux",
-			files: map[string]string{"/proc/uptime": ""}, wantErr: "is empty",
+			files: map[string]string{"/proc/uptime": ""}, validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "is empty")
+				s.Exactly(nil, got)
+			},
 		},
 		{
-			name: "linux: an uptime of NaN is refused", variant: "linux",
-			files: map[string]string{"/proc/uptime": "NaN 1"}, wantErr: "is not a number",
+			name:    "linux: an uptime of NaN is refused",
+			variant: "linux",
+			files: map[string]string{
+				"/proc/uptime": "NaN 1",
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "is not a number")
+				s.Exactly(nil, got)
+			},
 		},
 		{
-			name: "linux: an uptime of +Inf is refused", variant: "linux",
-			files: map[string]string{"/proc/uptime": "+Inf 1"}, wantErr: "is not a number",
+			name:    "linux: an uptime of +Inf is refused",
+			variant: "linux",
+			files: map[string]string{
+				"/proc/uptime": "+Inf 1",
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "is not a number")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "linux: an idle of NaN is left out",
 			variant: "linux",
 			files:   map[string]string{"/proc/uptime": "65 NaN\n"},
-			want:    &uptime.Info{Seconds: 65, Human: "1m 5s"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&uptime.Info{Seconds: 65, Human: "1m 5s"}, got)
+			},
 		},
 		{
-			name: "linux: uptime not a number", variant: "linux",
-			files: map[string]string{"/proc/uptime": "x 1"}, wantErr: "is not a number",
+			name:    "linux: uptime not a number",
+			variant: "linux",
+			files: map[string]string{
+				"/proc/uptime": "x 1",
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "is not a number")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "darwin: boot time and the clock",
@@ -187,7 +257,13 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n kern.boottime": "{ sec = 1767229145, usec = 0 } Thu Jan  1 00:59:05 2026\n",
 			}},
-			want: &uptime.Info{Seconds: 93700, BootTime: 1767229145, Human: "1d 2h 1m 40s"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(
+					&uptime.Info{Seconds: 93700, BootTime: 1767229145, Human: "1d 2h 1m 40s"},
+					got,
+				)
+			},
 		},
 		{
 			name:    "darwin: a boot time after the clock",
@@ -195,7 +271,10 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n kern.boottime": "{ sec = 1999999999, usec = 0 }\n",
 			}},
-			want: &uptime.Info{Seconds: 0, BootTime: 1999999999, Human: "0s"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&uptime.Info{Seconds: 0, BootTime: 1999999999, Human: "0s"}, got)
+			},
 		},
 		{
 			name:    "darwin: a boot time too large for an int64 is an error",
@@ -203,7 +282,10 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			runner: sourcetest.Commands{Out: map[string]string{
 				"sysctl -n kern.boottime": "{ sec = 99999999999999999999, usec = 0 }\n",
 			}},
-			wantErr: "sysctl kern.boottime:",
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "sysctl kern.boottime:")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "darwin: sysctl fails",
@@ -211,16 +293,26 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			runner: sourcetest.Commands{
 				Err: map[string]error{"sysctl -n kern.boottime": errors.New("boom")},
 			},
-			wantErr: "sysctl kern.boottime: boom",
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "sysctl kern.boottime: boom")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name: "darwin: no Exec gives no fact", variant: "darwin",
 			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name: "darwin: no seconds", variant: "darwin",
-			runner:  sourcetest.Commands{Out: map[string]string{"sysctl -n kern.boottime": "nope"}},
-			wantErr: "no seconds",
+			runner: sourcetest.Commands{Out: map[string]string{"sysctl -n kern.boottime": "nope"}},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "no seconds")
+				s.Exactly(nil, got)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -228,7 +320,8 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			var c uptime.Collector
 			switch tt.variant {
 			case "linux":
-				c = &uptime.Linux{FS: sourcetest.FS(s.T(), tt.files)}
+				f := sourcetest.FS(s.T(), tt.files)
+				c = &uptime.Linux{FS: sourcetest.FailRead(s.T(), f, tt.failRead...)}
 			case "darwin":
 				d := &uptime.Darwin{Exec: tt.runner.Mock(s.T()), Now: now}
 				if tt.nilExec {
@@ -236,19 +329,7 @@ func (s *UptimePublicTestSuite) TestCollect() {
 				}
 				c = d
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr != "" {
-				s.ErrorContains(err, tt.wantErr)
-
-				return
-			}
-			s.Require().NoError(err)
-			if tt.nilExec {
-				s.Exactly(nil, got)
-
-				return
-			}
-			s.Equal(tt.want, got)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

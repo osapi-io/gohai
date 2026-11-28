@@ -4958,7 +4958,6 @@
       "type": "object",
       "required": [
         "seconds",
-        "boot_time",
         "human"
       ]
     },
