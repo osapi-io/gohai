@@ -21,6 +21,7 @@
 package collector_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -70,6 +71,47 @@ func (s *CollectorPublicTestSuite) TestAbsent() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			tt.validateFunc(collector.Absent(tt.err))
+		})
+	}
+}
+
+func (s *CollectorPublicTestSuite) TestCancelled() {
+	done, cancel := context.WithCancel(context.Background())
+	cancel()
+	tests := []struct {
+		name         string
+		ctx          context.Context
+		err          error
+		validateFunc func(bool)
+	}{
+		{
+			name:         "a done context is cancelled",
+			ctx:          done,
+			err:          errors.New("exit status 1"),
+			validateFunc: func(got bool) { s.True(got) },
+		},
+		{
+			name:         "an error that wraps context.Canceled is cancelled",
+			ctx:          context.Background(),
+			err:          fmt.Errorf("lscpu: %w", context.Canceled),
+			validateFunc: func(got bool) { s.True(got) },
+		},
+		{
+			name:         "an error that wraps context.DeadlineExceeded is cancelled",
+			ctx:          context.Background(),
+			err:          fmt.Errorf("lscpu: %w", context.DeadlineExceeded),
+			validateFunc: func(got bool) { s.True(got) },
+		},
+		{
+			name:         "a failed command with a live context is not cancelled",
+			ctx:          context.Background(),
+			err:          errors.New("exit status 1"),
+			validateFunc: func(got bool) { s.False(got) },
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(collector.Cancelled(tt.ctx, tt.err))
 		})
 	}
 }

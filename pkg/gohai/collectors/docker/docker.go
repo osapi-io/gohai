@@ -27,6 +27,7 @@ package docker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -183,10 +184,11 @@ type dockerJSONImage struct {
 }
 
 // collectDocker queries Docker version, containers, and images. It
-// returns no fact when the docker command is not on the PATH. Any other
-// failure of docker version, docker ps or docker images is an error: a
-// daemon that is down or refuses the caller, a timeout, or a cancelled
-// context.
+// returns no fact when the docker command is not on the PATH. A failure
+// of docker version is an error with no fact: a daemon that is down or
+// refuses the caller, or a timeout. When docker version works and docker
+// ps or docker images fails, the facts read are kept with the error, so
+// the status is partial. A cancelled context gives no fact.
 func collectDocker(
 	ctx context.Context,
 	exec source.Runner,
@@ -203,20 +205,28 @@ func collectDocker(
 	}
 	version := strings.TrimSpace(string(versionOut))
 
+	info := &Info{Version: version}
+	var errs []error
 	containers, err := collectContainers(ctx, exec)
-	if err != nil {
+	switch {
+	case err != nil && collector.Cancelled(ctx, err):
 		return nil, fmt.Errorf("docker ps: %w", err)
+	case err != nil:
+		errs = append(errs, fmt.Errorf("docker ps: %w", err))
+	default:
+		inspectContainers(ctx, exec, containers)
+		info.Containers = containers
 	}
-	inspectContainers(ctx, exec, containers)
 	images, err := collectImages(ctx, exec)
-	if err != nil {
+	switch {
+	case err != nil && collector.Cancelled(ctx, err):
 		return nil, fmt.Errorf("docker images: %w", err)
+	case err != nil:
+		errs = append(errs, fmt.Errorf("docker images: %w", err))
+	default:
+		info.Images = images
 	}
-	return &Info{
-		Version:    version,
-		Containers: containers,
-		Images:     images,
-	}, nil
+	return info, errors.Join(errs...)
 }
 
 // collectContainers runs `docker ps -a --format '{{json .}}'` and

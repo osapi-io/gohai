@@ -22,6 +22,7 @@ package cpu
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -75,25 +76,31 @@ func (l *Linux) Collect(
 		count = countStatCPUs(l.FS)
 	}
 	info := summarize(count, cpus)
+	// A failed vulnerabilities read or a failed lscpu keeps the facts of
+	// /proc/cpuinfo, and returns the error with them, so the status is
+	// partial. A cancelled context gives no fact.
+	var errs []error
 	vulns, err := readVulnerabilities(l.FS)
 	if err != nil {
-		return nil, err
+		errs = append(errs, err)
 	}
 	if vulns != nil {
 		info.Vulnerabilities = vulns
 	}
 	if l.Exec == nil {
-		return info, nil
+		return info, errors.Join(errs...)
 	}
 	out, err := l.Exec.Execute(ctx, "lscpu")
-	if collector.Absent(err) {
-		return info, nil
-	}
-	if err != nil {
+	switch {
+	case collector.Absent(err):
+	case err != nil && collector.Cancelled(ctx, err):
 		return nil, fmt.Errorf("lscpu: %w", err)
+	case err != nil:
+		errs = append(errs, fmt.Errorf("lscpu: %w", err))
+	default:
+		applyLscpuToInfo(info, parseLscpu(out))
 	}
-	applyLscpuToInfo(info, parseLscpu(out))
-	return info, nil
+	return info, errors.Join(errs...)
 }
 
 // procCPUInfo has a block of facts for each logical CPU.

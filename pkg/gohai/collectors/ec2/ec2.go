@@ -363,6 +363,7 @@ func (c *Metadata) Collect(
 	if !onEC2(c.FS, prior, c.darwin) {
 		return nil, ctx.Err()
 	}
+	parent := ctx
 	ctx, cancel := context.WithTimeout(ctx, cmp.Or(c.Timeout, WalkTimeout))
 	defer cancel()
 
@@ -370,9 +371,10 @@ func (c *Metadata) Collect(
 	headers := imdsHeaders(token)
 	version := c.negotiateAPIVersion(ctx, headers)
 	// A path the IMDS does not answer (ErrNotAvailable) is left blank.
-	// Any other failure, such as a cancelled context or a body over
-	// cloudmetadata.MaxBody, stops the walk and is the collector's error,
-	// so a half-read instance never looks like a full one.
+	// Any other failure, such as the walk deadline or a body over
+	// cloudmetadata.MaxBody, stops the walk. The metadata read before it
+	// is kept with the error, so the status is partial, not ok. A
+	// cancelled run gives no fact.
 	var walkErr error
 	versionedGet := func(path string) ([]byte, error) {
 		if walkErr != nil {
@@ -453,11 +455,11 @@ func (c *Metadata) Collect(
 			}
 		}
 	}
-	if walkErr != nil {
+	if walkErr != nil && parent.Err() != nil {
 		return nil, walkErr
 	}
 
-	return info, nil
+	return info, walkErr
 }
 
 // fetchBlockDeviceMapping walks /meta-data/block-device-mapping/.

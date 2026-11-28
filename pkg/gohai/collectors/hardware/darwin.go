@@ -23,6 +23,7 @@ package hardware
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -87,28 +88,39 @@ func (d *Darwin) Collect(
 	if collector.Absent(hwErr) {
 		return info, nil
 	}
-	for _, err := range []error{hwErr, storageErr, powerErr} {
-		if err != nil && !collector.Absent(err) {
-			return nil, fmt.Errorf("read system_profiler: %w", err)
+	// Each call that worked fills its part of info. A call that failed
+	// adds its error, and the parts that worked are kept, so the status is
+	// partial. A cancelled run, or a run where no call worked, gives no
+	// fact.
+	var errs []error
+	read := false
+	for _, part := range []struct {
+		out   []byte
+		err   error
+		apply func(*Info, []byte) error
+	}{
+		{hwOut, hwErr, applyHardware},
+		{storageOut, storageErr, applyStorage},
+		{powerOut, powerErr, applyPower},
+	} {
+		switch {
+		case collector.Absent(part.err):
+		case part.err != nil && collector.Cancelled(ctx, part.err):
+			return nil, fmt.Errorf("read system_profiler: %w", part.err)
+		case part.err != nil:
+			errs = append(errs, fmt.Errorf("read system_profiler: %w", part.err))
+		default:
+			if err := part.apply(info, part.out); err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			read = true
 		}
 	}
-
-	if hwErr == nil {
-		if err := applyHardware(info, hwOut); err != nil {
-			return nil, err
-		}
+	if !read && len(errs) > 0 {
+		return nil, errors.Join(errs...)
 	}
-	if storageErr == nil {
-		if err := applyStorage(info, storageOut); err != nil {
-			return nil, err
-		}
-	}
-	if powerErr == nil {
-		if err := applyPower(info, powerOut); err != nil {
-			return nil, err
-		}
-	}
-	return info, nil
+	return info, errors.Join(errs...)
 }
 
 // applyHardware parses SPHardwareDataType JSON and populates

@@ -70,8 +70,12 @@ func (d *Darwin) Collect(
 	if collector.Absent(err) {
 		return info, nil
 	}
-	if err != nil {
+	if err != nil && collector.Cancelled(ctx, err) {
 		return nil, fmt.Errorf("read scutil --dns: %w", err)
+	}
+	if err != nil {
+		// The resolv.conf facts are kept, so the status is partial.
+		return info, fmt.Errorf("read scutil --dns: %w", err)
 	}
 	// Each "resolver #N" block has its servers, its search domains and,
 	// when it belongs to one, its interface. The first block of an

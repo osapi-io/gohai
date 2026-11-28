@@ -254,16 +254,18 @@ the HTTP request. This is how it finds an EC2 Mac instance.
     `read_timeout` and `keep_alive_timeout`. The whole collection also has a
     deadline, `ec2.WalkTimeout` (30 seconds), so an IMDS that answers the first
     request and then hangs cannot hold it for minutes. When the deadline ends,
-    the collector returns the context error. The deadline is less than the 60
-    second life of the IMDSv2 token, so the token cannot expire during a walk.
+    the collector returns the context error with the metadata read so far. The
+    deadline is less than the 60 second life of the IMDSv2 token, so the token
+    cannot expire during a walk.
 
 13. **Failures.** A path that the IMDS does not answer, such as a 404, a 429, a
     5xx or no connection, is left out: if it is the first request (`/ami-id`),
     the collector returns `(nil, nil)`, as for a host that is not on EC2.
-    Otherwise that field keeps its zero value. Any other failure stops the walk
-    and is the collector's error: a cancelled or expired context, or a response
-    that is more than `cloudmetadata.MaxBody`. Thus a half-read instance never
-    looks like a full one.
+    Otherwise that field keeps its zero value. Any other failure stops the walk:
+    the walk deadline, or a response that is more than `cloudmetadata.MaxBody`.
+    The metadata read before it is kept with the error, so the status is
+    `partial` and a half-read instance never looks like a full one. A failure of
+    the first request, or a cancelled context, gives no fact.
 
 The method is the same as Ohai's `Ohai::Mixin::Ec2Metadata`. These parts are the
 same:
