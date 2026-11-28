@@ -33,9 +33,10 @@ dependencies:
 | Linux    | ✅ (reads `/proc/1/comm`) |
 | macOS    | ✅ (always `launchd`)     |
 
-On Linux, if the collector cannot read `/proc/1/comm`, `name` is empty. This
-occurs in restricted containers. Consumers must read an empty value as unknown.
-An empty value does not identify an init system.
+On Linux, if `/proc/1/comm` is missing, `name` is empty. This occurs in
+restricted containers. Consumers must read an empty value as unknown. An empty
+value does not identify an init system. A `/proc/1/comm` that is there and can't
+be read is an error.
 
 ## Example output
 

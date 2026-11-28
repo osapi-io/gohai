@@ -176,6 +176,21 @@ func (s *IPCPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a sysctl file that can't be read is an error",
+			variant: "linux",
+			setupFS: func() *memfs.MemFS {
+				f := memfs.New()
+				// A directory where the file should be: ReadFile fails
+				// with an error that is not fs.ErrNotExist.
+				_ = f.MkdirAll("/proc/sys/kernel/shmmax", 0o755)
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /proc/sys/kernel/shmmax:")
+			},
+		},
+		{
 			name:    "linux: sem file with fewer than 4 fields is partial",
 			variant: "linux",
 			setupFS: func() *memfs.MemFS {

@@ -22,6 +22,7 @@ package initd
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -41,16 +42,19 @@ func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect reads /proc/1/comm and classifies the result. Missing or
-// unreadable /proc/1/comm (rare, but possible in restricted containers)
-// returns an empty Name rather than erroring.
+// Collect reads /proc/1/comm and classifies the result. A missing
+// /proc/1/comm (rare, but possible in restricted containers) returns an
+// empty Name. A /proc/1/comm that is there and can't be read is an error.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	b, err := l.FS.ReadFile(proc1CommPath)
-	if err != nil {
+	if collector.Absent(err) {
 		return &Info{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", proc1CommPath, err)
 	}
 	return &Info{Name: classify(string(b))}, nil
 }

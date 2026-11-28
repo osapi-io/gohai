@@ -72,8 +72,12 @@ func (l *Linux) Collect(
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", procOSRelease, err)
 	}
-	// The build string is optional, as uname -v is.
-	version, _ := l.FS.ReadFile(procVersion)
+	// The build string is optional, as uname -v is: a missing file is an
+	// empty version, and a file that can't be read is an error.
+	version, err := l.FS.ReadFile(procVersion)
+	if err != nil && !collector.Absent(err) {
+		return nil, fmt.Errorf("read %s: %w", procVersion, err)
+	}
 	machine, err := l.machine(ctx)
 	if err != nil {
 		return nil, err

@@ -22,6 +22,7 @@ package ipc
 
 import (
 	"context"
+	"errors"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -46,24 +47,28 @@ func NewLinux() *Linux {
 
 // Collect reads the IPC sysctl files under /proc/sys/kernel and returns
 // an Info struct. Missing files yield empty strings for their fields,
-// not an error, since not all kernels expose all parameters.
+// not an error, since not all kernels expose all parameters. A file that
+// is there and can't be read is an error.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	semRaw := readTrimmed(l.FS, "/proc/sys/kernel/sem")
-
-	return &Info{
-		Sem: parseSem(semRaw),
+	r := &sysctlReader{fs: l.FS}
+	info := &Info{
+		Sem: parseSem(r.read("/proc/sys/kernel/sem")),
 		Msg: MsgLimits{
-			MSGMNB: readTrimmed(l.FS, "/proc/sys/kernel/msgmnb"),
-			MSGMNI: readTrimmed(l.FS, "/proc/sys/kernel/msgmni"),
-			MSGMAX: readTrimmed(l.FS, "/proc/sys/kernel/msgmax"),
+			MSGMNB: r.read("/proc/sys/kernel/msgmnb"),
+			MSGMNI: r.read("/proc/sys/kernel/msgmni"),
+			MSGMAX: r.read("/proc/sys/kernel/msgmax"),
 		},
 		Shm: ShmLimits{
-			SHMALL: readTrimmed(l.FS, "/proc/sys/kernel/shmall"),
-			SHMMAX: readTrimmed(l.FS, "/proc/sys/kernel/shmmax"),
-			SHMMNI: readTrimmed(l.FS, "/proc/sys/kernel/shmmni"),
+			SHMALL: r.read("/proc/sys/kernel/shmall"),
+			SHMMAX: r.read("/proc/sys/kernel/shmmax"),
+			SHMMNI: r.read("/proc/sys/kernel/shmmni"),
 		},
-	}, nil
+	}
+	if err := errors.Join(r.errs...); err != nil {
+		return nil, err
+	}
+	return info, nil
 }

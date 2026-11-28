@@ -139,8 +139,8 @@ On Linux:
 
 1. `/proc/sys/kernel/ostype`, `/proc/sys/kernel/osrelease` and
    `/proc/sys/kernel/version` give `name`, `release` and `version`, the fields
-   of `uname(2)`. A missing `version` is empty. A missing `ostype` or
-   `osrelease` is an error.
+   of `uname(2)`. A missing `version` is empty, and a `version` that is there
+   and can't be read is an error. A missing `ostype` or `osrelease` is an error.
 2. `/proc/sys/kernel/arch` gives `machine` on Linux 6.1 and later. On an older
    kernel, the collector runs `uname -m`.
 3. `processor` is a copy of `machine`. `os` is always the string `"GNU/Linux"`.

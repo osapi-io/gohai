@@ -122,12 +122,13 @@ On Linux:
 1. The collector reads `/proc/modules` through the injected `avfs.VFS`. It
    parses the file one line at a time to get the `name`, `size` and `refcount`
    of each module. If the file is missing, the collector returns an empty `Info`
-   and no error. This occurs on systems that do not mount `procfs`.
+   and no error. This occurs on systems that do not mount `procfs`. A file that
+   is there and can't be read is an error.
 2. For each module, the collector reads `/sys/module/<name>/version`, if it is
    there. It removes the whitespace and puts the value in `modules[].version`.
    If the file is missing, the field stays empty. Many built-in modules do not
    have a version. This is the same as Ohai, which also gives no message if the
-   file is missing.
+   file is missing. A version file that is there and can't be read is an error.
 
 On macOS:
 

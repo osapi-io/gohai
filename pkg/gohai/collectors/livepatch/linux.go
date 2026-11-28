@@ -45,14 +45,15 @@ func NewLinux() *Linux {
 
 // Collect reads /sys/kernel/livepatch/ and returns patch status. It
 // returns no fact when the directory does not exist, because the kernel
-// has no livepatch support.
+// has no livepatch support, and an error when a livepatch file can't be
+// read.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	patches := collectPatches(l.FS)
-	if patches == nil {
-		return nil, nil
+	patches, err := collectPatches(l.FS)
+	if err != nil || patches == nil {
+		return nil, err
 	}
 
 	return &Info{Patches: patches}, nil

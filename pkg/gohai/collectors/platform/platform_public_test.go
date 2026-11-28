@@ -147,6 +147,44 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 		validateFunc func(any, error)
 	}{
 		{
+			name:    "linux: an /etc/os-release that can't be read is an error",
+			variant: "linux",
+			fs:      sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), nil), "/etc/os-release"),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /etc/os-release:")
+			},
+		},
+		{
+			name:      "linux: a redhat-release that can't be read for the minor version is an error",
+			variant:   "linux",
+			osRelease: "ID=rhel\nVERSION_ID=9\n",
+			fs:        sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), nil), "/etc/redhat-release"),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /etc/redhat-release:")
+			},
+		},
+		{
+			name:      "linux: a debian_version that can't be read for the version is an error",
+			variant:   "linux",
+			osRelease: "ID=debian\n",
+			fs:        sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), nil), "/etc/debian_version"),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /etc/debian_version:")
+			},
+		},
+		{
+			name:    "linux: no os-release and a legacy file that can't be read is an error",
+			variant: "linux",
+			fs:      sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), nil), "/etc/SuSE-release"),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /etc/SuSE-release:")
+			},
+		},
+		{
 			name:      "linux: ubuntu happy path, os-release populates everything",
 			variant:   "linux",
 			osRelease: "ID=ubuntu\nVERSION_ID=24.04\n",

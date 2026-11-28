@@ -34,6 +34,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernelmodules"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -192,6 +193,26 @@ func (s *KernelModulesPublicTestSuite) TestCollect() {
 				i, ok := got.(*kernelmodules.Info)
 				s.Require().True(ok)
 				s.Nil(i.Modules)
+			},
+		},
+		{
+			name:    "linux: a /proc/modules that can't be read is an error",
+			variant: "linux",
+			fs:      sourcetest.FailRead(s.T(), linuxFS(s, nil), "/proc/modules"),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /proc/modules:")
+			},
+		},
+		{
+			name:    "linux: a module version file that can't be read is an error",
+			variant: "linux",
+			fs: sourcetest.FailRead(s.T(), linuxFS(s, map[string]string{
+				"/proc/modules": "ipv6 557056 24 - Live 0x0000000000000000\n",
+			}), "/sys/module/ipv6/version"),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /sys/module/ipv6/version:")
 			},
 		},
 		{

@@ -32,6 +32,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -193,6 +194,7 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 	tests := []struct {
 		name         string
 		files        func() map[string]string
+		failRead     []string
 		answers      []answer
 		nilExec      bool
 		validateFunc func(any, error)
@@ -236,6 +238,21 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				s.Empty(got.(*kernel.Info).Version)
+			},
+		},
+		{
+			name: "when the version can't be read, it is an error",
+			files: func() map[string]string {
+				f := ubuntu()
+				delete(f, "/proc/sys/kernel/version")
+				f["/proc/sys/kernel/arch"] = "x86_64"
+
+				return f
+			},
+			failRead: []string{"/proc/sys/kernel/version"},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read /proc/sys/kernel/version:")
 			},
 		},
 		{
@@ -284,7 +301,10 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			c := &kernel.Linux{FS: s.hostFS(tt.files()), Exec: s.exec(tt.answers...)}
+			c := &kernel.Linux{
+				FS:   sourcetest.FailRead(s.T(), s.hostFS(tt.files()), tt.failRead...),
+				Exec: s.exec(tt.answers...),
+			}
 			if tt.nilExec {
 				c.Exec = nil
 			}

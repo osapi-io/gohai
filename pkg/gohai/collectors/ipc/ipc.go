@@ -24,6 +24,7 @@
 package ipc
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -117,14 +118,25 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// readTrimmed reads a sysfs/procfs file from fs and returns its
-// trimmed content, or empty string on error.
-func readTrimmed(
-	fs avfs.VFS,
+// sysctlReader reads sysfs/procfs files from fs and keeps the first
+// failure of each read, so one Collect can report them all.
+type sysctlReader struct {
+	fs   avfs.VFS
+	errs []error
+}
+
+// read returns the trimmed content of path. A missing file is an empty
+// string, as not all kernels expose all parameters; any other failure is
+// recorded in errs.
+func (r *sysctlReader) read(
 	path string,
 ) string {
-	b, err := fs.ReadFile(path)
+	b, err := r.fs.ReadFile(path)
+	if collector.Absent(err) {
+		return ""
+	}
 	if err != nil {
+		r.errs = append(r.errs, fmt.Errorf("read %s: %w", path, err))
 		return ""
 	}
 	return strings.TrimSpace(string(b))

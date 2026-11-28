@@ -125,7 +125,8 @@ On Linux:
    `/proc/sys/kernel/shmmni` one at a time. Each file has one decimal value.
 4. If a file is missing, its field is an empty string. This occurs in minimal
    containers that do not bind-mount all of `/proc/sys`. It also occurs if the
-   kernel does not have that parameter.
+   kernel does not have that parameter. A file that is there and can't be read
+   is an error.
 
 On macOS, the collector returns `nil`.
 
