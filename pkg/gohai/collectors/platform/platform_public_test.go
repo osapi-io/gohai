@@ -344,7 +344,8 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*platform.Info)
 				s.Require().True(ok)
-				s.Equal("rhel", info.Family, "the legacy file's own family")
+				// The legacy file's own family.
+				s.Equal("rhel", info.Family)
 			},
 		},
 		{

@@ -24,8 +24,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -35,6 +33,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
@@ -83,7 +82,6 @@ const novaDoc = `{
 
 type OpenStackPublicTestSuite struct {
 	suite.Suite
-	tmpDir string
 }
 
 func TestOpenStackPublicTestSuite(
@@ -92,62 +90,34 @@ func TestOpenStackPublicTestSuite(
 	suite.Run(t, new(OpenStackPublicTestSuite))
 }
 
-func (s *OpenStackPublicTestSuite) SetupTest() {
-	s.tmpDir = s.T().TempDir()
-	// Default: point passwd path at a nonexistent file so provider
-	// resolves to "openstack" unless a test overrides.
-	openstack.SetPasswdPath(filepath.Join(s.tmpDir, "no-passwd"))
-}
-
-// writePasswd writes a passwd-format file with the given lines and
-// swaps the package var.
-func (s *OpenStackPublicTestSuite) writePasswd(
-	content string,
-) func() {
-	path := filepath.Join(s.tmpDir, "passwd")
-	s.Require().NoError(os.WriteFile(path, []byte(content), 0o644))
-	return openstack.SetPasswdPath(path)
-}
-
-func (s *OpenStackPublicTestSuite) TestInterface() {
-	c := openstack.New()
+func (s *OpenStackPublicTestSuite) TestNew() {
+	fs := memfs.New()
 	tests := []struct {
 		name         string
-		got          any
-		validateFunc func(any)
+		c            *openstack.Collector
+		validateFunc func(*openstack.Collector)
 	}{
 		{
-			name: "Name",
-			got:  c.Name(),
-			validateFunc: func(got any) {
-				s.Equal("openstack", got)
+			name: "New: its name, category, default and dependencies",
+			c:    openstack.New(),
+			validateFunc: func(c *openstack.Collector) {
+				s.Equal("openstack", c.Name())
+				s.Equal("cloud", string(c.Category()))
+				s.False(c.DefaultEnabled())
+				s.Equal([]string{"dmi"}, c.Dependencies())
 			},
 		},
 		{
-			name: "Category",
-			got:  string(c.Category()),
-			validateFunc: func(got any) {
-				s.Equal("cloud", got)
-			},
-		},
-		{
-			name: "DefaultEnabled",
-			got:  c.DefaultEnabled(),
-			validateFunc: func(got any) {
-				s.Equal(false, got)
-			},
-		},
-		{
-			name: "Dependencies",
-			got:  c.Dependencies(),
-			validateFunc: func(got any) {
-				s.Equal([]string{"dmi"}, got)
+			name: "NewWith: reads the filesystem that it is given",
+			c:    openstack.NewWith(source.Sources{FS: fs, Family: family.Debian}),
+			validateFunc: func(c *openstack.Collector) {
+				s.Same(fs, c.FS)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			tt.validateFunc(tt.got)
+			tt.validateFunc(tt.c)
 		})
 	}
 }
@@ -407,8 +377,9 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			files := map[string]string{}
 			if tt.passwdLines != "" {
-				defer s.writePasswd(tt.passwdLines)()
+				files["/etc/passwd"] = tt.passwdLines
 			}
 
 			var httpCalled bool
@@ -432,6 +403,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 
 			client := cloudmetadata.New(srv.URL)
 			c := openstack.NewWithClient(client)
+			c.FS = sourcetest.FS(s.T(), files)
 
 			prior := tt.prior
 			if prior == nil {
@@ -464,27 +436,4 @@ func endlessTree(
 			http.NotFound(w, r)
 		}
 	}
-}
-
-func (s *OpenStackPublicTestSuite) TestNewWith() {
-	fs := memfs.New()
-	s.Require().NoError(fs.MkdirAll("/etc", 0o755))
-	s.Require().NoError(fs.WriteFile(
-		"/etc/passwd", []byte("dhc-user:x:1000:1000::/home/dhc-user:/bin/bash\n"), 0o644,
-	))
-	// SetupTest points the passwd path at a missing file. This test reads
-	// /etc/passwd of the given filesystem.
-	defer openstack.SetPasswdPath("/etc/passwd")()
-	c := openstack.NewWith(source.Sources{FS: fs, Family: family.Debian})
-	s.Same(fs, c.FS)
-
-	srv := httptest.NewServer(canned(metadataTree, ""))
-	defer srv.Close()
-	c = openstack.NewWithClient(cloudmetadata.New(srv.URL))
-	c.FS = fs
-	out, err := c.Collect(context.Background(), osPrior())
-	s.Require().NoError(err)
-	info, ok := out.(*openstack.Info)
-	s.Require().True(ok)
-	s.Equal("dreamhost", info.Provider, "the passwd of the given filesystem has dhc-user")
 }

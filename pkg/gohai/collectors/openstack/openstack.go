@@ -66,9 +66,9 @@ const (
 )
 
 // passwdPath is the system passwd file used for the dreamhost-vs-openstack
-// distinction. Package-level var so tests can swap it. Ohai's check is
+// distinction, read through the collector's FS. Ohai's check is
 // `Etc::Passwd.entries.map(&:name).include?("dhc-user")`.
-var passwdPath = "/etc/passwd"
+const passwdPath = "/etc/passwd"
 
 // dreamhostUser is the username Dreamhost shipped in their OpenStack
 // images pre-2016. Matches Ohai's literal string.

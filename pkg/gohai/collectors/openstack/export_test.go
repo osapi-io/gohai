@@ -20,16 +20,6 @@
 
 package openstack
 
-// SetPasswdPath swaps the /etc/passwd path tests look at for the
-// dreamhost-vs-openstack provider distinction.
-func SetPasswdPath(
-	path string,
-) func() {
-	orig := passwdPath
-	passwdPath = path
-	return func() { passwdPath = orig }
-}
-
 // MaxWalkDepth and MaxWalkRequests are the limits of the metadata walk.
 const (
 	MaxWalkDepth    = maxWalkDepth
