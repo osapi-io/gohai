@@ -94,7 +94,7 @@ for _, p := range facts.Process.Processes {
 ## Enable/disable
 
 ```bash
-gohai collect --collector.process      # opt-in (off by default — process enumeration scales with process count)
+gohai collect --collector.process      # opt-in (off by default, because the time to list processes grows with their count)
 gohai collect --no-collector.process   # explicitly disable (e.g. when stripping defaults)
 ```
 

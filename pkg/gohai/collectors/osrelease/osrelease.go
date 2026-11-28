@@ -19,7 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package osrelease parses /etc/os-release into typed fields. Matches
-// Ohai's linux/os_release plugin — every field documented in os-release(5).
+// Ohai's linux/os_release plugin: each field documented in os-release(5).
 package osrelease
 
 import (
@@ -61,7 +61,7 @@ func (base) Category() collector.Category { return collector.CategorySystem }
 func (base) DefaultEnabled() bool         { return true }
 func (base) Dependencies() []string       { return nil }
 
-// New returns the os_release variant for the host OS. Linux only —
+// New returns the os_release variant for the host OS. Linux only, because
 // macOS has no equivalent (sw_vers is already wrapped by platform).
 func New() Collector {
 	return NewWith(source.Sources{})

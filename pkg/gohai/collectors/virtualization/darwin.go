@@ -63,8 +63,8 @@ func (d *Darwin) Collect(
 }
 
 // cascadeDarwin walks Ohai's darwin/virtualization.rb detection order.
-// The three slow execs (sysctl, ioreg, system_profiler) run concurrently —
-// together they used to dominate wall time; fanning them out drops
+// The three slow execs (sysctl, ioreg, system_profiler) run concurrently.
+// Together they used to dominate wall time; fanning them out drops
 // virtualization's cost to max(exec) instead of sum(exec). Results are
 // applied in the same order as the serial version so System/Role
 // precedence is unchanged.
@@ -96,7 +96,7 @@ func cascadeDarwin(
 
 	// 5-9. Fan out the three slow execs. `ioreg -n pci1ab8,4000` targets
 	// the Parallels PCI node directly instead of dumping the full I/O
-	// registry — same semantic as Ohai's `ioreg -l | grep`, ~7x faster.
+	// registry: the same semantic as Ohai's `ioreg -l | grep`, ~7x faster.
 	var sysctlOut, ioregOut, spOut []byte
 	var wg sync.WaitGroup
 	wg.Add(3)

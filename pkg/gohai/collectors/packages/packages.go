@@ -58,7 +58,7 @@ func (base) Name() string { return "packages" }
 // Category returns "software".
 func (base) Category() collector.Category { return collector.CategorySoftware }
 
-// DefaultEnabled returns false — full package inventory is expensive.
+// DefaultEnabled returns false, because the full package inventory is expensive.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

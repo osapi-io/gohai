@@ -29,7 +29,7 @@ import (
 )
 
 // Darwin detects language runtimes on macOS by shelling out to each
-// runtime's version command. Same probes as Linux — version flags are
+// runtime's version command. The probes are the same as Linux, because version flags are
 // identical across platforms.
 type Darwin struct {
 	base

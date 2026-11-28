@@ -28,7 +28,7 @@ import (
 
 // Darwin is the macOS stub for the selinux collector. SELinux is a
 // Linux kernel security module and does not exist on macOS. Collect
-// returns nil, nil — no data, no error.
+// returns nil, nil: no data, no error.
 type Darwin struct {
 	base
 }
@@ -38,7 +38,7 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect returns nil on Darwin — SELinux is not available on macOS.
+// Collect returns nil on Darwin, because SELinux is not available on macOS.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,

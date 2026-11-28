@@ -71,7 +71,7 @@ func (l *Linux) Collect(
 		return info, nil
 	}
 
-	// lsblk enrichment — best-effort; non-fatal on failure.
+	// lsblk enrichment is best-effort, and a failure is not fatal.
 	out, err := l.Exec.Execute(ctx,
 		"lsblk", "-J", "-o", "NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL")
 	if err == nil {
@@ -82,7 +82,7 @@ func (l *Linux) Collect(
 		}
 	}
 
-	// ZFS enumeration — independent of lsblk; only fires when the
+	// ZFS enumeration is independent of lsblk, and only runs when the
 	// `zfs` binary is on PATH. Any exec failure (binary missing,
 	// permission denied, module not loaded) silently skips this
 	// section, so non-ZFS hosts return zero ZFS datasets with no error.
@@ -99,7 +99,7 @@ func (l *Linux) Collect(
 		info.ZFSDatasets = parseZFSGetAll(out)
 	}
 
-	// Btrfs allocation enrichment — only mounts identified as btrfs
+	// Btrfs allocation enrichment: only mounts identified as btrfs
 	// AND carrying a UUID (lsblk-derived) are eligible. Pure sysfs
 	// reads via FS; nil FS or missing /sys/fs/btrfs paths skip cleanly.
 	if l.FS != nil {

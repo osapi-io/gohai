@@ -26,7 +26,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin returns no LSB data — /etc/lsb-release is a Linux-specific
+// Darwin returns no LSB data, because /etc/lsb-release is a Linux-specific
 // file. Ohai's plugin is linux-only.
 type Darwin struct {
 	base

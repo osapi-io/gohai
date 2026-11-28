@@ -19,8 +19,8 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package sessions reports currently logged-in user sessions. On systemd
-// hosts we prefer `loginctl list-sessions` — the same data loginctl
-// itself shows — which surfaces graphical (GDM/KDE), remote-desktop,
+// hosts we prefer `loginctl list-sessions` (the same data loginctl
+// itself shows), which surfaces graphical (GDM/KDE), remote-desktop,
 // and `systemd-run` sessions that never reach utmp. On non-systemd
 // hosts and macOS we read utmp / utmpx, which is what `who` / `w`
 // print.
@@ -166,7 +166,7 @@ func cString(
 // parseLoginctlSessions parses `loginctl --no-pager --no-legend
 // --no-ask-password list-sessions` output. Each non-empty line is
 // whitespace-split into `session uid user [seat]`. Lines with fewer
-// than 3 fields are skipped (defensive — Ohai assumes the format).
+// than 3 fields are skipped (to be safe, because Ohai assumes the format).
 func parseLoginctlSessions(
 	raw []byte,
 ) []Session {

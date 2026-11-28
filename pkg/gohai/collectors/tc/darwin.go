@@ -26,7 +26,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin returns nil — macOS does not ship the Linux tc tool or the
+// Darwin returns nil, because macOS does not ship the Linux tc tool or the
 // qdisc traffic-control subsystem.
 type Darwin struct {
 	base

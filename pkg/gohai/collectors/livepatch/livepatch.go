@@ -20,7 +20,7 @@
 
 // Package livepatch reports the status of kernel livepatches loaded on
 // a Linux host. Each entry under /sys/kernel/livepatch/ represents a
-// loaded patch module. On Darwin the collector returns nil gracefully —
+// loaded patch module. On Darwin the collector returns nil gracefully,
 // kernel livepatching is a Linux-only feature.
 package livepatch
 
@@ -51,7 +51,7 @@ type Patch struct {
 	// Enabled is true when the patch is active (sysfs "enabled" == "1").
 	Enabled bool `json:"enabled"`
 	// Transition is true when the patch is mid-transition (sysfs
-	// "transition" == "1") — the kernel is still patching live tasks.
+	// "transition" == "1"): the kernel is still patching live tasks.
 	Transition bool `json:"transition"`
 }
 
@@ -69,7 +69,7 @@ func (base) Name() string { return "livepatch" }
 // Category returns "linux".
 func (base) Category() collector.Category { return collector.CategoryLinux }
 
-// DefaultEnabled returns false — livepatch is opt-in.
+// DefaultEnabled returns false, because livepatch is opt-in.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.
@@ -94,7 +94,7 @@ func NewWith(
 }
 
 // collectPatches reads /sys/kernel/livepatch/ entries. Returns nil
-// when the directory does not exist — livepatch kernel support is
+// when the directory does not exist, because the kernel has no livepatch support. It
 // absent. Returns an empty map when the directory exists but no patches
 // are loaded.
 func collectPatches(
@@ -123,7 +123,7 @@ func collectPatches(
 
 // readSysBool reads a sysfs file that contains "0" or "1" and returns
 // the boolean value. Returns false when the file does not exist or
-// cannot be read — absent sysfs files are normal for optional kernel
+// cannot be read, because absent sysfs files are normal for optional kernel
 // features.
 func readSysBool(
 	fs avfs.VFS,

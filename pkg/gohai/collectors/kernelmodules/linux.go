@@ -49,7 +49,7 @@ func NewLinux() *Linux {
 }
 
 // Collect returns the loaded module map. A missing /proc/modules yields
-// an empty Info — no error, matching the silent-on-miss convention used
+// an empty Info with no error, as the silent-on-miss convention used
 // across gohai collectors.
 func (l *Linux) Collect(
 	_ context.Context,

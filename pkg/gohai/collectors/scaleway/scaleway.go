@@ -20,8 +20,8 @@
 
 // Package scaleway collects Scaleway instance metadata from the
 // link-local metadata server at http://169.254.42.42/. The collector
-// returns nil with no error when the endpoint is not reachable —
-// that's the signal that the host isn't running on Scaleway.
+// returns nil with no error when the endpoint is not reachable.
+// That is the signal that the host isn't running on Scaleway.
 package scaleway
 
 import (
@@ -46,7 +46,7 @@ import (
 const ProviderName = "scaleway"
 
 // metadataBaseURL is Scaleway's unusual link-local metadata address
-// (not the standard 169.254.169.254 — matches Ohai's SCALEWAY_METADATA_ADDR).
+// (not the standard 169.254.169.254; it matches Ohai's SCALEWAY_METADATA_ADDR).
 const metadataBaseURL = "http://169.254.42.42"
 
 // metadataPath returns the entire instance config as JSON in one GET.
@@ -91,7 +91,7 @@ type Info struct {
 }
 
 // Bootscript is Scaleway's legacy boot configuration. Deprecated in
-// favor of local boot — modern instances may return null. Typed for
+// favor of local boot, and modern instances may return null. Typed for
 // parity with Ohai which surfaces it when present.
 type Bootscript struct {
 	ID           string `json:"id"`
@@ -223,7 +223,7 @@ func (*Collector) Name() string { return "scaleway" }
 // Category returns "cloud".
 func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
-// DefaultEnabled returns false — cloud collectors are opt-in.
+// DefaultEnabled returns false, because cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
 // Dependencies returns dmi: a Scaleway instance's DMI sys_vendor is
@@ -245,7 +245,7 @@ func (c *Collector) Collect(
 	body, err := c.client.Get(ctx, metadataPath)
 	if err != nil {
 		// Any fetch failure (transport, 404, body-read) means we
-		// can't determine whether we're on Scaleway — treat as "not
+		// can't determine whether we're on Scaleway. Treat it as "not
 		// on this cloud" rather than propagating noise.
 		return nil, ctx.Err()
 	}

@@ -92,7 +92,7 @@ func NewWith(
 // non-ASCII from values, and maps known keys to typed fields.
 //
 // Ohai converts keys to snake_case by downcasing and replacing spaces with
-// underscores — we do the same mapping from the canonical English labels.
+// underscores. We do the same mapping from the canonical English labels.
 func parseHostnamectl(
 	output string,
 ) *Info {
@@ -129,7 +129,7 @@ func parseHostnamectl(
 		case "location":
 			info.Location = val
 		case "kernel":
-			// "Kernel: Linux 5.15.0-91-generic" — split into name and release.
+			// "Kernel: Linux 5.15.0-91-generic", split into name and release.
 			parts := strings.SplitN(val, " ", 2)
 			if len(parts) >= 1 {
 				info.KernelName = parts[0]

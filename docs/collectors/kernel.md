@@ -109,7 +109,7 @@ if k.RosettaTranslated {
     log.Println("running under Rosetta 2")
 }
 
-// Module list lives on its own collector — opt in when needed.
+// The module list is a collector of its own. Opt in when you need it.
 // gohai.New(gohai.WithCollectors("kernel", "kernel_modules"))
 // if mods := facts.KernelModules; mods != nil { ... }
 ```

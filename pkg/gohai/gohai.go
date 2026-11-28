@@ -206,7 +206,7 @@ func selectCollectors(
 	reg *collector.Registry,
 	cfg config,
 ) ([]collector.Collector, error) {
-	// WithCollectors wins outright — explicit roster, no defaults. It
+	// WithCollectors wins outright: an explicit roster, no defaults. It
 	// names each collector, so a disabled list with it is a mistake.
 	if len(cfg.only) > 0 {
 		if len(cfg.disabled) > 0 {
@@ -236,7 +236,7 @@ func selectCollectors(
 		enabled = append(enabled, names...)
 	}
 	// Without WithDefaults / WithEnabled / WithCategory, return
-	// empty — gohai.New() is opt-in. Still validate the disabled
+	// empty, because gohai.New() is opt-in. Still validate the disabled
 	// list so unknown names error consistently.
 	if !cfg.useDefaults && len(enabled) == 0 {
 		if _, err := reg.SelectedWith(false, nil, cfg.disabled); err != nil {

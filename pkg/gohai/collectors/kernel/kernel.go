@@ -21,7 +21,7 @@
 // Package kernel reports kernel identity (name, release, version,
 // machine, processor, high-level OS) plus macOS Rosetta 2 translation
 // state. Loaded-module enumeration lives in the sibling kernel_modules
-// collector — that work shells out to kextstat on macOS (~280ms wall
+// collector, because that work shells out to kextstat on macOS (~280ms wall
 // time) and walks /sys/module on Linux, neither of which most
 // consumers need; splitting keeps this collector fast enough to stay
 // in the default set.
@@ -39,7 +39,7 @@ import (
 // the `uname(1)` CLI reports versus the raw syscall.
 type Info struct {
 	Name              string `json:"name"`                         // uname -s: "Linux", "Darwin"
-	Release           string `json:"release"`                      // uname -r: "5.15.0-47-generic" (OCSF: os.kernel_release — leaf stripped per CLAUDE.md)
+	Release           string `json:"release"`                      // uname -r: "5.15.0-47-generic" (OCSF: os.kernel_release, with the leaf removed)
 	Version           string `json:"version,omitempty"`            // uname -v: build string
 	Machine           string `json:"machine"`                      // uname -m: hardware arch ("x86_64", "arm64")
 	Processor         string `json:"processor,omitempty"`          // uname -p synthesis: same as Machine on Linux/Darwin

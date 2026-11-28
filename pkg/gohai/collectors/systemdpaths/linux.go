@@ -30,7 +30,7 @@ import (
 
 // Linux reports standard systemd directory paths on Linux by running
 // `systemd-path`. When the binary is absent or returns an error, an
-// empty Paths map is returned without error — matches Ohai's no-panic
+// empty Paths map is returned without error, as Ohai's no-panic
 // behaviour.
 type Linux struct {
 	base

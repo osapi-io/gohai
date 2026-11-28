@@ -53,7 +53,7 @@ const metadataTimeout = 6 * time.Second
 // /sys/class/dmi/id/bios_vendor. Matches Ohai's has_do_dmi? check.
 const dmiVendorSignature = "DigitalOcean"
 
-// Info is the DigitalOcean view — every field DO exposes via
+// Info is the DigitalOcean view: each field DO exposes via
 // /metadata/v1.json except `vendor_data`, which is dropped because
 // it commonly contains cloud-init user scripts with credentials
 // (matches Ohai's explicit drop).
@@ -74,7 +74,7 @@ type Info struct {
 }
 
 // Interface is one attached network interface. Scope is "public" or
-// "private" — DO's two-interface model (public NAT'd + private VLAN).
+// "private", in DO's two-interface model (public NAT'd + private VLAN).
 type Interface struct {
 	Scope    string `json:"scope"`
 	MAC      string `json:"mac"`
@@ -175,7 +175,7 @@ func (*Collector) Name() string { return "digital_ocean" }
 // Category returns "cloud".
 func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
-// DefaultEnabled returns false — cloud collectors are opt-in.
+// DefaultEnabled returns false, because cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi for the bios_vendor pre-check. Matches
@@ -204,7 +204,7 @@ func (c *Collector) Collect(
 
 // onDigitalOcean checks the dmi collector's bios.vendor field for
 // "DigitalOcean". Fails open (tries the HTTP call) when dmi wasn't
-// run — the endpoint probe itself is a valid detection fallback.
+// run, because the endpoint probe itself is a valid detection fallback.
 func onDigitalOcean(
 	prior collector.PriorResults,
 ) bool {

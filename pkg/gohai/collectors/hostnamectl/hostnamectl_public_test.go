@@ -248,7 +248,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			name:    "linux: non-ASCII value collapses double spaces",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				// Emoji between two words — after stripping, two adjacent spaces remain.
+				// An emoji between two words leaves two adjacent spaces after stripping.
 				return hostnamectlExec(t,
 					[]byte(" Chassis: vm \U0001F5A5 server\n"),
 					nil)

@@ -70,7 +70,7 @@ func (base) Name() string { return "services" }
 // Category returns "software".
 func (base) Category() collector.Category { return collector.CategorySoftware }
 
-// DefaultEnabled returns false — full service list can be large.
+// DefaultEnabled returns false, because the full service list can be large.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

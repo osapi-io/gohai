@@ -22,7 +22,7 @@
 // stores its raw output lines. Ohai's command plugin simply stores the
 // ps command string; gohai goes one step further and runs it so
 // consumers get the actual process listing. Both Linux and Darwin
-// support `ps -ef`. DefaultEnabled is false — large output, most
+// support `ps -ef`. DefaultEnabled is false, because the output is large and most
 // consumers don't need it.
 package command
 

@@ -18,13 +18,13 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package hardware collects macOS-specific hardware facts — the
+// Package hardware collects macOS-specific hardware facts: the
 // identity, memory, and firmware fields surfaced by
 // `system_profiler SPHardwareDataType`, attached storage from
 // `SPStorageDataType`, and battery / AC charger info from
 // `SPPowerDataType`. Mirrors Ohai's `darwin/hardware.rb` methodology.
 //
-// Non-Darwin platforms return an empty Info — this collector has no
+// Non-Darwin platforms return an empty Info, because this collector has no
 // Linux analogue. Linux hardware identity lives in `dmi`, `cpu`,
 // `memory`, and the planned `pci` / `block_device` collectors.
 package hardware
@@ -46,7 +46,7 @@ type Info struct {
 	ProvisioningUDID string `json:"provisioning_udid,omitempty"`
 
 	// CPU identity strings from system_profiler. Not a replacement for
-	// the cpu collector — these carry Apple's marketing labels
+	// the cpu collector. These carry Apple's marketing labels
 	// ("Intel Core i7", "Apple M1 Pro") that sysctl doesn't give.
 	CPUType               string `json:"cpu_type,omitempty"`                // Intel Macs
 	ChipType              string `json:"chip_type,omitempty"`               // Apple Silicon
@@ -67,10 +67,10 @@ type Info struct {
 	// Attached storage, one entry per logical volume.
 	Storage []Storage `json:"storage,omitempty"`
 
-	// Battery details — nil on desktop Macs without a battery.
+	// Battery details, nil on desktop Macs without a battery.
 	Battery *Battery `json:"battery,omitempty"`
 
-	// AC charger — nil when no charger is connected or reported.
+	// AC charger, nil when no charger is connected or reported.
 	Charger *Charger `json:"charger,omitempty"`
 }
 
@@ -131,7 +131,7 @@ func (base) DefaultEnabled() bool         { return false }
 func (base) Dependencies() []string       { return nil }
 
 // New returns the hardware variant for the host OS. Linux returns an
-// empty Info — this collector is Darwin-only, matching Ohai.
+// empty Info, because this collector is Darwin-only, as in Ohai.
 func New() Collector {
 	return NewWith(source.Sources{})
 }

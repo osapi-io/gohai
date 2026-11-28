@@ -21,7 +21,7 @@
 // Package oci collects Oracle Cloud Infrastructure instance metadata
 // from the link-local metadata server at http://169.254.169.254/opc/v2.
 // The collector returns nil with no error when the endpoint is not
-// reachable — that's the signal that the host isn't running on OCI.
+// reachable. That is the signal that the host isn't running on OCI.
 package oci
 
 import (
@@ -48,7 +48,7 @@ const metadataBaseURL = "http://169.254.169.254/opc/v2"
 const metadataTimeout = 6 * time.Second
 
 // metadataAuthHeader / Value is OCI's literal Authorization header.
-// Not a JWT — just the hardcoded string their IMDSv2 expects. Matches
+// It is not a JWT, only the hardcoded string their IMDSv2 expects. Matches
 // Ohai's Ohai::Mixin::OciMetadata::OCI_METADATA_HEADERS.
 const (
 	metadataAuthHeader = "Authorization"
@@ -59,7 +59,7 @@ const (
 // Matches Ohai's oci_chassis_asset_tag? regex (/OracleCloud.com/).
 const dmiChassisAssetTag = "OracleCloud.com"
 
-// Endpoint paths — each is a separate JSON document Ohai fetches.
+// Endpoint paths. Each is a separate JSON document Ohai fetches.
 const (
 	pathInstance = "/instance"
 	pathVNICs    = "/vnics"
@@ -100,7 +100,7 @@ type Info struct {
 	SourceDetails  *SourceDetails `json:"source_details,omitempty"`
 	PlatformConfig map[string]any `json:"platform_config,omitempty"`
 
-	// From /vnics — virtual NICs.
+	// From /vnics: virtual NICs.
 	VNICs []VNIC `json:"vnics,omitempty"`
 
 	// From /allVolumeAttachments. Keyed by attachment OCID to match
@@ -325,17 +325,17 @@ func (*Collector) Name() string { return "oci" }
 // Category returns "cloud".
 func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
-// DefaultEnabled returns false — cloud collectors are opt-in.
+// DefaultEnabled returns false, because cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
-// Dependencies declares dmi — OCI's signature is chassis.asset_tag
+// Dependencies declares dmi, because OCI's signature is chassis.asset_tag
 // containing "OracleCloud.com". Matches Ohai's oci_chassis_asset_tag?.
 func (*Collector) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the fetch on a DMI chassis.asset_tag match, then
 // fetches the three OCI metadata documents. Any per-endpoint failure
 // that wraps ErrNotAvailable (404 on /vnics or /allVolumeAttachments
-// on lightweight shapes) is tolerated — we populate what we can.
+// on lightweight shapes) is tolerated, and we populate what we can.
 // Returns (nil, nil) when the instance doc fetch fails, matching
 // "not on OCI" semantics.
 func (c *Collector) Collect(

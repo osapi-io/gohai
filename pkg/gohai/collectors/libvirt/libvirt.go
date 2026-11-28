@@ -65,7 +65,7 @@ func (base) Name() string { return "libvirt" }
 // Category returns "virtualization".
 func (base) Category() collector.Category { return collector.CategoryVirtualization }
 
-// DefaultEnabled returns false — libvirt is opt-in only.
+// DefaultEnabled returns false, because libvirt is opt-in only.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.
@@ -152,7 +152,7 @@ func parseVirshList(
 		if len(fields) < 3 {
 			continue
 		}
-		// Skip the header line — first field is "Id".
+		// Skip the header line, whose first field is "Id".
 		if fields[0] == "Id" {
 			continue
 		}

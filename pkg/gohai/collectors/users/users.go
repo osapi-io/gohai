@@ -180,7 +180,7 @@ type base struct{}
 func (base) Name() string                 { return "users" }
 func (base) Category() collector.Category { return collector.CategoryUsers }
 
-// DefaultEnabled is false — enumerating /etc/passwd is opt-in
+// DefaultEnabled is false. Enumerating /etc/passwd is opt-in
 // because consumers rarely need a full account dump.
 func (base) DefaultEnabled() bool   { return false }
 func (base) Dependencies() []string { return nil }

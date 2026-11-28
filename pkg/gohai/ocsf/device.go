@@ -20,7 +20,7 @@
 
 package ocsf
 
-// Device is the OCSF device object — the primary payload of an
+// Device is the OCSF device object, the primary payload of an
 // inventory_info event. Standard OCSF attributes are listed first;
 // gohai extension (uid 1337) attributes follow.
 type Device struct {

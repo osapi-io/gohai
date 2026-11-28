@@ -30,7 +30,7 @@ import (
 )
 
 // Linux collects kernel livepatch status on Linux hosts. FS is the
-// virtual filesystem — production uses the real OS filesystem; tests
+// virtual filesystem. Production uses the real OS filesystem; tests
 // inject an avfs memfs with canned sysfs structure.
 type Linux struct {
 	base

@@ -49,7 +49,7 @@ func (g *Gohai) Select(
 }
 
 // UnknownCollectorError is returned by Select when the named
-// collector isn't registered. Test-only — lives in export_test.go.
+// collector isn't registered. It is test-only, so it lives in export_test.go.
 type UnknownCollectorError struct{ Name string }
 
 func (e UnknownCollectorError) Error() string {

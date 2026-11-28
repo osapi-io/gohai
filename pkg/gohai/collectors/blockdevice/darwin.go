@@ -27,7 +27,7 @@ import (
 )
 
 // Darwin is the macOS variant of the block_device collector. macOS does
-// not expose /sys/block — this collector returns nil on Darwin, indicating
+// not expose /sys/block, so this collector returns nil on Darwin, indicating
 // the data is not available on this platform.
 type Darwin struct {
 	base
@@ -38,7 +38,7 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect returns nil on macOS — /sys/block is Linux-only.
+// Collect returns nil on macOS, because /sys/block is Linux-only.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,

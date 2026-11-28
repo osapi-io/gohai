@@ -21,7 +21,7 @@
 // Package azure collects Azure instance metadata from the link-local
 // metadata server at http://169.254.169.254/metadata/instance. The
 // collector returns nil with no error when the endpoint is not
-// reachable — that's the signal that the host isn't running on Azure.
+// reachable. That is the signal that the host isn't running on Azure.
 package azure
 
 import (
@@ -99,7 +99,7 @@ const dmiChassisAssetTag = "7783-7084-3265-9085-8269-3286-77"
 // dhclient when the server returns DHCP option 245.
 const dhcpOption245Signature = "unknown-245"
 
-// Info is the Azure view — identity, placement, OS, and network
+// Info is the Azure view: identity, placement, OS, and network,
 // merged into the flat struct pattern.
 type Info struct {
 	// Identity.
@@ -230,7 +230,7 @@ type HostGroup struct {
 	ID string `json:"id"`
 }
 
-// OSProfile mirrors Azure's compute.osProfile object — the OS
+// OSProfile mirrors Azure's compute.osProfile object: the OS
 // provisioning settings applied at VM creation.
 type OSProfile struct {
 	AdminUsername                 string `json:"admin_username,omitempty"`
@@ -451,7 +451,7 @@ func (*Collector) Name() string { return "azure" }
 // Category returns "cloud".
 func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
-// DefaultEnabled returns false — cloud collectors are opt-in.
+// DefaultEnabled returns false, because cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi, for the chassis asset tag that each Azure
@@ -488,7 +488,7 @@ func (c *Collector) Collect(
 //
 // The last two are Ohai's has_waagent? || has_dhcp_option_245? chain.
 // Windows-specific signals (C:\WindowsAzure directory, DhcpDomain
-// registry key) are not implemented — gohai is Linux/macOS primary.
+// registry key) are not implemented, because gohai is Linux/macOS primary.
 func onAzure(
 	fs avfs.VFS,
 	prior collector.PriorResults,

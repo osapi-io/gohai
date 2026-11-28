@@ -38,10 +38,10 @@ import (
 // processor blocks. Two extensions go on top:
 //
 //   - vulnerability mitigation status via /sys/devices/system/cpu/vulnerabilities/*
-//     (read through FS — an avfs.VFS, so tests can inject memfs content).
-//   - NUMA topology, per-level cache sizes, and — on s390x / ppc64le —
+//     (read through FS, an avfs.VFS, so tests can inject memfs content).
+//   - NUMA topology, per-level cache sizes, and (on s390x / ppc64le)
 //     authoritative core/socket/thread counts via `lscpu` (run through
-//     Exec — an source.Runner, so tests can mock the command).
+//     Exec, a source.Runner, so tests can mock the command).
 type Linux struct {
 	base
 

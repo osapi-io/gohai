@@ -29,7 +29,7 @@ import (
 // Darwin is a no-op libvirt collector for macOS. KVM requires Linux; libvirt
 // on macOS targets QEMU/HVF but the CLI surface and daemon behaviour differ
 // substantially from the Linux case. Rather than emit partial data, we return
-// nil — matching Ohai's approach of only implementing the Linux branch.
+// nil, as Ohai does: it only implements the Linux branch.
 type Darwin struct {
 	base
 }
@@ -39,7 +39,7 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect always returns nil on macOS — libvirt is not supported on Darwin.
+// Collect always returns nil on macOS, because libvirt does not support Darwin.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,

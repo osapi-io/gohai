@@ -43,7 +43,7 @@ import (
 //
 //   - Read /sys/class/net/<iface>/type to derive the canonical
 //     encapsulation name (Ethernet / Loopback / PPP / SLIP / IPIP /
-//     6to4) — Ohai's linux_encaps_lookup table.
+//     6to4), from Ohai's linux_encaps_lookup table.
 //   - Run `ip -o -f inet route show table main` and `ip -o -f inet6
 //     route show table main` to populate the routing table, default
 //     interface, and default gateway (v4 + v6).
@@ -157,8 +157,8 @@ func driverInfoTarget(
 // interface that driverInfoTarget names, and attaches the parsed driver info
 // under `Interface.Ethtool.DriverInfo`. Mirrors Ohai's
 // ethernet_driver_info, but skips virtual interfaces (see
-// ethtoolTarget), as well as loopback, tunnels and the like. ethtool failures —
-// binary missing, unsupported by the driver — silently leave Ethtool
+// ethtoolTarget), as well as loopback, tunnels and the like. An ethtool failure
+// (binary missing, unsupported by the driver) silently leaves Ethtool
 // nil for that interface; non-Ethernet hosts get no Ethtool data at
 // all, matching Ohai's behaviour.
 func applyEthtoolDriverInfo(
@@ -229,8 +229,8 @@ func applyIPLinkExtras(
 // subcommands (ring, channel, coalesce, offload, pause) per Ethernet
 // interface that a device backs (see ethtoolTarget), and attaches each parsed result to the corresponding
 // EthtoolInfo field. Mirrors Ohai's ethernet_{ring,channel,coalesce,
-// offload,pause}_parameters block. Each subcommand is independent —
-// failure of one doesn't suppress the others — and any per-call
+// offload,pause}_parameters block. Each subcommand is independent:
+// a failure of one doesn't suppress the others, and any per-call
 // error or empty parse silently skips that field.
 func applyEthtoolTuning(
 	ctx context.Context,
@@ -575,7 +575,7 @@ func expandRouteLine(
 		if hop == "" {
 			continue
 		}
-		// Re-use parseIPRouteLine by synthesizing a route line —
+		// Re-use parseIPRouteLine by synthesizing a route line:
 		// `<destination> nexthop tokens...`. Destination from the
 		// prefix; remaining attrs (gateway/dev/weight/...) come from
 		// the nexthop block.

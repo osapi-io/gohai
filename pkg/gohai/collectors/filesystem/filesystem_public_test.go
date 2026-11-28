@@ -54,7 +54,7 @@ func TestFilesystemPublicTestSuite(
 }
 
 // btrfsBgFixture is one block-group entry for the btrfs sysfs mock.
-// Either total/used (uint64) OR totalRaw (string) may be set —
+// Either total/used (uint64) OR totalRaw (string) may be set.
 // totalRaw lets tests inject unparseable content for the silent-skip
 // path. raid is the profile subdirectory name to create.
 type btrfsBgFixture struct {
@@ -114,7 +114,7 @@ func strconvBytes(
 	return string(digits)
 }
 
-// noLsblkExec returns a mock Executor that errors on every call —
+// noLsblkExec returns a mock Executor that errors on every call. It
 // simulates lsblk absent from PATH or a minimal container.
 func noLsblkExec(
 	t *testing.T,
@@ -133,7 +133,7 @@ func noLsblkExec(
 }
 
 // lsblkExec returns a mock Executor that returns canned lsblk JSON.
-// Any `zfs` invocation returns an error (simulates `zfs` not installed —
+// Any `zfs` invocation returns an error (it simulates `zfs` not installed,
 // the common case for Linux hosts without OpenZFS).
 func lsblkExec(
 	t *testing.T,
@@ -496,7 +496,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			mounts:  baseMounts,
 			out:     baseDF,
 			exec: func(t *testing.T) source.Runner {
-				// tab-separated `zfs get -p -H -t filesystem,volume all` — realistic subset
+				// tab-separated `zfs get -p -H -t filesystem,volume all`: a realistic subset
 				// covering pool root + nested fs + snapshot (mountpoint
 				// absent) + dataset with `none` (skipped for mountpoint).
 				const zfs = "tank\ttype\tfilesystem\t-\n" +
@@ -678,7 +678,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 			fs: func() avfs.VFS {
 				fs := memfs.New()
-				// bg dir exists, no profile subdirs, no total_bytes/bytes_used files —
+				// bg dir exists, with no profile subdirs and no total_bytes/bytes_used files. It
 				// exercises detectBtrfsRAID's no-match path and readUint's missing-file path.
 				s.Require().NoError(
 					fs.MkdirAll("/sys/fs/btrfs/empty-files/allocation/data", 0o755),

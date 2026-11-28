@@ -20,7 +20,7 @@
 
 // Enumerate the available collectors without collecting anything.
 //
-// The registry answers "what could I ask for?" — useful for building
+// The registry answers "what could I ask for?". Use it to build
 // flags, help output, or validating configuration before a run.
 package main
 

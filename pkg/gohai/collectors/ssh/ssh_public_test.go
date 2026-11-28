@@ -226,7 +226,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 	// must return 0 without panicking. We use this for both the Linux
 	// and Darwin truncated-modulus rows.
 	//
-	// Wire layout: algo-name(ssh-rsa) | exponent | (no modulus — blob
+	// Wire layout: algo-name(ssh-rsa) | exponent | (no modulus: the blob
 	// ends after exponent field). skipWireString returns nil on the
 	// second call; readWireString therefore gets nil → returns 0.
 	truncatedRSABlob := func() []byte {
@@ -607,7 +607,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: truncated rsa wire blob — key length 0",
+			name:    "linux: a truncated rsa wire blob has key length 0",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string][]byte{
@@ -792,7 +792,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: unknown key type — key length 0",
+			name:    "linux: an unknown key type has key length 0",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				// Build a blob whose type field is not rsa/ecdsa/ed25519 to
@@ -815,7 +815,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: wire blob too short for length header — key length 0",
+			name:    "linux: a wire blob too short for its length header has key length 0",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				// 3-byte blob: too short for even the first 4-byte length
@@ -838,10 +838,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: wire blob length field exceeds bytes — key length 0",
+			name:    "linux: a wire blob whose length field is more than its bytes has key length 0",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				// Length header claims 100 bytes but only 2 follow — the
+				// The length header claims 100 bytes but only 2 follow. That is the
 				// len(b) < 4+n branch in skipWireString.
 				tooShort := []byte{0, 0, 0, 100, 0x01, 0x02}
 				return fsWith(s.T(), map[string][]byte{
@@ -864,7 +864,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			// Exercise readWireString's len(b) < 4+n branch: blob has two
 			// valid fields (algo + exponent) so skipWireString succeeds twice,
 			// then the modulus field header claims 100 bytes but only 2 remain.
-			name:    "linux: modulus length exceeds remaining bytes — key length 0",
+			name:    "linux: a modulus longer than the bytes left has key length 0",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				algoField := marshalWireString([]byte("ssh-rsa"))
@@ -892,7 +892,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			// Exercise deriveKeyLength default branch: a fake type that is
 			// not rsa, ecdsa, or ed25519. The file field[0] is "ssh-dss"
 			// (deprecated) so keyType hits the default return 0.
-			name:    "linux: dsa key type — key length 0",
+			name:    "linux: a dsa key has key length 0",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				blob := marshalWireString([]byte("ssh-dss"))
@@ -920,7 +920,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 			// Exercise deriveKeyLength ecdsa inner-switch default: key type
 			// has "ecdsa" prefix but not a recognized nistp* curve label.
 			// This hits the `return 0` after the inner ecdsa switch.
-			name:    "linux: ecdsa unknown curve — key length 0",
+			name:    "linux: an ecdsa key with an unknown curve has key length 0",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				blob := marshalWireString([]byte("ecdsa-sha2-unknown"))

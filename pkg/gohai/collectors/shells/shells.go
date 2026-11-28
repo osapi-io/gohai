@@ -33,7 +33,7 @@ import (
 )
 
 // etcShellsPath is the canonical location of the installed-shells list.
-// Same path on Linux and macOS — both follow POSIX convention.
+// Same path on Linux and macOS, because both follow POSIX convention.
 const etcShellsPath = "/etc/shells"
 
 // Info holds the list of valid login shells.
@@ -55,7 +55,7 @@ func (base) Name() string { return "shells" }
 // Category returns "system".
 func (base) Category() collector.Category { return collector.CategorySystem }
 
-// DefaultEnabled returns true — shells is on by default.
+// DefaultEnabled returns true, because shells is on by default.
 func (base) DefaultEnabled() bool { return true }
 
 // Dependencies returns no dependencies.
@@ -101,7 +101,7 @@ func parseShells(
 }
 
 // wrapReadError decides whether a read error should soft-miss to an
-// empty Info (file absent — distroless/scratch containers legitimately
+// empty Info (the file is absent, because distroless/scratch containers
 // lack /etc/shells) or propagate as a real failure.
 func wrapReadError(
 	err error,

@@ -51,7 +51,7 @@ func WithSources(
 	}
 }
 
-// WithDefaults opts in to the recommended default collector set —
+// WithDefaults opts in to the recommended default collector set:
 // every collector whose DefaultEnabled() is true. Without this option
 // (and without WithCollectors / WithEnabled), gohai.New() returns an
 // empty registry and Collect() runs nothing. The CLI wires this in at
@@ -89,7 +89,7 @@ func WithCollectors(
 
 // WithCategory enables every collector whose Category() matches one
 // of the given names ("cloud", "hardware", "system", ...). Stacks
-// with WithEnabled / WithDefaults — categories add collectors,
+// with WithEnabled / WithDefaults: categories add collectors, and
 // WithDisabled still subtracts. Unknown category names error at
 // New() time so typos surface immediately.
 func WithCategory(
@@ -100,10 +100,10 @@ func WithCategory(
 
 // WithTimings embeds per-collector timing + error data into Facts
 // under a top-level `_timings` object. Each entry records the
-// collector's wall-clock duration, status (`ok` / `err`), and — for
-// failed collectors — the error string. Failed collectors are still
+// collector's wall-clock duration, status (`ok` / `err`), and, for
+// a failed collector, the error string. Failed collectors are still
 // dropped from the typed output; their timing entry is how the
-// failure surfaces when this option is on. Disabled by default —
+// failure surfaces when this option is on. It is off by default, and
 // when off, Facts contain only collector results.
 func WithTimings() Option {
 	return func(c *config) { c.withTimings = true }

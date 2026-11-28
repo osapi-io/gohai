@@ -26,7 +26,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin returns no os_release data — /etc/os-release is a Linux
+// Darwin returns no os_release data, because /etc/os-release is a Linux
 // freedesktop.org standard; macOS doesn't ship it. Ohai's plugin is
 // linux-only.
 type Darwin struct {

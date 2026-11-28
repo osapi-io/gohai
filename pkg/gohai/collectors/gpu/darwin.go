@@ -46,7 +46,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect shells out to system_profiler. On any failure (exec missing,
-// JSON malformed) we return an empty Info — matches the silent-on-miss
+// JSON malformed) we return an empty Info, as the silent-on-miss
 // convention used elsewhere.
 func (d *Darwin) Collect(
 	ctx context.Context,
@@ -77,7 +77,7 @@ func (d *Darwin) Collect(
 
 // darwinDisplay mirrors the shape of each entry in the
 // SPDisplaysDataType array. Unused keys (displays/connections) are
-// intentionally omitted — this collector reports the adapter, not the
+// left out on purpose: this collector reports the adapter, not the
 // attached displays.
 type darwinDisplay struct {
 	Name   string `json:"_name"`

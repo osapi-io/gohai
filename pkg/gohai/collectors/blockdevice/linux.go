@@ -33,7 +33,7 @@ import (
 const sysBlockDir = "/sys/block"
 
 // Linux collects block device sysfs attributes on Linux. FS is the
-// virtual filesystem the collector reads from — production is the real OS
+// virtual filesystem the collector reads from. Production uses the real OS
 // FS via avfs/osfs; tests inject an avfs memfs with canned content.
 type Linux struct {
 	base
@@ -55,7 +55,7 @@ func (l *Linux) Collect(
 ) (any, error) {
 	entries, err := l.FS.ReadDir(sysBlockDir)
 	if err != nil {
-		// /sys/block absent — container or unsupported host.
+		// /sys/block is absent: a container or an unsupported host.
 		return &Info{Devices: []BlockDevice{}}, nil
 	}
 

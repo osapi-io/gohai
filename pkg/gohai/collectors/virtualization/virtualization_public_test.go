@@ -883,7 +883,7 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			name:    "linux: hyperv guest via kvp_pool_3 with hypervisor_host extraction",
 			variant: "linux",
 			fs: func() avfs.VFS {
-				// KVP pool blob — Ohai scans for printable bytes between
+				// A KVP pool blob. Ohai scans for printable bytes between
 				// "HostName" and "HostingSystemEditionId". Embed NULs and
 				// mixed case so printable-filter + lowercasing both run.
 				blob := "junk\x00HostName\x00\x00HyperV-Host-01\x00\x00HostingSystemEditionId\x00more"

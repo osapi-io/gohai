@@ -69,7 +69,7 @@ func (base) Name() string { return "interrupts" }
 // Category returns "linux".
 func (base) Category() collector.Category { return collector.CategoryLinux }
 
-// DefaultEnabled returns false — interrupts is opt-in.
+// DefaultEnabled returns false, because interrupts is opt-in.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

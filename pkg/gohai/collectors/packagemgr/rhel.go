@@ -28,7 +28,7 @@ import (
 )
 
 // RHEL covers rhel / redhat / centos / fedora / rocky / alma /
-// amazon / oracle — dnf/yum-based hosts. Prefers dnf (RHEL 8+),
+// amazon / oracle: the dnf/yum-based hosts. Prefers dnf (RHEL 8+),
 // falls back to yum (RHEL 7 and earlier, Amazon Linux 2).
 type RHEL struct {
 	base

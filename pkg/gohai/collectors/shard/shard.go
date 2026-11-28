@@ -113,8 +113,8 @@ func getMachineName(
 	return info.MachineName, nil
 }
 
-// getDMISerial mirrors Ohai's get_dmi_property for serial_number —
-// cascades system → baseboard → chassis, takes first non-blank.
+// getDMISerial mirrors Ohai's get_dmi_property for serial_number: it
+// cascades system → baseboard → chassis, and takes the first non-blank.
 func getDMISerial(
 	info *dmi.Info,
 ) string {
@@ -133,7 +133,7 @@ func getDMISerial(
 	return ""
 }
 
-// getDMIUUID mirrors Ohai's get_dmi_property for uuid — only
+// getDMIUUID mirrors Ohai's get_dmi_property for uuid. Only
 // Product carries it in sysfs.
 func getDMIUUID(
 	info *dmi.Info,

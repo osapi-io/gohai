@@ -31,7 +31,7 @@ import (
 // Darwin collects VirtualBox guest additions data on macOS hosts via
 // `VBoxControl guestproperty enumerate`. The command is only available when
 // VirtualBox Guest Additions are installed. If absent, returns nil with no
-// error — macOS hosts are rarely VirtualBox guests.
+// error, because macOS hosts are rarely VirtualBox guests.
 type Darwin struct {
 	base
 

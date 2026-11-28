@@ -167,7 +167,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "darwin: returns nil — no SELinux",
+			name:    "darwin: returns nil, because macOS has no SELinux",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
@@ -176,7 +176,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: no /etc/selinux/config — disabled",
+			name:    "linux: with no /etc/selinux/config SELinux is disabled",
 			variant: "linux",
 			setupFS: func() avfs.VFS { return memfs.New() },
 			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
@@ -194,7 +194,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: config SELINUX=disabled — disabled, no sestatus",
+			name:    "linux: SELINUX=disabled in the config is disabled, and sestatus does not run",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
@@ -324,7 +324,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: nil executor — falls back to config only",
+			name:    "linux: with a nil executor only the config is read",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{

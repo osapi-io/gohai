@@ -20,7 +20,7 @@
 
 package ocsf
 
-// Cloud is the OCSF cloud object — context for cloud-hosted instances.
+// Cloud is the OCSF cloud object: context for cloud-hosted instances.
 type Cloud struct {
 	Provider       string   `json:"provider,omitempty"`
 	Region         string   `json:"region,omitempty"`

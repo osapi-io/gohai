@@ -45,21 +45,21 @@ func main() {
 		log.Fatalf("collecting facts: %v", err)
 	}
 
-	// Typed access — checked at compile time. Collectors that did not
+	// Typed access, which the compiler checks. Collectors that did not
 	// run, or that failed, leave their field nil.
 	if p := facts.Platform; p != nil {
 		fmt.Printf("typed:  %s %s (%s, %s)\n",
 			p.Name, p.Version, p.Family, p.CPUArchitecture)
 	}
 
-	// Key-path access — for keys chosen at runtime.
+	// Key-path access, for keys that are chosen at runtime.
 	family, err := facts.Get("platform.family")
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("by key: platform.family = %v\n", family)
 
-	// Flat map — every leaf as a dotted key, for export or filtering.
+	// A flat map, with each leaf as a dotted key, for export or filtering.
 	flat, err := facts.Flat()
 	if err != nil {
 		log.Fatal(err)

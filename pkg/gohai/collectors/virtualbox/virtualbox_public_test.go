@@ -209,7 +209,7 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: partial output — only VBoxVer present",
+			name:    "linux: partial output with only VBoxVer",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				return vboxExec(

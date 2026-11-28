@@ -26,7 +26,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin returns nil — hostnamectl is a Linux systemd tool not
+// Darwin returns nil, because hostnamectl is a Linux systemd tool not
 // present on macOS. Ohai's plugin is linux-only.
 type Darwin struct {
 	base

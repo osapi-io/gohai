@@ -45,7 +45,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns the timezone Info. macOS has no /etc/timezone
-// equivalent — if /etc/localtime isn't a symlink the Name stays empty
+// equivalent. If /etc/localtime isn't a symlink the Name stays empty
 // (rare on real macs; seen in some CI sandboxes).
 func (d *Darwin) Collect(
 	_ context.Context,

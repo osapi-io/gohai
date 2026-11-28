@@ -106,7 +106,7 @@ func (s *FactsPublicTestSuite) TestJSON() {
 
 // TestUnmarshalStoredBlob pins the on-the-wire JSON schema. If any Info
 // struct's JSON tag gets renamed or a Facts field changes without bumping
-// the schema, this test fails — catching backward-incompatible changes
+// the schema, this test fails. It catches backward-incompatible changes
 // for consumers that store serialized Facts (e.g., OSAPI's agent→server
 // fact handoff).
 func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {

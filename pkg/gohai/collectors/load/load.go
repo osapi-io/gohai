@@ -31,7 +31,7 @@ import (
 )
 
 // Info holds the 1/5/15-minute load averages. Matches `uptime(1)` /
-// `getloadavg(3)` output — values are runnable+uninterruptible task
+// `getloadavg(3)` output: the values are runnable+uninterruptible task
 // counts averaged over each window.
 type Info struct {
 	One     float64 `json:"one"`     // 1-minute load average

@@ -29,7 +29,7 @@ import (
 )
 
 // Linux collects traffic-control qdisc configuration on Linux hosts by
-// running `tc -s qdisc show`. If tc is absent, returns an empty list —
+// running `tc -s qdisc show`. If tc is absent, it returns an empty list,
 // not all kernels have iproute2 installed.
 type Linux struct {
 	base

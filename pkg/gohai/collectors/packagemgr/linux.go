@@ -27,7 +27,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// Linux covers generic Linux hosts where we don't know the family —
+// Linux covers generic Linux hosts where we don't know the family:
 // arch, alpine, suse, etc. Probes common package managers in order of
 // likelihood.
 type Linux struct {
@@ -47,7 +47,7 @@ func NewLinux() *Linux {
 // xbps-install (Void), emerge (Gentoo). Empty Name + Path if none
 // found (likely a minimal image).
 //
-// apt/dnf/yum are intentionally NOT probed here — those hosts dispatch
+// apt/dnf/yum are not probed here on purpose, because those hosts dispatch
 // to the Debian or RHEL variant before ever reaching this one.
 func (l *Linux) Collect(
 	ctx context.Context,

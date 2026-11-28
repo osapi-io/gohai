@@ -20,7 +20,7 @@
 
 // Package kernelmodules enumerates loaded kernel modules (Linux) / kexts
 // (macOS). Split from the kernel collector so kernel identity stays
-// cheap — enumeration shells out to kextstat on macOS (~280ms) and
+// cheap. Enumeration shells out to kextstat on macOS (~280ms) and
 // walks /sys/module/<name>/version on Linux, neither of which most
 // consumers need. Opt in via --collector.kernel_modules when you need
 // the list for CVE correlation, EDR audit, or unsigned-module checks.
@@ -41,7 +41,7 @@ type Module struct {
 	Size     uint64 `json:"size,omitempty"`     // bytes
 	RefCount int    `json:"refcount,omitempty"` // instances currently loaded
 	Version  string `json:"version,omitempty"`  // Linux: /sys/module/<m>/version; macOS: parens field from kextstat
-	Index    int    `json:"index,omitempty"`    // macOS only: kextstat column 1 — kext load order index
+	Index    int    `json:"index,omitempty"`    // macOS only: kextstat column 1, the load order of the kext
 }
 
 // Collector is the public interface every kernel_modules variant satisfies.

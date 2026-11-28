@@ -33,7 +33,7 @@ import (
 
 // Info holds memory usage data. Values are native bytes; Ohai emits
 // kB-suffixed strings, we chose bytes for Go ergonomics. Linux-only
-// fields stay zero on macOS and vice versa — the struct is the union.
+// fields stay zero on macOS and vice versa, because the struct is the union.
 type Info struct {
 	// Core totals (both platforms).
 	Total       uint64  `json:"total"`
@@ -77,7 +77,7 @@ type Info struct {
 	PerCPU       uint64 `json:"percpu,omitempty"`
 
 	// 32-bit legacy high/low memory split (HighTotal > 0 only on
-	// 32-bit kernels with >4GB RAM — parsed for Ohai parity; on 64-bit
+	// 32-bit kernels with >4GB RAM; parsed for Ohai parity. On 64-bit
 	// kernels these stay zero).
 	HighTotal uint64 `json:"high_total,omitempty"`
 	HighFree  uint64 `json:"high_free,omitempty"`

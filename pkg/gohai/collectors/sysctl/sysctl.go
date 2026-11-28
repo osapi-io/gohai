@@ -21,7 +21,7 @@
 // Package sysctl collects kernel parameters by running `sysctl -a`.
 // Matches Ohai's linux/sysctl plugin: runs `sysctl -a`, splits each
 // output line on "=" and stores key→value pairs. DefaultEnabled is
-// false — the full sysctl table is large and most consumers don't need
+// false, because the full sysctl table is large and most consumers don't need
 // it.
 package sysctl
 

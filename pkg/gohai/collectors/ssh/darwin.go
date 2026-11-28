@@ -34,7 +34,7 @@ import (
 // OpenSSH and stores host keys in the same /etc/ssh/ path as Linux.
 // /etc/passwd on macOS has only the system users, and the other users
 // are in the directory service, so Exec runs dscl to find each home.
-// FS is the virtual filesystem — production uses the real OS filesystem;
+// FS is the virtual filesystem. Production uses the real OS filesystem;
 // tests inject an avfs memfs with canned key files.
 type Darwin struct {
 	base

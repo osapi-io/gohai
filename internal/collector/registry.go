@@ -100,7 +100,7 @@ func (r *Registry) Get(
 
 // NamesInCategory returns the names of every collector whose Category
 // matches cat. Returns an empty slice (never nil) when no collector
-// has that category — callers should treat that as a user error
+// has that category. Callers should treat that as a user error
 // ("unknown category") rather than silently running nothing.
 func (r *Registry) NamesInCategory(
 	cat Category,
@@ -201,7 +201,7 @@ func (r *Registry) Run(
 		}
 		// Snapshot prior results once per level. Collectors at the
 		// same level have no inter-dependencies by definition, so
-		// they all see the same prior state — matches the
+		// they all see the same prior state, as the
 		// topological contract.
 		resultsMu.Lock()
 		prior := make(PriorResults, len(results))

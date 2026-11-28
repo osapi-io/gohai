@@ -93,7 +93,7 @@ func (base) Name() string { return "mdadm" }
 // Category returns "linux".
 func (base) Category() collector.Category { return collector.CategoryLinux }
 
-// DefaultEnabled returns false — mdadm is opt-in.
+// DefaultEnabled returns false, because mdadm is opt-in.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

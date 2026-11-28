@@ -27,7 +27,7 @@
 // so collectors can short-circuit to a nil result when the host isn't
 // on that provider.
 //
-// Tests don't stub this package — they point a Client at an
+// Tests don't stub this package. They point a Client at an
 // httptest.Server URL and exercise the real HTTP round-trip against
 // canned responses.
 package cloudmetadata
@@ -103,14 +103,14 @@ type Option func(*Client)
 
 // DefaultUserAgent is the User-Agent header applied to every request
 // unless the caller overrides it via WithHeader. Matches Ohai's
-// chef-ohai/<version> pattern — metadata services occasionally rate-
+// chef-ohai/<version> pattern, because metadata services sometimes rate-
 // limit or filter by UA, and a stable identifier makes gohai traffic
 // distinguishable in provider logs.
 const DefaultUserAgent = "gohai"
 
 // New returns a Client rooted at baseURL. Default timeout is 2s;
 // override with WithTimeout. Each Client shares one transport, with proxy
-// lookup disabled (metadata IPs are link-local — honoring HTTP_PROXY would
+// lookup disabled (metadata IPs are link-local, so honoring HTTP_PROXY would
 // route cloud probes through a proxy and almost certainly fail).
 // The User-Agent header defaults to DefaultUserAgent; override with
 // WithHeader("User-Agent", "...") if needed.
@@ -170,7 +170,7 @@ func WithTimeout(
 }
 
 // WithHTTPClient swaps the underlying http.Client wholesale. Tests
-// rarely need this — pointing baseURL at an httptest.Server exercises
+// rarely need this: pointing baseURL at an httptest.Server exercises
 // the full HTTP round-trip via the default client. Reserved for
 // advanced cases (custom Transport for TLS-on-metadata, retry
 // wrappers, etc.).
@@ -235,7 +235,7 @@ func (c *Client) RawGet(
 
 // Put issues a PUT against baseURL + path with per-request headers
 // merged onto the Client's default headers. Body may be nil. Used by
-// EC2's IMDSv2 token flow — that's currently the only provider that
+// EC2's IMDSv2 token flow. EC2 is the only provider that
 // writes rather than reads the metadata endpoint.
 func (c *Client) Put(
 	ctx context.Context,

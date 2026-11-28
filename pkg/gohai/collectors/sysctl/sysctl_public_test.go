@@ -193,7 +193,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			name:    "linux: empty key skipped",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				// Line with separator but no key portion — key becomes empty, skipped.
+				// A line with a separator but no key: the key is empty, so it is skipped.
 				return sysctlExec(t, []byte(" = value\nkernel.panic = 2\n"), nil)
 			},
 			validateFunc: func(got any, err error) {

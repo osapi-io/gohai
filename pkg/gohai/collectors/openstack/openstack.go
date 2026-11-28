@@ -46,7 +46,7 @@ import (
 // gohai.CloudOpenStack, which re-exports this constant.
 const ProviderName = "openstack"
 
-// metadataBaseURL is the standard IMDS endpoint — OpenStack mirrors
+// metadataBaseURL is the standard IMDS endpoint, because OpenStack mirrors
 // EC2's. We root at the host so the collector can reach both the
 // EC2-mirror tree under /latest/meta-data/ and Nova's enriched
 // document under /openstack/latest/meta_data.json.
@@ -54,7 +54,7 @@ const metadataBaseURL = "http://169.254.169.254"
 
 // dmiProductSignature is the substring OpenStack writes to
 // /sys/class/dmi/id/product_name. Ohai gates on the virtualization
-// plugin's openstack flag, which itself looks at DMI — we gate on
+// plugin's openstack flag, which itself looks at DMI. We gate on
 // DMI directly for the same effect.
 const dmiProductSignature = "OpenStack"
 
@@ -134,7 +134,7 @@ type Device struct {
 
 // openStackMetaDoc mirrors the subset of /openstack/latest/meta_data.json
 // we extract. `network_info` and `random_seed` remain intentionally
-// skipped — the former is deployment-specific Neutron data, the latter
+// skipped on purpose: the former is deployment-specific Neutron data, the latter
 // is sensitive and has no inventory value.
 type openStackMetaDoc struct {
 	UUID             string            `json:"uuid"`
@@ -194,10 +194,10 @@ func (*Collector) Name() string { return "openstack" }
 // Category returns "cloud".
 func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
-// DefaultEnabled returns false — cloud collectors are opt-in.
+// DefaultEnabled returns false, because cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
-// Dependencies declares dmi — OpenStack writes "OpenStack Nova" or
+// Dependencies declares dmi, because OpenStack writes "OpenStack Nova" or
 // "OpenStack Compute" as product_name. Matches Ohai's
 // virtualization-plugin gate which itself reads DMI.
 func (*Collector) Dependencies() []string { return []string{"dmi"} }
@@ -206,7 +206,7 @@ func (*Collector) Dependencies() []string { return []string{"dmi"} }
 // EC2-compatible /latest/meta-data tree recursively, and fetches the
 // Nova-specific meta_data.json. The provider field is populated
 // independently from /etc/passwd ("dreamhost" if dhc-user is present,
-// "openstack" otherwise — matches Ohai). First-call failure returns
+// "openstack" otherwise, as Ohai does). First-call failure returns
 // (nil, nil); per-path failures are tolerated.
 func (c *Collector) Collect(
 	ctx context.Context,
@@ -218,7 +218,7 @@ func (c *Collector) Collect(
 
 	tree, err := walk(ctx, c.client, "/latest/meta-data/")
 	if err != nil && !errors.Is(err, errWalkLimit) {
-		// Even if EC2-mirror walk fails, try the Nova doc — some
+		// Even if the EC2-mirror walk fails, try the Nova doc, because some
 		// minimal Nova deployments only serve the JSON. Don't drop
 		// detection just because /latest 404s.
 		tree = nil
@@ -252,7 +252,7 @@ func (c *Collector) Collect(
 	}
 
 	if tree == nil && info.UUID == "" {
-		// Nothing came back from either source — not actually OpenStack.
+		// Nothing came back from either source, so this is not OpenStack.
 		return nil, ctx.Err()
 	}
 	return info, nil
@@ -361,7 +361,7 @@ func walkDir(
 	return result, nil
 }
 
-// sanitizeKey mirrors Ohai's metadata_key — strip trailing slash,
+// sanitizeKey mirrors Ohai's metadata_key: strip the trailing slash,
 // then dashes and slashes become underscores.
 func sanitizeKey(
 	k string,

@@ -47,7 +47,7 @@ type Info struct {
 	ZFSDatasets []ZFSDataset `json:"zfs_datasets,omitempty"`
 }
 
-// ZFSDataset describes one ZFS dataset — a filesystem, volume,
+// ZFSDataset describes one ZFS dataset: a filesystem, volume,
 // snapshot, or bookmark the kernel's ZFS module knows about.
 // Populated by the Linux variant when the `zfs` binary is on PATH;
 // mirrors Ohai's `zfs_properties` / `zfs_parents` / `zfs_zpool` keys.
@@ -73,7 +73,7 @@ type ZFSDataset struct {
 	Properties map[string]ZFSProperty `json:"properties,omitempty"`
 }
 
-// ZFSProperty is one entry from `zfs get` — a property's value plus
+// ZFSProperty is one entry from `zfs get`: a property's value plus
 // its source annotation. Source is `"-"` when the property has no
 // source (read-only properties), `"default"` for kernel defaults,
 // `"local"` for properties set directly on the dataset, or
@@ -133,7 +133,7 @@ type BtrfsAllocation struct {
 }
 
 // Filesystem describes a block device with a filesystem that isn't
-// currently mounted — LUKS containers, inactive LVs, btrfs device
+// currently mounted, such as LUKS containers, inactive LVs, btrfs device
 // members, etc. Populated from lsblk on Linux when the filesystem has
 // no mountpoint. Capacity/usage are omitted; statfs requires a mount.
 type Filesystem struct {
@@ -326,7 +326,7 @@ func dfRows(
 }
 
 // lsblkJSON mirrors `lsblk -J` output. Only the subset of fields we
-// consume is declared — extra columns are ignored by json.Unmarshal.
+// consume is declared. json.Unmarshal ignores the extra columns.
 type lsblkJSON struct {
 	BlockDevices []lsblkNode `json:"blockdevices"`
 }
@@ -381,7 +381,7 @@ func parseLsblk(
 	return out, nil
 }
 
-// lsblkEntry is the internal flattened form — a filesystem-bearing
+// lsblkEntry is the internal flattened form: a filesystem-bearing
 // block device with enough context to decide mounted vs unmounted.
 type lsblkEntry struct {
 	Device     string
@@ -441,7 +441,7 @@ func readBtrfsInfo(
 
 // btrfsRAIDProfiles is the full set of RAID profile subdirectory
 // names btrfs may publish under <bg_type>/. Iterated in the kernel's
-// own ordering — the first profile present wins for that block-group
+// own order, and the first profile present wins for that block-group
 // type. Ohai checks only "single" / "dup" but real systems also see
 // raidN profiles, so we cover the lot.
 var btrfsRAIDProfiles = []string{
@@ -466,7 +466,7 @@ func detectBtrfsRAID(
 
 // readUint reads path through fs and returns the leading decimal
 // integer value. Returns 0 on missing file, read error, or unparseable
-// content — matches the silent-on-miss convention used elsewhere in
+// content, as the silent-on-miss convention elsewhere in
 // the package.
 func readUint(
 	fs avfs.VFS,

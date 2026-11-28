@@ -28,7 +28,7 @@ import (
 )
 
 // Linux collects ZFS pool status on Linux by running `zpool list`. Exec
-// is injected for testability — production uses source.Commands().
+// is injected for testability. Production uses source.Commands().
 type Linux struct {
 	base
 

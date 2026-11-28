@@ -36,7 +36,7 @@ import (
 //
 //   - ProductVersion → Version (e.g., "14.4.1").
 //   - ProductVersionExtra → VersionExtra (Apple Rapid Security
-//     Response patch suffix, e.g., "(a)" — empty when no RSR is
+//     Response patch suffix, e.g., "(a)"; empty when no RSR is
 //     applied).
 //   - BuildVersion → Build (e.g., "23E224").
 //

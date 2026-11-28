@@ -77,13 +77,13 @@ type Interface struct {
 // interfaces created with the VLAN device type.
 type VLANInfo struct {
 	ID       string   `json:"id"`                 // 802.1Q tag, decimal
-	Protocol string   `json:"protocol,omitempty"` // "802.1Q" / "802.1ad" — present only on the protocol-qualified ip-link line
+	Protocol string   `json:"protocol,omitempty"` // "802.1Q" / "802.1ad", only on an ip-link line that names its protocol
 	Flags    []string `json:"flags,omitempty"`    // REORDER_HDR / GVRP / LOOSE_BINDING
 }
 
 // TunnelInfo describes an IP-in-IP / IP6 tunnel as reported by
 // `ip -d link` for `ip6tnl` and `ipip` device types. Mirrors Ohai's
-// `iface[:tunnel_info]` Mash. All numeric fields stay as strings —
+// `iface[:tunnel_info]` Mash. All numeric fields stay as strings:
 // `ip` prints them as decimals but Ohai never converts.
 type TunnelInfo struct {
 	Proto       string `json:"proto,omitempty"` // any / ipip6 / ip6ip6
@@ -123,7 +123,7 @@ type XDPProgram struct {
 // Populated only on Linux for interfaces whose Encapsulation is
 // "Ethernet" (matching Ohai's `iface[:encapsulation] == "Ethernet"`
 // gate). Hosts without the ethtool binary leave Ethtool nil. Per-
-// subcommand failures are independent — one ethtool subcommand
+// subcommand failures are independent: one ethtool subcommand
 // erroring out doesn't suppress the others.
 type EthtoolInfo struct {
 	// DriverInfo mirrors `ethtool -i <iface>` output as a map. Common
@@ -131,14 +131,14 @@ type EthtoolInfo struct {
 	// supports_statistics, supports_test, supports_eeprom_access,
 	// supports_register_dump, supports_priv_flags. Keys are normalized
 	// to snake_case (Ohai only replaces spaces; we additionally
-	// translate hyphens — `firmware-version` → `firmware_version` —
+	// translate hyphens (`firmware-version` → `firmware_version`)
 	// for Go-idiomatic consistency).
 	DriverInfo map[string]string `json:"driver_info,omitempty"`
 
 	// RingParams mirrors `ethtool -g <iface>` output. Keys are
 	// prefixed with `max_` (from "Pre-set maximums") or `current_`
 	// (from "Current hardware settings") then the ethtool field name
-	// snake_cased — e.g. `max_rx`, `current_rx_jumbo`, `max_tx`.
+	// snake_cased, e.g. `max_rx`, `current_rx_jumbo`, `max_tx`.
 	// Values are integers (buffer descriptor counts).
 	RingParams map[string]int `json:"ring_params,omitempty"`
 
@@ -148,7 +148,7 @@ type EthtoolInfo struct {
 	ChannelParams map[string]int `json:"channel_params,omitempty"`
 
 	// CoalesceParams mirrors `ethtool -c <iface>` output. Most
-	// values are integers (microseconds, frame counts) — `rx_usecs`,
+	// values are integers (microseconds, frame counts), such as `rx_usecs`,
 	// `tx_max_coalesced_frames`, etc. The exception is the
 	// `Adaptive RX: on  TX: off` line which Ohai parses into two
 	// string entries `adaptive_rx` and `adaptive_tx` carrying
@@ -162,7 +162,7 @@ type EthtoolInfo struct {
 	OffloadParams map[string]string `json:"offload_params,omitempty"`
 
 	// PauseParams mirrors `ethtool -a <iface>` output. Values are
-	// booleans — Ohai converts the "on"/"off" strings via
+	// booleans: Ohai converts the "on"/"off" strings via
 	// `.eql? "on"`. Keys: `autonegotiate`, `rx`, `tx`.
 	PauseParams map[string]bool `json:"pause_params,omitempty"`
 }
@@ -320,7 +320,7 @@ func ipv4Broadcast(
 
 // scopeOf classifies an IP into Ohai's title-cased scope buckets.
 // Multicast classifications are intentionally collapsed into the
-// nearest single answer — Ohai uses Global for routable, Link for
+// nearest single answer. Ohai uses Global for routable, Link for
 // link-local-anything, Host for loopback. We don't emit Site (no
 // caller needs IPv6 site-local distinction in 2026).
 func scopeOf(
@@ -369,8 +369,8 @@ func parseEthtoolDriverInfo(
 }
 
 // parseEthtoolSectionedInts parses ethtool subcommand output that
-// has two sections — "Pre-set maximums:" and "Current hardware
-// settings:" — into a flat map keyed `max_<field>` / `current_<field>`
+// has two sections, "Pre-set maximums:" and "Current hardware
+// settings:", into a flat map keyed `max_<field>` / `current_<field>`
 // with integer values. Used for both ring_params (`ethtool -g`) and
 // channel_params (`ethtool -l`); Ohai's ethernet_ring_parameters and
 // ethernet_channel_parameters share this exact shape.
@@ -489,7 +489,7 @@ func parseAdaptiveLine(
 // parseEthtoolOffloadParams parses `ethtool -k <iface>` output. Each
 // non-header line is `feature: state[ annotation]`. Ohai lowercases
 // the value and strips bracketed annotations like `[fixed]` or
-// `[requested on]`. We mirror that exactly — the canonical state
+// `[requested on]`. We mirror that exactly: the canonical state
 // (`on` / `off`) is what consumers want; the annotation is noise.
 func parseEthtoolOffloadParams(
 	raw []byte,
@@ -523,7 +523,7 @@ func parseEthtoolOffloadParams(
 }
 
 // parseEthtoolPauseParams parses `ethtool -a <iface>` output. Values
-// are booleans — Ohai's `.eql? "on"` truthy-check, lowercased.
+// are booleans, from Ohai's `.eql? "on"` truthy-check, lowercased.
 func parseEthtoolPauseParams(
 	raw []byte,
 ) map[string]bool {
@@ -628,7 +628,7 @@ var tunnelProtoValues = map[string]struct{}{
 //   - vlan flags come from a `vlan id N` line whose tail may carry
 //     REORDER_HDR / GVRP / LOOSE_BINDING tokens.
 //   - tunnel_info lines come from `ip -d link` only for ip6tnl/ipip
-//     device types (other tunnel kinds — gre, vxlan — are not in
+//     device types (other tunnel kinds, such as gre and vxlan, are not in
 //     scope; Ohai doesn't parse them either).
 //   - xdp shows a header line announcing the mode (xdp /
 //     xdpgeneric / xdpoffload / xdpmulti) and one or more `prog/<m>
@@ -772,7 +772,7 @@ func parseTunnelLine(
 // header and one or more `prog/<mode> id N tag X` attached-program
 // lines. xdpModeTracker carries the per-interface mode state across
 // the multiple lines of an XDP block (the prog line uses the bare
-// `xdp` token to mean "use the announced mode" — Ohai's
+// `xdp` token to mean "use the announced mode", as in Ohai's
 // "keeping mode as xdpdrv" comment).
 func parseXDPLine(
 	line string,
@@ -827,7 +827,7 @@ func stateFromFlags(
 // Source: https://github.com/torvalds/linux/blob/master/include/uapi/linux/if_arp.h
 var arphrdEncapsulation = map[int]string{
 	1:   "Ethernet", // ARPHRD_ETHER
-	24:  "PPP",      // ARPHRD_PPP (kernel uses 512 — keep both)
+	24:  "PPP",      // ARPHRD_PPP (the kernel also uses 512, so keep both)
 	512: "PPP",
 	256: "SLIP", // ARPHRD_SLIP
 	257: "VJSLIP",
@@ -836,7 +836,7 @@ var arphrdEncapsulation = map[int]string{
 	772: "Loopback",
 }
 
-// isOpenVZAlias reports whether name looks like `<base>:<n>` — the
+// isOpenVZAlias reports whether name looks like `<base>:<n>`, the
 // venet0 alias pattern OpenVZ guests use.
 func isOpenVZAlias(
 	name string,

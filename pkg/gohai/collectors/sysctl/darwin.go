@@ -42,7 +42,7 @@ func NewDarwin() *Darwin {
 }
 
 // Collect runs `sysctl -a` and returns parsed sysctl parameters.
-// Exec errors yield an empty Info — not an error.
+// Exec errors yield an empty Info, not an error.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,

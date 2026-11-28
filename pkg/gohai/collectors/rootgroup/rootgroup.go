@@ -33,7 +33,7 @@ import (
 
 // Info holds the root group data.
 type Info struct {
-	Name string `json:"name"` // primary group name for root — typically "root" on Linux, "wheel" on macOS/BSD
+	Name string `json:"name"` // name of root's primary group: usually "root" on Linux and "wheel" on macOS/BSD
 }
 
 // Collector is the public interface every rootgroup variant satisfies.
@@ -50,7 +50,7 @@ func (base) Name() string { return "root_group" }
 // Category returns "system".
 func (base) Category() collector.Category { return collector.CategorySystem }
 
-// DefaultEnabled returns true — root_group is on by default.
+// DefaultEnabled returns true, because root_group is on by default.
 func (base) DefaultEnabled() bool { return true }
 
 // Dependencies returns no dependencies.
