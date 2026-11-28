@@ -175,7 +175,7 @@ detect_os() {
     case "$raw" in
         Darwin)  os=darwin ;;
         Linux)   os=linux ;;
-        *)       err "unsupported OS: $raw — build from source: https://github.com/osapi-io/gohai#-build-from-source" ;;
+        *)       err "unsupported OS: $raw. Build from source: https://github.com/osapi-io/gohai#-build-from-source" ;;
     esac
 }
 
