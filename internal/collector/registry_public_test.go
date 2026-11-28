@@ -426,6 +426,92 @@ func (s *RegistryPublicTestSuite) TestRun() {
 	}
 	tests := []runCase{
 		func() runCase {
+			release := make(chan struct{})
+
+			return runCase{
+				name: "a dependent starts when its own dependency ends, not after a slow collector",
+				setup: func(reg *collector.Registry) {
+					// slow ends only when dep runs. With levels, dep would
+					// wait for slow to end, and slow would time out.
+					slow := newCollectorWith(s.ctrl, "slow")
+					slow.EXPECT().
+						Collect(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(context.Context, collector.PriorResults) (any, error) {
+							select {
+							case <-release:
+								return "slow-result", nil
+							case <-time.After(5 * time.Second):
+								return nil, errors.New("dep did not start before slow ended")
+							}
+						})
+					fast := newCollectorWith(s.ctrl, "fast")
+					fast.EXPECT().Collect(gomock.Any(), gomock.Any()).Return("fast-result", nil)
+					dep := newCollectorWith(s.ctrl, "dep", "fast")
+					dep.EXPECT().
+						Collect(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ context.Context, prior collector.PriorResults) (any, error) {
+							close(release)
+
+							return prior["fast"], nil
+						})
+					for _, c := range []collector.Collector{slow, fast, dep} {
+						s.Require().NoError(reg.Register(c))
+					}
+				},
+				names: []string{"slow", "dep"},
+				validateFunc: func(results map[string]any, errs, _ []string, err error) {
+					s.Require().NoError(err)
+					s.Empty(errs)
+					s.Equal(map[string]any{
+						"slow": "slow-result", "fast": "fast-result", "dep": "fast-result",
+					}, results)
+				},
+			}
+		}(),
+		func() runCase {
+			var (
+				mu    sync.Mutex
+				calls int
+				seen  collector.PriorResults
+			)
+
+			return runCase{
+				name: "a collector with two dependencies runs once, after both",
+				setup: func(reg *collector.Registry) {
+					for _, c := range []struct {
+						name string
+						deps []string
+					}{
+						{"a", nil}, {"b", []string{"a"}}, {"c", []string{"a"}},
+					} {
+						m := newCollectorWith(s.ctrl, c.name, c.deps...)
+						m.EXPECT().Collect(gomock.Any(), gomock.Any()).Return(c.name+"-result", nil)
+						s.Require().NoError(reg.Register(m))
+					}
+					d := newCollectorWith(s.ctrl, "d", "b", "c")
+					d.EXPECT().
+						Collect(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ context.Context, prior collector.PriorResults) (any, error) {
+							mu.Lock()
+							defer mu.Unlock()
+							calls++
+							seen = prior
+
+							return "d-result", nil
+						})
+					s.Require().NoError(reg.Register(d))
+				},
+				names: []string{"d"},
+				validateFunc: func(results map[string]any, _, _ []string, err error) {
+					s.Require().NoError(err)
+					s.Equal(1, calls)
+					s.Equal("b-result", seen["b"])
+					s.Equal("c-result", seen["c"])
+					s.Len(results, 4)
+				},
+			}
+		}(),
+		func() runCase {
 			var order []string
 
 			return runCase{
