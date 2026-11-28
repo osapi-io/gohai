@@ -24,6 +24,8 @@ package gohai
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"strings"
 	"time"
 
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
@@ -223,186 +225,25 @@ func (f *Facts) String() string {
 	return fmt.Sprintf("Facts{%d collectors, took %s}", f.countPopulated(), f.CollectDuration)
 }
 
-// countPopulated returns how many collector fields are non-nil.
+// countPopulated returns how many collector fields are non-nil. A collector
+// field is each pointer field of Facts whose JSON name does not start with
+// "_", which marks the run's own data, such as _timings. Reflection keeps
+// the count in step with the fields, so a new collector is counted.
 func (f *Facts) countPopulated() int {
+	v := reflect.ValueOf(f).Elem()
+	t := v.Type()
 	n := 0
-	if f.Platform != nil {
-		n++
+	for i := range t.NumField() {
+		field := t.Field(i)
+		if field.Type.Kind() != reflect.Pointer ||
+			strings.HasPrefix(field.Tag.Get("json"), "_") {
+			continue
+		}
+		if !v.Field(i).IsNil() {
+			n++
+		}
 	}
-	if f.Hostname != nil {
-		n++
-	}
-	if f.Kernel != nil {
-		n++
-	}
-	if f.KernelModules != nil {
-		n++
-	}
-	if f.Uptime != nil {
-		n++
-	}
-	if f.Virtualization != nil {
-		n++
-	}
-	if f.MachineID != nil {
-		n++
-	}
-	if f.CPU != nil {
-		n++
-	}
-	if f.Load != nil {
-		n++
-	}
-	if f.Memory != nil {
-		n++
-	}
-	if f.Filesystem != nil {
-		n++
-	}
-	if f.Disk != nil {
-		n++
-	}
-	if f.Network != nil {
-		n++
-	}
-	if f.Process != nil {
-		n++
-	}
-	if f.Users != nil {
-		n++
-	}
-	if f.Timezone != nil {
-		n++
-	}
-	if f.RootGroup != nil {
-		n++
-	}
-	if f.Shells != nil {
-		n++
-	}
-	if f.Fips != nil {
-		n++
-	}
-	if f.OSRelease != nil {
-		n++
-	}
-	if f.LSB != nil {
-		n++
-	}
-	if f.Init != nil {
-		n++
-	}
-	if f.Shard != nil {
-		n++
-	}
-	if f.PackageMgr != nil {
-		n++
-	}
-	if f.Gce != nil {
-		n++
-	}
-	if f.Ec2 != nil {
-		n++
-	}
-	if f.Azure != nil {
-		n++
-	}
-	if f.DigitalOcean != nil {
-		n++
-	}
-	if f.OCI != nil {
-		n++
-	}
-	if f.Alibaba != nil {
-		n++
-	}
-	if f.Linode != nil {
-		n++
-	}
-	if f.OpenStack != nil {
-		n++
-	}
-	if f.Scaleway != nil {
-		n++
-	}
-	if f.DMI != nil {
-		n++
-	}
-	if f.GPU != nil {
-		n++
-	}
-	if f.BlockDevice != nil {
-		n++
-	}
-	if f.Command != nil {
-		n++
-	}
-	if f.Docker != nil {
-		n++
-	}
-	if f.Grub2 != nil {
-		n++
-	}
-	if f.Hostnamectl != nil {
-		n++
-	}
-	if f.Interrupts != nil {
-		n++
-	}
-	if f.IPC != nil {
-		n++
-	}
-	if f.Languages != nil {
-		n++
-	}
-	if f.Libvirt != nil {
-		n++
-	}
-	if f.Livepatch != nil {
-		n++
-	}
-	if f.Mdadm != nil {
-		n++
-	}
-	if f.Packages != nil {
-		n++
-	}
-	if f.RPM != nil {
-		n++
-	}
-	if f.SELinux != nil {
-		n++
-	}
-	if f.Services != nil {
-		n++
-	}
-	if f.SSH != nil {
-		n++
-	}
-	if f.Sysconf != nil {
-		n++
-	}
-	if f.Sysctl != nil {
-		n++
-	}
-	if f.SystemdPaths != nil {
-		n++
-	}
-	if f.TC != nil {
-		n++
-	}
-	if f.VirtualBox != nil {
-		n++
-	}
-	if f.VMware != nil {
-		n++
-	}
-	if f.Zpools != nil {
-		n++
-	}
-	if f.CACertificates != nil {
-		n++
-	}
+
 	return n
 }
 

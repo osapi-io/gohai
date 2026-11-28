@@ -38,6 +38,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostnamectl"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/initd"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/machineid"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
@@ -172,7 +173,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal("85", hw.CPUModelID)
 				s.Equal(int32(7), hw.CPUStepping)
 				s.Equal([]string{"aes", "avx2"}, hw.CPUFlags)
-				s.Equal(uint64(16384000000), hw.RAMSize)
+				s.Equal(uint64(15625), hw.RAMSize) // 16384000000 bytes in MB
 			},
 		},
 		{
@@ -237,7 +238,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 			validateFunc: func(event *ocsf.InventoryInfo) {
 				d := event.Device
 				s.Equal("abc-123", d.MachineID)
-				s.Equal(int64(1700000000), d.BootTime)
+				s.Equal(int64(1700000000000), d.BootTime) // ms
 				s.Equal(uint64(86400), d.UptimeSeconds)
 				s.Equal("America/New_York", d.TimezoneName)
 				s.Equal(-18000, d.TimezoneOffset)
@@ -374,6 +375,37 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal("Scaleway", event.Cloud.Provider)
 				s.Equal("org-123", event.Cloud.Account.UID)
 				s.Equal("proj-456", event.Cloud.ProjectUID)
+			},
+		},
+		{
+			name: "linode maps to cloud",
+			facts: &gohai.Facts{
+				CollectTime: time.Now(),
+				Linode:      &linode.Info{PublicIP: "203.0.113.5"},
+			},
+			validateFunc: func(event *ocsf.InventoryInfo) {
+				s.Require().NotNil(event.Cloud)
+				s.Equal("Linode", event.Cloud.Provider)
+			},
+		},
+		{
+			name: "an interface reports its global address, not a link-local one before it",
+			facts: &gohai.Facts{
+				CollectTime: time.Now(),
+				Network: &network.Info{
+					Interfaces: []network.Interface{
+						{
+							Name: "eth0",
+							Addresses: []network.Address{
+								{Addr: "fe80::1", Family: "inet6"},
+								{Addr: "10.0.0.7", Family: "inet"},
+							},
+						},
+					},
+				},
+			},
+			validateFunc: func(event *ocsf.InventoryInfo) {
+				s.Equal("10.0.0.7", event.Device.NetworkInterfaces[0].IP)
 			},
 		},
 		{

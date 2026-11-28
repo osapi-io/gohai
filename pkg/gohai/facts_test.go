@@ -21,6 +21,7 @@
 package gohai
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -577,7 +578,14 @@ func (s *FactsTestSuite) TestCountPopulated() {
 				Zpools:         zpoolsInfoPtr(),
 				CACertificates: caCertificatesInfoPtr(),
 			},
-			want: 47,
+			want: 48,
+		},
+		{
+			// Every collector field set, by reflection, so a field that
+			// countPopulated does not count fails here.
+			name:  "every collector field populated",
+			facts: everyCollectorField(),
+			want:  64,
 		},
 	}
 	for _, tt := range tests {
@@ -585,4 +593,19 @@ func (s *FactsTestSuite) TestCountPopulated() {
 			s.Equal(tt.want, tt.facts.countPopulated())
 		})
 	}
+}
+
+// everyCollectorField is a Facts with each collector field set, and
+// _timings, which is not a collector, set too.
+func everyCollectorField() *Facts {
+	f := &Facts{Timings: &Timings{}}
+	v := reflect.ValueOf(f).Elem()
+	for i := range v.NumField() {
+		field := v.Type().Field(i)
+		if field.Type.Kind() == reflect.Pointer && field.Name != "Timings" {
+			v.Field(i).Set(reflect.New(field.Type.Elem()))
+		}
+	}
+
+	return f
 }
