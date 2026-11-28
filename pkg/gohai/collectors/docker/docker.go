@@ -31,9 +31,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Container holds metadata for a single Docker container. ID is the full

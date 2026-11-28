@@ -25,9 +25,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/family"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 

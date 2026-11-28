@@ -31,9 +31,8 @@ import (
 	"encoding/pem"
 	"time"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // The sources of a CA: one the distribution ships, or one an administrator

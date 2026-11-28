@@ -32,9 +32,8 @@ import (
 	"bytes"
 	"regexp"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // macrosMarkerRE matches the `===...===` separator lines that bracket

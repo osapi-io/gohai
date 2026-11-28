@@ -36,9 +36,8 @@ import (
 
 	"github.com/avfs/avfs"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // resolverRetries is how often the FQDN lookups are tried, and

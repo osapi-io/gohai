@@ -31,11 +31,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Info holds filesystem data: the active mount table plus (Linux only)

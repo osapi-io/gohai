@@ -30,9 +30,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Pool holds the attributes of a single ZFS pool.

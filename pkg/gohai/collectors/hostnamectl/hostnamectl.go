@@ -28,9 +28,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // nonASCIIRe strips the icon that newer systemd versions print after the

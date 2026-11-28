@@ -27,11 +27,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // vulnerabilitiesDir is the sysfs directory whose files enumerate

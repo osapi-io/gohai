@@ -32,9 +32,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Array holds the details of a single MD RAID array.
