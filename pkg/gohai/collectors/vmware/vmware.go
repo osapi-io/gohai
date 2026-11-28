@@ -28,7 +28,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -117,11 +116,10 @@ func probeToolbox(
 	runner source.Runner,
 ) (bool, error) {
 	out, err := runner.Execute(ctx, toolboxCmd, "-v")
-	var exitErr *exec.ExitError
 	switch {
 	case err == nil:
 		return strings.TrimSpace(string(out)) != "", nil
-	case collector.Absent(err), errors.As(err, &exitErr):
+	case collector.Absent(err), exited(err):
 		return false, nil
 	default:
 		return false, fmt.Errorf("%s -v: %w", toolboxCmd, err)
@@ -143,11 +141,10 @@ func collectVMwareTools(
 			return ""
 		}
 		out, err := runner.Execute(ctx, toolboxCmd, args...)
-		var exitErr *exec.ExitError
 		switch {
 		case err == nil:
 			return trimStat(string(out))
-		case errors.As(err, &exitErr):
+		case exited(err):
 			return ""
 		default:
 			runErr = fmt.Errorf("%s %s: %w", toolboxCmd, strings.Join(args, " "), err)
@@ -189,4 +186,17 @@ func collectVMwareTools(
 	}
 
 	return info, nil
+}
+
+// exited reports whether err is a command that ran to its end and exited
+// with a status of its own, such as a stat the guest does not offer. A
+// command that a timeout or a signal killed has no exit status (ExitCode is
+// -1), so it is not one: source.Commands returns a killed command as an
+// *exec.ExitError too.
+func exited(
+	err error,
+) bool {
+	var status interface{ ExitCode() int }
+
+	return errors.As(err, &status) && status.ExitCode() >= 0
 }
