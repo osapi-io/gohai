@@ -30,6 +30,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/osapi-io/gohai/internal/spec"
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
@@ -153,7 +154,7 @@ func newCollectorValidateCommand(
 ) *cobra.Command {
 	var asJSON bool
 	var rules strings.Builder
-	for _, c := range gohai.CollectorChecks() {
+	for _, c := range spec.Checks() {
 		fmt.Fprintf(&rules, "  %s: %s\n", c.Rule, c.Requires)
 	}
 	cmd := &cobra.Command{
@@ -171,7 +172,7 @@ func newCollectorValidateCommand(
 		) error {
 			return writeProblems(
 				c.OutOrStdout(),
-				gohai.CollectorProblems(gohai.Collectors()),
+				spec.Problems(gohai.Collectors()),
 				asJSON,
 			)
 		},
@@ -271,12 +272,12 @@ func writeTerms(
 
 func writeProblems(
 	out io.Writer,
-	problems []gohai.Problem,
+	problems []spec.Problem,
 	asJSON bool,
 ) error {
 	if asJSON {
 		if problems == nil {
-			problems = []gohai.Problem{}
+			problems = []spec.Problem{}
 		}
 		if err := writeJSON(out, problems); err != nil {
 			return err

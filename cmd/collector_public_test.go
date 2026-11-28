@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/cmd"
+	"github.com/osapi-io/gohai/internal/spec"
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
@@ -43,7 +44,7 @@ func TestCollectorPublicTestSuite(
 }
 
 func (s *CollectorPublicTestSuite) TestWriteProblems() {
-	problems := []gohai.Problem{{
+	problems := []spec.Problem{{
 		Collector: "bad", Rule: "name", Message: "is not lowercase.", Fix: "rename it.",
 	}}
 	tests := []struct {

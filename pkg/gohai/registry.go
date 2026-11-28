@@ -25,45 +25,57 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// PublicRegistry exposes registered collector metadata for CLI use.
-type PublicRegistry struct {
+// Registry describes the built-in collectors: their names and categories.
+// The CLI reads it to list the collectors and to build its flags.
+type Registry interface {
+	// Names returns the name of each collector, sorted.
+	Names() []string
+	// NamesInCategory returns the names, sorted, of each collector in cat,
+	// or an empty slice when no collector is in cat.
+	NamesInCategory(cat string) []string
+	// CategoryOf returns the category of the collector called name, or ""
+	// when no collector has that name.
+	CategoryOf(name string) string
+}
+
+// registry is the Registry of NewRegistry.
+type registry struct {
 	reg *collector.Registry
 }
 
-// NewRegistry returns a PublicRegistry pre-populated with built-in
-// collectors, or the error of a built-in collector that does not register.
-func NewRegistry() (*PublicRegistry, error) {
+// NewRegistry returns a Registry of the built-in collectors, or the error of
+// a built-in collector that does not register.
+func NewRegistry() (Registry, error) {
 	r := collector.NewRegistry()
 	if err := registerBuiltins(r, source.Sources{}); err != nil {
 		return nil, err
 	}
 
-	return &PublicRegistry{reg: r}, nil
+	return &registry{reg: r}, nil
 }
 
-// Names returns all registered collector names, sorted.
-func (p *PublicRegistry) Names() []string {
+// Names returns the name of each collector, sorted.
+func (p *registry) Names() []string {
 	return p.reg.Names()
 }
 
-// NamesInCategory returns the names of every collector in cat. Empty
-// slice when the category has no collectors. Callers should treat
-// that as a user-facing "unknown category" error.
-func (p *PublicRegistry) NamesInCategory(
+// NamesInCategory returns the names, sorted, of each collector in cat, or an
+// empty slice when no collector is in cat.
+func (p *registry) NamesInCategory(
 	cat string,
 ) []string {
 	return p.reg.NamesInCategory(collector.Category(cat))
 }
 
-// CategoryOf returns the collector's category, or empty string when
-// no collector is registered under that name. Intended for CLI help
-// and `--list-collectors`-style output that groups by category.
-func (p *PublicRegistry) CategoryOf(
+// CategoryOf returns the category of the collector called name, or "" when
+// no collector has that name.
+func (p *registry) CategoryOf(
 	name string,
 ) string {
 	c, ok := p.reg.Get(name)
 	if !ok {
 		return ""
 	}
+
 	return string(c.Category())
 }

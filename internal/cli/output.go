@@ -124,7 +124,7 @@ func WriteOCSF(
 // WriteCollectorList writes the collectors of reg grouped by category.
 func WriteCollectorList(
 	out io.Writer,
-	reg *gohai.PublicRegistry,
+	reg gohai.Registry,
 ) error {
 	byCat := map[string][]string{}
 

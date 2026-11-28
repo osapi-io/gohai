@@ -46,7 +46,7 @@ func SetBuildInfo(
 // SetNewRegistryFn replaces how the collect command builds the registry, and
 // returns a func that puts it back.
 func SetNewRegistryFn(
-	fn func() (*gohai.PublicRegistry, error),
+	fn func() (gohai.Registry, error),
 ) func() {
 	old := newRegistryFn
 	newRegistryFn = fn

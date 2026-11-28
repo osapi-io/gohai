@@ -61,7 +61,7 @@ type executeCase struct {
 	args        []string
 	in          io.Reader
 	out         io.Writer
-	newRegistry func() (*gohai.PublicRegistry, error)
+	newRegistry func() (gohai.Registry, error)
 	// setup, when set, runs before the command and returns its restore.
 	setup        func() func()
 	validateFunc func(code int, out, errOut string)
