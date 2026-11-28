@@ -51,6 +51,7 @@ var (
 	scutilNameserverRE = regexp.MustCompile(`^nameserver\[\d+\]\s*:\s*(\S+)`)
 	scutilSearchRE     = regexp.MustCompile(`^search domain\[\d+\]\s*:\s*(\S+)`)
 	scutilIfIndexRE    = regexp.MustCompile(`^if_index\s*:\s*\d+\s*\(([^)]+)\)`)
+	scutilDomainRE     = regexp.MustCompile(`^domain\s*:`)
 )
 
 // Collect returns the dns Info.
@@ -75,17 +76,31 @@ func (d *Darwin) Collect(
 	// Each "resolver #N" block has its servers, its search domains and,
 	// when it belongs to one, its interface. The first block of an
 	// interface wins: scutil prints the scoped resolvers again after.
+	//
+	// Global is the default resolver, from which macOS writes resolv.conf:
+	// the first block of the unscoped "DNS configuration" section that has
+	// servers, no "domain" (which makes it a resolver for that domain only)
+	// and is not Supplemental (which a VPN adds for its own names).
 	var servers, domains []string
+	scoped, forDomain, supplemental := false, false, false
 	flush := func(iface string) {
 		if _, seen := info.Interfaces[iface]; iface != "" && !seen {
 			setResolver(info, iface, servers, domains)
 		}
+		if !scoped && !forDomain && !supplemental && info.Global == nil && len(servers) > 0 {
+			info.Global = &Resolver{Nameservers: servers, Domains: domains}
+		}
 		servers, domains = nil, nil
+		forDomain, supplemental = false, false
 	}
 	iface := ""
 	for _, line := range strings.Split(string(out), "\n") {
 		line = strings.TrimSpace(line)
 		switch {
+		case strings.HasPrefix(line, "DNS configuration (for scoped queries)"):
+			flush(iface)
+			iface = ""
+			scoped = true
 		case strings.HasPrefix(line, "resolver #"):
 			flush(iface)
 			iface = ""
@@ -95,6 +110,10 @@ func (d *Darwin) Collect(
 			domains = append(domains, scutilSearchRE.FindStringSubmatch(line)[1])
 		case scutilIfIndexRE.MatchString(line):
 			iface = scutilIfIndexRE.FindStringSubmatch(line)[1]
+		case scutilDomainRE.MatchString(line):
+			forDomain = true
+		case strings.HasPrefix(line, "flags") && strings.Contains(line, "Supplemental"):
+			supplemental = true
 		}
 	}
 	flush(iface)

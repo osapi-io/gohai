@@ -24,7 +24,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -60,21 +60,21 @@ func (d *Darwin) Collect(
 	if d.Exec == nil {
 		return nil, nil
 	}
-	count, ok := sysctlInt(ctx, d.Exec, "hw.logicalcpu")
-	if !ok {
-		return nil, errors.New("sysctl hw.logicalcpu failed")
+	out, err := d.Exec.Execute(ctx, "sysctl", "-n", "hw.logicalcpu")
+	if err != nil {
+		return nil, fmt.Errorf("sysctl hw.logicalcpu: %w", err)
 	}
+	count, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return nil, fmt.Errorf("parse sysctl hw.logicalcpu: %w", err)
+	}
+	// Apple Silicon has no machdep.cpu.family or machdep.cpu.model, so
+	// those stay empty rather than a made-up "0".
 	c := CPU{
 		ModelName: sysctlString(ctx, d.Exec, "machdep.cpu.brand_string"),
 		VendorID:  sysctlString(ctx, d.Exec, "machdep.cpu.vendor"),
-		Family:    "0",
-		ModelID:   "0",
-	}
-	if v := sysctlString(ctx, d.Exec, "machdep.cpu.family"); v != "" {
-		c.Family = v
-	}
-	if v := sysctlString(ctx, d.Exec, "machdep.cpu.model"); v != "" {
-		c.ModelID = v
+		Family:    sysctlString(ctx, d.Exec, "machdep.cpu.family"),
+		ModelID:   sysctlString(ctx, d.Exec, "machdep.cpu.model"),
 	}
 	if n, ok := sysctlInt(ctx, d.Exec, "machdep.cpu.stepping"); ok {
 		c.Stepping = int32(n)

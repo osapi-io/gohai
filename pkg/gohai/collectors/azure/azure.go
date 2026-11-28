@@ -29,6 +29,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"time"
@@ -469,7 +470,7 @@ func (c *Metadata) Collect(
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 			return nil, ctx.Err()
 		}
-		return nil, err
+		return nil, fmt.Errorf("read azure metadata: %w", err)
 	}
 	return transform(r), nil
 }

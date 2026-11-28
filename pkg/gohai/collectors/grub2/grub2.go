@@ -25,8 +25,6 @@
 package grub2
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -125,21 +123,20 @@ func readGrubenv(
 //	key=value
 //	key2=value2
 //
-// Lines starting with '#' are comments and skipped. Lines without '='
-// are also skipped. Values are taken verbatim, because GRUB does not quote or
-// escape values in the environment block.
+// Lines starting with '#' are comments and skipped. Lines without '=',
+// and lines with an empty key such as "=x", are also skipped. Values are
+// taken verbatim, because GRUB does not quote or escape values in the
+// environment block.
 func parseGrubenv(
 	content []byte,
 ) map[string]string {
 	env := map[string]string{}
-	sc := bufio.NewScanner(bytes.NewReader(content))
-	for sc.Scan() {
-		line := sc.Text()
+	for line := range strings.SplitSeq(string(content), "\n") {
 		if strings.HasPrefix(line, "#") {
 			continue
 		}
 		key, val, ok := strings.Cut(line, "=")
-		if !ok {
+		if !ok || key == "" {
 			continue
 		}
 		env[key] = val

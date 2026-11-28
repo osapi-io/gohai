@@ -24,6 +24,7 @@ import (
 	"context"
 	"io/fs"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -262,6 +263,39 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 				info, ok := got.(*grub2.Info)
 				s.Require().True(ok)
 				s.Equal(map[string]string{"key": "value"}, info.Environment)
+			},
+		},
+		{
+			name:    "linux: a line with an empty key is skipped",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/boot/grub2/grubenv": "=orphan\nkey=value\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"key": "value"}, info.Environment)
+			},
+		},
+		{
+			name:    "linux: a line after one over 64 KiB is still read",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/boot/grub2/grubenv": "long=" + strings.Repeat("x", 70_000) + "\nkey=value\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+
+				info, ok := got.(*grub2.Info)
+				s.Require().True(ok)
+				s.Equal("value", info.Environment["key"])
+				s.Len(info.Environment["long"], 70_000)
 			},
 		},
 	}

@@ -31,6 +31,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -305,6 +306,23 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 					Fingerprint: other.fingerprint, NotAfter: other.notAfter,
 				},
 			},
+		},
+		{
+			name:    "when a conf line after one over 64 KiB turns a CA off, it is off",
+			variant: "linux",
+			layout:  "debian",
+			files: map[string]string{
+				"/usr/share/ca-certificates/mozilla/Root_CA.crt": root.pem,
+				"/etc/ca-certificates.conf": "# " + strings.Repeat(
+					"x",
+					70_000,
+				) + "\n!mozilla/Root_CA.crt\n",
+			},
+			want: []cacertificates.Certificate{{
+				Name: "mozilla/Root_CA", Path: "/usr/share/ca-certificates/mozilla/Root_CA.crt",
+				Source: "system", Enabled: false, Subject: "CN=Root CA,O=Test",
+				Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+			}},
 		},
 		{
 			name:    "when a CA directory cannot be read, it is an error",

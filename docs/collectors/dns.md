@@ -18,15 +18,15 @@ DefaultEnabled is `false`.
 
 ## Collected fields
 
-| Field                      | Type       | Description                                                                                                                                                                                               | Schema mapping            |
-| -------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `nameservers`              | `[]string` | The `nameserver` lines of `/etc/resolv.conf`, in order.                                                                                                                                                   | No direct schema mapping. |
-| `search`                   | `[]string` | The last `search` or `domain` line.                                                                                                                                                                       | No direct schema mapping. |
-| `options`                  | `[]string` | The `options` lines, each option a value.                                                                                                                                                                 | No direct schema mapping. |
-| `interfaces`               | `map`      | The resolver of each interface that has one, by name.                                                                                                                                                     | No direct schema mapping. |
-| `interfaces.*.nameservers` | `[]string` | The name servers of the interface, without an IPv6 zone, a port or a TLS server name.                                                                                                                     | No direct schema mapping. |
-| `interfaces.*.domains`     | `[]string` | The domains of the interface. `~.` routes every name there.                                                                                                                                               | No direct schema mapping. |
-| `global`                   | `object`   | systemd-resolved's resolver of no interface (`resolvectl`'s `Global` line): its `nameservers` and `domains`. With systemd-resolved, `resolv.conf` names only the stub, so these are the upstream servers. | No direct schema mapping. |
+| Field                      | Type       | Description                                                                                                                                                                                                                                                   | Schema mapping            |
+| -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `nameservers`              | `[]string` | The `nameserver` lines of `/etc/resolv.conf`, in order.                                                                                                                                                                                                       | No direct schema mapping. |
+| `search`                   | `[]string` | The last `search` or `domain` line.                                                                                                                                                                                                                           | No direct schema mapping. |
+| `options`                  | `[]string` | The `options` lines, each option a value.                                                                                                                                                                                                                     | No direct schema mapping. |
+| `interfaces`               | `map`      | The resolver of each interface that has one, by name.                                                                                                                                                                                                         | No direct schema mapping. |
+| `interfaces.*.nameservers` | `[]string` | The name servers of the interface, without an IPv6 zone, a port or a TLS server name.                                                                                                                                                                         | No direct schema mapping. |
+| `interfaces.*.domains`     | `[]string` | The domains of the interface. `~.` routes every name there.                                                                                                                                                                                                   | No direct schema mapping. |
+| `global`                   | `object`   | The resolver of no interface: its `nameservers` and `domains`. On Linux, systemd-resolved's (`resolvectl`'s `Global` line). With systemd-resolved, `resolv.conf` names only the stub, so these are the upstream servers. On macOS, scutil's default resolver. | No direct schema mapping. |
 
 ## Platform support
 
@@ -115,8 +115,13 @@ On macOS:
    resolver.
 2. It runs `scutil --dns`. Each `resolver #N` block with an `if_index` gives
    that interface's `nameserver[…]` and `search domain[…]` values. scutil prints
-   the scoped resolvers a second time. The first block of an interface wins. If
-   `scutil` fails, the collector returns an error.
+   the scoped resolvers a second time. The first block of an interface wins.
+3. The default resolver gives `global`. It is the first block of the unscoped
+   `DNS configuration` section that has name servers, has no `domain` line (a
+   resolver for one domain only, such as `local`) and is not `Supplemental` (a
+   resolver that a VPN adds for its own names). macOS writes `resolv.conf` from
+   it.
+4. If `scutil` fails, the collector returns an error.
 
 Ohai has no DNS plugin. The data is configuration, not the state of a daemon, so
 it is a gohai fact.

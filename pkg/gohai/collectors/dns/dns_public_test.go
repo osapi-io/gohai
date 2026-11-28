@@ -174,12 +174,13 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			want:    &dns.Info{Nameservers: []string{"1.1.1.1"}},
 		},
 		{
-			name:    "darwin: scoped resolvers, the first of each interface",
+			name:    "darwin: scoped resolvers, the first of each interface, and the default resolver as global",
 			variant: "darwin",
 			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
 			runner: sourcetest.Commands{
 				Out: map[string]string{"scutil --dns": "DNS configuration\n\n" +
-					"resolver #1\n  search domain[0] : ts.example\n  nameserver[0] : 100.100.100.100\n  if_index : 24 (utun6)\n\n" +
+					"resolver #1\n  search domain[0] : ts.example\n  nameserver[0] : 100.100.100.100\n  if_index : 24 (utun6)\n" +
+					"  flags    : Supplemental, Request A records\n\n" +
 					"resolver #2\n  nameserver[0] : 1.1.1.1\n  if_index : 14 (en0)\n\n" +
 					"resolver #3\n  domain   : local\n  nameserver[0] : 224.0.0.251\n\n" +
 					"DNS configuration (for scoped queries)\n\n" +
@@ -194,6 +195,36 @@ func (s *DNSPublicTestSuite) TestCollect() {
 					},
 					"en0": {Nameservers: []string{"1.1.1.1"}},
 				},
+				Global: &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+			},
+		},
+		{
+			name:    "darwin: a per-domain first resolver is not the global one",
+			variant: "darwin",
+			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
+			runner: sourcetest.Commands{
+				Out: map[string]string{"scutil --dns": "DNS configuration\n\n" +
+					"resolver #1\n  domain   : local\n  nameserver[0] : 224.0.0.251\n\n" +
+					"resolver #2\n  nameserver[0] : 1.1.1.1\n"},
+			},
+			want: &dns.Info{
+				Nameservers: []string{"1.1.1.1"},
+				Global:      &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+			},
+		},
+		{
+			name:    "darwin: a scoped resolver is never the global one",
+			variant: "darwin",
+			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
+			runner: sourcetest.Commands{
+				Out: map[string]string{
+					"scutil --dns": "DNS configuration (for scoped queries)\n\n" +
+						"resolver #1\n  nameserver[0] : 9.9.9.9\n  if_index : 14 (en0)\n",
+				},
+			},
+			want: &dns.Info{
+				Nameservers: []string{"1.1.1.1"},
+				Interfaces:  map[string]dns.Resolver{"en0": {Nameservers: []string{"9.9.9.9"}}},
 			},
 		},
 		{

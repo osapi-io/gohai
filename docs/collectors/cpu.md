@@ -215,7 +215,7 @@ On macOS:
    - `machdep.cpu.brand_string`, `machdep.cpu.vendor`, `machdep.cpu.family`,
      `machdep.cpu.model` and `machdep.cpu.stepping` → the model, vendor, family,
      model and stepping. Apple Silicon has no family or model, and they are
-     `"0"`.
+     empty.
    - `machdep.cpu.features` and `machdep.cpu.leaf7_features`, in lower case →
      `flags`. Apple Silicon has neither.
    - `hw.physicalcpu` → `cores`. If it fails, `cores` is `count`.

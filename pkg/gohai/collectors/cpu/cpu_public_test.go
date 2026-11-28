@@ -1060,8 +1060,48 @@ Book(s) per drawer:  1
 					map[string]sysctlRet{"hw.logicalcpu": {err: errors.New("sysctl error")}},
 				)
 			},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+			validateFunc: func(got any, err error) {
+				s.EqualError(err, "sysctl hw.logicalcpu: sysctl error")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: a cancelled context keeps its cause",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return darwinExec(t, map[string]sysctlRet{"hw.logicalcpu": {err: context.Canceled}})
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: an hw.logicalcpu that is not a number is an error",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return darwinExec(t, map[string]sysctlRet{"hw.logicalcpu": {out: "many\n"}})
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "parse sysctl hw.logicalcpu: ")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: Apple Silicon has no family or model, and they stay empty",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return darwinExec(t, map[string]sysctlRet{
+					"machdep.cpu.family": {err: errors.New("unknown oid")},
+					"machdep.cpu.model":  {err: errors.New("unknown oid")},
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*cpu.Info)
+				s.Require().True(ok)
+				s.Empty(i.Family)
+				s.Empty(i.ModelID)
 			},
 		},
 	}
