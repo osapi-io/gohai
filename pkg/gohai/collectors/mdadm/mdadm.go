@@ -44,7 +44,9 @@ type Array struct {
 	// Level is the RAID level as reported by `mdadm --detail`
 	// (e.g. "raid1", "raid5"). Empty when --detail is unavailable.
 	Level string `json:"level,omitempty"`
-	// State is the array state (e.g. "clean", "active", "degraded").
+	// State is the array state as `mdadm --detail` prints it: a list
+	// separated by ", ", such as "clean", "active, resyncing" or
+	// "clean, degraded, recovering".
 	State string `json:"state,omitempty"`
 	// UUID is the array UUID from `mdadm --detail`.
 	UUID string `json:"uuid,omitempty"`
@@ -52,8 +54,14 @@ type Array struct {
 	ActiveDisks int `json:"active_disks"`
 	// TotalDisks is the total number of configured member slots.
 	TotalDisks int `json:"total_disks"`
-	// SpareDIsks is the count of spare disks in the array.
+	// SpareDisks is the count of spare disks in the array.
 	SpareDisks int `json:"spare_disks"`
+	// FailedDisks is the count of failed member disks, from `mdadm
+	// --detail`'s Failed Devices.
+	FailedDisks int `json:"failed_disks"`
+	// WorkingDisks is the count of working member disks, from `mdadm
+	// --detail`'s Working Devices.
+	WorkingDisks int `json:"working_disks"`
 	// Members lists the active member device names (e.g. ["sda1","sdb1"]).
 	Members []string `json:"members"`
 	// Spares lists the spare member device names.
@@ -158,23 +166,26 @@ func parseMdstat(
 	return devices
 }
 
-// raidLevelRE matches "Raid Level : raidN" or "RAID Level : raidN".
-var raidLevelRE = regexp.MustCompile(`(?i)Raid Level\s*:\s*(\S+)`)
-
-// arrayStateRE matches "State : clean" etc.
-var arrayStateRE = regexp.MustCompile(`State\s*:\s*(\S+)`)
-
-// uuidRE matches "UUID : xxxxxxxx:xxxxxxxx:xxxxxxxx:xxxxxxxx".
-var uuidRE = regexp.MustCompile(`UUID\s*:\s*(\S+)`)
-
-// activeDevicesRE matches "Active Devices : N".
-var activeDevicesRE = regexp.MustCompile(`Active Devices\s*:\s*(\d+)`)
-
-// totalDevicesRE matches "Total Devices : N".
-var totalDevicesRE = regexp.MustCompile(`Total Devices\s*:\s*(\d+)`)
-
-// spareDevicesRE matches "Spare Devices : N".
-var spareDevicesRE = regexp.MustCompile(`Spare Devices\s*:\s*(\d+)`)
+// The fields of `mdadm --detail`. Each is anchored to the start of its
+// line, so "Array State :" or "Resync Status :" does not match "State :".
+var (
+	// raidLevelRE matches "Raid Level : raidN" or "RAID Level : raidN".
+	raidLevelRE = regexp.MustCompile(`(?i)^\s*Raid Level\s*:\s*(\S+)`)
+	// arrayStateRE matches "State : clean, degraded", the whole list.
+	arrayStateRE = regexp.MustCompile(`^\s*State\s*:\s*(.+?)\s*$`)
+	// uuidRE matches "UUID : xxxxxxxx:xxxxxxxx:xxxxxxxx:xxxxxxxx".
+	uuidRE = regexp.MustCompile(`^\s*UUID\s*:\s*(\S+)`)
+	// activeDevicesRE matches "Active Devices : N".
+	activeDevicesRE = regexp.MustCompile(`^\s*Active Devices\s*:\s*(\d+)`)
+	// totalDevicesRE matches "Total Devices : N".
+	totalDevicesRE = regexp.MustCompile(`^\s*Total Devices\s*:\s*(\d+)`)
+	// spareDevicesRE matches "Spare Devices : N".
+	spareDevicesRE = regexp.MustCompile(`^\s*Spare Devices\s*:\s*(\d+)`)
+	// failedDevicesRE matches "Failed Devices : N".
+	failedDevicesRE = regexp.MustCompile(`^\s*Failed Devices\s*:\s*(\d+)`)
+	// workingDevicesRE matches "Working Devices : N".
+	workingDevicesRE = regexp.MustCompile(`^\s*Working Devices\s*:\s*(\d+)`)
+)
 
 // applyDetail enriches an Array with fields parsed from `mdadm --detail`
 // output. Fields not matched in the output are left at their zero values.
@@ -207,6 +218,16 @@ func applyDetail(
 		if m := spareDevicesRE.FindStringSubmatch(line); m != nil {
 			if v, err := strconv.Atoi(m[1]); err == nil {
 				arr.SpareDisks = v
+			}
+		}
+		if m := failedDevicesRE.FindStringSubmatch(line); m != nil {
+			if v, err := strconv.Atoi(m[1]); err == nil {
+				arr.FailedDisks = v
+			}
+		}
+		if m := workingDevicesRE.FindStringSubmatch(line); m != nil {
+			if v, err := strconv.Atoi(m[1]); err == nil {
+				arr.WorkingDisks = v
 			}
 		}
 	}

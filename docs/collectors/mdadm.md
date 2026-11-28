@@ -25,18 +25,20 @@ Consumers use this data to:
 
 ## Collected fields
 
-| Field                   | Type       | Description                                                                                                | Schema mapping   |
-| ----------------------- | ---------- | ---------------------------------------------------------------------------------------------------------- | ---------------- |
-| `arrays`                | `array`    | The list of MD RAID arrays in `/proc/mdstat`.                                                              | gohai convention |
-| `arrays[].device`       | `string`   | The kernel device name, for example `"md0"` or `"md127"`.                                                  | gohai convention |
-| `arrays[].level`        | `string`   | The RAID level, from `mdadm --detail`, for example `"raid1"` or `"raid5"`. Empty when it is not available. | gohai convention |
-| `arrays[].state`        | `string`   | The array state, from `mdadm --detail`, for example `"clean"`, `"active"` or `"degraded"`.                 | gohai convention |
-| `arrays[].uuid`         | `string`   | The array UUID, from `mdadm --detail`, for example `"a5d3:1234:dead:beef"`.                                | gohai convention |
-| `arrays[].active_disks` | `int`      | The count of active member disks, from `mdadm --detail`.                                                   | gohai convention |
-| `arrays[].total_disks`  | `int`      | The total count of configured member slots, from `mdadm --detail`.                                         | gohai convention |
-| `arrays[].spare_disks`  | `int`      | The count of spare disks, from `mdadm --detail`.                                                           | gohai convention |
-| `arrays[].members`      | `[]string` | The device names of the active members, from `/proc/mdstat`, for example `["sda1","sdb1"]`.                | gohai convention |
-| `arrays[].spares`       | `[]string` | The device names of the spare members, from `/proc/mdstat` (devices with the `(S)` tag).                   | gohai convention |
+| Field                    | Type       | Description                                                                                                                                   | Schema mapping   |
+| ------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `arrays`                 | `array`    | The list of MD RAID arrays in `/proc/mdstat`.                                                                                                 | gohai convention |
+| `arrays[].device`        | `string`   | The kernel device name, for example `"md0"` or `"md127"`.                                                                                     | gohai convention |
+| `arrays[].level`         | `string`   | The RAID level, from `mdadm --detail`, for example `"raid1"` or `"raid5"`. Empty when it is not available.                                    | gohai convention |
+| `arrays[].state`         | `string`   | The array state as `mdadm --detail` prints it, a list separated by `, `, for example `"clean"`, `"active, resyncing"` or `"clean, degraded"`. | gohai convention |
+| `arrays[].uuid`          | `string`   | The array UUID, from `mdadm --detail`, for example `"a5d3:1234:dead:beef"`.                                                                   | gohai convention |
+| `arrays[].active_disks`  | `int`      | The count of active member disks, from `mdadm --detail`.                                                                                      | gohai convention |
+| `arrays[].total_disks`   | `int`      | The total count of configured member slots, from `mdadm --detail`.                                                                            | gohai convention |
+| `arrays[].spare_disks`   | `int`      | The count of spare disks, from `mdadm --detail`.                                                                                              | gohai convention |
+| `arrays[].failed_disks`  | `int`      | The count of failed member disks, from the `Failed Devices` line of `mdadm --detail`.                                                         | gohai convention |
+| `arrays[].working_disks` | `int`      | The count of working member disks, from the `Working Devices` line of `mdadm --detail`.                                                       | gohai convention |
+| `arrays[].members`       | `[]string` | The device names of the active members, from `/proc/mdstat`, for example `["sda1","sdb1"]`.                                                   | gohai convention |
+| `arrays[].spares`        | `[]string` | The device names of the spare members, from `/proc/mdstat` (devices with the `(S)` tag).                                                      | gohai convention |
 
 ## Platform support
 
@@ -61,6 +63,8 @@ macOS has no MD RAID stack. The Darwin variant returns `nil`.
         "active_disks": 2,
         "total_disks": 2,
         "spare_disks": 0,
+        "failed_disks": 0,
+        "working_disks": 2,
         "members": ["sda1", "sdb1"],
         "spares": []
       }

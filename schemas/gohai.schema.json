@@ -3024,6 +3024,12 @@
         "spare_disks": {
           "type": "integer"
         },
+        "failed_disks": {
+          "type": "integer"
+        },
+        "working_disks": {
+          "type": "integer"
+        },
         "members": {
           "items": {
             "type": "string"
@@ -3044,6 +3050,8 @@
         "active_disks",
         "total_disks",
         "spare_disks",
+        "failed_disks",
+        "working_disks",
         "members",
         "spares"
       ]
