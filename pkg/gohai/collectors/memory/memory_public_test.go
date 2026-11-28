@@ -194,8 +194,10 @@ Pages bogus:                         lots.
 				s.Equal(uint64(1000*kb), i.Total)
 				s.Equal(uint64(200*kb), i.Free)
 				s.Equal(uint64(500*kb), i.Available)
-				s.Equal(uint64(140*kb), i.Cached, "Cached includes SReclaimable, as in gopsutil")
-				s.Equal(uint64(500*kb), i.Used, "Used is Total less Available")
+				// Cached includes SReclaimable, as in gopsutil.
+				s.Equal(uint64(140*kb), i.Cached)
+				// Used is Total less Available.
+				s.Equal(uint64(500*kb), i.Used)
 				s.InDelta(50.0, i.UsedPercent, 0.001)
 				s.Equal(uint64(70*kb), i.Shared)
 				s.Equal(uint64(70*kb), i.Shmem)
@@ -224,7 +226,8 @@ Pages bogus:                         lots.
 			files: map[string]string{"/proc/meminfo": "MemTotal: 1000 kB\nMemFree: 200 kB\n" +
 				"Cached: 100 kB\nSReclaimable: 50 kB\n"},
 			check: func(i *memory.Info) {
-				s.Equal(uint64(350*kb), i.Available, "Cached plus Free")
+				// Cached plus Free.
+				s.Equal(uint64(350*kb), i.Available)
 				s.Equal(uint64(650*kb), i.Used)
 				s.Nil(i.HugePages)
 				s.Nil(i.DirectMap)
@@ -266,7 +269,8 @@ Pages bogus:                         lots.
 				s.Equal(uint64(40*4096), i.Wired)
 				s.Equal(uint64(5*4096), i.Speculative)
 				s.Equal(uint64(6*4096), i.Compressed)
-				s.Equal(uint64(40*4096), i.Available, "free plus inactive, as in gopsutil")
+				// Free plus inactive, as in gopsutil.
+				s.Equal(uint64(40*4096), i.Available)
 				s.Equal(uint64(409600-40*4096), i.Used)
 				s.Equal(&memory.Swap{
 					Total: 2048 << 20, Used: 512 << 20, Free: 1536 << 20, UsedPercent: 25,

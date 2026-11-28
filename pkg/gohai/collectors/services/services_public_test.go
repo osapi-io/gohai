@@ -122,11 +122,12 @@ func (s *ServicesPublicTestSuite) TestNew() {
 		validateFunc func(services.Collector)
 	}{
 		{
-			name:   "darwin dispatches to Darwin",
+			name:   "darwin dispatches to Darwin, with a runner",
 			detect: "darwin",
 			validateFunc: func(c services.Collector) {
-				_, ok := c.(*services.Darwin)
-				s.True(ok)
+				d, ok := c.(*services.Darwin)
+				s.Require().True(ok)
+				s.NotNil(d.Exec)
 			},
 		},
 		{
@@ -200,110 +201,6 @@ const launchctlServices = "system = {\n\ttype = system\n\tservice stats = {\n\t\
 const launchctlDisabled = "\tdisabled services = {\n" +
 	"\t\t\"io.osapi.app\" => disabled\n\t\t\"com.apple.cron\" => enabled\n" +
 	"\t\t\"io.osapi.off\" => disabled\n\t\t\"io.osapi.idle\" => enabled\n\t}\n}\n"
-
-func (s *ServicesPublicTestSuite) TestCollectDarwin() {
-	tests := []struct {
-		name string
-		exec source.Runner
-		want []services.Service
-	}{
-		{
-			name: "each daemon, with its state and whether it is enabled, and the ones not loaded",
-			exec: launchctlExec(s.T(), []byte(launchctlServices+launchctlDisabled), nil),
-			want: []services.Service{
-				{
-					Name:    "com.apple.cron",
-					State:   "running",
-					Enabled: true,
-					Loaded:  true,
-					Type:    "launchd",
-				},
-				{
-					Name:    "io.osapi.app",
-					State:   "dead",
-					Enabled: false,
-					Loaded:  true,
-					Type:    "launchd",
-				},
-				{
-					Name:    "io.osapi.web",
-					State:   "failed",
-					Enabled: true,
-					Loaded:  true,
-					Type:    "launchd",
-				},
-				{
-					Name:    "com.apple.lskdd",
-					State:   "dead",
-					Enabled: true,
-					Loaded:  true,
-					Type:    "launchd",
-				},
-				{Name: "io.osapi.idle", State: "dead", Enabled: true, Type: "launchd"},
-				{Name: "io.osapi.off", State: "dead", Enabled: false, Type: "launchd"},
-			},
-		},
-		{
-			name: "no disabled block: each is enabled",
-			exec: launchctlExec(s.T(), []byte(launchctlServices+"}\n"), nil),
-			want: []services.Service{
-				{
-					Name:    "com.apple.cron",
-					State:   "running",
-					Enabled: true,
-					Loaded:  true,
-					Type:    "launchd",
-				},
-				{Name: "io.osapi.app", State: "dead", Enabled: true, Loaded: true, Type: "launchd"},
-				{
-					Name:    "io.osapi.web",
-					State:   "failed",
-					Enabled: true,
-					Loaded:  true,
-					Type:    "launchd",
-				},
-				{
-					Name:    "com.apple.lskdd",
-					State:   "dead",
-					Enabled: true,
-					Loaded:  true,
-					Type:    "launchd",
-				},
-			},
-		},
-		{
-			name: "output that stops inside the services block",
-			exec: launchctlExec(
-				s.T(),
-				[]byte("\tservices = {\n\t\t     412      - \tcom.apple.cron\n"),
-				nil,
-			),
-			want: []services.Service{
-				{
-					Name:    "com.apple.cron",
-					State:   "running",
-					Enabled: true,
-					Loaded:  true,
-					Type:    "launchd",
-				},
-			},
-		},
-		{
-			name: "launchctl that cannot run is an empty list",
-			exec: launchctlExec(s.T(), nil, errors.New("not found")),
-			want: []services.Service{},
-		},
-		{name: "no executor is an empty list", want: []services.Service{}},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			got, err := (&services.Darwin{Exec: tt.exec}).Collect(context.Background(), nil)
-			s.Require().NoError(err)
-			s.Equal(tt.want, got.(*services.Info).Services)
-		})
-	}
-	s.NotNil(services.NewDarwin().Exec)
-}
 
 func (s *ServicesPublicTestSuite) TestCollect() {
 	tests := []struct {
@@ -415,7 +312,8 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
 				s.Require().True(ok)
-				s.False(info.Services[0].Enabled, "ssh runs but is disabled")
+				// The ssh unit runs but is disabled.
+				s.False(info.Services[0].Enabled)
 			},
 		},
 		{
@@ -495,6 +393,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
 				s.Require().True(ok)
+				// The getty@ unit is a template, so it is not in the list.
 				s.Equal([]services.Service{
 					{
 						Name:          "ssh",
@@ -511,13 +410,139 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 						Enabled:       false,
 						UnitFileState: "disabled",
 					},
-				}, info.Services, "getty@ is a template, so it is not in the list")
+				}, info.Services)
 			},
 		},
 		{
 			name:    "linux: short field lines skipped",
 			variant: "linux",
 			exec:    systemctlExecWith(s.T(), []byte("ssh.service loaded\n"), nil, nil, nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{}, info.Services)
+			},
+		},
+		{
+			name:    "darwin: each daemon, with its state and whether it is enabled, and the ones not loaded",
+			variant: "darwin",
+			exec:    launchctlExec(s.T(), []byte(launchctlServices+launchctlDisabled), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{
+					{
+						Name:    "com.apple.cron",
+						State:   "running",
+						Enabled: true,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+					{
+						Name:    "io.osapi.app",
+						State:   "dead",
+						Enabled: false,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+					{
+						Name:    "io.osapi.web",
+						State:   "failed",
+						Enabled: true,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+					{
+						Name:    "com.apple.lskdd",
+						State:   "dead",
+						Enabled: true,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+					{Name: "io.osapi.idle", State: "dead", Enabled: true, Type: "launchd"},
+					{Name: "io.osapi.off", State: "dead", Enabled: false, Type: "launchd"},
+				}, info.Services)
+			},
+		},
+		{
+			name:    "darwin: no disabled block: each is enabled",
+			variant: "darwin",
+			exec:    launchctlExec(s.T(), []byte(launchctlServices+"}\n"), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{
+					{
+						Name:    "com.apple.cron",
+						State:   "running",
+						Enabled: true,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+					{
+						Name:    "io.osapi.app",
+						State:   "dead",
+						Enabled: true,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+					{
+						Name:    "io.osapi.web",
+						State:   "failed",
+						Enabled: true,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+					{
+						Name:    "com.apple.lskdd",
+						State:   "dead",
+						Enabled: true,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+				}, info.Services)
+			},
+		},
+		{
+			name:    "darwin: output that stops inside the services block",
+			variant: "darwin",
+			exec: launchctlExec(
+				s.T(),
+				[]byte("\tservices = {\n\t\t     412      - \tcom.apple.cron\n"),
+				nil,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{
+					{
+						Name:    "com.apple.cron",
+						State:   "running",
+						Enabled: true,
+						Loaded:  true,
+						Type:    "launchd",
+					},
+				}, info.Services)
+			},
+		},
+		{
+			name:    "darwin: launchctl that cannot run is an empty list",
+			variant: "darwin",
+			exec:    launchctlExec(s.T(), nil, errors.New("not found")),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				s.Equal([]services.Service{}, info.Services)
+			},
+		},
+		{
+			name:    "darwin: no executor is an empty list",
+			variant: "darwin",
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)

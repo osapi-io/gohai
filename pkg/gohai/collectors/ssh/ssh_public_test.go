@@ -267,8 +267,9 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
+				// The user jane has no key, and nobody and nohome are skipped.
 				s.Require().
-					Len(info.AuthorizedKeys, 2, "jane has no key, nobody and nohome are skipped")
+					Len(info.AuthorizedKeys, 2)
 				root := info.AuthorizedKeys["root"]
 				s.Require().Len(root, 1)
 				s.Equal("ssh-ed25519", root[0].Type)
@@ -276,8 +277,9 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				s.Empty(root[0].Options)
 				s.True(strings.HasPrefix(root[0].FingerprintSHA256, "SHA256:"))
 				john := info.AuthorizedKeys["john"]
+				// The bad base64 line and the line with no key are left out.
 				s.Require().
-					Len(john, 1, "the bad base64 line and the line with no key are left out")
+					Len(john, 1)
 				s.Equal("ecdsa-sha2-nistp256", john[0].Type)
 				s.Equal(`no-pty,from="10.0.0.0/8"`, john[0].Options)
 				s.Equal("john laptop", john[0].Comment)
@@ -342,11 +344,13 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
 				svc := info.AuthorizedKeys["svc"]
-				s.Require().Len(svc, 1, "a home of / reads an absolute pattern only")
+				// A home of / reads an absolute pattern only.
+				s.Require().Len(svc, 1)
 				s.Equal("svc@ci", svc[0].Comment)
 				john := info.AuthorizedKeys["john"]
+				// The same file twice is read once, and authorized_keys2 is not named.
 				s.Require().
-					Len(john, 2, "the same file twice is read once, and authorized_keys2 is not named")
+					Len(john, 2)
 				s.Equal("john@uid", john[0].Comment)
 				s.Equal("john@home", john[1].Comment)
 			},
@@ -422,10 +426,10 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				john := info.AuthorizedKeys["john"]
 				s.Require().Len(john, 2)
 				s.Equal(`"quoted first"`, john[1].Options)
+				// A key type inside a quoted option is not the key.
 				s.Equal(
 					"ssh-ed25519",
 					john[0].Type,
-					"a key type inside a quoted option is not the key",
 				)
 				s.Equal(`command="[redacted]",environment="[redacted]",no-pty`, john[0].Options)
 				s.Equal("john  laptop", john[0].Comment)
@@ -464,8 +468,9 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
+				// The users john, root and daemon, which shares the home of root.
 				s.Require().
-					Len(info.AuthorizedKeys, 3, "john, root and daemon, which shares root's home")
+					Len(info.AuthorizedKeys, 3)
 				s.Require().Len(info.AuthorizedKeys["john"], 1)
 				s.Equal("john@mac", info.AuthorizedKeys["john"][0].Comment)
 				s.Require().Len(info.AuthorizedKeys["root"], 1)
@@ -525,7 +530,8 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
-				s.Require().Len(info.Keys, 1, "the bad rsa key is left out")
+				// The bad rsa key is left out.
+				s.Require().Len(info.Keys, 1)
 				s.Equal("ssh-ed25519", info.Keys[0].Type)
 				s.Require().Len(info.AuthorizedKeys["root"], 1)
 			},
