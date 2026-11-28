@@ -348,7 +348,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 				return m
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "mdadm --detail /dev/md0: exit status 1")
 			},
 		},
@@ -453,7 +453,7 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				if true {
-					s.Nil(got)
+					s.Exactly(nil, got)
 					return
 				}
 				info, ok := got.(*mdadm.Info)

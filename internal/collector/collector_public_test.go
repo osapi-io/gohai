@@ -74,6 +74,55 @@ func (s *CollectorPublicTestSuite) TestAbsent() {
 	}
 }
 
+func (s *CollectorPublicTestSuite) TestResult() {
+	type info struct{ Name string }
+	failed := errors.New("exit status 1")
+	tests := []struct {
+		name         string
+		v            *info
+		err          error
+		validateFunc func(any, error)
+	}{
+		{
+			name: "a value is the result",
+			v:    &info{Name: "eth0"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&info{Name: "eth0"}, got)
+			},
+		},
+		{
+			name: "a nil value is an untyped nil",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name: "a nil value keeps its error",
+			err:  failed,
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, failed)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name: "a value keeps its error",
+			v:    &info{Name: "eth0"},
+			err:  failed,
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, failed)
+				s.Equal(&info{Name: "eth0"}, got)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(collector.Result(tt.v, tt.err))
+		})
+	}
+}
+
 func TestCollectorPublicTestSuite(
 	t *testing.T,
 ) {

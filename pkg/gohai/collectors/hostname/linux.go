@@ -55,5 +55,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectWithExec(ctx, l.Exec, l.FS, l.Resolver)
+	return collector.Result(collectWithExec(ctx, l.Exec, l.FS, l.Resolver))
 }

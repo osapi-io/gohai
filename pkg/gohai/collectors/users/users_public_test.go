@@ -437,7 +437,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"dscl . -list /Users UniqueID": errors.New("exit status 1"),
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "dscl . -list /Users UniqueID: exit status 1")
 			},
 		},
@@ -452,7 +452,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"dscl . -list /Users RealName": errors.New("exit status 1"),
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "dscl . -list /Users RealName: exit status 1")
 			},
 		},
@@ -464,7 +464,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"dscl . -list /Groups PrimaryGroupID": errors.New("exit status 1"),
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "dscl . -list /Groups PrimaryGroupID: exit status 1")
 			},
 		},
@@ -479,7 +479,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"dscl . -list /Groups GroupMembership": errors.New("exit status 1"),
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "dscl . -list /Groups GroupMembership: exit status 1")
 			},
 		},
@@ -491,7 +491,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"dscl . -list /Users AuthenticationAuthority": errors.New("exit status 1"),
 			},
 			validateFunc: func(got any, err error) {
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.EqualError(err, "dscl . -list /Users AuthenticationAuthority: exit status 1")
 			},
 		},

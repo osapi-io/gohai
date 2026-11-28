@@ -149,7 +149,7 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 			setupFS: func() avfs.VFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -159,7 +159,7 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -173,7 +173,7 @@ func (s *Grub2PublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "read /boot/grub2/grubenv")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{

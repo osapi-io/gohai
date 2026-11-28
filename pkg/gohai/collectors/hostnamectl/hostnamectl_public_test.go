@@ -322,7 +322,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 				s.Contains(err.Error(), "read hostnamectl")
 			},
 		},
@@ -343,7 +343,7 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				if true {
-					s.Nil(got)
+					s.Exactly(nil, got)
 					return
 				}
 				info, ok := got.(*hostnamectl.Info)

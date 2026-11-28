@@ -53,7 +53,7 @@ func (l *Linux) Collect(
 		return nil, nil
 	}
 
-	return collectSysconf(ctx, l.Exec)
+	return collector.Result(collectSysconf(ctx, l.Exec))
 }
 
 // collectSysconf runs `getconf <name>` for each value. Linux and macOS

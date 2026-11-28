@@ -54,5 +54,5 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectWithExec(ctx, d.Exec, d.FS, d.Resolver)
+	return collector.Result(collectWithExec(ctx, d.Exec, d.FS, d.Resolver))
 }

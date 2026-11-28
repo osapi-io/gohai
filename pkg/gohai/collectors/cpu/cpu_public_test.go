@@ -305,7 +305,7 @@ func (s *CPUPublicTestSuite) TestCollect() {
 			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{

@@ -52,5 +52,5 @@ func (d *Darwin) Collect(
 		return nil, nil
 	}
 
-	return collectSysconf(ctx, d.Exec)
+	return collector.Result(collectSysconf(ctx, d.Exec))
 }

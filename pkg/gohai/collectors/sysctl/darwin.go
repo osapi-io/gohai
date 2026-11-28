@@ -47,5 +47,5 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return run(ctx, d.Exec, darwinSep)
+	return collector.Result(run(ctx, d.Exec, darwinSep))
 }

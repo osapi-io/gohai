@@ -242,7 +242,7 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
 				s.Require().ErrorContains(err, tt.wantErr)
-				s.Nil(got)
+				s.Exactly(nil, got)
 
 				return
 			}

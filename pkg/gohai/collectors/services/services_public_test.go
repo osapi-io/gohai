@@ -323,7 +323,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				nil, errors.New("boom")),
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "systemctl list-unit-files: boom")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -343,7 +343,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			exec:    systemctlExec(s.T(), nil, errors.New("signal: killed")),
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "systemctl list-units: signal: killed")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{

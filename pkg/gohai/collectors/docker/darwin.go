@@ -47,5 +47,5 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectDocker(ctx, d.Exec)
+	return collector.Result(collectDocker(ctx, d.Exec))
 }

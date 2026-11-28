@@ -186,7 +186,7 @@ malformed
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
 				s.Contains(err.Error(), "permission denied")
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -250,7 +250,7 @@ malformed
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
-				s.Nil(got)
+				s.Exactly(nil, got)
 			},
 		},
 	}

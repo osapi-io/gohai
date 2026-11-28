@@ -49,5 +49,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectPOSIX(ctx, l.FS, l.Exec)
+	return collector.Result(collectPOSIX(ctx, l.FS, l.Exec))
 }
