@@ -365,7 +365,7 @@ func parseLsblk(
 		for _, n := range nodes {
 			if n.Fstype != "" {
 				out = append(out, lsblkEntry{
-					Device:     "/dev/" + n.Name,
+					Device:     n.Name,
 					Fstype:     n.Fstype,
 					UUID:       n.UUID,
 					Label:      n.Label,

@@ -73,7 +73,7 @@ func (l *Linux) Collect(
 
 	// lsblk enrichment is best-effort, and a failure is not fatal.
 	out, err := l.Exec.Execute(ctx,
-		"lsblk", "-J", "-o", "NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL")
+		"lsblk", "-J", "-p", "-o", "NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL")
 	if err == nil {
 		if entries, err := parseLsblk(out); err == nil {
 			merged, unmounted := mergeLsblkIntoMounts(info.Mounts, entries)
