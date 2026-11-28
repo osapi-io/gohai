@@ -913,13 +913,12 @@ func stateFromFlags(
 // Source: https://github.com/torvalds/linux/blob/master/include/uapi/linux/if_arp.h
 var arphrdEncapsulation = map[int]string{
 	1:   "Ethernet", // ARPHRD_ETHER
-	24:  "PPP",      // ARPHRD_PPP (the kernel also uses 512, so keep both)
-	512: "PPP",
-	256: "SLIP", // ARPHRD_SLIP
-	257: "VJSLIP",
-	768: "IPIP", // ARPHRD_TUNNEL
-	769: "6to4", // ARPHRD_TUNNEL6
-	772: "Loopback",
+	256: "SLIP",     // ARPHRD_SLIP
+	257: "VJSLIP",   // ARPHRD_CSLIP
+	512: "PPP",      // ARPHRD_PPP
+	768: "IPIP",     // ARPHRD_TUNNEL
+	772: "Loopback", // ARPHRD_LOOPBACK
+	776: "6to4",     // ARPHRD_SIT
 }
 
 // isOpenVZAlias reports whether name looks like `<base>:<n>`, the
