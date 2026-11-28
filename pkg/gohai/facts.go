@@ -25,6 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -210,7 +211,7 @@ func (f *Facts) Flat() map[string]any {
 	b, _ := json.Marshal(f)
 	var generic map[string]any
 	_ = json.Unmarshal(b, &generic)
-	return flattenMap("", generic)
+	return flattenMap(generic)
 }
 
 // Get returns the value at a dot-separated key path, or nil if absent.
@@ -579,23 +580,36 @@ func (f *Facts) set(
 	return false
 }
 
+// flattenMap is in with one dot-separated key for each value. A map's entries
+// and a list's elements get keys of their own: cpu.model, and cpu.flags.0 for
+// the first flag. An empty map or list has no key.
 func flattenMap(
-	prefix string,
 	in map[string]any,
 ) map[string]any {
 	out := make(map[string]any)
 	for k, v := range in {
-		key := k
-		if prefix != "" {
-			key = prefix + "." + k
-		}
-		if sub, ok := v.(map[string]any); ok {
-			for sk, sv := range flattenMap(key, sub) {
-				out[sk] = sv
-			}
-			continue
-		}
-		out[key] = v
+		flattenValue(out, k, v)
 	}
 	return out
+}
+
+// flattenValue puts v into out under key, or, for a map or a list, each of its
+// values under a key of its own.
+func flattenValue(
+	out map[string]any,
+	key string,
+	v any,
+) {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, sv := range t {
+			flattenValue(out, key+"."+k, sv)
+		}
+	case []any:
+		for i, sv := range t {
+			flattenValue(out, key+"."+strconv.Itoa(i), sv)
+		}
+	default:
+		out[key] = v
+	}
 }

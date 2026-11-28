@@ -144,35 +144,69 @@ func TestFactsTestSuite(
 
 func (s *FactsTestSuite) TestFlattenMap() {
 	tests := []struct {
-		name string
-		in   map[string]any
-		want map[string]any
+		name         string
+		in           map[string]any
+		validateFunc func(map[string]any)
 	}{
 		{
 			name: "scalars",
 			in:   map[string]any{"a": 1, "b": "x"},
-			want: map[string]any{"a": 1, "b": "x"},
+			validateFunc: func(got map[string]any) {
+				s.Equal(map[string]any{"a": 1, "b": "x"}, got)
+			},
 		},
 		{
 			name: "nested map",
 			in:   map[string]any{"cpu": map[string]any{"total": 8, "model": "intel"}},
-			want: map[string]any{"cpu.total": 8, "cpu.model": "intel"},
+			validateFunc: func(got map[string]any) {
+				s.Equal(map[string]any{"cpu.total": 8, "cpu.model": "intel"}, got)
+			},
 		},
 		{
 			name: "deep nest",
 			in:   map[string]any{"a": map[string]any{"b": map[string]any{"c": 1}}},
-			want: map[string]any{"a.b.c": 1},
+			validateFunc: func(got map[string]any) {
+				s.Equal(map[string]any{"a.b.c": 1}, got)
+			},
+		},
+		{
+			name: "a list's elements get an index key",
+			in:   map[string]any{"cpu": map[string]any{"flags": []any{"fpu", "sse"}}},
+			validateFunc: func(got map[string]any) {
+				s.Equal(map[string]any{"cpu.flags.0": "fpu", "cpu.flags.1": "sse"}, got)
+			},
+		},
+		{
+			name: "a list of maps flattens each map under its index",
+			in: map[string]any{"disks": []any{
+				map[string]any{"name": "vda", "size": 10},
+				map[string]any{"name": "vdb", "size": 20},
+			}},
+			validateFunc: func(got map[string]any) {
+				s.Equal(map[string]any{
+					"disks.0.name": "vda", "disks.0.size": 10,
+					"disks.1.name": "vdb", "disks.1.size": 20,
+				}, got)
+			},
+		},
+		{
+			name: "an empty list or map has no key",
+			in:   map[string]any{"flags": []any{}, "labels": map[string]any{}},
+			validateFunc: func(got map[string]any) {
+				s.Empty(got)
+			},
 		},
 		{
 			name: "empty",
 			in:   map[string]any{},
-			want: map[string]any{},
+			validateFunc: func(got map[string]any) {
+				s.Empty(got)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got := flattenMap("", tt.in)
-			s.Equal(tt.want, got)
+			tt.validateFunc(flattenMap(tt.in))
 		})
 	}
 }
