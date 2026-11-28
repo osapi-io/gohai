@@ -42,5 +42,5 @@ func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return nil, nil
+	return nil, collector.ErrUnsupported
 }

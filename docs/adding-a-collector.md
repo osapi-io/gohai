@@ -133,6 +133,22 @@ func (l *Linux) Collect(
 own `Collect`. Darwin reads through `sysctl`, `ioreg` and other commands, run
 through `Exec`. It has no build tag.
 
+The values that `Collect` returns set the status of the collector in the facts
+(`_status`):
+
+| `Collect` returns                                    | Status        |
+| ---------------------------------------------------- | ------------- |
+| the fact and no error                                | `ok`          |
+| `nil` and no error: the host has nothing to report   | `absent`      |
+| `nil` and `collector.ErrUnsupported`                 | `unsupported` |
+| `nil` and an error                                   | `failed`      |
+| the fact and an error: what it read before the error | `partial`     |
+
+A variant with nothing to read on its platform, such as the macOS variant of a
+Linux-only collector, returns `nil, collector.ErrUnsupported`. When one read of
+several fails, return the fact of the reads that worked with the error, so the
+status is `partial` and the other facts stay.
+
 Add `debian.go` / `rhel.go` **only** when the distribution is really different
 from generic Linux. For example, `package_mgr` needs apt or dnf. In all other
 cases, the generic `Linux` struct covers all hosts that are not darwin.
@@ -155,8 +171,8 @@ Add the related `Facts` field and `set()` switch case in `pkg/gohai/facts.go`.
 
 `registerBuiltins` returns an error when a `Register` call fails, such as on a
 duplicate name or a source field of the wrong type, and `New` and `NewRegistry`
-return it. `TestBuiltinCollectorsSetFacts` in `pkg/gohai` fails when your
-collector has no `Facts` field of its name, or when `set()` has no case for it.
+return it. `TestBuiltinCollectors` in `pkg/gohai` fails when your collector has
+no `Facts` field of its name, or when `set()` has no case for it.
 
 ## Step 5: tests (100% coverage, one test file)
 

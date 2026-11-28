@@ -7,7 +7,7 @@
 The collector reports the Linux traffic control (qdisc) configuration. It gets
 the data from `tc -s qdisc show`. Each network interface has a list of the
 queuing disciplines that are attached to it. macOS does not have the `tc` tool.
-On Darwin, the collector returns nil and no error.
+On Darwin, the collector gives no fact, and its status is `unsupported`.
 
 The method is the same as Ohai's `linux/tc.rb`. The collector parses the qdisc
 entries of each interface from the `tc` command output. It records the kind, the
@@ -132,7 +132,7 @@ On Linux:
 The interfaces are in the order of their first line in the `tc` output. This
 order is the same as the internal order of the kernel.
 
-On macOS, the collector returns `nil`.
+On macOS, the collector gives no fact, with the status `unsupported`.
 
 ## Backing library
 

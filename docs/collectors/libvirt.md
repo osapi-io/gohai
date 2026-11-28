@@ -12,7 +12,8 @@ binding, because no maintained Go libvirt binding has equivalent coverage. If
 no error.
 
 The collector supports only Linux. KVM needs Linux, and the libvirt daemon
-(`libvirtd`) is a Linux service. On macOS, the collector always returns `nil`.
+(`libvirtd`) is a Linux service. On macOS, the collector gives no fact, with the
+status `unsupported`.
 
 ## Collected fields
 
@@ -40,7 +41,7 @@ The collector supports only Linux. KVM needs Linux, and the libvirt daemon
 | Platform | Supported                                                                                   |
 | -------- | ------------------------------------------------------------------------------------------- |
 | Linux    | ✅ (`virsh version`, `virsh uri`, `virsh list --all`, `virsh dominfo` through the executor) |
-| macOS    | `nil` (Darwin does not support KVM)                                                         |
+| macOS    | No fact, with the status `unsupported` (Darwin does not support KVM)                        |
 
 ## Example output
 
@@ -143,7 +144,8 @@ does not need native bindings. The collector reports a subset of the full Ohai
 output. It does not list networks, storage pools or the hardware topology of the
 node.
 
-The collector does not support macOS. On Darwin, `Collect` always returns `nil`.
+The collector does not support macOS. On Darwin, `Collect` gives no fact, with
+the status `unsupported`.
 
 ## Backing library
 

@@ -145,10 +145,12 @@ func (g *Gohai) Collect(
 	start := time.Now()
 
 	var (
-		samplesMu sync.Mutex
 		samples   map[string]CollectorTiming
 		errorsMu  sync.Mutex
 		errs      map[string]string
+		statusMu  sync.Mutex
+		status    = make(map[string]Status, len(names))
+		durations = make(map[string]time.Duration, len(names))
 	)
 	hooks := collector.Hooks{
 		OnError: func(name string, err error) {
@@ -159,22 +161,16 @@ func (g *Gohai) Collect(
 			}
 			errs[name] = err.Error()
 		},
-	}
-	if g.withTimings {
-		samples = make(map[string]CollectorTiming, len(names))
-		hooks.OnComplete = func(name string, dur time.Duration, err error) {
-			entry := CollectorTiming{
-				DurationNs: dur.Nanoseconds(),
-				Status:     "ok",
-			}
-			if err != nil {
-				entry.Status = "err"
-				entry.Error = err.Error()
-			}
-			samplesMu.Lock()
-			samples[name] = entry
-			samplesMu.Unlock()
-		}
+		OnComplete: func(name string, dur time.Duration, _ error) {
+			statusMu.Lock()
+			defer statusMu.Unlock()
+			durations[name] = dur
+		},
+		OnStatus: func(name string, s collector.Status, _ error) {
+			statusMu.Lock()
+			defer statusMu.Unlock()
+			status[name] = Status(s)
+		},
 	}
 
 	results, runErr := g.registry.Run(ctx, names, hooks)
@@ -186,9 +182,10 @@ func (g *Gohai) Collect(
 		CollectTime:     start,
 		CollectDuration: time.Since(start),
 		Errors:          errs,
+		Status:          status,
 	}
-	if g.withTimings {
-		facts.Timings = &Timings{Collectors: samples}
+	if len(status) == 0 {
+		facts.Status = nil
 	}
 	for name, result := range results {
 		if result == nil || facts.set(name, result) {
@@ -200,6 +197,18 @@ func (g *Gohai) Collect(
 			facts.Errors = make(map[string]string)
 		}
 		facts.Errors[name] = fmt.Sprintf("gave a %T, which its Facts field does not hold", result)
+		facts.Status[name] = StatusFailed
+	}
+	if g.withTimings {
+		samples = make(map[string]CollectorTiming, len(durations))
+		for name, dur := range durations {
+			samples[name] = CollectorTiming{
+				DurationNs: dur.Nanoseconds(),
+				Status:     facts.Status[name],
+				Error:      facts.Errors[name],
+			}
+		}
+		facts.Timings = &Timings{Collectors: samples}
 	}
 	if runErr != nil {
 		return facts, fmt.Errorf("run collectors: %w", runErr)

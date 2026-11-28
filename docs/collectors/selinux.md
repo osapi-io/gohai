@@ -10,8 +10,8 @@ selinuxfs's `/sys/fs/selinux/enforce`. `/etc/selinux/config` gives the
 configured mode and the policy type, and `sestatus` gives the loaded policy
 name, the policy version and the maximum kernel policy version.
 
-On macOS, the collector returns `nil`. SELinux is a Linux kernel security
-module, and macOS does not have it.
+On macOS, the collector gives no fact, with the status `unsupported`. SELinux is
+a Linux kernel security module, and macOS does not have it.
 
 Consumers use this data to:
 
@@ -51,10 +51,10 @@ Consumers use this data to:
 
 ## Platform support
 
-| Platform | Supported                                        |
-| -------- | ------------------------------------------------ |
-| Linux    | ✅                                               |
-| macOS    | Returns `nil`. SELinux is not available on macOS |
+| Platform | Supported                                                                 |
+| -------- | ------------------------------------------------------------------------- |
+| Linux    | ✅                                                                        |
+| macOS    | No fact, with the status `unsupported`. SELinux is not available on macOS |
 
 ## Example output
 

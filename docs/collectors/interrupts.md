@@ -36,7 +36,8 @@ The collector uses the same method as Ohai's `interrupts` plugin. It reads
 | Linux    | ✅                          |
 | macOS    | nil (no `/proc/interrupts`) |
 
-macOS does not expose `/proc/interrupts`. The Darwin variant returns `nil`.
+macOS does not expose `/proc/interrupts`. The Darwin variant gives no fact, with
+the status `unsupported`.
 
 ## Example output
 
@@ -122,7 +123,7 @@ On Linux:
    the tokens after the counts to make the type label. Usually, `ERR` and `MIS`
    have no tokens after the counts.
 
-On macOS, the collector returns `nil`.
+On macOS, the collector gives no fact, with the status `unsupported`.
 
 ## Backing library
 

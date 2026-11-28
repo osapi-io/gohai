@@ -22,12 +22,17 @@ package gohai_test
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"math"
 	"testing"
 	"time"
 
+	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
@@ -329,5 +334,68 @@ func (s *FactsPublicTestSuite) TestString() {
 		s.Run(tt.name, func() {
 			tt.validateFunc(s.facts.String())
 		})
+	}
+}
+
+// TestStatus checks that the statuses of gohai.Status are the statuses of
+// internal/collector, which gohai.Collect converts: a status that one adds
+// and the other does not would reach the facts with no constant for it.
+func (s *FactsPublicTestSuite) TestStatus() {
+	// constants is the name and value of each constant of type Status in the
+	// Go file at path, read through avfs.
+	constants := func(path string) map[string]string {
+		repo := osfs.New()
+		src, err := repo.ReadFile(path)
+		s.Require().NoError(err)
+		file, err := parser.ParseFile(token.NewFileSet(), path, src, 0)
+		s.Require().NoError(err)
+		out := map[string]string{}
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok || gen.Tok != token.CONST {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				v, ok := spec.(*ast.ValueSpec)
+				if !ok || len(v.Values) != 1 {
+					continue
+				}
+				if t, ok := v.Type.(*ast.Ident); !ok || t.Name != "Status" {
+					continue
+				}
+				lit, ok := v.Values[0].(*ast.BasicLit)
+				s.Require().True(ok)
+				out[v.Names[0].Name] = lit.Value
+			}
+		}
+
+		return out
+	}
+	tests := []struct {
+		name         string
+		validateFunc func()
+	}{
+		{
+			name: "the statuses are those of internal/collector",
+			validateFunc: func() {
+				public := constants("facts.go")
+				internal := constants("../../internal/collector/collector.go")
+				s.Len(public, 5)
+				s.Equal(internal, public)
+			},
+		},
+		{
+			name: "each status has the value that its constant gives",
+			validateFunc: func() {
+				s.Equal(gohai.Status(collector.StatusOK), gohai.StatusOK)
+				s.Equal(gohai.Status(collector.StatusAbsent), gohai.StatusAbsent)
+				s.Equal(gohai.Status(collector.StatusUnsupported), gohai.StatusUnsupported)
+				s.Equal(gohai.Status(collector.StatusFailed), gohai.StatusFailed)
+				s.Equal(gohai.Status(collector.StatusPartial), gohai.StatusPartial)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, tt.validateFunc)
 	}
 }

@@ -160,11 +160,11 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "darwin: returns nil, because macOS has no SELinux",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
 				s.Exactly(nil, got)
 			},
 		},

@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"sync"
@@ -100,6 +101,24 @@ func newCancellingCollector(
 			return nil, nil
 		}).
 		AnyTimes()
+
+	return m
+}
+
+// newCollectorReturning is a collector named name whose Collect returns out
+// and err.
+func newCollectorReturning(
+	ctrl *gomock.Controller,
+	name string,
+	out any,
+	err error,
+) *mocks.MockCollector {
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(false).AnyTimes()
+	m.EXPECT().Dependencies().Return(nil).AnyTimes()
+	m.EXPECT().Collect(gomock.Any(), gomock.Any()).Return(out, err).AnyTimes()
 
 	return m
 }
@@ -529,6 +548,8 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 		injectAs      any
 		injectCancel  bool
 		injectCycle   bool
+		inject        func(*gomock.Controller) []collector.Collector
+		builtins      func(source.Sources) []collector.Collector
 		validateFunc  func(*gohai.Facts, error)
 	}{
 		{
@@ -601,7 +622,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 				s.Require().NotEmpty(facts.Timings.Collectors)
 				entry, ok := facts.Timings.Collectors["platform"]
 				s.Require().True(ok)
-				s.Equal("ok", entry.Status)
+				s.Equal(gohai.StatusOK, entry.Status)
 				s.Empty(entry.Error)
 				s.Greater(entry.DurationNs, int64(0))
 			},
@@ -632,7 +653,7 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 				s.Require().NotEmpty(facts.Timings.Collectors)
 				entry, ok := facts.Timings.Collectors["failtest"]
 				s.Require().True(ok)
-				s.Equal("err", entry.Status)
+				s.Equal(gohai.StatusFailed, entry.Status)
 				s.Contains(entry.Error, "simulated collector failure")
 				s.Greater(entry.DurationNs, int64(0))
 				s.Contains(facts.Errors["failtest"], "simulated collector failure")
@@ -670,6 +691,62 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name: "each collector that ran has its status",
+			opts: []gohai.Option{gohai.WithCollectors("platform")},
+			inject: func(ctrl *gomock.Controller) []collector.Collector {
+				return []collector.Collector{
+					newCollectorReturning(ctrl, "nothing", nil, nil),
+					newCollectorReturning(
+						ctrl,
+						"elsewhere",
+						nil,
+						fmt.Errorf("macOS: %w", collector.ErrUnsupported),
+					),
+					newCollectorReturning(ctrl, "broken", nil, errors.New("read failed")),
+				}
+			},
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Equal(map[string]gohai.Status{
+					"platform":  gohai.StatusOK,
+					"nothing":   gohai.StatusAbsent,
+					"elsewhere": gohai.StatusUnsupported,
+					"broken":    gohai.StatusFailed,
+				}, facts.Status)
+				// Nothing to read on a platform is not an error.
+				s.Equal(map[string]string{"broken": "read failed"}, facts.Errors)
+			},
+		},
+		{
+			name: "a partial collector keeps its facts and its error",
+			opts: []gohai.Option{gohai.WithCollectors("platform"), gohai.WithTimings()},
+			builtins: func(source.Sources) []collector.Collector {
+				return []collector.Collector{newCollectorReturning(
+					gomock.NewController(s.T()),
+					"platform",
+					&platform.Info{CPUArchitecture: "arm64"},
+					errors.New("uname failed"),
+				)}
+			},
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Require().NotNil(facts.Platform)
+				s.Equal("arm64", facts.Platform.CPUArchitecture)
+				s.Equal(map[string]gohai.Status{"platform": gohai.StatusPartial}, facts.Status)
+				s.Equal(map[string]string{"platform": "uname failed"}, facts.Errors)
+				s.Equal(gohai.StatusPartial, facts.Timings.Collectors["platform"].Status)
+				s.Equal("uname failed", facts.Timings.Collectors["platform"].Error)
+			},
+		},
+		{
+			name:     "a result that no Facts field holds is failed",
+			injectAs: "x",
+			validateFunc: func(facts *gohai.Facts, err error) {
+				s.Require().NoError(err)
+				s.Equal(gohai.StatusFailed, facts.Status["wrongtype"])
+			},
+		},
+		{
 			name:          "failed collector surfaces in Errors without WithTimings",
 			injectFailing: true,
 			validateFunc: func(facts *gohai.Facts, err error) {
@@ -685,8 +762,17 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
+			if tt.builtins != nil {
+				defer gohai.SetBuiltinCollectorsFn(tt.builtins)()
+			}
 			g, err := gohai.New(tt.opts...)
 			s.Require().NoError(err)
+			if tt.inject != nil {
+				for _, c := range tt.inject(gomock.NewController(s.T())) {
+					s.Require().NoError(g.Register(c))
+					s.Require().NoError(g.Select(c.Name()))
+				}
+			}
 			if tt.injectFailing {
 				s.Require().NoError(
 					g.Register(newFailingCollector(

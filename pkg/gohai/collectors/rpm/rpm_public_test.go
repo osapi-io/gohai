@@ -137,10 +137,10 @@ func (s *RPMPublicTestSuite) TestCollect() {
 		validateFunc func(any, error)
 	}{
 		{
-			name:    "darwin: returns nil",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
 				s.Exactly(nil, got)
 			},
 		},

@@ -74,6 +74,56 @@ func (s *CollectorPublicTestSuite) TestAbsent() {
 	}
 }
 
+func (s *CollectorPublicTestSuite) TestStatusOf() {
+	tests := []struct {
+		name         string
+		out          any
+		err          error
+		validateFunc func(collector.Status)
+	}{
+		{
+			name: "a fact and no error is ok",
+			out:  "x",
+			validateFunc: func(got collector.Status) {
+				s.Equal(collector.StatusOK, got)
+			},
+		},
+		{
+			name: "no fact and no error is absent",
+			validateFunc: func(got collector.Status) {
+				s.Equal(collector.StatusAbsent, got)
+			},
+		},
+		{
+			name: "a wrapped ErrUnsupported is unsupported",
+			err:  fmt.Errorf("darwin: %w", collector.ErrUnsupported),
+			validateFunc: func(got collector.Status) {
+				s.Equal(collector.StatusUnsupported, got)
+			},
+		},
+		{
+			name: "an error and no fact is failed",
+			err:  errors.New("boom"),
+			validateFunc: func(got collector.Status) {
+				s.Equal(collector.StatusFailed, got)
+			},
+		},
+		{
+			name: "a fact and an error is partial",
+			out:  "x",
+			err:  errors.New("one read failed"),
+			validateFunc: func(got collector.Status) {
+				s.Equal(collector.StatusPartial, got)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(collector.StatusOf(tt.out, tt.err))
+		})
+	}
+}
+
 func (s *CollectorPublicTestSuite) TestResult() {
 	type info struct{ Name string }
 	failed := errors.New("exit status 1")

@@ -220,17 +220,11 @@ Codename:	noble
 			},
 		},
 		{
-			name:    "darwin returns nil",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*lsb.Info)
-				s.Require().True(ok)
-				s.Equal(lsb.Info{}, *info)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 	}

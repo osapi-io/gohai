@@ -500,18 +500,12 @@ func (s *MdadmPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin returns nil",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			setupFS: func() avfs.VFS { return memfs.New() },
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*mdadm.Info)
-				s.Require().True(ok)
-				s.Equal([]mdadm.Array(nil), info.Arrays)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 	}

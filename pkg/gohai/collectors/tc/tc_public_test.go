@@ -502,17 +502,11 @@ qdisc fq_codel 10: dev eth0 parent 1:10 limit 10240p flows 1024
 			},
 		},
 		{
-			name:    "darwin: returns nil",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*tc.Info)
-				s.Require().True(ok)
-				s.Equal([]tc.Interface(nil), info.Interfaces)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 	}

@@ -328,17 +328,11 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin returns nil",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*interrupts.Info)
-				s.Require().True(ok)
-				s.Equal([]interrupts.IRQ(nil), info.IRQs)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 	}

@@ -51,7 +51,8 @@ kernels or container configurations have all parameters.
 | Linux    | ✅                          |
 | macOS    | nil (no `/proc/sys/kernel`) |
 
-macOS has no `/proc/sys/kernel`. The Darwin variant returns `nil`.
+macOS has no `/proc/sys/kernel`. The Darwin variant gives no fact, with the
+status `unsupported`.
 
 ## Example output
 
@@ -128,7 +129,7 @@ On Linux:
    kernel does not have that parameter. A file that is there and can't be read
    is an error.
 
-On macOS, the collector returns `nil`.
+On macOS, the collector gives no fact, with the status `unsupported`.
 
 ## Backing library
 

@@ -286,17 +286,11 @@ user-runtime: /run/user/1000
 			},
 		},
 		{
-			name:    "darwin: returns nil",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*systemdpaths.Info)
-				s.Require().True(ok)
-				s.Equal(map[string]string(nil), info.Paths)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 	}

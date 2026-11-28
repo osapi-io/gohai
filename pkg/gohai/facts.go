@@ -174,9 +174,14 @@ type Facts struct {
 	// not selected, so this is how a caller tells the two apart.
 	Errors map[string]string `json:"_errors,omitempty"`
 
+	// Status is why each collector that ran has its fact, or has none:
+	// ok, absent, unsupported, failed or partial. A failed or partial
+	// collector also has its error in Errors.
+	Status map[string]Status `json:"_status,omitempty"`
+
 	// Timings is populated only when the Gohai instance was built with
-	// WithTimings(). Contains per-collector wall-clock durations, status
-	// ("ok" / "err"), and the error message of a failed collector.
+	// WithTimings(). Contains per-collector wall-clock durations, the
+	// status, and the error message of a failed or partial collector.
 	Timings *Timings `json:"_timings,omitempty"`
 }
 
@@ -191,9 +196,29 @@ type Timings struct {
 // CollectorTiming is one collector's per-run observability entry.
 type CollectorTiming struct {
 	DurationNs int64  `json:"duration_ns"`
-	Status     string `json:"status"` // "ok" | "err"
+	Status     Status `json:"status"`
 	Error      string `json:"error,omitempty"`
 }
+
+// Status is why a collector has its fact, or has none.
+type Status string
+
+// The statuses of a collector after a run.
+const (
+	// StatusOK is a collector that returned its fact.
+	StatusOK Status = "ok"
+	// StatusAbsent is a collector that found nothing on the host to report.
+	StatusAbsent Status = "absent"
+	// StatusUnsupported is a collector with nothing to read on the platform,
+	// such as the macOS variant of a Linux-only collector.
+	StatusUnsupported Status = "unsupported"
+	// StatusFailed is a collector that failed with no fact, or that did not
+	// run because a collector it depends on failed.
+	StatusFailed Status = "failed"
+	// StatusPartial is a collector that returned a fact and an error: the
+	// fact holds what it read before the error.
+	StatusPartial Status = "partial"
+)
 
 // JSON returns the compact JSON representation of the facts.
 func (f *Facts) JSON() ([]byte, error) {

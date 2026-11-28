@@ -40,6 +40,52 @@ func Absent(
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, exec.ErrNotFound)
 }
 
+// ErrUnsupported is the error of a collector variant that has nothing to
+// read on its platform, such as the macOS variant of a Linux-only collector.
+// The registry gives it the status StatusUnsupported, not StatusFailed, and
+// it is not an error of the run.
+var ErrUnsupported = errors.New("not supported on this platform")
+
+// Status is why a collector has its fact, or has none.
+type Status string
+
+// The statuses of a collector after a run.
+const (
+	// StatusOK is a collector that returned its fact.
+	StatusOK Status = "ok"
+	// StatusAbsent is a collector that found nothing on the host to report:
+	// it returned no fact and no error.
+	StatusAbsent Status = "absent"
+	// StatusUnsupported is a collector with nothing to read on the platform:
+	// it returned ErrUnsupported.
+	StatusUnsupported Status = "unsupported"
+	// StatusFailed is a collector that returned an error and no fact, or that
+	// did not run because a collector it depends on failed.
+	StatusFailed Status = "failed"
+	// StatusPartial is a collector that returned a fact and an error: the
+	// fact holds what it read before the error.
+	StatusPartial Status = "partial"
+)
+
+// StatusOf is the status of a collector that returned out and err.
+func StatusOf(
+	out any,
+	err error,
+) Status {
+	switch {
+	case errors.Is(err, ErrUnsupported):
+		return StatusUnsupported
+	case err != nil && out != nil:
+		return StatusPartial
+	case err != nil:
+		return StatusFailed
+	case out == nil:
+		return StatusAbsent
+	default:
+		return StatusOK
+	}
+}
+
 // Result returns v as a Collect result. A nil v becomes an untyped nil, so
 // the registry records no fact. A typed nil pointer in an any is not nil,
 // and would put a null fact in the output.

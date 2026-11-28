@@ -330,20 +330,11 @@ func (s *FipsPublicTestSuite) TestCollect() {
 		},
 
 		{
-			name:    "darwin returns nil (no :darwin handler in Ohai)",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				if true {
-					s.Exactly(nil, got)
-					return
-				}
-				info, ok := got.(*fips.Info)
-				s.Require().True(ok)
-				s.Equal(false, info.Kernel.Enabled)
-				s.Require().NotNil(info.Policy)
-				s.Equal("", info.Policy.Name)
-				s.Equal(false, info.Policy.FIPSEffective)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 	}

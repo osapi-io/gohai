@@ -54,8 +54,9 @@ each device. gohai reports the same set of attributes as Ohai.
 | Linux    | ✅                    |
 | macOS    | nil (no `/sys/block`) |
 
-macOS has no `/sys/block` tree. The Darwin variant returns `nil`. This shows
-that the data is not available on this platform.
+macOS has no `/sys/block` tree. The Darwin variant gives no fact, with the
+status `unsupported`. This shows that the data is not available on this
+platform.
 
 ## Example output
 
@@ -147,7 +148,7 @@ On Linux:
    error, so that an empty field always means that the device has no such
    attribute.
 
-On macOS, the collector returns `nil`.
+On macOS, the collector gives no fact, with the status `unsupported`.
 
 ## Backing library
 

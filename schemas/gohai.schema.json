@@ -1848,6 +1848,12 @@
           },
           "type": "object"
         },
+        "_status": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
         "_timings": {
           "$ref": "#/$defs/Timings"
         }

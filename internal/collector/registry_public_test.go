@@ -23,6 +23,7 @@ package collector_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -707,6 +708,97 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.Contains(errNames, "bad")
 				s.Contains(completeNames, "bad")
 				s.Contains(completeNames, "good")
+			},
+		},
+		{
+			name: "each collector reports its status, and a partial one keeps its result",
+			setup: func(reg *collector.Registry) {
+				for _, c := range []struct {
+					name string
+					out  any
+					err  error
+				}{
+					{"ok", "ok-result", nil},
+					{"absent", nil, nil},
+					{"unsupported", nil, fmt.Errorf("darwin: %w", collector.ErrUnsupported)},
+					{"failed", nil, errors.New("boom")},
+					{"partial", "partial-result", errors.New("one read failed")},
+				} {
+					m := newCollectorWith(s.ctrl, c.name)
+					m.EXPECT().Collect(gomock.Any(), gomock.Any()).Return(c.out, c.err)
+					s.Require().NoError(reg.Register(m))
+				}
+			},
+			names: []string{"ok", "absent", "unsupported", "failed", "partial"},
+			hooks: func(mu *sync.Mutex, onErr *[]string, onComp *[]string) collector.Hooks {
+				return collector.Hooks{
+					OnError: func(n string, _ error) {
+						mu.Lock()
+						defer mu.Unlock()
+						*onErr = append(*onErr, n)
+					},
+					OnStatus: func(n string, st collector.Status, err error) {
+						mu.Lock()
+						defer mu.Unlock()
+						entry := n + ": " + string(st)
+						if err != nil {
+							entry += ": " + err.Error()
+						}
+						*onComp = append(*onComp, entry)
+					},
+				}
+			},
+			validateFunc: func(results map[string]any, errNames, statuses []string, err error) {
+				s.Require().NoError(err)
+				s.Equal(map[string]any{"ok": "ok-result", "partial": "partial-result"}, results)
+				s.ElementsMatch([]string{"failed", "partial"}, errNames)
+				s.ElementsMatch([]string{
+					"ok: ok",
+					"absent: absent",
+					"unsupported: unsupported: darwin: not supported on this platform",
+					"failed: failed: boom",
+					"partial: partial: one read failed",
+				}, statuses)
+			},
+		},
+		{
+			name: "a partial dependency gives its dependent the fact it read",
+			setup: func(reg *collector.Registry) {
+				a := newCollectorWith(s.ctrl, "a")
+				a.EXPECT().
+					Collect(gomock.Any(), gomock.Any()).
+					Return("a-partial", errors.New("one read failed"))
+				s.Require().NoError(reg.Register(a))
+				b := newCollectorWith(s.ctrl, "b", "a")
+				b.EXPECT().
+					Collect(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, prior collector.PriorResults) (any, error) {
+						return "b saw " + prior["a"].(string), nil
+					})
+				s.Require().NoError(reg.Register(b))
+			},
+			names: []string{"b"},
+			validateFunc: func(results map[string]any, errNames, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Equal(map[string]any{"a": "a-partial", "b": "b saw a-partial"}, results)
+				s.Equal([]string{"a"}, errNames)
+			},
+		},
+		{
+			name: "an unsupported dependency does not stop its dependent",
+			setup: func(reg *collector.Registry) {
+				a := newCollectorWith(s.ctrl, "a")
+				a.EXPECT().Collect(gomock.Any(), gomock.Any()).Return(nil, collector.ErrUnsupported)
+				s.Require().NoError(reg.Register(a))
+				b := newCollectorWith(s.ctrl, "b", "a")
+				b.EXPECT().Collect(gomock.Any(), gomock.Any()).Return("b-result", nil)
+				s.Require().NoError(reg.Register(b))
+			},
+			names: []string{"b"},
+			validateFunc: func(results map[string]any, errNames, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Equal(map[string]any{"b": "b-result"}, results)
+				s.Empty(errNames)
 			},
 		},
 	}
