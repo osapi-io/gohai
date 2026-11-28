@@ -44,7 +44,7 @@ var macrosMarkerRE = regexp.MustCompile(`={5,}`)
 // Info holds RPM configuration data.
 type Info struct {
 	// Macros is the map of RPM macro name → definition. Macro names
-	// do not include the leading '%' — they are stored exactly as
+	// do not include the leading '%'. They are stored exactly as
 	// `rpm --showrc` reports them (e.g. "buildroot", "__cc", "%{?_smp_mflags}").
 	Macros map[string]string `json:"macros"`
 }
@@ -63,7 +63,7 @@ func (base) Name() string { return "rpm" }
 // Category returns "linux".
 func (base) Category() collector.Category { return collector.CategoryLinux }
 
-// DefaultEnabled returns false — rpm is opt-in.
+// DefaultEnabled returns false, because rpm is opt-in.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

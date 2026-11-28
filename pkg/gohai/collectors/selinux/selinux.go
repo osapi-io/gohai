@@ -19,7 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package selinux reports SELinux status, mode, and policy information.
-// On Darwin the collector returns nil gracefully — SELinux is a
+// On Darwin the collector returns nil gracefully, because SELinux is a
 // Linux-only security framework. On Linux the collector reads
 // /etc/selinux/config for the configured policy and mode, and runs
 // `sestatus` for the runtime mode, policy version, and kernel policy
@@ -77,7 +77,7 @@ func (base) Name() string { return "selinux" }
 // Category returns "security".
 func (base) Category() collector.Category { return collector.CategorySecurity }
 
-// DefaultEnabled returns false — SELinux collection is opt-in.
+// DefaultEnabled returns false, because SELinux collection is opt-in.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

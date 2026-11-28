@@ -31,7 +31,7 @@ import (
 
 // Linux collects the shell list on Linux hosts. Embeds base for the
 // static Name / DefaultEnabled / Dependencies methods. FS is the
-// virtual filesystem the collector reads from — production is the real
+// virtual filesystem the collector reads from. Production uses the real
 // OS FS via avfs/osfs; tests inject an avfs memfs with canned content.
 type Linux struct {
 	base
@@ -45,7 +45,7 @@ func NewLinux() *Linux {
 }
 
 // Collect reads /etc/shells and returns the list of valid login shells.
-// A missing file soft-misses to an empty list — distroless/scratch
+// A missing file soft-misses to an empty list, because distroless/scratch
 // containers legitimately lack /etc/shells.
 func (l *Linux) Collect(
 	_ context.Context,

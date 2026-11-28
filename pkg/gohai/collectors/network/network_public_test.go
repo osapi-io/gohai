@@ -196,7 +196,7 @@ func ipRouteExec(
 		Execute(gomock.Any(), "ip", "-d", "link").
 		Return(nil, errAbsent).
 		AnyTimes()
-	// ethtool calls — default to "command not found" so existing tests
+	// ethtool calls default to "command not found", so existing tests
 	// that don't care about ethtool keep passing. Tests that exercise
 	// the ethtool path use ipRouteAndEthtoolExec / ipRouteAndEthtoolFullExec.
 	// Two arities to cover -i (one flag) and -g/-l/-c/-k/-a (all single flag).
@@ -548,10 +548,10 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().Len(i.Interfaces, 2)
 
-				// lo is Loopback — ethtool path skipped.
+				// lo is Loopback, so the ethtool path is skipped.
 				s.Nil(i.Interfaces[0].Ethtool)
 
-				// eth0 is Ethernet — DriverInfo populated.
+				// eth0 is Ethernet, so DriverInfo is populated.
 				s.Require().NotNil(i.Interfaces[1].Ethtool)
 				di := i.Interfaces[1].Ethtool.DriverInfo
 				s.Equal("e1000e", di["driver"])
@@ -705,7 +705,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
 			}),
 			exec: ipRouteAndEthtoolExec(s.T(), map[string]string{
-				// whitespace-only lines + a colon-only line — exercises both
+				// whitespace-only lines + a colon-only line exercise both
 				// the "no colon" continue and the "empty key" continue.
 				"eth0": "\n   \n: only-value\n",
 			}),
@@ -777,18 +777,18 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal(8, et.ChannelParams["max_combined"])
 				s.Equal(4, et.ChannelParams["current_combined"])
 
-				// coalesce — mixed types
+				// coalesce: mixed types
 				s.Equal("on", et.CoalesceParams["adaptive_rx"])
 				s.Equal("off", et.CoalesceParams["adaptive_tx"])
 				s.Equal(50, et.CoalesceParams["rx_usecs"])
 				s.Equal(64, et.CoalesceParams["tx_max_coalesced_frames"])
 
-				// offload — [fixed] annotation stripped
+				// offload: the [fixed] annotation is stripped
 				s.Equal("on", et.OffloadParams["rx_checksumming"])
 				s.Equal("on", et.OffloadParams["tx_checksumming"])
 				s.Equal("off", et.OffloadParams["generic_receive_offload"])
 
-				// pause — booleans
+				// pause: booleans
 				s.True(et.PauseParams["autonegotiate"])
 				s.True(et.PauseParams["rx"])
 				s.False(et.PauseParams["tx"])
@@ -1019,7 +1019,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("10", v.VLAN.ID)
 				s.Empty(v.VLAN.Flags)
 
-				// `remote` is the last word — no following value — so
+				// `remote` is the last word, with no value after it, so
 				// the key is recognised but no field set. proto stays.
 				s.Require().NotNil(t.TunnelInfo)
 				s.Equal("ipip6", t.TunnelInfo.Proto)
@@ -1063,7 +1063,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
 				s.Require().True(ok)
-				// Bare keywords with no payload — parsers see substring matches but
+				// Bare keywords with no payload: parsers see substring matches but
 				// extract nothing; per-iface annotations stay nil.
 				s.Nil(i.Interfaces[0].VLAN)
 				s.Nil(i.Interfaces[0].TunnelInfo)

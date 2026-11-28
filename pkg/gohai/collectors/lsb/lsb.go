@@ -19,7 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package lsb reports Linux Standard Base identification fields via
-// the `lsb_release` CLI — matches Ohai's linux/lsb plugin. The legacy
+// the `lsb_release` CLI, as Ohai's linux/lsb plugin does. The legacy
 // /etc/lsb-release file fallback was deliberately removed by Ohai in
 // chef/ohai#1562; we match that stance.
 package lsb
@@ -70,7 +70,7 @@ func NewWith(
 }
 
 // parseLsbReleaseCLI parses `lsb_release -a` output. The CLI emits one
-// labelled field per line — matches Ohai's regex set in linux/lsb.rb.
+// labelled field per line, which Ohai's regex set in linux/lsb.rb matches.
 func parseLsbReleaseCLI(
 	content string,
 ) *Info {

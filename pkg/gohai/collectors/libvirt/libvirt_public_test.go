@@ -192,7 +192,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 	}{
 		// ----- Linux -----
 		{
-			name:    "linux: full happy path — version, URI, two domains with dominfo",
+			name:    "linux: reads the version, the URI and two domains with dominfo",
 			variant: "linux",
 			exec:    func(t *testing.T) source.Runner { return fullVirshMock(t) },
 			validateFunc: func(got any, err error) {
@@ -242,7 +242,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: library line without libvirt prefix — raw value used",
+			name:    "linux: a library line without the libvirt prefix keeps its raw value",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
@@ -321,7 +321,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: virsh version fails — returns nil",
+			name:    "linux: when virsh version fails returns nil",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
@@ -383,7 +383,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: virsh dominfo fails — domain kept with name+state only",
+			name:    "linux: when virsh dominfo fails keeps the domain with its name and state only",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
@@ -412,7 +412,7 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: empty domain list — Domains field nil",
+			name:    "linux: an empty domain list leaves Domains nil",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)

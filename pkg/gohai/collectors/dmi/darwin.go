@@ -31,7 +31,7 @@ import (
 // comes from IOKit (`ioreg`) and `system_profiler` instead, covered
 // by the `hardware` collector. Returning an empty Info here keeps
 // the shape consistent across platforms so consumers can safely check
-// `facts.DMI.Product` without a per-OS branch — they just get empty
+// `facts.DMI.Product` without a per-OS branch. They get empty
 // strings on macOS.
 type Darwin struct {
 	base
@@ -42,7 +42,7 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect returns an empty Info — macOS has no SMBIOS/DMI surface.
+// Collect returns an empty Info, because macOS has no SMBIOS/DMI surface.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,

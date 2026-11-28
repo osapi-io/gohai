@@ -91,7 +91,7 @@ host.
 **`linux.go`:**
 
 ```go
-// (MIT header) — NO //go:build tag
+// (MIT header). The file has no //go:build tag.
 package cpu
 
 import (

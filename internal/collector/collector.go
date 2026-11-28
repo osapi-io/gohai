@@ -42,7 +42,7 @@ func Absent(
 
 // PriorResults is the map of already-completed collector outputs
 // passed to each collector's Collect call. Access typed values via
-// GetDep — that handles the runtime type assertion for you.
+// GetDep, which does the runtime type assertion for you.
 type PriorResults map[string]any
 
 // GetDep returns the prior collector's result cast to T, such as
@@ -66,7 +66,7 @@ func GetDep[T any](
 // Category groups related collectors for bulk enable/disable. Values
 // are lowercase free-form strings; the set below is the canonical
 // roster documented in docs/collectors/README.md. New categories can
-// be added without code changes — the registry and SDK treat them as
+// be added without code changes, because the registry and SDK treat them as
 // opaque tags. Keep this list in sync with the docs when the roster
 // changes.
 const (
@@ -100,7 +100,7 @@ type Collector interface {
 	// Name returns the unique identifier (e.g., "platform").
 	Name() string
 
-	// Category returns the group this collector belongs to — "system",
+	// Category returns the group this collector belongs to: "system",
 	// "hardware", "cloud", "network", etc. Used by the SDK's
 	// WithCategory option and the CLI's --category flag to enable
 	// sets of related collectors at once.

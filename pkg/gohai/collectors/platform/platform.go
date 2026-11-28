@@ -18,7 +18,7 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package platform reports OS identification — canonical name,
+// Package platform reports OS identification: canonical name,
 // version, family, and architecture. The collector prefers
 // `/etc/os-release` (systemd standard) and falls back through legacy
 // release files (redhat-release, SuSE-release, debian_version, etc.)
@@ -116,7 +116,7 @@ var minorVersionDistros = map[string]bool{
 }
 
 // majorOnlyVersionRE matches a `VERSION_ID` like `7` or `9` with no
-// dot — the case that warrants the redhat-release supplement.
+// dot. That is the case that warrants the redhat-release supplement.
 var majorOnlyVersionRE = regexp.MustCompile(`^\d+$`)
 
 // redhatReleaseVersionRE extracts the dotted version from
@@ -167,7 +167,7 @@ var (
 
 // parseGenericRelease returns the distro name and version from a
 // generic `<name> release <version>` line. The captured name is
-// reduced to its first whitespace-separated token, lowercased — so
+// reduced to its first whitespace-separated token, lowercased, so
 // `CentOS Linux release 7.9` and `Gentoo Base System release 2.13`
 // produce `centos` / `gentoo` rather than the noisier full prefix.
 func parseGenericRelease(

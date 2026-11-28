@@ -32,7 +32,7 @@ import (
 // `VBoxControl guestproperty enumerate`. The command is only available when
 // VirtualBox Guest Additions are installed. If the command fails (not a
 // VirtualBox guest or Guest Additions not installed) Collect returns nil
-// with no error — matching Ohai's rescue-based approach.
+// with no error, as Ohai's rescue-based approach does.
 type Linux struct {
 	base
 

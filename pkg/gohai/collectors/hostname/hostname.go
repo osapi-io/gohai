@@ -66,7 +66,7 @@ func readShortHostname(
 
 // Info holds hostname identification data.
 type Info struct {
-	Name        string `json:"name"`                   // short hostname (OCSF: device.hostname — leaf matches collector, stripped per CLAUDE.md)
+	Name        string `json:"name"`                   // short hostname (OCSF: device.hostname, with the leaf that matches the collector name removed)
 	MachineName string `json:"machine_name,omitempty"` // raw `hostname` output (macOS: ComputerName-derived friendly name)
 	FQDN        string `json:"fqdn,omitempty"`         // fully qualified (e.g., "web01.example.com")
 	Domain      string `json:"domain,omitempty"`       // domain portion (e.g., "example.com")
@@ -101,7 +101,7 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// collectWithExec is the shared Collect body — Linux and Darwin run
+// collectWithExec is the shared Collect body. Linux and Darwin run
 // the exact same commands (`hostname -s` for the short name,
 // `hostname` for the friendly machine name), matching Ohai's linux
 // and darwin branches.
@@ -147,7 +147,7 @@ func collectWithExec(
 // find the canonical FQDN. Retries the chain up to resolverRetries
 // times with resolverBackoff between attempts to ride over transient
 // resolver blips (split-horizon resolvers, systemd-resolved startup
-// races). Retries only fire on transient failures — a definitive
+// races). Retries only run on transient failures. A definitive
 // "no such host" (net.DNSError.IsNotFound) or an empty answer stops
 // the loop immediately. This matters on hosts without a PTR record
 // (laptops, minimal containers) where the full retry budget used to
@@ -202,7 +202,7 @@ func canonicalFQDN(
 
 // isDNSNotFound reports whether err is a definitive DNS "no such host"
 // answer. Used by canonicalFQDN to short-circuit the retry loop on
-// failures that won't resolve on a second attempt — transient errors
+// failures that won't resolve on a second attempt. Transient errors
 // (timeouts, IO errors) still drive a retry.
 func isDNSNotFound(
 	err error,

@@ -60,7 +60,7 @@ func TestVMwarePublicTestSuite(
 }
 
 // toolboxExec returns a MockRunner whose Execute expectations are set by
-// the caller via the returned recorder — convenience for multi-call mocks.
+// the caller via the returned recorder, which helps with multi-call mocks.
 func toolboxExec(
 	t *testing.T,
 ) (*mocks.MockRunner, *gomock.Controller) {
@@ -483,7 +483,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					Execute(gomock.Any(), vmwareToolboxPath, "timesync", "status").
 					Return([]byte(""), nil).
 					AnyTimes()
-				// non-empty but not valid JSON — triggers the json.Unmarshal error branch
+				// non-empty but not valid JSON, which triggers the json.Unmarshal error branch
 				m.EXPECT().
 					Execute(gomock.Any(), vmwareToolboxPath, "stat", "raw", "json", "session").
 					Return([]byte("not-json"), nil).
@@ -775,7 +775,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: toolbox-cmd returns empty output — nil",
+			name:    "darwin: when toolbox-cmd prints nothing returns nil",
 			variant: "darwin",
 			setupDarwin: func() *vmware.Darwin {
 				ctrl := gomock.NewController(s.T())

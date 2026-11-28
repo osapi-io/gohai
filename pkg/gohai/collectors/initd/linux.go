@@ -42,7 +42,7 @@ func NewLinux() *Linux {
 }
 
 // Collect reads /proc/1/comm and classifies the result. Missing or
-// unreadable /proc/1/comm (rare — possible in restricted containers)
+// unreadable /proc/1/comm (rare, but possible in restricted containers)
 // returns an empty Name rather than erroring.
 func (l *Linux) Collect(
 	_ context.Context,

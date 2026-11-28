@@ -87,12 +87,12 @@ This result shows these facts:
 
 ```
 schemas/ocsf-extension/
-  extension.json              — uid 1337, name "gohai"
-  dictionary.json             — attribute type definitions
+  extension.json              # uid 1337, name "gohai"
+  dictionary.json             # the type definitions of the attributes
   objects/
-    device.json               — extends device with fqdn, machine_id, etc.
-    device_hw_info.json        — extends hw_info with cpu_flags, etc.
-    os.json                   — extends os with distribution_id, etc.
+    device.json               # adds fqdn, machine_id and more to device
+    device_hw_info.json        # adds cpu_flags and more to hw_info
+    os.json                   # adds distribution_id and more to os
 ```
 
 ## Output formats

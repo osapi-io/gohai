@@ -31,8 +31,8 @@ import (
 )
 
 // Linux collects SSH host key fingerprints on Linux. Reads the standard
-// host public key files from /etc/ssh/. FS is the virtual filesystem —
-// production uses the real OS filesystem; tests inject an avfs memfs
+// host public key files from /etc/ssh/. FS is the virtual filesystem.
+// Production uses the real OS filesystem; tests inject an avfs memfs
 // with canned key files. Exec runs `getent passwd`, for the users of
 // LDAP or sssd, and `sshd -T`, for the AuthorizedKeysFile.
 type Linux struct {

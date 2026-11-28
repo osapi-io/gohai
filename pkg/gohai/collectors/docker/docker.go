@@ -20,8 +20,8 @@
 
 // Package docker reports Docker server version, containers, and images
 // on the host. If Docker is not on PATH or the daemon is unreachable,
-// Collect returns nil gracefully — mirrors Ohai's docker.rb stance of
-// not failing the run when Docker is absent.
+// Collect returns nil gracefully. Ohai's docker.rb also does
+// not fail the run when Docker is absent.
 package docker
 
 import (
@@ -108,7 +108,7 @@ func (base) Name() string { return "docker" }
 // Category returns "software".
 func (base) Category() collector.Category { return collector.CategorySoftware }
 
-// DefaultEnabled returns false — docker may not be present on the host.
+// DefaultEnabled returns false, because docker may not be on the host.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.
@@ -192,7 +192,7 @@ func collectDocker(
 	}
 	versionOut, err := exec.Execute(ctx, "docker", "version", "--format", "{{.Server.Version}}")
 	if err != nil {
-		// Docker not on PATH or daemon unreachable — soft-miss.
+		// Docker is not on PATH or the daemon is unreachable: a soft miss.
 		return nil, nil
 	}
 	version := strings.TrimSpace(string(versionOut))

@@ -20,7 +20,7 @@
 
 // Package grub2 reads the GRUB2 environment block and reports the
 // key=value pairs it contains. On Darwin the collector returns nil
-// gracefully — GRUB2 is a Linux/BSD bootloader. The collector is
+// gracefully, because GRUB2 is a Linux/BSD bootloader. The collector is
 // opt-in (DefaultEnabled false) because it requires a GRUB2 install.
 package grub2
 
@@ -39,7 +39,7 @@ import (
 // grubenvPaths lists the canonical grubenv locations in priority order.
 // Ohai checks for grub2-editenv on PATH first, then falls back to
 // directly reading the file. We read the file directly because it is
-// simpler and avoids a fork — grubenv is a fixed-format binary-safe
+// simpler and avoids a fork: grubenv is a fixed-format binary-safe
 // file, not an exec artifact.
 //
 //   - GRUB2 path (RHEL/Fedora): /boot/grub2/grubenv
@@ -72,7 +72,7 @@ func (base) Name() string { return "grub2" }
 // Category returns "linux".
 func (base) Category() collector.Category { return collector.CategoryLinux }
 
-// DefaultEnabled returns false — grub2 is opt-in.
+// DefaultEnabled returns false, because grub2 is opt-in.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.
@@ -126,7 +126,7 @@ func readGrubenv(
 //	key2=value2
 //
 // Lines starting with '#' are comments and skipped. Lines without '='
-// are also skipped. Values are taken verbatim — GRUB does not quote or
+// are also skipped. Values are taken verbatim, because GRUB does not quote or
 // escape values in the environment block.
 func parseGrubenv(
 	content []byte,

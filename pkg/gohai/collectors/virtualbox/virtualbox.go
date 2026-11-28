@@ -37,11 +37,11 @@ import (
 
 // Info holds VirtualBox guest additions data gathered from the guest VM.
 type Info struct {
-	HostVersion            string `json:"version,omitempty"`                  // VBoxVer guest property — VirtualBox host version
-	HostRevision           string `json:"revision,omitempty"`                 // VBoxRev guest property — VirtualBox host revision
-	GuestAdditionsVersion  string `json:"guest_additions_version,omitempty"`  // GuestAdd/VersionExt — Guest Additions version
-	GuestAdditionsRevision string `json:"guest_additions_revision,omitempty"` // GuestAdd/Revision — Guest Additions revision
-	LanguageID             string `json:"language_id,omitempty"`              // LanguageID guest property — host locale
+	HostVersion            string `json:"version,omitempty"`                  // VBoxVer guest property: the VirtualBox version of the host
+	HostRevision           string `json:"revision,omitempty"`                 // VBoxRev guest property: the VirtualBox revision of the host
+	GuestAdditionsVersion  string `json:"guest_additions_version,omitempty"`  // GuestAdd/VersionExt: the Guest Additions version
+	GuestAdditionsRevision string `json:"guest_additions_revision,omitempty"` // GuestAdd/Revision: the Guest Additions revision
+	LanguageID             string `json:"language_id,omitempty"`              // LanguageID guest property: the locale of the host
 }
 
 // Collector is the public interface every virtualbox variant satisfies.
@@ -58,7 +58,7 @@ func (base) Name() string { return "virtualbox" }
 // Category returns "virtualization".
 func (base) Category() collector.Category { return collector.CategoryVirtualization }
 
-// DefaultEnabled returns false — virtualbox is opt-in only.
+// DefaultEnabled returns false, because virtualbox is opt-in only.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

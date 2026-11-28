@@ -27,7 +27,7 @@ import (
 )
 
 // Darwin is the macOS variant of the ipc collector. macOS does not
-// expose /proc/sys/kernel — this collector returns nil on Darwin.
+// expose /proc/sys/kernel, so this collector returns nil on Darwin.
 type Darwin struct {
 	base
 }
@@ -37,7 +37,7 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect returns nil on macOS — /proc/sys/kernel is Linux-only.
+// Collect returns nil on macOS, because /proc/sys/kernel is Linux-only.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,

@@ -45,7 +45,7 @@ import (
 // gohai.CloudAlibaba, which re-exports this constant.
 const ProviderName = "alibaba"
 
-// metadataBaseURL is Alibaba's unusual metadata address — not the
+// metadataBaseURL is Alibaba's unusual metadata address. It is not the
 // standard 169.254.169.254 link-local. Matches Ohai's
 // Ohai::Mixin::AlibabaMetadata::ALIBABA_METADATA_ADDR constant.
 const metadataBaseURL = "http://100.100.100.200/2016-01-01"
@@ -85,7 +85,7 @@ type Info struct {
 	// Spot lifecycle.
 	SpotTerminationTime string `json:"spot_termination_time,omitempty"`
 
-	// Network — primary ENI flattened onto the top level.
+	// Network: the primary ENI, flattened onto the top level.
 	MAC          string   `json:"mac,omitempty"`
 	PrivateIPv4  string   `json:"private_ipv4,omitempty"`
 	PublicIPv4   string   `json:"public_ipv4,omitempty"`
@@ -188,10 +188,10 @@ func (*Collector) Name() string { return "alibaba" }
 // Category returns "cloud".
 func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
-// DefaultEnabled returns false — cloud collectors are opt-in.
+// DefaultEnabled returns false, because cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
-// Dependencies declares dmi — Alibaba writes "Alibaba Cloud" as
+// Dependencies declares dmi, because Alibaba writes "Alibaba Cloud" as
 // sys_vendor. Matches Ohai's has_ali_dmi? check.
 func (*Collector) Dependencies() []string { return []string{"dmi"} }
 
@@ -209,7 +209,7 @@ func (c *Collector) Collect(
 	}
 	tree, err := (&walker{client: c.client}).walk(ctx, "", 0)
 	if err != nil {
-		// First probe failed — not on Alibaba (or endpoint down).
+		// The first probe failed, so this is not Alibaba (or the endpoint is down).
 		return nil, ctx.Err()
 	}
 	return transform(tree), nil
@@ -261,7 +261,7 @@ type walker struct {
 // walk issues a GET against path (relative to the Client's baseURL).
 // When the response is a newline-separated directory listing, walk
 // recurses into each entry. Leaves are parsed as JSON when possible
-// and fall back to raw text — matches Ohai's has_trailing_slash? +
+// and fall back to raw text, as Ohai's has_trailing_slash? +
 // parse_json fallback idiom.
 //
 // The first call uses path "" (the `/2016-01-01/` listing). At that
@@ -462,7 +462,7 @@ func transform(
 	return info
 }
 
-// splitCommaOrSpace handles Alibaba's mixed list encoding — some
+// splitCommaOrSpace handles Alibaba's mixed list encoding: some
 // fields use comma separation, others use whitespace. Both collapse
 // to the same []string.
 func splitCommaOrSpace(
@@ -500,8 +500,8 @@ func strVal(
 }
 
 // intVal returns the integer value at key. json.Unmarshal parses
-// JSON numbers as float64, so that's the only dynamic type we handle
-// — anything else (absent, string, nested map) returns 0.
+// JSON numbers as float64, so that is the only dynamic type we handle.
+// Any other type (absent, string, nested map) returns 0.
 func intVal(
 	m map[string]any,
 	key string,

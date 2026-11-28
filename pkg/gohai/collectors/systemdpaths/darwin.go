@@ -26,7 +26,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin returns nil — systemd-path is a Linux-only binary. Ohai's
+// Darwin returns nil, because systemd-path is a Linux-only binary. Ohai's
 // plugin is linux-only.
 type Darwin struct {
 	base

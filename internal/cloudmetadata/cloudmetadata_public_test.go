@@ -36,7 +36,7 @@ import (
 )
 
 // brokenBodyTransport returns a 200 response whose Body errors on
-// Read — exercises Get's io.ReadAll-fails branch. Real HTTP clients
+// Read, which exercises Get's io.ReadAll-fails branch. Real HTTP clients
 // hit this on truncated responses / server resets mid-body.
 type brokenBodyTransport struct{}
 
@@ -364,7 +364,7 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 		{
 			name: "invalid URL builds fail before transport",
 			setup: func() (string, []cloudmetadata.Option, func()) {
-				// Control character in URL — http.NewRequestWithContext
+				// A control character in the URL: http.NewRequestWithContext
 				// rejects before any transport call.
 				return "http://\x7f", nil, func() {}
 			},

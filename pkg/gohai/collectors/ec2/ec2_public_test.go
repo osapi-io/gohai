@@ -48,7 +48,7 @@ func ec2Prior() collector.PriorResults {
 }
 
 // versionListing is what GET "/" returns from EC2's IMDS. A realistic
-// slice — sorted newest-first doesn't matter; negotiation sorts itself.
+// slice. Its newest-first order doesn't matter, because negotiation sorts it.
 const versionListing = "1.0\n2011-01-01\n2019-10-01\n2021-07-15\n2099-01-01\nlatest"
 
 // macA + macB are two canned ENIs.
@@ -88,7 +88,7 @@ var ec2Responses = map[string]string{
 	"/2021-07-15/meta-data/network/interfaces/macs/" + macA + "/security-groups":        "default\nssh",
 	"/2021-07-15/meta-data/network/interfaces/macs/" + macB + "/interface-id":           "eni-bbb",
 
-	// Placement extras, kernel/ramdisk, lifecycle, services, spot —
+	// Placement extras, kernel/ramdisk, lifecycle, services, spot:
 	// fields added for Ohai-parity gap closure.
 	"/2021-07-15/meta-data/placement/availability-zone-id": "use1-az1",
 	"/2021-07-15/meta-data/placement/group-name":           "my-cluster",
@@ -753,7 +753,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 					return
 				}
 				if r.URL.Path == "/" {
-					// Empty 200 — splitLines returns nil → fallback.
+					// An empty 200: splitLines returns nil → fallback.
 					_, _ = w.Write([]byte(""))
 					return
 				}

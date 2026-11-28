@@ -167,8 +167,8 @@ func sysctlInt(
 	return n, true
 }
 
-// sysctlInt64 runs `sysctl -n <key>` and parses the output as int64 —
-// used for hw.cpufrequency which exceeds int32 on modern CPUs.
+// sysctlInt64 runs `sysctl -n <key>` and parses the output as int64.
+// It is used for hw.cpufrequency which exceeds int32 on modern CPUs.
 func sysctlInt64(
 	ctx context.Context,
 	exec source.Runner,

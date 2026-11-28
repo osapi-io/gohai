@@ -32,7 +32,7 @@ import (
 // Darwin collects the shell list on macOS hosts. /etc/shells on macOS
 // ships with a small curated set (/bin/bash, /bin/zsh, /bin/sh, etc.)
 // and is managed by the OS installer. Embeds base for Name /
-// DefaultEnabled / Dependencies. FS is the virtual filesystem — real
+// DefaultEnabled / Dependencies. FS is the virtual filesystem: the real
 // OS on production, avfs memfs in tests.
 type Darwin struct {
 	base

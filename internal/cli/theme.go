@@ -18,8 +18,8 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package cli holds CLI-only output helpers — never imported by the
-// SDK under pkg/gohai/, only by cmd/. Mirrors jot's theme system
+// Package cli holds CLI-only output helpers. Only cmd/ imports them, never the
+// SDK under pkg/gohai/. Mirrors jot's theme system
 // (same Theme struct, same role names) so all retr0h CLIs share one
 // shape. Uses raw ANSI to avoid charmbracelet dependency conflicts.
 package cli
@@ -43,7 +43,7 @@ func rgb(
 
 // Theme is a six-role palette covering every place gohai's CLI
 // surface emits styled text. Roles are stable across themes so a
-// theme swap is a pure recolor — no callers change.
+// theme swap only changes colors, and no caller changes.
 type Theme struct {
 	Name      string
 	Mute      string
@@ -55,8 +55,8 @@ type Theme struct {
 	BannerBot string
 }
 
-// ThemeMaxheadroom is gohai's default — pulled from the maxheadroom
-// palette. The primary accent is a soft lavender (#b4a7d6) — cooler
+// ThemeMaxheadroom is gohai's default, from the maxheadroom
+// palette. The primary accent is a soft lavender (#b4a7d6). It is cooler
 // and more muted than the magenta used by jot/grind; supporting
 // roles are drawn from the same palette. Truecolor (24-bit) so the
 // install banner and `gohai --help` paint with the exact same hue.

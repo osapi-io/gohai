@@ -21,7 +21,7 @@
 // Select collectors by category, then subtract one.
 //
 // WithCategory adds every collector in a category. It stacks with the
-// other selection options, and WithDisabled still subtracts — so this
+// other selection options, and WithDisabled still subtracts. Thus this
 // is how you say "all the hardware facts except the expensive one".
 package main
 

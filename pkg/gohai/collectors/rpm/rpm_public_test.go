@@ -40,7 +40,7 @@ var (
 	_ collector.Collector = (*rpm.Darwin)(nil)
 )
 
-// showrcNoMarker has no `=====` marker lines — parseShowrc returns empty.
+// showrcNoMarker has no `=====` marker lines, so parseShowrc returns empty.
 const showrcNoMarker = `ARCHITECTURE AND OS:
 build arch : x86_64
 - %_topdir /root/rpmbuild
@@ -135,7 +135,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: rpm not installed — empty macros, no error",
+			name:    "linux: with rpm not installed the macros are empty, with no error",
 			variant: "linux",
 			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
 				m := mocks.NewMockRunner(ctrl)
@@ -191,7 +191,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: no marker lines — empty macros",
+			name:    "linux: with no marker lines the macros are empty",
 			variant: "linux",
 			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
 				m := mocks.NewMockRunner(ctrl)
@@ -209,7 +209,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:      "linux: nil executor — empty macros",
+			name:      "linux: with a nil executor the macros are empty",
 			variant:   "linux",
 			setupExec: nil,
 			validateFunc: func(got any, err error) {

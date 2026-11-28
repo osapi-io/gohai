@@ -34,7 +34,7 @@ import (
 
 // Darwin enumerates legacy kernel extensions via `kextstat -k -l`.
 // System Extensions (macOS 11+) live under /Library/SystemExtensions/
-// and require systemextensionsctl — not yet queried.
+// and require systemextensionsctl, which gohai does not query yet.
 type Darwin struct {
 	base
 

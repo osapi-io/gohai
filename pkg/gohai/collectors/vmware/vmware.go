@@ -71,7 +71,7 @@ func (base) Name() string { return "vmware" }
 // Category returns "virtualization".
 func (base) Category() collector.Category { return collector.CategoryVirtualization }
 
-// DefaultEnabled returns false — vmware is opt-in only.
+// DefaultEnabled returns false, because vmware is opt-in only.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

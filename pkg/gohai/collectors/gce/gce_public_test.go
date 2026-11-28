@@ -38,7 +38,7 @@ import (
 )
 
 // gcePrior builds a PriorResults containing a dmi.Info whose product
-// name matches GCE — the gate the collector's Collect runs before
+// name matches GCE. That is the gate the collector's Collect runs before
 // hitting the metadata endpoint.
 func gcePrior() collector.PriorResults {
 	return collector.PriorResults{
@@ -47,7 +47,7 @@ func gcePrior() collector.PriorResults {
 }
 
 // cannedResponse is a realistic slice of GCE's recursive metadata
-// response — same field names and shape as the real service, including
+// response, with the same field names and shape as the real service, including
 // the fields (attributes, licenses, scheduling detail, IAM scopes,
 // advanced network fields, disk encryption) that earlier versions of
 // this collector dropped.

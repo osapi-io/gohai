@@ -43,7 +43,7 @@ import (
 const sshDir = "/etc/ssh"
 
 // hostKeyGlob lists the well-known host public key file names in the
-// order Ohai checks them: rsa, ecdsa, ed25519. DSA keys are omitted —
+// order Ohai checks them: rsa, ecdsa, ed25519. DSA keys are left out, because
 // OpenSSH deprecated DSA keys in 7.0 (2015) and removed them in 9.8.
 var hostKeyFiles = []string{
 	sshDir + "/ssh_host_rsa_key.pub",
@@ -102,7 +102,7 @@ func (base) Name() string { return "ssh" }
 // Category returns "security".
 func (base) Category() collector.Category { return collector.CategorySecurity }
 
-// DefaultEnabled returns false — host key collection is opt-in.
+// DefaultEnabled returns false, because host key collection is opt-in.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.
@@ -157,7 +157,7 @@ func parseHostKeyPub(
 	content []byte,
 ) (HostKey, error) {
 	line := strings.TrimSpace(string(content))
-	// Strip any trailing comment / options — split on whitespace, take
+	// Strip any trailing comment / options: split on whitespace, take
 	// the first two fields.
 	fields := strings.Fields(line)
 	if len(fields) < 2 {

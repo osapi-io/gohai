@@ -30,7 +30,7 @@ import (
 )
 
 // Linux collects GRUB2 environment variables on Linux hosts. FS is the
-// virtual filesystem — production uses the real OS filesystem; tests
+// virtual filesystem. Production uses the real OS filesystem; tests
 // inject an avfs memfs with canned grubenv content.
 type Linux struct {
 	base

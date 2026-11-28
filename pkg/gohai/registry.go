@@ -47,7 +47,7 @@ func (p *PublicRegistry) Names() []string {
 }
 
 // NamesInCategory returns the names of every collector in cat. Empty
-// slice when the category has no collectors — callers should treat
+// slice when the category has no collectors. Callers should treat
 // that as a user-facing "unknown category" error.
 func (p *PublicRegistry) NamesInCategory(
 	cat string,

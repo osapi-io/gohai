@@ -43,7 +43,7 @@ func NewLinux() *Linux {
 }
 
 // Collect runs `sysctl -a` and parses its output. Exec errors yield
-// an empty Info — not an error (matches Ohai's no-panic stance).
+// an empty Info, not an error (as Ohai's no-panic stance does).
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,

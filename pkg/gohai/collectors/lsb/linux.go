@@ -28,12 +28,12 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// Linux reports LSB identification fields via the `lsb_release` CLI —
+// Linux reports LSB identification fields via the `lsb_release` CLI,
 // the authoritative source used by Ohai and mandated on RHEL-family
 // hosts with `redhat-lsb-core` installed. Ohai deliberately removed
 // the legacy /etc/lsb-release file fallback (chef/ohai#1562) because
 // on modern Debian/Ubuntu the `lsb-release` package ships both the
-// file and the CLI; we match that stance — when the CLI is absent,
+// file and the CLI. We take the same stance: when the CLI is absent,
 // Info stays empty rather than parsing a possibly-stale file.
 type Linux struct {
 	base

@@ -22,7 +22,7 @@
 // metadata server at http://169.254.169.254/. Uses IMDSv2 (token
 // flow) by default and falls back to IMDSv1 when the token endpoint
 // is unreachable. Returns nil with no error when the endpoint isn't
-// reachable — that's the signal that the host isn't running on EC2.
+// reachable. That is the signal that the host isn't running on EC2.
 package ec2
 
 import (
@@ -179,7 +179,7 @@ type Info struct {
 	SecurityGroups []string `json:"security_groups,omitempty"`
 
 	// Per-ENI subtree under /meta-data/network/interfaces/macs/<mac>/.
-	// Keyed by MAC address — matches Ohai's shape.
+	// Keyed by MAC address, as Ohai's shape is.
 	NetworkInterfaces map[string]NetworkInterface `json:"network_interfaces,omitempty"`
 
 	// Placement (from meta-data/placement + identity doc).
@@ -188,7 +188,7 @@ type Info struct {
 	AccountUID string `json:"account_uid,omitempty"`
 
 	// Placement extras (from meta-data/placement/*). Populated only
-	// when IMDS returns non-404 for the respective key — empty on
+	// when IMDS returns non-404 for the respective key. Empty on
 	// classic VPC instances without dedicated-host / partition-
 	// placement features.
 	AvailabilityZoneID string `json:"availability_zone_id,omitempty"`
@@ -205,7 +205,7 @@ type Info struct {
 	SpotInstanceAction  string `json:"spot_instance_action,omitempty"`
 	SpotTerminationTime string `json:"spot_termination_time,omitempty"`
 
-	// Services endpoint — useful on GovCloud / China regions.
+	// Services endpoint, useful on GovCloud / China regions.
 	ServicesDomain string `json:"services_domain,omitempty"`
 	CloudPartition string `json:"cloud_partition,omitempty"`
 
@@ -233,7 +233,7 @@ type Info struct {
 	APIVersion string `json:"api_version,omitempty"`
 
 	// UserData is the raw user-data blob. Base64-encoded when binary,
-	// plaintext otherwise — matches Ohai's handling.
+	// plaintext otherwise, as Ohai handles it.
 	UserData string `json:"user_data,omitempty"`
 }
 
@@ -263,7 +263,7 @@ type NetworkInterface struct {
 }
 
 // IAMInstanceInfo is the iam/info sub-document. Excludes
-// security-credentials (secrets) — matches Ohai's explicit drop.
+// security-credentials (secrets), as Ohai drops them on purpose.
 type IAMInstanceInfo struct {
 	Code               string `json:"code,omitempty"`
 	LastUpdated        string `json:"last_updated,omitempty"`
@@ -335,10 +335,10 @@ func (*Collector) Name() string { return "ec2" }
 // Category returns "cloud".
 func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
-// DefaultEnabled returns false — cloud collectors are opt-in.
+// DefaultEnabled returns false, because cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
-// Dependencies declares dmi — EC2 writes "Amazon" as bios_vendor
+// Dependencies declares dmi, because EC2 writes "Amazon" as bios_vendor
 // and/or "amazon" in bios_version. Matches Ohai's DMI-based gates.
 func (*Collector) Dependencies() []string { return []string{"dmi"} }
 
@@ -392,7 +392,7 @@ func (c *Collector) Collect(
 		info.ProductCodes = splitLines(string(body))
 	}
 
-	// Variable-keyed subtrees — fetch the listing, then each entry.
+	// Variable-keyed subtrees: fetch the listing, then each entry.
 	info.BlockDeviceMapping = fetchBlockDeviceMapping(versionedGet)
 	info.PublicKeys = fetchPublicKeys(versionedGet)
 
@@ -402,7 +402,7 @@ func (c *Collector) Collect(
 		info.NetworkInterfaces = enis
 	}
 
-	// IAM info — keep profile ARN, drop security-credentials.
+	// IAM info: keep the profile ARN, drop security-credentials.
 	if body, err := versionedGet(iamInfoPath); err == nil {
 		var iam rawIAMInfo
 		if json.Unmarshal(body, &iam) == nil {
@@ -500,7 +500,7 @@ func fetchPublicKeys(
 //   - dmi.BIOS.Ver contains "amazon" (has_ec2_xen_dmi?)
 //   - /sys/hypervisor/uuid starts with "ec2" (has_ec2_xen_uuid?)
 //
-// Any match → detected. Falls open when dmi isn't in prior — the
+// Any match → detected. Falls open when dmi isn't in prior, because the
 // HTTP probe will still error-out on non-EC2 hosts. On macOS, dmi has
 // no tables, so only the metadata service can tell an EC2 Mac
 // instance, and the collector probes it.
@@ -558,7 +558,7 @@ func imdsHeaders(
 
 // negotiateAPIVersion asks EC2's IMDS which versions it supports and
 // picks the latest one gohai knows. On failure (404, empty list, no
-// intersection) falls back to "latest" — which EC2 aliases to its
+// intersection) falls back to "latest", which EC2 aliases to its
 // newest supported version. Matches Ohai's best_api_version.
 func (c *Collector) negotiateAPIVersion(
 	ctx context.Context,
@@ -646,7 +646,7 @@ func splitLines(
 }
 
 // encodeUserData returns the raw user-data as plaintext when valid
-// UTF-8, or base64-encoded otherwise — matches Ohai's binary check.
+// UTF-8, or base64-encoded otherwise, as Ohai's binary check does.
 // Empty input returns empty string.
 func encodeUserData(
 	body []byte,
@@ -663,7 +663,7 @@ func encodeUserData(
 // fetchENIs walks /meta-data/network/interfaces/macs/, recursing
 // into each MAC subdirectory to build a typed NetworkInterface.
 // Returns the map keyed by MAC (trailing slash stripped). Empty when
-// the tree is absent or empty — tolerated for older instance shapes.
+// the tree is absent or empty, which older instance shapes can be.
 func fetchENIs(
 	get func(path string) ([]byte, error),
 ) map[string]NetworkInterface {
@@ -688,7 +688,7 @@ func fetchENIs(
 
 // fetchENI walks the subdirectory for one MAC and maps each known
 // leaf into the typed NetworkInterface struct. Unknown leaves are
-// silently ignored (we don't expose a Raw map on individual ENIs —
+// silently ignored (we don't expose a Raw map on individual ENIs, so
 // new fields are a typed-struct update).
 func fetchENI(
 	get func(path string) ([]byte, error),

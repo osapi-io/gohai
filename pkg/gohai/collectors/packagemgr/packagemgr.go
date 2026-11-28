@@ -19,7 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package packagemgr detects which package manager the host is
-// configured to use — apt on Debian-family, dnf/yum on RHEL-family,
+// configured to use: apt on Debian-family, dnf/yum on RHEL-family,
 // brew on macOS, etc. Matches Ohai's conceptual "platform family →
 // package manager" mapping.
 package packagemgr

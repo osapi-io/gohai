@@ -90,7 +90,7 @@ func NewWith(
 // single spaces is the vendor+model "name".
 //
 // Lines without at least 5 tokens (the minimum to carry addr, type,
-// transport, revision, device) are skipped — leaves the map entry
+// transport, revision, device) are skipped. That leaves the map entry
 // absent rather than half-populated.
 func parseLsscsi(
 	out []byte,

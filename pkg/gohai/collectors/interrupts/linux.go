@@ -35,7 +35,7 @@ import (
 const procInterrupts = "/proc/interrupts"
 
 // Linux collects interrupt statistics from /proc/interrupts. FS is the
-// virtual filesystem the collector reads from — production is the real OS FS
+// virtual filesystem the collector reads from. Production uses the real OS FS
 // via avfs/osfs; tests inject an avfs memfs with canned content.
 type Linux struct {
 	base

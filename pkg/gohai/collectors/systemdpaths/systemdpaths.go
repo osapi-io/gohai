@@ -20,7 +20,7 @@
 
 // Package systemdpaths reports standard systemd directory paths by
 // running `systemd-path` and parsing its "name: /path" output. Matches
-// Ohai's linux/systemd_paths plugin. Darwin returns nil — systemd is
+// Ohai's linux/systemd_paths plugin. Darwin returns nil, because systemd is
 // Linux-only. DefaultEnabled is false.
 package systemdpaths
 

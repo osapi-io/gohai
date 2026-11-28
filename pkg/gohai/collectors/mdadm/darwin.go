@@ -27,7 +27,7 @@ import (
 )
 
 // Darwin is the macOS variant of the mdadm collector. macOS has no
-// /proc/mdstat or mdadm — this collector returns nil on Darwin.
+// /proc/mdstat or mdadm, so this collector returns nil on Darwin.
 type Darwin struct {
 	base
 }
@@ -37,7 +37,7 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect returns nil on macOS — mdadm is Linux-only.
+// Collect returns nil on macOS, because mdadm is Linux-only.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,

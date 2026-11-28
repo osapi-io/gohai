@@ -57,7 +57,7 @@ type Info struct {
 	ModelID         string            `json:"model_id,omitempty"`
 	Stepping        int32             `json:"stepping,omitempty"`
 	Speed           float64           `json:"speed,omitempty"`      // MHz: the maximum clock when the OS gives one, else the current clock
-	CacheSize       int32             `json:"cache_size,omitempty"` // KB — aggregate from /proc/cpuinfo
+	CacheSize       int32             `json:"cache_size,omitempty"` // KB, summed from /proc/cpuinfo
 	Flags           []string          `json:"flags,omitempty"`
 	Caches          *Caches           `json:"caches,omitempty"`           // per-level sizes from lscpu (Linux)
 	NumaNodes       map[int][]int     `json:"numa_nodes,omitempty"`       // node id → CPU indices (Linux)
@@ -96,7 +96,7 @@ type Info struct {
 	// CPUs is the per-logical-CPU breakdown. Matters on hybrid-core
 	// architectures (Intel Alder Lake P+E, Apple Silicon P+E) where
 	// cores genuinely differ. Mirrors Ohai's `cpu["0"]`, `cpu["1"]`,
-	// ... entries — one CPU per processor line in /proc/cpuinfo.
+	// ... entries: one CPU for each processor line in /proc/cpuinfo.
 	CPUs []CPU `json:"cpus,omitempty"`
 }
 
@@ -119,7 +119,7 @@ type CPU struct {
 }
 
 // Caches carries the per-level cache sizes reported by `lscpu`. Strings
-// mirror lscpu's output verbatim (e.g. `32 KiB`, `1 MiB`) — Ohai does
+// mirror lscpu's output verbatim (e.g. `32 KiB`, `1 MiB`). Ohai does
 // the same; keeps units visible without a unit-conversion policy.
 type Caches struct {
 	L1d string `json:"l1d,omitempty"`
@@ -199,7 +199,7 @@ func summarize(
 
 // readVulnerabilities walks /sys/devices/system/cpu/vulnerabilities/
 // via the injected avfs and returns a mitigation-name → status map.
-// Missing directory yields nil — most modern Linux kernels have it,
+// A missing directory yields nil. Most modern Linux kernels have it,
 // but containers / stripped /sys do not, and an absent directory is
 // not an error.
 func readVulnerabilities(
@@ -243,7 +243,7 @@ type lscpuSummary struct {
 	cpusOffline     int
 	haveLscpuLayout bool // true once any of the topology fields was parsed
 
-	// Additional flat fields — merged onto Info verbatim.
+	// Additional flat fields, merged onto Info verbatim.
 	biosVendorID       string
 	biosModelName      string
 	machineType        string
@@ -268,7 +268,7 @@ type lscpuSummary struct {
 //   - Socket(s), Core(s) per socket, Thread(s) per core
 //   - Socket(s) per book, Book(s) per drawer, Drawer(s) (s390x)
 //   - L1d / L1i / L2 / L3 cache
-//   - NUMA node<N> CPU(s) — per node CPU index list
+//   - NUMA node<N> CPU(s): the CPU index list of each node
 //
 // Line format is `Field:\s+Value`. Unrecognized fields are ignored.
 func parseLscpu(
@@ -383,7 +383,7 @@ func parseLscpu(
 }
 
 // atoi is an error-suppressing Atoi for lscpu values that are
-// structurally guaranteed to be integers. Returns 0 on parse failure —
+// structurally guaranteed to be integers. It returns 0 on a parse failure,
 // which preserves the "unset" invariant callers rely on.
 func atoi(
 	v string,
@@ -413,7 +413,7 @@ func splitCSV(
 
 // parseCPURange converts an lscpu-style CPU list like `0-3,8,10-11`
 // into a sorted []int of CPU indices. Returns nil on malformed input
-// rather than partial results — a NUMA node with unparseable CPU list
+// rather than partial results: a NUMA node with an unparseable CPU list
 // is reported as absent rather than half-populated.
 func parseCPURange(
 	v string,
@@ -541,7 +541,7 @@ func applyLscpuToInfo(
 
 // nonZero returns n if n > 0, else 1. Used for the arch-override
 // multiplications where a missing factor should not zero out the
-// whole result — Ohai uses the same 1-identity trick.
+// whole result. Ohai uses the same 1-identity trick.
 func nonZero(
 	n int,
 ) int {

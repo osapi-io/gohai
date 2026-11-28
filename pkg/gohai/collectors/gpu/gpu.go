@@ -25,7 +25,7 @@
 // `system_profiler SPDisplaysDataType -json`, which covers integrated
 // Apple Silicon GPUs (reporting `cores`) and any discrete card.
 //
-// Ohai has no corresponding plugin — this collector is native to gohai
+// Ohai has no corresponding plugin. This collector is native to gohai
 // and maps its data directly onto the typed Info below. Since there's
 // no OCSF or OpenTelemetry schema for GPU devices either, field names
 // follow Go-idiomatic snake_case with fields chosen to cover both
@@ -45,7 +45,7 @@ type Info struct {
 }
 
 // Card is a single GPU / graphics device. Fields are populated
-// opportunistically — Linux fills PCI metadata; macOS fills Model /
+// when the platform has them: Linux fills PCI metadata; macOS fills Model /
 // Vendor / Cores / Bus from system_profiler. A field left empty
 // simply means that signal isn't available for that backend.
 type Card struct {

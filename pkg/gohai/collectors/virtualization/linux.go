@@ -62,7 +62,7 @@ func (l *Linux) Collect(
 }
 
 // cascadeLinux walks Ohai's linux/virtualization.rb detection order
-// and populates info. The order matters — later detections take
+// and populates info. The order matters: later detections take
 // precedence for the primary System/Role. Each step is independent
 // and silent on absence.
 func cascadeLinux(
@@ -146,7 +146,7 @@ func cascadeLinux(
 	}
 
 	// 10. Hyper-V KVP. When we see the pool file, extract the host
-	// name between "HostName" and "HostingSystemEditionId" — matches
+	// name between "HostName" and "HostingSystemEditionId", as
 	// Ohai's linux/virtualization.rb extraction. Keeps Raw printable
 	// bytes only and lowercases, same as Ohai's behaviour.
 	if b, err := fs.ReadFile("/var/lib/hyperv/.kvp_pool_3"); err == nil {
@@ -170,7 +170,7 @@ func cascadeLinux(
 
 	// 12a. LXC host: lxc-version or lxc-start on PATH AND cgroup root
 	// paths are all "/" (host-side cgroup namespace, not a container).
-	// Only fires when nothing else set System — matches Ohai OHAI-573
+	// Only fires when nothing else set System, as Ohai's OHAI-573
 	// guard to prevent false positives on lxc hosts that also look
 	// container-like via other signals.
 	if info.System == "" && cgroupRootsAllSlash(fs) {
@@ -220,7 +220,7 @@ func detectViaSystemd(
 
 // detectViaDMI reads sysfs DMI fields and matches against Ohai's
 // full guest_from_dmi_data table. Manufacturer (sys_vendor) is
-// checked first, then product_name — matches mixin/dmi_decode.rb.
+// checked first, then product_name, as in mixin/dmi_decode.rb.
 func detectViaDMI(
 	fs avfs.VFS,
 	info *Info,
@@ -280,7 +280,7 @@ func detectViaDMI(
 var cgroupContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]+:/(docker|lxc|containerd)/`)
 
 // cgroupNestedContainerRE matches systemd-managed and docker-ce layouts
-// where the runtime appears as a named cgroup under a parent slice —
+// where the runtime appears as a named cgroup under a parent slice:
 // `/system.slice/docker-<hash>.scope`, `/docker-ce/docker/<hash>`,
 // `/kubepods/.../docker-<hash>.scope`, etc. Mirrors Ohai's second regex
 // in linux/virtualization.rb.

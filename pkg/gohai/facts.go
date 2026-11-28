@@ -98,7 +98,7 @@ import (
 
 // Facts holds the result of a collection run. Each collector populates its
 // own typed field; disabled or failed collectors leave their field nil.
-// Facts round-trips through JSON cleanly — marshaled output can be
+// Facts round-trips through JSON cleanly: marshaled output can be
 // unmarshaled back into a Facts value without losing type information.
 type Facts struct {
 	Platform       *platform.Info       `json:"platform,omitempty"`
@@ -182,7 +182,7 @@ type Facts struct {
 
 // Timings captures the runtime observability data surfaced into Facts
 // when WithTimings() is passed to gohai.New. Total wall-clock time
-// for the run lives on Facts.CollectDuration — this struct is purely
+// for the run lives on Facts.CollectDuration. This struct is only
 // the per-collector breakdown.
 type Timings struct {
 	Collectors map[string]CollectorTiming `json:"collectors"`

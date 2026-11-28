@@ -20,7 +20,7 @@
 
 // Package tc reports Linux traffic control (qdisc) configuration via
 // `tc -s qdisc show`. macOS does not have tc; Darwin returns nil.
-// Mirrors Ohai's linux/tc.rb methodology — parse per-interface qdisc
+// Mirrors Ohai's linux/tc.rb methodology: parse per-interface qdisc
 // entries from the tc command output.
 package tc
 
@@ -80,7 +80,7 @@ func (base) Name() string { return "tc" }
 // Category returns "linux".
 func (base) Category() collector.Category { return collector.CategoryLinux }
 
-// DefaultEnabled returns false — tc requires iproute2 and is
+// DefaultEnabled returns false, because tc requires iproute2 and is
 // Linux-specific.
 func (base) DefaultEnabled() bool { return false }
 

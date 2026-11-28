@@ -74,7 +74,7 @@ func (base) Name() string { return "zpools" }
 // Category returns "linux".
 func (base) Category() collector.Category { return collector.CategoryLinux }
 
-// DefaultEnabled returns false — zpools is opt-in.
+// DefaultEnabled returns false, because zpools is opt-in.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.

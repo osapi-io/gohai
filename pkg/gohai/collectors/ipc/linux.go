@@ -30,7 +30,7 @@ import (
 )
 
 // Linux collects IPC kernel parameters from /proc/sys/kernel/. FS is
-// the virtual filesystem the collector reads from — production is the
+// the virtual filesystem the collector reads from. Production uses the
 // real OS FS via avfs/osfs; tests inject an avfs memfs with canned
 // content.
 type Linux struct {
@@ -45,7 +45,7 @@ func NewLinux() *Linux {
 }
 
 // Collect reads the IPC sysctl files under /proc/sys/kernel and returns
-// an Info struct. Missing files yield empty strings for their fields —
+// an Info struct. Missing files yield empty strings for their fields,
 // not an error, since not all kernels expose all parameters.
 func (l *Linux) Collect(
 	_ context.Context,

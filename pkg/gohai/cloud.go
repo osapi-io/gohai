@@ -34,7 +34,7 @@ import (
 
 // Cloud provider identifiers. Re-exported from each provider
 // package so consumers can switch on Facts.Cloud().Name without
-// magic strings — a typo like `gohai.CloudAWZ` fails to compile.
+// magic strings: a typo like `gohai.CloudAWZ` fails to compile.
 const (
 	CloudAWS          = ec2.ProviderName
 	CloudGCE          = gce.ProviderName
@@ -48,7 +48,7 @@ const (
 )
 
 // Cloud is the tiny detection record Facts.Cloud() returns. It
-// intentionally exposes only the provider identity — Region, Zone,
+// exposes only the provider identity on purpose. Region, Zone,
 // instance IDs, and other fields differ per provider in ways that
 // don't normalize cleanly, so consumers wanting those go to the
 // per-provider typed field (Facts.Ec2, Facts.Gce, etc.) after
@@ -61,7 +61,7 @@ type Cloud struct {
 // is on, or nil when no cloud-provider collector populated data.
 //
 // Intended for provider-agnostic code that needs to branch on cloud
-// identity — a typical flow:
+// identity. A typical flow:
 //
 //	cloud := facts.Cloud()
 //	if cloud == nil {
@@ -83,7 +83,7 @@ type Cloud struct {
 // compile-time checked, and avoids the intermediate indirection.
 //
 // Cloud() does NOT attempt to normalize Region, Zone, or instance
-// identity across providers — those shapes differ too much to
+// identity across providers. Those shapes differ too much to
 // flatten without losing meaningful information. Go to the typed
 // per-provider field for those.
 func (f *Facts) Cloud() *Cloud {

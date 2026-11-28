@@ -64,7 +64,7 @@ func (base) DefaultEnabled() bool         { return true }
 func (base) Dependencies() []string       { return nil }
 
 // New returns the fips variant for the host OS. Only Linux reports
-// FIPS mode — matches Ohai, which only provides the plugin on :linux
+// FIPS mode, as Ohai does: it only provides the plugin on :linux
 // and :windows. macOS has no kernel-level FIPS toggle equivalent.
 func New() Collector {
 	return NewWith(source.Sources{})

@@ -52,7 +52,7 @@ func TestFipsPublicTestSuite(
 }
 
 // pathErrorFS wraps a memfs and forces ReadFile to error on a
-// specific path — exercises non-ErrNotExist read failures.
+// specific path, to exercise read failures other than ErrNotExist.
 type pathErrorFS struct {
 	avfs.VFS
 	failPath string

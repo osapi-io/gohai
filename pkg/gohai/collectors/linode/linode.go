@@ -20,7 +20,7 @@
 
 // Package linode detects Linode hosts and reports their public /
 // private IPs. Linode does not expose a metadata endpoint that Ohai
-// uses — detection is heuristic (apt sources list), and the output
+// uses. Detection is heuristic (apt sources list), and the output
 // comes entirely from the host's own addresses, which `ip -o -4 addr
 // show` gives through the sources. Returns nil with no error when no
 // Linode signature is found.
@@ -66,7 +66,7 @@ const linodeSignature = "linode"
 
 // Info is the Linode view. Mirrors Ohai's node['linode'] which only
 // reports two facts: public_ip and private_ip. No metadata service
-// call — these come from the host's own eth0 / eth0:1 aliases.
+// call: these come from the host's own eth0 / eth0:1 aliases.
 type Info struct {
 	PublicIP  string `json:"public_ip,omitempty"`
 	PrivateIP string `json:"private_ip,omitempty"`
@@ -99,7 +99,7 @@ func (*Collector) Name() string { return "linode" }
 // Category returns "cloud".
 func (*Collector) Category() collector.Category { return collector.CategoryCloud }
 
-// DefaultEnabled returns false — cloud collectors are opt-in.
+// DefaultEnabled returns false, because cloud collectors are opt-in.
 func (*Collector) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi, for the vendor of a Linode VM, and hostname

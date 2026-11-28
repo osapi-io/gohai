@@ -18,13 +18,13 @@
 // FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
 
-// Package dmi reports SMBIOS / DMI data — BIOS, baseboard, chassis,
+// Package dmi reports SMBIOS / DMI data: BIOS, baseboard, chassis,
 // and product identity. Consumers use this to detect virtualization
 // vendors (cloud collectors check product.name for "Google Compute
 // Engine", "Amazon EC2", etc.), inventory hardware, and drive
 // compliance tooling. On Linux the data comes from
 // /sys/class/dmi/id/* via ghw (no root needed). macOS has no SMBIOS
-// equivalent; the collector returns an empty Info there — the macOS
+// equivalent, so the collector returns an empty Info there. The macOS
 // `hardware` collector (planned) covers that ground.
 package dmi
 
@@ -70,7 +70,7 @@ type Chassis struct {
 }
 
 // Product is the system identity (DMI type 1). Product.Name is the
-// primary signal cloud collectors key off — "Google Compute Engine",
+// primary signal that cloud collectors key off: "Google Compute Engine",
 // "Amazon EC2", "DigitalOcean Droplet", etc.
 type Product struct {
 	VendorName   string `json:"vendor_name,omitempty"`
@@ -96,7 +96,7 @@ func (base) Name() string { return "dmi" }
 // Category returns "hardware".
 func (base) Category() collector.Category { return collector.CategoryHardware }
 
-// DefaultEnabled returns false — dmi is opt-in. Cloud collectors
+// DefaultEnabled returns false, because dmi is opt-in. Cloud collectors
 // declare it as a dependency so enabling any cloud collector pulls
 // dmi in automatically; users who explicitly want hardware identity
 // can enable it directly.

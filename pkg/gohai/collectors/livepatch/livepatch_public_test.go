@@ -249,7 +249,7 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: sysfs files absent — defaults to false",
+			name:    "linux: with no sysfs files the default is false",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				// Patch dir exists but has no enabled/transition files.
@@ -273,7 +273,7 @@ func (s *LivepatchPublicTestSuite) TestCollect() {
 			name:    "linux: non-directory entries in livepatch dir are skipped",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				// A regular file alongside a patch directory — must be skipped.
+				// A regular file next to a patch directory must be skipped.
 				return fsWith(
 					s.T(),
 					[]string{"/sys/kernel/livepatch/lp_real"},

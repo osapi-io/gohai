@@ -22,7 +22,7 @@
 //
 // Collect returns an error only when collection as a whole fails. An
 // individual collector that errors is dropped from the typed output and
-// its field stays nil — indistinguishable from "not selected". WithTimings
+// its field stays nil, the same as "not selected". WithTimings
 // is how that failure becomes visible.
 package main
 

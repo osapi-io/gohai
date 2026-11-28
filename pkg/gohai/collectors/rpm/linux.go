@@ -42,7 +42,7 @@ func NewLinux() *Linux {
 
 // Collect runs `rpm --showrc` and returns the parsed macro map. When
 // rpm is not installed or the command fails, an empty macro map is
-// returned with no error — this matches Ohai's rpm.rb "skip if rpm not
+// returned with no error. This matches Ohai's rpm.rb "skip if rpm not
 // found" behaviour and avoids erroring on non-RPM systems.
 func (l *Linux) Collect(
 	ctx context.Context,
@@ -54,7 +54,7 @@ func (l *Linux) Collect(
 	}
 	out, err := l.Exec.Execute(ctx, "rpm", "--showrc")
 	if err != nil {
-		// rpm not installed or non-RPM host — return empty, no error.
+		// rpm is not installed or the host is not RPM-based: return empty, no error.
 		return info, nil
 	}
 	info.Macros = parseShowrc(out)

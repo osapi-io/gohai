@@ -27,7 +27,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// Debian covers debian / ubuntu / raspbian — apt-based hosts.
+// Debian covers debian / ubuntu / raspbian: the apt-based hosts.
 type Debian struct {
 	base
 

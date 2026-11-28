@@ -26,7 +26,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Darwin reports the macOS init system. Always launchd — macOS
+// Darwin reports the macOS init system. It is always launchd, because macOS
 // doesn't support alternative init systems.
 type Darwin struct {
 	base

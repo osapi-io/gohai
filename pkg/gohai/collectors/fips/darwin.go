@@ -40,7 +40,7 @@ func NewDarwin() *Darwin {
 	return &Darwin{}
 }
 
-// Collect returns nil — no FIPS facts on darwin.
+// Collect returns nil, because darwin has no FIPS facts.
 func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,

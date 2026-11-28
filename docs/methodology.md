@@ -98,9 +98,9 @@ Write a list in prose directly after the Description section:
 ```md
 The collector reports N related signals:
 
-- `<field>` — what it means, what source it comes from, what question it answers
+- `<field>`: what it means, where it comes from, and which question it answers
   for the consumer.
-- `<field>` — same, including when this signal and the one above can disagree
+- `<field>`: the same, and also when this signal and the one above can disagree
   and what that disagreement tells you.
 ```
 

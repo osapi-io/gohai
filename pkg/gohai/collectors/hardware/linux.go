@@ -27,8 +27,8 @@ import (
 )
 
 // Linux returns an empty Info. The hardware collector is Darwin-only
-// — Linux gets equivalent information from dmi (identity), cpu,
-// memory, disk/filesystem, and the future battery collector.
+// Linux returns an empty Info. The hardware collector is Darwin-only.
+// Linux gets equivalent information from dmi (identity), cpu,
 // Matches Ohai's `darwin/hardware.rb` scope.
 type Linux struct {
 	base

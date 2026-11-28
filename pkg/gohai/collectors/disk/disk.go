@@ -19,7 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package disk collects per-device disk I/O counters (node_exporter-style).
-// Ohai has no equivalent plugin — block-device *metadata* lives under
+// Ohai has no equivalent plugin. Block-device *metadata* lives under
 // linux/block_device.rb in Ohai, which we target with a future gohai
 // `block_device` collector. This collector is I/O counters only.
 package disk

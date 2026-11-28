@@ -19,7 +19,7 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package virtualization detects every hypervisor and container
-// runtime the host participates in — as guest, host, or both. A
+// runtime the host participates in, as guest, host, or both. A
 // single host can legitimately report multiple systems (a Docker host
 // that is itself a KVM guest on EC2, an LXD host on bare metal,
 // etc.). Mirrors Ohai's linux/virtualization.rb and
@@ -86,7 +86,7 @@ func (base) Name() string                 { return "virtualization" }
 func (base) Category() collector.Category { return collector.CategoryVirtualization }
 func (base) DefaultEnabled() bool         { return true }
 
-// Dependencies declares cpu — the Linux cascade consults the cpu
+// Dependencies declares cpu, because the Linux cascade consults the cpu
 // prior result's HypervisorVendor/VirtualizationType as a KVM
 // fallback when /sys/devices/virtual/misc/kvm isn't exposed
 // (nested VMs). Every other signal reads /proc or /sys directly.

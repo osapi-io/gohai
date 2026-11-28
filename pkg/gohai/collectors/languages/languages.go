@@ -57,7 +57,7 @@ func (base) Name() string { return "languages" }
 // Category returns "software".
 func (base) Category() collector.Category { return collector.CategorySoftware }
 
-// DefaultEnabled returns false — runtime detection shells out multiple times.
+// DefaultEnabled returns false, because runtime detection shells out many times.
 func (base) DefaultEnabled() bool { return false }
 
 // Dependencies returns no dependencies.
@@ -81,7 +81,7 @@ func NewWith(
 }
 
 // collectLanguages probes each well-known language runtime and returns
-// an Info struct. It is shared between Linux and Darwin — version flags
+// an Info struct. It is shared between Linux and Darwin, because version flags
 // are identical on both platforms.
 func collectLanguages(
 	ctx context.Context,
