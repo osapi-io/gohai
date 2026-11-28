@@ -548,7 +548,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return(nil, exitStatusError(1)).AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
@@ -563,7 +563,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return(nil, context.DeadlineExceeded).AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
@@ -640,7 +640,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupLinux: func() *vmware.Linux {
 				ctrl := gomock.NewController(s.T())
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return(nil, errKilled).AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
@@ -794,7 +794,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 			variant: "darwin",
 			setupDarwin: func() *vmware.Darwin {
 				ctrl := gomock.NewController(s.T())
-				m := sourcemocks.NewMockRunner(ctrl)
+				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
 					Return(nil, context.DeadlineExceeded).AnyTimes()
 				return &vmware.Darwin{Exec: m}
