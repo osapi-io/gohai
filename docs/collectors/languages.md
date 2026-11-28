@@ -78,8 +78,7 @@ the same special cases:
 - the version in parentheses of Perl, without its `v`
 - the `v` at the start of the Node version
 
-Linux and Darwin use the same probe sequence. The version flags are the same on
-the two platforms:
+Linux and Darwin run the same commands, with the same version flags:
 
 1. **Go.** `go version`. The collector gets the `goX.Y.Z` token and removes the
    `go` prefix.
@@ -97,6 +96,20 @@ the two platforms:
 6. **Perl.** `perl --version`. The collector gets the `(vX.Y.Z)` form in
    parentheses from the first line, and removes the `v` (`(v5.36.0)` →
    `5.36.0`).
+
+On Darwin, `/usr/bin/python3` and `/usr/bin/java` can be stubs. If the real
+runtime is not installed, a stub opens an install dialog on the desktop. Thus,
+before the Darwin collector runs `python3` or `java`, it runs `command -v` to
+find the command:
+
+- If the command is not on the PATH, the collector does not run the probe.
+- If the path is `/usr/bin/python3`, the collector runs `xcode-select -p`. If
+  the path is `/usr/bin/java`, it runs `/usr/libexec/java_home`. If this check
+  fails, the collector does not run the probe.
+- If the path is a different path, for example from Homebrew, the command is not
+  a stub, and the collector runs the probe.
+
+When the collector does not run the probe, the field is `nil`.
 
 If a runtime's command is not on the PATH, the collector sets its field to
 `nil`, because missing runtimes are usual on minimal hosts. A command that is
