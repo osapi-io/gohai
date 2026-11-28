@@ -21,13 +21,14 @@
 package gohai_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -41,107 +42,41 @@ func TestOptionsPublicTestSuite(
 	suite.Run(t, new(OptionsPublicTestSuite))
 }
 
-func (s *OptionsPublicTestSuite) TestNew() {
-	tests := []struct {
+func (s *OptionsPublicTestSuite) TestWithSources() {
+	type row struct {
 		name         string
-		opts         []gohai.Option
-		builtins     func(source.Sources) []collector.Collector
-		validateFunc func(any, error)
-	}{
+		src          func() source.Sources
+		collector    string
+		validateFunc func(*gohai.Facts, error)
+	}
+	tests := []row{
 		{
-			name: "a built-in collector that does not register errors",
-			builtins: func(src source.Sources) []collector.Collector {
-				return []collector.Collector{platform.NewWith(src), platform.NewWith(src)}
+			name: "a collector reads the filesystem it is given",
+			src: func() source.Sources {
+				fs := memfs.New()
+				s.Require().NoError(fs.MkdirAll("/etc", 0o755))
+				s.Require().NoError(fs.WriteFile("/etc/os-release",
+					[]byte("ID=gohaitest\nNAME=\"Gohai Test\"\nVERSION_ID=\"1.0\"\n"), 0o644))
+
+				return source.Sources{FS: fs, Family: family.Debian}
 			},
-			validateFunc: func(_ any, err error) {
-				s.ErrorContains(err, `register built-in collector "platform"`)
-			},
-		},
-		{
-			name: "defaults",
-			opts: nil,
-			validateFunc: func(g any, err error) {
+			collector: "os_release",
+			validateFunc: func(facts *gohai.Facts, err error) {
 				s.Require().NoError(err)
-				s.NotNil(g)
-			},
-		},
-		{
-			name: "with disabled",
-			opts: []gohai.Option{gohai.WithDisabled("platform")},
-			validateFunc: func(g any, err error) {
-				s.Require().NoError(err)
-				s.NotNil(g)
-			},
-		},
-		{
-			name: "with collectors only",
-			opts: []gohai.Option{gohai.WithCollectors("platform")},
-			validateFunc: func(g any, err error) {
-				s.Require().NoError(err)
-				s.NotNil(g)
-			},
-		},
-		{
-			name: "unknown enabled errors",
-			opts: []gohai.Option{gohai.WithEnabled("nope")},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name: "unknown disabled errors",
-			opts: []gohai.Option{gohai.WithDisabled("nope")},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name: "with collectors and disabled together errors",
-			opts: []gohai.Option{
-				gohai.WithCollectors("platform"),
-				gohai.WithDisabled("hostname"),
-			},
-			validateFunc: func(_ any, err error) {
-				s.ErrorContains(err, "WithCollectors and WithDisabled together")
-			},
-		},
-		{
-			name: "unknown only errors",
-			opts: []gohai.Option{gohai.WithCollectors("nope")},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
-			},
-		},
-		{
-			name: "with category cloud",
-			opts: []gohai.Option{gohai.WithCategory("cloud")},
-			validateFunc: func(g any, err error) {
-				s.Require().NoError(err)
-				s.NotNil(g)
-			},
-		},
-		{
-			name: "with category hardware stacks",
-			opts: []gohai.Option{gohai.WithCategory("hardware", "cloud")},
-			validateFunc: func(g any, err error) {
-				s.Require().NoError(err)
-				s.NotNil(g)
-			},
-		},
-		{
-			name: "unknown category errors",
-			opts: []gohai.Option{gohai.WithCategory("nope")},
-			validateFunc: func(_ any, err error) {
-				s.Error(err)
+				s.Require().NotNil(facts.OSRelease)
+				s.Equal("gohaitest", facts.OSRelease.ID)
+				s.Equal("1.0", facts.OSRelease.VersionID)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			if tt.builtins != nil {
-				defer gohai.SetBuiltinCollectorsFn(tt.builtins)()
-			}
-			tt.validateFunc(gohai.New(tt.opts...))
+			g, err := gohai.New(
+				gohai.WithSources(tt.src()),
+				gohai.WithCollectors(tt.collector),
+			)
+			s.Require().NoError(err)
+			tt.validateFunc(g.Collect(context.Background()))
 		})
 	}
 }

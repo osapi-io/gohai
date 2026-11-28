@@ -56,14 +56,132 @@ C 03  Display controller
 // gpuModalias is the modalias of the NVIDIA card of ids.
 const gpuModalias = "pci:v000010DEd00001C82sv00001458sd00003764bc03sc00i00\n"
 
-func (s *PCIDevPublicTestSuite) TestList() {
-	gz := func(b string) string {
-		var buf bytes.Buffer
-		zw := gzip.NewWriter(&buf)
-		_, _ = zw.Write([]byte(b))
-		_ = zw.Close()
-		return buf.String()
+// gz is b, gzip-compressed.
+func gz(
+	b string,
+) string {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	_, _ = zw.Write([]byte(b))
+	_ = zw.Close()
+
+	return buf.String()
+}
+
+func (s *PCIDevPublicTestSuite) TestLoadDB() {
+	modalias := "/sys/bus/pci/devices/0000:01:00.0/modalias"
+	tests := []struct {
+		name         string
+		files        map[string]string
+		validateFunc func(pcidev.Device)
+	}{
+		{
+			name: "reads pci.ids from the first path that has it",
+			files: map[string]string{
+				"/usr/share/hwdata/pci.ids": ids,
+				modalias:                    gpuModalias,
+			},
+			validateFunc: func(d pcidev.Device) {
+				s.Equal("NVIDIA Corporation", d.VendorName)
+				s.Equal("GV-N105TOC-4GD", d.SubsystemName)
+			},
+		},
+		{
+			name: "reads a gzip pci.ids",
+			files: map[string]string{
+				"/usr/share/misc/pci.ids.gz": gz(ids),
+				modalias:                     gpuModalias,
+			},
+			validateFunc: func(d pcidev.Device) {
+				s.Equal("NVIDIA Corporation", d.VendorName)
+			},
+		},
+		{
+			name: "a pci.ids.gz that is not gzip, and no other: names unknown",
+			files: map[string]string{
+				"/usr/share/hwdata/pci.ids.gz": "plain text",
+				modalias:                       gpuModalias,
+			},
+			validateFunc: func(d pcidev.Device) {
+				s.Equal("unknown", d.VendorName)
+			},
+		},
+		{
+			name: "a pci.ids.gz that is cut short: names unknown",
+			files: map[string]string{
+				"/usr/share/hwdata/pci.ids.gz": gz(ids)[:30],
+				modalias:                       gpuModalias,
+			},
+			validateFunc: func(d pcidev.Device) {
+				s.Equal("unknown", d.VendorName)
+			},
+		},
+		{
+			name: "no pci.ids at all: names unknown",
+			files: map[string]string{
+				modalias: gpuModalias,
+			},
+			validateFunc: func(d pcidev.Device) {
+				s.Equal("unknown", d.VendorName)
+			},
+		},
 	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			fs := sourcetest.FS(s.T(), tt.files)
+			d, ok := pcidev.Read(fs, pcidev.LoadDB(fs), "0000:01:00.0")
+			s.Require().True(ok)
+			tt.validateFunc(d)
+		})
+	}
+}
+
+func (s *PCIDevPublicTestSuite) TestParseIDs() {
+	tests := []struct {
+		name         string
+		ids          string
+		validateFunc func(pcidev.Device)
+	}{
+		{
+			name: "names the vendor, the product, the subsystem, the class and the subclass",
+			ids:  ids,
+			validateFunc: func(d pcidev.Device) {
+				s.Equal("NVIDIA Corporation", d.VendorName)
+				s.Equal("GP107 [GeForce GTX 1050 Ti]", d.ProductName)
+				s.Equal("GV-N105TOC-4GD", d.SubsystemName)
+				s.Equal("Display controller", d.ClassName)
+				s.Equal("VGA compatible controller", d.SubclassName)
+			},
+		},
+		{
+			name: "a line longer than the read buffer is skipped, and the parse goes on",
+			ids:  "8086  " + strings.Repeat("x", 2*1024*1024) + "\n" + ids,
+			validateFunc: func(d pcidev.Device) {
+				s.Equal("NVIDIA Corporation", d.VendorName)
+				s.Equal("GV-N105TOC-4GD", d.SubsystemName)
+			},
+		},
+		{
+			name: "no data names nothing",
+			validateFunc: func(d pcidev.Device) {
+				s.Equal("unknown", d.VendorName)
+				s.Equal("unknown", d.ClassName)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			fs := sourcetest.FS(s.T(), map[string]string{
+				"/sys/bus/pci/devices/0000:01:00.0/modalias": gpuModalias,
+			})
+			d, ok := pcidev.Read(fs, pcidev.ParseIDs([]byte(tt.ids)), "0000:01:00.0")
+			s.Require().True(ok)
+			tt.validateFunc(d)
+		})
+	}
+}
+
+func (s *PCIDevPublicTestSuite) TestList() {
 	dev := "/sys/bus/pci/devices/"
 	tests := []struct {
 		name         string
@@ -97,9 +215,9 @@ func (s *PCIDevPublicTestSuite) TestList() {
 			},
 		},
 		{
-			name: "a gzip pci.ids, an unknown device, a root-bus parent, and entries left out",
+			name: "an unknown device, a root-bus parent, and entries left out",
 			files: map[string]string{
-				"/usr/share/misc/pci.ids.gz":    gz(ids),
+				"/usr/share/hwdata/pci.ids":     ids,
 				dev + "0000:00:02.0/modalias":   "pci:v00008086d00009A49sv00001028sd00000A38bc03sc80i00\n",
 				dev + "0000:00:03.0/modalias":   "pci:short\n",
 				dev + "0000:00:00.0/modalias":   gpuModalias,
@@ -117,43 +235,6 @@ func (s *PCIDevPublicTestSuite) TestList() {
 				s.Equal("unknown", d[1].SubsystemName)
 				s.Empty(d[1].Driver)
 				s.Empty(d[1].ParentAddress)
-			},
-		},
-		{
-			name: "a pci.ids line longer than the read buffer is skipped, and the parse goes on",
-			files: map[string]string{
-				"/usr/share/hwdata/pci.ids": "8086  " + strings.Repeat(
-					"x",
-					2*1024*1024,
-				) + "\n" + ids,
-				dev + "0000:01:00.0/modalias": gpuModalias,
-			},
-			validateFunc: func(d []pcidev.Device) {
-				s.Require().Len(d, 1)
-				s.Equal("NVIDIA Corporation", d[0].VendorName)
-				s.Equal("GV-N105TOC-4GD", d[0].SubsystemName)
-			},
-		},
-		{
-			name: "a pci.ids.gz that is not gzip, and no other: names unknown",
-			files: map[string]string{
-				"/usr/share/hwdata/pci.ids.gz": "plain text",
-				dev + "0000:01:00.0/modalias":  gpuModalias,
-			},
-			validateFunc: func(d []pcidev.Device) {
-				s.Require().Len(d, 1)
-				s.Equal("unknown", d[0].VendorName)
-			},
-		},
-		{
-			name: "a pci.ids.gz that is cut short",
-			files: map[string]string{
-				"/usr/share/hwdata/pci.ids.gz": gz(ids)[:30],
-				dev + "0000:01:00.0/modalias":  gpuModalias,
-			},
-			validateFunc: func(d []pcidev.Device) {
-				s.Require().Len(d, 1)
-				s.Equal("unknown", d[0].VendorName)
 			},
 		},
 		{

@@ -51,6 +51,46 @@ func (s *ReadlogPublicTestSuite) TestSources() {
 			},
 		},
 		{
+			name: "the resolver resolves nothing",
+			validateFunc: func(src source.Sources, _ *readlog.Log) {
+				addrs, err := src.Resolver.LookupHost(context.Background(), "x")
+				s.NoError(err)
+				s.Nil(addrs)
+				names, err := src.Resolver.LookupAddr(context.Background(), "1.2.3.4")
+				s.NoError(err)
+				s.Nil(names)
+			},
+		},
+		{
+			name: "the transport refuses each request, with no network",
+			validateFunc: func(src source.Sources, _ *readlog.Log) {
+				req, err := http.NewRequestWithContext(
+					context.Background(),
+					http.MethodGet,
+					"http://169.254.169.254/latest/meta-data/",
+					nil,
+				)
+				s.Require().NoError(err)
+				resp, err := src.HTTP.RoundTrip(req)
+				s.Nil(resp)
+				s.EqualError(err, "readlog: the host has no network")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(readlog.Sources(family.Darwin))
+		})
+	}
+}
+
+func (s *ReadlogPublicTestSuite) TestFiles() {
+	tests := []struct {
+		name         string
+		validateFunc func(source.Sources, *readlog.Log)
+	}{
+		{
 			name: "the filesystem holds nothing, and logs each path once, sorted",
 			validateFunc: func(src source.Sources, log *readlog.Log) {
 				_, err := src.FS.Open("/a")
@@ -91,6 +131,20 @@ func (s *ReadlogPublicTestSuite) TestSources() {
 				)
 			},
 		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(readlog.Sources(family.Darwin))
+		})
+	}
+}
+
+func (s *ReadlogPublicTestSuite) TestCommands() {
+	tests := []struct {
+		name         string
+		validateFunc func(source.Sources, *readlog.Log)
+	}{
 		{
 			name: "a command answers with no output, and is logged",
 			validateFunc: func(src source.Sources, log *readlog.Log) {
@@ -105,32 +159,6 @@ func (s *ReadlogPublicTestSuite) TestSources() {
 				_, _ = src.Exec.Execute(context.Background(), "hostname")
 
 				s.Equal([]string{"hostname", "systemctl list-units --all"}, log.Commands())
-			},
-		},
-		{
-			name: "the resolver resolves nothing",
-			validateFunc: func(src source.Sources, _ *readlog.Log) {
-				addrs, err := src.Resolver.LookupHost(context.Background(), "x")
-				s.NoError(err)
-				s.Nil(addrs)
-				names, err := src.Resolver.LookupAddr(context.Background(), "1.2.3.4")
-				s.NoError(err)
-				s.Nil(names)
-			},
-		},
-		{
-			name: "the transport refuses each request, with no network",
-			validateFunc: func(src source.Sources, _ *readlog.Log) {
-				req, err := http.NewRequestWithContext(
-					context.Background(),
-					http.MethodGet,
-					"http://169.254.169.254/latest/meta-data/",
-					nil,
-				)
-				s.Require().NoError(err)
-				resp, err := src.HTTP.RoundTrip(req)
-				s.Nil(resp)
-				s.EqualError(err, "readlog: the host has no network")
 			},
 		},
 	}

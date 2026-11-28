@@ -62,11 +62,6 @@ func mappingRows(
 }
 
 func (s *SchemaPublicTestSuite) TestSchemaJSON() {
-	repo := osfs.New()
-	mapping, err := repo.ReadFile(repo.Join("field-mapping.md"))
-	s.Require().NoError(err)
-	rows := mappingRows(string(mapping))
-
 	tests := []struct {
 		name         string
 		validateFunc func()
@@ -81,30 +76,44 @@ func (s *SchemaPublicTestSuite) TestSchemaJSON() {
 				s.Contains(schema.Defs, "Facts")
 			},
 		},
-		{
-			name: "the row count of field-mapping.md is the count that README.md states",
-			validateFunc: func() {
-				readme, err := repo.ReadFile(repo.Join("README.md"))
-				s.Require().NoError(err)
-				m := regexp.MustCompile(`\((\d+) rows\)`).FindSubmatch(readme)
-				s.Require().NotNil(m)
-				s.Equal(strconv.Itoa(rows), string(m[1]))
-			},
-		},
-		{
-			name: "the row count of field-mapping.md is the count that CONTRIBUTING.md states",
-			validateFunc: func() {
-				contributing, err := repo.ReadFile(repo.Join("..", "CONTRIBUTING.md"))
-				s.Require().NoError(err)
-				m := regexp.MustCompile(`It has (\d+) rows\.`).FindSubmatch(contributing)
-				s.Require().NotNil(m)
-				s.Equal(strconv.Itoa(rows), string(m[1]))
-			},
-		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			tt.validateFunc()
+		})
+	}
+}
+
+func (s *SchemaPublicTestSuite) TestFieldMappingRows() {
+	repo := osfs.New()
+	mapping, err := repo.ReadFile(repo.Join("field-mapping.md"))
+	s.Require().NoError(err)
+	rows := strconv.Itoa(mappingRows(string(mapping)))
+
+	tests := []struct {
+		name string
+		page string
+		// statedRE finds the row count that page states.
+		statedRE *regexp.Regexp
+	}{
+		{
+			name:     "schemas/README.md states the row count of field-mapping.md",
+			page:     "README.md",
+			statedRE: regexp.MustCompile(`\((\d+) rows\)`),
+		},
+		{
+			name:     "CONTRIBUTING.md states the row count of field-mapping.md",
+			page:     repo.Join("..", "CONTRIBUTING.md"),
+			statedRE: regexp.MustCompile(`It has (\d+) rows\.`),
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			page, err := repo.ReadFile(tt.page)
+			s.Require().NoError(err)
+			m := tt.statedRE.FindSubmatch(page)
+			s.Require().NotNil(m)
+			s.Equal(rows, string(m[1]))
 		})
 	}
 }
