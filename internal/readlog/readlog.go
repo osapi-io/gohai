@@ -99,61 +99,84 @@ type vfs struct {
 	log *Log
 }
 
-func (v *vfs) Open(name string) (avfs.File, error) {
+func (v *vfs) Open(
+	name string,
+) (avfs.File, error) {
 	v.log.file(name)
 
 	return v.VFS.Open(name)
 }
 
-func (v *vfs) OpenFile(name string, flag int, perm fs.FileMode) (avfs.File, error) {
+func (v *vfs) OpenFile(
+	name string,
+	flag int,
+	perm fs.FileMode,
+) (avfs.File, error) {
 	v.log.file(name)
 
 	return v.VFS.OpenFile(name, flag, perm)
 }
 
-func (v *vfs) ReadFile(name string) ([]byte, error) {
+func (v *vfs) ReadFile(
+	name string,
+) ([]byte, error) {
 	v.log.file(name)
 
 	return v.VFS.ReadFile(name)
 }
 
-func (v *vfs) ReadDir(name string) ([]fs.DirEntry, error) {
+func (v *vfs) ReadDir(
+	name string,
+) ([]fs.DirEntry, error) {
 	v.log.file(name)
 
 	return v.VFS.ReadDir(name)
 }
 
-func (v *vfs) Stat(name string) (fs.FileInfo, error) {
+func (v *vfs) Stat(
+	name string,
+) (fs.FileInfo, error) {
 	v.log.file(name)
 
 	return v.VFS.Stat(name)
 }
 
-func (v *vfs) Lstat(name string) (fs.FileInfo, error) {
+func (v *vfs) Lstat(
+	name string,
+) (fs.FileInfo, error) {
 	v.log.file(name)
 
 	return v.VFS.Lstat(name)
 }
 
-func (v *vfs) Readlink(name string) (string, error) {
+func (v *vfs) Readlink(
+	name string,
+) (string, error) {
 	v.log.file(name)
 
 	return v.VFS.Readlink(name)
 }
 
-func (v *vfs) EvalSymlinks(path string) (string, error) {
+func (v *vfs) EvalSymlinks(
+	path string,
+) (string, error) {
 	v.log.file(path)
 
 	return v.VFS.EvalSymlinks(path)
 }
 
-func (v *vfs) Glob(pattern string) ([]string, error) {
+func (v *vfs) Glob(
+	pattern string,
+) ([]string, error) {
 	v.log.file(pattern)
 
 	return v.VFS.Glob(pattern)
 }
 
-func (v *vfs) WalkDir(root string, fn fs.WalkDirFunc) error {
+func (v *vfs) WalkDir(
+	root string,
+	fn fs.WalkDirFunc,
+) error {
 	v.log.file(root)
 
 	return v.VFS.WalkDir(root, fn)
@@ -179,6 +202,16 @@ func (r runner) Execute(
 // resolver resolves nothing.
 type resolver struct{}
 
-func (resolver) LookupHost(context.Context, string) ([]string, error) { return nil, nil }
+func (resolver) LookupHost(
+	context.Context,
+	string,
+) ([]string, error) {
+	return nil, nil
+}
 
-func (resolver) LookupAddr(context.Context, string) ([]string, error) { return nil, nil }
+func (resolver) LookupAddr(
+	context.Context,
+	string,
+) ([]string, error) {
+	return nil, nil
+}

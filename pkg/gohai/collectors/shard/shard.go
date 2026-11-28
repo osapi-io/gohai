@@ -144,21 +144,30 @@ func getDMIUUID(
 	return info.Product.UUID
 }
 
-func prodSerial(p *dmi.Product) string {
+// prodSerial returns the serial number of the product, or "" when sysfs has none.
+func prodSerial(
+	p *dmi.Product,
+) string {
 	if p == nil {
 		return ""
 	}
 	return p.SerialNumber
 }
 
-func bbSerial(b *dmi.Baseboard) string {
+// bbSerial returns the serial number of the baseboard, or "" when sysfs has none.
+func bbSerial(
+	b *dmi.Baseboard,
+) string {
 	if b == nil {
 		return ""
 	}
 	return b.SerialNumber
 }
 
-func chSerial(c *dmi.Chassis) string {
+// chSerial returns the serial number of the chassis, or "" when sysfs has none.
+func chSerial(
+	c *dmi.Chassis,
+) string {
 	if c == nil {
 		return ""
 	}
