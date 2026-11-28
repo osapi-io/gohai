@@ -42,10 +42,11 @@ import (
 )
 
 // resolverRetries is how often the FQDN lookups are tried, and
-// resolverBackoff how far apart. Tests set the backoff to zero.
-const resolverRetries = 3
-
-var resolverBackoff = 100 * time.Millisecond
+// resolverBackoff how far apart.
+const (
+	resolverRetries = 3
+	resolverBackoff = 100 * time.Millisecond
+)
 
 // kernelHostname is the name the kernel holds, on Linux.
 const kernelHostname = "/proc/sys/kernel/hostname"

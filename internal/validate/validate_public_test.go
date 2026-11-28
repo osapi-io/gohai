@@ -23,6 +23,7 @@ package validate_test
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,6 +45,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
+	"github.com/osapi-io/gohai/schemas"
 )
 
 type ValidatePublicTestSuite struct {
@@ -59,46 +61,36 @@ func TestValidatePublicTestSuite(
 func (s *ValidatePublicTestSuite) TestCompileSchema() {
 	tests := []struct {
 		name         string
-		schemaFn     func() []byte
-		resourceURL  string
+		schema       []byte
 		validateFunc func(*jsonschema.Schema, error)
 	}{
 		{
-			name: "valid embedded schema compiles",
+			name:   "the embedded schema compiles",
+			schema: schemas.SchemaJSON,
 			validateFunc: func(sch *jsonschema.Schema, err error) {
 				s.NoError(err)
 				s.NotNil(sch)
 			},
 		},
 		{
-			name:     "invalid JSON schema fails unmarshal",
-			schemaFn: func() []byte { return []byte(`{not json}`) },
+			name:   "a schema that is not JSON fails unmarshal",
+			schema: []byte(`{not json}`),
 			validateFunc: func(_ *jsonschema.Schema, err error) {
-				s.Error(err)
+				s.ErrorContains(err, "unmarshal schema")
 			},
 		},
 		{
-			name:        "invalid resource URL fails AddResource",
-			schemaFn:    func() []byte { return []byte(`{"type": "object"}`) },
-			resourceURL: "://bad\x00url",
+			name:   "JSON that is not a valid schema fails compile",
+			schema: []byte(`{"type": 5}`),
 			validateFunc: func(_ *jsonschema.Schema, err error) {
-				s.Error(err)
+				s.ErrorContains(err, "compile schema")
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			if tc.schemaFn != nil {
-				restore := validate.SetSchemaJSONFn(tc.schemaFn)
-				defer restore()
-			}
-			if tc.resourceURL != "" {
-				restore := validate.SetSchemaResourceURL(tc.resourceURL)
-				defer restore()
-			}
-
-			tc.validateFunc(validate.CompileSchema())
+			tc.validateFunc(validate.CompileSchema(tc.schema))
 		})
 	}
 }
@@ -107,46 +99,81 @@ func (s *ValidatePublicTestSuite) TestJSON() {
 	tests := []struct {
 		name         string
 		data         []byte
-		schemaFn     func() []byte
 		validateFunc func(error)
 	}{
 		{
-			name: "valid minimal facts",
+			name: "facts that match the embedded schema",
 			data: mustMarshal(s.T(), &gohai.Facts{CollectTime: time.Now()}),
 			validateFunc: func(err error) {
 				s.NoError(err)
 			},
 		},
 		{
-			name: "valid fully populated facts",
-			data: mustMarshal(s.T(), fullyPopulatedFacts()),
+			name: "facts that break the embedded schema",
+			data: []byte(`{"platform": {"os": 123}}`),
+			validateFunc: func(err error) {
+				s.Error(err)
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			tc.validateFunc(validate.JSON(tc.data))
+		})
+	}
+}
+
+func (s *ValidatePublicTestSuite) TestJSONWith() {
+	tests := []struct {
+		name         string
+		data         []byte
+		schema       []byte
+		validateFunc func(error)
+	}{
+		{
+			name:   "valid minimal facts",
+			schema: schemas.SchemaJSON,
+			data:   mustMarshal(s.T(), &gohai.Facts{CollectTime: time.Now()}),
 			validateFunc: func(err error) {
 				s.NoError(err)
 			},
 		},
 		{
-			name: "every host collector on an empty debian host",
-			data: emptyHostFacts(s.T(), family.Debian),
+			name:   "valid fully populated facts",
+			schema: schemas.SchemaJSON,
+			data:   mustMarshal(s.T(), fullyPopulatedFacts()),
 			validateFunc: func(err error) {
 				s.NoError(err)
 			},
 		},
 		{
-			name: "every host collector on an empty rhel host",
-			data: emptyHostFacts(s.T(), family.RHEL),
+			name:   "every host collector on an empty debian host",
+			schema: schemas.SchemaJSON,
+			data:   emptyHostFacts(s.T(), family.Debian),
 			validateFunc: func(err error) {
 				s.NoError(err)
 			},
 		},
 		{
-			name: "every host collector on an empty darwin host",
-			data: emptyHostFacts(s.T(), family.Darwin),
+			name:   "every host collector on an empty rhel host",
+			schema: schemas.SchemaJSON,
+			data:   emptyHostFacts(s.T(), family.RHEL),
 			validateFunc: func(err error) {
 				s.NoError(err)
 			},
 		},
 		{
-			name: "docker with no container and no image has empty lists",
+			name:   "every host collector on an empty darwin host",
+			schema: schemas.SchemaJSON,
+			data:   emptyHostFacts(s.T(), family.Darwin),
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name:   "docker with no container and no image has empty lists",
+			schema: schemas.SchemaJSON,
 			data: mustMarshal(s.T(), &gohai.Facts{Docker: &docker.Info{
 				Version:    "24.0.5",
 				Containers: []docker.Container{},
@@ -157,44 +184,43 @@ func (s *ValidatePublicTestSuite) TestJSON() {
 			},
 		},
 		{
-			name: "docker lists that are null break the schema",
-			data: mustMarshal(s.T(), &gohai.Facts{Docker: &docker.Info{Version: "24.0.5"}}),
+			name:   "docker lists that are null break the schema",
+			schema: schemas.SchemaJSON,
+			data:   mustMarshal(s.T(), &gohai.Facts{Docker: &docker.Info{Version: "24.0.5"}}),
 			validateFunc: func(err error) {
 				s.Error(err)
 			},
 		},
 		{
-			name: "invalid JSON",
-			data: []byte(`{not json}`),
+			name:   "invalid JSON",
+			schema: schemas.SchemaJSON,
+			data:   []byte(`{not json}`),
 			validateFunc: func(err error) {
 				s.Error(err)
 			},
 		},
 		{
-			name: "schema violation: wrong type",
-			data: []byte(`{"platform": {"os": 123}}`),
+			name:   "schema violation: wrong type",
+			schema: schemas.SchemaJSON,
+			data:   []byte(`{"platform": {"os": 123}}`),
 			validateFunc: func(err error) {
 				s.Error(err)
 			},
 		},
 		{
-			name:     "compile schema error",
-			data:     []byte(`{}`),
-			schemaFn: func() []byte { return []byte(`{bad}`) },
+			name:   "a schema that does not compile gives the error of CompileSchema once",
+			data:   []byte(`{}`),
+			schema: []byte(`{"type": 5}`),
 			validateFunc: func(err error) {
-				s.Error(err)
+				s.Require().Error(err)
+				s.Equal(1, strings.Count(err.Error(), "compile schema:"))
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			if tc.schemaFn != nil {
-				restore := validate.SetSchemaJSONFn(tc.schemaFn)
-				defer restore()
-			}
-
-			tc.validateFunc(validate.JSON(tc.data))
+			tc.validateFunc(validate.JSONWith(tc.schema, tc.data))
 		})
 	}
 }

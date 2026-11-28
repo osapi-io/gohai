@@ -25,7 +25,6 @@ import (
 	"errors"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 
@@ -138,8 +137,6 @@ func (s *HostnamePublicTestSuite) TestNew() {
 }
 
 func (s *HostnamePublicTestSuite) TestCollect() {
-	defer hostname.SetResolverBackoff(0)()
-
 	kernelName := map[string]string{"/proc/sys/kernel/hostname": "kernel-short.example.com\n"}
 	okLookupHost := func(string) ([]string, error) { return []string{"10.0.0.5"}, nil }
 	okLookupAddr := func(string) ([]string, error) { return []string{"web01.example.com."}, nil }
@@ -530,9 +527,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 }
 
 func (s *HostnamePublicTestSuite) TestCollectCancelledStopsRetries() {
-	// With an hour between retries, a retry that sleeps through the
-	// cancel would hang the test.
-	defer hostname.SetResolverBackoff(time.Hour)()
+	// A retry that sleeps through the cancel calls LookupHost again.
 	calls := 0
 	resolver := mocks.NewMockResolver(gomock.NewController(s.T()))
 	resolver.EXPECT().
