@@ -29,20 +29,23 @@ import (
 	"os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sessions"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
 	_ collector.Collector = (*sessions.Linux)(nil)
 	_ collector.Collector = (*sessions.Darwin)(nil)
+)
+
+// The command lines that the rows answer, as sourcetest.Commands keys them.
+const (
+	loginctlLine = "loginctl --no-pager --no-legend --no-ask-password list-sessions"
 )
 
 type SessionsPublicTestSuite struct {
@@ -55,35 +58,11 @@ func TestSessionsPublicTestSuite(
 	suite.Run(t, new(SessionsPublicTestSuite))
 }
 
-// loginctlExec returns a MockRunner that canned-answers the
-// `loginctl list-sessions` command.
-func loginctlExec(
-	t *testing.T,
-	out []byte, err error,
-) source.Runner {
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().
-		Execute(
-			gomock.Any(),
-			"loginctl",
-			"--no-pager",
-			"--no-legend",
-			"--no-ask-password",
-			"list-sessions",
-		).
-		Return(out, err).
-		AnyTimes()
-	return m
-}
-
 func (s *SessionsPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(sessions.Collector)
 	}{
 		{
@@ -126,11 +105,20 @@ func (s *SessionsPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c sessions.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := sessions.New()
+			c := sessions.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = sessions.New()
+			}
 			s.Equal("sessions", c.Name())
 			s.Equal("users", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -164,8 +152,14 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: loginctl present, parses sessions ignores utmp",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return loginctlExec(t, loginctlOutput, nil) },
-			files:   utmp,
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{loginctlLine: string(loginctlOutput)},
+				}.Mock(
+					t,
+				)
+			},
+			files: utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
@@ -186,7 +180,13 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			name:    "linux: loginctl missing, falls back to utmp",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return loginctlExec(t, nil, fmt.Errorf("exec loginctl: %w", exec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{
+						loginctlLine: fmt.Errorf("exec loginctl: %w", exec.ErrNotFound),
+					},
+				}.Mock(
+					t,
+				)
 			},
 			files: utmp,
 			validateFunc: func(got any, err error) {
@@ -215,8 +215,10 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: loginctl returns empty output, an empty list, not null, and no fallback",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return loginctlExec(t, []byte(""), nil) },
-			files:   utmp,
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Out: map[string]string{loginctlLine: ""}}.Mock(t)
+			},
+			files: utmp,
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*sessions.Info)
@@ -231,7 +233,11 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			name:    "linux: a failed loginctl falls back to utmp",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return loginctlExec(t, nil, errors.New("exit status 1"))
+				return sourcetest.Commands{
+					Err: map[string]error{loginctlLine: errors.New("exit status 1")},
+				}.Mock(
+					t,
+				)
 			},
 			files: utmp,
 			validateFunc: func(got any, err error) {
@@ -246,7 +252,13 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			name:    "linux: no loginctl and no utmp file, no sessions",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return loginctlExec(t, nil, fmt.Errorf("exec loginctl: %w", exec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{
+						loginctlLine: fmt.Errorf("exec loginctl: %w", exec.ErrNotFound),
+					},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -257,7 +269,11 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			name:    "linux: a failed loginctl and no utmp file, the loginctl error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return loginctlExec(t, nil, errors.New("exit status 1"))
+				return sourcetest.Commands{
+					Err: map[string]error{loginctlLine: errors.New("exit status 1")},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Exactly(nil, got)

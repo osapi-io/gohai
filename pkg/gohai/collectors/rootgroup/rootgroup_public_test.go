@@ -24,12 +24,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/rootgroup"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
@@ -48,12 +49,10 @@ func TestRootGroupPublicTestSuite(
 }
 
 func (s *RootGroupPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(rootgroup.Collector)
 	}{
 		{
@@ -96,11 +95,20 @@ func (s *RootGroupPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c rootgroup.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := rootgroup.New()
+			c := rootgroup.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = rootgroup.New()
+			}
 			s.Equal("root_group", c.Name())
 			s.Equal("system", string(c.Category()))
 			s.True(c.DefaultEnabled())

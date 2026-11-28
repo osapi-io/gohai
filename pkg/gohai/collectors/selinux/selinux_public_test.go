@@ -24,20 +24,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	osexec "os/exec"
-	"path/filepath"
 	"testing"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/selinux"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
@@ -45,19 +43,6 @@ var (
 	_ collector.Collector = (*selinux.Linux)(nil)
 	_ collector.Collector = (*selinux.Darwin)(nil)
 )
-
-// fsWith builds a memfs with the given path→content entries.
-func fsWith(
-	t require.TestingT,
-	files map[string]string,
-) avfs.VFS {
-	f := memfs.New()
-	for path, content := range files {
-		_ = f.MkdirAll(filepath.Dir(path), 0o755)
-		require.NoError(t, f.WriteFile(path, []byte(content), fs.FileMode(0o644)))
-	}
-	return f
-}
 
 // sestatusEnforcing is a minimal sestatus output for an enforcing host.
 const sestatusEnforcing = `SELinux status:                 enabled
@@ -96,12 +81,10 @@ func TestSelinuxPublicTestSuite(
 }
 
 func (s *SelinuxPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(selinux.Collector)
 	}{
 		{
@@ -144,11 +127,20 @@ func (s *SelinuxPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c selinux.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := selinux.New()
+			c := selinux.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = selinux.New()
+			}
 			s.Equal("selinux", c.Name())
 			s.Equal("security", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -197,7 +189,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: SELINUX=disabled in the config is disabled, and sestatus does not run",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/etc/selinux/config": "# comment\nSELINUX=disabled\nSELINUXTYPE=targeted\n",
 				})
 			},
@@ -219,7 +211,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: enforcing with sestatus",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/fs/selinux/enforce": "1\n",
 					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
@@ -246,7 +238,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: permissive with sestatus",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/fs/selinux/enforce": "0\n",
 					"/etc/selinux/config":     "SELINUX=permissive\nSELINUXTYPE=minimum\n",
 				})
@@ -273,7 +265,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: no sestatus: the kernel gives the status and the mode",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/fs/selinux/enforce": "1\n",
 					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
@@ -300,7 +292,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: the kernel decides over a sestatus that says disabled",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/fs/selinux/enforce": "0\n",
 					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
@@ -327,7 +319,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: with a nil executor only the config is read",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/fs/selinux/enforce": "1\n",
 					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
@@ -348,7 +340,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: config says enforcing, the kernel has no selinuxfs: disabled",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
@@ -368,7 +360,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: no config file, the kernel has SELinux on: enabled",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/sys/fs/selinux/enforce": "1\n"})
+				return sourcetest.FS(s.T(), map[string]string{"/sys/fs/selinux/enforce": "1\n"})
 			},
 			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
 				m := mocks.NewMockRunner(ctrl)
@@ -390,7 +382,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: a sestatus that is installed and fails is an error",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{"/sys/fs/selinux/enforce": "1\n"})
+				return sourcetest.FS(s.T(), map[string]string{"/sys/fs/selinux/enforce": "1\n"})
 			},
 			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
 				m := mocks.NewMockRunner(ctrl)
@@ -426,7 +418,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: config line without equals sign skipped",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/fs/selinux/enforce": "1\n",
 					"/etc/selinux/config":     "SELINUX=enforcing\nthis line has no equals\nSELINUXTYPE=targeted\n",
 				})
@@ -455,7 +447,7 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			name:    "linux: sestatus line without colon skipped",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
-				return fsWith(s.T(), map[string]string{
+				return sourcetest.FS(s.T(), map[string]string{
 					"/sys/fs/selinux/enforce": "1\n",
 					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})

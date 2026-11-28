@@ -24,10 +24,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysconf"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -49,12 +49,10 @@ func TestSysconfPublicTestSuite(
 }
 
 func (s *SysconfPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(sysconf.Collector)
 	}{
 		{
@@ -97,11 +95,20 @@ func (s *SysconfPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c sysconf.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := sysconf.New()
+			c := sysconf.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = sysconf.New()
+			}
 			s.Equal("sysconf", c.Name())
 			s.Equal("misc", string(c.Category()))
 			s.False(c.DefaultEnabled())

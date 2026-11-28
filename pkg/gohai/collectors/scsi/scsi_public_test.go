@@ -27,19 +27,23 @@ import (
 	osexec "os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scsi"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
 	_ collector.Collector = (*scsi.Linux)(nil)
 	_ collector.Collector = (*scsi.Darwin)(nil)
+)
+
+// The command lines that the rows answer, as sourcetest.Commands keys them.
+const (
+	lsscsiLine = "lsscsi"
 )
 
 type SCSIPublicTestSuite struct {
@@ -52,29 +56,11 @@ func TestSCSIPublicTestSuite(
 	suite.Run(t, new(SCSIPublicTestSuite))
 }
 
-// lsscsiExec returns a MockRunner that returns (out, err) when
-// `lsscsi` is invoked.
-func lsscsiExec(
-	t *testing.T,
-	out []byte,
-	err error,
-) source.Runner {
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().
-		Execute(gomock.Any(), "lsscsi").
-		Return(out, err).
-		AnyTimes()
-	return m
-}
-
 func (s *SCSIPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(scsi.Collector)
 	}{
 		{
@@ -101,11 +87,20 @@ func (s *SCSIPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c scsi.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := scsi.New()
+			c := scsi.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = scsi.New()
+			}
 			s.Equal("scsi", c.Name())
 			s.Equal("hardware", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -134,7 +129,7 @@ malformed
 			name:    "linux: happy path parses lsscsi output",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return lsscsiExec(t, []byte(lsscsiOut), nil)
+				return sourcetest.Commands{Out: map[string]string{lsscsiLine: lsscsiOut}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -168,7 +163,11 @@ malformed
 			name:    "linux: missing lsscsi binary yields empty info, no error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return lsscsiExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{lsscsiLine: fmt.Errorf("exec: %w", osexec.ErrNotFound)},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -181,7 +180,13 @@ malformed
 			name:    "linux: a failed run is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return lsscsiExec(t, nil, errors.New("exit status 1: permission denied"))
+				return sourcetest.Commands{
+					Err: map[string]error{
+						lsscsiLine: errors.New("exit status 1: permission denied"),
+					},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
@@ -204,7 +209,7 @@ malformed
 			name:    "linux: empty output yields empty info",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return lsscsiExec(t, []byte{}, nil)
+				return sourcetest.Commands{Out: map[string]string{lsscsiLine: ""}}.Mock(t)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -217,7 +222,11 @@ malformed
 			name:    "linux: minimum 5-field row (no name) still parses",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return lsscsiExec(t, []byte("[0:0:0:0] disk ATA KC48 /dev/sda\n"), nil)
+				return sourcetest.Commands{
+					Out: map[string]string{lsscsiLine: "[0:0:0:0] disk ATA KC48 /dev/sda\n"},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -236,7 +245,11 @@ malformed
 			name:    "linux: row with empty brackets is skipped",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return lsscsiExec(t, []byte("[] disk ATA KC48 /dev/sda\n"), nil)
+				return sourcetest.Commands{
+					Out: map[string]string{lsscsiLine: "[] disk ATA KC48 /dev/sda\n"},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)

@@ -27,19 +27,23 @@ import (
 	osexec "os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/systemdpaths"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
 	_ collector.Collector = (*systemdpaths.Linux)(nil)
 	_ collector.Collector = (*systemdpaths.Darwin)(nil)
+)
+
+// The command lines that the rows answer, as sourcetest.Commands keys them.
+const (
+	systemdPathLine = "systemd-path"
 )
 
 type SystemdPathsPublicTestSuite struct {
@@ -52,29 +56,11 @@ func TestSystemdPathsPublicTestSuite(
 	suite.Run(t, new(SystemdPathsPublicTestSuite))
 }
 
-// systemdPathExec returns a MockRunner that answers `systemd-path`
-// with the provided output and error.
-func systemdPathExec(
-	t *testing.T,
-	out []byte,
-	err error,
-) source.Runner {
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().
-		Execute(gomock.Any(), "systemd-path").
-		Return(out, err).
-		AnyTimes()
-	return m
-}
-
 func (s *SystemdPathsPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(systemdpaths.Collector)
 	}{
 		{
@@ -117,11 +103,20 @@ func (s *SystemdPathsPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c systemdpaths.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := systemdpaths.New()
+			c := systemdpaths.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = systemdpaths.New()
+			}
 			s.Equal("systemd_paths", c.Name())
 			s.Equal("linux", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -148,7 +143,13 @@ user-runtime: /run/user/1000
 		{
 			name:    "linux: full output parsed",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return systemdPathExec(t, fullOutput, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{systemdPathLine: string(fullOutput)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*systemdpaths.Info)
@@ -165,7 +166,9 @@ user-runtime: /run/user/1000
 		{
 			name:    "linux: empty output yields empty paths",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return systemdPathExec(t, []byte{}, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Out: map[string]string{systemdPathLine: ""}}.Mock(t)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*systemdpaths.Info)
@@ -177,9 +180,13 @@ user-runtime: /run/user/1000
 			name:    "linux: line without colon-space skipped",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return systemdPathExec(t,
-					[]byte("no_separator\nsystemd: /usr/lib/systemd\n"),
-					nil)
+				return sourcetest.Commands{
+					Out: map[string]string{
+						systemdPathLine: "no_separator\nsystemd: /usr/lib/systemd\n",
+					},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -192,9 +199,13 @@ user-runtime: /run/user/1000
 			name:    "linux: empty key skipped",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return systemdPathExec(t,
-					[]byte(": /some/path\nsystemd: /usr/lib/systemd\n"),
-					nil)
+				return sourcetest.Commands{
+					Out: map[string]string{
+						systemdPathLine: ": /some/path\nsystemd: /usr/lib/systemd\n",
+					},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -207,7 +218,13 @@ user-runtime: /run/user/1000
 			name:    "linux: exec error yields empty paths, no error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return systemdPathExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{
+						systemdPathLine: fmt.Errorf("exec: %w", osexec.ErrNotFound),
+					},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -220,7 +237,13 @@ user-runtime: /run/user/1000
 			name:    "linux: a failed run is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return systemdPathExec(t, nil, errors.New("exit status 1: permission denied"))
+				return sourcetest.Commands{
+					Err: map[string]error{
+						systemdPathLine: errors.New("exit status 1: permission denied"),
+					},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().Error(err)
