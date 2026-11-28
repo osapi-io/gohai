@@ -28,8 +28,9 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// Linux runs `ps -ef` on Linux and captures the raw output lines. A
-// host with no ps gives an empty Info; a ps that fails is an error.
+// Linux runs `ps -ef` on Linux and captures the output lines without
+// the arguments of each command. A host with no ps gives an empty Info;
+// a ps that fails is an error.
 type Linux struct {
 	base
 
@@ -41,7 +42,8 @@ func NewLinux() *Linux {
 	return &Linux{Exec: source.Commands()}
 }
 
-// Collect runs `ps -ef` and returns its raw output lines.
+// Collect runs `ps -ef` and returns the output lines without the
+// arguments of each command.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,

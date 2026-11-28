@@ -37,7 +37,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// Info holds the raw ps output.
+// Info holds the ps output lines without the arguments of each command.
 type Info struct {
 	// PS contains the lines from `ps -ef` including the header, with
 	// the arguments of each command removed.
@@ -73,13 +73,18 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// parsePSOutput splits ps output into individual lines, trimming
-// trailing whitespace and skipping blank lines. Shared by both
-// Linux and Darwin since `ps -ef` format is identical on both.
+// parsePSOutput splits ps output into its lines, trims trailing
+// whitespace, skips blank lines and removes the arguments of each
+// command. Shared by both Linux and Darwin. The first line is the
+// header, and its CMD or COMMAND column tells where each command
+// starts, so the layout of `ps -ef` on GNU, BSD and BusyBox all work.
+// Output with no such header gives no lines, so an unknown layout can
+// never leak an argument.
 func parsePSOutput(
 	output string,
 ) *Info {
 	info := &Info{PS: []string{}}
+	cmd := -1
 	// Split, not bufio.Scanner: ps -ef prints a whole command line when
 	// stdout is not a tty, and a line can pass the Scanner's 64 KiB limit.
 	for _, raw := range strings.Split(output, "\n") {
@@ -87,25 +92,44 @@ func parsePSOutput(
 		if line == "" {
 			continue
 		}
-		info.PS = append(info.PS, withoutArgs(line))
+		if cmd < 0 {
+			cmd = cmdColumn(line)
+			if cmd < 0 {
+				return info
+			}
+			info.PS = append(info.PS, line)
+			continue
+		}
+		info.PS = append(info.PS, withoutArgs(line, cmd))
 	}
 	return info
 }
 
-// psColumns is the number of `ps -ef` columns before CMD: UID, PID,
-// PPID, C, STIME, TTY and TIME. None of them holds a space.
-const psColumns = 7
+// cmdColumn returns the number of columns before the CMD or COMMAND
+// column of a ps header, or -1 when the header has neither.
+func cmdColumn(
+	header string,
+) int {
+	for i, name := range strings.Fields(header) {
+		if name == "CMD" || name == "COMMAND" {
+			return i
+		}
+	}
+	return -1
+}
 
-// withoutArgs returns line cut after the first word of its CMD column,
-// so the arguments of a process never reach the facts. A line with no
-// CMD column, or a CMD with no arguments, comes back as it is. A
-// program path that holds a space is cut at the space too, which keeps
-// less than the path but never an argument.
+// withoutArgs returns line cut after the first word of its command,
+// which starts after the given number of columns, so the arguments of a
+// process never reach the facts. A line with no command, or a command
+// with no arguments, comes back as it is. A program path that holds a
+// space is cut at the space too, which keeps less than the path but
+// never an argument.
 func withoutArgs(
 	line string,
+	columns int,
 ) string {
 	rest := line
-	for range psColumns {
+	for range columns {
 		rest = strings.TrimLeft(rest, " \t")
 		i := strings.IndexAny(rest, " \t")
 		if i < 0 {

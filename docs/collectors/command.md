@@ -90,9 +90,13 @@ On Linux and on macOS, the collector runs `ps -ef` through the shared
 
 1. The collector removes the whitespace at the end of each output line.
 2. The collector skips blank lines.
-3. The collector stores the header row and all process rows as raw strings in
-   `PS`.
-4. If `ps` is not on the host, the collector returns an empty `PS` slice and no
+3. The collector reads the header row and finds its `CMD` or `COMMAND` column.
+   This finds the command in the GNU, BSD and BusyBox layouts of `ps`. Output
+   with no such header gives an empty `PS`, so an unknown layout cannot leak an
+   argument.
+4. The collector stores the header row, and each process row cut after the first
+   word of its command, in `PS`.
+5. If `ps` is not on the host, the collector returns an empty `PS` slice and no
    error. If `ps` fails, the collector returns an error.
 
 Ohai's `ps.rb` uses `"ps -ef"` on Linux, macOS, AIX and Solaris, and

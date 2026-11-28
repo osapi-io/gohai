@@ -187,16 +187,72 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			},
 		},
 		{
-			name:    "linux: a line with fewer columns than ps prints is kept as it is",
+			name:    "linux: the BusyBox layout keeps no arguments",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return psExec(t, []byte("root 1 0 0 10:00 ?\n"), nil)
+				return psExec(t, []byte("PID   USER     TIME  COMMAND\n"+
+					"    1 root      0:00 /sbin/init --fake-pw-123\n"+
+					"   42 app       0:01 app --token fake-tok-456\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
 				s.Require().True(ok)
-				s.Equal([]string{"root 1 0 0 10:00 ?"}, info.PS)
+				s.Equal([]string{
+					"PID   USER     TIME  COMMAND",
+					"    1 root      0:00 /sbin/init",
+					"   42 app       0:01 app",
+				}, info.PS)
+			},
+		},
+		{
+			name:    "linux: columns split by tabs keep no arguments",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(
+					t,
+					[]byte("PID\tTIME\tCMD\n7\t0:00\tapp\t--token\tfake-tok-456\n"),
+					nil,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{"PID\tTIME\tCMD", "7\t0:00\tapp"}, info.PS)
+			},
+		},
+		{
+			name:    "linux: a line with fewer columns than the header keeps no command",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(
+					t,
+					[]byte("UID PID PPID C STIME TTY TIME CMD\nroot 1 0 0 10:00 ?\n"),
+					nil,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal(
+					[]string{"UID PID PPID C STIME TTY TIME CMD", "root 1 0 0 10:00 ?"},
+					info.PS,
+				)
+			},
+		},
+		{
+			name:    "linux: output with no CMD or COMMAND header gives no lines",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return psExec(t, []byte("PID USER ARGS\n1 root /sbin/init --fake-pw-123\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Equal([]string{}, info.PS)
 			},
 		},
 		{
@@ -247,13 +303,13 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 			name:    "linux: blank lines in output are skipped",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return psExec(t, []byte("header\n\nprocess1\n\n"), nil)
+				return psExec(t, []byte("PID CMD\n\n1 process1\n\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*command.Info)
 				s.Require().True(ok)
-				s.Equal([]string{"header", "process1"}, info.PS)
+				s.Equal([]string{"PID CMD", "1 process1"}, info.PS)
 			},
 		},
 		{
