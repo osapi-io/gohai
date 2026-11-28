@@ -20,13 +20,14 @@ manages.
 
 Some common keys in `paths` are below. Other keys can also occur.
 
-| Key                          | Typical value                 |
-| ---------------------------- | ----------------------------- |
-| `systemd`                    | `/usr/lib/systemd`            |
-| `systemd-search-system-unit` | `/etc/systemd/system.control` |
-| `systemd-system-unit`        | `/etc/systemd/system`         |
-| `user-configuration`         | `~/.config`                   |
-| `user-runtime`               | `/run/user/<uid>`             |
+| Key                          | Typical value                                                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `systemd-util`               | `/usr/lib/systemd`                                                                                                   |
+| `systemd-system-unit`        | `/usr/lib/systemd/system`                                                                                            |
+| `systemd-system-conf`        | `/etc/systemd/system`                                                                                                |
+| `systemd-search-system-unit` | A list of directories with a colon between them, from `/etc/systemd/system.control` to `/run/systemd/generator.late` |
+| `user-configuration`         | `~/.config`                                                                                                          |
+| `user-runtime`               | `/run/user/<uid>`                                                                                                    |
 
 The keys that the collector reports change with the installed systemd version.
 
@@ -45,9 +46,10 @@ The keys that the collector reports change with the installed systemd version.
 {
   "systemd_paths": {
     "paths": {
-      "systemd": "/usr/lib/systemd",
-      "systemd-search-system-unit": "/etc/systemd/system.control",
-      "systemd-system-unit": "/etc/systemd/system",
+      "systemd-search-system-unit": "/etc/systemd/system.control:/run/systemd/system.control:/run/systemd/transient:/run/systemd/generator.early:/etc/systemd/system:/etc/systemd/system.attached:/run/systemd/system:/run/systemd/system.attached:/run/systemd/generator:/usr/local/lib/systemd/system:/usr/lib/systemd/system:/run/systemd/generator.late",
+      "systemd-system-conf": "/etc/systemd/system",
+      "systemd-system-unit": "/usr/lib/systemd/system",
+      "systemd-util": "/usr/lib/systemd",
       "user-configuration": "/home/user/.config",
       "user-runtime": "/run/user/1000"
     }
