@@ -10,8 +10,6 @@ freedesktop.org file in which each modern Linux distribution describes itself.
 It is the authoritative, machine-readable source for the distribution identity,
 version, codename and upstream compatibility.
 
-Consumers use this to:
-
 Consumers use this data to:
 
 - Find the exact Linux distribution and version of a host, for example
@@ -96,14 +94,15 @@ None.
 
 ## Data sources
 
-| Platform | What we read      | Ohai plugin                                                                                                                                  | Alignment                                                                                                                                      |
-| -------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Linux    | `/etc/os-release` | [`linux/os_release.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/os_release.rb) parses the same file into `os_release`. | **Equivalent.** The file is the same, and both read all keys. gohai keeps the known keys as typed fields and puts the unknown keys in `extra`. |
-| macOS    | None              | Ohai has no handler.                                                                                                                         | Parity. gohai gives no fact, with the status `unsupported`.                                                                                    |
+| Platform | What we read                                                                      | Ohai plugin                                                                                                                                  | Alignment                                                                                                                                      |
+| -------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/etc/os-release`, or `/usr/lib/os-release` when `/etc/os-release` does not exist | [`linux/os_release.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/os_release.rb) parses the same file into `os_release`. | **Equivalent.** The file is the same, and both read all keys. gohai keeps the known keys as typed fields and puts the unknown keys in `extra`. |
+| macOS    | None                                                                              | Ohai has no handler.                                                                                                                         | Parity. gohai gives no fact, with the status `unsupported`.                                                                                    |
 
 Ohai also reports some old aliases, for example `lsb.id`. In gohai, the `lsb`
 collector reports those aliases, not this collector.
 
 ## Backing library
 
-- The Go standard library (`os`, `bufio`). There is no third-party dependency.
+- [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read the file, with
+  `family.ReadOSRelease`.

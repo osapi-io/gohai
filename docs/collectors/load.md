@@ -18,7 +18,8 @@ the system, not a short burst.
 Consumers use this data to:
 
 - Add a low-cost saturation signal to heartbeat and health-probe payloads. The
-  collector makes one `getloadavg(3)` call and does not scan the processes.
+  collector reads `/proc/loadavg` on Linux, or runs `sysctl -n vm.loadavg` on
+  macOS. It does not scan the processes.
 - Compare CPU pressure with the start times of incidents. The 15-minute window
   keeps its value through short spikes.
 - Start load shedding or autoscaling when `one` goes above a threshold for the
@@ -99,9 +100,10 @@ On macOS:
 
 Ohai has no loadavg plugin in its current `main`. Thus this collector has no
 equivalent in Ohai. The field names are the Go form of the three values of
-`getloadavg(3)`. The collector does not report the last fields of
-`/proc/loadavg` (`runnable_tasks`, `last_pid`), because `getloadavg(3)` does not
-give them. gohai will add them when a consumer needs them.
+`getloadavg(3)`. The collector reads only the first three numbers of
+`/proc/loadavg`. It does not report the last fields (`runnable_tasks`,
+`last_pid`), because `vm.loadavg` on macOS does not have them. gohai will add
+them when a consumer needs them.
 
 ## Backing library
 

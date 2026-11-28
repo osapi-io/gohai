@@ -82,7 +82,7 @@ finds:
 **On Linux (Debian/Ubuntu family):**
 
 1. The collector runs
-   `dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\t${db:Status-Status}\n'`.
+   `dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\t${db:Status-Status}\t${binary:Summary}\t${Installed-Size}\n'`.
 2. It parses the tab-delimited output, one package on each line.
 3. It skips lines where `db:Status-Status` is not `installed`. This is the same
    as the debian branch of Ohai's `packages.rb`, which also filters on the
@@ -90,10 +90,10 @@ finds:
 4. It skips malformed lines (fewer than 4 fields) and entries with an empty
    name.
 
-**On Linux (RHEL/Fedora/SUSE and all non-debian distros):**
+**On Linux (the `rhel`, `fedora`, `amazon`, `suse` and `mandriva` families):**
 
 1. The collector runs
-   `rpm -qa --qf '%{NAME}\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\t%{ARCH}\n'`.
+   `rpm -qa --qf '%{NAME}\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\t%{ARCH}\t%{SUMMARY}\t%{SIZE}\n'`.
 2. It parses the tab-delimited output, one package on each line.
 3. It skips malformed lines and entries with an empty name.
 4. The version string has the release component (`5.1-6.el9`), and the epoch

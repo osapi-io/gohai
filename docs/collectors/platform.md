@@ -113,7 +113,7 @@ One difference from Ohai is on purpose: on macOS, the name and the family are
     "name": "darwin",
     "version": "14.4.1",
     "version_extra": "(a)",
-    "family": "Standalone Workstation",
+    "family": "darwin",
     "cpu_architecture": "arm64",
     "build": "23E224"
   }
