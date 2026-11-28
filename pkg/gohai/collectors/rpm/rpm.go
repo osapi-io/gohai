@@ -21,8 +21,8 @@
 // Package rpm reports RPM macro definitions from `rpm --showrc`. On
 // Darwin the collector returns nil gracefully. On Linux the collector
 // shells out to `rpm --showrc`, locates the macro section between the
-// two `===...===` marker lines, and parses each `-` prefixed macro
-// definition (including multi-line continuations). The collector is
+// two `===...===` marker lines, and parses each macro definition, a
+// "-13: name<TAB>body" line with its continuation lines. The collector is
 // opt-in (DefaultEnabled false) because it requires RPM to be installed
 // and forks a subprocess.
 package rpm
@@ -31,7 +31,6 @@ import (
 	"bufio"
 	"bytes"
 	"regexp"
-	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
@@ -89,15 +88,17 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// parseShowrc parses the output of `rpm --showrc` and returns the
-// macro definitions. The output format has two `===...===` marker
-// lines; the macro definitions live between them. Each macro starts
-// with a `-` prefix line:
-//
-//   - %{name} <value>
-//
-// Continuation lines (no `-` prefix) append to the preceding macro
-// with a newline separator — matches Ohai's rpm.rb parsing exactly.
+// macroLineRE matches the line that starts a macro in `rpm --showrc`: its
+// nesting level, a colon and a space, the name, then a tab and the body,
+// as in "-13: _builddir\t%{_topdir}/BUILD". The level is negative for
+// built-in and file macros, and 0 or more for macros defined at run time.
+var macroLineRE = regexp.MustCompile(`^\s*-?\d+: ([^\t]+)(?:\t(.*))?$`)
+
+// parseShowrc parses the output of `rpm --showrc` and returns the macro
+// definitions. The macros live between the two `===...===` marker lines.
+// Each macro starts with a level line (see macroLineRE). The lines after it
+// that do not start a macro are its body's continuation, joined with
+// newlines.
 func parseShowrc(
 	output []byte,
 ) map[string]string {
@@ -121,33 +122,17 @@ func parseShowrc(
 	var name, value string
 
 	for _, line := range lines[markerIdx[0]+1 : markerIdx[1]] {
-		if strings.HasPrefix(line, "-") {
-			// Store the previous macro if any.
+		if m := macroLineRE.FindStringSubmatch(line); m != nil {
 			if name != "" {
 				macros[name] = value
 			}
-			// Parse new macro: "- <name> <value...>" (split on first two
-			// spaces — same as Ohai's `line.split(" ", 3)` picking [1] and [2]).
-			parts := strings.SplitN(line, " ", 3)
-			if len(parts) < 2 {
-				name = ""
-				value = ""
-				continue
-			}
-			name = parts[1]
-			if len(parts) == 3 {
-				value = parts[2]
-			} else {
-				value = ""
-			}
-		} else {
-			// Continuation line — append to current macro.
-			if name != "" {
-				value += "\n" + line
-			}
+			name, value = m[1], m[2]
+			continue
+		}
+		if name != "" {
+			value += "\n" + line
 		}
 	}
-	// Store the last parsed macro.
 	if name != "" {
 		macros[name] = value
 	}

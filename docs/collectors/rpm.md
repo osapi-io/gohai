@@ -42,14 +42,12 @@ Consumers use this data to:
 {
   "rpm": {
     "macros": {
-      "%_topdir": "/root/rpmbuild",
-      "%_builddir": "%{_topdir}/BUILD",
-      "%_rpmdir": "%{_topdir}/RPMS",
-      "%_sourcedir": "%{_topdir}/SOURCES",
-      "%_specdir": "%{_topdir}/SPECS",
-      "%_srcrpmdir": "%{_topdir}/SRPMS",
-      "%__cc": "gcc\n  -m64 -mtune=generic",
-      "%optflags": "-O2 -flto=auto -ffat-lto-objects -fexceptions -g -grecord-gcc-switches -pipe -Wall -Werror=format-security"
+      "_builddir": "%{_topdir}/BUILD",
+      "_rpmdir": "%{_topdir}/RPMS",
+      "_sourcedir": "%{_topdir}/SOURCES",
+      "_target": "aarch64-linux",
+      "__spec_install_pre": "%{___build_pre}\n    %{__rm} -rf \"%{buildroot}\"\n%{nil}",
+      "optflags": "-O2 -flto=auto -ffat-lto-objects -fexceptions -g -grecord-gcc-switches -pipe -Wall -Werror=format-security"
     }
   }
 }
@@ -79,7 +77,7 @@ g, _ := gohai.New(gohai.WithCollectors("rpm"))
 facts, _ := g.Collect(context.Background())
 
 if facts.RPM != nil {
-    fmt.Println("RPM top directory:", facts.RPM.Macros["%_topdir"])
+    fmt.Println("RPM top directory:", facts.RPM.Macros["_topdir"])
 }
 ```
 
@@ -106,15 +104,22 @@ On Linux:
    collector returns `{macros: {}}` and no error. This is the same as Ohai,
    which skips the plugin if it does not find rpm. Thus there is no error on
    systems without RPM, for example Debian and Alpine.
+
 2. The collector finds the two `===...===` marker lines (5 or more `=` signs) in
    the output. The macro definitions are between these two markers.
+
 3. The collector parses each line in the macro section:
-   - A line that starts with `-` starts a new macro definition. The collector
-     splits the line on spaces into a maximum of 3 parts: the `-` prefix, the
-     macro name, and the remainder as the initial value. It skips a `-` line
-     that has no name field.
-   - A continuation line (no `-` prefix) adds to the value of the current macro,
-     after a newline.
+
+   - A line such as `-13: _builddir<TAB>%{_topdir}/BUILD` starts a new macro
+     definition: the level (negative for built-in and file macros, 0 or more for
+     macros defined at run time), a colon and a space, the name, a tab, and the
+     body. A macro with no tab has an empty body. The name is stored as `rpm`
+     prints it, without a leading `%`.
+   - Any other line adds to the body of the current macro, after a newline. A
+     line before the first macro is dropped.
+
+   This format was checked against `rpm --showrc` on Fedora and openSUSE.
+
 4. When the marker section ends, the collector stores the last macro.
 
 Note: Ohai's `rpm.rb` also parses the `ARCHITECTURE AND OS`, `RPMRC VALUES`,
