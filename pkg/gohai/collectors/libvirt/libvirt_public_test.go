@@ -23,6 +23,8 @@ package libvirt_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -321,18 +323,51 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: when virsh version fails returns nil",
+			name:    "linux: no virsh on the host gives no fact",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				ctrl := gomock.NewController(t)
 				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
-					Return(nil, errors.New("virsh: command not found")).AnyTimes()
+					Return(nil, fmt.Errorf("exec virsh: %w", exec.ErrNotFound))
 				return m
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a daemon that is not running gives no fact",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
+					Return(nil, errors.New("exec virsh: exit status 1: error: failed to connect to the hypervisor\n"+
+						"error: Failed to connect socket to '/var/run/libvirt/virtqemud-sock': No such file or directory"))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: no permission on the daemon's socket is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
+					Return(nil, errors.New("exec virsh: exit status 1: error: failed to connect to the hypervisor\n"+
+						"error: Failed to connect socket to '/var/run/libvirt/libvirt-sock': Permission denied"))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read virsh version:")
+				s.ErrorContains(err, "Permission denied")
 			},
 		},
 		{

@@ -187,8 +187,11 @@ sequence:
 
 In each step, a missing file is skipped. A file that is there and can't be read,
 such as an `/etc/os-release` with no read permission, is an error, so the
-collector doesn't report a wrong platform from a later file. 6. **CPU
-architecture.** The value comes from `runtime.GOARCH`.
+collector doesn't report a wrong platform from a later file.
+
+6. **CPU architecture.** The value comes from `uname -m`, in its Go name, such
+   as `amd64` for `x86_64`. With no `uname`, it is `runtime.GOARCH`. A `uname`
+   that runs and fails is an error.
 
 On macOS:
 
@@ -199,7 +202,12 @@ On macOS:
    - `BuildVersion` → `Build`, the canonical macOS build ID.
    - `ProductVersionExtra` → `VersionExtra`. This is the Apple Rapid Security
      Response suffix, for example `"(a)"`. Most macOS versions do not have it.
-3. If `sw_vers` fails, or its output does not have a key, the field stays empty.
+3. If `sw_vers` is not on the host, or its output does not have a key, the field
+   stays empty. A `sw_vers` that runs and fails is an error.
+4. **CPU architecture.** `sysctl -n hw.optional.arm64` is `1` on Apple silicon,
+   also under Rosetta. Otherwise `uname -m` decides. A `uname` that runs and
+   fails is an error, because the architecture of the gohai binary can differ
+   from the host's. With no `uname`, the binary's architecture is used.
 
 ## Backing library
 

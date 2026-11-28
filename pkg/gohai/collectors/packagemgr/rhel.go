@@ -46,6 +46,9 @@ func (r *RHEL) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, path := firstFound(ctx, r.Exec, "dnf", "yum")
+	name, path, err := firstFound(ctx, r.Exec, "dnf", "yum")
+	if err != nil {
+		return nil, err
+	}
 	return &Info{Name: name, Path: path}, nil
 }

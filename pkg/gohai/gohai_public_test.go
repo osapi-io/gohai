@@ -674,13 +674,16 @@ func (s *GohaiPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			// init runs no command, so the cancel can't stop it: its fact is
+			// one that finished. A collector that runs commands, such as
+			// platform with its uname, fails on the cancel instead.
 			name:         "a cancelled run returns the facts that finished with its error",
-			opts:         []gohai.Option{gohai.WithCollectors("platform")},
+			opts:         []gohai.Option{gohai.WithCollectors("init")},
 			injectCancel: true,
 			validateFunc: func(facts *gohai.Facts, err error) {
 				s.Require().ErrorIs(err, context.Canceled)
 				s.Require().NotNil(facts)
-				s.NotNil(facts.Platform)
+				s.NotNil(facts.Init)
 			},
 		},
 		{

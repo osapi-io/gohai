@@ -224,17 +224,39 @@ func (s *ProcessPublicTestSuite) TestCollect() {
 			}},
 		},
 		{
-			name:    "darwin: the name and the args fail",
+			name:    "darwin: no ps for the name and the args leaves them empty",
 			variant: "darwin",
 			runner: sourcetest.Commands{
 				Out: map[string]string{
 					psMain: "    7     1 john     U     0.0  0.0      0 x-1:00 Thu Nov 20 12:04:00 2026\n",
 				},
-				Err: map[string]error{psName: errors.New("boom"), psArgs: errors.New("boom")},
 			},
 			want: &process.Info{Count: 1, Processes: []process.Process{
 				{PID: 7, ParentPID: 1, Owner: "john", CreationTime: started.Unix()},
 			}},
+		},
+		{
+			name:    "darwin: a ps for the names that fails is an error",
+			variant: "darwin",
+			runner: sourcetest.Commands{
+				Out: map[string]string{
+					psMain: "    7     1 john     U     0.0  0.0      0 x-1:00 Thu Nov 20 12:04:00 2026\n",
+				},
+				Err: map[string]error{psName: errors.New("boom")},
+			},
+			wantErr: "pid=,ucomm=: boom",
+		},
+		{
+			name:    "darwin: a ps for the args that fails is an error",
+			variant: "darwin",
+			runner: sourcetest.Commands{
+				Out: map[string]string{
+					psMain: "    7     1 john     U     0.0  0.0      0 x-1:00 Thu Nov 20 12:04:00 2026\n",
+					psName: "    7 launchd\n",
+				},
+				Err: map[string]error{psArgs: errors.New("boom")},
+			},
+			wantErr: "pid=,args=: boom",
 		},
 		{
 			name:    "darwin: ps fails",

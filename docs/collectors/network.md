@@ -284,8 +284,10 @@ On Linux:
     also skips virtual interfaces, such as a veth, a bridge or a bond: an
     interface with no `/sys/class/net/<iface>/device`. A container host can have
     hundreds of veths, and ethtool would run six times for each one. Ohai does
-    not skip them. If the binary is missing or a call fails, the field stays
-    empty.
+    not skip them. If the binary is missing, or the driver doesn't support the
+    query ("Operation not supported"), the field stays empty. Any other ethtool
+    failure is an error. All the ethtool runs share one time budget, and a spent
+    budget stops them on purpose; a cancelled context is an error.
 
 08. **Ethtool tuning set.** For the same interfaces, the collector runs five
     more ethtool probes through the executor. It parses each probe into a typed
@@ -302,8 +304,8 @@ On Linux:
     - `ethtool -a <iface>` gives `pause_params` (autoneg, rx, tx).
 
     This is the same as a new audit of the method of Ohai's `linux/network.rb`.
-    If one probe fails, the collector continues. Only the sub-record of that
-    probe stays empty.
+    If the driver doesn't support one probe, the collector continues. Only the
+    sub-record of that probe stays empty. Any other failure is an error.
 
 09. **Neighbours.** `ip neigh show` gives the kernel ARP and NDP cache. The
     collector maps each line to a `Neighbour` with these values: address,
@@ -324,7 +326,9 @@ rows of `netstat -ibdnW` give the counters. A down interface has a `*` after its
 name there. The rows of the `Internet:` and `Internet6:` tables of `netstat -rn`
 are the routes. The first `default` row with a gateway (flag `G`) of each family
 gives the default interface and gateway, without the `%en0` zone of an IPv6
-gateway. Encapsulation and the OpenVZ merge are Linux only.
+gateway. A host with no `netstat` has no counters and no routes, and a `netstat`
+that runs and fails is an error. Encapsulation and the OpenVZ merge are Linux
+only.
 
 ## Backing library
 

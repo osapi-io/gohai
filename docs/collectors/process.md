@@ -117,6 +117,10 @@ decaying average, not the average since start. `cpu_seconds` is `utime` plus
 `stime` on Linux, and the `time` column of `ps` on macOS. The difference between
 two samples, over the seconds between them, is the CPU share in that time.
 
+On macOS, the `ucomm=` and `args=` runs of `ps` give each process its name and
+command line. A `ps` that fails for one of them is an error, so a process does
+not lose its name in silence.
+
 `Read(ctx, pid)` reads one process without the others: its `/proc/<pid>`
 directory on Linux, and `ps -p <pid>` on macOS. It is an error when there is no
 such process. A caller that watches one process, such as its own, uses it on

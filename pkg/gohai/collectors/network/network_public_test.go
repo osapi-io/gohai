@@ -221,7 +221,7 @@ func ipRouteAndEthtoolFullExec(
 			}
 			out, ok := src[iface]
 			if !ok {
-				return nil, errors.New("ethtool: no such device or unsupported")
+				return nil, errors.New("exec ethtool: exit status 94: Cannot get driver information: Operation not supported")
 			}
 			return []byte(out), nil
 		}).
@@ -283,7 +283,7 @@ func ethtoolOnlyFor(
 			if args[0] == "-i" {
 				return []byte("driver: igb\n"), nil
 			}
-			return nil, errors.New("ethtool: not supported")
+			return nil, errors.New("exec ethtool: exit status 94: Cannot get device settings: Operation not supported")
 		}).
 		AnyTimes()
 	return m
@@ -365,11 +365,11 @@ func ipRouteAndEthtoolExec(
 		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, _ string, args ...string) ([]byte, error) {
 			if len(args) < 2 || args[0] != "-i" {
-				return nil, errors.New("ethtool: subcommand not supported by mock")
+				return nil, errors.New("exec ethtool: exit status 94: Cannot get ring parameters: Operation not supported")
 			}
 			out, ok := driverInfo[args[1]]
 			if !ok {
-				return nil, errors.New("ethtool: no such device")
+				return nil, errors.New("exec ethtool: exit status 1: Cannot get driver information: Operation not supported")
 			}
 			return []byte(out), nil
 		}).
@@ -644,7 +644,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "linux: ethtool -i error skipped silently, Ethtool stays nil",
+			name:       "linux: an ethtool query the driver doesn't support is skipped, Ethtool stays nil",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs: sourcetest.FS(s.T(), map[string]string{
@@ -659,6 +659,51 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Interfaces, 2)
 				s.Nil(i.Interfaces[0].Ethtool)
 				s.Nil(i.Interfaces[1].Ethtool)
+			},
+		},
+		{
+			name:       "linux: an ethtool run that fails for another reason is an error",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: sourcetest.FS(s.T(), map[string]string{
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
+			}),
+			exec: func() source.Runner {
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
+				m.EXPECT().
+					Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errAbsent).
+					AnyTimes()
+				m.EXPECT().
+					Execute(gomock.Any(), "ethtool", "-i", "eth0").
+					Return(nil, errors.New("exec ethtool: exit status 1: Cannot get driver information: Operation not permitted"))
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "ethtool -i eth0:")
+				s.ErrorContains(err, "Operation not permitted")
+			},
+		},
+		{
+			name:       "linux: a context cancelled before ethtool is an error",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: sourcetest.FS(s.T(), map[string]string{
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
+			}),
+			exec: ipRouteAndEthtoolExec(s.T(), map[string]string{"eth0": "driver: e1000e\n"}),
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorIs(err, context.Canceled)
+				s.ErrorContains(err, "ethtool:")
 			},
 		},
 		{
@@ -1802,6 +1847,34 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Require().Len(i.Interfaces, 1)
 				// The routes of en0 attach to it.
 				s.Len(i.Interfaces[0].Routes, 3)
+			},
+		},
+		{
+			name:    "darwin: a netstat -ibdnW that fails is an error",
+			variant: "darwin",
+			runner: &sourcetest.Commands{
+				Out: map[string]string{
+					"ifconfig -a -v": "en0: flags=8863<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 index 14\n",
+				},
+				Err: map[string]error{"netstat -ibdnW": errors.New("exit status 1")},
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.EqualError(err, "netstat -ibdnW: exit status 1")
+			},
+		},
+		{
+			name:    "darwin: a netstat -rn that fails is an error",
+			variant: "darwin",
+			runner: &sourcetest.Commands{
+				Out: map[string]string{
+					"ifconfig -a -v": "en0: flags=8863<UP,BROADCAST,RUNNING,MULTICAST> mtu 1500 index 14\n",
+				},
+				Err: map[string]error{"netstat -rn": errors.New("exit status 1")},
+			},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.EqualError(err, "netstat -rn: exit status 1")
 			},
 		},
 		{

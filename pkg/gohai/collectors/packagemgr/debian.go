@@ -44,6 +44,9 @@ func (d *Debian) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, path := firstFound(ctx, d.Exec, "apt", "apt-get")
+	name, path, err := firstFound(ctx, d.Exec, "apt", "apt-get")
+	if err != nil {
+		return nil, err
+	}
 	return &Info{Name: name, Path: path}, nil
 }

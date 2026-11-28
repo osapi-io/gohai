@@ -53,6 +53,9 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	name, path := firstFound(ctx, l.Exec, "zypper", "pacman", "apk", "xbps-install", "emerge")
+	name, path, err := firstFound(ctx, l.Exec, "zypper", "pacman", "apk", "xbps-install", "emerge")
+	if err != nil {
+		return nil, err
+	}
 	return &Info{Name: name, Path: path}, nil
 }

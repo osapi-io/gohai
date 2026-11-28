@@ -99,8 +99,14 @@ func (d *Darwin) list(
 	if err != nil {
 		return nil, fmt.Errorf("ps: %w", err)
 	}
-	names := d.column(ctx, ps("-o", "pid=,ucomm=")...)
-	args := d.column(ctx, ps("-ww", "-o", "pid=,args=")...)
+	names, err := d.column(ctx, ps("-o", "pid=,ucomm=")...)
+	if err != nil {
+		return nil, err
+	}
+	args, err := d.column(ctx, ps("-ww", "-o", "pid=,args=")...)
+	if err != nil {
+		return nil, err
+	}
 	procs := []Process{}
 	for _, line := range strings.Split(string(out), "\n") {
 		f := strings.Fields(line)
@@ -164,15 +170,19 @@ func cpuTime(
 }
 
 // column is the rest of each line of ps with args, after the pid, by pid.
-// It is empty when ps fails.
+// It is empty when ps is not on the host. A ps that runs and fails is an
+// error, so a process doesn't lose its name and command line in silence.
 func (d *Darwin) column(
 	ctx context.Context,
 	args ...string,
-) map[string]string {
+) (map[string]string, error) {
 	col := map[string]string{}
 	out, err := d.Exec.Execute(ctx, "ps", args...)
+	if collector.Absent(err) {
+		return col, nil
+	}
 	if err != nil {
-		return col
+		return nil, fmt.Errorf("ps %s: %w", strings.Join(args, " "), err)
 	}
 	for _, line := range strings.Split(string(out), "\n") {
 		pid, rest, ok := strings.Cut(strings.TrimSpace(line), " ")
@@ -181,5 +191,5 @@ func (d *Darwin) column(
 		}
 	}
 
-	return col
+	return col, nil
 }

@@ -8,8 +8,9 @@ The collector reports the libvirt domain data from a KVM or QEMU hypervisor
 host. It uses the `virsh` CLI, which is part of `libvirt-client` or
 `libvirt-bin`. Ohai uses the `ruby-libvirt` gem. gohai does not use a Go
 binding, because no maintained Go libvirt binding has equivalent coverage. If
-`virsh` is missing or cannot connect to the daemon, `Collect` returns `nil` and
-no error.
+`virsh` is missing or its daemon is not running, `Collect` returns `nil` and no
+error. A `virsh` that can't connect for another reason, such as no permission on
+the daemon's socket, is an error.
 
 The collector supports only Linux. KVM needs Linux, and the libvirt daemon
 (`libvirtd`) is a Linux service. On macOS, the collector gives no fact, with the
@@ -114,14 +115,16 @@ On Linux, the collector runs four `virsh` commands in sequence. Each one has
 `-c qemu:///system`, so the collector reads the system daemon for root and for
 other users. Without `-c`, `virsh` connects a user who is not root to
 `qemu:///session`, which usually has no domains. A user who cannot connect to
-the system daemon gets no fact, the same as a host where the daemon is down.
+the system daemon gets an error, not the same empty result as a host where the
+daemon is down.
 
-1. **`virsh version`**. The probe, and the source of the version. If this
-   command fails, `Collect` returns `nil` immediately. The command fails if
-   `virsh` is missing or the daemon is down. The collector first gets the daemon
-   version from the "Running against daemon:" line. If that line is not there,
-   it uses the library version from the "Using library: libvirt \<ver>" line.
-   This is the same as the `libvirt_version` that Ohai reports.
+1. **`virsh version`**. The probe, and the source of the version. If `virsh` is
+   missing, or the daemon's socket is missing or refuses the connection,
+   `Collect` returns `nil` immediately. Any other failure is an error. The
+   collector first gets the daemon version from the "Running against daemon:"
+   line. If that line is not there, it uses the library version from the "Using
+   library: libvirt \<ver>" line. This is the same as the `libvirt_version` that
+   Ohai reports.
 
 2. **`virsh uri`**. The connection URI, for example `qemu:///system`. The
    collector returns an error if this command fails.

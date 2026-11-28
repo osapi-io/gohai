@@ -51,7 +51,8 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns network Info. With no Exec it gives no fact, as every
-// value comes from ifconfig and netstat.
+// value comes from ifconfig and netstat. A host with no netstat has no
+// counters and no routes; a netstat that runs and fails is an error.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -64,18 +65,26 @@ func (d *Darwin) Collect(
 		return nil, fmt.Errorf("ifconfig -a -v: %w", err)
 	}
 	ifs := parseIfconfig(out)
-	if out, err := d.Exec.Execute(ctx, "netstat", "-ibdnW"); err == nil {
+	out, err = d.Exec.Execute(ctx, "netstat", "-ibdnW")
+	switch {
+	case err == nil:
 		links := parseNetstatLinks(out)
 		for i := range ifs {
 			if l, ok := links[ifs[i].Name]; ok {
 				ifs[i].Counters = l
 			}
 		}
+	case !collector.Absent(err):
+		return nil, fmt.Errorf("netstat -ibdnW: %w", err)
 	}
 	sort.SliceStable(ifs, func(i, j int) bool { return ifs[i].Number < ifs[j].Number })
 	info := &Info{Interfaces: ifs}
-	if out, err := d.Exec.Execute(ctx, "netstat", "-rn"); err == nil {
+	out, err = d.Exec.Execute(ctx, "netstat", "-rn")
+	switch {
+	case err == nil:
 		applyNetstatRoutes(info, out)
+	case !collector.Absent(err):
+		return nil, fmt.Errorf("netstat -rn: %w", err)
 	}
 
 	return info, nil
