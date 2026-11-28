@@ -82,7 +82,7 @@ a consumer needs each layer, it must read all of `systems`.
   "virtualization": {
     "system": "apple",
     "role": "guest",
-    "systems": { "qemu": "guest", "apple": "guest" }
+    "systems": { "apple": "guest" }
   }
 }
 ```
@@ -122,7 +122,8 @@ gohai collect --no-collector.virtualization   # disable
 
 ## Dependencies
 
-None.
+`cpu`. On Linux, step 05 reads the earlier result of the `cpu` collector to find
+a KVM guest. On macOS, the collector does not use it.
 
 ## Data sources
 
@@ -225,7 +226,8 @@ On macOS, the checks are the same as Ohai's `darwin/virtualization.rb`:
    `command -v VBoxManage` → `vbox` host. `command -v prlctl` → `parallels`
    host.
 2. **VMware Fusion host.** `/Applications/VMware Fusion.app` is there.
-3. **Parallels guest.** The `ioreg -l` output has `pci1ab8,4000`.
+3. **Parallels guest.** The output of `ioreg -n pci1ab8,4000` has
+   `pci1ab8,4000`.
 4. **VirtualBox, VMware or Apple VM guest.** The collector parses
    `system_profiler SPHardwareDataType`. It looks for `VirtualBox` or `VMW` in
    `Boot ROM Version`, and for `VirtualMac` in `Model Identifier`.
