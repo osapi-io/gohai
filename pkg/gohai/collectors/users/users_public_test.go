@@ -23,7 +23,9 @@ package users_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
+	osexec "os/exec"
 	"strconv"
 	"strings"
 	"testing"
@@ -140,6 +142,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		nilExec      bool
 		dscl         string            // dscl output; "" is a dscl that fails
 		dsclLists    map[string]string // output of other dscl lines
+		dsclErrs     map[string]error  // error of other dscl lines
 		validateFunc func(any, error)
 	}{
 		{
@@ -423,6 +426,72 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "darwin: a dscl that fails to list the users is an error",
+			variant: "darwin",
+			dscl:    "root ;ShadowHash;\n",
+			dsclErrs: map[string]error{
+				"dscl . -list /Users UniqueID": errors.New("exit status 1"),
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "dscl . -list /Users UniqueID: exit status 1")
+			},
+		},
+		{
+			name:    "darwin: a dscl that fails to list a user attribute is an error",
+			variant: "darwin",
+			dscl:    "root ;ShadowHash;\n",
+			dsclLists: map[string]string{
+				"dscl . -list /Users UniqueID": "root 0\n",
+			},
+			dsclErrs: map[string]error{
+				"dscl . -list /Users RealName": errors.New("exit status 1"),
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "dscl . -list /Users RealName: exit status 1")
+			},
+		},
+		{
+			name:    "darwin: a dscl that fails to list the groups is an error",
+			variant: "darwin",
+			dscl:    "root ;ShadowHash;\n",
+			dsclErrs: map[string]error{
+				"dscl . -list /Groups PrimaryGroupID": errors.New("exit status 1"),
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "dscl . -list /Groups PrimaryGroupID: exit status 1")
+			},
+		},
+		{
+			name:    "darwin: a dscl that fails to list the group members is an error",
+			variant: "darwin",
+			dscl:    "root ;ShadowHash;\n",
+			dsclLists: map[string]string{
+				"dscl . -list /Groups PrimaryGroupID": "admin 80\n",
+			},
+			dsclErrs: map[string]error{
+				"dscl . -list /Groups GroupMembership": errors.New("exit status 1"),
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "dscl . -list /Groups GroupMembership: exit status 1")
+			},
+		},
+		{
+			name:    "darwin: a dscl that fails to list AuthenticationAuthority is an error",
+			variant: "darwin",
+			dscl:    "unused",
+			dsclErrs: map[string]error{
+				"dscl . -list /Users AuthenticationAuthority": errors.New("exit status 1"),
+			},
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "dscl . -list /Users AuthenticationAuthority: exit status 1")
+			},
+		},
+		{
 			name:    "darwin: groups from /etc/group when dscl cannot list them",
 			variant: "darwin",
 			files: map[string]string{
@@ -489,10 +558,13 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			if tt.dscl != "" {
 				r.Out[dscl] = tt.dscl
 			} else {
-				r.Err[dscl] = errors.New("exec dscl: not found")
+				r.Err[dscl] = fmt.Errorf("exec dscl: %w", osexec.ErrNotFound)
 			}
 			for line, out := range tt.dsclLists {
 				r.Out[line] = out
+			}
+			for line, err := range tt.dsclErrs {
+				r.Err[line] = err
 			}
 			var exec source.Runner = r.Mock(s.T())
 			if tt.nilExec {

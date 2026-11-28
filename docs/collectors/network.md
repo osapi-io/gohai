@@ -222,13 +222,15 @@ On Linux:
     `ip link show`. The interfaces are in `number` order.
 
 02. **Counters.** `/proc/net/dev` gives the bytes, packets, errors and drops of
-    each interface.
+    each interface. A host with no `/proc/net/dev` has no counters, and a file
+    that cannot be read is an error.
 
 03. **Address structure.** `ip -o addr show` gives the address CIDRs of each
-    interface. A point-to-point address, `inet <local> peer <peer>/<len>`, takes
-    the prefix length from the peer and keeps the peer in `peer`. Another
-    address with no prefix gets a host prefix. The collector parses each CIDR
-    with `net.ParseCIDR`. It sets these fields:
+    interface. A host with no `ip` has no addresses, and a failed run is an
+    error. A point-to-point address, `inet <local> peer <peer>/<len>`, takes the
+    prefix length from the peer and keeps the peer in `peer`. Another address
+    with no prefix gets a host prefix. The collector parses each CIDR with
+    `net.ParseCIDR`. It sets these fields:
 
     - `family`, from the address kind.
     - `prefixlen`, from the mask.
@@ -260,7 +262,9 @@ On Linux:
     it. A typed default, such as `blackhole default`, does not. The collector
     also adds each route to the `routes` slice of its interface. If `ip` is not
     available, the routing fields stay empty. Minimal containers without
-    iproute2 do not have `ip`.
+    iproute2 do not have `ip`. A failed `ip route` is an error, except
+    `ip -6 route` on a kernel with IPv6 off, which has no `/proc/net/if_inet6`
+    and so no IPv6 routes.
 
 06. **Link details.** `/sys/class/net/<iface>/speed` and `/duplex` give the
     `Speed` and `Duplex` of each interface, written as ethtool writes them:
@@ -304,7 +308,8 @@ On Linux:
 09. **Neighbours.** `ip neigh show` gives the kernel ARP and NDP cache. The
     collector maps each line to a `Neighbour` with these values: address,
     family, MAC (`lladdr`), interface (`dev`), and state (the last word, such as
-    `REACHABLE`).
+    `REACHABLE`). A failed `ip neigh show` is an error, and so is a failed
+    `ip -d link`, which gives the VLAN, tunnel and XDP details.
 
 10. **OpenVZ alias merge.** The host is an OpenVZ guest if `/proc/vz` is there
     AND `/proc/bc/0` is missing. On an OpenVZ guest, the collector adds the
