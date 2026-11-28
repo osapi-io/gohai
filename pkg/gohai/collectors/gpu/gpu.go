@@ -19,8 +19,9 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package gpu reports graphics / compute cards present on the host.
-// On Linux we wrap ghw/gpu which walks /sys/class/drm and resolves
-// vendor/product names via the bundled pci.ids database. macOS has no
+// On Linux the collector walks /sys/class/drm and resolves
+// vendor/product names through internal/pcidev and its bundled pci.ids
+// database. macOS has no
 // DRM equivalent so the darwin variant parses
 // `system_profiler SPDisplaysDataType -json`, which covers integrated
 // Apple Silicon GPUs (reporting `cores`) and any discrete card.

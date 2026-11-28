@@ -53,7 +53,9 @@ type Certificate struct {
 	Source string `json:"source"`
 	// Enabled is false for a system CA that the host's config turns off,
 	// such as a "!" line in /etc/ca-certificates.conf, and for a CA that
-	// the host distrusts, such as one in a p11-kit blocklist.
+	// the host distrusts, such as one in a p11-kit blocklist. On macOS it
+	// is always true, because the collector does not read the trust
+	// settings.
 	Enabled bool `json:"enabled"`
 	// Subject is the certificate's subject, when the file parses.
 	Subject string `json:"subject,omitempty"`

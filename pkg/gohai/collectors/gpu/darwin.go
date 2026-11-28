@@ -45,9 +45,9 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect shells out to system_profiler. On any failure (exec missing,
-// JSON malformed) we return an empty Info, as the silent-on-miss
-// convention used elsewhere.
+// Collect shells out to system_profiler. A system_profiler that is not
+// on the PATH gives an empty Info. A failed run or malformed JSON is an
+// error.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,

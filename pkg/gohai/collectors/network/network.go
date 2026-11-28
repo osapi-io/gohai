@@ -60,7 +60,7 @@ type Interface struct {
 	Encapsulation string       `json:"encapsulation,omitempty"` // canonical: Ethernet / Loopback / PPP / SLIP / IPIP / 6to4
 	Kind          string       `json:"kind,omitempty"`          // Linux: ethernet / bridge / bond / wifi / vlan / vxlan / wireguard / tun / loopback / virtual
 	Driver        string       `json:"driver,omitempty"`        // sysfs driver name (e1000e, virtio_net, ixgbe, ...)
-	Speed         string       `json:"speed,omitempty"`         // ghw link speed string ("1000Mb/s")
+	Speed         string       `json:"speed,omitempty"`         // link speed string, such as "1000Mb/s"
 	Duplex        string       `json:"duplex,omitempty"`        // Full | Half | Unknown!, as ethtool writes it
 	Flags         []string     `json:"flags,omitempty"`
 	Addresses     []Address    `json:"addresses,omitempty"`
@@ -850,8 +850,8 @@ func isOpenVZAlias(
 }
 
 // NICStat captures the per-interface link-layer fields we surface on
-// `Interface.{Driver, Speed, Duplex}`. Speed is a string (matching
-// ghw's `"1000Mb/s"` shape) so we can preserve units / "Unknown!".
+// `Interface.{Driver, Speed, Duplex}`. Speed is a string, such as
+// "1000Mb/s", so it keeps its unit and an "Unknown!" value.
 // Exported so tests can stub the probe via SetNICFn.
 type NICStat struct {
 	Driver string
