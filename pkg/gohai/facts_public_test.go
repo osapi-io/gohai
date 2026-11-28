@@ -209,10 +209,35 @@ func (s *FactsPublicTestSuite) TestUnmarshalStoredBlob() {
 }
 
 func (s *FactsPublicTestSuite) TestFlat() {
-	flat := s.facts.Flat()
-	s.Equal("ubuntu", flat["platform.name"])
-	s.Equal("24.04", flat["platform.version"])
-	s.EqualValues(8, flat["cpu.count"])
+	tests := []struct {
+		name         string
+		facts        *gohai.Facts
+		validateFunc func(map[string]any)
+	}{
+		{
+			name:  "nested fields get dot-separated keys",
+			facts: s.facts,
+			validateFunc: func(flat map[string]any) {
+				s.Equal("ubuntu", flat["platform.name"])
+				s.Equal("24.04", flat["platform.version"])
+				s.EqualValues(8, flat["cpu.count"])
+			},
+		},
+		{
+			name:  "each element of a list gets its index",
+			facts: &gohai.Facts{CPU: &cpu.Info{Flags: []string{"fpu", "sse2"}}},
+			validateFunc: func(flat map[string]any) {
+				s.Equal("fpu", flat["cpu.flags.0"])
+				s.Equal("sse2", flat["cpu.flags.1"])
+				s.NotContains(flat, "cpu.flags")
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(tt.facts.Flat())
+		})
+	}
 }
 
 func (s *FactsPublicTestSuite) TestGet() {
