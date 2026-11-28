@@ -43,6 +43,12 @@ type Hooks struct {
 	// regardless of success or failure, with the wall-clock duration
 	// of that call. Useful for --debug timing output.
 	OnComplete func(name string, dur time.Duration, err error)
+	// OnStatus is invoked once for each collector that ran, or that did not
+	// run because a dependency failed, with its status and its error. The
+	// error of StatusUnsupported is ErrUnsupported. Called from the
+	// collector's goroutine, concurrent with other collectors in the same
+	// level.
+	OnStatus func(name string, status Status, err error)
 }
 
 // ErrDependencyFailed is the error of a collector that did not run because
@@ -240,22 +246,31 @@ func (r *Registry) Run(
 					out, cerr = collect(ctx, c, prior)
 				}
 				dur := time.Since(start)
+				status := StatusOf(out, cerr)
+				if status == StatusUnsupported {
+					// Nothing to read on this platform is not an error of
+					// the run, and a dependent runs without the fact.
+					out, cerr = nil, nil
+				}
 				if hooks.OnComplete != nil {
 					hooks.OnComplete(c.Name(), dur, cerr)
 				}
-				if cerr != nil {
-					if hooks.OnError != nil {
-						hooks.OnError(c.Name(), cerr)
-					}
-					resultsMu.Lock()
-					failed[c.Name()] = cerr
-					resultsMu.Unlock()
-
-					return
+				if hooks.OnStatus != nil {
+					hooks.OnStatus(c.Name(), status, cerr)
+				}
+				if cerr != nil && hooks.OnError != nil {
+					hooks.OnError(c.Name(), cerr)
 				}
 				resultsMu.Lock()
-				results[c.Name()] = out
-				resultsMu.Unlock()
+				defer resultsMu.Unlock()
+				if cerr != nil {
+					failed[c.Name()] = cerr
+				}
+				// A partial result keeps what the collector read before its
+				// error.
+				if out != nil {
+					results[c.Name()] = out
+				}
 			}()
 		}
 		wg.Wait()

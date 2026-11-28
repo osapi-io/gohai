@@ -10,7 +10,8 @@ paths (`%_topdir`, `%_builddir`), the compiler flags (`%optflags`), the platform
 identifiers (`%_arch`), and many other parts of how RPM builds and installs
 packages.
 
-On macOS, the collector returns `nil`. macOS does not have RPM.
+On macOS, the collector gives no fact, with the status `unsupported`. macOS does
+not have RPM.
 
 Consumers use this data to:
 
@@ -29,10 +30,10 @@ Consumers use this data to:
 
 ## Platform support
 
-| Platform | Supported                               |
-| -------- | --------------------------------------- |
-| Linux    | ✅ (`rpm` must be installed)            |
-| macOS    | Returns `nil`. macOS does not have RPM. |
+| Platform | Supported                                                        |
+| -------- | ---------------------------------------------------------------- |
+| Linux    | ✅ (`rpm` must be installed)                                     |
+| macOS    | No fact, with the status `unsupported`. macOS does not have RPM. |
 
 ## Example output
 

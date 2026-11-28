@@ -25,10 +25,10 @@ collector does not parse `/etc/lsb-release`. Data sources tells why.
 
 ## Platform support
 
-| Platform | Supported                              |
-| -------- | -------------------------------------- |
-| Linux    | ✅ (`lsb_release -a` through executor) |
-| macOS    | `nil` (Darwin has no LSB)              |
+| Platform | Supported                                                  |
+| -------- | ---------------------------------------------------------- |
+| Linux    | ✅ (`lsb_release -a` through executor)                     |
+| macOS    | No fact, with the status `unsupported` (Darwin has no LSB) |
 
 ## Example output
 

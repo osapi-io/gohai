@@ -9,8 +9,9 @@ on a Linux host. With kernel livepatch, you can apply security patches to a
 running kernel without a reboot. Each entry under `/sys/kernel/livepatch/` is
 one loaded patch module.
 
-On macOS, the collector returns `nil`. Kernel livepatch is a Linux feature only.
-It needs `CONFIG_LIVEPATCH=y` in the kernel build.
+On macOS, the collector gives no fact, with the status `unsupported`. Kernel
+livepatch is a Linux feature only. It needs `CONFIG_LIVEPATCH=y` in the kernel
+build.
 
 Consumers use this data to:
 
@@ -43,10 +44,10 @@ Consumers use this data to:
 
 ## Platform support
 
-| Platform | Supported                                                  |
-| -------- | ---------------------------------------------------------- |
-| Linux    | ✅ (requires `CONFIG_LIVEPATCH=y`)                         |
-| macOS    | Returns `nil`. Kernel livepatch is not available on macOS. |
+| Platform | Supported                                                                           |
+| -------- | ----------------------------------------------------------------------------------- |
+| Linux    | ✅ (requires `CONFIG_LIVEPATCH=y`)                                                  |
+| macOS    | No fact, with the status `unsupported`. Kernel livepatch is not available on macOS. |
 
 ## Example output
 

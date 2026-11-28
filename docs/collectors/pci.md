@@ -48,10 +48,10 @@ filesystem.
 
 ## Platform support
 
-| Platform | Supported                                                             |
-| -------- | --------------------------------------------------------------------- |
-| Linux    | ✅                                                                    |
-| macOS    | ❌ (the sysfs PCI tree is only on Linux; the collector gives no fact) |
+| Platform | Supported                                                                                            |
+| -------- | ---------------------------------------------------------------------------------------------------- |
+| Linux    | ✅                                                                                                   |
+| macOS    | ❌ (the sysfs PCI tree is only on Linux; the collector gives no fact, with the status `unsupported`) |
 
 ## Example output
 
@@ -116,11 +116,11 @@ On Linux:
    `devices` map and no error. The other hardware collectors also fail quietly
    in this way.
 
-On macOS, the collector gives no fact, as each collector does on a platform that
-it does not support. macOS gives the PCI topology through IOKit
-(`ioreg -p IODeviceTree -c IOPCIDevice`). But Ohai's pci plugin is only for
-Linux, and its output shape follows the Linux sysfs and lspci model. gohai has
-the same scope.
+On macOS, the collector gives no fact, with the status `unsupported`, as each
+collector does on a platform that it does not support. macOS gives the PCI
+topology through IOKit (`ioreg -p IODeviceTree -c IOPCIDevice`). But Ohai's pci
+plugin is only for Linux, and its output shape follows the Linux sysfs and lspci
+model. gohai has the same scope.
 
 gohai reports the same fields as Ohai's `linux/lspci.rb`: `vendor_id`,
 `vendor_name`, `device_id`, `device_name`, `class_id`, `class_name`,

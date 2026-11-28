@@ -158,10 +158,10 @@ func (s *PCIPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: no fact",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
 				s.Exactly(nil, got)
 			},
 		},

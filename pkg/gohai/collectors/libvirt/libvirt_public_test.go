@@ -434,11 +434,11 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 		},
 		// ----- Darwin -----
 		{
-			name:    "darwin always returns nil",
+			name:    "darwin: unsupported",
 			variant: "darwin",
 			exec:    func(*testing.T) source.Runner { return nil },
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
+				s.Require().ErrorIs(err, collector.ErrUnsupported)
 				s.Exactly(nil, got)
 			},
 		},

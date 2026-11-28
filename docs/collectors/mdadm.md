@@ -53,7 +53,8 @@ Consumers use this data to:
 | Linux    | ✅             |
 | macOS    | nil (no mdadm) |
 
-macOS has no MD RAID stack. The Darwin variant returns `nil`.
+macOS has no MD RAID stack. The Darwin variant gives no fact, with the status
+`unsupported`.
 
 ## Example output
 
@@ -144,7 +145,7 @@ On Linux:
    for `--detail` on an inactive array and for a user that can't open the
    device.
 
-On macOS, the collector returns `nil`.
+On macOS, the collector gives no fact, with the status `unsupported`.
 
 ## Backing library
 

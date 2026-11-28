@@ -9,8 +9,8 @@ The collector reports the variables of the GRUB2 environment block from the
 It keeps boot-time variables after a reboot. Bootloaders and `grub2-editenv` use
 it to record the boot state.
 
-On macOS, the collector returns `nil`. GRUB2 is a Linux and BSD bootloader. It
-is not on macOS.
+On macOS, the collector gives no fact, with the status `unsupported`. GRUB2 is a
+Linux and BSD bootloader. It is not on macOS.
 
 Consumers use this data to:
 
@@ -28,10 +28,10 @@ Consumers use this data to:
 
 ## Platform support
 
-| Platform | Supported                            |
-| -------- | ------------------------------------ |
-| Linux    | ✅                                   |
-| macOS    | Returns `nil`. GRUB2 is not on macOS |
+| Platform | Supported                                                     |
+| -------- | ------------------------------------------------------------- |
+| Linux    | ✅                                                            |
+| macOS    | No fact, with the status `unsupported`. GRUB2 is not on macOS |
 
 ## Example output
 

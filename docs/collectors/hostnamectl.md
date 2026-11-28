@@ -8,8 +8,8 @@ The collector reports the system identity fields from `hostnamectl` on Linux.
 These are the static hostname, the chassis type, the deployment environment, the
 kernel identity, the hardware vendor and model, the firmware version, and the
 virtualization type. The collector is the same as Ohai's `linux/hostnamectl`
-plugin. On Darwin, the collector returns `nil`, because `hostnamectl` is a
-systemd tool for Linux.
+plugin. On Darwin, the collector gives no fact, with the status `unsupported`,
+because `hostnamectl` is a systemd tool for Linux.
 
 `DefaultEnabled` is `false`. The data is for Linux only, and it needs systemd.
 

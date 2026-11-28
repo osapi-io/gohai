@@ -49,11 +49,11 @@ revision, it must compare this data with `platform` and `kernel`.
 
 ## Platform support
 
-| Platform | Supported |
-| -------- | --------- |
-| Linux    | ✅        |
-| macOS    | `nil`     |
-| Other    | `nil`     |
+| Platform | Supported                              |
+| -------- | -------------------------------------- |
+| Linux    | ✅                                     |
+| macOS    | No fact, with the status `unsupported` |
+| Other    | `nil`                                  |
 
 The collector does not support macOS. Apple's CoreCrypto module has no runtime
 switch that is equivalent to the Linux kernel flag. On macOS, FIPS 140
@@ -146,10 +146,10 @@ The kernel-flag signal is the same as in Ohai's `fips.rb`. gohai adds the
 `crypto-policies` check. This check finds the FIPS 140-3 drift after boot. Ohai
 reads the OpenSSL binding, so it does not find this drift.
 
-On macOS, the collector returns no data. Apple's CoreCrypto module has no
-runtime FIPS switch that is equivalent to the Linux kernel flag. FIPS 140
-validation is a property of the compiled module. You must find it in Apple's
-certificate list. Ohai also does not support macOS.
+On macOS, the collector gives no fact, with the status `unsupported`. Apple's
+CoreCrypto module has no runtime FIPS switch that is equivalent to the Linux
+kernel flag. FIPS 140 validation is a property of the compiled module. You must
+find it in Apple's certificate list. Ohai also does not support macOS.
 
 ## Backing library
 

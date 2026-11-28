@@ -22,7 +22,8 @@ Consumers use this data to:
 - Run distribution logic of the Chef, Ansible or Puppet type without an external
   tool.
 
-macOS has no equivalent file. On macOS, the collector returns `nil`.
+macOS has no equivalent file. On macOS, the collector gives no fact, with the
+status `unsupported`.
 
 ## Collected fields
 
@@ -98,7 +99,7 @@ None.
 | Platform | What we read      | Ohai plugin                                                                                                                                  | Alignment                                                                                                                                      |
 | -------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | Linux    | `/etc/os-release` | [`linux/os_release.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/linux/os_release.rb) parses the same file into `os_release`. | **Equivalent.** The file is the same, and both read all keys. gohai keeps the known keys as typed fields and puts the unknown keys in `extra`. |
-| macOS    | None              | Ohai has no handler.                                                                                                                         | Parity. gohai returns `nil`.                                                                                                                   |
+| macOS    | None              | Ohai has no handler.                                                                                                                         | Parity. gohai gives no fact, with the status `unsupported`.                                                                                    |
 
 **Known gaps:** None. Ohai also reports some old aliases for backward
 compatibility, for example `lsb.id`. In gohai, the `lsb` collector reports those

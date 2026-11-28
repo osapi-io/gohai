@@ -6,8 +6,8 @@
 
 The collector reports the standard systemd directory paths. It runs
 `systemd-path` and parses its `name: /path` output. It is the same as Ohai's
-`linux/systemd_paths` plugin. Darwin returns `nil` because systemd is only on
-Linux.
+`linux/systemd_paths` plugin. Darwin gives no fact, with the status
+`unsupported`, because systemd is only on Linux.
 
 DefaultEnabled is `false`. The data is only useful on Linux hosts that systemd
 manages.
