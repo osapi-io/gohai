@@ -145,8 +145,8 @@ on Alibaba Cloud, and the collector sends no request.
     entry that ends in `/`, and gets each leaf as a value. This algorithm is the
     same as Ohai's `fetch_metadata` in `mixin/alibaba_metadata.rb`. The walk
     goes at most 8 directory levels down, and sends at most 256 requests, so a
-    server that lists a directory in itself cannot make it run without end.
-    Ohai has no such limit.
+    server that lists a directory in itself cannot make it run without end. Ohai
+    has no such limit.
 04. **`/user-data` excluded:** the collector skips `/user-data`, at the root
     level only. Ohai also skips it. The cloud-init scripts in it can contain
     credentials.
@@ -164,9 +164,9 @@ on Alibaba Cloud, and the collector sends no request.
     are typed. There is no `Raw` field for other data.
 08. **Deliberately excluded:** the walk does not read
     `meta-data/ram/security-credentials/` (a short-lived AccessKey and
-    SecurityToken), so the credentials are never fetched or held in memory.
-    The typed output also leaves out `public-keys/<keypair>/openssh-key`. Both
-    are sensitive for security and have no value for an inventory.
+    SecurityToken), so the credentials are never fetched or held in memory. The
+    typed output also leaves out `public-keys/<keypair>/openssh-key`. Both are
+    sensitive for security and have no value for an inventory.
 09. **User-Agent:** `gohai` (the cloudmetadata default). Alibaba's metadata
     service filters some requests by User-Agent.
 10. **Timeout:** 6 seconds for each request. This is the same as Ohai's

@@ -108,8 +108,8 @@ finds:
    error.
 
 **Errors:** If the command is not on the host, the collector returns an empty
-package list and no error. If the command is there and fails, for example with
-a non-zero exit or a timeout, the collector returns the error. Ohai's
+package list and no error. If the command is there and fails, for example with a
+non-zero exit or a timeout, the collector returns the error. Ohai's
 `packages.rb` continues after both, but then a failure looks the same as a host
 with no package manager.
 
