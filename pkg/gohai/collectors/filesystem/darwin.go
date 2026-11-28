@@ -47,11 +47,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect returns filesystem Info.
+// Collect returns filesystem Info. With no Exec it gives no fact, as
+// mount and df give every value.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	out, err := d.Exec.Execute(ctx, "mount")
 	if err != nil {
 		return nil, fmt.Errorf("mount: %w", err)
