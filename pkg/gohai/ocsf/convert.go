@@ -21,7 +21,10 @@
 package ocsf
 
 import (
+	"net"
+
 	"github.com/osapi-io/gohai/pkg/gohai"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 )
 
 const schemaVersion = "1.8.0"
@@ -98,7 +101,8 @@ func buildDevice(
 	}
 
 	if f.Uptime != nil {
-		d.BootTime = int64(f.Uptime.BootTime)
+		// OCSF timestamps are milliseconds; boot_time is seconds.
+		d.BootTime = int64(f.Uptime.BootTime) * 1000
 		d.UptimeSeconds = f.Uptime.Seconds
 	}
 
@@ -168,7 +172,8 @@ func buildHWInfo(
 	}
 
 	if f.Memory != nil {
-		hw.RAMSize = f.Memory.Total
+		// OCSF's ram_size is megabytes; Memory.Total is bytes.
+		hw.RAMSize = f.Memory.Total / (1 << 20)
 	}
 
 	if f.DMI != nil {
@@ -208,9 +213,7 @@ func buildNetworkInterfaces(
 			Flags:  iface.Flags,
 		}
 
-		if len(iface.Addresses) > 0 {
-			ni.IP = iface.Addresses[0].Addr
-		}
+		ni.IP = interfaceIP(iface.Addresses)
 
 		if iface.Encapsulation != "" {
 			ni.Type = iface.Encapsulation
@@ -269,6 +272,9 @@ func buildCloud(
 		c.Provider = "OpenStack"
 		c.Zone = f.OpenStack.Zone
 		c.ProjectUID = f.OpenStack.ProjectUID
+	} else if f.Linode != nil {
+		found = true
+		c.Provider = "Linode"
 	} else if f.Scaleway != nil {
 		found = true
 		c.Provider = "Scaleway"
@@ -282,6 +288,25 @@ func buildCloud(
 	}
 
 	return c
+}
+
+// interfaceIP is the address that names an interface: its first global
+// address, so that a loopback or link-local address is not reported when the
+// interface has a routable one, else its first address.
+func interfaceIP(
+	addrs []network.Address,
+) string {
+	for _, a := range addrs {
+		ip := net.ParseIP(a.Addr)
+		if ip != nil && ip.IsGlobalUnicast() {
+			return a.Addr
+		}
+	}
+	if len(addrs) > 0 {
+		return addrs[0].Addr
+	}
+
+	return ""
 }
 
 func findPrimaryIP(
