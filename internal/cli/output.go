@@ -48,7 +48,11 @@ func WriteFlat(
 	out io.Writer,
 	facts *gohai.Facts,
 ) error {
-	flatMap := facts.Flat()
+	flatMap, err := facts.Flat()
+	if err != nil {
+		return fmt.Errorf("write flat output: %w", err)
+	}
+
 	keys := make([]string, 0, len(flatMap))
 
 	for k := range flatMap {

@@ -22,6 +22,7 @@ package gohai_test
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -29,6 +30,8 @@ import (
 
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/memory"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 )
 
@@ -212,24 +215,42 @@ func (s *FactsPublicTestSuite) TestFlat() {
 	tests := []struct {
 		name         string
 		facts        *gohai.Facts
-		validateFunc func(map[string]any)
+		validateFunc func(map[string]any, error)
 	}{
 		{
 			name:  "nested fields get dot-separated keys",
 			facts: s.facts,
-			validateFunc: func(flat map[string]any) {
+			validateFunc: func(flat map[string]any, err error) {
+				s.Require().NoError(err)
 				s.Equal("ubuntu", flat["platform.name"])
 				s.Equal("24.04", flat["platform.version"])
-				s.EqualValues(8, flat["cpu.count"])
+				s.Equal(json.Number("8"), flat["cpu.count"])
 			},
 		},
 		{
 			name:  "each element of a list gets its index",
 			facts: &gohai.Facts{CPU: &cpu.Info{Flags: []string{"fpu", "sse2"}}},
-			validateFunc: func(flat map[string]any) {
+			validateFunc: func(flat map[string]any, err error) {
+				s.Require().NoError(err)
 				s.Equal("fpu", flat["cpu.flags.0"])
 				s.Equal("sse2", flat["cpu.flags.1"])
 				s.NotContains(flat, "cpu.flags")
+			},
+		},
+		{
+			name:  "an integer above 2^53 keeps every digit",
+			facts: &gohai.Facts{Memory: &memory.Info{Total: 9007199254740993}},
+			validateFunc: func(flat map[string]any, err error) {
+				s.Require().NoError(err)
+				s.Equal(json.Number("9007199254740993"), flat["memory.total"])
+			},
+		},
+		{
+			name:  "facts that do not encode return the error",
+			facts: &gohai.Facts{Load: &load.Info{One: math.NaN()}},
+			validateFunc: func(flat map[string]any, err error) {
+				s.Nil(flat)
+				s.EqualError(err, "flatten facts: json: unsupported value: NaN")
 			},
 		},
 	}
@@ -242,31 +263,51 @@ func (s *FactsPublicTestSuite) TestFlat() {
 
 func (s *FactsPublicTestSuite) TestGet() {
 	tests := []struct {
+		name         string
+		facts        *gohai.Facts
 		path         string
-		validateFunc func(any)
+		validateFunc func(any, error)
 	}{
 		{
-			path: "platform.name",
-			validateFunc: func(got any) {
+			name:  "a string",
+			facts: s.facts,
+			path:  "platform.name",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				s.Equal("ubuntu", got)
 			},
 		},
 		{
-			path: "cpu.count",
-			validateFunc: func(got any) {
-				s.Equal(float64(8), got)
+			name:  "a number is a json.Number",
+			facts: s.facts,
+			path:  "cpu.count",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(json.Number("8"), got)
 			},
 		},
 		{
-			path: "missing",
-			validateFunc: func(got any) {
+			name:  "a missing path is nil",
+			facts: s.facts,
+			path:  "missing",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
 				s.Nil(got)
+			},
+		},
+		{
+			name:  "facts that do not encode return the error",
+			facts: &gohai.Facts{Load: &load.Info{One: math.NaN()}},
+			path:  "load.one",
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "flatten facts: json: unsupported value: NaN")
 			},
 		},
 	}
 	for _, tt := range tests {
-		s.Run(tt.path, func() {
-			tt.validateFunc(s.facts.Get(tt.path))
+		s.Run(tt.name, func() {
+			tt.validateFunc(tt.facts.Get(tt.path))
 		})
 	}
 }

@@ -22,6 +22,7 @@
 package gohai
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -204,21 +205,37 @@ func (f *Facts) PrettyJSON() ([]byte, error) {
 	return json.MarshalIndent(f, "", "  ")
 }
 
-// Flat returns a flat dot-separated key map of all facts. Marshal and
-// unmarshal are guaranteed to succeed because every field on Facts is
-// JSON-safe (Info structs with JSON tags, time.Time, time.Duration).
-func (f *Facts) Flat() map[string]any {
-	b, _ := json.Marshal(f)
+// Flat returns a flat dot-separated key map of all facts. A number stays a
+// json.Number, so an integer keeps every digit and prints as an integer. It
+// returns an error when the facts do not encode as JSON, such as a NaN float.
+func (f *Facts) Flat() (map[string]any, error) {
 	var generic map[string]any
-	_ = json.Unmarshal(b, &generic)
-	return flattenMap(generic)
+
+	b, err := json.Marshal(f)
+	if err == nil {
+		dec := json.NewDecoder(bytes.NewReader(b))
+		dec.UseNumber()
+		err = dec.Decode(&generic)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("flatten facts: %w", err)
+	}
+
+	return flattenMap(generic), nil
 }
 
-// Get returns the value at a dot-separated key path, or nil if absent.
+// Get returns the value at a dot-separated key path, or nil if absent. A
+// number is a json.Number. It returns the error of Flat.
 func (f *Facts) Get(
 	path string,
-) any {
-	return f.Flat()[path]
+) (any, error) {
+	flat, err := f.Flat()
+	if err != nil {
+		return nil, err
+	}
+
+	return flat[path], nil
 }
 
 // String returns a printable summary.
