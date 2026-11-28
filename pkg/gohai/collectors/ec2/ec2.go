@@ -292,6 +292,8 @@ type Collector struct {
 	// FS is the filesystem that /sys/hypervisor/uuid is read from.
 	FS     avfs.VFS
 	client *cloudmetadata.Client
+	// darwin is true on macOS, where dmi has no tables.
+	darwin bool
 }
 
 var _ collector.Collector = (*Collector)(nil)
@@ -324,7 +326,7 @@ func NewWithClient(
 	c *cloudmetadata.Client,
 	src source.Sources,
 ) *Collector {
-	return collector.Wire(&Collector{client: c}, src)
+	return collector.Wire(&Collector{client: c, darwin: collector.IsDarwin(src)}, src)
 }
 
 // Name returns "ec2".
@@ -353,7 +355,7 @@ func (c *Collector) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
-	if !onEC2(c.FS, prior) {
+	if !onEC2(c.FS, prior, c.darwin) {
 		return nil, ctx.Err()
 	}
 
@@ -499,13 +501,19 @@ func fetchPublicKeys(
 //   - /sys/hypervisor/uuid starts with "ec2" (has_ec2_xen_uuid?)
 //
 // Any match → detected. Falls open when dmi isn't in prior — the
-// HTTP probe will still error-out on non-EC2 hosts.
+// HTTP probe will still error-out on non-EC2 hosts. On macOS, dmi has
+// no tables, so only the metadata service can tell an EC2 Mac
+// instance, and the collector probes it.
 func onEC2(
 	fs avfs.VFS,
 	prior collector.PriorResults,
+	darwin bool,
 ) bool {
 	info, ok := collector.GetDep[*dmi.Info](prior, "dmi")
 	if !ok || info == nil {
+		return true
+	}
+	if darwin && info.BIOS == nil {
 		return true
 	}
 	if info.BIOS != nil {

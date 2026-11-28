@@ -24,6 +24,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -118,45 +120,24 @@ func TestAlibabaPublicTestSuite(
 	suite.Run(t, new(AlibabaPublicTestSuite))
 }
 
-func (s *AlibabaPublicTestSuite) TestInterface() {
-	c := alibaba.New()
+func (s *AlibabaPublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		got          any
-		validateFunc func(any)
+		validateFunc func(*alibaba.Collector)
 	}{
 		{
-			name: "Name",
-			got:  c.Name(),
-			validateFunc: func(got any) {
-				s.Equal("alibaba", got)
-			},
-		},
-		{
-			name: "Category",
-			got:  string(c.Category()),
-			validateFunc: func(got any) {
-				s.Equal("cloud", got)
-			},
-		},
-		{
-			name: "DefaultEnabled",
-			got:  c.DefaultEnabled(),
-			validateFunc: func(got any) {
-				s.Equal(false, got)
-			},
-		},
-		{
-			name: "Dependencies",
-			got:  c.Dependencies(),
-			validateFunc: func(got any) {
-				s.Equal([]string{"dmi"}, got)
+			name: "New gives the alibaba cloud collector, opt-in, after dmi",
+			validateFunc: func(c *alibaba.Collector) {
+				s.Equal("alibaba", c.Name())
+				s.Equal(collector.CategoryCloud, c.Category())
+				s.False(c.DefaultEnabled())
+				s.Equal([]string{"dmi"}, c.Dependencies())
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			tt.validateFunc(tt.got)
+			tt.validateFunc(alibaba.New())
 		})
 	}
 }
@@ -184,12 +165,12 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		tree         map[string]string
 		handler      http.HandlerFunc // overrides tree when set
 		closed       bool
-		validateFunc func(any, bool, bool)
+		validateFunc func(any, []string)
 	}{
 		{
 			name: "happy path populates every typed field + skips user-data",
 			tree: treeResponses,
-			validateFunc: func(out any, _ bool, hitUserData bool) {
+			validateFunc: func(out any, paths []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info)
@@ -235,7 +216,56 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				s.Equal([]string{"2001:db8::1", "2001:db8::2"}, eni.IPv6s)
 				s.Equal("2001:db8::", eni.IPv6Gateway)
 
-				s.False(hitUserData)
+				s.NotContains(paths, "/user-data")
+			},
+		},
+		{
+			name:  "dmi with no product table is not Alibaba: no request",
+			prior: collector.PriorResults{"dmi": &dmi.Info{}},
+			tree:  treeResponses,
+			validateFunc: func(out any, paths []string) {
+				s.Nil(out)
+				s.Empty(paths)
+			},
+		},
+		{
+			name: "the walk never reads the role's security credentials",
+			tree: map[string]string{
+				"/":                                    "meta-data/",
+				"/meta-data/":                          "ram/",
+				"/meta-data/ram/":                      "role-name\nsecurity-credentials/",
+				"/meta-data/ram/role-name":             "ecs-default",
+				"/meta-data/ram/security-credentials/": "ecs-default",
+				"/meta-data/ram/security-credentials/ecs-default": `{"AccessKeySecret":"s"}`,
+			},
+			validateFunc: func(out any, paths []string) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
+				s.Equal("ecs-default", info.RAMRoleName)
+				for _, p := range paths {
+					s.NotContains(p, "security-credentials")
+				}
+			},
+		},
+		{
+			name: "a directory that lists itself ends at the request limit",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.URL.Path == "/":
+					_, _ = w.Write([]byte("meta-data/"))
+				case r.URL.Path == "/meta-data/hostname":
+					_, _ = w.Write([]byte("h"))
+				case strings.HasSuffix(r.URL.Path, "/"):
+					_, _ = w.Write([]byte("hostname\nloop/\nloop2/"))
+				default:
+					_, _ = w.Write([]byte("x"))
+				}
+			},
+			validateFunc: func(out any, paths []string) {
+				info, ok := out.(*alibaba.Info)
+				s.Require().True(ok)
+				s.Equal("h", info.Hostname)
+				s.LessOrEqual(len(paths), 256)
 			},
 		},
 		{
@@ -244,8 +274,8 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "Dell Inc."}},
 			},
 			tree: treeResponses,
-			validateFunc: func(out any, httpCalled bool, _ bool) {
-				s.False(httpCalled)
+			validateFunc: func(out any, paths []string) {
+				s.Empty(paths)
 				s.Nil(out)
 			},
 		},
@@ -253,7 +283,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			name:  "no dmi in prior fails open",
 			prior: collector.PriorResults{},
 			tree:  treeResponses,
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info)
@@ -263,14 +293,14 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		{
 			name: "first-probe 404 drops silently",
 			tree: map[string]string{},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				s.Nil(out)
 			},
 		},
 		{
 			name:   "connection refused drops silently",
 			closed: true,
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				s.Nil(out)
 			},
 		},
@@ -282,7 +312,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/hostname": "only-me",
 				// /meta-data/broken-subdir/ intentionally absent → 404
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Equal("only-me", info.Hostname)
@@ -296,7 +326,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/hostname": "prod-1",
 				// /meta-data/missing intentionally absent → 404
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Equal("prod-1", info.Hostname)
@@ -311,7 +341,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/dns-conf/":            "nameservers",
 				"/meta-data/dns-conf/nameservers": "   ",
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Nil(info.Nameservers)
@@ -326,7 +356,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/ntp-conf/":            "ntp-servers",
 				"/meta-data/ntp-conf/ntp-servers": "",
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Nil(info.NTPServers)
@@ -339,7 +369,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/some-other-dir/":  "x",
 				"/some-other-dir/x": "y",
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info)
@@ -362,7 +392,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/disks":    `"not-a-map"`,
 				"/meta-data/network":  `"not-a-map"`,
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Equal("h", info.Hostname)
@@ -393,7 +423,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/network/interfaces/macs/":        "aa:bb",
 				"/meta-data/network/interfaces/macs/aa:bb":   `"not-a-map"`,
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				// Empty marketplace (no product code, no charge type)
@@ -414,7 +444,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/":            "instance-id",
 				"/meta-data/instance-id": `123`, // parses as JSON number, not string
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Empty(info.ID) // strVal returns "" when type isn't string
@@ -427,7 +457,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/":         "\nhostname\n\n",
 				"/meta-data/hostname": "h",
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Equal("h", info.Hostname)
@@ -441,7 +471,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/instance/":              "instance-type",
 				"/meta-data/instance/instance-type": "ecs.g6.large",
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Equal("ecs.g6.large", info.Type)
@@ -460,7 +490,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": "10.0.0.1 10.0.0.2",
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Require().Len(info.NetworkInterfaces, 1)
@@ -481,7 +511,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": "   ",
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Require().Len(info.NetworkInterfaces, 1)
@@ -499,7 +529,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 				"/meta-data/network/interfaces/macs/aa:bb/":              "private-ipv4s",
 				"/meta-data/network/interfaces/macs/aa:bb/private-ipv4s": ",, ,",
 			},
-			validateFunc: func(out any, _ bool, _ bool) {
+			validateFunc: func(out any, _ []string) {
 				info, ok := out.(*alibaba.Info)
 				s.Require().True(ok)
 				s.Nil(info.NetworkInterfaces["aa:bb"].PrivateIPv4s)
@@ -509,18 +539,19 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var httpCalled bool
-			var hitUserData bool
+			// The handler runs on the server's goroutines, so the paths
+			// that it records are behind a lock.
+			var mu sync.Mutex
+			var paths []string
 			h := tt.handler
 			if h == nil {
 				h = serve(tt.tree)
 			}
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
-					httpCalled = true
-					if r.URL.Path == "/user-data" {
-						hitUserData = true
-					}
+					mu.Lock()
+					paths = append(paths, r.URL.Path)
+					mu.Unlock()
 					h(w, r)
 				},
 			))
@@ -540,7 +571,9 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			out, err := c.Collect(context.Background(), prior)
 			s.Require().NoError(err)
 
-			tt.validateFunc(out, httpCalled, hitUserData)
+			mu.Lock()
+			defer mu.Unlock()
+			tt.validateFunc(out, paths)
 		})
 	}
 }

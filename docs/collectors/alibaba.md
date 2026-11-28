@@ -128,7 +128,9 @@ gohai collect --category=cloud         # pulls this + all cloud collectors
 ## Dependencies
 
 `dmi`. Alibaba writes `"Alibaba Cloud"` as `sys_vendor`. If `dmi` did not run,
-the check passes and the collector continues.
+the check passes and the collector continues. If `dmi` ran and found no product
+table, as in a container or on a host with no `/sys/class/dmi`, the host is not
+on Alibaba Cloud, and the collector sends no request.
 
 ## Data sources
 
@@ -141,7 +143,10 @@ the check passes and the collector continues.
 03. **Recursive walk:** the collector starts at `/` and gets each directory
     listing. A listing has one entry on each line. The collector goes into each
     entry that ends in `/`, and gets each leaf as a value. This algorithm is the
-    same as Ohai's `fetch_metadata` in `mixin/alibaba_metadata.rb`.
+    same as Ohai's `fetch_metadata` in `mixin/alibaba_metadata.rb`. The walk
+    goes at most 8 directory levels down, and sends at most 256 requests, so a
+    server that lists a directory in itself cannot make it run without end.
+    Ohai has no such limit.
 04. **`/user-data` excluded:** the collector skips `/user-data`, at the root
     level only. Ohai also skips it. The cloud-init scripts in it can contain
     credentials.
@@ -157,10 +162,11 @@ the check passes and the collector continues.
     `spot/termination-time`), `image/market-place/`, `tags/instance/`,
     `disks/<serial>/` and `network/interfaces/macs/<mac>/`. All reported fields
     are typed. There is no `Raw` field for other data.
-08. **Deliberately excluded:** the collector does not read
-    `ram/security-credentials/<role>/` (a short-lived AccessKey and
-    SecurityToken) or `public-keys/<keypair>/openssh-key`. Both are sensitive
-    for security and have no value for an inventory.
+08. **Deliberately excluded:** the walk does not read
+    `meta-data/ram/security-credentials/` (a short-lived AccessKey and
+    SecurityToken), so the credentials are never fetched or held in memory.
+    The typed output also leaves out `public-keys/<keypair>/openssh-key`. Both
+    are sensitive for security and have no value for an inventory.
 09. **User-Agent:** `gohai` (the cloudmetadata default). Alibaba's metadata
     service filters some requests by User-Agent.
 10. **Timeout:** 6 seconds for each request. This is the same as Ohai's

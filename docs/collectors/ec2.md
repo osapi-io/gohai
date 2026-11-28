@@ -18,8 +18,10 @@ Detection uses all of Ohai's signals that are not for Windows:
   `has_ec2_xen_dmi?`)
 - `/sys/hypervisor/uuid` starts with `"ec2"` (the same as `has_ec2_xen_uuid?`)
 
-If no signal is found, the collector does not send the HTTP request. Otherwise,
-the collector reads:
+On macOS, `dmi` has no tables, so only the metadata service can tell an EC2 Mac
+instance. There the collector sends the HTTP request. If no signal is found on
+Linux, the collector does not send the HTTP request. Otherwise, the collector
+reads:
 
 - The `/meta-data/` tree. This is a selected list of paths, and
   `security-groups` and `local-ipv4s` as arrays split on newlines.
@@ -164,7 +166,8 @@ gohai collect --category=cloud     # pulls this + all cloud collectors
 `bios_version` contains `amazon`. The collector also checks
 `/sys/hypervisor/uuid`, for Xen PV instances and older HVM instances on Xen. If
 dmi did not run, the check fails open: the collector continues to the HTTP
-request.
+request. On macOS, dmi gives no BIOS table, so the collector also continues to
+the HTTP request. This is how it finds an EC2 Mac instance.
 
 ## Data sources
 
@@ -174,6 +177,8 @@ request.
     - `dmi.BIOS.Ver` contains `"amazon"` in lowercase (Ohai's
       `has_ec2_xen_dmi?`). This finds HVM instances on Xen-based hypervisors.
     - `/sys/hypervisor/uuid` starts with `"ec2"` (Ohai's `has_ec2_xen_uuid?`)
+    - The host is macOS and `dmi` has no BIOS table. Ohai has no signal for an
+      EC2 Mac instance, so this one is gohai's.
 
 02. **IMDSv2 token.** The collector sends `PUT /latest/api/token` with
     `X-aws-ec2-metadata-token-ttl-seconds: 60`. The response body is the token.

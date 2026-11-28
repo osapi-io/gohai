@@ -24,6 +24,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -81,45 +82,24 @@ func TestDigitalOceanPublicTestSuite(
 	suite.Run(t, new(DigitalOceanPublicTestSuite))
 }
 
-func (s *DigitalOceanPublicTestSuite) TestInterface() {
-	c := digitalocean.New()
+func (s *DigitalOceanPublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		got          any
-		validateFunc func(any)
+		validateFunc func(*digitalocean.Collector)
 	}{
 		{
-			name: "Name",
-			got:  c.Name(),
-			validateFunc: func(got any) {
-				s.Equal("digital_ocean", got)
-			},
-		},
-		{
-			name: "Category",
-			got:  string(c.Category()),
-			validateFunc: func(got any) {
-				s.Equal("cloud", got)
-			},
-		},
-		{
-			name: "DefaultEnabled",
-			got:  c.DefaultEnabled(),
-			validateFunc: func(got any) {
-				s.Equal(false, got)
-			},
-		},
-		{
-			name: "Dependencies",
-			got:  c.Dependencies(),
-			validateFunc: func(got any) {
-				s.Equal([]string{"dmi"}, got)
+			name: "New gives the digital_ocean cloud collector, opt-in, after dmi",
+			validateFunc: func(c *digitalocean.Collector) {
+				s.Equal("digital_ocean", c.Name())
+				s.Equal(collector.CategoryCloud, c.Category())
+				s.False(c.DefaultEnabled())
+				s.Equal([]string{"dmi"}, c.Dependencies())
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			tt.validateFunc(tt.got)
+			tt.validateFunc(digitalocean.New())
 		})
 	}
 }
@@ -180,16 +160,15 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:  "dmi without BIOS fails open and tries HTTP",
+			name:  "dmi without a BIOS table is not DO: no request",
 			prior: collector.PriorResults{"dmi": &dmi.Info{}},
 			handler: func(w http.ResponseWriter, _ *http.Request) {
 				_, _ = w.Write([]byte(`{"droplet_id": 42}`))
 			},
-			validateFunc: func(out any, _ bool, _ error) {
-				info, ok := out.(*digitalocean.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Equal(int64(42), info.ID)
+			validateFunc: func(out any, httpCalled bool, err error) {
+				s.NoError(err)
+				s.False(httpCalled)
+				s.Nil(out)
 			},
 		},
 		{
@@ -235,10 +214,12 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var httpCalled bool
+			// The handler runs on the server's goroutines, so the flag
+			// that it sets is atomic.
+			var httpCalled atomic.Bool
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
-					httpCalled = true
+					httpCalled.Store(true)
 					tt.handler(w, r)
 				},
 			))
@@ -256,7 +237,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 				prior = doPrior()
 			}
 			out, err := c.Collect(context.Background(), prior)
-			tt.validateFunc(out, httpCalled, err)
+			tt.validateFunc(out, httpCalled.Load(), err)
 		})
 	}
 }
