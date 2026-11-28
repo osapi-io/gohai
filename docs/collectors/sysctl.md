@@ -114,8 +114,8 @@ On Linux and macOS, the collector runs `sysctl -a` through the shared
 4. A line longer than 1 MiB is an error, not a short table.
 
 Ohai's `linux/sysctl.rb` fills the mash only when `exitstatus == 0`. gohai keeps
-the partial table of a run that exits with a status, because a host where
-gohai is not root gives the keys that it can read.
+the partial table of a run that exits with a status, because a host where gohai
+is not root gives the keys that it can read.
 
 ## Backing library
 

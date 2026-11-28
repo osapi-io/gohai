@@ -174,12 +174,11 @@ filesystem:
    It has the users of LDAP and sssd when their service lists them. sssd does
    not list them when `enumerate` is off, which is its default. If `getent`
    fails or gives no user, the collector uses `/etc/passwd`. An `/etc/passwd`
-   that exists and does not read is an error. On macOS,
-   `/etc/passwd` has only the system users, and the other users are in the
-   directory service. Thus the collector runs
-   `dscl . -list /Users NFSHomeDirectory`, and uses the first home of each user.
-   This command does not need root. If `dscl` fails, the collector uses
-   `/etc/passwd`.
+   that exists and does not read is an error. On macOS, `/etc/passwd` has only
+   the system users, and the other users are in the directory service. Thus the
+   collector runs `dscl . -list /Users NFSHomeDirectory`, and uses the first
+   home of each user. This command does not need root. If `dscl` fails, the
+   collector uses `/etc/passwd`.
 2. **The files.** The collector runs `sshd -T` and uses its
    `authorizedkeysfile`. It changes the tokens of each pattern: `%%` to `%`,
    `%h` to the home, `%u` to the user and `%U` to the uid. A relative pattern is
@@ -195,8 +194,8 @@ filesystem:
    its text, and a key type in an option value is not the key. A comment line,
    an empty line and a line with no key or a bad key are left out. A user with
    no file is not in the map.
-4. **The read failures.** A file that the collector may not read is left out,
-   as each other user's file is to a collector that is not root. Any other read
+4. **The read failures.** A file that the collector may not read is left out, as
+   each other user's file is to a collector that is not root. Any other read
    failure of a file that exists is an error. A cancelled collection is an
    error.
 
