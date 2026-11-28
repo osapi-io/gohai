@@ -11,27 +11,27 @@ On Darwin, the collector returns nil and no error.
 
 The method is the same as Ohai's `linux/tc.rb`. The collector parses the qdisc
 entries of each interface from the `tc` command output. It records the kind, the
-handle and the parent of each qdisc. gohai also records the statistics that
-`-s` prints under each qdisc, which Ohai does not.
+handle and the parent of each qdisc. gohai also records the statistics that `-s`
+prints under each qdisc, which Ohai does not.
 
 ## Collected fields
 
-| Field                          | Type     | Description                                                                                                                  | Schema mapping              |
-| ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `interfaces`                   | `list`   | The list of interfaces that have a qdisc configuration                                                                       | None                        |
-| `interfaces[].name`            | `string` | The network interface name, for example `eth0`                                                                               | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs`          | `list`   | The qdiscs that are attached to this interface                                                                               | None                        |
-| `interfaces[].qdiscs[].kind`   | `string` | The qdisc type, for example `fq_codel`, `pfifo_fast` or `noqueue`                                                            | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].handle` | `string` | The qdisc handle without its colon, for example `1` or `0`                                                                   | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].parent` | `string` | The parent handle, or `root` for a root qdisc, which `tc` prints with the word `root`. It is empty for a qdisc with neither. | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].stats` | `object` | The counters that `tc -s` prints under the qdisc. It is absent when `tc` prints no statistics line for the qdisc. | None |
-| `interfaces[].qdiscs[].stats.sent_bytes` | `integer` | The bytes that the qdisc sent | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].stats.sent_packets` | `integer` | The packets that the qdisc sent | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].stats.dropped` | `integer` | The packets that the qdisc dropped | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].stats.overlimits` | `integer` | The times that the qdisc was over its limit | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].stats.requeues` | `integer` | The packets that the qdisc put back in its queue | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].stats.backlog_bytes` | `integer` | The bytes in the queue now | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].stats.backlog_packets` | `integer` | The packets in the queue now | No direct OCSF/OTel mapping |
+| Field                                         | Type      | Description                                                                                                                  | Schema mapping              |
+| --------------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `interfaces`                                  | `list`    | The list of interfaces that have a qdisc configuration                                                                       | None                        |
+| `interfaces[].name`                           | `string`  | The network interface name, for example `eth0`                                                                               | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs`                         | `list`    | The qdiscs that are attached to this interface                                                                               | None                        |
+| `interfaces[].qdiscs[].kind`                  | `string`  | The qdisc type, for example `fq_codel`, `pfifo_fast` or `noqueue`                                                            | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].handle`                | `string`  | The qdisc handle without its colon, for example `1` or `0`                                                                   | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].parent`                | `string`  | The parent handle, or `root` for a root qdisc, which `tc` prints with the word `root`. It is empty for a qdisc with neither. | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].stats`                 | `object`  | The counters that `tc -s` prints under the qdisc. It is absent when `tc` prints no statistics line for the qdisc.            | None                        |
+| `interfaces[].qdiscs[].stats.sent_bytes`      | `integer` | The bytes that the qdisc sent                                                                                                | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].stats.sent_packets`    | `integer` | The packets that the qdisc sent                                                                                              | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].stats.dropped`         | `integer` | The packets that the qdisc dropped                                                                                           | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].stats.overlimits`      | `integer` | The times that the qdisc was over its limit                                                                                  | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].stats.requeues`        | `integer` | The packets that the qdisc put back in its queue                                                                             | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].stats.backlog_bytes`   | `integer` | The bytes in the queue now                                                                                                   | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].stats.backlog_packets` | `integer` | The packets in the queue now                                                                                                 | No direct OCSF/OTel mapping |
 
 ## Platform support
 
