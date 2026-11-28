@@ -160,15 +160,9 @@ func parseSestatus(
 		}
 		key = strings.TrimSpace(strings.ToLower(key))
 		val = strings.TrimSpace(val)
+		// The running kernel's selinuxfs decides the status and the mode;
+		// sestatus only adds the policy and its versions.
 		switch key {
-		case "selinux status":
-			if val == "enabled" {
-				info.Status = "enabled"
-			} else {
-				info.Status = "disabled"
-			}
-		case "current mode":
-			info.CurrentMode = strings.ToLower(val)
 		case "loaded policy name":
 			info.LoadedPolicyName = val
 		case "max kernel policy version":

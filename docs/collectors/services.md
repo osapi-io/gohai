@@ -41,7 +41,7 @@ services. This collector is a gohai addition.
 | `services[].loaded`          | `bool`   | `true` when the init system has the service loaded: systemd's `LOAD` column is `loaded`, or launchd's `services` block has the label. A unit that has only a unit file, or a label that has only an override, is `false` | No direct OCSF/OTel mapping |
 | `services[].unit_file_state` | `string` | The state of the unit file: `enabled`, `enabled-runtime`, `disabled`, `static`, `masked` and the others. Empty when `list-unit-files` failed                                                                             | No direct OCSF/OTel mapping |
 | `services[].description`     | `string` | The unit's `Description=`, for example `OpenSSH server daemon`. Empty for a unit that systemd has not loaded                                                                                                             | No direct OCSF/OTel mapping |
-| `services[].type`            | `string` | Kept for future use. It is empty now                                                                                                                                                                                     | No direct OCSF/OTel mapping |
+| `services[].type`            | `string` | `launchd` on macOS. Empty on Linux                                                                                                                                                                                       | No direct OCSF/OTel mapping |
 
 ## Platform support
 
@@ -124,9 +124,11 @@ On Linux:
 6. It runs `systemctl list-unit-files --type=service --no-legend --no-pager`. A
    unit whose state is `enabled` or `enabled-runtime` is `enabled: true`. A unit
    that runs now, but is disabled, is `enabled: false`. When this command fails,
-   no unit is enabled.
-7. When systemctl is missing, the collector returns an empty list, not an error.
-   Many containers do not have systemd.
+   the collector returns an error.
+7. A host that systemd did not boot, that is, one with no `/run/systemd/system`,
+   such as most containers, has an empty list and no error. A missing
+   `systemctl` is also an empty list. On a host that systemd booted, a
+   `systemctl list-units` that fails is an error.
 
 On macOS, a launchctl that cannot run is an empty list, not an error.
 

@@ -23,7 +23,10 @@ package selinux_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
+	osexec "os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -50,7 +53,7 @@ func fsWith(
 ) avfs.VFS {
 	f := memfs.New()
 	for path, content := range files {
-		_ = f.MkdirAll("/etc/selinux", 0o755)
+		_ = f.MkdirAll(filepath.Dir(path), 0o755)
 		require.NoError(t, f.WriteFile(path, []byte(content), fs.FileMode(0o644)))
 	}
 	return f
@@ -217,7 +220,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
-					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
+					"/sys/fs/selinux/enforce": "1\n",
+					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
 			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
@@ -243,7 +247,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
-					"/etc/selinux/config": "SELINUX=permissive\nSELINUXTYPE=minimum\n",
+					"/sys/fs/selinux/enforce": "0\n",
+					"/etc/selinux/config":     "SELINUX=permissive\nSELINUXTYPE=minimum\n",
 				})
 			},
 			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
@@ -265,18 +270,19 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: sestatus fails — status derived from config",
+			name:    "linux: no sestatus: the kernel gives the status and the mode",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
-					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
+					"/sys/fs/selinux/enforce": "1\n",
+					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
 			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
 				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "sestatus").
-					Return(nil, errors.New("sestatus: command not found"))
+					Return(nil, fmt.Errorf("sestatus: %w", osexec.ErrNotFound))
 				return m
 			},
 			validateFunc: func(got any, err error) {
@@ -284,18 +290,19 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("enabled", info.Status)
-				s.Equal("", info.CurrentMode)
+				s.Equal("enforcing", info.CurrentMode)
 				s.Equal("targeted", info.LoadedPolicyName)
 				s.Equal("", info.MaxKernelPolicyVersion)
 				s.Equal("", info.PolicyVersion)
 			},
 		},
 		{
-			name:    "linux: sestatus returns disabled status",
+			name:    "linux: the kernel decides over a sestatus that says disabled",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
-					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
+					"/sys/fs/selinux/enforce": "0\n",
+					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
 			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
@@ -309,8 +316,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
-				s.Equal("disabled", info.Status)
-				s.Equal("", info.CurrentMode)
+				s.Equal("enabled", info.Status)
+				s.Equal("permissive", info.CurrentMode)
 				s.Equal("targeted", info.LoadedPolicyName)
 				s.Equal("", info.MaxKernelPolicyVersion)
 				s.Equal("", info.PolicyVersion)
@@ -321,7 +328,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
-					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
+					"/sys/fs/selinux/enforce": "1\n",
+					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
 			setupExec: nil,
@@ -330,10 +338,86 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 				info, ok := got.(*selinux.Info)
 				s.Require().True(ok)
 				s.Equal("enabled", info.Status)
-				s.Equal("", info.CurrentMode)
+				s.Equal("enforcing", info.CurrentMode)
 				s.Equal("targeted", info.LoadedPolicyName)
 				s.Equal("", info.MaxKernelPolicyVersion)
 				s.Equal("", info.PolicyVersion)
+			},
+		},
+		{
+			name:    "linux: config says enforcing, the kernel has no selinuxfs: disabled",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{
+					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
+				})
+			},
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				return sourcemocks.NewMockRunner(ctrl)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("disabled", info.Status)
+				s.Equal("enforcing", info.ConfigMode)
+				s.Equal("", info.CurrentMode)
+			},
+		},
+		{
+			name:    "linux: no config file, the kernel has SELinux on: enabled",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{"/sys/fs/selinux/enforce": "1\n"})
+			},
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "sestatus").
+					Return([]byte(sestatusEnforcing), nil)
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("enabled", info.Status)
+				s.Equal("enforcing", info.CurrentMode)
+				s.Equal("", info.ConfigMode)
+			},
+		},
+		{
+			name:    "linux: a sestatus that is installed and fails is an error",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return fsWith(s.T(), map[string]string{"/sys/fs/selinux/enforce": "1\n"})
+			},
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				m := sourcemocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "sestatus").
+					Return(nil, errors.New("signal: killed"))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "sestatus: signal: killed")
+				s.Nil(got)
+			},
+		},
+		{
+			name:    "linux: an enforce file that cannot be read is an error",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				f := memfs.New()
+				s.Require().NoError(f.MkdirAll("/sys/fs/selinux/enforce", 0o755))
+				return f
+			},
+			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
+				return sourcemocks.NewMockRunner(ctrl)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /sys/fs/selinux/enforce")
+				s.Nil(got)
 			},
 		},
 		{
@@ -343,7 +427,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
-					"/etc/selinux/config": "SELINUX=enforcing\nthis line has no equals\nSELINUXTYPE=targeted\n",
+					"/sys/fs/selinux/enforce": "1\n",
+					"/etc/selinux/config":     "SELINUX=enforcing\nthis line has no equals\nSELINUXTYPE=targeted\n",
 				})
 			},
 			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
@@ -371,7 +456,8 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			variant: "linux",
 			setupFS: func() avfs.VFS {
 				return fsWith(s.T(), map[string]string{
-					"/etc/selinux/config": "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
+					"/sys/fs/selinux/enforce": "1\n",
+					"/etc/selinux/config":     "SELINUX=enforcing\nSELINUXTYPE=targeted\n",
 				})
 			},
 			setupExec: func(ctrl *gomock.Controller) *sourcemocks.MockRunner {
