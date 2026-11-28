@@ -130,9 +130,14 @@ func parseTCOutput(
 		}
 		iface := fields[devIdx+1]
 
-		// Extract optional parent.
+		// The parent is the handle after "parent", or "root" for a qdisc
+		// that tc prints with the word root.
 		parent := ""
 		for i, f := range fields {
+			if f == "root" {
+				parent = "root"
+				break
+			}
 			if f == "parent" && i+1 < len(fields) {
 				parent = fields[i+1]
 				break

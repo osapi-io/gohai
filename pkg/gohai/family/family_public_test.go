@@ -21,6 +21,7 @@
 package family_test
 
 import (
+	"io/fs"
 	"path/filepath"
 	"testing"
 
@@ -140,10 +141,69 @@ func (s *FamilyPublicTestSuite) TestDetect() {
 	}
 }
 
+func (s *FamilyPublicTestSuite) TestReadOSRelease() {
+	tests := []struct {
+		name         string
+		files        map[string]string
+		dirs         []string
+		validateFunc func([]byte, error)
+	}{
+		{
+			name: "when /etc/os-release exists, it is read and /usr/lib is not",
+			files: map[string]string{
+				"/etc/os-release":     "ID=ubuntu\n",
+				"/usr/lib/os-release": "ID=fedora\n",
+			},
+			validateFunc: func(b []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ID=ubuntu\n", string(b))
+			},
+		},
+		{
+			name:  "when only /usr/lib/os-release exists, it is read",
+			files: map[string]string{"/usr/lib/os-release": "ID=fedora\n"},
+			validateFunc: func(b []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ID=fedora\n", string(b))
+			},
+		},
+		{
+			name: "when neither exists, the error is not-exist",
+			validateFunc: func(b []byte, err error) {
+				s.Require().ErrorIs(err, fs.ErrNotExist)
+				s.Nil(b)
+			},
+		},
+		{
+			name:  "when /etc/os-release cannot be read, the error names it",
+			files: map[string]string{"/usr/lib/os-release": "ID=fedora\n"},
+			dirs:  []string{"/etc/os-release"},
+			validateFunc: func(b []byte, err error) {
+				s.Require().ErrorContains(err, "read /etc/os-release")
+				s.Nil(b)
+			},
+		},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			vfs := memfs.New()
+			for _, dir := range tc.dirs {
+				s.Require().NoError(vfs.MkdirAll(dir, 0o755))
+			}
+			for path, content := range tc.files {
+				s.Require().NoError(vfs.MkdirAll(filepath.Dir(path), 0o755))
+				s.Require().NoError(vfs.WriteFile(path, []byte(content), 0o644))
+			}
+			tc.validateFunc(family.ReadOSRelease(vfs))
+		})
+	}
+}
+
 func (s *FamilyPublicTestSuite) TestFromFS() {
 	tests := []struct {
 		name  string
 		files map[string]string
+		dirs  []string
 		want  string
 	}{
 		{
@@ -166,11 +226,25 @@ func (s *FamilyPublicTestSuite) TestFromFS() {
 			files: map[string]string{"/etc/os-release": "ID=fedora\n"},
 			want:  family.Fedora,
 		},
+		{
+			name:  "when only /usr/lib/os-release exists, it names the platform",
+			files: map[string]string{"/usr/lib/os-release": "ID=fedora\n"},
+			want:  family.Fedora,
+		},
+		{
+			name:  "when /etc/os-release cannot be read, /usr/lib is not read",
+			files: map[string]string{"/usr/lib/os-release": "ID=fedora\n"},
+			dirs:  []string{"/etc/os-release"},
+			want:  "",
+		},
 		{name: "when the filesystem has neither", want: ""},
 	}
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
 			fs := memfs.New()
+			for _, dir := range tc.dirs {
+				s.Require().NoError(fs.MkdirAll(dir, 0o755))
+			}
 			for path, content := range tc.files {
 				s.Require().NoError(fs.MkdirAll(filepath.Dir(path), 0o755))
 				s.Require().NoError(fs.WriteFile(path, []byte(content), 0o644))

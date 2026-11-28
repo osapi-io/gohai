@@ -145,6 +145,7 @@ UBUNTU_CODENAME=noble
 		content      string
 		missing      bool
 		readErr      bool
+		usrLib       bool // content is in /usr/lib/os-release, and /etc has none
 		validateFunc func(any, error)
 	}{
 		{
@@ -181,6 +182,19 @@ UBUNTU_CODENAME=noble
 				s.Equal("don't", info.Version)
 				s.Equal(`"1`, info.VersionID)
 				s.Equal("", info.Extra["BUILD_ID"])
+			},
+		},
+		{
+			name:    "linux: no /etc/os-release, so /usr/lib/os-release names the distribution",
+			variant: "linux",
+			usrLib:  true,
+			content: "ID=fedora\nVERSION_ID=42\n",
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*osrelease.Info)
+				s.Require().True(ok)
+				s.Equal("fedora", info.ID)
+				s.Equal("42", info.VersionID)
 			},
 		},
 		{
@@ -259,6 +273,11 @@ VARIANT_ID=workstation
 					vfs = readErrorFS{VFS: memfs.New()}
 				case tt.missing:
 					vfs = memfs.New()
+				case tt.usrLib:
+					f := memfs.New()
+					_ = f.MkdirAll("/usr/lib", 0o755)
+					_ = f.WriteFile("/usr/lib/os-release", []byte(tt.content), fs.FileMode(0o644))
+					vfs = f
 				default:
 					f := memfs.New()
 					_ = f.MkdirAll("/etc", 0o755)

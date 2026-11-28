@@ -4506,7 +4506,7 @@
         "type": {
           "type": "string"
         },
-        "transport": {
+        "vendor": {
           "type": "string"
         },
         "name": {

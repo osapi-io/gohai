@@ -15,14 +15,14 @@ handle and the parent of each qdisc.
 
 ## Collected fields
 
-| Field                          | Type     | Description                                                       | Schema mapping              |
-| ------------------------------ | -------- | ----------------------------------------------------------------- | --------------------------- |
-| `interfaces`                   | `list`   | The list of interfaces that have a qdisc configuration            | None                        |
-| `interfaces[].name`            | `string` | The network interface name, for example `eth0`                    | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs`          | `list`   | The qdiscs that are attached to this interface                    | None                        |
-| `interfaces[].qdiscs[].kind`   | `string` | The qdisc type, for example `fq_codel`, `pfifo_fast` or `noqueue` | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].handle` | `string` | The qdisc handle without its colon, for example `1` or `0`        | No direct OCSF/OTel mapping |
-| `interfaces[].qdiscs[].parent` | `string` | The parent handle. It is empty for root qdiscs                    | No direct OCSF/OTel mapping |
+| Field                          | Type     | Description                                                                                                                  | Schema mapping              |
+| ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| `interfaces`                   | `list`   | The list of interfaces that have a qdisc configuration                                                                       | None                        |
+| `interfaces[].name`            | `string` | The network interface name, for example `eth0`                                                                               | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs`          | `list`   | The qdiscs that are attached to this interface                                                                               | None                        |
+| `interfaces[].qdiscs[].kind`   | `string` | The qdisc type, for example `fq_codel`, `pfifo_fast` or `noqueue`                                                            | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].handle` | `string` | The qdisc handle without its colon, for example `1` or `0`                                                                   | No direct OCSF/OTel mapping |
+| `interfaces[].qdiscs[].parent` | `string` | The parent handle, or `root` for a root qdisc, which `tc` prints with the word `root`. It is empty for a qdisc with neither. | No direct OCSF/OTel mapping |
 
 ## Platform support
 
@@ -39,11 +39,11 @@ handle and the parent of each qdisc.
     "interfaces": [
       {
         "name": "lo",
-        "qdiscs": [{ "kind": "noqueue", "handle": "0" }]
+        "qdiscs": [{ "kind": "noqueue", "handle": "0", "parent": "root" }]
       },
       {
         "name": "eth0",
-        "qdiscs": [{ "kind": "fq_codel", "handle": "0" }]
+        "qdiscs": [{ "kind": "fq_codel", "handle": "0", "parent": "root" }]
       },
       {
         "name": "eth1",

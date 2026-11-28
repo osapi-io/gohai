@@ -143,20 +143,20 @@ malformed
 				d := info.Devices["0:0:0:0"]
 				s.Equal("0:0:0:0", d.SCSIAddr)
 				s.Equal("disk", d.Type)
-				s.Equal("ATA", d.Transport)
+				s.Equal("ATA", d.Vendor)
 				s.Equal("ST500DM002-1BD14", d.Name)
 				s.Equal("KC48", d.Revision)
 				s.Equal("/dev/sda", d.Device)
 
 				d = info.Devices["5:0:0:0"]
-				s.Equal("LSI", d.Transport)
+				s.Equal("LSI", d.Vendor)
 				s.Equal("MR9240-8i", d.Name)
 				s.Equal("2.13", d.Revision)
 
 				// Vendor + model with a space between them.
 				d = info.Devices["6:0:0:0"]
 				s.Equal("cd/dvd", d.Type)
-				s.Equal("NECVMWar", d.Transport)
+				s.Equal("NECVMWar", d.Vendor)
 				s.Equal("VMware IDE CDR10", d.Name)
 				s.Equal("1.00", d.Revision)
 				s.Equal("/dev/sr0", d.Device)
@@ -212,7 +212,7 @@ malformed
 				s.Require().Len(info.Devices, 1)
 				d := info.Devices["0:0:0:0"]
 				s.Equal("disk", d.Type)
-				s.Equal("ATA", d.Transport)
+				s.Equal("ATA", d.Vendor)
 				s.Empty(d.Name) // no tokens between transport and revision
 				s.Equal("KC48", d.Revision)
 				s.Equal("/dev/sda", d.Device)

@@ -4,10 +4,11 @@
 
 ## Description
 
-The collector parses `/etc/os-release`. This is the standard freedesktop.org
-file in which each modern Linux distribution describes itself. It is the
-authoritative, machine-readable source for the distribution identity, version,
-codename and upstream compatibility.
+The collector parses `/etc/os-release`, or `/usr/lib/os-release` when
+`/etc/os-release` does not exist, as os-release(5) says. This is the standard
+freedesktop.org file in which each modern Linux distribution describes itself.
+It is the authoritative, machine-readable source for the distribution identity,
+version, codename and upstream compatibility.
 
 Consumers use this to:
 

@@ -23,11 +23,12 @@ package osrelease
 import (
 	"context"
 	"errors"
-	"os"
+	"io/fs"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
 // Linux parses /etc/os-release on Linux hosts.
@@ -42,15 +43,16 @@ func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm()}
 }
 
-// Collect reads /etc/os-release. Missing file soft-misses to an empty
-// Info — common on minimal/scratch containers that lack the file.
+// Collect reads /etc/os-release, or /usr/lib/os-release when the first does
+// not exist, as os-release(5) says. A host with neither, as minimal or
+// scratch containers are, gives an empty Info.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	b, err := l.FS.ReadFile(osReleasePath)
+	b, err := family.ReadOSRelease(l.FS)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return &Info{}, nil
 		}
 		return nil, err

@@ -20,7 +20,7 @@
 
 // Package scsi enumerates SCSI devices visible to the host by parsing
 // the output of `lsscsi`. Mirrors Ohai's linux/scsi.rb methodology:
-// one entry per SCSI address, with transport, type, make+model name,
+// one entry per SCSI address, with type, vendor, make+model name,
 // firmware revision, and the backing device node. macOS has no
 // equivalent interface so the Darwin variant returns an empty Info.
 package scsi
@@ -44,12 +44,14 @@ type Info struct {
 // Matches the shape Ohai's linux/scsi.rb emits under
 // node['scsi'][<address>].
 type Device struct {
-	SCSIAddr  string `json:"scsi_addr"`
-	Type      string `json:"type,omitempty"`
-	Transport string `json:"transport,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Revision  string `json:"revision,omitempty"`
-	Device    string `json:"device,omitempty"`
+	SCSIAddr string `json:"scsi_addr"`
+	Type     string `json:"type,omitempty"`
+	// Vendor is the vendor column of `lsscsi`, such as ATA or LSI. Ohai
+	// names it transport, but `lsscsi` prints the transport only with -t.
+	Vendor   string `json:"vendor,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Revision string `json:"revision,omitempty"`
+	Device   string `json:"device,omitempty"`
 }
 
 // Collector is the public interface every scsi variant satisfies.
@@ -106,11 +108,11 @@ func parseLsscsi(
 			continue
 		}
 		d := Device{
-			SCSIAddr:  addr,
-			Type:      fields[1],
-			Transport: fields[2],
-			Device:    fields[len(fields)-1],
-			Revision:  fields[len(fields)-2],
+			SCSIAddr: addr,
+			Type:     fields[1],
+			Vendor:   fields[2],
+			Device:   fields[len(fields)-1],
+			Revision: fields[len(fields)-2],
 		}
 		if len(fields) > 5 {
 			d.Name = strings.Join(fields[3:len(fields)-2], " ")

@@ -31,6 +31,9 @@
 package family
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"runtime"
 	"strings"
 
@@ -136,8 +139,33 @@ func Of(
 	return ""
 }
 
-// osRelease names the distribution: its ID line is the platform.
-const osRelease = "/etc/os-release"
+// osReleasePaths are the files that name the distribution, in the order
+// that os-release(5) gives: /etc/os-release, then /usr/lib/os-release when
+// the first does not exist.
+var osReleasePaths = [...]string{"/etc/os-release", "/usr/lib/os-release"}
+
+// ReadOSRelease is the content of the host's os-release file, read through
+// vfs: /etc/os-release, or /usr/lib/os-release when the first does not
+// exist. Its error is the last path's when neither exists, so
+// errors.Is(err, fs.ErrNotExist) tells a host with no file, and any other
+// read error is returned at once.
+func ReadOSRelease(
+	vfs avfs.VFS,
+) ([]byte, error) {
+	var err error
+	for _, path := range osReleasePaths {
+		var b []byte
+		b, err = vfs.ReadFile(path)
+		if err == nil {
+			return b, nil
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("read %s: %w", path, err)
+		}
+	}
+
+	return nil, err
+}
 
 // hostFS is the filesystem Detect reads. Swapped in tests.
 var hostFS avfs.VFS = osfs.NewWithNoIdm()
@@ -167,7 +195,7 @@ const macOSVersion = "/System/Library/CoreServices/SystemVersion.plist"
 func FromFS(
 	fs avfs.VFS,
 ) string {
-	data, err := fs.ReadFile(osRelease)
+	data, err := ReadOSRelease(fs)
 	if err != nil {
 		if _, statErr := fs.Stat(macOSVersion); statErr == nil {
 			return Darwin
