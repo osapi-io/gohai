@@ -23,6 +23,8 @@ package sysctl_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -192,7 +194,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				// Line with separator but no key portion — key becomes empty, skipped.
-				return sysctlExec(t, []byte(": value\nkernel.panic = 2\n"), nil)
+				return sysctlExec(t, []byte(" = value\nkernel.panic = 2\n"), nil)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -202,14 +204,59 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			},
 		},
 		{
-			name:    "linux: exec error yields empty params, no error",
+			name:    "linux: no sysctl yields empty params, no error",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, nil, errors.New("not found")) },
+			exec: func(t *testing.T) source.Runner {
+				return sysctlExec(t, nil, fmt.Errorf("sysctl: %w", osexec.ErrNotFound))
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
 				s.Require().True(ok)
 				s.Equal(map[string]string{}, info.Params)
+			},
+		},
+		{
+			name:    "linux: a value with \": \" keeps its text",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sysctlExec(
+					t,
+					[]byte("dev.cdrom.info = CD-ROM information, Id: cdrom.c 3.20\n"),
+					nil,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{
+					"dev.cdrom.info": "CD-ROM information, Id: cdrom.c 3.20",
+				}, info.Params)
+			},
+		},
+		{
+			name:    "linux: a failed run that printed part of the table gives that part",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sysctlExec(t, []byte("kernel.panic = 1\n"), errors.New("exit status 255"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*sysctl.Info)
+				s.Require().True(ok)
+				s.Equal(map[string]string{"kernel.panic": "1"}, info.Params)
+			},
+		},
+		{
+			name:    "linux: a failed run that printed nothing is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sysctlExec(t, nil, errors.New("signal: killed"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "sysctl -a: signal: killed")
+				s.Nil(got)
 			},
 		},
 		{
@@ -240,9 +287,11 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			},
 		},
 		{
-			name:    "darwin: exec error yields empty params, no error",
+			name:    "darwin: no sysctl yields empty params, no error",
 			variant: "darwin",
-			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, nil, errors.New("not found")) },
+			exec: func(t *testing.T) source.Runner {
+				return sysctlExec(t, nil, fmt.Errorf("sysctl: %w", osexec.ErrNotFound))
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)

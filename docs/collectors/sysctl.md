@@ -91,9 +91,14 @@ None.
 
 Ohai's `linux/sysctl.rb` runs `sysctl -a` and parses the key=value output. gohai
 does the same on Linux and macOS. It runs `sysctl -a` through the shared
-Executor. The only difference is the separator. gohai tries `: ` before `=`, so
-that it parses macOS values that contain `=` correctly, for example
-`vm.swapusage`.
+Executor. The only difference is the separator. Linux prints `key = value` and
+macOS prints `key: value`, and each line splits at the first separator of its
+own host. Thus a Linux value that contains `: `, such as `dev.cdrom.info`, and a
+macOS value that contains `=`, such as `vm.swapusage`, keep their text.
+
+A host with no `sysctl` gives an empty table. When `sysctl -a` fails but prints
+part of the table, as it does for a user who cannot read some keys, the
+collector keeps that part. A run that fails and prints nothing is an error.
 
 On Linux and macOS, the collector runs `sysctl -a` through the shared
 `source.Runner`:

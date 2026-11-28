@@ -48,12 +48,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	if l.Exec == nil {
-		return &Info{Params: make(map[string]string)}, nil
-	}
-	out, err := l.Exec.Execute(ctx, "sysctl", "-a")
-	if err != nil {
-		return &Info{Params: make(map[string]string)}, nil
-	}
-	return parseSysctl(string(out)), nil
+	return run(ctx, l.Exec, linuxSep)
 }

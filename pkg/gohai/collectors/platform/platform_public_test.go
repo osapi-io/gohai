@@ -34,6 +34,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	plat "github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -92,7 +93,33 @@ func swVersExec(
 		Execute(gomock.Any(), "sw_vers").
 		Return(out, err).
 		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("not found")).
+		AnyTimes()
+	m.EXPECT().
+		Execute(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, errors.New("not found")).
+		AnyTimes()
 	return m
+}
+
+// archExec returns a runner that answers the architecture reads with out,
+// sw_vers with nothing, and fails each other line.
+func archExec(
+	t *testing.T,
+	out map[string]string,
+) source.Runner {
+	r := sourcetest.Commands{Out: map[string]string{"sw_vers": ""}, Err: map[string]error{}}
+	for k, v := range out {
+		r.Out[k] = v
+	}
+	for _, line := range []string{"uname -m", "sysctl -n hw.optional.arm64"} {
+		if _, ok := r.Out[line]; !ok {
+			r.Err[line] = errors.New("not found")
+		}
+	}
+	return r.Mock(t)
 }
 
 const swVersWithRSR = `ProductName:		macOS
@@ -600,6 +627,131 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: uname's x86_64 is amd64",
+			variant: "linux",
+			fs:      memfs.New(),
+			exec: func(t *testing.T) source.Runner {
+				return archExec(t, map[string]string{
+					"uname -m": "x86_64\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal("amd64", info.CPUArchitecture)
+			},
+		},
+		{
+			name:    "linux: uname's aarch64 is arm64",
+			variant: "linux",
+			fs:      memfs.New(),
+			exec: func(t *testing.T) source.Runner {
+				return archExec(t, map[string]string{
+					"uname -m": "aarch64\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal("arm64", info.CPUArchitecture)
+			},
+		},
+		{
+			name:    "linux: a machine with no Go name is reported as uname gives it",
+			variant: "linux",
+			fs:      memfs.New(),
+			exec: func(t *testing.T) source.Runner {
+				return archExec(t, map[string]string{
+					"uname -m": "sparc64\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal("sparc64", info.CPUArchitecture)
+			},
+		},
+		{
+			name:    "linux: an empty uname is the binary's architecture",
+			variant: "linux",
+			fs:      memfs.New(),
+			exec: func(t *testing.T) source.Runner {
+				return archExec(t, map[string]string{
+					"uname -m": "\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal(platform.GoArch(), info.CPUArchitecture)
+			},
+		},
+		{
+			name:    "linux: a failed uname is the binary's architecture",
+			variant: "linux",
+			fs:      memfs.New(),
+			exec: func(t *testing.T) source.Runner {
+				return archExec(t, map[string]string{})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal(platform.GoArch(), info.CPUArchitecture)
+			},
+		},
+		{
+			name:    "darwin: Apple silicon under Rosetta is arm64",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return archExec(t, map[string]string{
+					"sysctl -n hw.optional.arm64": "1\n",
+					"uname -m":                    "x86_64\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal("arm64", info.CPUArchitecture)
+			},
+		},
+		{
+			name:    "darwin: an Intel Mac is amd64",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return archExec(t, map[string]string{
+					"sysctl -n hw.optional.arm64": "0\n",
+					"uname -m":                    "x86_64\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal("amd64", info.CPUArchitecture)
+			},
+		},
+		{
+			name:    "darwin: no arm64 key, uname decides",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return archExec(t, map[string]string{
+					"uname -m": "x86_64\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal("amd64", info.CPUArchitecture)
+			},
+		},
+		{
 			name:    "darwin: nil Exec, no version or build",
 			variant: "darwin",
 			exec:    func(*testing.T) source.Runner { return nil },
@@ -623,7 +775,11 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			var c platform.Collector
 			switch tt.variant {
 			case "linux":
-				c = &platform.Linux{FS: tt.fs}
+				l := &platform.Linux{FS: tt.fs}
+				if tt.exec != nil {
+					l.Exec = tt.exec(s.T())
+				}
+				c = l
 			case "darwin":
 				c = &platform.Darwin{Exec: tt.exec(s.T())}
 			}

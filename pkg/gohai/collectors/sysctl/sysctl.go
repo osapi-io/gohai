@@ -27,6 +27,10 @@ package sysctl
 
 import (
 	"bufio"
+	"context"
+	"errors"
+	"fmt"
+	osexec "os/exec"
 	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -68,35 +72,58 @@ func NewWith(
 	return collector.Wire(NewLinux(), src)
 }
 
-// parseSysctl parses `sysctl -a` output (one "key = value" or
-// "key: value" pair per line). Linux emits "key = value"; macOS emits
-// "key: value". We try ": " first — on Linux lines with " = " the key
-// never contains ": ", and on macOS values may contain " = " which
-// would corrupt a key if we split on " = " first. Lines with neither
-// separator are skipped.
+// run runs `sysctl -a` through exec and parses it with sep, the separator
+// of the host's format. A host with no sysctl gives an empty table. A run
+// that fails but prints part of the table, as `sysctl -a` does for a user
+// who cannot read some keys, gives that part. A run that fails and prints
+// nothing is an error.
+func run(
+	ctx context.Context,
+	exec source.Runner,
+	sep string,
+) (*Info, error) {
+	if exec == nil {
+		return &Info{Params: make(map[string]string)}, nil
+	}
+	out, err := exec.Execute(ctx, "sysctl", "-a")
+	switch {
+	case err == nil, len(out) > 0:
+		return parseSysctl(string(out), sep), nil
+	case errors.Is(err, osexec.ErrNotFound):
+		return &Info{Params: make(map[string]string)}, nil
+	default:
+		return nil, fmt.Errorf("sysctl -a: %w", err)
+	}
+}
+
+// Separators of `sysctl -a`: Linux prints "key = value", macOS prints
+// "key: value". Each host's lines split at the first of its own separator,
+// so a Linux value that holds ": ", such as dev.cdrom.info's, and a macOS
+// value that holds " = ", keep their text.
+const (
+	linuxSep  = " = "
+	darwinSep = ": "
+)
+
+// parseSysctl parses `sysctl -a` output, one pair for each line, split at
+// the first sep. Lines without sep, or with an empty key, are skipped.
 func parseSysctl(
 	output string,
+	sep string,
 ) *Info {
 	info := &Info{Params: make(map[string]string)}
 	sc := bufio.NewScanner(strings.NewReader(output))
+	sc.Buffer(make([]byte, 0, 64*1024), 1<<20)
 	for sc.Scan() {
-		line := sc.Text()
-		// Try ": " first (macOS native; also present in some Linux lines).
-		// Then fall back to " = " (Linux standard format).
-		var key, val string
-		if idx := strings.Index(line, ": "); idx >= 0 {
-			key = strings.TrimSpace(line[:idx])
-			val = strings.TrimSpace(line[idx+2:])
-		} else if idx := strings.Index(line, " = "); idx >= 0 {
-			key = strings.TrimSpace(line[:idx])
-			val = strings.TrimSpace(line[idx+3:])
-		} else {
+		key, val, ok := strings.Cut(sc.Text(), sep)
+		if !ok {
 			continue
 		}
+		key = strings.TrimSpace(key)
 		if key == "" {
 			continue
 		}
-		info.Params[key] = val
+		info.Params[key] = strings.TrimSpace(val)
 	}
 	return info
 }

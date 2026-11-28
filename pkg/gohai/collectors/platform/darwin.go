@@ -23,7 +23,6 @@ package platform
 import (
 	"bufio"
 	"context"
-	"runtime"
 	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/family"
@@ -61,7 +60,7 @@ func (d *Darwin) Collect(
 ) (any, error) {
 	info := &Info{
 		OS: family.Darwin, Name: family.Darwin, Family: family.Darwin,
-		CPUArchitecture: runtime.GOARCH,
+		CPUArchitecture: darwinArch(ctx, d.Exec),
 	}
 	if d.Exec != nil {
 		applySwVers(ctx, d.Exec, info)

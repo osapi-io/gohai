@@ -28,7 +28,9 @@
 package platform
 
 import (
+	"context"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -261,4 +263,72 @@ func applyLegacyReleaseFallback(
 		}
 		return
 	}
+}
+
+// goArch is the architecture of the gohai binary: the answer when the host
+// cannot be asked.
+var goArch = runtime.GOARCH
+
+// machineArch maps a kernel's machine name, as `uname -m` prints it, to the
+// Go name of the architecture.
+var machineArch = map[string]string{
+	"x86_64":  "amd64",
+	"amd64":   "amd64",
+	"i386":    "386",
+	"i486":    "386",
+	"i586":    "386",
+	"i686":    "386",
+	"aarch64": "arm64",
+	"arm64":   "arm64",
+	"armv6l":  "arm",
+	"armv7l":  "arm",
+	"armv8l":  "arm",
+	"ppc64le": "ppc64le",
+	"ppc64":   "ppc64",
+	"s390x":   "s390x",
+	"riscv64": "riscv64",
+	"mips64":  "mips64",
+	"loong64": "loong64",
+}
+
+// unameArch is the Go name of the host's architecture, from `uname -m`.
+// A machine name with no Go name is reported as uname gives it. When exec
+// is nil or uname fails, it is the binary's architecture.
+func unameArch(
+	ctx context.Context,
+	exec source.Runner,
+) string {
+	if exec == nil {
+		return goArch
+	}
+	out, err := exec.Execute(ctx, "uname", "-m")
+	if err != nil {
+		return goArch
+	}
+	m := strings.TrimSpace(string(out))
+	if m == "" {
+		return goArch
+	}
+	if a, ok := machineArch[m]; ok {
+		return a
+	}
+
+	return m
+}
+
+// darwinArch is the Go name of a Mac's architecture. `sysctl -n
+// hw.optional.arm64` is 1 on Apple silicon, also for a process that Rosetta
+// translates, where `uname -m` says x86_64. Otherwise it is uname's answer.
+func darwinArch(
+	ctx context.Context,
+	exec source.Runner,
+) string {
+	if exec != nil {
+		if out, err := exec.Execute(ctx, "sysctl", "-n", "hw.optional.arm64"); err == nil &&
+			strings.TrimSpace(string(out)) == "1" {
+			return "arm64"
+		}
+	}
+
+	return unameArch(ctx, exec)
 }

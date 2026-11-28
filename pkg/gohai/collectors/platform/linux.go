@@ -22,11 +22,11 @@ package platform
 
 import (
 	"context"
-	"runtime"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects platform identification on Linux. It reads the ID and
@@ -45,19 +45,22 @@ type Linux struct {
 	base
 
 	FS avfs.VFS
+	// Exec runs `uname -m` for the host's architecture. When it is nil or
+	// uname fails, the architecture is the binary's.
+	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the real OS filesystem.
 func NewLinux() *Linux {
-	return &Linux{FS: osfs.NewWithNoIdm()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect returns platform Info.
 func (l *Linux) Collect(
-	_ context.Context,
+	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info := &Info{OS: "linux", CPUArchitecture: runtime.GOARCH}
+	info := &Info{OS: "linux", CPUArchitecture: unameArch(ctx, l.Exec)}
 	if l.FS != nil {
 		readOSRelease(l.FS, info)
 		applyRedhatReleaseSupplement(l.FS, info)
