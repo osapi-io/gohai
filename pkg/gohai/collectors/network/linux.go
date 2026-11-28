@@ -87,21 +87,31 @@ func (l *Linux) Collect(
 	ifs = applyOpenVZAliasMerge(l.FS, ifs)
 	applyNICStats(l.FS, ifs)
 	info := &Info{Interfaces: ifs}
-	if l.Exec != nil {
-		applyRoutes(ctx, l.Exec, info)
-		budget := l.ethtoolBudget
-		if budget == 0 {
-			budget = defaultEthtoolBudget
-		}
-		ectx, cancel := context.WithTimeout(ctx, budget)
-		applyEthtoolDriverInfo(ectx, l.FS, l.Exec, info)
-		applyEthtoolTuning(ectx, l.FS, l.Exec, info)
-		cancel()
-		applyIPLinkExtras(ctx, l.Exec, info)
-		if out, err := l.Exec.Execute(ctx, "ip", "neigh", "show"); err == nil {
-			info.Neighbours = parseIPNeigh(out)
-		}
+	if l.Exec == nil {
+		return info, nil
 	}
+	if err := applyRoutes(ctx, l.FS, l.Exec, info); err != nil {
+		return nil, err
+	}
+	budget := l.ethtoolBudget
+	if budget == 0 {
+		budget = defaultEthtoolBudget
+	}
+	ectx, cancel := context.WithTimeout(ctx, budget)
+	applyEthtoolDriverInfo(ectx, l.FS, l.Exec, info)
+	applyEthtoolTuning(ectx, l.FS, l.Exec, info)
+	cancel()
+	if err := applyIPLinkExtras(ctx, l.Exec, info); err != nil {
+		return nil, err
+	}
+	out, err := l.Exec.Execute(ctx, "ip", "neigh", "show")
+	switch {
+	case err == nil:
+		info.Neighbours = parseIPNeigh(out)
+	case !collector.Absent(err):
+		return nil, fmt.Errorf("ip neigh show: %w", err)
+	}
+
 	return info, nil
 }
 
@@ -184,21 +194,23 @@ func applyEthtoolDriverInfo(
 // entries. Mirrors the relevant subset of Ohai's link_statistics:
 // the three signals that neither sysfs nor the ethtool family covers.
 //
-// `ip` failures (binary missing, permission denied) silently leave
-// the three fields nil for every interface — same behaviour as the
-// existing applyRoutes path.
+// A host with no `ip` leaves the three fields nil for every interface,
+// and a failed `ip -d link` is an error.
 func applyIPLinkExtras(
 	ctx context.Context,
 	exec source.Runner,
 	info *Info,
-) {
+) error {
 	out, err := exec.Execute(ctx, "ip", "-d", "link")
 	if err != nil {
-		return
+		if collector.Absent(err) {
+			return nil
+		}
+		return fmt.Errorf("ip -d link: %w", err)
 	}
 	annotations := parseIPLinkOutput(out)
 	if len(annotations) == 0 {
-		return
+		return nil
 	}
 	for i := range info.Interfaces {
 		ann, ok := annotations[info.Interfaces[i].Name]
@@ -209,6 +221,8 @@ func applyIPLinkExtras(
 		info.Interfaces[i].TunnelInfo = ann.TunnelInfo
 		info.Interfaces[i].XDP = ann.XDP
 	}
+
+	return nil
 }
 
 // applyEthtoolTuning invokes the five tuning-oriented ethtool
@@ -440,12 +454,15 @@ func openVZGuest(
 
 // applyRoutes runs `ip route show` for v4 and v6, parses the
 // output, populates Info.Routes + per-interface Routes + the
-// top-level default_* fields.
+// top-level default_* fields. A host with no `ip` has no routes. A failed
+// run is an error, except `ip -6` on a kernel with IPv6 off, which has no
+// /proc/net/if_inet6 and no v6 routes.
 func applyRoutes(
 	ctx context.Context,
+	fs avfs.VFS,
 	exec source.Runner,
 	info *Info,
-) {
+) error {
 	// The default route of a family is the one the kernel uses: the
 	// lowest metric, and the first of equal metrics.
 	defaultMetric := map[string]int{}
@@ -455,7 +472,10 @@ func applyRoutes(
 	} {
 		out, err := exec.Execute(ctx, "ip", "-o", fam.flag, "route", "show", "table", "main")
 		if err != nil {
-			continue
+			if collector.Absent(err) || (fam.family == "inet6" && !ipv6On(fs)) {
+				continue
+			}
+			return fmt.Errorf("ip -o %s route show: %w", fam.flag, err)
 		}
 		for _, logical := range joinContinuationLines(string(out)) {
 			for _, r := range expandRouteLine(logical, fam.family) {
@@ -489,6 +509,17 @@ func applyRoutes(
 	for _, r := range info.Routes {
 		attachToInterface(info, r)
 	}
+
+	return nil
+}
+
+// ipv6On reports whether the kernel has IPv6: it has /proc/net/if_inet6
+// unless IPv6 is off, as with ipv6.disable=1.
+func ipv6On(
+	fs avfs.VFS,
+) bool {
+	_, err := fs.Stat("/proc/net/if_inet6")
+	return err == nil
 }
 
 // joinContinuationLines folds `\`-continued lines into a single
@@ -713,11 +744,18 @@ func (l *Linux) interfaces(
 	}
 	addrs := map[string][]Address{}
 	if l.Exec != nil {
-		if out, err := l.Exec.Execute(ctx, "ip", "-o", "addr", "show"); err == nil {
+		out, err := l.Exec.Execute(ctx, "ip", "-o", "addr", "show")
+		switch {
+		case err == nil:
 			addrs = parseIPAddr(out)
+		case !collector.Absent(err):
+			return nil, fmt.Errorf("ip -o addr show: %w", err)
 		}
 	}
-	counters := readNetDev(l.FS)
+	counters, err := readNetDev(l.FS)
+	if err != nil {
+		return nil, err
+	}
 	ifs := []Interface{}
 	for _, e := range entries {
 		name := e.Name()
@@ -799,14 +837,18 @@ func parseIPAddrFields(
 }
 
 // readNetDev is the counters of /proc/net/dev, by interface: received
-// bytes, packets, errors and drops, then the same sent.
+// bytes, packets, errors and drops, then the same sent. A host with no
+// /proc/net/dev has no counters, and one that cannot be read is an error.
 func readNetDev(
 	fs avfs.VFS,
-) map[string]*Counters {
+) (map[string]*Counters, error) {
 	counters := map[string]*Counters{}
 	b, err := fs.ReadFile("/proc/net/dev")
 	if err != nil {
-		return counters
+		if collector.Absent(err) {
+			return counters, nil
+		}
+		return nil, fmt.Errorf("read /proc/net/dev: %w", err)
 	}
 	for _, line := range strings.Split(string(b), "\n") {
 		name, rest, ok := strings.Cut(line, ":")
@@ -827,7 +869,7 @@ func readNetDev(
 		}
 	}
 
-	return counters
+	return counters, nil
 }
 
 // spent reports whether the ethtool budget in ctx is used up. A timer

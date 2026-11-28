@@ -141,8 +141,10 @@ run these commands:
    `dscl . -list /Groups GroupMembership`. Each group with a numeric
    `PrimaryGroupID` gives an entry in `group`, with the members that
    `GroupMembership` names.
-3. If `dscl` cannot list the users, the collector uses `/etc/passwd`. If it
-   cannot list the groups, the collector uses `/etc/group`.
+3. If the host has no `dscl`, or the directory service lists no users, the
+   collector uses `/etc/passwd`. For the groups, it uses `/etc/group` in the
+   same way. A `dscl` run that fails is an error, so a failed read is not
+   reported as the system accounts of the flat files.
 4. The collector gets `current_user` from `id -u`, as on Linux.
 
 This agrees with Ohai. Ohai's `passwd` plugin uses Ruby's `Etc.passwd`, which

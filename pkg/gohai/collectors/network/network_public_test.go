@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
@@ -43,6 +44,9 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
+
+// errAbsent is the error of a command that is not on the host.
+var errAbsent = fmt.Errorf("exec: %w", exec.ErrNotFound)
 
 var (
 	_ collector.Collector = (*network.Linux)(nil)
@@ -190,7 +194,7 @@ func ipRouteExec(
 	// don't care about those signals keep passing.
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-d", "link").
-		Return(nil, errors.New("ip: not found")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	// ethtool calls — default to "command not found" so existing tests
 	// that don't care about ethtool keep passing. Tests that exercise
@@ -216,15 +220,15 @@ func ipRouteAndEthtoolFullExec(
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-d", "link").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
@@ -272,11 +276,11 @@ func ipRouteAndIPLinkExec(
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-d", "link").
@@ -299,11 +303,11 @@ func ethtoolOnlyFor(
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-d", "link").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
@@ -331,11 +335,11 @@ func driverInfoOnlyFor(
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-d", "link").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
@@ -357,11 +361,11 @@ func noEthtool(
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-d", "link").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
@@ -382,15 +386,15 @@ func ipRouteAndEthtoolExec(
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-6", "route", "show", "table", "main").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-d", "link").
-		Return(nil, errors.New("nope")).
+		Return(nil, errAbsent).
 		AnyTimes()
 	m.EXPECT().
 		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
@@ -465,7 +469,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/sys/class/net/lo/type":   "772\n",
 				"/sys/class/net/eth0/type": "1\n",
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -499,7 +503,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			ifsFn:      adminDownInterfaces,
 			countersFn: zeroCounters,
 			fs:         fsWith(s.T(), nil),
-			exec:       ipRouteExec(s.T(), nil, errors.New("n/a"), nil, errors.New("n/a")),
+			exec:       ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -934,9 +938,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			exec: ipRouteExec(
 				s.T(),
 				nil,
-				errors.New("nope"),
+				errAbsent,
 				nil,
-				errors.New("nope"),
+				errAbsent,
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1088,7 +1092,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					"default via 10.0.0.1 dev eth0 metric 100\n"+
 					"default via 10.0.0.2 dev lo metric 100\n"+
 					"unreachable 192.0.2.0/24\n"), nil,
-				nil, errors.New("nope")),
+				nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1115,7 +1119,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				),
 				nil,
 				nil,
-				errors.New("nope"),
+				errAbsent,
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1143,7 +1147,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.T(),
 				// 10.0.0.5 is owned by eth0 in canonicalInterfaces.
 				[]byte("10.0.0.0/24 proto kernel scope link src 10.0.0.5\n"),
-				nil, nil, errors.New("nope"),
+				nil, nil, errAbsent,
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1161,7 +1165,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			exec: ipRouteExec(
 				s.T(),
 				[]byte("10.0.0.0/24 proto kernel scope link src 1.2.3.4\n"),
-				nil, nil, errors.New("nope"),
+				nil, nil, errAbsent,
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1179,9 +1183,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			exec: ipRouteExec(
 				s.T(),
 				nil,
-				errors.New("not found"),
+				errAbsent,
 				nil,
-				errors.New("not found"),
+				errAbsent,
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -1207,7 +1211,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), map[string]string{
 				"/proc/vz/version": "",
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1232,7 +1236,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), map[string]string{
 				"/proc/vz/version": "",
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1258,7 +1262,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/proc/vz/version": "",
 				"/proc/bc/0":       "",
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1278,7 +1282,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs: fsWith(s.T(), map[string]string{
 				"/proc/vz/version": "",
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1295,7 +1299,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				"/sys/class/net/lo/type":   "not-a-number\n",
 				"/sys/class/net/eth0/type": "9999\n", // unknown ARPHRD
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1315,7 +1319,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs:         fsWith(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.5 metric 100\n"),
-				nil, nil, errors.New("nope")),
+				nil, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1336,7 +1340,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs:         fsWith(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("   \n\n"),
-				nil, nil, errors.New("nope")),
+				nil, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1351,7 +1355,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs:         fsWith(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("default via 10.0.0.1 dev eth0 metric oops\n"),
-				nil, nil, errors.New("nope")),
+				nil, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1367,13 +1371,27 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs:         fsWith(s.T(), nil),
 			exec: ipRouteExec(s.T(),
 				[]byte("default via 10.0.0.1 dev nonexistent0\n"),
-				nil, nil, errors.New("nope")),
+				nil, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
 				s.Require().True(ok)
 				s.Require().Len(i.Routes, 1)
 				s.Equal("nonexistent0", i.Routes[0].Interface)
+			},
+		},
+		{
+			name:       "nil Exec: the interfaces of sysfs, and no routes",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Len(i.Interfaces, 2)
+				s.Empty(i.Routes)
+				s.Empty(i.Neighbours)
 			},
 		},
 		{
@@ -1393,7 +1411,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs: fsWithSymlinks(s.T(), nil, map[string]string{
 				"/sys/class/net/eth0/device/driver": "../../../../bus/pci/drivers/e1000e",
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1411,7 +1429,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs: fsWithSymlinks(s.T(), nil, map[string]string{
 				"/sys/class/net/eth0/device/driver": "../../../../bus/pci/drivers/virtio_net",
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1429,7 +1447,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			fs: fsWithSymlinks(s.T(), nil, map[string]string{
 				"/sys/class/net/eth0/device/driver": "ixgbe",
 			}),
-			exec: ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1442,7 +1460,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
 			fs:         fsWith(s.T(), nil),
-			exec:       ipRouteExec(s.T(), nil, errors.New("nope"), nil, errors.New("nope")),
+			exec:       ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*network.Info)
@@ -1451,6 +1469,117 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				s.Equal("10.0.0.1", i.Neighbours[0].Address)
 				s.Equal("inet", i.Neighbours[0].Family)
 				s.Equal("REACHABLE", i.Neighbours[0].State)
+			},
+		},
+		{
+			name:       "linux: a failed ip -o addr show is an error",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: func() source.Runner {
+				m := ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent).(*mocks.MockRunner)
+				m.EXPECT().Execute(gomock.Any(), "ip", "-o", "addr", "show").
+					Return(nil, errors.New("exit status 1")).AnyTimes()
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "ip -o addr show: exit status 1")
+			},
+		},
+		{
+			name:       "linux: a failed ip -4 route is an error",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec:       ipRouteExec(s.T(), nil, errors.New("exit status 2"), nil, errAbsent),
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "ip -o -4 route show: exit status 2")
+			},
+		},
+		{
+			name:       "linux: a failed ip -6 route with IPv6 on is an error",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), map[string]string{"/proc/net/if_inet6": ""}),
+			exec:       ipRouteExec(s.T(), nil, nil, nil, errors.New("exit status 2")),
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "ip -o -6 route show: exit status 2")
+			},
+		},
+		{
+			name:       "linux: a failed ip -6 route with IPv6 off has no v6 routes",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: ipRouteExec(
+				s.T(),
+				[]byte("default via 10.0.0.1 dev eth0\n"), nil,
+				nil, errors.New("exit status 2"),
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Equal("eth0", i.DefaultInterface)
+				s.Empty(i.DefaultInet6Interface)
+			},
+		},
+		{
+			name:       "linux: a failed ip -d link is an error",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: func() source.Runner {
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
+				m.EXPECT().
+					Execute(gomock.Any(), "ip", "-o", gomock.Any(), "route", "show", "table", "main").
+					Return(nil, errAbsent).
+					AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "ip", "-d", "link").
+					Return(nil, errors.New("exit status 1")).AnyTimes()
+				m.EXPECT().Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
+					Return(nil, errAbsent).AnyTimes()
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "ip -d link: exit status 1")
+			},
+		},
+		{
+			name:       "linux: a failed ip neigh show is an error",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         fsWith(s.T(), nil),
+			exec: func() source.Runner {
+				m := ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent).(*mocks.MockRunner)
+				m.EXPECT().Execute(gomock.Any(), "ip", "neigh", "show").
+					Return(nil, errors.New("exit status 1")).AnyTimes()
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.EqualError(err, "ip neigh show: exit status 1")
+			},
+		},
+		{
+			name:  "linux: a /proc/net/dev that cannot be read is an error",
+			ifsFn: canonicalInterfaces,
+			countersFn: func() ([]tCounters, error) {
+				return nil, nil
+			},
+			fs: func() avfs.VFS {
+				f := fsWith(s.T(), nil)
+				require.NoError(s.T(), f.MkdirAll("/proc/net/dev", 0o755))
+				return f
+			}(),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
+			validateFunc: func(got any, err error) {
+				s.Nil(got)
+				s.ErrorContains(err, "read /proc/net/dev")
 			},
 		},
 		{

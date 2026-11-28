@@ -22,6 +22,7 @@ package users
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -34,8 +35,9 @@ import (
 
 // Darwin enumerates users and groups from the local node of the directory
 // service with dscl. On macOS, /etc/passwd and /etc/group have only the
-// system accounts, not the accounts that a person made. When dscl cannot
-// list them, the flat files are used.
+// system accounts, not the accounts that a person made. On a host with no
+// dscl, or a directory service with no records, the flat files are used. A
+// dscl that fails is an error.
 type Darwin struct {
 	base
 
@@ -56,19 +58,46 @@ func (d *Darwin) Collect(
 ) (any, error) {
 	info := readPOSIX(d.FS)
 	if d.Exec != nil {
-		if p, ok := d.dsclPasswd(ctx); ok {
-			info.Passwd = p
-		}
-		if g, ok := d.dsclGroup(ctx); ok {
-			info.Group = g
-		}
-		if out, err := d.list(ctx, "/Users", "AuthenticationAuthority"); err == nil {
-			applyDisabled(info.Passwd, out)
+		if err := d.applyDscl(ctx, info); err != nil {
+			return nil, err
 		}
 	}
 	setCurrentUser(ctx, d.Exec, info)
 
 	return info, nil
+}
+
+// applyDscl puts the users and groups of the directory service in info,
+// in place of the flat files' when dscl lists any, and marks the disabled
+// users. A list that dscl does not have leaves its part of info as it is.
+// Its error is the first dscl run that failed.
+func (d *Darwin) applyDscl(
+	ctx context.Context,
+	info *Info,
+) error {
+	p, err := d.dsclPasswd(ctx)
+	switch {
+	case err == nil && p != nil:
+		info.Passwd = p
+	case err != nil && !collector.Absent(err):
+		return err
+	}
+	g, err := d.dsclGroup(ctx)
+	switch {
+	case err == nil && g != nil:
+		info.Group = g
+	case err != nil && !collector.Absent(err):
+		return err
+	}
+	out, err := d.list(ctx, "/Users", "AuthenticationAuthority")
+	switch {
+	case err == nil:
+		applyDisabled(info.Passwd, out)
+	case !collector.Absent(err):
+		return err
+	}
+
+	return nil
 }
 
 // list runs `dscl . -list <path> <attr>`: one "name value..." line for
@@ -78,22 +107,27 @@ func (d *Darwin) list(
 	path string,
 	attr string,
 ) ([]byte, error) {
-	return d.Exec.Execute(ctx, "dscl", ".", "-list", path, attr)
+	out, err := d.Exec.Execute(ctx, "dscl", ".", "-list", path, attr)
+	if err != nil {
+		return nil, fmt.Errorf("dscl . -list %s %s: %w", path, attr, err)
+	}
+
+	return out, nil
 }
 
 // values is the value of attr for each record of path, by record name. A
 // record with many values, such as two homes, keeps the first, unless all
-// is true, as for a RealName with spaces. A failed run gives no values.
+// is true, as for a RealName with spaces. Its error is the run's.
 func (d *Darwin) values(
 	ctx context.Context,
 	path string,
 	attr string,
 	all bool,
-) map[string]string {
+) (map[string]string, error) {
 	out := map[string]string{}
 	b, err := d.list(ctx, path, attr)
 	if err != nil {
-		return out
+		return nil, err
 	}
 	for _, line := range strings.Split(string(b), "\n") {
 		f := strings.Fields(line)
@@ -107,22 +141,37 @@ func (d *Darwin) values(
 		}
 	}
 
-	return out
+	return out, nil
 }
 
 // dsclPasswd is each user that has a UniqueID, with its group, home,
-// shell and real name. It is false when dscl cannot list the users.
+// shell and real name. It is nil when the directory service lists no
+// users, and its error is the first dscl run that failed.
 func (d *Darwin) dsclPasswd(
 	ctx context.Context,
-) (map[string]PasswdEntry, bool) {
-	uids := d.values(ctx, "/Users", "UniqueID", false)
-	if len(uids) == 0 {
-		return nil, false
+) (map[string]PasswdEntry, error) {
+	uids, err := d.values(ctx, "/Users", "UniqueID", false)
+	if err != nil || len(uids) == 0 {
+		return nil, err
 	}
-	gids := d.values(ctx, "/Users", "PrimaryGroupID", false)
-	homes := d.values(ctx, "/Users", "NFSHomeDirectory", false)
-	shells := d.values(ctx, "/Users", "UserShell", false)
-	names := d.values(ctx, "/Users", "RealName", true)
+	attrs := map[string]map[string]string{}
+	for _, a := range []struct {
+		name string
+		all  bool
+	}{
+		{"PrimaryGroupID", false},
+		{"NFSHomeDirectory", false},
+		{"UserShell", false},
+		{"RealName", true},
+	} {
+		v, err := d.values(ctx, "/Users", a.name, a.all)
+		if err != nil && !collector.Absent(err) {
+			return nil, err
+		}
+		attrs[a.name] = v
+	}
+	gids, homes := attrs["PrimaryGroupID"], attrs["NFSHomeDirectory"]
+	shells, names := attrs["UserShell"], attrs["RealName"]
 	out := map[string]PasswdEntry{}
 	for name, v := range uids {
 		uid, err := strconv.Atoi(v)
@@ -139,19 +188,23 @@ func (d *Darwin) dsclPasswd(
 		}
 	}
 
-	return out, true
+	return out, nil
 }
 
 // dsclGroup is each group that has a PrimaryGroupID, with its members. It
-// is false when dscl cannot list the groups.
+// is nil when the directory service lists no groups, and its error is the
+// first dscl run that failed.
 func (d *Darwin) dsclGroup(
 	ctx context.Context,
-) (map[string]GroupEntry, bool) {
-	gids := d.values(ctx, "/Groups", "PrimaryGroupID", false)
-	if len(gids) == 0 {
-		return nil, false
+) (map[string]GroupEntry, error) {
+	gids, err := d.values(ctx, "/Groups", "PrimaryGroupID", false)
+	if err != nil || len(gids) == 0 {
+		return nil, err
 	}
-	members := d.values(ctx, "/Groups", "GroupMembership", true)
+	members, err := d.values(ctx, "/Groups", "GroupMembership", true)
+	if err != nil && !collector.Absent(err) {
+		return nil, err
+	}
 	out := map[string]GroupEntry{}
 	for name, v := range gids {
 		gid, err := strconv.Atoi(v)
@@ -165,5 +218,5 @@ func (d *Darwin) dsclGroup(
 		out[name] = e
 	}
 
-	return out, true
+	return out, nil
 }
