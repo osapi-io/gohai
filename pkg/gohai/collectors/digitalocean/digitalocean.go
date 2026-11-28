@@ -209,8 +209,15 @@ func onDigitalOcean(
 	prior collector.PriorResults,
 ) bool {
 	info, ok := collector.GetDep[*dmi.Info](prior, "dmi")
-	if !ok || info == nil || info.BIOS == nil {
+	// When dmi did not run, as when a caller asked for this collector
+	// alone, only the metadata service can tell. A host whose DMI has no
+	// BIOS table, such as a container or a host with no
+	// /sys/class/dmi, is not this cloud, so it is not probed.
+	if !ok {
 		return true
+	}
+	if info == nil || info.BIOS == nil {
+		return false
 	}
 	return info.BIOS.Manufacturer == dmiVendorSignature
 }

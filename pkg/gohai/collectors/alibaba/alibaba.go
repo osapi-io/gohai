@@ -29,6 +29,7 @@ package alibaba
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -206,7 +207,7 @@ func (c *Collector) Collect(
 	if !onAlibaba(prior) {
 		return nil, ctx.Err()
 	}
-	tree, err := walk(ctx, c.client, "")
+	tree, err := (&walker{client: c.client}).walk(ctx, "", 0)
 	if err != nil {
 		// First probe failed — not on Alibaba (or endpoint down).
 		return nil, ctx.Err()
@@ -221,10 +222,40 @@ func onAlibaba(
 	prior collector.PriorResults,
 ) bool {
 	info, ok := collector.GetDep[*dmi.Info](prior, "dmi")
-	if !ok || info == nil || info.Product == nil {
+	// When dmi did not run, as when a caller asked for this collector
+	// alone, only the metadata service can tell. A host whose DMI has no
+	// product table, such as a container or a host with no
+	// /sys/class/dmi, is not this cloud, so it is not probed.
+	if !ok {
 		return true
 	}
+	if info == nil || info.Product == nil {
+		return false
+	}
 	return strings.Contains(info.Product.VendorName, dmiVendorSignature)
+}
+
+// securityCredentialsPath is the directory of the instance role's
+// access key, secret and token. The walk never reads it.
+const securityCredentialsPath = "meta-data/ram/security-credentials"
+
+// errWalkLimit is the error of a read after maxWalkRequests.
+var errWalkLimit = errors.New("alibaba metadata walk: request limit reached")
+
+// maxWalkDepth is the deepest directory level that walk reads. The
+// deepest path that transform reads is three levels down.
+const maxWalkDepth = 8
+
+// maxWalkRequests is the most requests that one walk sends. A metadata
+// tree of an instance has fewer than 100 entries.
+const maxWalkRequests = 256
+
+// walker walks the metadata tree, and counts the requests that it
+// sends, so a server that lists a directory in itself cannot make the
+// walk recurse or send requests without end.
+type walker struct {
+	client   *cloudmetadata.Client
+	requests int
 }
 
 // walk issues a GET against path (relative to the Client's baseURL).
@@ -235,12 +266,14 @@ func onAlibaba(
 //
 // The first call uses path "" (the `/2016-01-01/` listing). At that
 // level only, Ohai explicitly excludes `/user-data` from the walk.
-func walk(
+// walk never reads ram/security-credentials: it holds the role's
+// access key, secret and token, and transform drops it.
+func (w *walker) walk(
 	ctx context.Context,
-	c *cloudmetadata.Client,
 	path string,
+	depth int,
 ) (map[string]any, error) {
-	listing, err := c.Get(ctx, "/"+path)
+	listing, err := w.get(ctx, "/"+path)
 	if err != nil {
 		return nil, err
 	}
@@ -254,16 +287,22 @@ func walk(
 		if path == "" && strings.TrimRight(line, "/") == "user-data" {
 			continue
 		}
-		key := sanitizeKey(line)
 		child := fmt.Sprintf("%s%s", path, line)
+		if strings.TrimRight(child, "/") == securityCredentialsPath {
+			continue
+		}
+		key := sanitizeKey(line)
 		if strings.HasSuffix(line, "/") {
-			sub, err := walk(ctx, c, child)
+			if depth >= maxWalkDepth {
+				continue
+			}
+			sub, err := w.walk(ctx, child, depth+1)
 			if err != nil {
 				continue
 			}
 			result[key] = sub
 		} else {
-			leaf, err := c.Get(ctx, "/"+child)
+			leaf, err := w.get(ctx, "/"+child)
 			if err != nil {
 				continue
 			}
@@ -276,6 +315,18 @@ func walk(
 		}
 	}
 	return result, nil
+}
+
+// get reads path, unless the walk has sent maxWalkRequests requests.
+func (w *walker) get(
+	ctx context.Context,
+	path string,
+) ([]byte, error) {
+	if w.requests >= maxWalkRequests {
+		return nil, errWalkLimit
+	}
+	w.requests++
+	return w.client.Get(ctx, path)
 }
 
 // sanitizeKey mirrors Ohai's sanitize_key + trailing-underscore strip.

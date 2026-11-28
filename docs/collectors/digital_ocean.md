@@ -95,8 +95,10 @@ gohai collect --category=cloud               # pulls this + all cloud collectors
 
 `dmi`. DO writes `"DigitalOcean"` as `bios_vendor`. The dmi collector reports it
 as `BIOS.Manufacturer`. The collector makes the HTTP call only on an exact
-match. If `dmi` has no data because the user disabled it, the check passes and
-the collector tries the endpoint.
+match. If `dmi` did not run because the user disabled it, the check passes and
+the collector tries the endpoint. If `dmi` ran and found no BIOS table, as in a
+container or on a host with no `/sys/class/dmi`, the host is not on
+DigitalOcean, and the collector sends no request.
 
 ## Data sources
 

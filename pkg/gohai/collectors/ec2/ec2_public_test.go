@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -36,6 +37,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -197,6 +199,12 @@ func handlerFor(
 			_, _ = w.Write([]byte(o.tokenBody))
 			return
 		}
+		// IMDSv2 refuses a read without the session token, as EC2 does
+		// when an instance requires IMDSv2.
+		if !o.token404 && r.Header.Get("X-aws-ec2-metadata-token") != o.tokenBody {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 		if r.URL.Path == "/" {
 			if o.version404 {
 				http.NotFound(w, r)
@@ -251,45 +259,25 @@ func handlerFor(
 	}
 }
 
-func (s *EC2PublicTestSuite) TestInterface() {
-	c := ec2.New()
+func (s *EC2PublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		got          any
-		validateFunc func(any)
+		validateFunc func(*ec2.Collector)
 	}{
 		{
-			name: "Name",
-			got:  c.Name(),
-			validateFunc: func(got any) {
-				s.Equal("ec2", got)
-			},
-		},
-		{
-			name: "Category",
-			got:  string(c.Category()),
-			validateFunc: func(got any) {
-				s.Equal("cloud", got)
-			},
-		},
-		{
-			name: "DefaultEnabled",
-			got:  c.DefaultEnabled(),
-			validateFunc: func(got any) {
-				s.Equal(false, got)
-			},
-		},
-		{
-			name: "Dependencies",
-			got:  c.Dependencies(),
-			validateFunc: func(got any) {
-				s.Equal([]string{"dmi"}, got)
+			name: "New gives the ec2 cloud collector, opt-in, after dmi",
+			validateFunc: func(c *ec2.Collector) {
+				s.Equal("ec2", c.Name())
+				s.Equal(collector.CategoryCloud, c.Category())
+				s.False(c.DefaultEnabled())
+				s.Equal([]string{"dmi"}, c.Dependencies())
+				s.NotNil(c.FS)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			tt.validateFunc(tt.got)
+			tt.validateFunc(ec2.New())
 		})
 	}
 }
@@ -299,6 +287,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		name         string
 		prior        collector.PriorResults
 		hypervisor   string // content for /sys/hypervisor/uuid; "" = don't write
+		family       string // the host's family; "" is Linux
 		opts         *serverOpts
 		handler      http.HandlerFunc // overrides opts-based handler when set
 		closed       bool
@@ -499,6 +488,27 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			},
 			hypervisor: "kvm-12345",
 			opts:       (&serverOpts{}).withDefaults(),
+			validateFunc: func(out any, httpCalled bool) {
+				s.False(httpCalled)
+				s.Nil(out)
+			},
+		},
+		{
+			name:   "macOS, where dmi has no tables, probes the metadata service",
+			prior:  collector.PriorResults{"dmi": &dmi.Info{}},
+			family: family.Darwin,
+			opts:   (&serverOpts{}).withDefaults(),
+			validateFunc: func(out any, httpCalled bool) {
+				s.True(httpCalled)
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
+				s.Equal("i-abc", info.ID)
+			},
+		},
+		{
+			name:  "Linux with an empty dmi and no xen UUID is not EC2",
+			prior: collector.PriorResults{"dmi": &dmi.Info{}},
+			opts:  (&serverOpts{}).withDefaults(),
 			validateFunc: func(out any, httpCalled bool) {
 				s.False(httpCalled)
 				s.Nil(out)
@@ -801,14 +811,16 @@ func (s *EC2PublicTestSuite) TestCollect() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			var httpCalled bool
+			// The handler runs on the server's goroutines, so the flag
+			// that it sets is atomic.
+			var httpCalled atomic.Bool
 			h := tt.handler
 			if h == nil {
 				h = handlerFor(tt.opts)
 			}
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
-					httpCalled = true
+					httpCalled.Store(true)
 					h(w, r)
 				},
 			))
@@ -819,7 +831,10 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			}
 
 			client := cloudmetadata.New(srv.URL)
-			c := ec2.NewWithClient(client, source.Sources{FS: s.hostFS(tt.hypervisor)})
+			c := ec2.NewWithClient(client, source.Sources{
+				FS:     s.hostFS(tt.hypervisor),
+				Family: tt.family,
+			})
 
 			prior := tt.prior
 			if prior == nil {
@@ -828,7 +843,7 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			out, err := c.Collect(context.Background(), prior)
 			s.Require().NoError(err)
 
-			tt.validateFunc(out, httpCalled)
+			tt.validateFunc(out, httpCalled.Load())
 		})
 	}
 }
