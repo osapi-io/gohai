@@ -100,10 +100,10 @@ None.
 On Linux:
 
 1. The collector runs `rpm --showrc` through the injected `source.Runner`. If
-   the command fails (rpm is not installed, or permission is denied), the
-   collector returns `{macros: {}}` and no error. This is the same as Ohai,
-   which skips the plugin if it does not find rpm. Thus there is no error on
-   systems without RPM, for example Debian and Alpine.
+   rpm is not installed, the collector returns `{macros: {}}` and no error. This
+   is the same as Ohai, which skips the plugin if it does not find rpm. Thus
+   there is no error on systems without RPM, for example Debian and Alpine. If
+   rpm is installed and `rpm --showrc` fails, the collector returns an error.
 
 2. The collector finds the two `===...===` marker lines (5 or more `=` signs) in
    the output. The macro definitions are between these two markers.

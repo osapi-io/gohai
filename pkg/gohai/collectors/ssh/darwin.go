@@ -55,10 +55,23 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return &Info{
-		Keys:           collectHostKeys(d.FS),
-		AuthorizedKeys: collectAuthorizedKeys(d.FS, d.homes(ctx), keyFiles(ctx, d.Exec)),
-	}, nil
+	keys, err := collectHostKeys(d.FS)
+	if err != nil {
+		return nil, err
+	}
+	homes, err := d.homes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	authorized, err := collectAuthorizedKeys(d.FS, homes, keyFiles(ctx, d.Exec))
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	return &Info{Keys: keys, AuthorizedKeys: authorized}, nil
 }
 
 // homes is the home of each user from `dscl . -list /Users
@@ -66,11 +79,11 @@ func (d *Darwin) Collect(
 // users of /etc/passwd when there is no Exec or dscl fails.
 func (d *Darwin) homes(
 	ctx context.Context,
-) []home {
+) ([]home, error) {
 	if d.Exec != nil {
 		out, err := d.Exec.Execute(ctx, "dscl", ".", "-list", "/Users", "NFSHomeDirectory")
 		if err == nil {
-			return dsclHomes(out)
+			return dsclHomes(out), nil
 		}
 	}
 

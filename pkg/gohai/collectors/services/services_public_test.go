@@ -553,10 +553,12 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: launchctl that cannot run is an empty list",
+			name:    "darwin: no launchctl is an empty list",
 			variant: "darwin",
 			exec: sourcetest.Commands{
-				Err: map[string]error{launchctlLine: errors.New("not found")},
+				Err: map[string]error{
+					launchctlLine: fmt.Errorf("exec launchctl: %w", osexec.ErrNotFound),
+				},
 			}.Mock(
 				s.T(),
 			),
@@ -565,6 +567,19 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 				info, ok := got.(*services.Info)
 				s.Require().True(ok)
 				s.Equal([]services.Service{}, info.Services)
+			},
+		},
+		{
+			name:    "darwin: a launchctl that fails is an error",
+			variant: "darwin",
+			exec: sourcetest.Commands{
+				Err: map[string]error{launchctlLine: errors.New("exec launchctl: exit status 5")},
+			}.Mock(
+				s.T(),
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().EqualError(err, "launchctl print system: exec launchctl: exit status 5")
+				s.Exactly(nil, got)
 			},
 		},
 		{

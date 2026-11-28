@@ -210,6 +210,7 @@ func (s *SSHPublicTestSuite) TestCollect() {
 		setupFS      func() avfs.VFS
 		commands     sourcetest.Commands
 		nilExec      bool
+		cancel       bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -479,6 +480,118 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				info, ok := got.(*gohaisssh.Info)
 				s.Require().True(ok)
 				s.Require().Len(info.AuthorizedKeys["root"], 1)
+			},
+		},
+		{
+			name:    "linux: a host key file that does not read is an error",
+			variant: "linux",
+			nilExec: true,
+			setupFS: func() avfs.VFS {
+				return sourcetest.FailRead(s.T(), memfs.New(), "/etc/ssh/ssh_host_rsa_key.pub")
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/ssh/ssh_host_rsa_key.pub")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: an /etc/passwd that does not read is an error",
+			variant: "linux",
+			nilExec: true,
+			setupFS: func() avfs.VFS {
+				return sourcetest.FailRead(s.T(), memfs.New(), "/etc/passwd")
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/passwd")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: dscl fails and /etc/passwd does not read: an error",
+			variant: "darwin",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FailRead(s.T(), memfs.New(), "/etc/passwd")
+			},
+			commands: sourcetest.Commands{
+				Err: map[string]error{dsclHomes: errors.New("exec dscl: not found")},
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/passwd")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: an authorized_keys file that does not read is an error",
+			variant: "linux",
+			nilExec: true,
+			setupFS: func() avfs.VFS {
+				fs := sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
+				})
+				return sourcetest.FailRead(s.T(), fs, "/root/.ssh/authorized_keys")
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /root/.ssh/authorized_keys")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: a host key file that does not read is an error",
+			variant: "darwin",
+			nilExec: true,
+			setupFS: func() avfs.VFS {
+				return sourcetest.FailRead(s.T(), memfs.New(), "/etc/ssh/ssh_host_ed25519_key.pub")
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/ssh/ssh_host_ed25519_key.pub")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: an authorized_keys file that does not read is an error",
+			variant: "darwin",
+			nilExec: true,
+			setupFS: func() avfs.VFS {
+				fs := sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd": "root:*:0:0::/var/root:/bin/sh\n",
+				})
+				return sourcetest.FailRead(s.T(), fs, "/var/root/.ssh/authorized_keys")
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /var/root/.ssh/authorized_keys")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: a cancelled collection is an error",
+			variant: "darwin",
+			nilExec: true,
+			cancel:  true,
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                    "root:*:0:0::/var/root:/bin/sh\n",
+					"/var/root/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 root@mac\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a cancelled collection is an error",
+			variant: "linux",
+			nilExec: true,
+			cancel:  true,
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/etc/passwd":                "root:x:0:0::/root:/bin/sh\n",
+					"/root/.ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG9zYXBpIHRlc3Qga2V5IG1hdGVyaWFsIDEyMzQ1 root@lab\n",
+				})
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -951,7 +1064,12 @@ func (s *SSHPublicTestSuite) TestCollect() {
 				}
 				c = &gohaisssh.Darwin{FS: tt.setupFS(), Exec: exec}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancel {
+				cancel()
+			}
+			tt.validateFunc(c.Collect(ctx, nil))
 		})
 	}
 }

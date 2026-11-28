@@ -193,8 +193,31 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 		fs           func() avfs.VFS
 		exec         func(*testing.T) source.Runner
 		prior        collector.PriorResults
+		cancel       bool
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: a cancelled collection is an error, not bare metal",
+			variant: "linux",
+			cancel:  true,
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
+			exec:    func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: a cancelled collection is an error, not bare metal",
+			variant: "darwin",
+			cancel:  true,
+			fs:      func() avfs.VFS { return sourcetest.FS(s.T(), nil) },
+			exec:    func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
+			},
+		},
 		{
 			name:    "linux: bare metal empty Systems",
 			variant: "linux",
@@ -1446,7 +1469,12 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &virtualization.Darwin{FS: tt.fs(), Exec: tt.exec(s.T())}
 			}
-			tt.validateFunc(c.Collect(context.Background(), tt.prior))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancel {
+				cancel()
+			}
+			tt.validateFunc(c.Collect(ctx, tt.prior))
 		})
 	}
 }

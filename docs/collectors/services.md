@@ -130,7 +130,8 @@ On Linux:
    `systemctl` is also an empty list. On a host that systemd booted, a
    `systemctl list-units` that fails is an error.
 
-On macOS, a launchctl that cannot run is an empty list, not an error.
+On macOS, a host with no `launchctl` has an empty list and no error. A
+`launchctl print system` that fails is an error.
 
 ## Backing library
 

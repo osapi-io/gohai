@@ -26,6 +26,7 @@ package users
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -71,31 +72,45 @@ func collectPOSIX(
 	fs avfs.VFS,
 	exec source.Runner,
 ) (*Info, error) {
-	info := readPOSIX(fs)
+	info, err := readPOSIX(fs)
+	if err != nil {
+		return nil, err
+	}
 	setCurrentUser(ctx, exec, info)
 
 	return info, nil
 }
 
-// readPOSIX reads /etc/passwd, /etc/group and /etc/shadow from fs.
+// readPOSIX reads /etc/passwd, /etc/group and /etc/shadow from fs. A file
+// that does not exist gives an empty map. An /etc/passwd or /etc/group
+// that exists and does not read is an error. /etc/shadow is readable only
+// by root, so a shadow that does not read leaves Locked unset.
 func readPOSIX(
 	fs avfs.VFS,
-) *Info {
+) (*Info, error) {
 	info := &Info{
 		Passwd: map[string]PasswdEntry{},
 		Group:  map[string]GroupEntry{},
 	}
-	if b, err := fs.ReadFile(passwdPath); err == nil {
+	b, err := fs.ReadFile(passwdPath)
+	switch {
+	case err == nil:
 		info.Passwd = parsePasswd(b)
+	case !collector.Absent(err):
+		return nil, fmt.Errorf("read %s: %w", passwdPath, err)
 	}
-	if b, err := fs.ReadFile(groupPath); err == nil {
+	b, err = fs.ReadFile(groupPath)
+	switch {
+	case err == nil:
 		info.Group = parseGroup(b)
+	case !collector.Absent(err):
+		return nil, fmt.Errorf("read %s: %w", groupPath, err)
 	}
 	if b, err := fs.ReadFile(shadowPath); err == nil {
 		applyShadow(info.Passwd, b)
 	}
 
-	return info
+	return info, nil
 }
 
 // setCurrentUser sets CurrentUser to the effective user: the name that

@@ -58,6 +58,13 @@ func (l *Linux) Collect(
 ) (any, error) {
 	info := &Info{}
 	cascadeLinux(ctx, l.FS, l.Exec, prior, info)
+	// The cascade skips each probe that fails, since most hosts lack most
+	// probes. A cancelled collection stops every probe, so its empty
+	// result would look like a host with no virtualization: it is an
+	// error instead.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return info, nil
 }
 

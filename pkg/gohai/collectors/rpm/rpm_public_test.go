@@ -23,6 +23,8 @@ package rpm_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -149,7 +151,7 @@ func (s *RPMPublicTestSuite) TestCollect() {
 				m := mocks.NewMockRunner(ctrl)
 				m.EXPECT().
 					Execute(gomock.Any(), "rpm", "--showrc").
-					Return(nil, errors.New("rpm: command not found"))
+					Return(nil, fmt.Errorf("exec rpm: %w", osexec.ErrNotFound))
 				return m
 			},
 			validateFunc: func(got any, err error) {
@@ -158,6 +160,21 @@ func (s *RPMPublicTestSuite) TestCollect() {
 				info, ok := got.(*rpm.Info)
 				s.Require().True(ok)
 				s.Equal(map[string]string{}, info.Macros)
+			},
+		},
+		{
+			name:    "linux: an rpm --showrc that fails is an error",
+			variant: "linux",
+			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "rpm", "--showrc").
+					Return(nil, errors.New("exec rpm: exit status 1"))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().EqualError(err, "rpm --showrc: exec rpm: exit status 1")
+				s.Exactly(nil, got)
 			},
 		},
 		{

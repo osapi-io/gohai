@@ -59,6 +59,13 @@ func (d *Darwin) Collect(
 ) (any, error) {
 	info := &Info{}
 	cascadeDarwin(ctx, d.FS, d.Exec, info)
+	// The cascade skips each probe that fails, since most hosts lack most
+	// probes. A cancelled collection stops every probe, so its empty
+	// result would look like a host with no virtualization: it is an
+	// error instead.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return info, nil
 }
 

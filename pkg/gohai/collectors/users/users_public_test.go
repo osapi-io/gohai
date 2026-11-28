@@ -128,6 +128,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 		name         string
 		variant      string
 		files        map[string]string
+		failRead     []string // paths that exist and do not read
 		euid         int
 		id           string // output of `id -u`; "" uses euid
 		idName       string // output of `id -un`; "" is an id -un that fails
@@ -186,6 +187,47 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				s.Empty(info.Passwd)
 				s.Empty(info.Group)
 				s.Empty(info.CurrentUser)
+			},
+		},
+		{
+			name:     "linux: an /etc/passwd that does not read is an error",
+			variant:  "linux",
+			failRead: []string{"/etc/passwd"},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/passwd")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:     "linux: an /etc/group that does not read is an error",
+			variant:  "linux",
+			files:    map[string]string{"/etc/passwd": "root:x:0:0::/root:/bin/sh\n"},
+			failRead: []string{"/etc/group"},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/group")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:     "linux: an /etc/shadow that does not read leaves Locked unset",
+			variant:  "linux",
+			files:    map[string]string{"/etc/passwd": "root:x:0:0::/root:/bin/sh\n"},
+			failRead: []string{"/etc/shadow"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*users.Info)
+				s.Require().True(ok)
+				s.Nil(info.Passwd["root"].Locked)
+			},
+		},
+		{
+			name:     "darwin: an /etc/passwd that does not read is an error",
+			variant:  "darwin",
+			nilExec:  true,
+			failRead: []string{"/etc/passwd"},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/passwd")
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -570,9 +612,21 @@ func (s *UsersPublicTestSuite) TestCollect() {
 			var c users.Collector
 			switch tt.variant {
 			case "linux":
-				c = &users.Linux{FS: sourcetest.FS(s.T(), tt.files), Exec: exec}
+				c = &users.Linux{
+					FS: sourcetest.FailRead(
+						s.T(),
+						sourcetest.FS(s.T(), tt.files),
+						tt.failRead...),
+					Exec: exec,
+				}
 			case "darwin":
-				c = &users.Darwin{FS: sourcetest.FS(s.T(), tt.files), Exec: exec}
+				c = &users.Darwin{
+					FS: sourcetest.FailRead(
+						s.T(),
+						sourcetest.FS(s.T(), tt.files),
+						tt.failRead...),
+					Exec: exec,
+				}
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

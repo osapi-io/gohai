@@ -22,6 +22,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,7 +58,12 @@ func (d *Darwin) Collect(
 	}
 	out, err := d.Exec.Execute(ctx, "launchctl", "print", "system")
 	if err != nil {
-		return &Info{Services: []Service{}}, nil
+		// A host with no launchctl has no services to list. Any other
+		// failure of launchctl is an error.
+		if collector.Absent(err) {
+			return &Info{Services: []Service{}}, nil
+		}
+		return nil, fmt.Errorf("launchctl print system: %w", err)
 	}
 
 	return parsePrintSystem(string(out)), nil

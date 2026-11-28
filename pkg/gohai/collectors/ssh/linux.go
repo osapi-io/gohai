@@ -54,10 +54,23 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return &Info{
-		Keys:           collectHostKeys(l.FS),
-		AuthorizedKeys: collectAuthorizedKeys(l.FS, l.homes(ctx), keyFiles(ctx, l.Exec)),
-	}, nil
+	keys, err := collectHostKeys(l.FS)
+	if err != nil {
+		return nil, err
+	}
+	homes, err := l.homes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	authorized, err := collectAuthorizedKeys(l.FS, homes, keyFiles(ctx, l.Exec))
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	return &Info{Keys: keys, AuthorizedKeys: authorized}, nil
 }
 
 // homes is the home of each user of `getent passwd`, which has the users
@@ -65,11 +78,11 @@ func (l *Linux) Collect(
 // there is no Exec or getent fails.
 func (l *Linux) homes(
 	ctx context.Context,
-) []home {
+) ([]home, error) {
 	if l.Exec != nil {
 		if out, err := l.Exec.Execute(ctx, "getent", "passwd"); err == nil {
 			if homes := parsePasswd(out); len(homes) > 0 {
-				return homes
+				return homes, nil
 			}
 		}
 	}
