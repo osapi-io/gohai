@@ -40,11 +40,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect returns the load averages.
+// Collect returns the load averages. With no Exec it gives no fact, as
+// zero averages would read as an idle host.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	out, err := d.Exec.Execute(ctx, "sysctl", "-n", "vm.loadavg")
 	if err != nil {
 		return nil, fmt.Errorf("sysctl vm.loadavg: %w", err)

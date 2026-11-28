@@ -127,6 +127,7 @@ func (s *DiskPublicTestSuite) TestCollect() {
 		variant string
 		files   map[string]string
 		runner  sourcetest.Commands
+		nilExec bool
 		want    *disk.Info
 		wantErr string
 	}{
@@ -160,6 +161,12 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			}}},
 		},
 		{
+			name:    "darwin: no Exec gives no devices",
+			variant: "darwin",
+			nilExec: true,
+			want:    &disk.Info{Devices: []disk.Device{}},
+		},
+		{
 			name:    "darwin: ioreg fails",
 			variant: "darwin",
 			runner:  sourcetest.Commands{Err: map[string]error{ioregLine: errors.New("boom")}},
@@ -173,7 +180,11 @@ func (s *DiskPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &disk.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &disk.Darwin{Exec: tt.runner.Mock(s.T())}
+				d := &disk.Darwin{Exec: tt.runner.Mock(s.T())}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {

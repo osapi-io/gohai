@@ -59,6 +59,9 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return &Info{Devices: []Device{}}, nil
+	}
 	out, err := d.Exec.Execute(
 		ctx,
 		"ioreg",
