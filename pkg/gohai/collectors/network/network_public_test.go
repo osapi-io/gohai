@@ -684,12 +684,14 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					Return(nil, errAbsent).
 					AnyTimes()
 				m.EXPECT().
-					Execute(gomock.Any(), "ethtool", "-i", "eth0").
-					Return(nil, errors.New("exec ethtool: exit status 1: Cannot get driver information: Operation not permitted"))
+					Execute(gomock.Any(), "ethtool", gomock.Any(), "eth0").
+					Return(nil, errors.New("exec ethtool: exit status 1: Cannot get driver information: Operation not permitted")).
+					Times(2)
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
 				s.ErrorContains(err, "ethtool -i eth0:")
+				s.ErrorContains(err, "ethtool -g eth0:")
 				s.ErrorContains(err, "Operation not permitted")
 				// The interfaces read before ethtool stay.
 				info, ok := got.(*network.Info)
@@ -703,6 +705,65 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					[]string{info.Interfaces[0].Name, info.Interfaces[1].Name},
 					"eth0",
 				)
+			},
+		},
+		{
+			name: "linux: an ethtool failure on one interface still reads the next one",
+			ifsFn: func() ([]tIface, error) {
+				return []tIface{
+					{
+						Index: 2,
+						Name:  "eth0", MTU: 1500, MAC: "02:42:ac:11:00:02",
+						Flags: []string{"up", "broadcast", "multicast"},
+					},
+					{
+						Index: 3,
+						Name:  "eth1", MTU: 1500, MAC: "02:42:ac:11:00:03",
+						Flags: []string{"up", "broadcast", "multicast"},
+					},
+				}, nil
+			},
+			countersFn: zeroCounters,
+			fs: sourcetest.FS(s.T(), map[string]string{
+				"/sys/class/net/eth0/type":          "1\n",
+				"/sys/class/net/eth0/device/uevent": "DRIVER=e1000e\n",
+				"/sys/class/net/eth1/type":          "1\n",
+				"/sys/class/net/eth1/device/uevent": "DRIVER=e1000e\n",
+			}),
+			exec: func() source.Runner {
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
+				m.EXPECT().
+					Execute(gomock.Any(), "ip", gomock.Any()).
+					Return(nil, errAbsent).
+					AnyTimes()
+				m.EXPECT().
+					Execute(gomock.Any(), "ethtool", gomock.Any(), "eth0").
+					Return(nil, errors.New("exec ethtool: exit status 1: Cannot get device settings: No such device")).
+					Times(2)
+				m.EXPECT().
+					Execute(gomock.Any(), "ethtool", "-i", "eth1").
+					Return([]byte("driver: e1000e\n"), nil)
+				m.EXPECT().
+					Execute(gomock.Any(), "ethtool", "-g", "eth1").
+					Return([]byte("Ring parameters for eth1:\nPre-set maximums:\nRX:\t4096\nCurrent hardware settings:\nRX:\t256\n"), nil)
+				m.EXPECT().
+					Execute(gomock.Any(), "ethtool", gomock.Any(), "eth1").
+					Return(nil, errors.New("exec ethtool: Operation not supported")).
+					AnyTimes()
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "ethtool -i eth0:")
+				s.ErrorContains(err, "ethtool -g eth0:")
+				s.NotContains(err.Error(), "eth1")
+				info, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().Len(info.Interfaces, 2)
+				s.Nil(info.Interfaces[0].Ethtool)
+				s.Require().NotNil(info.Interfaces[1].Ethtool)
+				s.Equal("e1000e", info.Interfaces[1].Ethtool.DriverInfo["driver"])
+				s.NotNil(info.Interfaces[1].Ethtool.RingParams)
 			},
 		},
 		{

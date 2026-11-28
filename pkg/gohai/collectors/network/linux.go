@@ -102,14 +102,13 @@ func (l *Linux) Collect(
 		budget = defaultEthtoolBudget
 	}
 	ectx, cancel := context.WithTimeout(ctx, budget)
-	err = applyEthtoolDriverInfo(ectx, l.FS, l.Exec, info)
-	if err == nil {
-		err = applyEthtoolTuning(ectx, l.FS, l.Exec, info)
-	}
-	cancel()
-	if err != nil {
+	if err := applyEthtoolDriverInfo(ectx, l.FS, l.Exec, info); err != nil {
 		errs = append(errs, err)
 	}
+	if err := applyEthtoolTuning(ectx, l.FS, l.Exec, info); err != nil {
+		errs = append(errs, err)
+	}
+	cancel()
 	// A spent budget stops ethtool on purpose; a done ctx is an error.
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("ethtool: %w", err)
@@ -171,7 +170,9 @@ func driverInfoTarget(
 // ethernet_driver_info, but skips virtual interfaces (see
 // ethtoolTarget), as well as loopback, tunnels and the like. A host with
 // no ethtool, a driver that doesn't support the query, or a spent ethtool
-// budget leaves Ethtool nil; any other ethtool failure is an error.
+// budget leaves Ethtool nil. Any other ethtool failure, such as an
+// interface that goes away during the run, is that interface's error:
+// the others are still read, and the errors are joined.
 // Non-Ethernet hosts get no Ethtool data at all, matching Ohai's behaviour.
 func applyEthtoolDriverInfo(
 	ctx context.Context,
@@ -179,16 +180,21 @@ func applyEthtoolDriverInfo(
 	exec source.Runner,
 	info *Info,
 ) error {
+	var errs []error
 	for i := range info.Interfaces {
 		if spent(ctx) {
-			return nil
+			break
 		}
 		if !driverInfoTarget(fs, info.Interfaces[i]) {
 			continue
 		}
 		out, ok, err := runEthtool(ctx, exec, "-i", info.Interfaces[i].Name)
-		if err != nil || !ok {
-			return err
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		if !ok {
+			break
 		}
 		if out == nil {
 			continue
@@ -202,7 +208,7 @@ func applyEthtoolDriverInfo(
 		}
 		info.Interfaces[i].Ethtool.DriverInfo = di
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // ethtoolUnsupported reports whether err is ethtool saying that the
@@ -277,17 +283,19 @@ func applyIPLinkExtras(
 // EthtoolInfo field. Mirrors Ohai's ethernet_{ring,channel,coalesce,
 // offload,pause}_parameters block. Each subcommand is independent: a
 // query the driver doesn't support, or an empty parse, skips that field.
-// A host with no ethtool or a spent budget stops; any other failure is
-// an error.
+// A host with no ethtool or a spent budget stops. Any other failure ends
+// that interface's queries, the others are still read, and the errors
+// are joined.
 func applyEthtoolTuning(
 	ctx context.Context,
 	fs avfs.VFS,
 	exec source.Runner,
 	info *Info,
 ) error {
+	var errs []error
 	for i := range info.Interfaces {
 		if spent(ctx) {
-			return nil
+			break
 		}
 		if !ethtoolTarget(fs, info.Interfaces[i]) {
 			continue
@@ -331,15 +339,19 @@ func applyEthtoolTuning(
 		}
 		for _, q := range queries {
 			out, ok, err := runEthtool(ctx, exec, q.flag, name)
-			if err != nil || !ok {
-				return err
+			if err != nil {
+				errs = append(errs, err)
+				break
+			}
+			if !ok {
+				return errors.Join(errs...)
 			}
 			if out != nil {
 				q.apply(out)
 			}
 		}
 	}
-	return nil
+	return errors.Join(errs...)
 }
 
 // applyNICStats fills each interface's speed and duplex, and its driver,
