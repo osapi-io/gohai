@@ -176,12 +176,14 @@ type Collector interface {
 	// Dependencies returns names of collectors that must run before this one.
 	Dependencies() []string
 
-	// Collect gathers facts and returns a typed struct (or nil if not
-	// supported). prior contains the typed outputs of collectors that
-	// finished before this one. It always includes everything declared in
-	// Dependencies, and may include other upstream collectors. When a
-	// dependency fails, Collect is not called, and the collector's error
-	// wraps ErrDependencyFailed. Access typed values via GetDep[T].
+	// Collect gathers facts and returns a typed struct, nil when the host
+	// does not have them, or ErrUnsupported on a platform with nothing to
+	// read. prior contains the typed outputs of collectors that finished
+	// before this one. It holds each dependency declared in Dependencies
+	// that gave a fact, and may hold other upstream collectors. When a
+	// dependency fails with no fact, Collect is not called, and the
+	// collector's error wraps ErrDependencyFailed. Access typed values via
+	// GetDep[T].
 	Collect(
 		ctx context.Context,
 		prior PriorResults,

@@ -64,11 +64,13 @@ func New(
 }
 
 // Collect runs all selected collectors and returns Facts. Each collector's
-// typed result is written to the matching field on Facts; collectors that
-// error or aren't selected leave their field nil, and Facts.Errors has the
-// error of each that failed. A cancelled ctx is an error, and Collect then
-// returns the Facts of the collectors that finished with it, so a caller with
-// a deadline keeps what was collected. Any other error returns nil Facts. When the instance
+// typed result is written to the matching field on Facts. A collector that
+// is not selected, or that failed with no fact, leaves its field nil. A
+// partial collector keeps the fact it read. Facts.Status has the status of
+// each collector that ran, and Facts.Errors has the error of each that has
+// one. A cancelled ctx is an error, and Collect then returns the Facts of
+// the collectors that finished with it, so a caller with a deadline keeps
+// what was collected. Any other error returns nil Facts. When the instance
 // was built with WithTimings, per-collector durations are embedded in
 // Facts.Timings.
 func (g *Gohai) Collect(
