@@ -121,10 +121,15 @@ daemon is down.
 1. **`virsh version`**. The probe, and the source of the version. If `virsh` is
    missing, or the daemon's socket is missing or refuses the connection,
    `Collect` returns `nil` immediately. Any other failure is an error. The
-   collector first gets the daemon version from the "Running against daemon:"
-   line. If that line is not there, it uses the library version from the "Using
-   library: libvirt \<ver>" line. This is the same as the `libvirt_version` that
-   Ohai reports.
+   collector reads that from the English text of the error, which `virsh` gives
+   with `LC_ALL=C`, as gohai runs commands. A runner that keeps the host's
+   locale can give a translated message. So the collector also checks for the
+   daemons' sockets, `libvirt-sock` and `virtqemud-sock` under `/run/libvirt`
+   and `/var/run/libvirt`. When none of them is there, the daemon is not
+   running, and `Collect` returns `nil`. The collector first gets the daemon
+   version from the "Running against daemon:" line. If that line is not there,
+   it uses the library version from the "Using library: libvirt \<ver>" line.
+   This is the same as the `libvirt_version` that Ohai reports.
 
 2. **`virsh uri`**. The connection URI, for example `qemu:///system`. The
    collector returns an error if this command fails.
