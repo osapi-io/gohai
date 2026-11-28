@@ -20,10 +20,11 @@
 
 // Package linode detects Linode hosts and reports their public /
 // private IPs. Linode does not expose a metadata endpoint that Ohai
-// uses. Detection is heuristic (apt sources list), and the output
-// comes entirely from the host's own addresses, which `ip -o -4 addr
-// show` gives through the sources. Returns nil with no error when no
-// Linode signature is found.
+// uses. The DMI vendor decides when dmi ran; only without it do the
+// apt sources and the linode.com domain decide. The output comes
+// entirely from the host's own addresses, which `ip -o -4 addr show`
+// gives through the sources. Returns nil with no error when the host is
+// not a Linode.
 package linode
 
 import (
@@ -57,10 +58,14 @@ const aptSourcesPath = "/etc/apt/sources.list"
 // sources.list.d/*.sources and not in sources.list.
 const aptSourcesDir = "/etc/apt/sources.list.d"
 
-// dmiVendorName is the SMBIOS sys_vendor of a Linode (Akamai) VM.
-// cloud-init's ds-identify finds its Akamai datasource by it. It finds
-// a Linode on an image with no apt file, such as an RPM distribution.
-const dmiVendorName = "Linode"
+// dmiVendorNames are the SMBIOS sys_vendor values of a Linode VM:
+// "Linode", and "Akamai" on newer Akamai Cloud VMs. cloud-init's
+// ds-identify finds its Akamai datasource by them.
+var dmiVendorNames = []string{"Linode", "Akamai"}
+
+// linodeDomain is the domain of a Linode host's default name, such as
+// li123-45.members.linode.com.
+const linodeDomain = "linode.com"
 
 // linodeSignature is the substring we look for in apt sources.
 const linodeSignature = "linode"
@@ -116,10 +121,8 @@ func (*Host) DefaultEnabled() bool { return false }
 // (matches Ohai's has_linode_domain? signal which reads node['domain']).
 func (*Host) Dependencies() []string { return []string{"dmi", "hostname"} }
 
-// Collect returns the Linode Info when any detection signal fires
-// (the DMI vendor is Linode, an apt source names linode, or the domain
-// contains "linode"), else (nil, nil). The apt and domain signals are
-// Ohai's looks_like_linode? OR chain.
+// Collect returns the Linode Info when onLinode finds a Linode, else
+// (nil, nil).
 func (c *Host) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -144,39 +147,52 @@ func (c *Host) Collect(
 	return info, nil
 }
 
-// onLinode runs these detection signals:
-//   - dmi's sys_vendor is "Linode" (cloud-init's Akamai signal)
+// onLinode decides whether the host is a Linode. When dmi ran, its
+// sys_vendor decides alone: "Linode" or "Akamai". A host that uses
+// mirrors.linode.com, or is named under linode.com, is not a Linode
+// because of that. Only when dmi did not run, as when a caller asked
+// for this collector alone, do Ohai's best-effort signals decide:
 //   - /etc/apt/sources.list, or a file in /etc/apt/sources.list.d,
 //     contains "linode" (Ohai's has_linode_apt_repos?, with the
 //     directory of newer images added)
-//   - The host's FQDN or Domain contains "linode" (has_linode_domain?,
-//     e.g. members.linode.com)
+//   - the host's FQDN or Domain is linode.com or ends in .linode.com,
+//     such as members.linode.com (Ohai's has_linode_domain?, tightened
+//     from a substring to the domain)
 func onLinode(
 	fs avfs.VFS,
 	prior collector.PriorResults,
 ) bool {
-	if d, ok := collector.GetDep[*dmi.Info](prior, "dmi"); ok && d != nil &&
-		d.Product != nil && d.Product.VendorName == dmiVendorName {
-		return true
+	if d, ok := collector.GetDep[*dmi.Info](prior, "dmi"); ok {
+		return d != nil && d.Product != nil &&
+			slices.Contains(dmiVendorNames, d.Product.VendorName)
 	}
 	if aptNamesLinode(fs) {
 		return true
 	}
 	if h, ok := collector.GetDep[*hostname.Info](prior, "hostname"); ok && h != nil {
-		if strings.Contains(strings.ToLower(h.FQDN), linodeSignature) ||
-			strings.Contains(strings.ToLower(h.Domain), linodeSignature) {
-			return true
-		}
+		return inLinodeDomain(h.FQDN) || inLinodeDomain(h.Domain)
 	}
 	return false
 }
 
+// inLinodeDomain reports whether name is linode.com or a name under it.
+func inLinodeDomain(
+	name string,
+) bool {
+	name = strings.TrimSuffix(strings.ToLower(name), ".")
+
+	return name == linodeDomain || strings.HasSuffix(name, "."+linodeDomain)
+}
+
 // aptNamesLinode reports whether /etc/apt/sources.list or a file in
-// /etc/apt/sources.list.d contains "linode". A file that cannot be read
-// is no signal.
+// /etc/apt/sources.list.d contains "linode". A file that cannot be read,
+// or no filesystem, is no signal.
 func aptNamesLinode(
 	fs avfs.VFS,
 ) bool {
+	if fs == nil {
+		return false
+	}
 	paths := []string{aptSourcesPath}
 	if entries, err := fs.ReadDir(aptSourcesDir); err == nil {
 		for _, e := range entries {
