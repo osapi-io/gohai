@@ -483,7 +483,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 					"bad       x\n" +
 					"noid\n",
 				"dscl . -list /Users PrimaryGroupID":   "root 0\njohn 20\nguest 201\n",
-				"dscl . -list /Users NFSHomeDirectory": "root /var/root /private/var/root\njohn /Users/john\n",
+				"dscl . -list /Users NFSHomeDirectory": "root /var/root /private/var/root\njohn /Volumes/Macintosh HD/Users/john\n",
 				"dscl . -list /Users UserShell":        "root /bin/sh\njohn /bin/zsh\n",
 				"dscl . -list /Users RealName":         "root      System Administrator\njohn      John Doe\nguest\n",
 				"dscl . -list /Groups PrimaryGroupID":  "admin  80\nstaff  20\nbad    x\n",
@@ -497,7 +497,8 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				john := info.Passwd["john"]
 				s.Equal(501, john.UID)
 				s.Equal(20, john.GID)
-				s.Equal("/Users/john", john.Dir)
+				// A home with a space is kept whole.
+				s.Equal("/Volumes/Macintosh HD/Users/john", john.Dir)
 				s.Equal("/bin/zsh", john.Shell)
 				s.Equal("John Doe", john.GECOS)
 				// The first home.

@@ -140,7 +140,9 @@ run these commands:
    `NFSHomeDirectory`, `UserShell` and `RealName`. Each line has the name of a
    record and its value. Each user with a numeric `UniqueID` gives an entry in
    `passwd`: `uid`, `gid`, `dir`, `shell` and `gecos` (the `RealName`). A user
-   with two homes keeps the first.
+   with two homes keeps the first. A home or a shell with a space, such as
+   `/Users/Jo Smith`, is kept whole: a second value starts at a space and a
+   slash.
 2. `dscl . -list /Groups PrimaryGroupID` and
    `dscl . -list /Groups GroupMembership`. Each group with a numeric
    `PrimaryGroupID` gives an entry in `group`, with the members that

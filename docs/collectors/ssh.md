@@ -177,8 +177,9 @@ filesystem:
    that exists and does not read is an error. On macOS, `/etc/passwd` has only
    the system users, and the other users are in the directory service. Thus the
    collector runs `dscl . -list /Users NFSHomeDirectory`, and uses the first
-   home of each user. This command does not need root. If `dscl` fails, the
-   collector uses `/etc/passwd`.
+   home of each user. A home with a space, such as `/Users/Jo Smith`, is kept
+   whole: a second home starts at a space and a slash. This command does not
+   need root. If `dscl` fails, the collector uses `/etc/passwd`.
 2. **The files.** The collector runs `sshd -T` and uses its
    `authorizedkeysfile`. It changes the tokens of each pattern: `%%` to `%`,
    `%h` to the home, `%u` to the user and `%U` to the uid. A relative pattern is
