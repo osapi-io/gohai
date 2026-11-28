@@ -27,6 +27,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -294,6 +295,23 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		return m
 	}
 
+	// unsafeMap lists names that would change the request path or query.
+	unsafeMap := maps.Clone(ec2Responses)
+	unsafeMap["/2021-07-15/meta-data/block-device-mapping"] = "ami\n../../user-data\nroot?x=1"
+	unsafeMap["/2021-07-15/meta-data/public-keys"] = "0=my-keypair\n..=bad\n1#frag=bad"
+	unsafeMap["/2021-07-15/meta-data/network/interfaces/macs/"] = macA + "/\n../\nx y/"
+	var unsafeMu sync.Mutex
+	var unsafeSeen []string
+	unsafeHandler := func(w http.ResponseWriter, r *http.Request) {
+		unsafeMu.Lock()
+		unsafeSeen = append(
+			unsafeSeen,
+			r.URL.RawPath+r.URL.Path+"?"+r.URL.RawQuery+"#"+r.URL.Fragment,
+		)
+		unsafeMu.Unlock()
+		handlerFor((&serverOpts{responseMap: unsafeMap}).withDefaults())(w, r)
+	}
+
 	tests := []struct {
 		name         string
 		prior        collector.PriorResults
@@ -439,6 +457,25 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("latest", info.APIVersion)
+			},
+		},
+		{
+			name:    "a listed name that would change the request path is skipped",
+			handler: unsafeHandler,
+			validateFunc: func(out any, _ bool) {
+				info, ok := out.(*ec2.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal(map[string]string{"ami": "/dev/xvda"}, info.BlockDeviceMapping)
+				s.Equal([]string{"ssh-rsa AAAA"}, info.PublicKeys)
+				s.Len(info.NetworkInterfaces, 1)
+				unsafeMu.Lock()
+				defer unsafeMu.Unlock()
+				for _, seen := range unsafeSeen {
+					s.NotContains(seen, "..")
+					s.NotContains(seen, "x y")
+					s.True(strings.HasSuffix(seen, "?#"))
+				}
 			},
 		},
 		{
