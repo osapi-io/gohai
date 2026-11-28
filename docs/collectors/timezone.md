@@ -7,9 +7,10 @@
 The collector reports the active timezone of the host. It reports the IANA zone
 name (for example `America/Los_Angeles`), the current short abbreviation (`PDT`,
 `PST`, `UTC`) and the current offset from UTC in seconds. The collector gets the
-zone name from `/etc/localtime`. The abbreviation and the offset come from Go's
-`time.Now().Zone()`. They show the DST rule that is active when the collector
-runs.
+zone name from `/etc/localtime`. The abbreviation and the offset come from the
+zone data in `/etc/localtime` itself, applied to the current time. They show the
+DST rule that is active when the collector runs, and a change of zone shows at
+the next collection.
 
 Consumers use this to:
 
@@ -102,37 +103,37 @@ timezone value that a person can read and a value that a program can parse.
 On Linux:
 
 1. The collector gets the IANA `name`. It calls `Readlink("/etc/localtime")`
-   through the injected `avfs.VFS` and removes the `/usr/share/zoneinfo/`
-   prefix. This gives values like `America/Los_Angeles`. A relative link, such
-   as `../usr/share/zoneinfo/Etc/UTC` on Ubuntu, is relative to `/etc`, so it
-   also gives `Etc/UTC`. A target outside the zoneinfo directory is the name as
-   the link gives it.
-2. Sometimes `/etc/localtime` is not a symlink. On Debian-style hosts the
-   timezone data is a copy, not a symlink. Some container images are the same.
-   In this condition, the collector reads `/etc/timezone` through the VFS and
-   removes the whitespace.
-3. If the two sources fail, `name` stays empty. The Go runtime still gives
-   `abbrev` and `offset`.
-4. `abbrev` and `offset` come from `time.Now().Zone()`. These are the cached
-   local-time rules of the runtime. The offset is the value at the time of
-   collection. Thus a host on `America/Los_Angeles` reports `-25200` in July
-   (PDT) and `-28800` in January (PST).
+   through the injected `avfs.VFS`, and takes the part after the last
+   `/zoneinfo/` of the target. This gives values like `America/Los_Angeles` from
+   `/usr/share/zoneinfo/`, and also from NixOS's `/etc/zoneinfo/`. A relative
+   link, such as `../usr/share/zoneinfo/Etc/UTC` on Ubuntu, is relative to
+   `/etc`, so it also gives `Etc/UTC`. A bare target that is an IANA name, such
+   as `UTC`, is that name. Any other target, such as a path with no zoneinfo
+   directory, gives no name: `name` is never a path.
+2. Sometimes `/etc/localtime` is not a symlink. On Debian-style hosts, RHEL,
+   Alpine and some container images, the timezone data is a copy. In this
+   condition, the collector reads `/etc/timezone`, then the `ZONE=` line of
+   `/etc/sysconfig/clock` (RHEL and SUSE), through the VFS. It takes the first
+   one that is an IANA name.
+3. If no source gives a name, `name` stays empty.
+4. `abbrev` and `offset` come from the zone data in `/etc/localtime`, read
+   through the VFS and applied to the current time. The offset is the value at
+   the time of collection. Thus a host on `America/Los_Angeles` reports `-25200`
+   in July (PDT) and `-28800` in January (PST). When the file cannot be read or
+   parsed, they come from the process's local zone.
 
 On macOS:
 
-1. The collector gets the IANA `name`. It calls `Readlink("/etc/localtime")` and
-   removes the macOS prefix `/var/db/timezone/zoneinfo/`, not the Linux prefix
-   `/usr/share/zoneinfo/`. There is no second source like `/etc/timezone`,
-   because Apple does not supply that file. If the symlink is missing, `name`
-   stays empty, but `abbrev` and `offset` still have values. A missing symlink
-   is rare. Some CI sandboxes have it.
-2. `abbrev` and `offset` come from `time.Now().Zone()`, the same as on Linux.
-
-gohai reports more than Ohai's `timezone.rb`, which reports only
-`Time.now.getlocal.zone` (the abbreviation). gohai also reports the IANA name
-(`America/Los_Angeles`, not only `PDT`) and the numeric offset.
+1. The collector gets the IANA `name` from `Readlink("/etc/localtime")`, the
+   same way: the part after the last `/zoneinfo/`, which also handles Apple's
+   versioned `/var/db/timezone/tz/<version>/zoneinfo/`. There is no second
+   source like `/etc/timezone`, because Apple does not supply that file. If the
+   symlink is missing, `name` stays empty, but `abbrev` and `offset` still have
+   values. A missing symlink is rare. Some CI sandboxes have it.
+2. `abbrev` and `offset` come from the zone data in `/etc/localtime`, the same
+   as on Linux.
 
 ## Backing library
 
-- The Go standard library (`os.Readlink`, `os.ReadFile`, `time`). There is no
-  third-party dependency.
+- `avfs.VFS` (`Readlink`, `ReadFile`) for the files, and the Go standard
+  library's `time` (`LoadLocationFromTZData`) for the zone data.

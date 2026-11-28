@@ -22,6 +22,7 @@ package timezone
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/avfs/avfs"
@@ -29,13 +30,13 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// linuxZoneinfoPrefix is stripped from the symlink target to yield the
-// IANA name. Standard Linux (glibc tzdata) layout.
-const linuxZoneinfoPrefix = "/usr/share/zoneinfo/"
-
 // timezonePath is the Debian/Ubuntu fallback when /etc/localtime is a
 // copied file rather than a symlink (common in container images).
 const timezonePath = "/etc/timezone"
+
+// sysconfigClock is the RHEL and SUSE fallback: its ZONE= line names the
+// zone when /etc/localtime is a copied file.
+const sysconfigClock = "/etc/sysconfig/clock"
 
 // Linux collects timezone facts on Linux hosts. Embeds base for
 // Name/DefaultEnabled/Dependencies.
@@ -51,23 +52,31 @@ func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm(), Now: time.Now}
 }
 
-// Collect returns the timezone Info. Never errors — missing sources
-// leave fields empty, clock values still populate from Go's runtime.
+// Collect returns the timezone Info. It never errors: a missing source
+// leaves the name empty.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	abbrev, offset := clockZone(l.Now)
+	abbrev, offset := clockZone(l.FS, l.Now)
 	name := resolveName(
 		l.FS.Readlink,
 		func() (string, error) {
 			b, err := l.FS.ReadFile(timezonePath)
+			return string(b), err
+		},
+		func() (string, error) {
+			b, err := l.FS.ReadFile(sysconfigClock)
 			if err != nil {
 				return "", err
 			}
-			return string(b), nil
+			for _, line := range strings.Split(string(b), "\n") {
+				if v, ok := strings.CutPrefix(strings.TrimSpace(line), "ZONE="); ok {
+					return strings.Trim(v, `"'`), nil
+				}
+			}
+			return "", nil
 		},
-		linuxZoneinfoPrefix,
 	)
 	return &Info{Name: name, Abbrev: abbrev, Offset: offset}, nil
 }

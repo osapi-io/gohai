@@ -22,17 +22,12 @@ package timezone
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/osapi-io/gohai/internal/collector"
 )
-
-// darwinZoneinfoPrefix is the macOS-specific zoneinfo database path
-// (Apple maintains its own tzdata symlinked under /var/db/timezone).
-const darwinZoneinfoPrefix = "/var/db/timezone/zoneinfo/"
 
 // Darwin collects timezone facts on macOS hosts. Embeds base for
 // Name/DefaultEnabled/Dependencies.
@@ -55,11 +50,7 @@ func (d *Darwin) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	abbrev, offset := clockZone(d.Now)
-	name := resolveName(
-		d.FS.Readlink,
-		func() (string, error) { return "", errors.New("no fallback on darwin") },
-		darwinZoneinfoPrefix,
-	)
+	abbrev, offset := clockZone(d.FS, d.Now)
+	name := resolveName(d.FS.Readlink)
 	return &Info{Name: name, Abbrev: abbrev, Offset: offset}, nil
 }
