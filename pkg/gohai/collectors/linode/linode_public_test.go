@@ -106,6 +106,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 		ip           string // the output of ip -o -4 addr show
 		ipErr        error
 		nilExec      bool
+		nilFS        bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -121,7 +122,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:  "FQDN contains 'linode' triggers detection without apt",
+			name:  "an FQDN in the linode.com domain triggers detection without apt",
 			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{FQDN: "myhost.members.linode.com"},
@@ -135,7 +136,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:  "Domain contains 'linode' triggers detection",
+			name:  "a Domain in linode.com triggers detection",
 			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{Domain: "members.linode.com"},
@@ -185,6 +186,117 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			name: "another DMI vendor is no signal",
 			prior: collector.PriorResults{
 				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "QEMU"}},
+			},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Nil(out)
+			},
+		},
+		{
+			name:  "a host that DMI says is not a Linode is not one, though it uses mirrors.linode.com",
+			files: linodeApt,
+			prior: collector.PriorResults{
+				"dmi":      &dmi.Info{Product: &dmi.Product{VendorName: "QEMU"}},
+				"hostname": &hostname.Info{FQDN: "box.members.linode.com"},
+			},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Nil(out)
+			},
+		},
+		{
+			name: "the DMI vendor Akamai triggers detection",
+			prior: collector.PriorResults{
+				"dmi": &dmi.Info{Product: &dmi.Product{VendorName: "Akamai"}},
+			},
+			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
+				s.Equal("50.1.2.3", info.PublicIP)
+			},
+		},
+		{
+			name:  "dmi with no product table is not a Linode",
+			files: linodeApt,
+			prior: collector.PriorResults{"dmi": &dmi.Info{}},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Nil(out)
+			},
+		},
+		{
+			name: "a name that only contains linode is not in the linode.com domain",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{
+					FQDN:   "linode-builder.example.com",
+					Domain: "example.com",
+				},
+			},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Nil(out)
+			},
+		},
+		{
+			name: "a FQDN of notlinode.com is not in the linode.com domain",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{FQDN: "notlinode.com"},
+			},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, out)
+			},
+		},
+		{
+			name: "a FQDN of linode.com.evil is not in the linode.com domain",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{FQDN: "linode.com.evil"},
+			},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, out)
+			},
+		},
+		{
+			name: "a Domain of notlinode.com is not in the linode.com domain",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{Domain: "notlinode.com"},
+			},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, out)
+			},
+		},
+		{
+			name: "a Domain of linode.com.evil is not in the linode.com domain",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{Domain: "linode.com.evil"},
+			},
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, out)
+			},
+		},
+		{
+			name: "a fully qualified name with a trailing dot is in the domain",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{FQDN: "li1-2.members.linode.com."},
+			},
+			ip: ipLine("eth0", "eth0", "50.1.2.3/24"),
+			validateFunc: func(out any, err error) {
+				s.Require().NoError(err)
+				info, ok := out.(*linode.Info)
+				s.Require().True(ok)
+				s.Equal("50.1.2.3", info.PublicIP)
+			},
+		},
+		{
+			name:  "with no FS, apt is no signal",
+			nilFS: true,
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{FQDN: "host.example.com"},
 			},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
@@ -314,6 +426,9 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			})
 			if tt.nilExec {
 				c = &linode.Host{FS: sourcetest.FS(s.T(), tt.files)}
+			}
+			if tt.nilFS {
+				c = &linode.Host{Exec: m}
 			}
 			out, err := c.Collect(context.Background(), tt.prior)
 			tt.validateFunc(out, err)
