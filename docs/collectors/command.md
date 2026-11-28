@@ -86,8 +86,8 @@ On Linux and on macOS, the collector runs `ps -ef` through the shared
 2. The collector skips blank lines.
 3. The collector stores the header row and all process rows as raw strings in
    `PS`.
-4. If `ps` is missing or returns an error, the collector returns an empty `PS`
-   slice and no error. This is the same as Ohai, which does not panic.
+4. If `ps` is not on the host, the collector returns an empty `PS` slice and no
+   error. If `ps` fails, the collector returns an error.
 
 Ohai's `ps.rb` uses `"ps -ef"` on Linux, macOS, AIX and Solaris, and
 `"ps -axww"` on BSDs. gohai uses `ps -ef` on Linux and on Darwin. macOS `ps`

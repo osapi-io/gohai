@@ -96,7 +96,10 @@ On Linux:
 2. If that file does not exist, the collector reads `/boot/grub/grubenv`. Debian
    and Ubuntu use this path.
 3. If neither file exists, the collector gives no fact. The missing `grub2` key
-   tells consumers that GRUB2 is not installed.
+   tells consumers that GRUB2 is not installed. If a file exists but the
+   collector cannot read it, the collector returns an error. On RHEL,
+   `/boot/grub2/grubenv` has mode 0600, so a user who is not root gets this
+   error.
 4. The collector parses the file one line at a time:
    - It skips lines that start with `#`, for example the standard
      `# GRUB Environment Block` header.

@@ -119,20 +119,19 @@ On Linux, the collector runs four `virsh` commands in sequence:
    This is the same as the `libvirt_version` that Ohai reports.
 
 2. **`virsh uri`**. The connection URI, for example `qemu:///system`. The
-   collector ignores errors and gives no message. If an error occurs, `uri`
-   stays empty and the collection continues.
+   collector returns an error if this command fails.
 
-3. **`virsh list --all`**. The list of all domains, in all states. If an error
-   occurs, the domain list is empty and the collection continues. To parse the
-   output table, the collector skips the header line and the separator. Then it
-   gets the name from column 2 and the state from columns 3 and higher. It joins
-   the state columns with spaces, so that "shut off" stays one value.
+3. **`virsh list --all`**. The list of all domains, in all states. If this
+   command fails, the collector returns an error. To parse the output table, the
+   collector skips the header line and the separator. Then it gets the name from
+   column 2 and the state from columns 3 and higher. It joins the state columns
+   with spaces, so that "shut off" stays one value.
 
 4. **`virsh dominfo <name>`**. The collector adds the UUID, the vCPU count, the
-   maximum memory and the autostart status to each domain. The collector ignores
-   the errors of each domain and gives no message. If an error occurs, the
-   domain stays in the list with only its name and state. The collector skips
-   lines that have no colon separator.
+   maximum memory and the autostart status to each domain. A domain can go away
+   between the list and its `dominfo`. Thus, if `dominfo` fails, the domain
+   stays in the list with only its name and state. The collector skips lines
+   that have no colon separator.
 
 Ohai's libvirt plugin uses the `ruby-libvirt` gem for direct API access. gohai
 uses the `virsh` CLI. `virsh` is always there when libvirt is installed, and it

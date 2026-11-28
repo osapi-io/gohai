@@ -98,12 +98,16 @@ None.
 On Linux:
 
 1. The collector reads `/etc/resolv.conf` through its filesystem. A line that
-   starts with `#` or `;` is a comment.
-2. When the command runner is there, it runs `resolvectl dns` and
-   `resolvectl domain`. Each `Link N (name): …` line gives that interface's name
-   servers or domains, and the `Global: …` line gives `global`. A server loses
-   its `%zone`, its `#name` and its port. If `resolvectl` fails, as on a host
-   without systemd-resolved, the interfaces stay empty.
+   starts with `#` or `;` is a comment. If the file is not there, the top-level
+   fields stay empty. If the collector cannot read it, the collector returns an
+   error.
+2. When `/run/systemd/resolve` exists, systemd-resolved runs, and the collector
+   runs `resolvectl dns` and `resolvectl domain`. Each `Link N (name): …` line
+   gives that interface's name servers or domains, and the `Global: …` line
+   gives `global`. A server loses its `%zone`, its `#name` and its port. Without
+   that directory, or without `resolvectl`, the interfaces stay empty. If
+   `resolvectl` fails while systemd-resolved runs, the collector returns an
+   error.
 
 On macOS:
 
@@ -111,7 +115,8 @@ On macOS:
    resolver.
 2. It runs `scutil --dns`. Each `resolver #N` block with an `if_index` gives
    that interface's `nameserver[…]` and `search domain[…]` values. scutil prints
-   the scoped resolvers a second time. The first block of an interface wins.
+   the scoped resolvers a second time. The first block of an interface wins. If
+   `scutil` fails, the collector returns an error.
 
 Ohai has no DNS plugin. The data is configuration, not the state of a daemon, so
 it is a gohai fact.

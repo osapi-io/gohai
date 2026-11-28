@@ -111,9 +111,9 @@ On Linux, the collector runs `hostnamectl` with no subcommand through the shared
 4. The collector splits the `Kernel` value at the first space. The first part is
    the kernel name (`Linux`). The second part is the release
    (`5.15.0-91-generic`).
-5. If `hostnamectl` is missing or gives a non-zero exit code, the collector
-   returns an empty `Info` and no error. This is the same as Ohai, which does
-   not panic in this case.
+5. If `hostnamectl` is not on the host, the collector returns an empty `Info`
+   and no error. If `hostnamectl` gives a non-zero exit code, the collector
+   returns an error.
 
 The collector does not support macOS, because `hostnamectl` is a systemd tool
 for Linux.

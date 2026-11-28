@@ -22,6 +22,7 @@ package hostnamectl
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -29,8 +30,8 @@ import (
 
 // Linux reports hostnamectl fields on Linux by running `hostnamectl`
 // and parsing its "Key: value" output. Matches Ohai's linux/hostnamectl
-// plugin. When `hostnamectl` is absent or returns an error an empty
-// Info is returned without error — matches Ohai's no-panic behaviour.
+// plugin. A host with no `hostnamectl` gives an empty Info; a
+// hostnamectl that fails is an error.
 type Linux struct {
 	base
 
@@ -43,7 +44,7 @@ func NewLinux() *Linux {
 }
 
 // Collect runs `hostnamectl` and returns the parsed Info. A missing
-// binary or exec error yields an empty Info — not an error.
+// binary yields an empty Info; any other exec error is returned.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -52,8 +53,11 @@ func (l *Linux) Collect(
 		return &Info{}, nil
 	}
 	out, err := l.Exec.Execute(ctx, "hostnamectl")
-	if err != nil {
+	if collector.Absent(err) {
 		return &Info{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read hostnamectl: %w", err)
 	}
 	return parseHostnamectl(string(out)), nil
 }

@@ -23,6 +23,8 @@ package hostnamectl_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -301,16 +303,28 @@ func (s *HostnamectlPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: exec error yields empty Info, no error",
+			name:    "linux: no hostnamectl on the host yields empty Info, no error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return hostnamectlExec(t, nil, errors.New("command not found"))
+				return hostnamectlExec(t, nil, fmt.Errorf("exec hostnamectl: %w", exec.ErrNotFound))
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*hostnamectl.Info)
 				s.Require().True(ok)
 				s.Equal(hostnamectl.Info{}, *info)
+			},
+		},
+		{
+			name:    "linux: a hostnamectl that fails is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return hostnamectlExec(t, nil, errors.New("exit status 1"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Nil(got)
+				s.Contains(err.Error(), "read hostnamectl")
 			},
 		},
 		{

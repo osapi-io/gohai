@@ -22,6 +22,7 @@ package dns
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -47,6 +48,10 @@ func NewLinux() *Linux {
 	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
+// resolvedRuntimeDir is the runtime directory of systemd-resolved,
+// which exists only while the service runs.
+const resolvedRuntimeDir = "/run/systemd/resolve"
+
 // resolvectlLinkRE is a link line of resolvectl: "Link 2 (eth0): 10.0.0.1".
 var resolvectlLinkRE = regexp.MustCompile(`^Link \d+ \(([^)]+)\):(.*)$`)
 
@@ -59,17 +64,30 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	info := &Info{}
-	if b, err := l.FS.ReadFile(resolvConf); err == nil {
-		parseResolvConf(info, b)
+	info, err := readResolvConf(l.FS)
+	if err != nil {
+		return nil, err
 	}
 	if l.Exec == nil {
 		return info, nil
 	}
+	// resolvectl answers only while systemd-resolved runs, and the
+	// service's runtime directory exists only then. Without it, the host
+	// has no per-link resolvers, which is not a failed read.
+	if _, err := l.FS.Stat(resolvedRuntimeDir); err != nil {
+		if collector.Absent(err) {
+			return info, nil
+		}
+
+		return nil, fmt.Errorf("stat %s: %w", resolvedRuntimeDir, err)
+	}
 	for _, kind := range []string{"dns", "domain"} {
 		out, err := l.Exec.Execute(ctx, "resolvectl", kind)
+		if collector.Absent(err) {
+			return info, nil
+		}
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("read resolvectl %s: %w", kind, err)
 		}
 		for _, line := range strings.Split(string(out), "\n") {
 			line = strings.TrimSpace(line)

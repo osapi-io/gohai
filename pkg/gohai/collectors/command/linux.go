@@ -22,14 +22,14 @@ package command
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// Linux runs `ps -ef` on Linux and captures the raw output lines.
-// Exec errors yield an empty Info — not an error, matching Ohai's
-// no-panic posture.
+// Linux runs `ps -ef` on Linux and captures the raw output lines. A
+// host with no ps gives an empty Info; a ps that fails is an error.
 type Linux struct {
 	base
 
@@ -50,8 +50,11 @@ func (l *Linux) Collect(
 		return &Info{PS: []string{}}, nil
 	}
 	out, err := l.Exec.Execute(ctx, "ps", "-ef")
-	if err != nil {
+	if collector.Absent(err) {
 		return &Info{PS: []string{}}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read ps: %w", err)
 	}
 	return parsePSOutput(string(out)), nil
 }
