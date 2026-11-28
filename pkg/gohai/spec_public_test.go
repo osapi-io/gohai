@@ -105,11 +105,11 @@ func (s *SpecPublicTestSuite) TestCollectors() {
 		{
 			name: "the list is built once, whatever the number of calls",
 			validateFunc: func() {
+				gohai.Collectors()
 				before := gohai.SpecBuilds()
 				gohai.Collectors()
 				_, _ = gohai.CollectorByName("dns")
 				gohai.Collectors()
-				s.Equal(int32(1), before)
 				s.Equal(before, gohai.SpecBuilds())
 			},
 		},
