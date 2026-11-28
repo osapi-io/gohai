@@ -27,6 +27,7 @@
 package alibaba
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -54,6 +55,12 @@ const metadataBaseURL = "http://100.100.100.200/2016-01-01"
 // metadataTimeout matches Ohai's 6s read + keep-alive timeout in
 // mixin/alibaba_metadata.rb.
 const metadataTimeout = 6 * time.Second
+
+// WalkTimeout is the longest that one collection runs, over all of its
+// requests. metadataTimeout bounds one request; without this, a server
+// that answers the first listing and then hangs would hold the walk for
+// up to maxWalkRequests times metadataTimeout, about 25 minutes.
+const WalkTimeout = 30 * time.Second
 
 // dmiVendorSignature is the substring Alibaba writes to
 // /sys/class/dmi/id/sys_vendor. Matches Ohai's has_ali_dmi?.
@@ -154,6 +161,9 @@ type Metadata struct {
 	// HTTP is the transport of the metadata reads. A nil HTTP is the
 	// shared transport.
 	HTTP http.RoundTripper
+	// Timeout is the longest that one collection runs, over all of its
+	// requests. Zero is WalkTimeout.
+	Timeout time.Duration
 }
 
 // Collector is the public interface of the alibaba collector.
@@ -211,6 +221,8 @@ func (c *Metadata) Collect(
 	if !onAlibaba(prior) {
 		return nil, ctx.Err()
 	}
+	ctx, cancel := context.WithTimeout(ctx, cmp.Or(c.Timeout, WalkTimeout))
+	defer cancel()
 	tree, err := (&walker{client: c.client()}).walk(ctx, "", 0)
 	if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 		// The first probe got no answer, so this is not Alibaba (or the

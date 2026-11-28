@@ -26,6 +26,7 @@
 package ec2
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -54,6 +55,13 @@ const metadataBaseURL = "http://169.254.169.254"
 // metadataTimeout matches Ohai's 10s read + keep-alive timeout in
 // mixin/ec2_metadata.rb.
 const metadataTimeout = 10 * time.Second
+
+// WalkTimeout is the longest that one collection runs, over all of its
+// requests. metadataTimeout bounds one request; without this, an IMDS
+// that answers the first request and then hangs would hold the walk for
+// minutes. It is less than the 60s life of the IMDSv2 token, so the token
+// cannot expire during a walk.
+const WalkTimeout = 30 * time.Second
 
 // DMI detection signatures. Matches Ohai's has_ec2_amazon_dmi? and
 // has_ec2_xen_dmi? checks.
@@ -288,6 +296,9 @@ type Metadata struct {
 	HTTP http.RoundTripper
 	// FS is the filesystem that /sys/hypervisor/uuid is read from.
 	FS avfs.VFS
+	// Timeout is the longest that one collection runs, over all of its
+	// requests. Zero is WalkTimeout.
+	Timeout time.Duration
 	// darwin is true on macOS, where dmi has no tables.
 	darwin bool
 }
@@ -352,6 +363,8 @@ func (c *Metadata) Collect(
 	if !onEC2(c.FS, prior, c.darwin) {
 		return nil, ctx.Err()
 	}
+	ctx, cancel := context.WithTimeout(ctx, cmp.Or(c.Timeout, WalkTimeout))
+	defer cancel()
 
 	token := c.fetchIMDSv2Token(ctx)
 	headers := imdsHeaders(token)
