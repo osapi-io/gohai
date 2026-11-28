@@ -30,6 +30,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
@@ -166,6 +167,8 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 		tree         map[string]string
 		handler      http.HandlerFunc // overrides tree when set
 		closed       bool
+		cancelAfter  int    // cancel the context once the server answered this many requests
+		wantErr      string // the error Collect returns; "" is none
 		validateFunc func(any, []string)
 	}{
 		{
@@ -249,7 +252,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name: "a directory that lists itself ends at the request limit",
+			name: "a directory that lists itself stops at the request limit, as an error",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				switch {
 				case r.URL.Path == "/":
@@ -262,13 +265,36 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 					_, _ = w.Write([]byte("x"))
 				}
 			},
-			validateFunc: func(out any, paths []string) {
-				info, ok := out.(*alibaba.Info)
-				s.Require().True(ok)
-				s.Equal("h", info.Hostname)
-				s.LessOrEqual(len(paths), 256)
-			},
+			wantErr: "request limit reached",
 		},
+		{
+			name:        "a context that ends during the walk is an error",
+			tree:        treeResponses,
+			cancelAfter: 3,
+			wantErr:     "context canceled",
+		},
+		{
+			name: "a root listing that is more than MaxBody is an error",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(strings.Repeat("x", cloudmetadata.MaxBody+1)))
+			},
+			wantErr: "read alibaba metadata /: ",
+		},
+		{
+			name: "a leaf that is more than MaxBody is an error",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/":
+					_, _ = w.Write([]byte("meta-data/"))
+				case "/meta-data/":
+					_, _ = w.Write([]byte("hostname"))
+				default:
+					_, _ = w.Write([]byte(strings.Repeat("x", cloudmetadata.MaxBody+1)))
+				}
+			},
+			wantErr: "read alibaba metadata /meta-data/hostname: ",
+		},
+
 		{
 			name: "dmi says not Alibaba short-circuits",
 			prior: collector.PriorResults{
@@ -550,12 +576,18 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			}
 			// The collector asks for /2016-01-01/...; the handler serves the paths
 			// under it.
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 			srv := httptest.NewServer(http.StripPrefix("/2016-01-01", http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					mu.Lock()
 					paths = append(paths, r.URL.Path)
+					n := len(paths)
 					mu.Unlock()
 					h(w, r)
+					if tt.cancelAfter > 0 && n == tt.cancelAfter {
+						cancel()
+					}
 				},
 			)))
 			if tt.closed {
@@ -570,7 +602,13 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			if prior == nil {
 				prior = aliPrior()
 			}
-			out, err := c.Collect(context.Background(), prior)
+			out, err := c.Collect(ctx, prior)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+				s.Exactly(nil, out)
+
+				return
+			}
 			s.Require().NoError(err)
 
 			mu.Lock()

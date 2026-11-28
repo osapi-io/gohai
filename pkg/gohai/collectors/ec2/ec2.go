@@ -28,6 +28,8 @@ package ec2
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -354,8 +356,21 @@ func (c *Metadata) Collect(
 	token := c.fetchIMDSv2Token(ctx)
 	headers := imdsHeaders(token)
 	version := c.negotiateAPIVersion(ctx, headers)
+	// A path the IMDS does not answer (ErrNotAvailable) is left blank.
+	// Any other failure, such as a cancelled context or a body over
+	// cloudmetadata.MaxBody, stops the walk and is the collector's error,
+	// so a half-read instance never looks like a full one.
+	var walkErr error
 	versionedGet := func(path string) ([]byte, error) {
-		return c.client().GetWithHeaders(ctx, "/"+version+path, headers)
+		if walkErr != nil {
+			return nil, walkErr
+		}
+		body, err := c.client().GetWithHeaders(ctx, "/"+version+path, headers)
+		if err != nil && !errors.Is(err, cloudmetadata.ErrNotAvailable) {
+			walkErr = fmt.Errorf("read ec2 metadata %s: %w", path, err)
+		}
+
+		return body, err
 	}
 
 	values := make(map[string]string, len(metadataPaths))
@@ -363,7 +378,7 @@ func (c *Metadata) Collect(
 		body, err := versionedGet(p)
 		if err != nil {
 			if i == 0 {
-				return nil, ctx.Err()
+				return nil, walkErr
 			}
 			continue
 		}
@@ -424,6 +439,9 @@ func (c *Metadata) Collect(
 				info.ID = doc.InstanceID
 			}
 		}
+	}
+	if walkErr != nil {
+		return nil, walkErr
 	}
 
 	return info, nil

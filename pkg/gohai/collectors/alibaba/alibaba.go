@@ -212,15 +212,19 @@ func (c *Metadata) Collect(
 		return nil, ctx.Err()
 	}
 	tree, err := (&walker{client: c.client()}).walk(ctx, "", 0)
+	if errors.Is(err, cloudmetadata.ErrNotAvailable) {
+		// The first probe got no answer, so this is not Alibaba (or the
+		// endpoint is down).
+		return nil, nil
+	}
 	if err != nil {
-		// The first probe failed, so this is not Alibaba (or the endpoint is down).
-		return nil, ctx.Err()
+		return nil, err
 	}
 	return transform(tree), nil
 }
 
 // onAlibaba checks the dmi collector's sys_vendor (exposed as
-// Product.VendorName by ghw, which reads /sys/class/dmi/id/sys_vendor)
+// Product.VendorName, from /sys/class/dmi/id/sys_vendor)
 // for the "Alibaba" substring. Fails open when dmi wasn't run.
 func onAlibaba(
 	prior collector.PriorResults,
@@ -301,14 +305,20 @@ func (w *walker) walk(
 				continue
 			}
 			sub, err := w.walk(ctx, child, depth+1)
-			if err != nil {
+			if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 				continue
+			}
+			if err != nil {
+				return nil, err
 			}
 			result[key] = sub
 		} else {
 			leaf, err := w.get(ctx, "/"+child)
-			if err != nil {
+			if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 				continue
+			}
+			if err != nil {
+				return nil, err
 			}
 			var jv any
 			if json.Unmarshal(leaf, &jv) == nil {
@@ -330,7 +340,12 @@ func (w *walker) get(
 		return nil, errWalkLimit
 	}
 	w.requests++
-	return w.client.Get(ctx, path)
+	body, err := w.client.Get(ctx, path)
+	if err != nil && !errors.Is(err, cloudmetadata.ErrNotAvailable) {
+		return nil, fmt.Errorf("read alibaba metadata %s: %w", path, err)
+	}
+
+	return body, err
 }
 
 // sanitizeKey mirrors Ohai's sanitize_key + trailing-underscore strip.

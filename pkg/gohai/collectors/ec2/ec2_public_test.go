@@ -23,6 +23,7 @@ package ec2_test
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,6 +34,7 @@ import (
 	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
@@ -283,6 +285,14 @@ func (s *EC2PublicTestSuite) TestNew() {
 }
 
 func (s *EC2PublicTestSuite) TestCollect() {
+	huge := strings.Repeat("x", cloudmetadata.MaxBody+1)
+	withBody := func(path, body string) map[string]string {
+		m := maps.Clone(ec2Responses)
+		m["/2021-07-15"+path] = body
+
+		return m
+	}
+
 	tests := []struct {
 		name         string
 		prior        collector.PriorResults
@@ -291,8 +301,26 @@ func (s *EC2PublicTestSuite) TestCollect() {
 		opts         *serverOpts
 		handler      http.HandlerFunc // overrides opts-based handler when set
 		closed       bool
+		cancelAfter  int    // cancel the context once the server answered this many requests
+		wantErr      string // the error Collect returns; "" is none
 		validateFunc func(any, bool)
 	}{
+		{
+			name:        "a context that ends during the walk is an error",
+			opts:        (&serverOpts{}).withDefaults(),
+			cancelAfter: 5,
+			wantErr:     "context canceled",
+		},
+		{
+			name:    "a leaf that is more than MaxBody is an error",
+			opts:    (&serverOpts{responseMap: withBody("/meta-data/security-groups", huge)}).withDefaults(),
+			wantErr: "read ec2 metadata /meta-data/security-groups: ",
+		},
+		{
+			name:    "a first path that is more than MaxBody is an error",
+			opts:    (&serverOpts{responseMap: withBody("/meta-data/ami-id", huge)}).withDefaults(),
+			wantErr: "read ec2 metadata /meta-data/ami-id: ",
+		},
 		{
 			name: "IMDSv2 happy path with version negotiation + full walk",
 			opts: (&serverOpts{
@@ -791,10 +819,16 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			if h == nil {
 				h = handlerFor(tt.opts)
 			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			var requests atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					httpCalled.Store(true)
 					h(w, r)
+					if tt.cancelAfter > 0 && int(requests.Add(1)) == tt.cancelAfter {
+						cancel()
+					}
 				},
 			))
 			if tt.closed {
@@ -813,7 +847,13 @@ func (s *EC2PublicTestSuite) TestCollect() {
 			if prior == nil {
 				prior = ec2Prior()
 			}
-			out, err := c.Collect(context.Background(), prior)
+			out, err := c.Collect(ctx, prior)
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+				s.Exactly(nil, out)
+
+				return
+			}
 			s.Require().NoError(err)
 
 			tt.validateFunc(out, httpCalled.Load())
