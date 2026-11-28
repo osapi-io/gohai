@@ -140,7 +140,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, httpCalled bool, err error) {
 				s.Require().NoError(err)
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -185,7 +185,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			handler: func(http.ResponseWriter, *http.Request) {},
 			validateFunc: func(out any, httpCalled bool, _ error) {
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -194,7 +194,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			handler:   func(http.ResponseWriter, *http.Request) {},
 			validateFunc: func(out any, httpCalled bool, _ error) {
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -205,7 +205,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, _ bool, err error) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -215,7 +215,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			closed:  true,
 			validateFunc: func(out any, _ bool, err error) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -227,7 +227,7 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, _ bool, err error) {
 				s.ErrorContains(err, "scaleway metadata: read body")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{

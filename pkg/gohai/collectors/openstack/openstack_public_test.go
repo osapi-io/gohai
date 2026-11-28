@@ -219,7 +219,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, httpCalled bool, err error) {
 				s.Require().NoError(err)
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -253,7 +253,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			novaBody: "",
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -268,7 +268,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().ErrorContains(err, "openstack: decode meta_data.json")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -284,7 +284,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().
 					EqualError(err, "openstack: unexpected status 500 from /openstack/latest/meta_data.json")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -299,7 +299,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().
 					EqualError(err, "openstack: unexpected status 500 from /latest/meta-data/")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -319,7 +319,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 					err,
 					"openstack: unexpected status 500 from /latest/meta-data/placement/",
 				)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -330,7 +330,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -342,7 +342,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().
 					EqualError(err, "openstack: unexpected status 500 from /latest/meta-data/")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -353,7 +353,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().
 					EqualError(err, "openstack: unexpected status 403 from /latest/meta-data/")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -371,7 +371,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().
 					EqualError(err, "openstack: unexpected status 500 from /latest/meta-data/bad")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -426,7 +426,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			closed:  true,
 			validateFunc: func(out any, _ bool, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -491,7 +491,7 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{"dmi": &dmi.Info{}},
 			validateFunc: func(out any, httpCalled bool, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.False(httpCalled)
 			},
 		},

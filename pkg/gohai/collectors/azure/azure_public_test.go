@@ -296,7 +296,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			meta: azureService(),
 			validateFunc: func(out any, err error, m *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Empty(m.requests)
 			},
 		},
@@ -321,7 +321,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			meta: azureService(),
 			validateFunc: func(out any, err error, m *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Empty(m.requests)
 			},
 		},
@@ -330,7 +330,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			meta: azureService(),
 			validateFunc: func(out any, err error, m *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Empty(m.requests)
 			},
 		},
@@ -410,7 +410,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error, _ *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -419,7 +419,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			meta:  &metadata{err: errors.New("connection refused")},
 			validateFunc: func(out any, err error, _ *metadata) {
 				s.NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -431,7 +431,7 @@ func (s *AzurePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error, _ *metadata) {
 				s.ErrorContains(err, "read azure metadata: ")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{

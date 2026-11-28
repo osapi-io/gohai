@@ -162,7 +162,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			handler: func(http.ResponseWriter, *http.Request) {},
 			validateFunc: func(out any, httpCalled bool, _ error) {
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -174,7 +174,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			validateFunc: func(out any, httpCalled bool, err error) {
 				s.NoError(err)
 				s.False(httpCalled)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -196,7 +196,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 				http.NotFound(w, nil)
 			},
 			validateFunc: func(out any, _ bool, _ error) {
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -204,7 +204,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
 			validateFunc: func(out any, _ bool, _ error) {
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{

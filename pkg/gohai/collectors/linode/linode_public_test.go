@@ -157,7 +157,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -166,7 +166,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{"hostname": (*hostname.Info)(nil)},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -189,7 +189,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -201,7 +201,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -223,7 +223,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{"dmi": &dmi.Info{}},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -236,7 +236,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -300,7 +300,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -325,7 +325,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -351,14 +351,14 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
 			name: "missing apt file → nil",
 			validateFunc: func(out any, err error) {
 				s.Require().NoError(err)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -406,7 +406,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 			ipErr: errors.New("exit status 1"),
 			validateFunc: func(out any, err error) {
 				s.EqualError(err, "linode: ip addr: exit status 1")
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 	}

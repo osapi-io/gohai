@@ -251,7 +251,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			prior: collector.PriorResults{"dmi": &dmi.Info{}},
 			tree:  treeResponses,
 			validateFunc: func(out any, paths []string) {
-				s.Nil(out)
+				s.Exactly(nil, out)
 				s.Empty(paths)
 			},
 		},
@@ -336,7 +336,7 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			tree: treeResponses,
 			validateFunc: func(out any, paths []string) {
 				s.Empty(paths)
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
@@ -354,14 +354,14 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			name: "first-probe 404 drops silently",
 			tree: map[string]string{},
 			validateFunc: func(out any, _ []string) {
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
 			name:   "connection refused drops silently",
 			closed: true,
 			validateFunc: func(out any, _ []string) {
-				s.Nil(out)
+				s.Exactly(nil, out)
 			},
 		},
 		{
