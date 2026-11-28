@@ -544,7 +544,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
 				"/etc/group":  "wheel:x:0:root\n",
 			},
-			dscl:    "root ;ShadowHash;\n",
+			dscl: "root ;ShadowHash;\n",
 			dsclErrs: map[string]error{
 				"dscl . -list /Users UniqueID": errors.New("exit status 1"),
 			},
@@ -565,7 +565,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
 				"/etc/group":  "wheel:x:0:root\n",
 			},
-			dscl:    "root ;ShadowHash;\n",
+			dscl: "root ;ShadowHash;\n",
 			dsclLists: map[string]string{
 				"dscl . -list /Users UniqueID": "root 0\n",
 			},
@@ -589,7 +589,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
 				"/etc/group":  "wheel:x:0:root\n",
 			},
-			dscl:    "root ;ShadowHash;\n",
+			dscl: "root ;ShadowHash;\n",
 			dsclErrs: map[string]error{
 				"dscl . -list /Groups PrimaryGroupID": errors.New("exit status 1"),
 			},
@@ -610,7 +610,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
 				"/etc/group":  "wheel:x:0:root\n",
 			},
-			dscl:    "root ;ShadowHash;\n",
+			dscl: "root ;ShadowHash;\n",
 			dsclLists: map[string]string{
 				"dscl . -list /Groups PrimaryGroupID": "admin 80\n",
 			},
@@ -634,7 +634,7 @@ func (s *UsersPublicTestSuite) TestCollect() {
 				"/etc/passwd": "root:x:0:0::/root:/bin/sh\n",
 				"/etc/group":  "wheel:x:0:root\n",
 			},
-			dscl:    "unused",
+			dscl: "unused",
 			dsclErrs: map[string]error{
 				"dscl . -list /Users AuthenticationAuthority": errors.New("exit status 1"),
 			},
