@@ -90,9 +90,14 @@ The collector reports two related signals about the host type:
 
 ### Non-VMware host
 
+The collector gives no fact. The output has no `vmware` key, and `_status` shows
+`absent`:
+
 ```json
 {
-  "vmware": null
+  "_status": {
+    "vmware": "absent"
+  }
 }
 ```
 

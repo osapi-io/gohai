@@ -7,8 +7,8 @@
 The collector reports the ZFS pool status. It runs
 `zpool list -H -o name,size,alloc,free,health,altroot`. Linux and macOS can both
 have ZFS through [OpenZFS]. Thus the two variants try to run `zpool`. If the
-collector does not find `zpool`, or if `zpool` exits with a non-zero code, the
-collector returns an empty pool list and no error.
+collector does not find `zpool`, it returns an empty pool list and no error. If
+`zpool` is there and fails, the collector returns the error.
 
 `zpool` reports the `-` sentinel for fields that have no value. An example is
 `altroot` when no alternative root is set. The collector changes `-` to an empty
@@ -113,10 +113,10 @@ On Linux and macOS, the method is the same:
 1. The collector runs `zpool list -H -o name,size,alloc,free,health,altroot`
    through the injected `source.Runner`. `-H` removes the header line. `-o`
    selects the six fields that gohai needs, with tabs between them.
-2. The command can fail. The exit code can be non-zero, `zpool` can be missing
-   from `PATH`, or the executor can be `nil`. In these conditions, the collector
+2. If `zpool` is missing from `PATH`, or the executor is `nil`, the collector
    returns an empty pool list and no error. This shows that ZFS is not installed
-   on the host.
+   on the host. If `zpool` is there and exits with a non-zero code, the
+   collector returns the error.
 3. The collector parses each output line and splits it on tabs. It skips lines
    that do not have exactly six fields. This prevents errors from an output
    format that is not expected.

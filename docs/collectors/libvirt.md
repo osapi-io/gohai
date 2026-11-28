@@ -77,9 +77,14 @@ status `unsupported`.
 
 ### Non-KVM host or virsh absent
 
+The collector gives no fact. The output has no `libvirt` key, and `_status`
+shows `absent`:
+
 ```json
 {
-  "libvirt": null
+  "_status": {
+    "libvirt": "absent"
+  }
 }
 ```
 
