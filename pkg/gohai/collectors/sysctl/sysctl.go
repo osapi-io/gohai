@@ -89,7 +89,7 @@ func run(
 	case err == nil:
 	case errors.Is(err, osexec.ErrNotFound):
 		return &Info{Params: make(map[string]string)}, nil
-	case len(out) > 0 && exitedWithStatus(err) && ctx.Err() == nil:
+	case len(out) > 0 && exitedWithStatus(err):
 		// A non-root sysctl -a exits non-zero after it prints the keys it
 		// can read. That output is the table it can give, so it is kept.
 		// A run that a timeout, a cancel or the output limit stopped is

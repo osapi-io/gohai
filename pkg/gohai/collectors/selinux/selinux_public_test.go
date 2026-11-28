@@ -209,6 +209,33 @@ func (s *SelinuxPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a config line over 64 KiB keeps the config lines after it",
+			variant: "linux",
+			setupFS: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/sys/fs/selinux/enforce": "1\n",
+					"/etc/selinux/config": "# " + strings.Repeat(
+						"x",
+						70000,
+					) + "\nSELINUX=permissive\nSELINUXTYPE=mls\n",
+				})
+			},
+			setupExec: func(ctrl *gomock.Controller) *mocks.MockRunner {
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().
+					Execute(gomock.Any(), "sestatus").
+					Return(nil, fmt.Errorf("exec sestatus: %w", osexec.ErrNotFound))
+				return m
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*selinux.Info)
+				s.Require().True(ok)
+				s.Equal("permissive", info.ConfigMode)
+				s.Equal("mls", info.LoadedPolicyName)
+			},
+		},
+		{
 			name:    "linux: a line over 64 KiB keeps the config and sestatus lines after it",
 			variant: "linux",
 			setupFS: func() avfs.VFS {
