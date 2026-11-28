@@ -11,15 +11,18 @@ the collector **negotiates an api-version** with the service. This is the same
 as Ohai's `best_api_version` handshake. If `facts.Azure != nil`, the host is on
 Azure.
 
-Detection uses two Linux signals. They are the same as Ohai's chain for hosts
-that are not Windows:
+Detection uses three Linux signals:
 
-- `/usr/sbin/waagent` exists. This shows that the Azure Linux Agent is
-  installed.
+- The DMI chassis asset tag is `7783-7084-3265-9085-8269-3286-77`. Each Azure VM
+  has this tag, and cloud-init detects Azure by it.
+- `/usr/sbin/waagent` or `/usr/bin/waagent` exists. This shows that the Azure
+  Linux Agent is installed.
 - `/var/lib/dhcp/dhclient.eth0.leases` contains the DHCP option-245 signature
   (`unknown-245`).
 
-If neither signal is there, the collector stops and makes no HTTP call.
+The last two are Ohai's chain for hosts that are not Windows. The asset tag finds
+a VM that has neither, such as an image with cloud-init and systemd-networkd. If
+no signal is there, the collector stops and makes no HTTP call.
 
 ## Collected fields
 
@@ -120,15 +123,20 @@ gohai collect --category=cloud       # pulls this + all cloud collectors
 
 ## Dependencies
 
-None. Detection uses file signals that are specific to Azure (the waagent binary
-and DHCP option 245), not DMI.
+`dmi`, for the chassis asset tag. When you enable `azure`, the registry enables
+`dmi` too. A local Hyper-V VM has the same DMI vendor as Azure,
+`Microsoft Corporation`, but not the asset tag, so the vendor alone is not a
+signal.
 
 ## Data sources
 
 1. **Detection gate:** the collector returns `(nil, nil)` unless one of these is
    true:
-   - `/usr/sbin/waagent` exists. This shows that the Azure Linux Agent is
-     installed. This check is the same as Ohai's `has_waagent?`.
+   - The `dmi` chassis asset tag is `7783-7084-3265-9085-8269-3286-77`. This
+     check is the same as cloud-init's `DataSourceAzure`.
+   - `/usr/sbin/waagent` or `/usr/bin/waagent` exists. This shows that the Azure
+     Linux Agent is installed. This check is Ohai's `has_waagent?`, with the
+     second path added.
    - `/var/lib/dhcp/dhclient.eth0.leases` contains `"unknown-245"`. This check
      is the same as Ohai's `has_dhcp_option_245?`.
 2. **API version negotiation:** the collector sends `GET /metadata/instance`
@@ -157,7 +165,7 @@ and DHCP option 245), not DMI.
 The method is the same as Ohai's `Ohai::Mixin::AzureMetadata`. These parts are
 the same:
 
-- the detection chain (the signals for hosts that are not Windows)
+- the waagent and DHCP option-245 signals (for hosts that are not Windows)
 - the version-negotiation handshake
 - the 6s timeout
 - the structure of network interfaces, with the MAC as the key
