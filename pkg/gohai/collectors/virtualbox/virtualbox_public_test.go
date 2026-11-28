@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -136,6 +137,25 @@ func (s *VirtualBoxPublicTestSuite) TestCollect() {
 		validateFunc func(any, error)
 	}{
 		// ----- Linux -----
+		{
+			name:    "linux: a line over 64 KiB keeps the properties after it",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						vboxLine: strings.Repeat("x", 70000) + "\n" + vboxControlOutput,
+					},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualbox.Info)
+				s.Require().True(ok)
+				s.Equal("7.0.14", i.HostVersion)
+			},
+		},
 		{
 			name:    "linux: canonical guestproperty output parsed",
 			variant: "linux",

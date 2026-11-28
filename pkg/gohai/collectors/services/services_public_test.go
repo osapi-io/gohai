@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -171,6 +172,33 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		noSystemd    bool
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "linux: a line over 64 KiB keeps the services after it",
+			variant: "linux",
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine: "UNIT LOAD ACTIVE SUB DESCRIPTION\n" +
+						"long.service loaded active running " + strings.Repeat("x", 70000) + "\n" +
+						"ssh.service loaded active running OpenSSH server daemon\n",
+					unitFilesLine: "ssh.service enabled enabled\n",
+				},
+			}.Mock(
+				s.T(),
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*services.Info)
+				s.Require().True(ok)
+				var ssh services.Service
+				for _, svc := range info.Services {
+					if svc.Name == "ssh" {
+						ssh = svc
+					}
+				}
+				s.Equal("running", ssh.State)
+				s.Equal("OpenSSH server daemon", ssh.Description)
+			},
+		},
 		{
 			name:    "linux: systemctl returns services",
 			variant: "linux",

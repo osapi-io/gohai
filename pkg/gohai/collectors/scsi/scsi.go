@@ -26,8 +26,6 @@
 package scsi
 
 import (
-	"bufio"
-	"bytes"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -96,9 +94,10 @@ func parseLsscsi(
 	out []byte,
 ) map[string]Device {
 	result := map[string]Device{}
-	sc := bufio.NewScanner(bytes.NewReader(out))
-	for sc.Scan() {
-		fields := strings.Fields(sc.Text())
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(string(out)) {
+		fields := strings.Fields(strings.TrimRight(rawLine, "\r\n"))
 		if len(fields) < 5 {
 			continue
 		}

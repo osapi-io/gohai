@@ -28,8 +28,6 @@
 package selinux
 
 import (
-	"bufio"
-	"bytes"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -111,9 +109,10 @@ func parseConfigFile(
 	if err != nil {
 		return "", ""
 	}
-	sc := bufio.NewScanner(bytes.NewReader(b))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(string(b)) {
+		line := strings.TrimSpace(strings.TrimRight(rawLine, "\r\n"))
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -150,9 +149,10 @@ func parseSestatus(
 	output []byte,
 	info *Info,
 ) {
-	sc := bufio.NewScanner(bytes.NewReader(output))
-	for sc.Scan() {
-		line := sc.Text()
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(string(output)) {
+		line := strings.TrimRight(rawLine, "\r\n")
 		key, val, ok := strings.Cut(line, ":")
 		if !ok {
 			continue

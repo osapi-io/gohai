@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -55,6 +56,23 @@ func TestSysctlPublicTestSuite(
 ) {
 	suite.Run(t, new(SysctlPublicTestSuite))
 }
+
+// exitStatusError is the error of a command that exited by itself with a
+// status, as an *exec.ExitError of a finished process is.
+type exitStatusError int
+
+func (e exitStatusError) Error() string {
+	return fmt.Sprintf("exit status %d", int(e))
+}
+
+// ExitCode is the status the command exited with.
+func (e exitStatusError) ExitCode() int {
+	return int(e)
+}
+
+// errKilled is the error that source.Commands returns for a command that its
+// timeout killed: an *exec.ExitError with no exit status.
+var errKilled = fmt.Errorf("exec sysctl: stopped after 10s: %w", &osexec.ExitError{})
 
 func (s *SysctlPublicTestSuite) TestNew() {
 	tests := []struct {
@@ -258,7 +276,7 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
 					Out: map[string]string{sysctlLine: "kernel.panic = 1\n"},
-					Err: map[string]error{sysctlLine: errors.New("exit status 255")},
+					Err: map[string]error{sysctlLine: exitStatusError(255)},
 				}.Mock(
 					t,
 				)
@@ -268,6 +286,73 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 				info, ok := got.(*sysctl.Info)
 				s.Require().True(ok)
 				s.Equal(map[string]string{"kernel.panic": "1"}, info.Params)
+			},
+		},
+		{
+			name:    "linux: a run stopped by its timeout is an error, not a partial table",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{sysctlLine: "kernel.panic = 1\n"},
+					Err: map[string]error{sysctlLine: errKilled},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "sysctl -a: exec sysctl: stopped after")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a cancelled run is an error, not a partial table",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{sysctlLine: "kernel.panic = 1\n"},
+					Err: map[string]error{sysctlLine: context.Canceled},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: output over the size limit is an error, not a partial table",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{sysctlLine: "kernel.panic = 1\n"},
+					Err: map[string]error{
+						sysctlLine: errors.New("exec sysctl: stdout is more than 1048576 bytes"),
+					},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "stdout is more than")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a line over 1 MiB is an error, not a short table",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						sysctlLine: "a = 1\nbig = " + strings.Repeat("x", 1<<20) + "\nz = 2\n",
+					},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "sysctl -a: parse:")
+				s.Exactly(nil, got)
 			},
 		},
 		{
