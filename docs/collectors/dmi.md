@@ -6,11 +6,11 @@
 
 The collector reports SMBIOS and DMI data: the BIOS, baseboard, chassis and
 product identity. On Linux, the collector reads `/sys/class/dmi/id/*` through
-its filesystem. Most fields do not need root. `product_serial` and
-`product_uuid` have mode 0400, so they are `"unknown"` for a caller that is not
-root. macOS has no equivalent of SMBIOS. On macOS, the collector returns an
-empty Info, and the [`hardware`](hardware.md) collector gives the macOS hardware
-identity.
+its filesystem. Most fields do not need root. `board_serial`, `chassis_serial`,
+`product_serial` and `product_uuid` have mode 0400, so they are `"unknown"` for
+a caller that is not root. macOS has no equivalent of SMBIOS. On macOS, the
+collector returns an empty Info, and the [`hardware`](hardware.md) collector
+gives the macOS hardware identity.
 
 The main consumers are the cloud-provider collectors (`gce`, `ec2`, `azure` and
 others). They use `product.name`, `product.vendor_name`, `bios.manufacturer` and
@@ -43,36 +43,36 @@ section.
 
 ### Baseboard
 
-| Field           | Type     | Description                    |
-| --------------- | -------- | ------------------------------ |
-| `vendor`        | `string` | The motherboard vendor.        |
-| `product`       | `string` | The motherboard model.         |
-| `version`       | `string` | The motherboard version.       |
-| `serial_number` | `string` | The motherboard serial number. |
-| `asset_tag`     | `string` | The asset tag.                 |
+| Field           | Type     | Description                                                                                                            |
+| --------------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `vendor`        | `string` | The motherboard vendor.                                                                                                |
+| `product`       | `string` | The motherboard model.                                                                                                 |
+| `version`       | `string` | The motherboard version.                                                                                               |
+| `serial_number` | `string` | The motherboard serial number. On Linux it has mode 0400. Only root can read it, so it is `"unknown"` for other users. |
+| `asset_tag`     | `string` | The asset tag.                                                                                                         |
 
 ### Chassis
 
-| Field              | Type     | Description                                            |
-| ------------------ | -------- | ------------------------------------------------------ |
-| `vendor`           | `string` | The chassis vendor.                                    |
-| `type`             | `string` | The numeric DMI code of the chassis type.              |
-| `type_description` | `string` | The chassis type as text.                              |
-| `version`          | `string` | The chassis version.                                   |
-| `serial_number`    | `string` | The chassis serial number.                             |
-| `asset_tag`        | `string` | The asset tag, for example `"OracleCloud.com"` on OCI. |
+| Field              | Type     | Description                                                                                                        |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `vendor`           | `string` | The chassis vendor.                                                                                                |
+| `type`             | `string` | The numeric DMI code of the chassis type.                                                                          |
+| `type_description` | `string` | The chassis type as text.                                                                                          |
+| `version`          | `string` | The chassis version.                                                                                               |
+| `serial_number`    | `string` | The chassis serial number. On Linux it has mode 0400. Only root can read it, so it is `"unknown"` for other users. |
+| `asset_tag`        | `string` | The asset tag, for example `"OracleCloud.com"` on OCI.                                                             |
 
 ### Product
 
-| Field           | Type     | Description                                                                                                  |
-| --------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
-| `vendor_name`   | `string` | The system vendor, for example `"Google"`, `"Amazon EC2"` or `"Dell Inc."`.                                  |
-| `name`          | `string` | The product name. This is the main signal to find the cloud.                                                 |
-| `family`        | `string` | The product family.                                                                                          |
-| `version`       | `string` | The product version.                                                                                         |
-| `serial_number` | `string` | The product serial number. On Linux it has mode 0400. Only root can read it, so it is empty for other users. |
-| `uuid`          | `string` | The system UUID. On Linux it has mode 0400. Only root can read it, so it is empty for other users.           |
-| `sku`           | `string` | The product SKU.                                                                                             |
+| Field           | Type     | Description                                                                                                        |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `vendor_name`   | `string` | The system vendor, for example `"Google"`, `"Amazon EC2"` or `"Dell Inc."`.                                        |
+| `name`          | `string` | The product name. This is the main signal to find the cloud.                                                       |
+| `family`        | `string` | The product family.                                                                                                |
+| `version`       | `string` | The product version.                                                                                               |
+| `serial_number` | `string` | The product serial number. On Linux it has mode 0400. Only root can read it, so it is `"unknown"` for other users. |
+| `uuid`          | `string` | The system UUID. On Linux it has mode 0400. Only root can read it, so it is `"unknown"` for other users.           |
+| `sku`           | `string` | The product SKU.                                                                                                   |
 
 ## Platform support
 
@@ -84,7 +84,7 @@ section.
 
 ## Example output
 
-### GCE VM
+### GCE VM, run by a user that is not root
 
 ```json
 {
@@ -95,7 +95,7 @@ section.
     "product": {
       "vendor_name": "Google",
       "name": "Google Compute Engine",
-      "uuid": ""
+      "uuid": "unknown"
     }
   }
 }
@@ -154,7 +154,8 @@ None.
 
 Ohai's `dmi.rb` runs `dmidecode`. `dmidecode` reads `/dev/mem` and needs root.
 gohai reads `/sys/class/dmi/id/*` instead. All users can read these sysfs
-entries, so they do not need more privileges. This difference from Ohai is
+entries, except the four serial and UUID files that have mode 0400, so the
+collector does not need more privileges. This difference from Ohai is
 intentional. On Linux, sysfs is the current way to read SMBIOS data without
 privileges. The fields are the same: the BIOS vendor, version and date, the
 baseboard, the chassis and the product. But gohai does not parse the free-form
@@ -165,11 +166,11 @@ On Linux:
 1. The collector reads each `/sys/class/dmi/id/*` file (`bios_vendor`,
    `bios_version`, `bios_date`, `board_*`, `chassis_*`, `product_*`,
    `sys_vendor`) through its filesystem. A file that is not there, or a
-   root-only field (`product_serial`, `product_uuid`) for a caller that is not
-   root, gives `"unknown"`. A file that fails to read for any other reason is an
-   error, so that `"unknown"` does not stand for a read that failed.
-   `chassis_type` is an SMBIOS code, and the SMBIOS table gives its
-   `type_description`, for example `10` → `Notebook`.
+   root-only field (`board_serial`, `chassis_serial`, `product_serial`,
+   `product_uuid`) for a caller that is not root, gives `"unknown"`. A file that
+   fails to read for any other reason is an error, so that `"unknown"` does not
+   stand for a read that failed. `chassis_type` is an SMBIOS code, and the
+   SMBIOS table gives its `type_description`, for example `10` → `Notebook`.
 2. A board with no `/sys/class/dmi/id` but a device tree under
    `/sys/firmware/devicetree/base`, such as a Raspberry Pi, gets what the tree
    has: `model`, `serial-number`, the vendor of the first `compatible` entry,
