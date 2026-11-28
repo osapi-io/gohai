@@ -102,16 +102,16 @@ Do these steps for each JSON field in each collector:
    and look at [schema.ocsf.io](https://schema.ocsf.io/). If OCSF has a field
    for this concept:
    - The field is **T1**.
-   - The JSON tag **MUST** use the OCSF field name. First apply the
-     redundant-prefix rule: remove the prefix of the parent object when it is
-     the same as the collector name.
+   - The JSON tag is the OCSF field name. First apply the redundant-prefix rule:
+     remove the prefix of the parent object when it is the same as the collector
+     name.
    - If our current JSON tag is different, set `Changed? yes` in
      `field-mapping.md`. Put the correct name in `Chosen JSON`.
 2. **Then check OTel**, only if OCSF has no field. Open the semconv YAMLs in
    `references/otel-*.yaml`. If OTel has an attribute for this concept:
    - The field is **T2**.
-   - The JSON tag **MUST** use the OTel attribute name. This is the last segment
-     of the dotted path, after you remove the redundant prefix.
+   - The JSON tag is the OTel attribute name. This is the last segment of the
+     dotted path, after you remove the redundant prefix.
    - The rename rule above also applies.
 3. **Convention (T3).** Neither OCSF nor OTel covers the field. Use the field
    name of the backing library in `snake_case`. Add a unit suffix when the unit

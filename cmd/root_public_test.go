@@ -38,22 +38,26 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai"
 )
 
-type CmdPublicTestSuite struct {
+type RootPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestCmdPublicTestSuite(
+func TestRootPublicTestSuite(
 	t *testing.T,
 ) {
-	suite.Run(t, new(CmdPublicTestSuite))
+	suite.Run(t, new(RootPublicTestSuite))
 }
 
 // failWriter fails each write, as a closed pipe does.
 type failWriter struct{}
 
-func (failWriter) Write([]byte) (int, error) { return 0, errors.New("broken pipe") }
+func (failWriter) Write(
+	[]byte,
+) (int, error) {
+	return 0, errors.New("broken pipe")
+}
 
-func (s *CmdPublicTestSuite) TestExecute() {
+func (s *RootPublicTestSuite) TestExecute() {
 	dir := s.T().TempDir()
 	valid := filepath.Join(dir, "valid.json")
 	invalid := filepath.Join(dir, "invalid.json")
@@ -70,12 +74,14 @@ func (s *CmdPublicTestSuite) TestExecute() {
 	cancel()
 
 	tests := []struct {
-		name         string
-		ctx          context.Context
-		args         []string
-		in           io.Reader
-		out          io.Writer
-		newRegistry  func() (*gohai.PublicRegistry, error)
+		name        string
+		ctx         context.Context
+		args        []string
+		in          io.Reader
+		out         io.Writer
+		newRegistry func() (*gohai.PublicRegistry, error)
+		// setup, when set, runs before the command and returns its restore.
+		setup        func() func()
 		validateFunc func(code int, out, errOut string)
 	}{
 		{
@@ -359,12 +365,77 @@ func (s *CmdPublicTestSuite) TestExecute() {
 				s.Equal("[]", strings.TrimSpace(out))
 			},
 		},
+		{
+			name: "collector list fails when its output fails",
+			args: []string{"collector", "list"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+		{
+			name: "collector list --json fails when its output fails",
+			args: []string{"collector", "list", "--json"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+		{
+			name: "collector get fails when its output fails",
+			args: []string{"collector", "get", "--name", "uptime"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+		{
+			name: "collector spec get fails when its output fails",
+			args: []string{"collector", "spec", "get"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+		{
+			name: "collector validate --json fails when its output fails",
+			args: []string{"collector", "validate", "--json"},
+			out:  failWriter{},
+			validateFunc: func(code int, _, errOut string) {
+				s.Equal(1, code)
+				s.Contains(errOut, "broken pipe")
+			},
+		},
+		{
+			name: "version prints the build info as JSON",
+			args: []string{"version"},
+			setup: func() func() {
+				return cmd.SetBuildInfo("v1.2.3", "abc123", "clean", "2026-11-26", "goreleaser")
+			},
+			validateFunc: func(code int, out, _ string) {
+				s.Require().Zero(code)
+				var v map[string]any
+				s.Require().NoError(json.Unmarshal([]byte(out), &v))
+				s.Equal("v1.2.3", v["gitVersion"])
+				s.Equal("abc123", v["gitCommit"])
+				s.Equal("clean", v["gitTreeState"])
+				s.Equal("2026-11-26", v["buildDate"])
+				s.Equal("goreleaser", v["builtBy"])
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			if tt.newRegistry != nil {
 				defer cmd.SetNewRegistryFn(tt.newRegistry)()
+			}
+			if tt.setup != nil {
+				defer tt.setup()()
 			}
 			ctx := tt.ctx
 			if ctx == nil {
@@ -383,88 +454,4 @@ func (s *CmdPublicTestSuite) TestExecute() {
 			tt.validateFunc(code, out.String(), errOut.String())
 		})
 	}
-}
-
-func (s *CmdPublicTestSuite) TestWriteFailures() {
-	tests := []struct {
-		name string
-		args []string
-	}{
-		{name: "collector list", args: []string{"collector", "list"}},
-		{name: "collector list --json", args: []string{"collector", "list", "--json"}},
-		{name: "collector get", args: []string{"collector", "get", "--name", "uptime"}},
-		{name: "collector spec get", args: []string{"collector", "spec", "get"}},
-		{name: "collector validate --json", args: []string{"collector", "validate", "--json"}},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name+" fails when its output fails", func() {
-			var errOut bytes.Buffer
-			code := cmd.Execute(
-				context.Background(),
-				tt.args,
-				strings.NewReader(""),
-				failWriter{},
-				&errOut,
-			)
-			s.Equal(1, code)
-			s.Contains(errOut.String(), "broken pipe")
-		})
-	}
-}
-
-func (s *CmdPublicTestSuite) TestWriteProblems() {
-	problems := []gohai.Problem{{
-		Collector: "bad", Rule: "name", Message: "is not lowercase.", Fix: "rename it.",
-	}}
-	tests := []struct {
-		name         string
-		asJSON       bool
-		validateFunc func(out string, err error)
-	}{
-		{
-			name: "a problem prints its fix and fails",
-			validateFunc: func(out string, err error) {
-				s.Error(err)
-				s.Equal("bad [name]: is not lowercase. Fix: rename it.\n", out)
-			},
-		},
-		{
-			name:   "a problem as JSON fails",
-			asJSON: true,
-			validateFunc: func(out string, err error) {
-				s.Error(err)
-				s.Contains(out, `"collector": "bad"`)
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			var out bytes.Buffer
-			err := cmd.WriteProblems(&out, problems, tt.asJSON)
-			tt.validateFunc(out.String(), err)
-		})
-	}
-}
-
-func (s *CmdPublicTestSuite) TestVersionBuildInfo() {
-	defer cmd.SetBuildInfo("v1.2.3", "abc123", "clean", "2026-11-26", "goreleaser")()
-
-	var out, errOut bytes.Buffer
-	code := cmd.Execute(
-		context.Background(),
-		[]string{"version"},
-		strings.NewReader(""),
-		&out,
-		&errOut,
-	)
-	s.Require().Zero(code, errOut.String())
-	var v map[string]any
-	s.Require().NoError(json.Unmarshal(out.Bytes(), &v))
-	s.Equal("v1.2.3", v["gitVersion"])
-	s.Equal("abc123", v["gitCommit"])
-	s.Equal("clean", v["gitTreeState"])
-	s.Equal("2026-11-26", v["buildDate"])
-	s.Equal("goreleaser", v["builtBy"])
 }
