@@ -95,8 +95,9 @@ signal needs `hostname`. That signal is the same as Ohai's `has_linode_domain?`.
 2. The collector runs `ip -o -4 addr show` through the shared `source.Runner`.
    Each line names the label of its address: the interface, such as `eth0`, or
    an alias, such as `eth0:1`. For `eth0` and `eth0:1`, the collector uses the
-   first IPv4 address that is not link-local. If a label is missing, or `ip`
-   fails, its field is an empty string.
+   first IPv4 address that is not link-local. If a label is missing, or `ip` is
+   not installed, its field is an empty string. An `ip` that runs and fails, or
+   a cancelled context, is an error.
 
 The method is the same as Ohai's Linode plugin, with the DMI signal and the
 `sources.list.d` directory added. It uses the same domain signal and the same
