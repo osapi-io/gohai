@@ -44,9 +44,7 @@ type UptimePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestUptimePublicTestSuite(
-	t *testing.T,
-) {
+func TestUptimePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(UptimePublicTestSuite))
 }
 

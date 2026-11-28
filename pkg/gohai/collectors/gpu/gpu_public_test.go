@@ -47,9 +47,7 @@ type GPUPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestGPUPublicTestSuite(
-	t *testing.T,
-) {
+func TestGPUPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(GPUPublicTestSuite))
 }
 

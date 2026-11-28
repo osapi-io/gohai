@@ -58,9 +58,7 @@ type DockerPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestDockerPublicTestSuite(
-	t *testing.T,
-) {
+func TestDockerPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(DockerPublicTestSuite))
 }
 

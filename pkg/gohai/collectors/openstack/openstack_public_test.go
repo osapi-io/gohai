@@ -84,9 +84,7 @@ type OpenStackPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestOpenStackPublicTestSuite(
-	t *testing.T,
-) {
+func TestOpenStackPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(OpenStackPublicTestSuite))
 }
 

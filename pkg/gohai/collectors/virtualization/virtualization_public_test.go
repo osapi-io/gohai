@@ -44,9 +44,7 @@ type VirtualizationPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestVirtualizationPublicTestSuite(
-	t *testing.T,
-) {
+func TestVirtualizationPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(VirtualizationPublicTestSuite))
 }
 

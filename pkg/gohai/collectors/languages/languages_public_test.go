@@ -46,9 +46,7 @@ type LanguagesPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestLanguagesPublicTestSuite(
-	t *testing.T,
-) {
+func TestLanguagesPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(LanguagesPublicTestSuite))
 }
 

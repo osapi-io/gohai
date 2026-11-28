@@ -36,9 +36,7 @@ type OptionsPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestOptionsPublicTestSuite(
-	t *testing.T,
-) {
+func TestOptionsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(OptionsPublicTestSuite))
 }
 

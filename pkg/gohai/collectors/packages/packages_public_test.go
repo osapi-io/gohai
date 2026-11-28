@@ -49,9 +49,7 @@ type PackagesPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestPackagesPublicTestSuite(
-	t *testing.T,
-) {
+func TestPackagesPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(PackagesPublicTestSuite))
 }
 

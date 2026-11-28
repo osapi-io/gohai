@@ -36,9 +36,7 @@ type PCIDevPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestPCIDevPublicTestSuite(
-	t *testing.T,
-) {
+func TestPCIDevPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(PCIDevPublicTestSuite))
 }
 

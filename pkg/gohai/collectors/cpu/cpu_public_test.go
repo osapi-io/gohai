@@ -50,9 +50,7 @@ type CPUPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestCPUPublicTestSuite(
-	t *testing.T,
-) {
+func TestCPUPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CPUPublicTestSuite))
 }
 

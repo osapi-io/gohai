@@ -57,9 +57,7 @@ type ConvertPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestConvertPublicTestSuite(
-	t *testing.T,
-) {
+func TestConvertPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ConvertPublicTestSuite))
 }
 

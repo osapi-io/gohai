@@ -65,9 +65,7 @@ type ScalewayPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestScalewayPublicTestSuite(
-	t *testing.T,
-) {
+func TestScalewayPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ScalewayPublicTestSuite))
 }
 

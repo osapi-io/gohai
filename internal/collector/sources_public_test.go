@@ -230,8 +230,6 @@ func (s *SourcesPublicTestSuite) TestCheckSources() {
 	}
 }
 
-func TestSourcesPublicTestSuite(
-	t *testing.T,
-) {
+func TestSourcesPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(SourcesPublicTestSuite))
 }

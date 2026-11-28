@@ -159,9 +159,7 @@ type GcePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestGcePublicTestSuite(
-	t *testing.T,
-) {
+func TestGcePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(GcePublicTestSuite))
 }
 

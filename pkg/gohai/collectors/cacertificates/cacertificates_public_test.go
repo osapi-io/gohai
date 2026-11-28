@@ -552,8 +552,6 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 	}
 }
 
-func TestCACertificatesPublicTestSuite(
-	t *testing.T,
-) {
+func TestCACertificatesPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CACertificatesPublicTestSuite))
 }

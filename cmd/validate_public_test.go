@@ -40,9 +40,7 @@ type ValidatePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestValidatePublicTestSuite(
-	t *testing.T,
-) {
+func TestValidatePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ValidatePublicTestSuite))
 }
 

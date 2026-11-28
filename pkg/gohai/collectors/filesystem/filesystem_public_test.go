@@ -47,9 +47,7 @@ type FilesystemPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestFilesystemPublicTestSuite(
-	t *testing.T,
-) {
+func TestFilesystemPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(FilesystemPublicTestSuite))
 }
 

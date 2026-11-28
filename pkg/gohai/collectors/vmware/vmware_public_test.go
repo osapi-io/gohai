@@ -52,9 +52,7 @@ type VMwarePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestVMwarePublicTestSuite(
-	t *testing.T,
-) {
+func TestVMwarePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(VMwarePublicTestSuite))
 }
 

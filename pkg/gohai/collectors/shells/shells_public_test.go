@@ -44,9 +44,7 @@ type ShellsPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestShellsPublicTestSuite(
-	t *testing.T,
-) {
+func TestShellsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ShellsPublicTestSuite))
 }
 

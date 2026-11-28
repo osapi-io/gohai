@@ -32,9 +32,7 @@ type DsclPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestDsclPublicTestSuite(
-	t *testing.T,
-) {
+func TestDsclPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(DsclPublicTestSuite))
 }
 

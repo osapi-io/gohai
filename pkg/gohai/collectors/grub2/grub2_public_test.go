@@ -68,9 +68,7 @@ type Grub2PublicTestSuite struct {
 	suite.Suite
 }
 
-func TestGrub2PublicTestSuite(
-	t *testing.T,
-) {
+func TestGrub2PublicTestSuite(t *testing.T) {
 	suite.Run(t, new(Grub2PublicTestSuite))
 }
 

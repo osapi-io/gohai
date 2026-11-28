@@ -215,9 +215,7 @@ func (s *CollectorPublicTestSuite) TestResult() {
 	}
 }
 
-func TestCollectorPublicTestSuite(
-	t *testing.T,
-) {
+func TestCollectorPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(CollectorPublicTestSuite))
 }
 

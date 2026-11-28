@@ -42,9 +42,7 @@ type IPCPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestIPCPublicTestSuite(
-	t *testing.T,
-) {
+func TestIPCPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(IPCPublicTestSuite))
 }
 

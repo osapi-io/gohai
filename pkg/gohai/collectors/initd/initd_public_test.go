@@ -44,9 +44,7 @@ type InitdPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestInitdPublicTestSuite(
-	t *testing.T,
-) {
+func TestInitdPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(InitdPublicTestSuite))
 }
 

@@ -163,9 +163,7 @@ type HardwarePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestHardwarePublicTestSuite(
-	t *testing.T,
-) {
+func TestHardwarePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(HardwarePublicTestSuite))
 }
 

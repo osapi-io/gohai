@@ -42,9 +42,7 @@ type DiskPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestDiskPublicTestSuite(
-	t *testing.T,
-) {
+func TestDiskPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(DiskPublicTestSuite))
 }
 

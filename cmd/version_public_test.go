@@ -33,9 +33,7 @@ type VersionPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestVersionPublicTestSuite(
-	t *testing.T,
-) {
+func TestVersionPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(VersionPublicTestSuite))
 }
 

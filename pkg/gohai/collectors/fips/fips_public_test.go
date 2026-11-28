@@ -46,9 +46,7 @@ type FipsPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestFipsPublicTestSuite(
-	t *testing.T,
-) {
+func TestFipsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(FipsPublicTestSuite))
 }
 

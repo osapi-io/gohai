@@ -58,9 +58,7 @@ type NetworkPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestNetworkPublicTestSuite(
-	t *testing.T,
-) {
+func TestNetworkPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(NetworkPublicTestSuite))
 }
 

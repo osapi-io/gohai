@@ -45,9 +45,7 @@ type ProcessPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestProcessPublicTestSuite(
-	t *testing.T,
-) {
+func TestProcessPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ProcessPublicTestSuite))
 }
 

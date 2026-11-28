@@ -32,9 +32,7 @@ type NamePublicTestSuite struct {
 	suite.Suite
 }
 
-func TestNamePublicTestSuite(
-	t *testing.T,
-) {
+func TestNamePublicTestSuite(t *testing.T) {
 	suite.Run(t, new(NamePublicTestSuite))
 }
 

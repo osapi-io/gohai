@@ -42,9 +42,7 @@ type RootGroupPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestRootGroupPublicTestSuite(
-	t *testing.T,
-) {
+func TestRootGroupPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(RootGroupPublicTestSuite))
 }
 

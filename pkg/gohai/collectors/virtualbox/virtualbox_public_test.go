@@ -61,9 +61,7 @@ type VirtualBoxPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestVirtualBoxPublicTestSuite(
-	t *testing.T,
-) {
+func TestVirtualBoxPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(VirtualBoxPublicTestSuite))
 }
 

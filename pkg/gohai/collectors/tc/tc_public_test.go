@@ -59,9 +59,7 @@ type TCPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestTCPublicTestSuite(
-	t *testing.T,
-) {
+func TestTCPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(TCPublicTestSuite))
 }
 

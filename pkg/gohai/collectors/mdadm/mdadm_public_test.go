@@ -112,9 +112,7 @@ type MdadmPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestMdadmPublicTestSuite(
-	t *testing.T,
-) {
+func TestMdadmPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(MdadmPublicTestSuite))
 }
 

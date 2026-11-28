@@ -47,9 +47,7 @@ type HostnamectlPublicTestSuite struct {
 	suite.Suite
 }
 
-func TestHostnamectlPublicTestSuite(
-	t *testing.T,
-) {
+func TestHostnamectlPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(HostnamectlPublicTestSuite))
 }
 

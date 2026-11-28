@@ -170,8 +170,6 @@ func (s *ReadlogPublicTestSuite) TestCommands() {
 	}
 }
 
-func TestReadlogPublicTestSuite(
-	t *testing.T,
-) {
+func TestReadlogPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(ReadlogPublicTestSuite))
 }

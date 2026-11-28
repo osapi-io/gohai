@@ -45,9 +45,7 @@ type FactsPublicTestSuite struct {
 	facts *gohai.Facts
 }
 
-func TestFactsPublicTestSuite(
-	t *testing.T,
-) {
+func TestFactsPublicTestSuite(t *testing.T) {
 	suite.Run(t, new(FactsPublicTestSuite))
 }
 
