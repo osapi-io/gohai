@@ -119,6 +119,7 @@ func (s *UptimePublicTestSuite) TestCollect() {
 		variant string
 		files   map[string]string
 		runner  sourcetest.Commands
+		nilExec bool
 		want    *uptime.Info
 		wantErr string
 	}{
@@ -183,6 +184,10 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			wantErr: "sysctl kern.boottime: boom",
 		},
 		{
+			name: "darwin: no Exec gives no fact", variant: "darwin",
+			nilExec: true,
+		},
+		{
 			name: "darwin: no seconds", variant: "darwin",
 			runner:  sourcetest.Commands{Out: map[string]string{"sysctl -n kern.boottime": "nope"}},
 			wantErr: "no seconds",
@@ -195,7 +200,11 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			case "linux":
 				c = &uptime.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &uptime.Darwin{Exec: tt.runner.Mock(s.T()), Now: now}
+				d := &uptime.Darwin{Exec: tt.runner.Mock(s.T()), Now: now}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
@@ -204,6 +213,11 @@ func (s *UptimePublicTestSuite) TestCollect() {
 				return
 			}
 			s.Require().NoError(err)
+			if tt.nilExec {
+				s.Nil(got)
+
+				return
+			}
 			s.Equal(tt.want, got)
 		})
 	}

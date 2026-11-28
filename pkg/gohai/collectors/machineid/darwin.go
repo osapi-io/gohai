@@ -45,11 +45,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect returns the machine ID.
+// Collect returns the machine ID. With no Exec it gives no fact, as the
+// ID comes from ioreg.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	out, err := d.Exec.Execute(ctx, "ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
 	if err != nil {
 		return nil, fmt.Errorf("ioreg IOPlatformExpertDevice: %w", err)

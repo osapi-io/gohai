@@ -31,6 +31,7 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysconf"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
@@ -134,9 +135,12 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 		name    string
 		variant string
 		out     map[string]string
+		nilExec bool
 		wantErr string
 	}{
 		{name: "linux: the four values", variant: "linux", out: all},
+		{name: "linux: no Exec gives no fact", variant: "linux", nilExec: true},
+		{name: "darwin: no Exec gives no fact", variant: "darwin", nilExec: true},
 		{name: "darwin: the four values", variant: "darwin", out: all},
 		{
 			name: "linux: getconf fails", variant: "linux",
@@ -155,9 +159,13 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			r := sourcetest.Commands{Out: tt.out}
-			var c sysconf.Collector = &sysconf.Linux{Exec: r.Mock(s.T())}
+			var exec source.Runner = r.Mock(s.T())
+			if tt.nilExec {
+				exec = nil
+			}
+			var c sysconf.Collector = &sysconf.Linux{Exec: exec}
 			if tt.variant == "darwin" {
-				c = &sysconf.Darwin{Exec: r.Mock(s.T())}
+				c = &sysconf.Darwin{Exec: exec}
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
@@ -166,6 +174,11 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 				return
 			}
 			s.Require().NoError(err)
+			if tt.nilExec {
+				s.Nil(got)
+
+				return
+			}
 			s.Equal(
 				&sysconf.Info{ClkTck: 100, Pagesize: 4096, NprocessorsConf: 8, NprocessorsOnln: 6},
 				got,
