@@ -163,10 +163,20 @@ func failOn(
 	path string,
 	instance string,
 ) http.HandlerFunc {
+	return statusOn(path, http.StatusInternalServerError, instance)
+}
+
+// statusOn answers path with status, the instance with instance, and
+// every other path with "[]".
+func statusOn(
+	path string,
+	status int,
+	instance string,
+) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case path:
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(status)
 		case "/instance":
 			_, _ = w.Write([]byte(instance))
 		default:
@@ -278,6 +288,32 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Require().NotNil(info)
 				s.Equal("VM.Standard.E4.Flex", info.Type)
+			},
+		},
+		{
+			name:    "no dmi in prior: a 403 on the instance is another service, not OCI",
+			prior:   collector.PriorResults{},
+			handler: statusOn("/instance", http.StatusForbidden, ""),
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().NoError(err)
+				s.Nil(out)
+			},
+		},
+		{
+			name:    "no dmi in prior: a 500 on the instance is still an error",
+			prior:   collector.PriorResults{},
+			handler: failOn("/instance", ""),
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 500 from /instance")
+				s.Nil(out)
+			},
+		},
+		{
+			name:    "dmi says OCI: a 403 on the instance is an error",
+			handler: statusOn("/instance", http.StatusForbidden, ""),
+			validateFunc: func(out any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 403 from /instance")
+				s.Nil(out)
 			},
 		},
 		{

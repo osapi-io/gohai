@@ -338,8 +338,10 @@ func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 // fetches the three OCI metadata documents. An instance document with no
 // answer, or a 404, means the host is not on OCI, and gives (nil, nil). A
 // VNIC or volume document that is not there (a 404 on a lightweight
-// shape) leaves its part empty. Any other failure of a document, such as
-// an HTTP 500, malformed JSON or a cancelled context, is an error.
+// shape) leaves its part empty. When dmi did not run, so nothing has said
+// the host is on OCI, any 4xx is also "not there": it is another service,
+// not OCI's. Any other failure of a document, such as an HTTP 5xx,
+// malformed JSON or a cancelled context, is an error.
 func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -348,15 +350,18 @@ func (c *Metadata) Collect(
 		return nil, ctx.Err()
 	}
 
+	_, dmiRan := collector.GetDep[*dmi.Info](prior, "dmi")
+	probing := !dmiRan
+
 	var ri rawInstance
-	found, err := c.document(ctx, pathInstance, &ri)
+	found, err := c.document(ctx, pathInstance, &ri, probing)
 	if err != nil || !found {
 		return nil, err
 	}
 	info := transformInstance(ri)
 
 	var vnics []rawVNIC
-	if _, err := c.document(ctx, pathVNICs, &vnics); err != nil {
+	if _, err := c.document(ctx, pathVNICs, &vnics, probing); err != nil {
 		return nil, err
 	}
 	for _, v := range vnics {
@@ -364,7 +369,7 @@ func (c *Metadata) Collect(
 	}
 
 	var vols []rawVolumeAttachment
-	if _, err := c.document(ctx, pathVolumes, &vols); err != nil {
+	if _, err := c.document(ctx, pathVolumes, &vols, probing); err != nil {
 		return nil, err
 	}
 	if len(vols) > 0 {
@@ -381,15 +386,18 @@ func (c *Metadata) Collect(
 }
 
 // document reads the JSON document at path into out. It reports false
-// with no error when the document is not there: no answer, or a 404. Any
-// other failure is an error.
+// with no error when the document is not there: no answer, a 404, or,
+// while probing a host that DMI did not confirm, any 4xx. Any other
+// failure is an error.
 func (c *Metadata) document(
 	ctx context.Context,
 	path string,
 	out any,
+	probing bool,
 ) (bool, error) {
 	body, err := c.client().Lookup(ctx, path)
-	if errors.Is(err, cloudmetadata.ErrNotAvailable) {
+	if errors.Is(err, cloudmetadata.ErrNotAvailable) ||
+		(probing && cloudmetadata.ClientError(err)) {
 		return false, ctx.Err()
 	}
 	if err != nil {

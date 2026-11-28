@@ -240,10 +240,35 @@ func (c *Client) Lookup(
 		return nil, fmt.Errorf("%w: status 404 from %s", ErrNotAvailable, path)
 	}
 	if status < 200 || status >= 300 {
-		return nil, fmt.Errorf("unexpected status %d from %s", status, path)
+		return nil, &StatusError{Status: status, Path: path}
 	}
 
 	return body, nil
+}
+
+// StatusError is the error of a Lookup whose answer was a non-2xx status
+// other than 404. A collector that probes a host which DMI did not
+// confirm can tell a 4xx (another service, not this cloud) from a 5xx (a
+// metadata service that failed) by Status.
+type StatusError struct {
+	// Status is the HTTP status code of the answer.
+	Status int
+	// Path is the path that was asked for.
+	Path string
+}
+
+// Error returns "unexpected status <status> from <path>".
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("unexpected status %d from %s", e.Status, e.Path)
+}
+
+// ClientError reports whether err is a StatusError with a 4xx status.
+func ClientError(
+	err error,
+) bool {
+	var se *StatusError
+
+	return errors.As(err, &se) && se.Status >= 400 && se.Status < 500
 }
 
 // Put issues a PUT against baseURL + path with per-request headers

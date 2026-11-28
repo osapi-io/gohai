@@ -754,6 +754,28 @@ func (s *CloudMetadataPublicTestSuite) TestLookup() {
 			validateFunc: func(body []byte, err error) {
 				s.Require().EqualError(err, "unexpected status 500 from /doc")
 				s.NotErrorIs(err, cloudmetadata.ErrNotAvailable)
+				var se *cloudmetadata.StatusError
+				s.Require().ErrorAs(err, &se)
+				s.Equal(http.StatusInternalServerError, se.Status)
+				s.Equal("/doc", se.Path)
+				s.False(cloudmetadata.ClientError(err))
+				s.Nil(body)
+			},
+		},
+		{
+			name: "403 is a client error that is not ErrNotAvailable",
+			setup: func() (string, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/doc": func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusForbidden)
+					},
+				})
+				return srv.URL, srv.Close
+			},
+			validateFunc: func(body []byte, err error) {
+				s.Require().EqualError(err, "unexpected status 403 from /doc")
+				s.NotErrorIs(err, cloudmetadata.ErrNotAvailable)
+				s.True(cloudmetadata.ClientError(err))
 				s.Nil(body)
 			},
 		},
@@ -767,6 +789,7 @@ func (s *CloudMetadataPublicTestSuite) TestLookup() {
 			},
 			validateFunc: func(body []byte, err error) {
 				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+				s.False(cloudmetadata.ClientError(err))
 				s.Nil(body)
 			},
 		},

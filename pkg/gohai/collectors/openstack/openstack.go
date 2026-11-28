@@ -225,7 +225,13 @@ func (c *Metadata) Collect(
 		return nil, ctx.Err()
 	}
 
-	tree, err := walk(ctx, c.client(), "/latest/meta-data/")
+	// When dmi did not run, nothing has said the host is on OpenStack, so
+	// any 4xx is another service, not OpenStack's: the document is not
+	// there. On a host that DMI confirmed, only a 404 means that.
+	_, dmiRan := collector.GetDep[*dmi.Info](prior, "dmi")
+	get := c.lookup(!dmiRan)
+
+	tree, err := walk(ctx, get, "/latest/meta-data/")
 	switch {
 	case errors.Is(err, cloudmetadata.ErrNotAvailable):
 		// The EC2-mirror tree is not there. Try the Nova doc, because some
@@ -241,7 +247,7 @@ func (c *Metadata) Collect(
 		populateFromTree(info, tree)
 	}
 
-	body, err := c.fetchNovaDoc(ctx)
+	body, err := get(ctx, "/openstack/latest/meta_data.json")
 	if err != nil && !errors.Is(err, cloudmetadata.ErrNotAvailable) {
 		return nil, fmt.Errorf("openstack: %w", err)
 	}
@@ -315,7 +321,7 @@ var errWalkLimit = errors.New("metadata walk limit reached")
 // and the walk stops with errWalkLimit after maxWalkRequests requests.
 func walk(
 	ctx context.Context,
-	c *cloudmetadata.Client,
+	c getFunc,
 	path string,
 ) (map[string]any, error) {
 	requests := 0
@@ -326,7 +332,7 @@ func walk(
 // limits hold across the whole tree.
 func walkDir(
 	ctx context.Context,
-	c *cloudmetadata.Client,
+	c getFunc,
 	path string,
 	depth int,
 	requests *int,
@@ -336,7 +342,7 @@ func walkDir(
 			return nil, errWalkLimit
 		}
 		*requests++
-		return c.Lookup(ctx, p)
+		return c(ctx, p)
 	}
 	listing, err := get(path)
 	if err != nil {
@@ -441,10 +447,23 @@ func onOpenStack(
 	return strings.Contains(info.Product.Name, dmiProductSignature)
 }
 
-// fetchNovaDoc fetches Nova's enriched meta_data.json, which sits
-// outside the EC2-mirror tree.
-func (c *Metadata) fetchNovaDoc(
-	ctx context.Context,
-) ([]byte, error) {
-	return c.client().Lookup(ctx, "/openstack/latest/meta_data.json")
+// getFunc fetches one metadata path, as cloudmetadata.Client.Lookup does.
+type getFunc func(ctx context.Context, path string) ([]byte, error)
+
+// lookup returns the getFunc of the collector's client. While probing a
+// host that DMI did not confirm, a 4xx also wraps ErrNotAvailable, so it
+// is "not there" and not an error.
+func (c *Metadata) lookup(
+	probing bool,
+) getFunc {
+	client := c.client()
+
+	return func(ctx context.Context, path string) ([]byte, error) {
+		body, err := client.Lookup(ctx, path)
+		if probing && cloudmetadata.ClientError(err) {
+			return nil, fmt.Errorf("%w: %w", cloudmetadata.ErrNotAvailable, err)
+		}
+
+		return body, err
+	}
 }

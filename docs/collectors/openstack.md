@@ -124,9 +124,11 @@ does not probe it.
 7. **Failures.** A document, directory or value that gets no answer or a 404 is
    not there, and is skipped. If neither the EC2-compatible tree nor the Nova
    document is there, the collector returns `(nil, nil)`. One source alone is
-   sufficient to give an Info with data. Any other failure is an error: an HTTP
-   500 or other non-2xx status, a Nova document that isn't valid JSON, or a
-   cancelled context.
+   sufficient to give an Info with data. When `dmi` did not run, so nothing has
+   said the host is on OpenStack, any 4xx is also "not there", because it comes
+   from another service. Any other failure is an error: an HTTP 5xx, a 4xx on
+   a host that DMI says is on OpenStack, a Nova document that isn't valid JSON,
+   or a cancelled context.
 
 The method is the same as the recursive read of Ohai's
 `Ohai::Mixin::Ec2Metadata`, which the openstack plugin also uses. Like Ohai,

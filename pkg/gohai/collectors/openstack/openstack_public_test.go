@@ -303,6 +303,60 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name: "a 500 on a subdirectory's listing is an error",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/latest/meta-data/placement/" {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				canned(map[string]string{
+					"/latest/meta-data/":       "ami-id\nplacement/",
+					"/latest/meta-data/ami-id": "ami-aaa",
+				}, novaDoc)(w, r)
+			},
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().EqualError(
+					err,
+					"openstack: unexpected status 500 from /latest/meta-data/placement/",
+				)
+				s.Nil(out)
+			},
+		},
+		{
+			name:  "no dmi in prior: a 403 from both sources is another service, not OpenStack",
+			prior: collector.PriorResults{},
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+			},
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
+				s.Nil(out)
+			},
+		},
+		{
+			name:  "no dmi in prior: a 500 is still an error",
+			prior: collector.PriorResults{},
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusInternalServerError)
+			},
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().
+					EqualError(err, "openstack: unexpected status 500 from /latest/meta-data/")
+				s.Nil(out)
+			},
+		},
+		{
+			name: "dmi says OpenStack: a 403 on the tree listing is an error",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+			},
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().
+					EqualError(err, "openstack: unexpected status 403 from /latest/meta-data/")
+				s.Nil(out)
+			},
+		},
+		{
 			name: "a 500 on a leaf during the walk is an error",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/latest/meta-data/bad" {
