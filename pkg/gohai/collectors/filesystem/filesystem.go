@@ -41,7 +41,7 @@ import (
 // Info holds filesystem data: the active mount table plus (Linux only)
 // any block devices with a filesystem but no active mountpoint, and
 // (Linux only, when `zfs` is on PATH) every ZFS dataset reported by
-// `zfs get -p -H all`.
+// `zfs get -p -H -t filesystem,volume all`.
 type Info struct {
 	Mounts      []Mount      `json:"mounts"`
 	Unmounted   []Filesystem `json:"unmounted,omitempty"`
@@ -59,9 +59,9 @@ type ZFSDataset struct {
 	// property is set to a real path. Empty when the dataset is a
 	// snapshot, a volume, or has `mountpoint=none` / `legacy`.
 	Mountpoint string `json:"mountpoint,omitempty"`
-	// IsPool reports whether this dataset IS a zpool root (no slash
-	// in the name — no proper ancestors). Matches Ohai's
-	// `zfs_zpool` boolean.
+	// IsPool reports whether this dataset IS a zpool root: no `/`, `@`
+	// or `#` in the name, so no proper ancestors and not a snapshot or a
+	// bookmark. Matches Ohai's `zfs_zpool` boolean.
 	IsPool bool `json:"is_pool,omitempty"`
 	// Parents holds every proper ancestor dataset path, shallowest
 	// first. E.g. "tank/a/b" → ["tank", "tank/a"]. Matches Ohai's
@@ -484,7 +484,8 @@ func readUint(
 	return n
 }
 
-// parseZFSGetAll parses tab-separated `zfs get -p -H all` output into
+// parseZFSGetAll parses tab-separated `zfs get -p -H -t
+// filesystem,volume all` output into
 // a flat slice of ZFSDataset. Format per line:
 //
 //	<name>\t<property>\t<value>\t<source>
@@ -498,7 +499,9 @@ func readUint(
 //   - Mountpoint is lifted from the `mountpoint` property when the
 //     value is an absolute path (ignores `none` / `legacy` / `-`).
 //   - Parents enumerates proper ancestor paths (ohai zfs_parents).
-//   - IsPool is true when the dataset name has no `/` (ohai zfs_zpool).
+//   - IsPool is true when the dataset name has no `/`, `@` or `#`: a
+//     pool root, not a dataset under it, a snapshot or a bookmark (ohai
+//     zfs_zpool).
 func parseZFSGetAll(
 	raw []byte,
 ) []ZFSDataset {
@@ -518,7 +521,7 @@ func parseZFSGetAll(
 			ds = &ZFSDataset{
 				Name:       name,
 				Properties: map[string]ZFSProperty{},
-				IsPool:     !strings.Contains(name, "/"),
+				IsPool:     !strings.ContainsAny(name, "/@#"),
 				Parents:    zfsParentsOf(name),
 			}
 			byName[name] = ds
@@ -537,11 +540,16 @@ func parseZFSGetAll(
 }
 
 // zfsParentsOf returns the proper-ancestor dataset paths of name,
-// shallowest first. "tank/a/b" → ["tank", "tank/a"]; "tank" → nil.
-// Matches Ohai's zfs_parents computation (parents.pop at the end).
+// shallowest first. "tank/a/b" → ["tank", "tank/a"]; "tank" → nil. A
+// snapshot or a bookmark has its dataset as a parent too:
+// "tank/a@snap" → ["tank", "tank/a"]. Matches Ohai's zfs_parents
+// computation (parents.pop at the end).
 func zfsParentsOf(
 	name string,
 ) []string {
+	if i := strings.IndexAny(name, "@#"); i >= 0 {
+		return append(zfsParentsOf(name[:i]), name[:i])
+	}
 	parts := strings.Split(name, "/")
 	if len(parts) <= 1 {
 		return nil

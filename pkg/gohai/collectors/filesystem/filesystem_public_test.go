@@ -126,7 +126,7 @@ func noLsblkExec(
 		Return(nil, errors.New("not found")).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "zfs", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Execute(gomock.Any(), "zfs", "get", "-p", "-H", "-t", "filesystem,volume", "all").
 		Return(nil, errors.New("not found")).
 		AnyTimes()
 	return m
@@ -146,14 +146,15 @@ func lsblkExec(
 		Return([]byte(out), nil).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "zfs", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Execute(gomock.Any(), "zfs", "get", "-p", "-H", "-t", "filesystem,volume", "all").
 		Return(nil, errors.New("zfs: command not found")).
 		AnyTimes()
 	return m
 }
 
 // lsblkZFSExec behaves like lsblkExec but additionally returns canned
-// `zfs get -p -H all` output for the ZFS enumeration path.
+// `zfs get -p -H -t filesystem,volume all` output for the ZFS
+// enumeration path.
 func lsblkZFSExec(
 	t *testing.T,
 	lsblkOut, zfsOut string,
@@ -165,7 +166,7 @@ func lsblkZFSExec(
 		Return([]byte(lsblkOut), nil).
 		AnyTimes()
 	m.EXPECT().
-		Execute(gomock.Any(), "zfs", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		Execute(gomock.Any(), "zfs", "get", "-p", "-H", "-t", "filesystem,volume", "all").
 		Return([]byte(zfsOut), nil).
 		AnyTimes()
 	return m
@@ -490,12 +491,12 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: ZFS datasets parsed with pool + nested + mountpoints",
+			name:    "linux: ZFS datasets parsed with pool, nested and mountpoints; a snapshot and a bookmark are not pools, and have their dataset as a parent",
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
 			exec: func(t *testing.T) source.Runner {
-				// tab-separated `zfs get -p -H all` — realistic subset
+				// tab-separated `zfs get -p -H -t filesystem,volume all` — realistic subset
 				// covering pool root + nested fs + snapshot (mountpoint
 				// absent) + dataset with `none` (skipped for mountpoint).
 				const zfs = "tank\ttype\tfilesystem\t-\n" +
@@ -508,14 +509,15 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 					"tank/home/john\tmountpoint\t/home/john\tinherited from tank/home\n" +
 					"tank/vol1\ttype\tvolume\t-\n" +
 					"tank/vol1\tmountpoint\tnone\tdefault\n" +
-					"tank@snap1\ttype\tsnapshot\t-\n"
+					"tank@snap1\ttype\tsnapshot\t-\n" +
+					"tank/home#bm1\ttype\tbookmark\t-\n"
 				return lsblkZFSExec(t, "", zfs)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				i, ok := got.(*filesystem.Info)
 				s.Require().True(ok)
-				s.Require().Len(i.ZFSDatasets, 5)
+				s.Require().Len(i.ZFSDatasets, 6)
 
 				tank := i.ZFSDatasets[0]
 				s.Equal("tank", tank.Name)
@@ -549,7 +551,13 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 
 				snap := i.ZFSDatasets[4]
 				s.Equal("tank@snap1", snap.Name)
-				s.True(snap.IsPool) // no "/" → looks like a pool-level name
+				s.False(snap.IsPool)
+				s.Equal([]string{"tank"}, snap.Parents)
+
+				bookmark := i.ZFSDatasets[5]
+				s.Equal("tank/home#bm1", bookmark.Name)
+				s.False(bookmark.IsPool)
+				s.Equal([]string{"tank", "tank/home"}, bookmark.Parents)
 			},
 		},
 		{
