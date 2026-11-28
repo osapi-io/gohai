@@ -128,16 +128,20 @@ None.
 
 On Linux, the collector does each check that Ohai's `linux/virtualization.rb`
 does, in sequence. For each positive result, it sets `systems[<name>] = role`.
-The order is important. The last positive result sets the primary `system` and
-`role`, but each layer stays in `systems`:
+The order is important. The last positive result sets the primary `system`, but
+each layer stays in `systems`. `role` is always the role that `systems` keeps
+for the primary `system`, so the two never disagree:
 
 01. **`systemd-detect-virt` fast path.** If `systemd-detect-virt` is on PATH,
     the collector runs `systemd-detect-virt --vm` and
     `systemd-detect-virt --container`. Each result that is not `none` and not
     empty is a guest.
 
-02. **Container-runtime hosts.** `command -v docker`, `command -v podman` or
-    `command -v nova` → host.
+02. **Container-runtime hosts.** A CLI on the PATH is not a runtime, because a
+    container image can hold the docker CLI. `command -v docker` → host only
+    when the daemon's socket, `/var/run/docker.sock` or `/run/docker.sock`, is
+    there. `command -v podman` → host only outside a podman container, that is,
+    with no `/run/.containerenv`. `command -v nova` → host.
 
 03. **Xen.** `/proc/xen` is there → guest. `/proc/xen/capabilities` has
     `control_d` → host.
@@ -186,9 +190,11 @@ The order is important. The last positive result sets the primary `system` and
 
     The collector also reads `/proc/1/environ` and `/proc/self/environ` for a
     variable that starts with `container=lxc`, `container=systemd-nspawn` or
-    `container=podman`. Only root can read `/proc/1/environ`. The collector can
-    always read its own environment, and a process in a container gets the
-    variables of the container.
+    `container=podman`. Only root can read `/proc/1/environ`, so a run as
+    another user misses these values there. It still reads its own environment,
+    which has `container=` only when PID 1 passed it down. The
+    `systemd-detect-virt --container` check in step 01 covers a non-root run on
+    a systemd host.
 
     `KUBERNETES_SERVICE_HOST` in one of the two environments →
     `systems[kubernetes] = guest`. Kubernetes is not a runtime, so it is the
@@ -218,12 +224,14 @@ On macOS, the checks are the same as Ohai's `darwin/virtualization.rb`:
    `command -v VBoxManage` → `vbox` host. `command -v prlctl` → `parallels`
    host.
 2. **VMware Fusion host.** `/Applications/VMware Fusion.app` is there.
-3. **QEMU or Virtualization.framework guest.** `sysctl -n kern.hv_vmm_present`
-   returns `1`.
-4. **Parallels guest.** The `ioreg -l` output has `pci1ab8,4000`.
-5. **VirtualBox, VMware or Apple VM guest.** The collector parses
+3. **Parallels guest.** The `ioreg -l` output has `pci1ab8,4000`.
+4. **VirtualBox, VMware or Apple VM guest.** The collector parses
    `system_profiler SPHardwareDataType`. It looks for `VirtualBox` or `VMW` in
    `Boot ROM Version`, and for `VirtualMac` in `Model Identifier`.
+5. **QEMU guest.** `sysctl -n kern.hv_vmm_present` returns `1`, and no check
+   above named the hypervisor. Each hypervisor's guest has this value, also
+   Virtualization.framework, VMware Fusion and Parallels, so it names `qemu`
+   only when nothing else does.
 
 A bare-metal Mac with no hypervisor software gives an empty `systems` map and an
 empty `system` and `role`.

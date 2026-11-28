@@ -123,23 +123,33 @@ func cascadeDarwin(
 	}()
 	wg.Wait()
 
-	if strings.TrimSpace(string(sysctlOut)) == "1" {
-		addSystem(info, "qemu", "guest", false)
-	}
+	// kern.hv_vmm_present is 1 in each hypervisor's guest: QEMU, Apple's
+	// Virtualization.framework, VMware Fusion and Parallels. The
+	// hypervisor is named from the Parallels PCI node, the Boot ROM
+	// Version and the Model Identifier first, and is qemu only when none
+	// of them names it.
+	named := false
 	if strings.Contains(string(ioregOut), "pci1ab8,4000") {
 		addSystem(info, "parallels", "guest", false)
+		named = true
 	}
 	if len(spOut) > 0 {
 		text := string(spOut)
 		switch {
 		case bootROMContains(text, "VirtualBox"):
 			addSystem(info, "vbox", "guest", false)
+			named = true
 		case bootROMContains(text, "VMW"):
 			addSystem(info, "vmware", "guest", false)
+			named = true
 		}
 		if modelIDContains(text, "VirtualMac") {
 			addSystem(info, "apple", "guest", false)
+			named = true
 		}
+	}
+	if !named && strings.TrimSpace(string(sysctlOut)) == "1" {
+		addSystem(info, "qemu", "guest", false)
 	}
 }
 
