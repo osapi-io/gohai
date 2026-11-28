@@ -41,7 +41,8 @@ func Execute(
 	ctx context.Context,
 	args []string,
 	in io.Reader,
-	out, errOut io.Writer,
+	out io.Writer,
+	errOut io.Writer,
 ) int {
 	out = cli.Colored(out, colorFor(out, os.Getenv, terminal))
 	errOut = cli.Colored(errOut, colorFor(errOut, os.Getenv, terminal))

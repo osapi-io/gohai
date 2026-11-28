@@ -74,6 +74,12 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		validateFunc func(*ocsf.InventoryInfo)
 	}{
 		{
+			name: "nil facts give a nil event",
+			validateFunc: func(event *ocsf.InventoryInfo) {
+				s.Nil(event)
+			},
+		},
+		{
 			name: "empty facts produces valid event envelope",
 			facts: &gohai.Facts{
 				CollectTime: collected,

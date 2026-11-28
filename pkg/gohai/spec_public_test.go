@@ -64,6 +64,16 @@ func (s *SpecPublicTestSuite) TestCollectors() {
 			},
 		},
 		{
+			name: "each call returns the same list in its own slice",
+			validateFunc: func() {
+				first := gohai.Collectors()
+				first[0] = gohai.CollectorSpec{Name: "changed"}
+				second := gohai.Collectors()
+				s.Equal(specs, second)
+				s.NotEqual("changed", second[0].Name)
+			},
+		},
+		{
 			name: "dns: its constructor, package, fields and reads",
 			validateFunc: func() {
 				dns := byName["dns"]

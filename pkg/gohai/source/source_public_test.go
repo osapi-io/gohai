@@ -169,7 +169,9 @@ func (s *SourcePublicTestSuite) TestCommandsWith() {
 		name    string
 		ctx     func() context.Context
 		args    []string
+		timeout time.Duration
 		limit   int
+		within  time.Duration
 		want    string
 		wantErr string
 	}{
@@ -187,6 +189,15 @@ func (s *SourcePublicTestSuite) TestCommandsWith() {
 			name:    "when stdout is more than the limit",
 			args:    []string{"-c", "printf 0123456789abcdef; printf more"},
 			limit:   10,
+			want:    "0123456789",
+			wantErr: "exec sh: stdout is more than 10 bytes",
+		},
+		{
+			name:    "when stdout passes the limit, the command stops before its timeout",
+			args:    []string{"-c", "printf 0123456789abcdef; sleep 5"},
+			timeout: 5 * time.Second,
+			limit:   10,
+			within:  2 * time.Second,
 			want:    "0123456789",
 			wantErr: "exec sh: stdout is more than 10 bytes",
 		},
@@ -212,10 +223,18 @@ func (s *SourcePublicTestSuite) TestCommandsWith() {
 			if limit == 0 {
 				limit = source.MaxOutput
 			}
+			timeout := tc.timeout
+			if timeout == 0 {
+				timeout = 200 * time.Millisecond
+			}
+			within := tc.within
+			if within == 0 {
+				within = 3 * time.Second
+			}
 			start := time.Now()
-			out, err := source.CommandsWith(200*time.Millisecond, 100*time.Millisecond, limit).
+			out, err := source.CommandsWith(timeout, 100*time.Millisecond, limit).
 				Execute(ctx, "sh", tc.args...)
-			s.Less(time.Since(start), 3*time.Second)
+			s.Less(time.Since(start), within)
 			s.Equal(tc.want, string(out))
 			if tc.wantErr != "" {
 				s.ErrorContains(err, tc.wantErr)

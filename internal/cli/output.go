@@ -34,7 +34,8 @@ import (
 func WriteOutput(
 	out io.Writer,
 	facts *gohai.Facts,
-	pretty, flat bool,
+	pretty bool,
+	flat bool,
 ) error {
 	if flat {
 		return WriteFlat(out, facts)

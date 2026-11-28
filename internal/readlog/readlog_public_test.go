@@ -73,6 +73,25 @@ func (s *ReadlogPublicTestSuite) TestSources() {
 			},
 		},
 		{
+			name: "a Sub logs its directory, and its reads with their full path",
+			validateFunc: func(src source.Sources, log *readlog.Log) {
+				root, err := src.FS.Sub("/")
+				s.Require().NoError(err)
+				_, _ = root.ReadFile("etc/os-release")
+				_ = root.MkdirAll("etc/ssh", 0o755)
+				etc, err := root.Sub("etc")
+				s.Require().NoError(err)
+				_, _ = etc.ReadFile("ssh/sshd_config")
+				_, err = src.FS.Sub("/missing")
+				s.Error(err)
+
+				s.Equal(
+					[]string{"/", "/etc", "/etc/os-release", "/etc/ssh/sshd_config", "/missing"},
+					log.Files(),
+				)
+			},
+		},
+		{
 			name: "a command answers with no output, and is logged",
 			validateFunc: func(src source.Sources, log *readlog.Log) {
 				out, err := src.Exec.Execute(

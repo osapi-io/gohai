@@ -145,7 +145,8 @@ func (f *flagSet) values() []string {
 // RunE does not run.
 func registerCollectorFlags(
 	cmd *cobra.Command,
-	enabled, disabled *flagSet,
+	enabled *flagSet,
+	disabled *flagSet,
 ) *gohai.PublicRegistry {
 	reg, err := newRegistryFn()
 	if err != nil {
@@ -192,10 +193,14 @@ var newRegistryFn = gohai.NewRegistry
 func runCollect(
 	ctx context.Context,
 	out io.Writer,
-	enabled, disabled *flagSet,
+	enabled *flagSet,
+	disabled *flagSet,
 	categories []string,
 	format string,
-	pretty, flat, noDefaults, withTimings bool,
+	pretty bool,
+	flat bool,
+	noDefaults bool,
+	withTimings bool,
 ) error {
 	switch format {
 	case "ohai", "ocsf":

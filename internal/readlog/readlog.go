@@ -29,6 +29,7 @@ import (
 	"errors"
 	"io/fs"
 	"net/http"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -120,16 +121,47 @@ func (offline) RoundTrip(
 // runs.
 const resolvedRuntimeDir = "/run/systemd/resolve"
 
-// vfs is an empty file system that logs each path that is read.
+// vfs is an empty file system that logs each path that is read. A vfs that
+// Sub returns has a prefix, the directory of the Sub, so that its reads are
+// logged with their full path.
 type vfs struct {
 	avfs.VFS
-	log *Log
+	log    *Log
+	prefix string
+}
+
+// logPath logs name, with the prefix of a Sub before it.
+func (v *vfs) logPath(
+	name string,
+) {
+	if v.prefix != "" {
+		name = path.Join(v.prefix, name)
+	}
+	v.log.file(name)
+}
+
+// Sub logs dir, and returns the sub file system, which logs its reads with
+// dir before each path.
+func (v *vfs) Sub(
+	dir string,
+) (avfs.VFS, error) {
+	v.logPath(dir)
+	sub, err := v.VFS.Sub(dir)
+	if err != nil {
+		return nil, err
+	}
+	prefix := dir
+	if v.prefix != "" {
+		prefix = path.Join(v.prefix, dir)
+	}
+
+	return &vfs{VFS: sub, log: v.log, prefix: prefix}, nil
 }
 
 func (v *vfs) Open(
 	name string,
 ) (avfs.File, error) {
-	v.log.file(name)
+	v.logPath(name)
 
 	return v.VFS.Open(name)
 }
@@ -139,7 +171,7 @@ func (v *vfs) OpenFile(
 	flag int,
 	perm fs.FileMode,
 ) (avfs.File, error) {
-	v.log.file(name)
+	v.logPath(name)
 
 	return v.VFS.OpenFile(name, flag, perm)
 }
@@ -147,7 +179,7 @@ func (v *vfs) OpenFile(
 func (v *vfs) ReadFile(
 	name string,
 ) ([]byte, error) {
-	v.log.file(name)
+	v.logPath(name)
 
 	return v.VFS.ReadFile(name)
 }
@@ -155,7 +187,7 @@ func (v *vfs) ReadFile(
 func (v *vfs) ReadDir(
 	name string,
 ) ([]fs.DirEntry, error) {
-	v.log.file(name)
+	v.logPath(name)
 
 	return v.VFS.ReadDir(name)
 }
@@ -163,7 +195,7 @@ func (v *vfs) ReadDir(
 func (v *vfs) Stat(
 	name string,
 ) (fs.FileInfo, error) {
-	v.log.file(name)
+	v.logPath(name)
 
 	return v.VFS.Stat(name)
 }
@@ -171,7 +203,7 @@ func (v *vfs) Stat(
 func (v *vfs) Lstat(
 	name string,
 ) (fs.FileInfo, error) {
-	v.log.file(name)
+	v.logPath(name)
 
 	return v.VFS.Lstat(name)
 }
@@ -179,7 +211,7 @@ func (v *vfs) Lstat(
 func (v *vfs) Readlink(
 	name string,
 ) (string, error) {
-	v.log.file(name)
+	v.logPath(name)
 
 	return v.VFS.Readlink(name)
 }
@@ -187,7 +219,7 @@ func (v *vfs) Readlink(
 func (v *vfs) EvalSymlinks(
 	path string,
 ) (string, error) {
-	v.log.file(path)
+	v.logPath(path)
 
 	return v.VFS.EvalSymlinks(path)
 }
@@ -195,7 +227,7 @@ func (v *vfs) EvalSymlinks(
 func (v *vfs) Glob(
 	pattern string,
 ) ([]string, error) {
-	v.log.file(pattern)
+	v.logPath(pattern)
 
 	return v.VFS.Glob(pattern)
 }
@@ -204,7 +236,7 @@ func (v *vfs) WalkDir(
 	root string,
 	fn fs.WalkDirFunc,
 ) error {
-	v.log.file(root)
+	v.logPath(root)
 
 	return v.VFS.WalkDir(root, fn)
 }

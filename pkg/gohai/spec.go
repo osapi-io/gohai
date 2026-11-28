@@ -26,6 +26,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/readlog"
@@ -90,8 +91,18 @@ func SpecPlatforms() []string {
 
 // Collectors are the built-in collectors, in the order that gohai runs
 // them. The reads come from running each collector on an empty host of each
-// platform, so they are always what the code does.
+// platform, so they are always what the code does. The list is built once,
+// on the first call, and each call returns its own copy of the slice.
 func Collectors() []CollectorSpec {
+	return slices.Clone(collectorSpecs())
+}
+
+// collectorSpecs builds the list of Collectors once, since each build runs
+// every collector on three platforms.
+var collectorSpecs = sync.OnceValue(buildCollectorSpecs)
+
+// buildCollectorSpecs is the list of Collectors.
+func buildCollectorSpecs() []CollectorSpec {
 	fields := factFields()
 	probe, _ := readlog.Sources(family.Debian)
 	out := make([]CollectorSpec, 0, len(builtinCollectors(probe)))
@@ -161,7 +172,7 @@ func factFields() map[string][]Field {
 		for t.Kind() == reflect.Pointer {
 			t = t.Elem()
 		}
-		if t.Kind() != reflect.Struct || name == "" || name == "-" {
+		if t.Kind() != reflect.Struct || name == "-" {
 			continue
 		}
 		var fields []Field
@@ -249,7 +260,11 @@ func CollectorProblems(
 		fix[c.Rule] = c.Fix
 	}
 	var out []Problem
-	add := func(name, rule, message string) {
+	add := func(
+		name string,
+		rule string,
+		message string,
+	) {
 		out = append(out, Problem{Collector: name, Rule: rule, Message: message, Fix: fix[rule]})
 	}
 	names := map[string]bool{}
