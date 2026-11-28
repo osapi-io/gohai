@@ -593,6 +593,41 @@ func (s *RegistryPublicTestSuite) TestRun() {
 			},
 		},
 		{
+			name: "a failed dependency skips its dependents, and the error names it",
+			setup: func(reg *collector.Registry) {
+				s.Require().
+					NoError(reg.Register(newFailingCollector(s.ctrl, "a", errors.New("boom"))))
+				// b and c have no Collect expectation: gomock fails the test
+				// if either one runs.
+				s.Require().NoError(reg.Register(newCollectorWith(s.ctrl, "b", "a")))
+				s.Require().NoError(reg.Register(newCollectorWith(s.ctrl, "c", "b")))
+				s.Require().
+					NoError(reg.Register(newCollector(s.ctrl, "good", "", true)))
+			},
+			names: []string{"c", "good"},
+			hooks: func(mu *sync.Mutex, onErr *[]string, _ *[]string) collector.Hooks {
+				return collector.Hooks{
+					OnError: func(n string, err error) {
+						mu.Lock()
+						defer mu.Unlock()
+						if n != "a" {
+							s.ErrorIs(err, collector.ErrDependencyFailed)
+						}
+						*onErr = append(*onErr, n+": "+err.Error())
+					},
+				}
+			},
+			validateFunc: func(results map[string]any, errNames, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Equal(map[string]any{"good": "good-result"}, results)
+				s.ElementsMatch([]string{
+					"a: boom",
+					"b: dependency failed: a: boom",
+					"c: dependency failed: b: dependency failed: a: boom",
+				}, errNames)
+			},
+		},
+		{
 			name: "a panic in a collector is its error, and the others run",
 			setup: func(reg *collector.Registry) {
 				bad := newCollectorWith(s.ctrl, "bad")

@@ -44,6 +44,11 @@ type Hooks struct {
 	OnComplete func(name string, dur time.Duration, err error)
 }
 
+// ErrDependencyFailed is the error of a collector that did not run because
+// a collector it depends on failed. The error names the dependency and wraps
+// its error.
+var ErrDependencyFailed = errors.New("dependency failed")
+
 // PanicError is the error of a collector that panicked. Error names the
 // collector and the panic value, and Stack holds the goroutine's stack at the
 // panic, so that a caller can find where it was.
@@ -192,6 +197,7 @@ func (r *Registry) Run(
 	}
 
 	results := make(map[string]any, len(collectors))
+	failed := make(map[string]error, len(collectors))
 	var resultsMu sync.Mutex
 
 	for _, level := range levels {
@@ -208,6 +214,10 @@ func (r *Registry) Run(
 		for k, v := range results {
 			prior[k] = v
 		}
+		failedBefore := make(map[string]error, len(failed))
+		for k, v := range failed {
+			failedBefore[k] = v
+		}
 		resultsMu.Unlock()
 
 		var wg sync.WaitGroup
@@ -217,7 +227,11 @@ func (r *Registry) Run(
 			go func() {
 				defer wg.Done()
 				start := time.Now()
-				out, cerr := collect(ctx, c, prior)
+				var out any
+				cerr := dependencyError(c, failedBefore)
+				if cerr == nil {
+					out, cerr = collect(ctx, c, prior)
+				}
 				dur := time.Since(start)
 				if hooks.OnComplete != nil {
 					hooks.OnComplete(c.Name(), dur, cerr)
@@ -226,6 +240,10 @@ func (r *Registry) Run(
 					if hooks.OnError != nil {
 						hooks.OnError(c.Name(), cerr)
 					}
+					resultsMu.Lock()
+					failed[c.Name()] = cerr
+					resultsMu.Unlock()
+
 					return
 				}
 				resultsMu.Lock()
@@ -361,4 +379,20 @@ func (r *Registry) topoLevels(
 		}
 	}
 	return levels, nil
+}
+
+// dependencyError is the error of a collector whose dependency failed in an
+// earlier level, or nil when each dependency succeeded. A collector that
+// failed this way is itself failed, so its own dependents do not run either.
+func dependencyError(
+	c Collector,
+	failed map[string]error,
+) error {
+	for _, dep := range c.Dependencies() {
+		if err, ok := failed[dep]; ok {
+			return fmt.Errorf("%w: %s: %w", ErrDependencyFailed, dep, err)
+		}
+	}
+
+	return nil
 }
