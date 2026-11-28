@@ -174,22 +174,22 @@ func failingToolboxMock(
 	return m
 }
 
-// exitStatus is the error of a command that exited by itself with a
+// exitStatusError is the error of a command that exited by itself with a
 // status, as an *exec.ExitError of a finished process is.
-type exitStatus int
+type exitStatusError int
 
-func (e exitStatus) Error() string {
+func (e exitStatusError) Error() string {
 	return fmt.Sprintf("exit status %d", int(e))
 }
 
 // ExitCode is the status the command exited with.
-func (e exitStatus) ExitCode() int {
+func (e exitStatusError) ExitCode() int {
 	return int(e)
 }
 
-// killed is the error that source.Commands returns for a command that its
+// errKilled is the error that source.Commands returns for a command that its
 // timeout killed: an *exec.ExitError with no exit status.
-var killed = fmt.Errorf("exec vmware-toolbox-cmd: stopped after 10s: %w", &exec.ExitError{})
+var errKilled = fmt.Errorf("exec vmware-toolbox-cmd: stopped after 10s: %w", &exec.ExitError{})
 
 func (s *VMwarePublicTestSuite) TestNew() {
 	orig := platform.Detect
@@ -550,7 +550,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				ctrl := gomock.NewController(s.T())
 				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
-					Return(nil, exitStatus(1)).AnyTimes()
+					Return(nil, exitStatusError(1)).AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
 			},
 			validateFunc: func(got any, err error) {
@@ -606,7 +606,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
 				return &vmware.Linux{
 					FS:   f,
-					Exec: failingToolboxMock(s.T(), "stat raw json session", exitStatus(1)),
+					Exec: failingToolboxMock(s.T(), "stat raw json session", exitStatusError(1)),
 				}
 			},
 			validateFunc: func(got any, err error) {
@@ -627,12 +627,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				_ = f.WriteFile("/proc/scsi/scsi", []byte("VMware SCSI\n"), fs.FileMode(0o444))
 				return &vmware.Linux{
 					FS:   f,
-					Exec: failingToolboxMock(s.T(), "stat raw json session", killed),
+					Exec: failingToolboxMock(s.T(), "stat raw json session", errKilled),
 				}
 			},
 			validateFunc: func(got any, err error) {
 				s.Nil(got)
-				s.ErrorIs(err, killed)
+				s.ErrorIs(err, errKilled)
 			},
 		},
 		{
@@ -642,12 +642,12 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 				ctrl := gomock.NewController(s.T())
 				m := sourcemocks.NewMockRunner(ctrl)
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "-v").
-					Return(nil, killed).AnyTimes()
+					Return(nil, errKilled).AnyTimes()
 				return &vmware.Linux{FS: memfs.New(), Exec: m}
 			},
 			validateFunc: func(got any, err error) {
 				s.Nil(got)
-				s.ErrorIs(err, killed)
+				s.ErrorIs(err, errKilled)
 			},
 		},
 		{
@@ -708,7 +708,7 @@ func (s *VMwarePublicTestSuite) TestCollect() {
 					Return([]byte(""), nil).
 					AnyTimes()
 				m.EXPECT().Execute(gomock.Any(), vmwareToolboxPath, "stat", "speed").
-					Return(nil, exitStatus(1)).AnyTimes()
+					Return(nil, exitStatusError(1)).AnyTimes()
 				m.EXPECT().
 					Execute(gomock.Any(), vmwareToolboxPath, "stat", "sessionid").
 					Return([]byte(""), nil).
