@@ -755,10 +755,33 @@ func (s *RegistryPublicTestSuite) TestRun() {
 				s.ElementsMatch([]string{
 					"ok: ok",
 					"absent: absent",
-					"unsupported: unsupported",
+					"unsupported: unsupported: darwin: not supported on this platform",
 					"failed: failed: boom",
 					"partial: partial: one read failed",
 				}, statuses)
+			},
+		},
+		{
+			name: "a partial dependency gives its dependent the fact it read",
+			setup: func(reg *collector.Registry) {
+				a := newCollectorWith(s.ctrl, "a")
+				a.EXPECT().
+					Collect(gomock.Any(), gomock.Any()).
+					Return("a-partial", errors.New("one read failed"))
+				s.Require().NoError(reg.Register(a))
+				b := newCollectorWith(s.ctrl, "b", "a")
+				b.EXPECT().
+					Collect(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, prior collector.PriorResults) (any, error) {
+						return "b saw " + prior["a"].(string), nil
+					})
+				s.Require().NoError(reg.Register(b))
+			},
+			names: []string{"b"},
+			validateFunc: func(results map[string]any, errNames, _ []string, err error) {
+				s.Require().NoError(err)
+				s.Equal(map[string]any{"a": "a-partial", "b": "b saw a-partial"}, results)
+				s.Equal([]string{"a"}, errNames)
 			},
 		},
 		{

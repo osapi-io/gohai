@@ -247,6 +247,9 @@ func (r *Registry) Run(
 				}
 				dur := time.Since(start)
 				status := StatusOf(out, cerr)
+				if hooks.OnStatus != nil {
+					hooks.OnStatus(c.Name(), status, cerr)
+				}
 				if status == StatusUnsupported {
 					// Nothing to read on this platform is not an error of
 					// the run, and a dependent runs without the fact.
@@ -255,15 +258,14 @@ func (r *Registry) Run(
 				if hooks.OnComplete != nil {
 					hooks.OnComplete(c.Name(), dur, cerr)
 				}
-				if hooks.OnStatus != nil {
-					hooks.OnStatus(c.Name(), status, cerr)
-				}
 				if cerr != nil && hooks.OnError != nil {
 					hooks.OnError(c.Name(), cerr)
 				}
 				resultsMu.Lock()
 				defer resultsMu.Unlock()
-				if cerr != nil {
+				// Only a collector with no fact stops its dependents. A partial
+				// one gives them the fact it read.
+				if cerr != nil && out == nil {
 					failed[c.Name()] = cerr
 				}
 				// A partial result keeps what the collector read before its
