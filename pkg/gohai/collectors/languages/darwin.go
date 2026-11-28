@@ -47,14 +47,9 @@ func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	stub := map[string]bool{}
-	return collectLanguages(ctx, d.Exec, func(cmd string) bool {
-		if v, ok := stub[cmd]; ok {
-			return v
-		}
-		stub[cmd] = d.isStub(ctx, cmd)
-		return stub[cmd]
-	}), nil
+	return collector.Result(collectLanguages(ctx, d.Exec, func(cmd string) bool {
+		return d.isStub(ctx, cmd)
+	}))
 }
 
 // stubChecks names, for each runtime that macOS ships as a stub in

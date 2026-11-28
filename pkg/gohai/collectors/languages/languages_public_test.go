@@ -23,6 +23,8 @@ package languages_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -108,7 +110,7 @@ func buildAbsentMock(
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	m := mocks.NewMockRunner(ctrl)
-	absent := errors.New("not found")
+	absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
 	m.EXPECT().Execute(gomock.Any(), "go", "version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "python3", "--version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "ruby", "--version").Return(nil, absent).AnyTimes()
@@ -142,7 +144,7 @@ func buildSingleMock(
 	t.Helper()
 	ctrl := gomock.NewController(t)
 	m := mocks.NewMockRunner(ctrl)
-	absent := errors.New("not found")
+	absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
 
 	probes := []struct{ cmd, arg string }{
 		{"go", "version"},
@@ -238,9 +240,11 @@ func (s *LanguagesPublicTestSuite) TestNew() {
 
 func (s *LanguagesPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name         string
-		variant      string
-		exec         source.Runner
+		name    string
+		variant string
+		exec    source.Runner
+		// cancel runs Collect with a context that is already cancelled.
+		cancel       bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -375,17 +379,20 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
-				absent := errors.New("not found")
+				absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
 				for _, p := range [][]string{
 					{"go", "version"},
 					{"python3", "--version"},
 					{"ruby", "--version"},
 					{"node", "--version"},
-					{"java", "--version"},
 					{"perl", "--version"},
 				} {
 					m.EXPECT().Execute(gomock.Any(), p[0], p[1]).Return(nil, absent).AnyTimes()
 				}
+				// Java 8 is on the PATH, and exits non-zero for --version.
+				m.EXPECT().
+					Execute(gomock.Any(), "java", "--version").
+					Return(nil, errors.New("exit status 1"))
 				m.EXPECT().
 					Execute(gomock.Any(), "sh", "-c", "java -version 2>&1").
 					Return([]byte("openjdk version \"1.8.0_292\"\nOpenJDK Runtime Environment\n"), nil)
@@ -403,17 +410,20 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			variant: "linux",
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
-				absent := errors.New("not found")
+				absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
 				for _, p := range [][]string{
 					{"go", "version"},
 					{"python3", "--version"},
 					{"ruby", "--version"},
 					{"node", "--version"},
-					{"java", "--version"},
 					{"perl", "--version"},
 				} {
 					m.EXPECT().Execute(gomock.Any(), p[0], p[1]).Return(nil, absent).AnyTimes()
 				}
+				// Java 8 is on the PATH, and exits non-zero for --version.
+				m.EXPECT().
+					Execute(gomock.Any(), "java", "--version").
+					Return(nil, errors.New("exit status 1"))
 				m.EXPECT().
 					Execute(gomock.Any(), "sh", "-c", "java -version 2>&1").
 					Return([]byte("Picked up JAVA_TOOL_OPTIONS: -Xmx512m\nopenjdk version \"1.8.0_292\"\nOpenJDK Runtime Environment\n"), nil)
@@ -431,7 +441,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
-				absent := errors.New("not found")
+				absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
 				for _, p := range [][]string{
 					{"go", "version"}, {"ruby", "--version"}, {"node", "--version"}, {"perl", "--version"},
 				} {
@@ -459,7 +469,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			variant: "darwin",
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
-				absent := errors.New("not found")
+				absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
 				for _, p := range [][]string{
 					{"go", "version"}, {"ruby", "--version"}, {"node", "--version"}, {"perl", "--version"},
 				} {
@@ -479,6 +489,78 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 				info, ok := got.(*languages.Info)
 				s.Require().True(ok)
 				s.Equal(languages.Info{Python: strPtr("3.12.1")}, *info)
+			},
+		},
+		{
+			name:    "linux: a runtime that runs and fails is an error",
+			variant: "linux",
+			exec: func() source.Runner {
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
+				absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
+				m.EXPECT().
+					Execute(gomock.Any(), "go", "version").
+					Return(nil, errors.New("exit status 2"))
+				for _, p := range [][]string{
+					{"python3", "--version"},
+					{"ruby", "--version"},
+					{"node", "--version"},
+					{"java", "--version"},
+					{"perl", "--version"},
+				} {
+					m.EXPECT().Execute(gomock.Any(), p[0], p[1]).Return(nil, absent)
+				}
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.EqualError(err, "go version: exit status 2")
+			},
+		},
+		{
+			name:    "linux: a java 8 whose -version fails is an error",
+			variant: "linux",
+			exec: func() source.Runner {
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
+				absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
+				for _, p := range [][]string{
+					{"go", "version"},
+					{"python3", "--version"},
+					{"ruby", "--version"},
+					{"node", "--version"},
+					{"perl", "--version"},
+				} {
+					m.EXPECT().Execute(gomock.Any(), p[0], p[1]).Return(nil, absent)
+				}
+				m.EXPECT().
+					Execute(gomock.Any(), "java", "--version").
+					Return(nil, errors.New("exit status 1"))
+				m.EXPECT().
+					Execute(gomock.Any(), "sh", "-c", "java -version 2>&1").
+					Return(nil, errors.New("exit status 1"))
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.EqualError(err, "sh -c java -version 2>&1: exit status 1")
+			},
+		},
+		{
+			name:    "linux: a cancelled context is an error, not an empty Info",
+			variant: "linux",
+			cancel:  true,
+			exec: func() source.Runner {
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
+				m.EXPECT().
+					Execute(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, context.Canceled).
+					AnyTimes()
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorIs(err, context.Canceled)
+				s.ErrorContains(err, "go: context canceled")
+				s.ErrorContains(err, "java: context canceled")
 			},
 		},
 		{
@@ -502,7 +584,12 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			case "darwin":
 				c = &languages.Darwin{Exec: tt.exec}
 			}
-			tt.validateFunc(c.Collect(context.Background(), nil))
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			if tt.cancel {
+				cancel()
+			}
+			tt.validateFunc(c.Collect(ctx, nil))
 		})
 	}
 }
