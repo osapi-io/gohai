@@ -26,6 +26,8 @@ package languages
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -82,15 +84,35 @@ func NewWith(
 
 // collectLanguages probes each well-known language runtime and returns
 // an Info struct. It is shared between Linux and Darwin, because version flags
-// are identical on both platforms.
+// are identical on both platforms. A runtime that is not on the PATH is nil;
+// one that runs and fails, or a done ctx, is an error.
 func collectLanguages(
 	ctx context.Context,
 	exec source.Runner,
 	skip func(cmd string) bool,
-) *Info {
+) (*Info, error) {
 	info := &Info{}
 	if exec == nil {
-		return info
+		return info, nil
+	}
+	var errs []error
+	// run executes one probe. It returns the output, or nil for an absent
+	// runtime, and records any other failure.
+	run := func(
+		cmd string,
+		args ...string,
+	) ([]byte, error) {
+		out, err := exec.Execute(ctx, cmd, args...)
+		if err == nil {
+			return out, nil
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("%s: %w", cmd, ctxErr)
+		}
+		if collector.Absent(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("%s %s: %w", cmd, strings.Join(args, " "), err)
 	}
 	probe := func(
 		cmd string,
@@ -100,8 +122,12 @@ func collectLanguages(
 		if skip != nil && skip(cmd) {
 			return nil
 		}
-		out, err := exec.Execute(ctx, cmd, args...)
+		out, err := run(cmd, args...)
 		if err != nil {
+			errs = append(errs, err)
+			return nil
+		}
+		if out == nil {
 			return nil
 		}
 		return parser(string(out))
@@ -111,17 +137,44 @@ func collectLanguages(
 	info.Python = probe("python3", []string{"--version"}, parsePythonVersion)
 	info.Ruby = probe("ruby", []string{"--version"}, parseRubyVersion)
 	info.Node = probe("node", []string{"--version"}, parseNodeVersion)
-	info.Java = probe("java", []string{"--version"}, parseJavaVersion)
-	if info.Java == nil && (skip == nil || !skip("java")) {
-		// Java 8 has no --version. Its java -version writes to stderr, so
-		// the shell joins stderr to stdout.
-		out, err := exec.Execute(ctx, "sh", "-c", "java -version 2>&1")
-		if err == nil {
-			info.Java = parseJavaVersion(string(out))
-		}
-	}
+	info.Java = probeJava(ctx, exec, skip, run, &errs)
 	info.Perl = probe("perl", []string{"--version"}, parsePerlVersion)
-	return info
+	if err := errors.Join(errs...); err != nil {
+		return nil, err
+	}
+	return info, nil
+}
+
+// probeJava reads the Java version. Java 9 and later print it for
+// --version. Java 8 has no --version and exits non-zero for it, so a java
+// that is on the PATH and fails --version is asked with -version, which
+// writes to stderr; the shell joins stderr to stdout.
+func probeJava(
+	ctx context.Context,
+	exec source.Runner,
+	skip func(cmd string) bool,
+	run func(cmd string, args ...string) ([]byte, error),
+	errs *[]error,
+) *string {
+	if skip != nil && skip("java") {
+		return nil
+	}
+	out, err := exec.Execute(ctx, "java", "--version")
+	switch {
+	case err == nil:
+		return parseJavaVersion(string(out))
+	case ctx.Err() != nil:
+		*errs = append(*errs, fmt.Errorf("java: %w", ctx.Err()))
+		return nil
+	case collector.Absent(err):
+		return nil
+	}
+	out, err = run("sh", "-c", "java -version 2>&1")
+	if err != nil {
+		*errs = append(*errs, err)
+		return nil
+	}
+	return parseJavaVersion(string(out))
 }
 
 // strPtr returns a pointer to s.

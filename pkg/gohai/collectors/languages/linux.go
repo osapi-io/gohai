@@ -45,5 +45,5 @@ func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return collectLanguages(ctx, l.Exec, nil), nil
+	return collector.Result(collectLanguages(ctx, l.Exec, nil))
 }

@@ -91,14 +91,18 @@ the two platforms:
    output (`v20.1.0` → `20.1.0`).
 5. **Java.** `java --version`, which writes to stdout. The collector gets the
    second field of the first line (`openjdk 21.0.1 2023-10-17` → `21.0.1`). Java
-   8 does not have `--version`, so the collector gives no version for it.
+   8 does not have `--version` and exits non-zero for it. For a `java` that is
+   on the PATH and fails `--version`, the collector runs `java -version`, which
+   writes to stderr, and reads the version from its `version "..."` line.
 6. **Perl.** `perl --version`. The collector gets the `(vX.Y.Z)` form in
    parentheses from the first line, and removes the `v` (`(v5.36.0)` →
    `5.36.0`).
 
-If a probe fails, the collector sets its field to `nil`. A probe fails if the
-command is not found or gives a non-zero exit code. The collector never returns
-an error, because missing runtimes are usual on minimal hosts.
+If a runtime's command is not on the PATH, the collector sets its field to
+`nil`, because missing runtimes are usual on minimal hosts. A command that is
+there and fails, for example with a non-zero exit code or a permission error, is
+an error, and so is a cancelled context. An absent source is an empty result,
+and a failed read is an error.
 
 ## Backing library
 
