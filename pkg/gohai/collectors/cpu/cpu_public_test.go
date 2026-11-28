@@ -300,6 +300,15 @@ func (s *CPUPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "darwin: no Exec gives no fact",
+			variant: "darwin",
+			exec:    func(*testing.T) source.Runner { return nil },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
+		},
+		{
 			name:    "darwin: an Intel Mac's family, model, flags and frequency, with the logical count as cores when hw.physicalcpu fails",
 			variant: "darwin",
 			runner: sourcetest.Commands{Out: map[string]string{

@@ -90,12 +90,16 @@ func (l *Linux) Collect(
 }
 
 // machine is the hardware architecture: /proc/sys/kernel/arch, or uname -m
-// on a kernel without it.
+// on a kernel without it. With no Exec, a kernel without arch gives an
+// empty machine.
 func (l *Linux) machine(
 	ctx context.Context,
 ) (string, error) {
 	if b, err := l.FS.ReadFile(procArch); err == nil && field(b) != "" {
 		return field(b), nil
+	}
+	if l.Exec == nil {
+		return "", nil
 	}
 	out, err := l.Exec.Execute(ctx, "uname", "-m")
 	if err != nil {

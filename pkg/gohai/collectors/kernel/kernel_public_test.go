@@ -175,6 +175,7 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 		name         string
 		files        func() map[string]string
 		answers      []answer
+		nilExec      bool
 		validateFunc func(any, error)
 	}{
 		{
@@ -243,6 +244,17 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 			},
 		},
 		{
+			name:    "when the kernel has no arch and there is no Exec, the machine is empty",
+			files:   ubuntu,
+			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i := got.(*kernel.Info)
+				s.Equal("Linux", i.Name)
+				s.Empty(i.Machine)
+			},
+		},
+		{
 			name:    "when uname -m fails, it is an error",
 			files:   ubuntu,
 			answers: []answer{{args: []string{"uname", "-m"}, err: errors.New("no uname")}},
@@ -254,6 +266,9 @@ func (s *KernelPublicTestSuite) TestCollectLinux() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			c := &kernel.Linux{FS: s.hostFS(tt.files()), Exec: s.exec(tt.answers...)}
+			if tt.nilExec {
+				c.Exec = nil
+			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
@@ -266,8 +281,17 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 	tests := []struct {
 		name         string
 		answers      []answer
+		nilExec      bool
 		validateFunc func(any, error)
 	}{
+		{
+			name:    "when there is no Exec, there is no fact",
+			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
+		},
 		{
 			name:    "when it runs on Apple Silicon, with no Rosetta",
 			answers: []answer{sysctlKernel(arm, nil)},
@@ -333,6 +357,9 @@ func (s *KernelPublicTestSuite) TestCollectDarwin() {
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			c := &kernel.Darwin{Exec: s.exec(tt.answers...)}
+			if tt.nilExec {
+				c.Exec = nil
+			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}

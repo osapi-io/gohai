@@ -51,11 +51,15 @@ func NewDarwin() *Darwin {
 }
 
 // Collect returns the CPU Info: one entry, for the package, as gopsutil
-// gave it on macOS.
+// gave it on macOS. With no Exec it gives no fact, as every value comes
+// from sysctl.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	count, ok := sysctlInt(ctx, d.Exec, "hw.logicalcpu")
 	if !ok {
 		return nil, fmt.Errorf("sysctl hw.logicalcpu failed")

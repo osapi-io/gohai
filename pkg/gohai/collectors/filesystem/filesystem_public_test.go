@@ -735,6 +735,15 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "darwin: no Exec gives no fact",
+			variant: "darwin",
+			exec:    func(*testing.T) source.Runner { return nil },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Nil(got)
+			},
+		},
+		{
 			name:    "darwin: APFS root populated",
 			variant: "darwin",
 			out:     darwinOut,
@@ -813,9 +822,13 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				}
 				c = &filesystem.Linux{FS: fs, Exec: exec}
 			case "darwin":
-				c = &filesystem.Darwin{
+				d := &filesystem.Darwin{
 					Exec: sourcetest.Commands{Out: tt.out, Err: tt.errs}.Mock(s.T()),
 				}
+				if tt.exec != nil {
+					d.Exec = tt.exec(s.T())
+				}
+				c = d
 			}
 			tt.validateFunc(c.Collect(context.Background(), nil))
 		})

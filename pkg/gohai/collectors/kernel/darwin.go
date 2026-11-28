@@ -47,11 +47,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect returns kernel Info.
+// Collect returns kernel Info. With no Exec it gives no fact, as every
+// value comes from sysctl.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	// The four values of uname(3), one to a line, in the order asked.
 	out, err := d.Exec.Execute(ctx, "sysctl", "-n",
 		"kern.ostype", "kern.osrelease", "kern.version", "hw.machine")
