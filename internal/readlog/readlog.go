@@ -79,19 +79,28 @@ func (l *Log) file(
 }
 
 // Sources is an empty host of family, and the log of what is read from it.
+// The host has only the runtime directory of systemd-resolved, so that the
+// dns collector goes on to run resolvectl, as on a host where the service
+// runs. osapi builds its command allowlist from these reads.
 func Sources(
 	family string,
 ) (source.Sources, *Log) {
 	l := &Log{files: map[string]bool{}, commands: map[string]bool{}}
+	fs := memfs.New()
+	_ = fs.MkdirAll(resolvedRuntimeDir, 0o755)
 
 	return source.Sources{
-		FS:       &vfs{VFS: memfs.New(), log: l},
+		FS:       &vfs{VFS: fs, log: l},
 		Exec:     runner{log: l},
 		Now:      func() time.Time { return time.Unix(0, 0).UTC() },
 		Family:   family,
 		Resolver: resolver{},
 	}, l
 }
+
+// resolvedRuntimeDir is the directory that systemd-resolved makes while it
+// runs.
+const resolvedRuntimeDir = "/run/systemd/resolve"
 
 // vfs is an empty file system that logs each path that is read.
 type vfs struct {
