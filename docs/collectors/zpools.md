@@ -42,7 +42,8 @@ Consumers use this to:
 | Linux    | ✅ (if OpenZFS is installed) |
 | macOS    | ✅ (if OpenZFS is installed) |
 
-If `zpool` is missing, the two variants return an empty list, not an error.
+If `zpool` is missing, the two variants return an empty list, not an error. If
+`zpool` is there and fails, they return the error.
 
 ## Example output
 

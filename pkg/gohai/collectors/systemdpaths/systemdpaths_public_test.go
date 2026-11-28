@@ -23,6 +23,8 @@ package systemdpaths_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -204,12 +206,26 @@ user-runtime: /run/user/1000
 		{
 			name:    "linux: exec error yields empty paths, no error",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return systemdPathExec(t, nil, errors.New("not found")) },
+			exec: func(t *testing.T) source.Runner {
+				return systemdPathExec(t, nil, fmt.Errorf("exec: %w", osexec.ErrNotFound))
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*systemdpaths.Info)
 				s.Require().True(ok)
 				s.Equal(map[string]string{}, info.Paths)
+			},
+		},
+		{
+			name:    "linux: a failed run is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return systemdPathExec(t, nil, errors.New("exit status 1: permission denied"))
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				s.Nil(got)
 			},
 		},
 		{

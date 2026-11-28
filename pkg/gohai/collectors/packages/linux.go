@@ -23,6 +23,7 @@ package packages
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -49,8 +50,8 @@ func NewLinux() *Linux {
 }
 
 // Collect queries the installed-package database and returns the
-// package list. Returns an empty list (not an error) if the query tool
-// is absent or fails — mirrors Ohai's no-panic stance.
+// package list. It returns an empty list when the query tool is not on
+// the host, and the error when the tool fails.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -79,7 +80,10 @@ func collectDpkg(
 	format := "${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n"
 	out, err := exec.Execute(ctx, "dpkg-query", "-W", "-f="+format)
 	if err != nil {
-		return &Info{Packages: []Package{}}, nil
+		if collector.Absent(err) {
+			return &Info{Packages: []Package{}}, nil
+		}
+		return nil, fmt.Errorf("dpkg-query: %w", err)
 	}
 	info := &Info{Packages: []Package{}}
 	sc := bufio.NewScanner(strings.NewReader(string(out)))
@@ -115,7 +119,10 @@ func collectRPM(
 	format := "%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n"
 	out, err := exec.Execute(ctx, "rpm", "-qa", "--qf", format)
 	if err != nil {
-		return &Info{Packages: []Package{}}, nil
+		if collector.Absent(err) {
+			return &Info{Packages: []Package{}}, nil
+		}
+		return nil, fmt.Errorf("rpm -qa: %w", err)
 	}
 	info := &Info{Packages: []Package{}}
 	sc := bufio.NewScanner(strings.NewReader(string(out)))

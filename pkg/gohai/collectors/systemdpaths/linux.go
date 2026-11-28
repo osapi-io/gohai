@@ -22,6 +22,7 @@ package systemdpaths
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -42,8 +43,8 @@ func NewLinux() *Linux {
 	return &Linux{Exec: source.Commands()}
 }
 
-// Collect runs `systemd-path` and parses its output. Exec errors yield
-// an empty Info — not an error.
+// Collect runs `systemd-path` and parses its output. A host without
+// systemd-path gives an empty Info, and a failed run is an error.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
@@ -53,7 +54,10 @@ func (l *Linux) Collect(
 	}
 	out, err := l.Exec.Execute(ctx, "systemd-path")
 	if err != nil {
-		return &Info{Paths: make(map[string]string)}, nil
+		if collector.Absent(err) {
+			return &Info{Paths: make(map[string]string)}, nil
+		}
+		return nil, fmt.Errorf("systemd-path: %w", err)
 	}
 	return parseSystemdPath(string(out)), nil
 }

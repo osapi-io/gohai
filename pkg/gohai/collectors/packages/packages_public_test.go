@@ -23,6 +23,8 @@ package packages_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -316,7 +318,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
 					},
 					nil,
-					errors.New("not found"),
+					fmt.Errorf("exec: %w", osexec.ErrNotFound),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -324,6 +326,28 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				info, ok := got.(*packages.Info)
 				s.Require().True(ok)
 				s.Equal([]packages.Package{}, info.Packages)
+			},
+		},
+		{
+			name:    "linux debian: a failed run is an error",
+			variant: "linux",
+			detect:  "debian",
+			exec: func(t *testing.T) source.Runner {
+				return mockExec(
+					t,
+					"dpkg-query",
+					[]string{
+						"-W",
+						"-f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n",
+					},
+					nil,
+					errors.New("exit status 1: permission denied"),
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				s.Nil(got)
 			},
 		},
 		{
@@ -379,7 +403,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
 					},
 					nil,
-					errors.New("not found"),
+					fmt.Errorf("exec: %w", osexec.ErrNotFound),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -387,6 +411,29 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				info, ok := got.(*packages.Info)
 				s.Require().True(ok)
 				s.Equal([]packages.Package{}, info.Packages)
+			},
+		},
+		{
+			name:    "linux rhel: a failed run is an error",
+			variant: "linux",
+			detect:  "rhel",
+			exec: func(t *testing.T) source.Runner {
+				return mockExec(
+					t,
+					"rpm",
+					[]string{
+						"-qa",
+						"--qf",
+						"%{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n",
+					},
+					nil,
+					errors.New("exit status 1: permission denied"),
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				s.Nil(got)
 			},
 		},
 		{
@@ -516,7 +563,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					"brew",
 					[]string{"list", "--versions"},
 					nil,
-					errors.New("not found"),
+					fmt.Errorf("exec: %w", osexec.ErrNotFound),
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -524,6 +571,24 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 				info, ok := got.(*packages.Info)
 				s.Require().True(ok)
 				s.Equal([]packages.Package{}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a failed run is an error",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return mockExec(
+					t,
+					"brew",
+					[]string{"list", "--versions"},
+					nil,
+					errors.New("exit status 1: permission denied"),
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				s.Nil(got)
 			},
 		},
 		{

@@ -22,6 +22,7 @@ package virtualbox
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -53,7 +54,10 @@ func (d *Darwin) Collect(
 	}
 	out, err := d.Exec.Execute(ctx, "VBoxControl", "guestproperty", "enumerate")
 	if err != nil {
-		return nil, nil
+		if collector.Absent(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("VBoxControl guestproperty enumerate: %w", err)
 	}
 	return parseVBoxControlOutput(out), nil
 }

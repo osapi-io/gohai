@@ -123,7 +123,7 @@ The collector is the same as Ohai's `linux/scsi.rb`. It uses the same command,
 the same parse algorithm, the same field names and the same key for each
 address. If `lsscsi` is missing, Ohai skips it, because the plugin has
 `optional true`. The gohai collector does the same: it returns an empty result,
-not an error.
+not an error. If `lsscsi` is there and fails, the collector returns the error.
 
 ## Backing library
 

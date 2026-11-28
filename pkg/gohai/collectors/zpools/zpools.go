@@ -27,6 +27,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -139,9 +140,9 @@ func parseZpoolList(
 	return pools
 }
 
-// collectPools runs `zpool list` via execFn and parses the output. If
-// zpool is not found (command error) it returns an empty list without
-// error — ZFS is not installed on this host.
+// collectPools runs `zpool list` and parses the output. If zpool is
+// not on the host, ZFS is not installed, and it returns an empty list.
+// A failed zpool run is an error.
 func collectPools(
 	ctx context.Context,
 	exec source.Runner,
@@ -151,8 +152,11 @@ func collectPools(
 	}
 	out, err := exec.Execute(ctx, "zpool", zpoolArgs...)
 	if err != nil {
-		// zpool not installed or no pools — return empty, not an error.
-		return &Info{Pools: []Pool{}}, nil
+		// zpool is not installed: ZFS is not on this host.
+		if collector.Absent(err) {
+			return &Info{Pools: []Pool{}}, nil
+		}
+		return nil, fmt.Errorf("zpool list: %w", err)
 	}
 	return &Info{Pools: parseZpoolList(out)}, nil
 }

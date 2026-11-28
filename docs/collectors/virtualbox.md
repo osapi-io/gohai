@@ -104,9 +104,10 @@ five properties with the regex patterns from the guest branch of Ohai's
 - `GuestAdd/VersionExt, value: <val>,` → `guest_additions_version`
 - `GuestAdd/Revision, value: <val>,` → `guest_additions_revision`
 
-If `VBoxControl` is missing, the command fails and `Collect` returns `nil`, not
-an error. `VBoxControl` is missing if the host is not a VirtualBox guest, or if
-Guest Additions are not installed. The collector ignores all other lines in the
+If `VBoxControl` is missing, `Collect` returns `nil`, not an error.
+`VBoxControl` is missing if the host is not a VirtualBox guest, or if Guest
+Additions are not installed. If `VBoxControl` is there and fails, `Collect`
+returns the error. The collector ignores all other lines in the
 output and gives no message about them.
 
 ## Backing library

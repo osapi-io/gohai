@@ -107,12 +107,7 @@ func parseShells(
 func wrapReadError(
 	err error,
 ) (*Info, error) {
-	// avfs returns os.ErrNotExist-wrapped errors for missing files.
-	// We check via string match on the sentinel since avfs's error
-	// wrapping doesn't preserve errors.Is semantics across all
-	// backends.
-	if strings.Contains(err.Error(), "no such file or directory") ||
-		strings.Contains(err.Error(), "file does not exist") {
+	if collector.Absent(err) {
 		return &Info{Paths: []string{}}, nil
 	}
 	return nil, fmt.Errorf("read %s: %w", etcShellsPath, err)
