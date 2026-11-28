@@ -72,8 +72,9 @@ type Info struct {
 	PrivateIP string `json:"private_ip,omitempty"`
 }
 
-// Collector detects Linode hosts and reads interface-derived IPs.
-type Collector struct {
+// Host is the linode collector. It detects Linode hosts from the host's
+// files and reads the interface-derived IPs.
+type Host struct {
 	// FS is the filesystem that the apt sources are read from.
 	FS avfs.VFS
 	// Exec runs `ip -o -4 addr show`, which gives the addresses of eth0
@@ -81,37 +82,44 @@ type Collector struct {
 	Exec source.Runner
 }
 
-var _ collector.Collector = (*Collector)(nil)
+// Collector is the public interface of the linode collector.
+type Collector interface {
+	collector.Collector
+}
 
-// New returns a Collector that reads the real host.
-func New() *Collector { return NewWith(source.Sources{}) }
+var _ Collector = (*Host)(nil)
 
-// NewWith returns a Collector that reads the host through src.
+// New returns the linode collector on the real host.
+func New() Collector {
+	return NewWith(source.Sources{})
+}
+
+// NewWith returns the linode collector reading the host through src.
 func NewWith(
 	src source.Sources,
-) *Collector {
-	return collector.Wire(&Collector{}, src)
+) Collector {
+	return collector.Wire(&Host{}, src)
 }
 
 // Name returns "linode".
-func (*Collector) Name() string { return "linode" }
+func (*Host) Name() string { return "linode" }
 
 // Category returns "cloud".
-func (*Collector) Category() collector.Category { return collector.CategoryCloud }
+func (*Host) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false, because cloud collectors are opt-in.
-func (*Collector) DefaultEnabled() bool { return false }
+func (*Host) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi, for the vendor of a Linode VM, and hostname
 // so the FQDN/Domain check can run against the host's resolved name
 // (matches Ohai's has_linode_domain? signal which reads node['domain']).
-func (*Collector) Dependencies() []string { return []string{"dmi", "hostname"} }
+func (*Host) Dependencies() []string { return []string{"dmi", "hostname"} }
 
 // Collect returns the Linode Info when any detection signal fires
 // (the DMI vendor is Linode, an apt source names linode, or the domain
 // contains "linode"), else (nil, nil). The apt and domain signals are
 // Ohai's looks_like_linode? OR chain.
-func (c *Collector) Collect(
+func (c *Host) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {

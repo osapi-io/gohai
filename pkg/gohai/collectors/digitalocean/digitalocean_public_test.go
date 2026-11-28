@@ -29,10 +29,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // doPrior returns a prior-results map whose dmi bios vendor matches
@@ -85,11 +86,11 @@ func TestDigitalOceanPublicTestSuite(
 func (s *DigitalOceanPublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		validateFunc func(*digitalocean.Collector)
+		validateFunc func(digitalocean.Collector)
 	}{
 		{
 			name: "New gives the digital_ocean cloud collector, opt-in, after dmi",
-			validateFunc: func(c *digitalocean.Collector) {
+			validateFunc: func(c digitalocean.Collector) {
 				s.Equal("digital_ocean", c.Name())
 				s.Equal(collector.CategoryCloud, c.Category())
 				s.False(c.DefaultEnabled())
@@ -229,8 +230,7 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 				defer srv.Close()
 			}
 
-			client := cloudmetadata.New(srv.URL)
-			c := digitalocean.NewWithClient(client)
+			c := digitalocean.NewWith(source.Sources{HTTP: sourcetest.Server(srv.URL)})
 
 			prior := tt.prior
 			if prior == nil {

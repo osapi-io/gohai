@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -141,6 +142,35 @@ func HTTP(
 	bodies map[string]string,
 ) http.RoundTripper {
 	return metadata(bodies)
+}
+
+// Server is a transport that sends each request to the server at base, such
+// as an httptest.Server's URL, in place of the host the request names. A
+// cloud collector reads it as source.Sources.HTTP, so a test serves the
+// metadata service with its own handler.
+func Server(
+	base string,
+) http.RoundTripper {
+	return server{base: base}
+}
+
+// server is the transport of Server.
+type server struct{ base string }
+
+// RoundTrip sends a copy of req to the server at s.base.
+func (s server) RoundTrip(
+	req *http.Request,
+) (*http.Response, error) {
+	to, err := url.Parse(s.base)
+	if err != nil {
+		return nil, fmt.Errorf("parse server URL: %w", err)
+	}
+	out := req.Clone(req.Context())
+	out.URL.Scheme = to.Scheme
+	out.URL.Host = to.Host
+	out.Host = to.Host
+
+	return http.DefaultTransport.RoundTrip(out)
 }
 
 // metadata is the transport of HTTP. http.RoundTripper is the standard

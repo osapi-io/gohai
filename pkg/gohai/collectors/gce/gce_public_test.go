@@ -167,11 +167,11 @@ func TestGcePublicTestSuite(
 func (s *GcePublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		validateFunc func(*gce.Collector)
+		validateFunc func(gce.Collector)
 	}{
 		{
 			name: "New gives the gce cloud collector, opt-in, after dmi",
-			validateFunc: func(c *gce.Collector) {
+			validateFunc: func(c gce.Collector) {
 				s.Equal("gce", c.Name())
 				s.Equal(collector.CategoryCloud, c.Category())
 				s.False(c.DefaultEnabled())

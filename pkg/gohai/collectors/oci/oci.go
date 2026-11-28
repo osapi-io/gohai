@@ -27,6 +27,7 @@ package oci
 import (
 	"context"
 	"errors"
+	"net/http"
 	"strings"
 	"time"
 
@@ -282,55 +283,56 @@ type rawVolumeAttachment struct {
 	EncryptionInTransit bool   `json:"encryptionInTransit"`
 }
 
-// Collector fetches OCI's three metadata endpoints.
-type Collector struct {
-	client *cloudmetadata.Client
+// Metadata fetches OCI's three metadata endpoints.
+type Metadata struct {
+	// HTTP is the transport of the metadata reads. A nil HTTP is the
+	// shared transport.
+	HTTP http.RoundTripper
 }
 
-var _ collector.Collector = (*Collector)(nil)
+// Collector is the public interface of the oci collector.
+type Collector interface {
+	collector.Collector
+}
 
-// New returns a default Collector pointed at OCI's metadata server
-// with the required Authorization header pre-configured and Ohai-
-// matching 6s timeout.
-func New() *Collector {
+var _ Collector = (*Metadata)(nil)
+
+// New returns the oci collector on the real host.
+func New() Collector {
 	return NewWith(source.Sources{})
 }
 
-// NewWith returns a Collector that reads the metadata service through
-// src.HTTP, so a fake host can answer it. A zero src.HTTP is the shared
-// transport.
+// NewWith returns the oci collector reading the host through src. It reads
+// the metadata service through src.HTTP, so a fake host can answer it. A
+// zero src.HTTP is the shared transport.
 func NewWith(
 	src source.Sources,
-) *Collector {
-	return NewWithClient(
-		cloudmetadata.New(
-			metadataBaseURL,
-			cloudmetadata.WithHeader(metadataAuthHeader, metadataAuthValue),
-			cloudmetadata.WithTimeout(metadataTimeout),
-			cloudmetadata.WithTransport(src.HTTP),
-		),
+) Collector {
+	return collector.Wire(&Metadata{}, src)
+}
+
+// client is the metadata client of c, which reads through c.HTTP.
+func (c *Metadata) client() *cloudmetadata.Client {
+	return cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithHeader(metadataAuthHeader, metadataAuthValue),
+		cloudmetadata.WithTimeout(metadataTimeout),
+		cloudmetadata.WithTransport(c.HTTP),
 	)
 }
 
-// NewWithClient returns a Collector backed by a caller-supplied client.
-func NewWithClient(
-	c *cloudmetadata.Client,
-) *Collector {
-	return &Collector{client: c}
-}
-
 // Name returns "oci".
-func (*Collector) Name() string { return "oci" }
+func (*Metadata) Name() string { return "oci" }
 
 // Category returns "cloud".
-func (*Collector) Category() collector.Category { return collector.CategoryCloud }
+func (*Metadata) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false, because cloud collectors are opt-in.
-func (*Collector) DefaultEnabled() bool { return false }
+func (*Metadata) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi, because OCI's signature is chassis.asset_tag
 // containing "OracleCloud.com". Matches Ohai's oci_chassis_asset_tag?.
-func (*Collector) Dependencies() []string { return []string{"dmi"} }
+func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the fetch on a DMI chassis.asset_tag match, then
 // fetches the three OCI metadata documents. Any per-endpoint failure
@@ -338,7 +340,7 @@ func (*Collector) Dependencies() []string { return []string{"dmi"} }
 // on lightweight shapes) is tolerated, and we populate what we can.
 // Returns (nil, nil) when the instance doc fetch fails, matching
 // "not on OCI" semantics.
-func (c *Collector) Collect(
+func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
@@ -347,7 +349,7 @@ func (c *Collector) Collect(
 	}
 
 	var ri rawInstance
-	if err := c.client.GetJSON(ctx, pathInstance, &ri); err != nil {
+	if err := c.client().GetJSON(ctx, pathInstance, &ri); err != nil {
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 			return nil, ctx.Err()
 		}
@@ -360,7 +362,7 @@ func (c *Collector) Collect(
 	// empty, and keeps the instance's facts. A cancelled context is the
 	// error of the collection.
 	var vnics []rawVNIC
-	if err := c.client.GetJSON(ctx, pathVNICs, &vnics); err == nil {
+	if err := c.client().GetJSON(ctx, pathVNICs, &vnics); err == nil {
 		for _, v := range vnics {
 			info.VNICs = append(info.VNICs, VNIC(v))
 		}
@@ -369,7 +371,7 @@ func (c *Collector) Collect(
 	}
 
 	var vols []rawVolumeAttachment
-	if err := c.client.GetJSON(ctx, pathVolumes, &vols); err == nil {
+	if err := c.client().GetJSON(ctx, pathVolumes, &vols); err == nil {
 		if len(vols) > 0 {
 			info.VolumeAttachments = make(map[string]VolumeAttachment, len(vols))
 		}

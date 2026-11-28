@@ -277,8 +277,8 @@ func registerBuiltins(
 var builtinCollectorsFn = builtinCollectors
 
 // builtinCollectors returns the built-in collectors to register, each
-// reading the host through src. The cloud collectors read their provider's
-// metadata service, which src does not cover.
+// reading the host through src. The cloud collectors also read their
+// provider's metadata service, through src.HTTP.
 func builtinCollectors(
 	src source.Sources,
 ) []collector.Collector {

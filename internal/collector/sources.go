@@ -22,6 +22,7 @@ package collector
 
 import (
 	"fmt"
+	"net/http"
 	"reflect"
 	"time"
 
@@ -62,6 +63,7 @@ var (
 	execType     = reflect.TypeFor[source.Runner]()
 	nowType      = reflect.TypeFor[func() time.Time]()
 	resolverType = reflect.TypeFor[source.Resolver]()
+	httpType     = reflect.TypeFor[http.RoundTripper]()
 )
 
 // sourceFields are the exported fields of a collector variant that hold a
@@ -74,13 +76,15 @@ var sourceFields = []struct {
 	{"Exec", execType},
 	{"Now", nowType},
 	{"Resolver", resolverType},
+	{"HTTP", httpType},
 }
 
 // Wire gives the collector variant c the sources of src, and returns c. It
 // sets the exported fields of the variant that hold a source: FS (an
-// avfs.VFS), Exec (a source.Runner), Now (a func() time.Time) and Resolver
-// (a source.Resolver). A field the variant does not have is not set. A zero
-// source in src is the real host's. A field with one of those names and a
+// avfs.VFS), Exec (a source.Runner), Now (a func() time.Time), Resolver
+// (a source.Resolver) and HTTP (an http.RoundTripper). A field the variant
+// does not have is not set. A zero source in src is the real host's, except
+// a zero HTTP, which stays nil: the cloud collectors' shared transport. A field with one of those names and a
 // different type is not set: CheckSources reports it, and Registry.Register
 // refuses the collector, so the collector cannot read the real host with
 // nothing to say so.
@@ -97,16 +101,36 @@ func Wire[C any](
 	s := v.Elem()
 	values := map[string]any{
 		"FS": src.FS, "Exec": src.Exec, "Now": src.Now, "Resolver": src.Resolver,
+		"HTTP": src.HTTP,
 	}
 	for _, sf := range sourceFields {
 		f := s.FieldByName(sf.name)
 		if !f.IsValid() || f.Type() != sf.typ || !f.CanSet() {
 			continue
 		}
+		// A zero HTTP stays zero: the cloud collectors' shared transport.
+		if values[sf.name] == nil {
+			continue
+		}
 		f.Set(reflect.ValueOf(values[sf.name]))
 	}
 
 	return c
+}
+
+// HasHTTP reports whether c is a variant with an HTTP source field: a
+// collector that reads over the network, such as a cloud's metadata
+// service, as well as the host.
+func HasHTTP(
+	c any,
+) bool {
+	v := reflect.ValueOf(c)
+	if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
+		return false
+	}
+	f, ok := v.Elem().Type().FieldByName("HTTP")
+
+	return ok && f.Type == httpType
 }
 
 // CheckSources returns an error when c is a pointer to a struct with a

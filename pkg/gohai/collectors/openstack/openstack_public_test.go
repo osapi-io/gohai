@@ -31,7 +31,6 @@ import (
 	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
@@ -94,13 +93,13 @@ func (s *OpenStackPublicTestSuite) TestNew() {
 	fs := memfs.New()
 	tests := []struct {
 		name         string
-		c            *openstack.Collector
-		validateFunc func(*openstack.Collector)
+		c            openstack.Collector
+		validateFunc func(openstack.Collector)
 	}{
 		{
 			name: "New: its name, category, default and dependencies",
 			c:    openstack.New(),
-			validateFunc: func(c *openstack.Collector) {
+			validateFunc: func(c openstack.Collector) {
 				s.Equal("openstack", c.Name())
 				s.Equal("cloud", string(c.Category()))
 				s.False(c.DefaultEnabled())
@@ -110,8 +109,8 @@ func (s *OpenStackPublicTestSuite) TestNew() {
 		{
 			name: "NewWith: reads the filesystem that it is given",
 			c:    openstack.NewWith(source.Sources{FS: fs, Family: family.Debian}),
-			validateFunc: func(c *openstack.Collector) {
-				s.Same(fs, c.FS)
+			validateFunc: func(c openstack.Collector) {
+				s.Same(fs, c.(*openstack.Metadata).FS)
 			},
 		},
 	}
@@ -401,9 +400,10 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				defer srv.Close()
 			}
 
-			client := cloudmetadata.New(srv.URL)
-			c := openstack.NewWithClient(client)
-			c.FS = sourcetest.FS(s.T(), files)
+			c := openstack.NewWith(source.Sources{
+				FS:   sourcetest.FS(s.T(), files),
+				HTTP: sourcetest.Server(srv.URL),
+			})
 
 			prior := tt.prior
 			if prior == nil {

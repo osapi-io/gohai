@@ -30,10 +30,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 func aliPrior() collector.PriorResults {
@@ -123,11 +124,11 @@ func TestAlibabaPublicTestSuite(
 func (s *AlibabaPublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		validateFunc func(*alibaba.Collector)
+		validateFunc func(alibaba.Collector)
 	}{
 		{
 			name: "New gives the alibaba cloud collector, opt-in, after dmi",
-			validateFunc: func(c *alibaba.Collector) {
+			validateFunc: func(c alibaba.Collector) {
 				s.Equal("alibaba", c.Name())
 				s.Equal(collector.CategoryCloud, c.Category())
 				s.False(c.DefaultEnabled())
@@ -547,22 +548,23 @@ func (s *AlibabaPublicTestSuite) TestCollect() {
 			if h == nil {
 				h = serve(tt.tree)
 			}
-			srv := httptest.NewServer(http.HandlerFunc(
+			// The collector asks for /2016-01-01/...; the handler serves the paths
+			// under it.
+			srv := httptest.NewServer(http.StripPrefix("/2016-01-01", http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					mu.Lock()
 					paths = append(paths, r.URL.Path)
 					mu.Unlock()
 					h(w, r)
 				},
-			))
+			)))
 			if tt.closed {
 				srv.Close()
 			} else {
 				defer srv.Close()
 			}
 
-			client := cloudmetadata.New(srv.URL)
-			c := alibaba.NewWithClient(client)
+			c := alibaba.NewWith(source.Sources{HTTP: sourcetest.Server(srv.URL)})
 
 			prior := tt.prior
 			if prior == nil {

@@ -29,6 +29,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -253,56 +254,57 @@ type rawProject struct {
 	Attributes       map[string]string `json:"attributes"`
 }
 
-// Collector fetches the GCE metadata tree via the cloudmetadata helper.
-type Collector struct {
-	client *cloudmetadata.Client
+// Metadata fetches the GCE metadata tree via the cloudmetadata helper.
+type Metadata struct {
+	// HTTP is the transport of the metadata reads. A nil HTTP is the
+	// shared transport.
+	HTTP http.RoundTripper
 }
 
-var _ collector.Collector = (*Collector)(nil)
+// Collector is the public interface of the gce collector.
+type Collector interface {
+	collector.Collector
+}
 
-// New returns a default Collector pointed at GCE's metadata server
-// with the required Metadata-Flavor header and Ohai-matching 6s timeout.
-func New() *Collector {
+var _ Collector = (*Metadata)(nil)
+
+// New returns the gce collector on the real host.
+func New() Collector {
 	return NewWith(source.Sources{})
 }
 
-// NewWith returns a Collector that reads the metadata service through
-// src.HTTP, so a fake host can answer it. A zero src.HTTP is the shared
-// transport.
+// NewWith returns the gce collector reading the host through src. It reads
+// the metadata service through src.HTTP, so a fake host can answer it. A
+// zero src.HTTP is the shared transport.
 func NewWith(
 	src source.Sources,
-) *Collector {
-	return NewWithClient(
-		cloudmetadata.New(
-			metadataBaseURL,
-			cloudmetadata.WithHeader(metadataFlavorHeader, "Google"),
-			cloudmetadata.WithTimeout(metadataTimeout),
-			cloudmetadata.WithTransport(src.HTTP),
-		),
+) Collector {
+	return collector.Wire(&Metadata{}, src)
+}
+
+// client is the metadata client of c, which reads through c.HTTP.
+func (c *Metadata) client() *cloudmetadata.Client {
+	return cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithHeader(metadataFlavorHeader, "Google"),
+		cloudmetadata.WithTimeout(metadataTimeout),
+		cloudmetadata.WithTransport(c.HTTP),
 	)
 }
 
-// NewWithClient returns a Collector backed by a caller-supplied
-// cloudmetadata.Client. Tests point the client at an httptest.Server.
-func NewWithClient(
-	c *cloudmetadata.Client,
-) *Collector {
-	return &Collector{client: c}
-}
-
 // Name returns "gce".
-func (*Collector) Name() string { return "gce" }
+func (*Metadata) Name() string { return "gce" }
 
 // Category returns "cloud".
-func (*Collector) Category() collector.Category { return collector.CategoryCloud }
+func (*Metadata) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false, because cloud collectors are opt-in.
-func (*Collector) DefaultEnabled() bool { return false }
+func (*Metadata) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi, because the DMI pre-check lets us skip the 2s
 // metadata-endpoint timeout on non-GCE hosts. Matches Ohai's
 // has_gce_dmi? gate in lib/ohai/plugins/gce.rb.
-func (*Collector) Dependencies() []string { return []string{"dmi"} }
+func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the metadata fetch on a DMI product_name match.
 // Issues one recursive=true GET; the response body is unmarshalled
@@ -313,14 +315,14 @@ func (*Collector) Dependencies() []string { return []string{"dmi"} }
 // Gce field drops from Facts. A read that fails for another reason,
 // such as a body over cloudmetadata.MaxBody, is an error, so the
 // facts are not lost with no word.
-func (c *Collector) Collect(
+func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onGCE(prior) {
 		return nil, ctx.Err()
 	}
-	body, err := c.client.Get(ctx, "/?recursive=true")
+	body, err := c.client().Get(ctx, "/?recursive=true")
 	if err != nil {
 		// A transport failure or a non-2xx answer means the host is
 		// not on GCE. Any other failure is the error of the read.

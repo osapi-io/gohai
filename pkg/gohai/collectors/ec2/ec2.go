@@ -29,6 +29,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -287,60 +288,59 @@ type rawIAMInfo struct {
 	InstanceProfileID  string `json:"InstanceProfileId"`
 }
 
-// Collector fetches EC2 metadata via IMDSv2 (with IMDSv1 fallback).
-type Collector struct {
+// Metadata fetches EC2 metadata via IMDSv2 (with IMDSv1 fallback).
+type Metadata struct {
+	// HTTP is the transport of the metadata reads. A nil HTTP is the
+	// shared transport.
+	HTTP http.RoundTripper
 	// FS is the filesystem that /sys/hypervisor/uuid is read from.
-	FS     avfs.VFS
-	client *cloudmetadata.Client
+	FS avfs.VFS
 	// darwin is true on macOS, where dmi has no tables.
 	darwin bool
 }
 
-var _ collector.Collector = (*Collector)(nil)
+// Collector is the public interface of the ec2 collector.
+type Collector interface {
+	collector.Collector
+}
 
-// New returns a default Collector pointed at EC2's metadata server
-// with Ohai-matching 10s timeout.
-func New() *Collector {
+var _ Collector = (*Metadata)(nil)
+
+// New returns the ec2 collector on the real host.
+func New() Collector {
 	return NewWith(source.Sources{})
 }
 
-// NewWith returns a Collector that reads the metadata service through
-// src.HTTP, so a fake host can answer it. A zero src.HTTP is the shared
-// transport.
+// NewWith returns the ec2 collector reading the host through src. It reads
+// the metadata service through src.HTTP, so a fake host can answer it. A
+// zero src.HTTP is the shared transport.
 func NewWith(
 	src source.Sources,
-) *Collector {
-	return NewWithClient(
-		cloudmetadata.New(
-			metadataBaseURL,
-			cloudmetadata.WithTimeout(metadataTimeout),
-			cloudmetadata.WithTransport(src.HTTP),
-		),
-		src,
+) Collector {
+	return collector.Wire(&Metadata{darwin: collector.IsDarwin(src)}, src)
+}
+
+// client is the metadata client of c, which reads through c.HTTP.
+func (c *Metadata) client() *cloudmetadata.Client {
+	return cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithTimeout(metadataTimeout),
+		cloudmetadata.WithTransport(c.HTTP),
 	)
 }
 
-// NewWithClient returns a Collector backed by a caller-supplied client, that
-// reads the host through src.
-func NewWithClient(
-	c *cloudmetadata.Client,
-	src source.Sources,
-) *Collector {
-	return collector.Wire(&Collector{client: c, darwin: collector.IsDarwin(src)}, src)
-}
-
 // Name returns "ec2".
-func (*Collector) Name() string { return "ec2" }
+func (*Metadata) Name() string { return "ec2" }
 
 // Category returns "cloud".
-func (*Collector) Category() collector.Category { return collector.CategoryCloud }
+func (*Metadata) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false, because cloud collectors are opt-in.
-func (*Collector) DefaultEnabled() bool { return false }
+func (*Metadata) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi, because EC2 writes "Amazon" as bios_vendor
 // and/or "amazon" in bios_version. Matches Ohai's DMI-based gates.
-func (*Collector) Dependencies() []string { return []string{"dmi"} }
+func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect runs the EC2 IMDS sequence matching Ohai's plugin:
 //  1. DMI + hypervisor UUID gates (fail open when dmi absent)
@@ -351,7 +351,7 @@ func (*Collector) Dependencies() []string { return []string{"dmi"} }
 //  5. IAM info (credentials scrubbed)
 //  6. Dynamic identity document
 //  7. User-data (base64 when binary)
-func (c *Collector) Collect(
+func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
@@ -363,7 +363,7 @@ func (c *Collector) Collect(
 	headers := imdsHeaders(token)
 	version := c.negotiateAPIVersion(ctx, headers)
 	versionedGet := func(path string) ([]byte, error) {
-		return c.client.GetWithHeaders(ctx, "/"+version+path, headers)
+		return c.client().GetWithHeaders(ctx, "/"+version+path, headers)
 	}
 
 	values := make(map[string]string, len(metadataPaths))
@@ -534,10 +534,10 @@ func onEC2(
 
 // fetchIMDSv2Token requests an IMDSv2 token with a 60s TTL. Empty
 // string on failure → IMDSv1 fallback path.
-func (c *Collector) fetchIMDSv2Token(
+func (c *Metadata) fetchIMDSv2Token(
 	ctx context.Context,
 ) string {
-	body, err := c.client.Put(ctx, tokenPath, map[string]string{
+	body, err := c.client().Put(ctx, tokenPath, map[string]string{
 		tokenTTLHeader: tokenTTLValue,
 	})
 	if err != nil {
@@ -560,11 +560,11 @@ func imdsHeaders(
 // picks the latest one gohai knows. On failure (404, empty list, no
 // intersection) falls back to "latest", which EC2 aliases to its
 // newest supported version. Matches Ohai's best_api_version.
-func (c *Collector) negotiateAPIVersion(
+func (c *Metadata) negotiateAPIVersion(
 	ctx context.Context,
 	headers map[string]string,
 ) string {
-	body, err := c.client.GetWithHeaders(ctx, "/", headers)
+	body, err := c.client().GetWithHeaders(ctx, "/", headers)
 	if err != nil {
 		return "latest"
 	}

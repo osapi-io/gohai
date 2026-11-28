@@ -401,69 +401,66 @@ type rawSubnet struct {
 	Prefix  string `json:"prefix"`
 }
 
-// Collector fetches Azure's single-JSON metadata response.
-type Collector struct {
-	client *cloudmetadata.Client
+// Metadata fetches Azure's single-JSON metadata response.
+type Metadata struct {
+	// HTTP is the transport of the metadata reads. A nil HTTP is the
+	// shared transport.
+	HTTP http.RoundTripper
 	// FS is the filesystem that the waagent binary and the dhclient leases
 	// are read from.
 	FS avfs.VFS
 }
 
-var _ collector.Collector = (*Collector)(nil)
+// Collector is the public interface of the azure collector.
+type Collector interface {
+	collector.Collector
+}
 
-// New returns a default Collector pointed at Azure's metadata server
-// with the required Metadata: true header and Ohai-matching 6s timeout.
-func New() *Collector {
+var _ Collector = (*Metadata)(nil)
+
+// New returns the azure collector on the real host.
+func New() Collector {
 	return NewWith(source.Sources{})
 }
 
-// NewWith is New reading the host's files through src.
+// NewWith returns the azure collector reading the host through src. It reads
+// the metadata service through src.HTTP, so a fake host can answer it. A
+// zero src.HTTP is the shared transport.
 func NewWith(
 	src source.Sources,
-) *Collector {
-	return collector.Wire(newClient(src), src)
+) Collector {
+	return collector.Wire(&Metadata{}, src)
 }
 
-// newClient is a Collector with Azure's metadata client.
-func newClient(
-	src source.Sources,
-) *Collector {
-	return NewWithClient(
-		cloudmetadata.New(
-			metadataBaseURL,
-			cloudmetadata.WithHeader(metadataHeaderKey, metadataHeaderValue),
-			cloudmetadata.WithTimeout(metadataTimeout),
-			cloudmetadata.WithTransport(src.HTTP),
-		),
+// client is the metadata client of c, which reads through c.HTTP.
+func (c *Metadata) client() *cloudmetadata.Client {
+	return cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithHeader(metadataHeaderKey, metadataHeaderValue),
+		cloudmetadata.WithTimeout(metadataTimeout),
+		cloudmetadata.WithTransport(c.HTTP),
 	)
 }
 
-// NewWithClient returns a Collector backed by a caller-supplied client.
-func NewWithClient(
-	c *cloudmetadata.Client,
-) *Collector {
-	return collector.Wire(&Collector{client: c}, source.Sources{})
-}
-
 // Name returns "azure".
-func (*Collector) Name() string { return "azure" }
+func (*Metadata) Name() string { return "azure" }
 
 // Category returns "cloud".
-func (*Collector) Category() collector.Category { return collector.CategoryCloud }
+func (*Metadata) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false, because cloud collectors are opt-in.
-func (*Collector) DefaultEnabled() bool { return false }
+func (*Metadata) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi, for the chassis asset tag that each Azure
 // VM has.
-func (*Collector) Dependencies() []string { return []string{"dmi"} }
+func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the fetch on the Azure detection signals (the DMI
 // chassis asset tag, the waagent binary, or DHCP option 245). Negotiates an api-version with the
 // metadata service (matches Ohai's handshake), then fetches the
 // instance document. Returns (nil, nil) when no detection signal
 // fires or the endpoint is unreachable.
-func (c *Collector) Collect(
+func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
@@ -472,7 +469,7 @@ func (c *Collector) Collect(
 	}
 	version := c.negotiateAPIVersion(ctx)
 	var r raw
-	if err := c.client.GetJSON(ctx, metadataPath+"?api-version="+version, &r); err != nil {
+	if err := c.client().GetJSON(ctx, metadataPath+"?api-version="+version, &r); err != nil {
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 			return nil, ctx.Err()
 		}
@@ -515,11 +512,11 @@ func onAzure(
 // the last entry of supportedAPIVersions on any failure. Matches
 // Ohai's best_api_version handshake: Azure returns HTTP 400 with
 // a `newest-versions` JSON body when no api-version is supplied.
-func (c *Collector) negotiateAPIVersion(
+func (c *Metadata) negotiateAPIVersion(
 	ctx context.Context,
 ) string {
 	fallback := supportedAPIVersions[len(supportedAPIVersions)-1]
-	body, status, err := c.client.RawGet(ctx, metadataPath)
+	body, status, err := c.client().RawGet(ctx, metadataPath)
 	if err != nil || status != http.StatusBadRequest {
 		return fallback
 	}

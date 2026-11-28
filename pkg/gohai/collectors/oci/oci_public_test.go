@@ -28,10 +28,11 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 func ociPrior() collector.PriorResults {
@@ -100,13 +101,13 @@ func TestOCIPublicTestSuite(
 func (s *OCIPublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		c            *oci.Collector
-		validateFunc func(*oci.Collector)
+		c            oci.Collector
+		validateFunc func(oci.Collector)
 	}{
 		{
 			name: "New: its name, category, default and dependencies",
 			c:    oci.New(),
-			validateFunc: func(c *oci.Collector) {
+			validateFunc: func(c oci.Collector) {
 				s.Equal("oci", c.Name())
 				s.Equal("cloud", string(c.Category()))
 				s.False(c.DefaultEnabled())
@@ -347,7 +348,9 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			var httpCalled bool
-			srv := httptest.NewServer(http.HandlerFunc(
+			// The collector asks for /opc/v2/...; the handler serves the paths
+			// under it.
+			srv := httptest.NewServer(http.StripPrefix("/opc/v2", http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					httpCalled = true
 					if tt.cancelOn != "" && r.URL.Path == tt.cancelOn {
@@ -357,16 +360,14 @@ func (s *OCIPublicTestSuite) TestCollect() {
 					}
 					h(w, r)
 				},
-			))
+			)))
 			if tt.closed {
 				srv.Close()
 			} else {
 				defer srv.Close()
 			}
 
-			client := cloudmetadata.New(srv.URL,
-				cloudmetadata.WithHeader("Authorization", "Bearer Oracle"))
-			c := oci.NewWithClient(client)
+			c := oci.NewWith(source.Sources{HTTP: sourcetest.Server(srv.URL)})
 
 			prior := tt.prior
 			if prior == nil {

@@ -29,7 +29,6 @@ import (
 	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
@@ -76,13 +75,13 @@ func (s *ScalewayPublicTestSuite) TestNew() {
 	fs := memfs.New()
 	tests := []struct {
 		name         string
-		c            *scaleway.Collector
-		validateFunc func(*scaleway.Collector)
+		c            scaleway.Collector
+		validateFunc func(scaleway.Collector)
 	}{
 		{
 			name: "New: its name, category, default and dependencies",
 			c:    scaleway.New(),
-			validateFunc: func(c *scaleway.Collector) {
+			validateFunc: func(c scaleway.Collector) {
 				s.Equal("scaleway", c.Name())
 				s.Equal("cloud", string(c.Category()))
 				s.False(c.DefaultEnabled())
@@ -92,8 +91,8 @@ func (s *ScalewayPublicTestSuite) TestNew() {
 		{
 			name: "NewWith: reads the filesystem that it is given",
 			c:    scaleway.NewWith(source.Sources{FS: fs, Family: family.Debian}),
-			validateFunc: func(c *scaleway.Collector) {
-				s.Same(fs, c.FS)
+			validateFunc: func(c scaleway.Collector) {
+				s.Same(fs, c.(*scaleway.Metadata).FS)
 			},
 		},
 	}
@@ -279,9 +278,10 @@ func (s *ScalewayPublicTestSuite) TestCollect() {
 				defer srv.Close()
 			}
 
-			client := cloudmetadata.New(srv.URL)
-			c := scaleway.NewWithClient(client)
-			c.FS = sourcetest.FS(s.T(), files)
+			c := scaleway.NewWith(source.Sources{
+				FS:   sourcetest.FS(s.T(), files),
+				HTTP: sourcetest.Server(srv.URL),
+			})
 
 			out, err := c.Collect(context.Background(), tt.prior)
 			tt.validateFunc(out, httpCalled, err)

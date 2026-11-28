@@ -60,33 +60,33 @@ func TestLinodePublicTestSuite(
 func (s *LinodePublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		collector    func() *linode.Collector
-		validateFunc func(*linode.Collector)
+		collector    func() linode.Collector
+		validateFunc func(linode.Collector)
 	}{
 		{
 			name:      "New gives the linode cloud collector, opt-in, after dmi and hostname",
 			collector: linode.New,
-			validateFunc: func(c *linode.Collector) {
+			validateFunc: func(c linode.Collector) {
 				s.Equal("linode", c.Name())
 				s.Equal(collector.CategoryCloud, c.Category())
 				s.False(c.DefaultEnabled())
 				s.Equal([]string{"dmi", "hostname"}, c.Dependencies())
-				s.NotNil(c.FS)
-				s.NotNil(c.Exec)
+				s.NotNil(c.(*linode.Host).FS)
+				s.NotNil(c.(*linode.Host).Exec)
 			},
 		},
 		{
 			name: "NewWith reads through the given sources",
-			collector: func() *linode.Collector {
+			collector: func() linode.Collector {
 				return linode.NewWith(source.Sources{
 					FS:     memfs.New(),
 					Exec:   mocks.NewMockRunner(gomock.NewController(s.T())),
 					Family: family.Debian,
 				})
 			},
-			validateFunc: func(c *linode.Collector) {
-				s.IsType(&memfs.MemFS{}, c.FS)
-				s.IsType(&mocks.MockRunner{}, c.Exec)
+			validateFunc: func(c linode.Collector) {
+				s.IsType(&memfs.MemFS{}, c.(*linode.Host).FS)
+				s.IsType(&mocks.MockRunner{}, c.(*linode.Host).Exec)
 			},
 		},
 	}
@@ -288,7 +288,7 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				Family: family.Debian,
 			})
 			if tt.nilExec {
-				c = &linode.Collector{FS: sourcetest.FS(s.T(), tt.files)}
+				c = &linode.Host{FS: sourcetest.FS(s.T(), tt.files)}
 			}
 			out, err := c.Collect(context.Background(), tt.prior)
 			s.Require().NoError(err)
