@@ -708,6 +708,32 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a device with two mounts gives both its uuid and btrfs data",
+			variant: "linux",
+			mounts:  "/dev/sda1 / btrfs rw 0 0\n/dev/sda1 /home btrfs rw 0 0\n",
+			exec: func(t *testing.T) source.Runner {
+				return lsblkExec(t, `{"blockdevices":[
+					{"name":"/dev/sda1","fstype":"btrfs","uuid":"abc-123","label":"root","mountpoint":"/"}
+				]}`)
+			},
+			fs: btrfsFS(s, "abc-123", map[string]btrfsBgFixture{
+				"data": {raid: "raid1", total: 1073741824, used: 524288000},
+			}),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Mounts, 2)
+				for _, m := range i.Mounts {
+					s.Equal("abc-123", m.UUID)
+					s.Equal("root", m.Label)
+					s.Require().NotNil(m.Btrfs)
+					s.Equal("raid1", m.Btrfs.RAID)
+				}
+				s.Empty(i.Unmounted)
+			},
+		},
+		{
 			name:    "linux: btrfs single profile recognised, a total that is not a number is 0",
 			variant: "linux",
 			mounts:  btrfsMount,
