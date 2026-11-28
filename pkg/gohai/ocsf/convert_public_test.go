@@ -64,6 +64,10 @@ func TestConvertPublicTestSuite(
 }
 
 func (s *ConvertPublicTestSuite) TestFromFacts() {
+	// collected is the CollectTime of each row: a fixed time, so a row that
+	// checks the event time compares with a value that does not move.
+	collected := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
 	tests := []struct {
 		name         string
 		facts        *gohai.Facts
@@ -72,7 +76,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "empty facts produces valid event envelope",
 			facts: &gohai.Facts{
-				CollectTime: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectTime: collected,
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal(ocsf.ClassUIDInventoryInfo, event.ClassUID)
@@ -81,7 +85,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 				s.Equal(ocsf.ActivityIDCollect, event.ActivityID)
 				s.Equal(ocsf.SeverityIDInfo, event.SeverityID)
 				s.Equal("Device Inventory Info", event.ClassName)
-				s.NotZero(event.Time)
+				s.Equal(collected.UnixMilli(), event.Time)
 				s.NotNil(event.Metadata)
 				s.Equal("1.8.0", event.Metadata.Version)
 				s.Equal("gohai", event.Metadata.Product.Name)
@@ -93,7 +97,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "hostname maps to device",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Hostname: &hostname.Info{
 					Name:   "web-01",
 					Domain: "example.com",
@@ -109,7 +113,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "platform maps to device.os",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Platform: &platform.Info{
 					OS:              "linux",
 					Name:            "Ubuntu",
@@ -133,7 +137,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "darwin os type_id",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Platform:    &platform.Info{OS: "darwin"},
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
@@ -143,7 +147,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "cpu and memory map to device.hw_info",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				CPU: &cpu.Info{
 					Count:     8,
 					Cores:     4,
@@ -179,7 +183,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "kernel maps to device.os kernel fields",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Platform:    &platform.Info{OS: "linux"},
 				Kernel: &kernel.Info{
 					Name:    "Linux",
@@ -196,7 +200,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "network interfaces map to device.network_interfaces",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Network: &network.Info{
 					DefaultInterface: "eth0",
 					Interfaces: []network.Interface{
@@ -225,7 +229,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "extension fields populated",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				MachineID:   &machineid.Info{ID: "abc-123"},
 				Uptime:      &uptime.Info{BootTime: 1700000000, Seconds: 86400},
 				Timezone:    &timezone.Info{Name: "America/New_York", Offset: -18000},
@@ -250,7 +254,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "no cloud when no provider detected",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Nil(event.Cloud)
@@ -259,7 +263,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "ec2 maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Ec2: &ec2.Info{
 					Region:         "us-east-1",
 					Zone:           "us-east-1a",
@@ -279,7 +283,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "gce maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Gce: &gce.Info{
 					Region:     "us-central1",
 					Zone:       "us-central1-a",
@@ -294,7 +298,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "azure maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Azure: &azure.Info{
 					Region:         "eastus",
 					Zone:           "1",
@@ -312,7 +316,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "oci maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				OCI: &oci.Info{
 					Region:     "us-ashburn-1",
 					Zone:       "AD-1",
@@ -327,7 +331,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "alibaba maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Alibaba: &alibaba.Info{
 					Region:     "cn-hangzhou",
 					Zone:       "cn-hangzhou-a",
@@ -342,7 +346,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "digital_ocean maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime:  time.Now(),
+				CollectTime:  collected,
 				DigitalOcean: &digitalocean.Info{Region: "nyc3"},
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
@@ -353,7 +357,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "openstack maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				OpenStack:   &openstack.Info{Zone: "nova", ProjectUID: "proj-123"},
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
@@ -364,7 +368,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "scaleway maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Scaleway: &scaleway.Info{
 					Zone:       "fr-par-1",
 					AccountUID: "org-123",
@@ -380,7 +384,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "linode maps to cloud",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Linode:      &linode.Info{PublicIP: "203.0.113.5"},
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
@@ -391,7 +395,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "an interface reports its global address, not a link-local one before it",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Network: &network.Info{
 					Interfaces: []network.Interface{
 						{
@@ -411,7 +415,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "dmi maps to hw_info",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				DMI: &dmi.Info{
 					BIOS: &dmi.BIOS{Manufacturer: "Dell", Ver: "2.18", Date: "2023-01-15"},
 					Product: &dmi.Product{
@@ -436,7 +440,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "os_release maps to device.os extension fields",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Platform:    &platform.Info{OS: "linux"},
 				OSRelease: &osrelease.Info{
 					ID:              "ubuntu",
@@ -456,7 +460,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "hostnamectl cpe_name maps to device.os",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Platform:    &platform.Info{OS: "linux"},
 				Hostnamectl: &hostnamectl.Info{
 					OperatingSystemCPEName: "cpe:/o:canonical:ubuntu:22.04",
@@ -469,7 +473,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "init maps to device extension field",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Init:        &initd.Info{Name: "systemd"},
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
@@ -478,14 +482,14 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		},
 		{
 			name:  "windows os type_id",
-			facts: &gohai.Facts{CollectTime: time.Now(), Platform: &platform.Info{OS: "windows"}},
+			facts: &gohai.Facts{CollectTime: collected, Platform: &platform.Info{OS: "windows"}},
 			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal(100, event.Device.OS.TypeID)
 			},
 		},
 		{
 			name:  "unknown os type_id",
-			facts: &gohai.Facts{CollectTime: time.Now(), Platform: &platform.Info{OS: "freebsd"}},
+			facts: &gohai.Facts{CollectTime: collected, Platform: &platform.Info{OS: "freebsd"}},
 			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Equal(0, event.Device.OS.TypeID)
 			},
@@ -493,7 +497,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "network without default interface returns empty primary IP",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Network: &network.Info{
 					Interfaces: []network.Interface{
 						{
@@ -510,7 +514,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "os_release fills name when platform name is empty",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Platform:    &platform.Info{OS: "linux"},
 				OSRelease:   &osrelease.Info{Name: "Alpine Linux"},
 			},
@@ -521,7 +525,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "nil network returns nil interfaces",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
 				s.Nil(event.Device.NetworkInterfaces)
@@ -530,7 +534,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "empty network interfaces returns nil",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Network:     &network.Info{Interfaces: []network.Interface{}},
 			},
 			validateFunc: func(event *ocsf.InventoryInfo) {
@@ -540,7 +544,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "findPrimaryIP with no inet match returns empty",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Network: &network.Info{
 					DefaultInterface: "eth0",
 					Interfaces: []network.Interface{
@@ -558,7 +562,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "interface without addresses still maps",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Network: &network.Info{
 					Interfaces: []network.Interface{
 						{Name: "eth0", MAC: "aa:bb:cc:dd:ee:ff"},
@@ -573,7 +577,7 @@ func (s *ConvertPublicTestSuite) TestFromFacts() {
 		{
 			name: "encapsulation maps to network interface type",
 			facts: &gohai.Facts{
-				CollectTime: time.Now(),
+				CollectTime: collected,
 				Network: &network.Info{
 					Interfaces: []network.Interface{
 						{Name: "eth0", Encapsulation: "Ethernet"},

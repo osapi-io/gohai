@@ -24,9 +24,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"reflect"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
@@ -45,11 +48,9 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
+	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
-// failingCollector is a test double that always returns a canned error
-// from Collect. Used to exercise the error-path branch of
-// Facts.Timings without depending on a real collector's upstream seam.
 // newFailingCollector returns a generated Collector mock whose Collect fails.
 func newFailingCollector(
 	ctrl *gomock.Controller,
@@ -97,6 +98,142 @@ func TestGohaiPublicTestSuite(
 
 // TestWithSources: a collector reads the host that WithSources gives, not
 // the machine the test runs on.
+// TestBuiltinCollectors checks two things of each built-in collector, for
+// each family. Each field that holds a source has the source that was given:
+// a field that collector.Wire does not set reads the real host under a
+// caller's fake host, and nothing else would say so. And Facts has a field of
+// the collector's name, which Facts.set fills: a collector that is missing
+// from the switch of Facts.set would lose its data with no signal.
+func (s *GohaiPublicTestSuite) TestBuiltinCollectors() {
+	ctrl := gomock.NewController(s.T())
+	fs := memfs.New()
+	exec := sourcemocks.NewMockRunner(ctrl)
+	resolver := sourcemocks.NewMockResolver(ctrl)
+	now := func() time.Time { return time.Unix(42, 0) }
+	sources := map[reflect.Type]any{
+		reflect.TypeFor[avfs.VFS]():         avfs.VFS(fs),
+		reflect.TypeFor[source.Runner]():    source.Runner(exec),
+		reflect.TypeFor[source.Resolver]():  source.Resolver(resolver),
+		reflect.TypeFor[func() time.Time](): now,
+	}
+	ft := reflect.TypeFor[gohai.Facts]()
+	byName := map[string]reflect.StructField{}
+	for i := range ft.NumField() {
+		f := ft.Field(i)
+		byName[gohai.JSONName(f)] = f
+	}
+
+	// takesSources checks that each source field of c is exported and has
+	// the source that was given.
+	takesSources := func(c collector.Collector) {
+		v := reflect.ValueOf(c)
+		if v.Kind() != reflect.Pointer || v.Elem().Kind() != reflect.Struct {
+			return
+		}
+		st := v.Elem()
+		for i := range st.NumField() {
+			field := st.Type().Field(i)
+			want, isSource := sources[field.Type]
+			if !isSource {
+				continue
+			}
+			s.Run(field.Name, func() {
+				s.Require().True(field.IsExported())
+				got := st.Field(i).Interface()
+				if field.Type == reflect.TypeFor[func() time.Time]() {
+					s.Equal(reflect.ValueOf(want).Pointer(), reflect.ValueOf(got).Pointer())
+
+					return
+				}
+				s.True(got == want)
+			})
+		}
+	}
+	// setsFacts checks that Facts has a field of the name of c, and that
+	// Facts.set puts the result of c there.
+	setsFacts := func(c collector.Collector) {
+		field, ok := byName[c.Name()]
+		s.Require().True(ok)
+		s.Require().Equal(reflect.Pointer, field.Type.Kind())
+		result := reflect.New(field.Type.Elem())
+		facts := &gohai.Facts{}
+		facts.Set(c.Name(), result.Interface())
+		s.Equal(result.Pointer(), reflect.ValueOf(facts).Elem().FieldByIndex(field.Index).Pointer())
+	}
+
+	tests := []struct {
+		name         string
+		src          source.Sources
+		validateFunc func(collector.Collector)
+	}{
+		{
+			name: "debian: each source field has the source that was given",
+			src: source.Sources{
+				FS: fs, Exec: exec, Now: now, Resolver: resolver, Family: family.Debian,
+			},
+			validateFunc: takesSources,
+		},
+		{
+			name: "darwin: each source field has the source that was given",
+			src: source.Sources{
+				FS: fs, Exec: exec, Now: now, Resolver: resolver, Family: family.Darwin,
+			},
+			validateFunc: takesSources,
+		},
+		{
+			name:         "each collector has a Facts field that Facts.set fills",
+			src:          source.Sources{Family: family.Debian, FS: memfs.New()},
+			validateFunc: setsFacts,
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			for _, c := range gohai.BuiltinCollectors(tt.src) {
+				s.Run(c.Name(), func() {
+					tt.validateFunc(c)
+				})
+			}
+		})
+	}
+}
+
+// TestRegisterBuiltins checks that a registration error of a built-in
+// collector is returned, not dropped.
+func (s *GohaiPublicTestSuite) TestRegisterBuiltins() {
+	src := source.Sources{Family: family.Debian, FS: memfs.New()}
+	tests := []struct {
+		name         string
+		registered   bool
+		validateFunc func(error)
+	}{
+		{
+			name: "registers each built-in collector",
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name:       "a duplicate is an error",
+			registered: true,
+			validateFunc: func(err error) {
+				s.EqualError(
+					err,
+					`register built-in collector "platform": collector "platform" already registered`,
+				)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			reg := collector.NewRegistry()
+			if tt.registered {
+				s.Require().NoError(gohai.RegisterBuiltins(reg, src))
+			}
+			tt.validateFunc(gohai.RegisterBuiltins(reg, src))
+		})
+	}
+}
+
 func (s *GohaiPublicTestSuite) TestWithSources() {
 	fs := memfs.New()
 	s.Require().NoError(fs.MkdirAll("/etc", 0o755))
@@ -194,7 +331,8 @@ func (s *GohaiPublicTestSuite) TestWithSourcesHTTP() {
 			c := tt.new(source.Sources{FS: fs, Family: family.Debian, HTTP: rt})
 			got, err := c.Collect(context.Background(), nil)
 			s.Require().NoError(err)
-			s.Nil(got, "a metadata service that answers 404 is no cloud")
+			// A metadata service that answers 404 is no cloud.
+			s.Nil(got)
 			s.Equal(map[string]bool{tt.host: true}, rt.seen)
 		})
 	}

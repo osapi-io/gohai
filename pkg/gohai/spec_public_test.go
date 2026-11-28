@@ -33,33 +33,90 @@ type SpecPublicTestSuite struct {
 	suite.Suite
 }
 
+func TestSpecPublicTestSuite(
+	t *testing.T,
+) {
+	suite.Run(t, new(SpecPublicTestSuite))
+}
+
 func (s *SpecPublicTestSuite) TestCollectors() {
 	specs := gohai.Collectors()
-	reg, err := gohai.NewRegistry()
-	s.Require().NoError(err)
-	s.Len(specs, len(reg.Names()))
-
 	byName := map[string]gohai.CollectorSpec{}
 	for _, c := range specs {
 		byName[c.Name] = c
-		s.Len(c.Reads, len(gohai.SpecPlatforms()), "%s has the reads of each platform", c.Name)
 	}
 
-	dns := byName["dns"]
-	s.Equal("dns.NewWith(src)", dns.Constructor)
-	s.Equal("github.com/osapi-io/gohai/pkg/gohai/collectors/dns", dns.Package)
-	s.Empty(dns.Network)
-	s.Contains(dns.Fields, gohai.Field{Name: "nameservers", Type: "[]string"})
-	s.Equal("debian", dns.Reads[0].Platform)
-	s.Contains(dns.Reads[0].Files, "/etc/resolv.conf")
-	s.Contains(dns.Reads[0].Commands, "resolvectl dns")
-	s.Equal("darwin", dns.Reads[2].Platform)
-	s.Contains(dns.Reads[2].Commands, "scutil --dns")
-
-	ec2 := byName["ec2"]
-	s.Equal("ec2.New()", ec2.Constructor)
-	s.Contains(ec2.Network, "metadata service")
-	s.Equal([]string{"dmi"}, byName["alibaba"].Dependencies)
+	tests := []struct {
+		name         string
+		validateFunc func()
+	}{
+		{
+			name: "one spec for each registered collector, with the reads of each platform",
+			validateFunc: func() {
+				reg, err := gohai.NewRegistry()
+				s.Require().NoError(err)
+				s.Len(specs, len(reg.Names()))
+				for _, c := range specs {
+					s.Run(c.Name, func() {
+						s.Len(c.Reads, len(gohai.SpecPlatforms()))
+					})
+				}
+			},
+		},
+		{
+			name: "dns: its constructor, package, fields and reads",
+			validateFunc: func() {
+				dns := byName["dns"]
+				s.Equal("dns.NewWith(src)", dns.Constructor)
+				s.Equal("github.com/osapi-io/gohai/pkg/gohai/collectors/dns", dns.Package)
+				s.Empty(dns.Network)
+				s.Contains(dns.Fields, gohai.Field{Name: "nameservers", Type: "[]string"})
+				s.Equal("debian", dns.Reads[0].Platform)
+				s.Contains(dns.Reads[0].Files, "/etc/resolv.conf")
+				s.Contains(dns.Reads[0].Commands, "resolvectl dns")
+				s.Equal("darwin", dns.Reads[2].Platform)
+				s.Contains(dns.Reads[2].Commands, "scutil --dns")
+			},
+		},
+		{
+			name: "ec2 reads the network, and alibaba depends on dmi",
+			validateFunc: func() {
+				ec2 := byName["ec2"]
+				s.Equal("ec2.New()", ec2.Constructor)
+				s.Contains(ec2.Network, "metadata service")
+				s.Equal([]string{"dmi"}, byName["alibaba"].Dependencies)
+			},
+		},
+		{
+			name: "a field is named by its JSON tag, else by its Go name",
+			validateFunc: func() {
+				type t struct {
+					Tagged   string `json:"tagged,omitempty"`
+					Untagged string
+				}
+				rt := reflect.TypeFor[t]()
+				s.Equal("tagged", gohai.JSONName(rt.Field(0)))
+				s.Equal("Untagged", gohai.JSONName(rt.Field(1)))
+			},
+		},
+		{
+			name: "each term of a spec has a name, what it does and when",
+			validateFunc: func() {
+				terms := gohai.CollectorTerms()
+				s.NotEmpty(terms)
+				for _, t := range terms {
+					s.Run(t.Name, func() {
+						s.NotEmpty(t.Name)
+						s.NotEmpty(t.Does)
+						s.NotEmpty(t.When)
+					})
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, tt.validateFunc)
+	}
 }
 
 func (s *SpecPublicTestSuite) TestCollectorByName() {
@@ -144,7 +201,8 @@ func (s *SpecPublicTestSuite) TestCollectorProblems() {
 				rules = append(rules, p.Rule)
 				seen[p.Rule] = true
 				s.NotEmpty(p.Message)
-				s.NotEmpty(p.Fix, "every rule has a fix")
+				// Every rule has a fix.
+				s.NotEmpty(p.Fix)
 			}
 			s.Equal(tc.wantRules, rules)
 		})
@@ -153,33 +211,9 @@ func (s *SpecPublicTestSuite) TestCollectorProblems() {
 	// Each check is a rule that CollectorProblems applies, and each rule has
 	// a check: the cases above trigger every one.
 	for _, c := range gohai.CollectorChecks() {
-		s.NotEmpty(c.Requires, c.Rule)
-		s.True(seen[c.Rule], "no case triggers the rule %s", c.Rule)
+		s.Run("a case triggers the rule "+c.Rule, func() {
+			s.NotEmpty(c.Requires)
+			s.True(seen[c.Rule])
+		})
 	}
-}
-
-func (s *SpecPublicTestSuite) TestCollectorTerms() {
-	terms := gohai.CollectorTerms()
-	s.NotEmpty(terms)
-	for _, t := range terms {
-		s.NotEmpty(t.Name)
-		s.NotEmpty(t.Does, t.Name)
-		s.NotEmpty(t.When, t.Name)
-	}
-}
-
-func (s *SpecPublicTestSuite) TestJSONName() {
-	type t struct {
-		Tagged   string `json:"tagged,omitempty"`
-		Untagged string
-	}
-	rt := reflect.TypeFor[t]()
-	s.Equal("tagged", gohai.JSONName(rt.Field(0)))
-	s.Equal("Untagged", gohai.JSONName(rt.Field(1)), "a field with no tag has its Go name")
-}
-
-func TestSpecPublicTestSuite(
-	t *testing.T,
-) {
-	suite.Run(t, new(SpecPublicTestSuite))
 }
