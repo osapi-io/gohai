@@ -32,6 +32,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/libvirt"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -187,9 +188,12 @@ func (s *LibvirtPublicTestSuite) TestNew() {
 
 func (s *LibvirtPublicTestSuite) TestCollect() {
 	tests := []struct {
-		name         string
-		variant      string
-		exec         func(*testing.T) source.Runner
+		name    string
+		variant string
+		exec    func(*testing.T) source.Runner
+		// files, when not nil, is the host's filesystem, where the
+		// collector looks for the daemons' sockets.
+		files        map[string]string
 		validateFunc func(any, error)
 	}{
 		// ----- Linux -----
@@ -370,6 +374,41 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a translated error with no daemon socket on the host gives no fact",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
+					Return(nil, errors.New("exec virsh: exit status 1: Fehler: Verbindung zum Hypervisor fehlgeschlagen\n"+
+						"Fehler: Verbindung zum Socket '/var/run/libvirt/virtqemud-sock' fehlgeschlagen: Datei oder Verzeichnis nicht gefunden"))
+				return m
+			},
+			files: map[string]string{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a translated error with a daemon socket on the host is an error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				ctrl := gomock.NewController(t)
+				m := mocks.NewMockRunner(ctrl)
+				m.EXPECT().Execute(gomock.Any(), "virsh", "-c", "qemu:///system", "version").
+					Return(nil, errors.New("exec virsh: exit status 1: Fehler: Verbindung zum Hypervisor fehlgeschlagen\n"+
+						"Fehler: Verbindung zum Socket '/run/libvirt/libvirt-sock' fehlgeschlagen: Keine Berechtigung"))
+				return m
+			},
+			files: map[string]string{"/run/libvirt/libvirt-sock": ""},
+			validateFunc: func(got any, err error) {
+				s.Exactly(nil, got)
+				s.ErrorContains(err, "read virsh version:")
+				s.ErrorContains(err, "Keine Berechtigung")
+			},
+		},
+		{
 			name:    "linux: no permission on the daemon's socket is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
@@ -499,7 +538,11 @@ func (s *LibvirtPublicTestSuite) TestCollect() {
 			var c libvirt.Collector
 			switch tt.variant {
 			case "linux":
-				c = &libvirt.Linux{Exec: tt.exec(s.T())}
+				l := &libvirt.Linux{Exec: tt.exec(s.T())}
+				if tt.files != nil {
+					l.FS = sourcetest.FS(s.T(), tt.files)
+				}
+				c = l
 			case "darwin":
 				c = libvirt.NewDarwin()
 			}

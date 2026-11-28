@@ -25,24 +25,31 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
+
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // Linux collects libvirt domain data on Linux hosts via the virsh CLI. virsh
 // must be on PATH and able to connect to the system daemon, qemu:///system,
-// which every call names, so root and other users see the same domains. When virsh is absent or `virsh version` does not
-// answer, Collect returns nil with no error: not every Linux host is a
-// KVM hypervisor. Once the daemon answers, a failed read is an error.
+// which every call names, so root and other users see the same domains.
+// When virsh is absent or `virsh version` does not answer, Collect returns
+// nil with no error: not every Linux host is a KVM hypervisor. Once the
+// daemon answers, a failed read is an error.
 type Linux struct {
 	base
 
+	// FS is where the collector looks for the daemons' sockets. A nil FS
+	// skips that check, and only the text of virsh's error decides.
+	FS   avfs.VFS
 	Exec source.Runner
 }
 
 // NewLinux returns a Linux variant wired to the production Executor.
 func NewLinux() *Linux {
-	return &Linux{Exec: source.Commands()}
+	return &Linux{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
 // Collect queries virsh for version, URI, and full domain list. Returns nil
@@ -61,7 +68,7 @@ func (l *Linux) Collect(
 	// failure, such as no permission on the daemon's socket, is an error.
 	verOut, err := l.virsh(ctx, "version")
 	if err != nil {
-		if noHypervisor(err) && ctx.Err() == nil {
+		if l.noHypervisor(err) && ctx.Err() == nil {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("read virsh version: %w", err)
@@ -104,17 +111,48 @@ func (l *Linux) Collect(
 // other domains, usually none, than qemu:///system for root.
 const systemURI = "qemu:///system"
 
+// daemonSockets are the sockets that the libvirt daemons listen on: the
+// monolithic libvirtd and the modular virtqemud, under /run and under its
+// older /var/run name.
+var daemonSockets = []string{
+	"/run/libvirt/libvirt-sock",
+	"/run/libvirt/virtqemud-sock",
+	"/var/run/libvirt/libvirt-sock",
+	"/var/run/libvirt/virtqemud-sock",
+}
+
 // noHypervisor reports whether err from `virsh version` says that there
 // is no hypervisor to ask: virsh is not on the host, or its daemon is not
 // running, so its socket is missing or refuses the connection.
-func noHypervisor(
+//
+// The text of virsh's error is in English when virsh runs with LC_ALL=C,
+// as source.Commands does. A Runner that keeps the host's locale gets a
+// translated message, so a host with none of the daemons' sockets also
+// counts as no hypervisor, whatever the message says.
+func (l *Linux) noHypervisor(
 	err error,
 ) bool {
 	msg := err.Error()
 
 	return collector.Absent(err) ||
 		strings.Contains(msg, "No such file or directory") ||
-		strings.Contains(msg, "Connection refused")
+		strings.Contains(msg, "Connection refused") ||
+		l.noDaemonSocket()
+}
+
+// noDaemonSocket reports whether none of daemonSockets is on the host. It
+// is false when the FS is nil, or when a socket cannot be checked.
+func (l *Linux) noDaemonSocket() bool {
+	if l.FS == nil {
+		return false
+	}
+	for _, path := range daemonSockets {
+		if _, err := l.FS.Stat(path); !collector.Absent(err) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // virsh runs virsh against the system daemon with args.
