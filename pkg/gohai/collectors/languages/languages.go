@@ -184,15 +184,21 @@ func parseNodeVersion(
 func parseJavaVersion(
 	out string,
 ) *string {
-	// First line only, such as "openjdk 21.0.1 2023-10-17". The rest is
-	// the runtime and the VM.
-	line := strings.SplitN(strings.TrimSpace(out), "\n", 2)[0]
-	// java -version quotes the version: openjdk version "1.8.0_292".
-	if _, rest, ok := strings.Cut(line, `version "`); ok {
-		if v, _, ok := strings.Cut(rest, `"`); ok {
-			return strPtr(v)
+	// java -version quotes the version: openjdk version "1.8.0_292". A
+	// JVM with JAVA_TOOL_OPTIONS set prints "Picked up ..." before it, so
+	// take the first line that has the quoted version.
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	for _, l := range lines {
+		if _, rest, ok := strings.Cut(l, `version "`); ok {
+			if v, _, ok := strings.Cut(rest, `"`); ok {
+				return strPtr(v)
+			}
 		}
 	}
+	// java --version has no quotes: its first line is the version, such
+	// as "openjdk 21.0.1 2023-10-17". The rest is the runtime and the VM.
+	// A "Picked up" notice goes to stderr, which this form does not read.
+	line := lines[0]
 	if f := strings.Fields(line); len(f) >= 2 {
 		return strPtr(f[1])
 	}

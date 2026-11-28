@@ -399,6 +399,34 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: JAVA_TOOL_OPTIONS puts a line before the java 8 version",
+			variant: "linux",
+			exec: func() source.Runner {
+				m := mocks.NewMockRunner(gomock.NewController(s.T()))
+				absent := errors.New("not found")
+				for _, p := range [][]string{
+					{"go", "version"},
+					{"python3", "--version"},
+					{"ruby", "--version"},
+					{"node", "--version"},
+					{"java", "--version"},
+					{"perl", "--version"},
+				} {
+					m.EXPECT().Execute(gomock.Any(), p[0], p[1]).Return(nil, absent).AnyTimes()
+				}
+				m.EXPECT().
+					Execute(gomock.Any(), "sh", "-c", "java -version 2>&1").
+					Return([]byte("Picked up JAVA_TOOL_OPTIONS: -Xmx512m\nopenjdk version \"1.8.0_292\"\nOpenJDK Runtime Environment\n"), nil)
+				return m
+			}(),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Equal(languages.Info{Java: strPtr("1.8.0_292")}, *info)
+			},
+		},
+		{
 			name:    "darwin: the python3 and java stubs do not run without the tools and a JDK",
 			variant: "darwin",
 			exec: func() source.Runner {
