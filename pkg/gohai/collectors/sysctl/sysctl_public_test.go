@@ -27,19 +27,23 @@ import (
 	osexec "os/exec"
 	"testing"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
-	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/sysctl"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
 	_ collector.Collector = (*sysctl.Linux)(nil)
 	_ collector.Collector = (*sysctl.Darwin)(nil)
+)
+
+// The command lines that the rows answer, as sourcetest.Commands keys them.
+const (
+	sysctlLine = "sysctl -a"
 )
 
 type SysctlPublicTestSuite struct {
@@ -52,29 +56,11 @@ func TestSysctlPublicTestSuite(
 	suite.Run(t, new(SysctlPublicTestSuite))
 }
 
-// sysctlExec returns a MockRunner that answers `sysctl -a` with the
-// provided output and error.
-func sysctlExec(
-	t *testing.T,
-	out []byte,
-	err error,
-) source.Runner {
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().
-		Execute(gomock.Any(), "sysctl", "-a").
-		Return(out, err).
-		AnyTimes()
-	return m
-}
-
 func (s *SysctlPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(sysctl.Collector)
 	}{
 		{
@@ -117,11 +103,20 @@ func (s *SysctlPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c sysctl.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := sysctl.New()
+			c := sysctl.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = sysctl.New()
+			}
 			s.Equal("sysctl", c.Name())
 			s.Equal("linux", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -152,7 +147,13 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "linux: canonical key=value output parsed",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, linuxOutput, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{sysctlLine: string(linuxOutput)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -168,7 +169,9 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "linux: empty output yields empty params map",
 			variant: "linux",
-			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, []byte{}, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Out: map[string]string{sysctlLine: ""}}.Mock(t)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -180,7 +183,11 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			name:    "linux: lines without separator skipped",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return sysctlExec(t, []byte("no_separator\nkernel.panic = 1\n"), nil)
+				return sourcetest.Commands{
+					Out: map[string]string{sysctlLine: "no_separator\nkernel.panic = 1\n"},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -194,7 +201,11 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				// A line with a separator but no key: the key is empty, so it is skipped.
-				return sysctlExec(t, []byte(" = value\nkernel.panic = 2\n"), nil)
+				return sourcetest.Commands{
+					Out: map[string]string{sysctlLine: " = value\nkernel.panic = 2\n"},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -207,7 +218,11 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			name:    "linux: no sysctl yields empty params, no error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return sysctlExec(t, nil, fmt.Errorf("sysctl: %w", osexec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{sysctlLine: fmt.Errorf("sysctl: %w", osexec.ErrNotFound)},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -220,10 +235,12 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			name:    "linux: a value with \": \" keeps its text",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return sysctlExec(
+				return sourcetest.Commands{
+					Out: map[string]string{
+						sysctlLine: "dev.cdrom.info = CD-ROM information, Id: cdrom.c 3.20\n",
+					},
+				}.Mock(
 					t,
-					[]byte("dev.cdrom.info = CD-ROM information, Id: cdrom.c 3.20\n"),
-					nil,
 				)
 			},
 			validateFunc: func(got any, err error) {
@@ -239,7 +256,12 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			name:    "linux: a failed run that printed part of the table gives that part",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return sysctlExec(t, []byte("kernel.panic = 1\n"), errors.New("exit status 255"))
+				return sourcetest.Commands{
+					Out: map[string]string{sysctlLine: "kernel.panic = 1\n"},
+					Err: map[string]error{sysctlLine: errors.New("exit status 255")},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -252,7 +274,11 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			name:    "linux: a failed run that printed nothing is an error",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
-				return sysctlExec(t, nil, errors.New("signal: killed"))
+				return sourcetest.Commands{
+					Err: map[string]error{sysctlLine: errors.New("signal: killed")},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "sysctl -a: signal: killed")
@@ -273,7 +299,13 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 		{
 			name:    "darwin: colon-separated output parsed",
 			variant: "darwin",
-			exec:    func(t *testing.T) source.Runner { return sysctlExec(t, darwinOutput, nil) },
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{sysctlLine: string(darwinOutput)},
+				}.Mock(
+					t,
+				)
+			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*sysctl.Info)
@@ -290,7 +322,11 @@ vm.swapusage: total = 1024.00M  used = 512.00M  free = 512.00M  (encrypted)
 			name:    "darwin: no sysctl yields empty params, no error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return sysctlExec(t, nil, fmt.Errorf("sysctl: %w", osexec.ErrNotFound))
+				return sourcetest.Commands{
+					Err: map[string]error{sysctlLine: fmt.Errorf("sysctl: %w", osexec.ErrNotFound)},
+				}.Mock(
+					t,
+				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)

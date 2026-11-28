@@ -32,7 +32,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
-	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/services"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -62,6 +62,13 @@ getty@.service              static          -
 not-a-unit
 `
 
+// The command lines that the rows answer, as sourcetest.Commands keys them.
+const (
+	unitsLine     = "systemctl list-units --type=service --all --no-pager --plain"
+	unitFilesLine = "systemctl list-unit-files --type=service --no-legend --no-pager"
+	launchctlLine = "launchctl print system"
+)
+
 type ServicesPublicTestSuite struct {
 	suite.Suite
 }
@@ -72,53 +79,11 @@ func TestServicesPublicTestSuite(
 	suite.Run(t, new(ServicesPublicTestSuite))
 }
 
-func systemctlExec(
-	t *testing.T,
-	out []byte,
-	err error,
-) source.Runner {
-	return systemctlExecWith(t, out, err, []byte(unitFilesOut), nil)
-}
-
-// systemctlExecWith answers list-units with out and err, and
-// list-unit-files with files and filesErr.
-func systemctlExecWith(
-	t *testing.T,
-	out []byte,
-	err error,
-	files []byte,
-	filesErr error,
-) source.Runner {
-	t.Helper()
-	ctrl := gomock.NewController(t)
-	m := mocks.NewMockRunner(ctrl)
-	m.EXPECT().Execute(
-		gomock.Any(),
-		"systemctl",
-		"list-units",
-		"--type=service",
-		"--all",
-		"--no-pager",
-		"--plain",
-	).Return(out, err).AnyTimes()
-	m.EXPECT().Execute(
-		gomock.Any(),
-		"systemctl",
-		"list-unit-files",
-		"--type=service",
-		"--no-legend",
-		"--no-pager",
-	).Return(files, filesErr).AnyTimes()
-	return m
-}
-
 func (s *ServicesPublicTestSuite) TestNew() {
-	orig := platform.Detect
-	defer func() { platform.Detect = orig }()
-
 	tests := []struct {
 		name         string
 		detect       string
+		real         bool // New, on the real host
 		validateFunc func(services.Collector)
 	}{
 		{
@@ -162,11 +127,20 @@ func (s *ServicesPublicTestSuite) TestNew() {
 				s.True(ok)
 			},
 		},
+		{
+			name: "New reads the real host",
+			real: true,
+			validateFunc: func(c services.Collector) {
+				s.NotNil(c)
+			},
+		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			platform.Detect = func() string { return tt.detect }
-			c := services.New()
+			c := services.NewWith(source.Sources{Family: tt.detect, FS: memfs.New()})
+			if tt.real {
+				c = services.New()
+			}
 			s.Equal("services", c.Name())
 			s.Equal("software", string(c.Category()))
 			s.False(c.DefaultEnabled())
@@ -174,19 +148,6 @@ func (s *ServicesPublicTestSuite) TestNew() {
 			tt.validateFunc(c)
 		})
 	}
-}
-
-// launchctlExec answers launchctl print system with out and err.
-func launchctlExec(
-	t *testing.T,
-	out []byte,
-	err error,
-) source.Runner {
-	t.Helper()
-	m := mocks.NewMockRunner(gomock.NewController(t))
-	m.EXPECT().Execute(gomock.Any(), "launchctl", "print", "system").Return(out, err).AnyTimes()
-
-	return m
 }
 
 const launchctlServices = "system = {\n\ttype = system\n\tservice stats = {\n\t\tx = 1\n\t}\n" +
@@ -213,7 +174,11 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: systemctl returns services",
 			variant: "linux",
-			exec:    systemctlExec(s.T(), []byte(systemctlOut), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{unitsLine: systemctlOut, unitFilesLine: unitFilesOut},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -249,9 +214,15 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: a unit whose LOAD is not loaded is not loaded",
 			variant: "linux",
-			exec: systemctlExec(s.T(), []byte(
-				"gone.service  not-found inactive dead gone.service\n"+
-					"hidden.service masked   inactive dead hidden.service\n"), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine: "gone.service  not-found inactive dead gone.service\n" +
+						"hidden.service masked   inactive dead hidden.service\n",
+					unitFilesLine: unitFilesOut,
+				},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -266,9 +237,14 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: a unit that systemd has not loaded is in the list, from its unit file",
 			variant: "linux",
-			exec: systemctlExecWith(s.T(),
-				[]byte("ssh.service loaded active running OpenSSH server daemon\n"), nil,
-				[]byte("ssh.service enabled enabled\nlabcheck.service disabled enabled\n"), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine:     "ssh.service loaded active running OpenSSH server daemon\n",
+					unitFilesLine: "ssh.service enabled enabled\nlabcheck.service disabled enabled\n",
+				},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -289,11 +265,17 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: an alias, a template and a unit listed twice are in the list once",
 			variant: "linux",
-			exec: systemctlExecWith(s.T(), []byte(""), nil,
-				[]byte("dbus-org.freedesktop.resolve1.service alias -\n"+
-					"getty@.service static -\n"+
-					"masked.service masked enabled\n"+
-					"masked.service masked enabled\n"), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine: "",
+					unitFilesLine: "dbus-org.freedesktop.resolve1.service alias -\n" +
+						"getty@.service static -\n" +
+						"masked.service masked enabled\n" +
+						"masked.service masked enabled\n",
+				},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -306,8 +288,14 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: a unit that runs is not enabled unless its unit file is",
 			variant: "linux",
-			exec: systemctlExecWith(s.T(), []byte(systemctlOut), nil,
-				[]byte("ssh.service disabled enabled\n"), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine:     systemctlOut,
+					unitFilesLine: "ssh.service disabled enabled\n",
+				},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -319,8 +307,12 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: list-unit-files fails: an error",
 			variant: "linux",
-			exec: systemctlExecWith(s.T(), []byte(systemctlOut), nil,
-				nil, errors.New("boom")),
+			exec: sourcetest.Commands{
+				Out: map[string]string{unitsLine: systemctlOut},
+				Err: map[string]error{unitFilesLine: errors.New("boom")},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "systemctl list-unit-files: boom")
 				s.Nil(got)
@@ -329,7 +321,12 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: no systemctl: empty list",
 			variant: "linux",
-			exec:    systemctlExec(s.T(), nil, fmt.Errorf("systemctl: %w", osexec.ErrNotFound)),
+			exec: sourcetest.Commands{
+				Out: map[string]string{unitFilesLine: unitFilesOut},
+				Err: map[string]error{unitsLine: fmt.Errorf("systemctl: %w", osexec.ErrNotFound)},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -340,7 +337,12 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: systemctl fails on a systemd host: an error",
 			variant: "linux",
-			exec:    systemctlExec(s.T(), nil, errors.New("signal: killed")),
+			exec: sourcetest.Commands{
+				Out: map[string]string{unitFilesLine: unitFilesOut},
+				Err: map[string]error{unitsLine: errors.New("signal: killed")},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().ErrorContains(err, "systemctl list-units: signal: killed")
 				s.Nil(got)
@@ -372,7 +374,11 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: empty output returns empty list",
 			variant: "linux",
-			exec:    systemctlExecWith(s.T(), []byte(""), nil, nil, nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{unitsLine: "", unitFilesLine: ""},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -383,10 +389,13 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: lines without .service are skipped",
 			variant: "linux",
-			exec: systemctlExec(
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					unitsLine:     "not-a-service-line\nssh.service loaded active running OpenSSH\n",
+					unitFilesLine: unitFilesOut,
+				},
+			}.Mock(
 				s.T(),
-				[]byte("not-a-service-line\nssh.service loaded active running OpenSSH\n"),
-				nil,
 			),
 			// The unit files of the other tests add cron and NetworkManager.
 			validateFunc: func(got any, err error) {
@@ -416,7 +425,11 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: short field lines skipped",
 			variant: "linux",
-			exec:    systemctlExecWith(s.T(), []byte("ssh.service loaded\n"), nil, nil, nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{unitsLine: "ssh.service loaded\n", unitFilesLine: ""},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -427,7 +440,11 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: each daemon, with its state and whether it is enabled, and the ones not loaded",
 			variant: "darwin",
-			exec:    launchctlExec(s.T(), []byte(launchctlServices+launchctlDisabled), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{launchctlLine: launchctlServices + launchctlDisabled},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -469,7 +486,11 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: no disabled block: each is enabled",
 			variant: "darwin",
-			exec:    launchctlExec(s.T(), []byte(launchctlServices+"}\n"), nil),
+			exec: sourcetest.Commands{
+				Out: map[string]string{launchctlLine: launchctlServices + "}\n"},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
@@ -509,10 +530,12 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: output that stops inside the services block",
 			variant: "darwin",
-			exec: launchctlExec(
+			exec: sourcetest.Commands{
+				Out: map[string]string{
+					launchctlLine: "\tservices = {\n\t\t     412      - \tcom.apple.cron\n",
+				},
+			}.Mock(
 				s.T(),
-				[]byte("\tservices = {\n\t\t     412      - \tcom.apple.cron\n"),
-				nil,
 			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -532,7 +555,11 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 		{
 			name:    "darwin: launchctl that cannot run is an empty list",
 			variant: "darwin",
-			exec:    launchctlExec(s.T(), nil, errors.New("not found")),
+			exec: sourcetest.Commands{
+				Err: map[string]error{launchctlLine: errors.New("not found")},
+			}.Mock(
+				s.T(),
+			),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)
