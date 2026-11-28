@@ -171,9 +171,13 @@ on Alibaba Cloud, and the collector sends no request.
     service filters some requests by User-Agent.
 10. **Timeout:** 6 seconds for each request. This is the same as Ohai's
     `read_timeout` + `keep_alive_timeout`.
-11. **Failure handling:** if the first call (the root listing) fails, the
-    collector returns `(nil, nil)`. If a call for one path fails during the
-    walk, the collector continues. Those fields stay empty in the typed output.
+11. **Failure handling:** a path that the server does not answer, such as a 404,
+    a 5xx or no connection, is left out: if it is the root listing, the
+    collector returns `(nil, nil)`, as for a host that is not on Alibaba.
+    Otherwise those fields stay empty in the typed output. Any other failure
+    stops the walk and is the collector's error: a cancelled or expired context,
+    a response that is more than `cloudmetadata.MaxBody`, or a walk that reaches
+    its 256-request limit.
 
 The method is the same as Ohai's `Ohai::Mixin::AlibabaMetadata`. These parts are
 the same:

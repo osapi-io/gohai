@@ -250,9 +250,13 @@ the HTTP request. This is how it finds an EC2 Mac instance.
 12. **Timeout.** 10 seconds for each request. This is the same as Ohai's
     `read_timeout` and `keep_alive_timeout`.
 
-13. **Failures.** If the first request (`/ami-id`) fails, the collector returns
-    `(nil, nil)`. If a request for a subsequent path fails, the collector
-    continues, and that field keeps its zero value.
+13. **Failures.** A path that the IMDS does not answer, such as a 404, a 429, a
+    5xx or no connection, is left out: if it is the first request (`/ami-id`),
+    the collector returns `(nil, nil)`, as for a host that is not on EC2.
+    Otherwise that field keeps its zero value. Any other failure stops the walk
+    and is the collector's error: a cancelled or expired context, or a response
+    that is more than `cloudmetadata.MaxBody`. Thus a half-read instance never
+    looks like a full one.
 
 The method is the same as Ohai's `Ohai::Mixin::Ec2Metadata`. These parts are the
 same:
