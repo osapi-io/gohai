@@ -11,11 +11,12 @@ the link-local metadata server at
 host that is not on GCE, the collector cannot reach the metadata endpoint. Then
 the `gce` field is not in `Facts`, and there is no error or log message.
 
-The output has each field that GCE returns for `?recursive=true`. The collector
-makes the fields flat, the same as the other gohai collectors, which each have
-one top-level struct. The collector changes the resource paths (`machineType`,
-`zone`, `image`, `network`) to their short forms. It reports all other values
-exactly as GCE gives them.
+The output has the typed fields of the GCE `?recursive=true` answer. It leaves
+out the instance and project `attributes` and the instance `partnerAttributes`.
+The collector makes the fields flat, the same as the other gohai collectors,
+which each have one top-level struct. The collector changes the resource paths
+(`machineType`, `zone`, `image`, `network`) to their short forms. Step 7 of Data
+sources lists the other changes.
 
 ## Collected fields
 
@@ -193,7 +194,7 @@ gohai collect --category=cloud     # pulls gce + dmi + other cloud collectors as
 ```
 
 The collector is opt-in. On a host that is not on GCE, a request to the metadata
-endpoint waits for the `cloudmetadata` default timeout (2 s).
+endpoint waits for the collector's 6 s metadata timeout.
 
 ## Dependencies
 
@@ -213,7 +214,7 @@ request.
 1. **DMI check** (refer to [dmi.md](dmi.md)). The collector reads the prior
    result of the `dmi` collector. If `product.name` does not contain
    `"Google Compute Engine"`, it stops and returns `(nil, nil)`. This prevents
-   the 2 s metadata-endpoint timeout on hosts that are not on GCE. If `dmi` ran
+   the 6 s metadata-endpoint timeout on hosts that are not on GCE. If `dmi` ran
    and has no product table, the collector also stops. If `dmi` did not run, the
    collector sends the HTTP request.
 2. **Endpoint.**
@@ -247,7 +248,9 @@ request.
    reports them; gohai does not.
 
 The method is the same as Ohai's `Ohai::Mixin::GCEMetadata`: the same URL, the
-same header, the same single recursive request, and the same full tree.
+same header and the same single recursive request. The output is different:
+gohai keeps only the typed fields. It leaves out the attributes that steps 7 and
+8 name.
 
 ## Backing library
 
