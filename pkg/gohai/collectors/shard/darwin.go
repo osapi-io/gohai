@@ -23,6 +23,8 @@ package shard
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
@@ -48,8 +50,11 @@ func NewDarwin() *Darwin {
 
 // Collect derives the shard seed. On macOS, Ohai uses
 // hardware["serial_number"] and hardware["platform_UUID"]. We read
-// the same sources via system_profiler and ioreg. With no Exec the
-// seed comes from the machine name alone.
+// the same sources via system_profiler and ioreg. With no Exec, or with
+// a command that is not on the host, the seed comes from the inputs that
+// remain. A command that is there and fails, or whose output does not
+// parse, is an error and gives no seed: a seed from fewer inputs moves the
+// host to a different shard, which is worse than no seed.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -61,45 +66,61 @@ func (d *Darwin) Collect(
 	if d.Exec == nil {
 		return newInfo(machinename, "", ""), nil
 	}
-	serial := readDarwinSerial(ctx, d.Exec)
-	uuid := readDarwinUUID(ctx, d.Exec)
+	serial, serialErr := readDarwinSerial(ctx, d.Exec)
+	uuid, uuidErr := readDarwinUUID(ctx, d.Exec)
+	if err := errors.Join(serialErr, uuidErr); err != nil {
+		return nil, err
+	}
+
 	return newInfo(machinename, serial, uuid), nil
 }
 
 // readDarwinSerial gets the hardware serial from system_profiler,
-// matching Ohai's hardware["serial_number"] source.
+// matching Ohai's hardware["serial_number"] source. It is "" with no
+// error when system_profiler is not on the host or lists no hardware.
 func readDarwinSerial(
 	ctx context.Context,
 	exec source.Runner,
-) string {
+) (string, error) {
 	out, err := exec.Execute(ctx, "system_profiler", "SPHardwareDataType", "-json")
+	if collector.Absent(err) {
+		return "", nil
+	}
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("system_profiler: %w", err)
 	}
 	var sp struct {
 		Items []struct {
 			SerialNumber string `json:"serial_number"`
 		} `json:"SPHardwareDataType"`
 	}
-	if err := json.Unmarshal(out, &sp); err != nil || len(sp.Items) == 0 {
-		return ""
+	if err := json.Unmarshal(out, &sp); err != nil {
+		return "", fmt.Errorf("system_profiler: %w", err)
 	}
-	return strings.TrimSpace(sp.Items[0].SerialNumber)
+	if len(sp.Items) == 0 {
+		return "", nil
+	}
+
+	return strings.TrimSpace(sp.Items[0].SerialNumber), nil
 }
 
 // readDarwinUUID reads IOPlatformUUID from ioreg, matching Ohai's
-// hardware["platform_UUID"] source. It is "" when ioreg fails.
+// hardware["platform_UUID"] source. It is "" with no error when ioreg is
+// not on the host or prints no IOPlatformUUID.
 func readDarwinUUID(
 	ctx context.Context,
 	exec source.Runner,
-) string {
+) (string, error) {
 	out, err := exec.Execute(ctx, "ioreg", "-rd1", "-c", "IOPlatformExpertDevice")
+	if collector.Absent(err) {
+		return "", nil
+	}
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("ioreg: %w", err)
 	}
 	if m := platformUUIDRE.FindSubmatch(out); m != nil {
-		return string(m[1])
+		return string(m[1]), nil
 	}
 
-	return ""
+	return "", nil
 }

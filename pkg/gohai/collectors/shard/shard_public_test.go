@@ -23,9 +23,12 @@ package shard_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	osexec "os/exec"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 
@@ -125,6 +128,28 @@ func (s *ShardPublicTestSuite) TestNew() {
 			tt.validateFunc(c)
 		})
 	}
+}
+
+// seedOf is the seed of the machine name with serial and uuid, as the
+// Linux variant computes it from dmi, so a macOS row can name the seed of
+// the inputs it expects.
+func seedOf(
+	t *testing.T,
+	serial string,
+	uuid string,
+) int {
+	got, err := (&shard.Linux{}).Collect(
+		context.Background(),
+		collector.PriorResults{
+			"hostname": &hostname.Info{MachineName: machinename},
+			"dmi":      &dmi.Info{Product: &dmi.Product{SerialNumber: serial, UUID: uuid}},
+		},
+	)
+	require.NoError(t, err)
+	info, ok := got.(*shard.Info)
+	require.True(t, ok)
+
+	return info.Seed
 }
 
 func (s *ShardPublicTestSuite) TestCollect() {
@@ -315,36 +340,39 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
-
-				if defaultSeed >= 0 {
-					s.Equal(defaultSeed, info.Seed)
-				} else {
-					s.GreaterOrEqual(info.Seed, 0)
-				}
+				s.Equal(defaultSeed, info.Seed)
 			},
 		},
 		{
-			name:    "darwin: ioreg error → empty uuid, seed still computes",
+			name:    "darwin: an ioreg that fails is an error and no seed",
 			variant: "darwin",
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
-			ioregErr: errors.New("boom"),
+			ioregErr: errors.New("signal: killed"),
+			spOut:    []byte(sysProfJSON),
+			validateFunc: func(got any, err error) {
+				s.EqualError(err, "ioreg: signal: killed")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: no ioreg on the host seeds without the uuid",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			ioregErr: fmt.Errorf("ioreg: %w", osexec.ErrNotFound),
 			spOut:    []byte(sysProfJSON),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
-
-				if -1 >= 0 {
-					s.Equal(-1, info.Seed)
-				} else {
-					s.GreaterOrEqual(info.Seed, 0)
-				}
+				s.Equal(seedOf(s.T(), serial, ""), info.Seed)
 			},
 		},
 		{
-			name:    "darwin: no UUID in ioreg's output → empty uuid",
+			name:    "darwin: no UUID in ioreg's output seeds without the uuid",
 			variant: "darwin",
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
@@ -355,16 +383,11 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
-
-				if -1 >= 0 {
-					s.Equal(-1, info.Seed)
-				} else {
-					s.GreaterOrEqual(info.Seed, 0)
-				}
+				s.Equal(seedOf(s.T(), serial, ""), info.Seed)
 			},
 		},
 		{
-			name:    "darwin: malformed system_profiler JSON → empty serial",
+			name:    "darwin: system_profiler JSON that does not parse is an error and no seed",
 			variant: "darwin",
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
@@ -372,19 +395,12 @@ func (s *ShardPublicTestSuite) TestCollect() {
 			ioregOut: []byte(`"IOPlatformUUID" = "` + uuid + `"`),
 			spOut:    []byte("not json"),
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*shard.Info)
-				s.Require().True(ok)
-
-				if -1 >= 0 {
-					s.Equal(-1, info.Seed)
-				} else {
-					s.GreaterOrEqual(info.Seed, 0)
-				}
+				s.ErrorContains(err, "system_profiler: invalid character")
+				s.Exactly(nil, got)
 			},
 		},
 		{
-			name:    "darwin: empty items array → empty serial",
+			name:    "darwin: an empty items array seeds without the serial",
 			variant: "darwin",
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
@@ -395,32 +411,35 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
-
-				if -1 >= 0 {
-					s.Equal(-1, info.Seed)
-				} else {
-					s.GreaterOrEqual(info.Seed, 0)
-				}
+				s.Equal(seedOf(s.T(), "", uuid), info.Seed)
 			},
 		},
 		{
-			name:    "darwin: system_profiler error → empty serial",
+			name:    "darwin: a system_profiler that times out is an error and no seed",
 			variant: "darwin",
 			prior: collector.PriorResults{
 				"hostname": &hostname.Info{MachineName: machinename},
 			},
 			ioregOut: []byte(`"IOPlatformUUID" = "` + uuid + `"`),
-			spErr:    errors.New("not found"),
+			spErr:    context.DeadlineExceeded,
+			validateFunc: func(got any, err error) {
+				s.EqualError(err, "system_profiler: context deadline exceeded")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: no system_profiler on the host seeds without the serial",
+			variant: "darwin",
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{MachineName: machinename},
+			},
+			ioregOut: []byte(`"IOPlatformUUID" = "` + uuid + `"`),
+			spErr:    fmt.Errorf("system_profiler: %w", osexec.ErrNotFound),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
-
-				if -1 >= 0 {
-					s.Equal(-1, info.Seed)
-				} else {
-					s.GreaterOrEqual(info.Seed, 0)
-				}
+				s.Equal(seedOf(s.T(), "", uuid), info.Seed)
 			},
 		},
 	}
