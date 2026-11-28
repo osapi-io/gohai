@@ -55,8 +55,6 @@ call.
 | `storage_profile`                | `*StorageProfile`         | The OS disk and the data disks. Refer to pkg.go.dev.                                                              | No direct schema mapping.      |
 | `tags`                           | `string`                  | A list of `key:value` tags, with a semicolon between tags.                                                        | No direct schema mapping.      |
 | `tags_list`                      | `[]Tag`                   | The parsed tags.                                                                                                  | No direct schema mapping.      |
-| `user_data`                      | `string`                  | The custom data, in Base64.                                                                                       | No direct schema mapping.      |
-| `custom_data`                    | `string`                  | The legacy custom data field.                                                                                     | No direct schema mapping.      |
 | `is_host_compatibility_layer_vm` | `bool`                    | Shows if the VM is a compatibility-layer VM.                                                                      | No direct schema mapping.      |
 | `security_profile`               | `*SecurityProfile`        | The secure boot, vTPM and encryption flags.                                                                       | No direct schema mapping.      |
 | `public_keys`                    | `[]PublicKey`             | The SSH keys that the profile attaches.                                                                           | No direct schema mapping.      |
@@ -154,14 +152,18 @@ signal.
 7. **Failure handling:** if the transport fails, or Azure returns 404 or an
    other error, the collector returns `(nil, nil)`.
 8. **Transformation:** the collector flattens the `compute` sub-object into the
-   top-level `Info` (identity, placement, marketplace, tags, user-data). It
-   keeps the optional nested records as typed sub-structs when Azure gives them:
-   `host`, `host_group`, `os_profile`, `additional_capabilities`,
-   `extended_location`, `plan`, `storage_profile`, `security_profile` and
-   `public_keys`. It also collects the IP addresses of each interface from
+   top-level `Info` (identity, placement, marketplace, tags). It keeps the
+   optional nested records as typed sub-structs when Azure gives them: `host`,
+   `host_group`, `os_profile`, `additional_capabilities`, `extended_location`,
+   `plan`, `storage_profile`, `security_profile` and `public_keys`. It also
+   collects the IP addresses of each interface from
    `network.interface[].ipv4/ipv6` into the flat top-level `public_ipv4`,
    `local_ipv4`, `public_ipv6` and `local_ipv6` lists. These lists are in
    addition to the map of interfaces, which has the MAC address as the key.
+9. **No user data.** The collector leaves out `userData` and `customData`. They
+   often hold provisioning secrets, and facts that a program ships to a central
+   store would give them to each reader of that store. Ohai reports them; gohai
+   does not.
 
 The method is the same as Ohai's `Ohai::Mixin::AzureMetadata`. These parts are
 the same:

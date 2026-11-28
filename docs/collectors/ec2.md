@@ -32,8 +32,6 @@ reads:
   holds secrets.
 - The dynamic instance identity document (`accountId`, `region`,
   `availabilityZone`, `instanceId`).
-- The raw user-data. It is base64-encoded when it is binary, and plain text when
-  it is UTF-8.
 
 ## Collected fields
 
@@ -61,7 +59,6 @@ reads:
 | `local_ipv4s`           | `[]string`                    | All private IPv4 addresses of the primary interface.                                                  | No direct schema mapping.      |
 | `network_interfaces`    | `map[string]NetworkInterface` | The subtree of each ENI, with the MAC as the key. Refer to the table below.                           | OCSF `network_interface`       |
 | `api_version`           | `string`                      | The IMDS API version that the collector negotiated.                                                   | No direct schema mapping.      |
-| `user_data`             | `string`                      | The raw user-data. It is base64-encoded when it is binary.                                            | No direct schema mapping.      |
 | `availability_zone_id`  | `string`                      | The AZ identifier, for example `use1-az1`.                                                            | No direct schema mapping.      |
 | `group_name`            | `string`                      | The placement group name.                                                                             | No direct schema mapping.      |
 | `host_id`               | `string`                      | The Dedicated Host ID. It is empty on shared hosts.                                                   | No direct schema mapping.      |
@@ -243,9 +240,10 @@ the HTTP request. This is how it finds an EC2 Mac instance.
     with `accountId`, `region`, `availabilityZone` and `instanceId`. These
     values fill the top-level fields when the meta-data tree does not give them.
 
-10. **User-data.** The collector sends `GET /<version>/user-data/`. It stores
-    the data as plain text when it is valid UTF-8, and base64-encoded when it is
-    binary. This is the same as Ohai's `Encoding::BINARY` check.
+10. **No user-data.** The collector does not read `/user-data/`. User-data often
+    holds cloud-init passwords and bootstrap tokens, and facts that a program
+    ships to a central store would give them to each reader of that store. Ohai
+    reports it; gohai does not.
 
 11. **User-Agent.** `gohai` (the cloudmetadata default).
 

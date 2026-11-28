@@ -67,8 +67,6 @@ type Info struct {
 	Features   []string `json:"features,omitempty"`
 	FloatingIP string   `json:"floating_ip,omitempty"`
 	ReservedIP string   `json:"reserved_ip,omitempty"` // DO's newer replacement for floating_ip
-	AuthKey    string   `json:"auth_key,omitempty"`    // DO internal token (often empty)
-	UserData   string   `json:"user_data,omitempty"`   // user-supplied cloud-init
 	IPv4NS     []string `json:"ipv4_nameservers,omitempty"`
 
 	Interfaces []Interface `json:"interfaces,omitempty"`
@@ -107,9 +105,7 @@ type raw struct {
 			IPAddress string `json:"ip_address"`
 		} `json:"ipv4"`
 	} `json:"reserved_ip"`
-	AuthKey  string `json:"auth_key"`
-	UserData string `json:"user_data"`
-	DNS      *struct {
+	DNS *struct {
 		Nameservers []string `json:"nameservers"`
 	} `json:"dns"`
 	Interfaces map[string][]rawIface `json:"interfaces"`
@@ -246,8 +242,6 @@ func transform(
 	if r.ReservedIP != nil && r.ReservedIP.IPv4 != nil {
 		info.ReservedIP = r.ReservedIP.IPv4.IPAddress
 	}
-	info.AuthKey = r.AuthKey
-	info.UserData = r.UserData
 	if r.DNS != nil {
 		info.IPv4NS = r.DNS.Nameservers
 	}

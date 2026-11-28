@@ -22,6 +22,7 @@ package gce_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -222,14 +223,18 @@ func (s *GcePublicTestSuite) TestCollect() {
 				s.Equal("NONE", info.MaintenanceEvent)
 				s.Equal("abc-123", info.VirtualClockDriftToken)
 				s.Equal(int64(3600), info.RemainingCPUTime)
-				s.Equal("some-appliance", info.PartnerAttributes["marketplace_product"])
 				s.Equal("my-project", info.ProjectUID)
 				s.Equal(int64(987654321), info.NumericProjectID)
 
 				s.Equal([]string{"8045211539491955793"}, info.Licenses)
-				s.Contains(info.Attributes, "ssh-keys")
-				s.Contains(info.Attributes, "startup-script")
-				s.Contains(info.ProjectAttributes, "ssh-keys")
+				// The metadata and partner attributes hold ssh-keys,
+				// startup scripts and partner data. The facts leave
+				// them out.
+				facts, err := json.Marshal(info)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "ssh-keys")
+				s.NotContains(string(facts), "startup-script")
+				s.NotContains(string(facts), "some-appliance")
 
 				s.Equal([]gce.Disk{{
 					DeviceName: "boot",

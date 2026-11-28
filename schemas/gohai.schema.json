@@ -392,12 +392,6 @@
           },
           "type": "array"
         },
-        "user_data": {
-          "type": "string"
-        },
-        "custom_data": {
-          "type": "string"
-        },
         "is_host_compatibility_layer_vm": {
           "type": "boolean"
         },
@@ -970,12 +964,6 @@
           "type": "string"
         },
         "reserved_ip": {
-          "type": "string"
-        },
-        "auth_key": {
-          "type": "string"
-        },
-        "user_data": {
           "type": "string"
         },
         "ipv4_nameservers": {
@@ -1557,9 +1545,6 @@
           "$ref": "#/$defs/Ec2IAMInstanceInfo"
         },
         "api_version": {
-          "type": "string"
-        },
-        "user_data": {
           "type": "string"
         }
       },
@@ -2211,23 +2196,11 @@
         "numeric_project_id": {
           "type": "integer"
         },
-        "project_attributes": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        },
         "licenses": {
           "items": {
             "type": "string"
           },
           "type": "array"
-        },
-        "attributes": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
         },
         "network_interfaces": {
           "items": {
@@ -2252,12 +2225,6 @@
         },
         "remaining_cpu_time": {
           "type": "integer"
-        },
-        "partner_attributes": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
         }
       },
       "additionalProperties": false,
@@ -3755,12 +3722,6 @@
         "time_created": {
           "type": "integer"
         },
-        "metadata": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        },
         "defined_tags": {
           "type": "object"
         },
@@ -4051,12 +4012,6 @@
         },
         "launch_index": {
           "type": "integer"
-        },
-        "meta_data": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
         },
         "public_keys": {
           "additionalProperties": {

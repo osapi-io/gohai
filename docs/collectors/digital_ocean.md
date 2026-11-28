@@ -26,8 +26,6 @@ cloud-init user scripts with credentials. Ohai also removes it.
 | `features`         | `[]string`    | The DO feature flags that are enabled on this droplet. | No direct schema mapping. |
 | `floating_ip`      | `string`      | The floating IPv4 of the droplet, if it has one.       | No direct schema mapping. |
 | `reserved_ip`      | `string`      | The newer DO replacement for floating_ip (IPv4).       | No direct schema mapping. |
-| `auth_key`         | `string`      | The DO internal auth token. Frequently empty.          | No direct schema mapping. |
-| `user_data`        | `string`      | The cloud-init data that the user gave.                | No direct schema mapping. |
 | `ipv4_nameservers` | `[]string`    | The DNS resolvers.                                     | No direct schema mapping. |
 | `interfaces`       | `[]Interface` | The attached VNICs. Refer to Interface.                | OCSF `network_interface`  |
 
@@ -113,9 +111,10 @@ DigitalOcean, and the collector sends no request.
    an other error, the collector returns `(nil, nil)`.
 6. **Security scrub:** the collector removes `vendor_data` from the output, as
    Ohai does. It can contain cloud-init scripts and credentials. The collector
-   keeps `user_data` and `auth_key`. `user_data` is the cloud-init payload of
-   the droplet owner. `auth_key` is the DO internal token, which Ohai also
-   reports.
+   also removes `user_data`, the cloud-init payload of the droplet owner, and
+   `auth_key`, the DO internal token. Ohai reports both; gohai does not, because
+   facts that a program ships to a central store would give them to each reader
+   of that store.
 7. **Transformation:** the collector moves `reserved_ip` from the nested
    `reserved_ip.ipv4.ip_address` path to the flat top-level field. `reserved_ip`
    is the newer DO replacement for the legacy `floating_ip`. Both fields are in

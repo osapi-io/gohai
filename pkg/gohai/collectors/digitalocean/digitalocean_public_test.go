@@ -22,6 +22,7 @@ package digitalocean_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -130,8 +131,12 @@ func (s *DigitalOceanPublicTestSuite) TestCollect() {
 				s.Equal([]string{"ssh-rsa AAAA..."}, info.PublicKeys)
 				s.Equal("138.1.2.3", info.FloatingIP)
 				s.Equal("162.1.2.3", info.ReservedIP)
-				s.Equal("secret-auth-token", info.AuthKey)
-				s.Equal("#cloud-config\nhostname: web-1", info.UserData)
+				// The auth key and the user-data are secrets: the facts
+				// leave them out.
+				facts, err := json.Marshal(info)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "secret-auth-token")
+				s.NotContains(string(facts), "cloud-config")
 				s.Equal([]string{"67.207.67.2", "67.207.67.3"}, info.IPv4NS)
 
 				s.Require().Len(info.Interfaces, 2)

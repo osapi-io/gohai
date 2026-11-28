@@ -22,7 +22,7 @@ package ec2_test
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -332,7 +332,10 @@ func (s *EC2PublicTestSuite) TestCollect() {
 					"arn:aws:iam::123456789012:instance-profile/web",
 					info.IAMInfo.InstanceProfileArn,
 				)
-				s.Equal("plain user-data", info.UserData)
+				// The user-data is a secret: the facts leave it out.
+				facts, err := json.Marshal(info)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "plain user-data")
 
 				s.Require().Len(info.NetworkInterfaces, 2)
 				a, okA := info.NetworkInterfaces[macA]
@@ -634,36 +637,6 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				s.Equal("us-east-1", info.Region)
 				s.Equal("us-east-1a", info.Zone)
 				s.Equal("123456789012", info.AccountUID)
-			},
-		},
-		{
-			name: "binary user-data is base64-encoded",
-			opts: (&serverOpts{userData: []byte{0xff, 0xfe, 0xfd, 0x01}}).withDefaults(),
-			validateFunc: func(out any, _ bool) {
-				info, ok := out.(*ec2.Info)
-				s.Require().True(ok)
-				s.Equal(
-					base64.StdEncoding.EncodeToString([]byte{0xff, 0xfe, 0xfd, 0x01}),
-					info.UserData,
-				)
-			},
-		},
-		{
-			name: "empty user-data body is empty string",
-			opts: (&serverOpts{userData: []byte{}}).withDefaults(),
-			validateFunc: func(out any, _ bool) {
-				info, ok := out.(*ec2.Info)
-				s.Require().True(ok)
-				s.Empty(info.UserData)
-			},
-		},
-		{
-			name: "no user-data configured returns empty string",
-			opts: (&serverOpts{}).withDefaults(),
-			validateFunc: func(out any, _ bool) {
-				info, ok := out.(*ec2.Info)
-				s.Require().True(ok)
-				s.Empty(info.UserData)
 			},
 		},
 		{

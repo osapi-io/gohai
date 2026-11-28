@@ -106,7 +106,6 @@ type Info struct {
 	ProjectUID  string            `json:"project_uid,omitempty"`
 	UUID        string            `json:"uuid,omitempty"`
 	LaunchIndex int               `json:"launch_index,omitempty"`
-	MetaData    map[string]string `json:"meta_data,omitempty"`
 	PublicKeys  map[string]string `json:"public_keys,omitempty"`
 
 	// Devices is the attached-block-device list from meta_data.json.
@@ -142,7 +141,6 @@ type openStackMetaDoc struct {
 	Name             string            `json:"name"`
 	ProjectID        string            `json:"project_id"`
 	Hostname         string            `json:"hostname"`
-	Meta             map[string]string `json:"meta"`
 	PublicKeys       map[string]string `json:"public_keys"`
 	AvailabilityZone string            `json:"availability_zone"`
 	LaunchIndex      int               `json:"launch_index"`
@@ -245,7 +243,6 @@ func (c *Metadata) Collect(
 			info.Name = doc.Name
 			info.ProjectUID = doc.ProjectID
 			info.LaunchIndex = doc.LaunchIndex
-			info.MetaData = doc.Meta
 			info.PublicKeys = doc.PublicKeys
 			for _, d := range doc.Devices {
 				info.Devices = append(info.Devices, Device(d))

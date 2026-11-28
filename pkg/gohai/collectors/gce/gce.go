@@ -90,17 +90,11 @@ type Info struct {
 	Region string `json:"region"`
 
 	// Project.
-	ProjectUID        string            `json:"project_uid"`
-	NumericProjectID  int64             `json:"numeric_project_id"`
-	ProjectAttributes map[string]string `json:"project_attributes,omitempty"`
+	ProjectUID       string `json:"project_uid"`
+	NumericProjectID int64  `json:"numeric_project_id"`
 
 	// Licensing: the raw GCP license IDs attached to the VM.
 	Licenses []string `json:"licenses,omitempty"`
-
-	// Instance metadata attributes. Often contains user-uploaded SSH
-	// keys and startup scripts, the same content Ohai surfaces under
-	// node['gce']['instance']['attributes'].
-	Attributes map[string]string `json:"attributes,omitempty"`
 
 	// Network interfaces.
 	NetworkInterfaces []NetworkInterface `json:"network_interfaces,omitempty"`
@@ -119,10 +113,6 @@ type Info struct {
 	// RemainingCPUTime is the remaining CPU time in seconds for Spot
 	// VMs before preemption. -1 (or absent) on standard instances.
 	RemainingCPUTime int64 `json:"remaining_cpu_time,omitempty"`
-
-	// PartnerAttributes carries opaque key/value pairs set by
-	// GCE partner images (e.g. marketplace product metadata).
-	PartnerAttributes map[string]string `json:"partner_attributes,omitempty"`
 }
 
 // NetworkInterface is one attached VNIC. All fields GCE reports,
@@ -192,12 +182,10 @@ type rawInstance struct {
 	ServiceAccounts   map[string]rawServiceAccount `json:"serviceAccounts"`
 	Scheduling        rawScheduling                `json:"scheduling"`
 	Description       string                       `json:"description"`
-	Attributes        map[string]string            `json:"attributes"`
 	Licenses          []rawLicense                 `json:"licenses"`
 	MaintenanceEvent  string                       `json:"maintenanceEvent"`
 	VirtualClock      *rawVirtualClock             `json:"virtualClock"`
 	RemainingCPUTime  int64                        `json:"remainingCpuTime"`
-	PartnerAttributes map[string]string            `json:"partnerAttributes"`
 }
 
 type rawVirtualClock struct {
@@ -249,9 +237,8 @@ type rawLicense struct {
 }
 
 type rawProject struct {
-	ProjectID        string            `json:"projectId"`
-	NumericProjectID int64             `json:"numericProjectId"`
-	Attributes       map[string]string `json:"attributes"`
+	ProjectID        string `json:"projectId"`
+	NumericProjectID int64  `json:"numericProjectId"`
 }
 
 // Metadata fetches the GCE metadata tree via the cloudmetadata helper.
@@ -307,10 +294,9 @@ func (*Metadata) DefaultEnabled() bool { return false }
 func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the metadata fetch on a DMI product_name match.
-// Issues one recursive=true GET; the response body is unmarshalled
-// twice: once into the typed rawResponse for the curated Info, and
-// once into a generic map[string]any for the Raw forward-compat
-// escape hatch (matches Ohai's full-tree dump). Returns (nil, nil)
+// Issues one recursive=true GET and unmarshals the body into the
+// typed rawResponse for the curated Info. It does not keep the full
+// tree, which holds the metadata attributes. Returns (nil, nil)
 // when we're not on GCE or when the endpoint is unreachable, so the
 // Gce field drops from Facts. A read that fails for another reason,
 // such as a body over cloudmetadata.MaxBody, is an error, so the
@@ -379,10 +365,7 @@ func transform(
 		Zone:              lastSegment(r.Instance.Zone),
 		ProjectUID:        r.Project.ProjectID,
 		NumericProjectID:  r.Project.NumericProjectID,
-		ProjectAttributes: r.Project.Attributes,
-		Attributes:        r.Instance.Attributes,
 		RemainingCPUTime:  r.Instance.RemainingCPUTime,
-		PartnerAttributes: r.Instance.PartnerAttributes,
 	}
 	if r.Instance.VirtualClock != nil {
 		info.VirtualClockDriftToken = r.Instance.VirtualClock.DriftToken

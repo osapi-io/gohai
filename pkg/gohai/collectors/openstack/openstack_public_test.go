@@ -22,6 +22,7 @@ package openstack_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -72,7 +73,7 @@ const novaDoc = `{
   "hostname": "prod-1",
   "availability_zone": "nova",
   "launch_index": 0,
-  "meta": {"owner": "sre"},
+  "meta": {"owner": "sre", "db_password": "hunter2-secret"},
   "public_keys": {"default": "ssh-rsa AAA..."},
   "devices": [
     {"type": "disk", "bus": "virtio", "serial": "vda-1234", "path": "/dev/vda", "address": "0:0:0:0", "tags": ["boot"]}
@@ -171,7 +172,11 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				s.Equal([]string{"default", "ssh"}, info.SecurityGroups)
 				s.Equal("uuid-xxx", info.UUID)
 				s.Equal("proj-1", info.ProjectUID)
-				s.Equal("sre", info.MetaData["owner"])
+				// The user-defined meta can hold secrets. The facts
+				// leave it out.
+				facts, err := json.Marshal(info)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "hunter2-secret")
 				s.Require().Len(info.Devices, 1)
 				s.Equal("disk", info.Devices[0].Type)
 				s.Equal("virtio", info.Devices[0].Bus)
