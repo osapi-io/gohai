@@ -34,6 +34,9 @@ Consumers use this data to:
 | Linux (SUSE, Arch, Alpine, Void, Gentoo) | ✅ (the collector looks for zypper, pacman, apk, xbps-install, emerge) |
 | macOS                                    | ✅ (`brew` first, then `port`)                                         |
 
+gohai does not run on Windows, so the collector reads no Windows package
+manager, such as Chocolatey, winget or Scoop.
+
 The platform family decides which managers the collector looks for. The family
 comes from the caller's sources. If the sources have no family,
 `family.Detect()` reads `/etc/os-release`. It maps `ubuntu`, `debian` and
@@ -118,9 +121,6 @@ collector. Thus you can enable or disable the two collectors independently.
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Linux    | `sh -c 'command -v <name>'` for the manager of the family: `apt` on debian, `dnf` or `yum` on rhel, `zypper`, `pacman` and others. | [`packages.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/packages.rb) uses the same family selection internally. | **Equivalent selection, different output.** Ohai keeps the selection internal and reports the inventory of installed packages. gohai reports the selection as a typed fact. Consumers then make their own install or query calls. |
 | macOS    | `sh -c 'command -v brew'`, then `port`.                                                                                            | Ohai has no detection of macOS package managers.                                                                                | **Extension.** Ohai does not look for macOS package managers. gohai finds brew and MacPorts.                                                                                                                                      |
-
-**Known gaps:** Windows (Chocolatey, winget, Scoop) is out of scope. gohai does
-not support Windows yet.
 
 ## Backing library
 

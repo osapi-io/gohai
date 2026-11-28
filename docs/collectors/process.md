@@ -126,11 +126,8 @@ directory on Linux, and `ps -p <pid>` on macOS. It is an error when there is no
 such process. A caller that watches one process, such as its own, uses it on
 each sample, not `Collect`.
 
-**Known gaps vs. Ohai:** gohai does not report the `tty` and `stime` columns of
-`ps`. It also does not report threads, the file descriptor count or the
-environment of each process. These are planned extensions, if consumers need
-them. For parity with Ohai, the gohai `command` collector reports the raw
-`ps -ef` text block separately.
+For parity with Ohai, the gohai `command` collector reports the raw `ps -ef`
+text block separately.
 
 ## Backing library
 
