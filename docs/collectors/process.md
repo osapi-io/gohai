@@ -37,6 +37,9 @@ Consumers use this data to:
 | `processes[].mem_percent`   | float64 | RSS as a share of physical memory.                                                                                               | No direct schema mapping.     |
 | `processes[].rss`           | int64   | The resident set size, in bytes.                                                                                                 | OTel `process.memory.usage`.  |
 | `processes[].cpu_seconds`   | float64 | User and system CPU time used, in seconds. Two samples give the CPU share between them.                                          | No direct schema mapping.     |
+| `processes[].tty`           | string  | The controlling terminal, such as `pts/0`, `tty1` or `ttys000`. Empty for a process with no terminal.                            | No direct schema mapping.     |
+| `processes[].threads`       | int     | The thread count. Linux only.                                                                                                    | No direct schema mapping.     |
+| `processes[].open_files`    | int     | The count of open file descriptors. Linux only, and empty for a process whose `/proc/<pid>/fd` the run may not list.             | No direct schema mapping.     |
 
 The field name `cmd_line` comes from OCSF (`process.cmd_line`), not from Ohai's
 `command`. If OCSF and Ohai both name a field, the OCSF name is used.
@@ -104,10 +107,10 @@ None.
 
 ## Data sources
 
-| Platform | What we read                                                                                   | Ohai plugin                                                                                                                                                          | Alignment                                                                                                                                                                                                                                                                                                                      |
-| -------- | ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Linux    | `/proc/<pid>/stat`, `/proc/<pid>/status`, `/proc/<pid>/cmdline` and `/proc/meminfo`.           | [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb) sets `command[:ps] = "ps -ef"`. The `command` plugin runs it and reports the raw `ps` text. | **Different shape, same source data.** Ohai reports the raw `ps -ef` output as one text block through its companion `command` collector (refer to `docs/collectors/command.md`). gohai parses `/proc` into typed records, one for each process. Ohai's `ps -ef` columns include `tty` and `stime`. gohai does not report them. |
-| macOS    | `ps -ax -o pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,time=,lstart=`, then `ucomm=` and `args=`. | The same top-level [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb), with `ps -ef` in the `:darwin` branch.                                  | **Same source data, different shape.** This is the same as the Linux row.                                                                                                                                                                                                                                                      |
+| Platform | What we read                                                                                        | Ohai plugin                                                                                                                                                          | Alignment                                                                                                                                                                                                                                                                                                           |
+| -------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Linux    | `/proc/<pid>/stat`, `/proc/<pid>/status`, `/proc/<pid>/cmdline` and `/proc/meminfo`.                | [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb) sets `command[:ps] = "ps -ef"`. The `command` plugin runs it and reports the raw `ps` text. | **Different shape, same source data.** Ohai reports the raw `ps -ef` output as one text block through its companion `command` collector (refer to `docs/collectors/command.md`). gohai parses `/proc` into typed records, one for each process. Ohai's `ps -ef` `tty` is `tty`, and its `stime` is `creation_time`. |
+| macOS    | `ps -ax -o pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,time=,tty=,lstart=`, then `ucomm=` and `args=`. | The same top-level [`ps.rb`](https://github.com/chef/ohai/blob/main/lib/ohai/plugins/ps.rb), with `ps -ef` in the `:darwin` branch.                                  | **Same source data, different shape.** This is the same as the Linux row.                                                                                                                                                                                                                                           |
 
 On Linux, `cpu_percent` is `utime` plus `stime` of `/proc/<pid>/stat`, in
 seconds, divided by the seconds since the process started, times 100. `rss` is
@@ -116,6 +119,18 @@ seconds, divided by the seconds since the process started, times 100. `rss` is
 decaying average, not the average since start. `cpu_seconds` is `utime` plus
 `stime` on Linux, and the `time` column of `ps` on macOS. The difference between
 two samples, over the seconds between them, is the CPU share in that time.
+
+On Linux, `tty` is the `tty_nr` field of `/proc/<pid>/stat`, a device number, as
+its name: `pts/N` for a pseudo-terminal (majors 136 to 143), `ttyN` for a
+virtual console and `ttySN` for a serial port (major 4). A device of any other
+kind gives an empty `tty`. `threads` is `Threads` of `/proc/<pid>/status`, and
+`open_files` is the count of entries in `/proc/<pid>/fd`. Only root may list
+another user's `fd` directory, so for a run that is not root, `open_files` is
+empty for those processes. On macOS, `tty` is the `tty` column of `ps`, where
+`??` means no terminal. `ps` has no thread or file count, so `threads` and
+`open_files` are Linux only.
+
+The collector does not report the environment of a process.
 
 On macOS, the `ucomm=` and `args=` runs of `ps` give each process its name and
 command line. A `ps` that fails for one of them is an error, so a process does

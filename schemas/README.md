@@ -7,7 +7,7 @@ analysis for the 950 JSON fields of gohai.
 
 | File                | Purpose                                                                                                                                      |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `field-mapping.md`  | **Source of truth.** The tier mapping of each field (961 rows). `Changed? yes/no` shows which fields need a new name to agree with OCSF/OTel |
+| `field-mapping.md`  | **Source of truth.** The tier mapping of each field (964 rows). `Changed? yes/no` shows which fields need a new name to agree with OCSF/OTel |
 | `ocsf-gaps.md`      | Fields that OCSF does not cover, but that it must cover. These are candidates for upstream PRs to the OCSF schema repo                       |
 | `gohai.schema.json` | The generated JSON Schema (draft 2020-12) for `gohai.Facts`. It shows the current Go tags. Generate it again after a rename                  |
 | `schema.go`         | The `//go:embed` of the schema for the `gohai validate` command                                                                              |
@@ -24,7 +24,7 @@ Each JSON field name comes from one of three tiers. Use the tiers in this order:
 2. **OpenTelemetry Resource Semantic Conventions** (92 fields). Use this tier
    when OCSF has no field. Refer to
    [OTel semconv](https://opentelemetry.io/docs/specs/semconv/resource/).
-3. **gohai convention** (759 fields). The names of the backing library in
+3. **gohai convention** (764 fields). The names of the backing library in
    `snake_case`. Add a unit suffix when the unit is not clear.
 
 [`field-mapping.md`](field-mapping.md) has the full mapping of each field, with

@@ -4318,6 +4318,15 @@
         },
         "cpu_seconds": {
           "type": "number"
+        },
+        "tty": {
+          "type": "string"
+        },
+        "threads": {
+          "type": "integer"
+        },
+        "open_files": {
+          "type": "integer"
         }
       },
       "additionalProperties": false,

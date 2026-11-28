@@ -57,6 +57,14 @@ type Process struct {
 	// difference between two samples, over the time between them, is the
 	// CPU share in that time.
 	CPUSeconds float64 `json:"cpu_seconds,omitempty"`
+	// TTY is the controlling terminal, such as "pts/0" or "ttys000". It is
+	// empty for a process with no terminal.
+	TTY string `json:"tty,omitempty"`
+	// Threads is the thread count. Linux only.
+	Threads int `json:"threads,omitempty"`
+	// OpenFiles is the count of open file descriptors. Linux only, and
+	// only for a process whose /proc/<pid>/fd the run may list.
+	OpenFiles int `json:"open_files,omitempty"`
 }
 
 // Collector is the public interface every process variant satisfies.
