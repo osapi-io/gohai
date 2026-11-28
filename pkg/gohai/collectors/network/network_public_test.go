@@ -430,7 +430,9 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 		// files and runner give a row its host through the sources: the
 		// sysfs and /proc files, and the commands. A row with a runner
 		// does not use the interface seams above.
-		files        map[string]string
+		files map[string]string
+		// links are symbolic links in that fs, each path to its target.
+		links        map[string]string
 		runner       *sourcetest.Commands
 		nilExec      bool
 		validateFunc func(any, error)
@@ -1917,6 +1919,32 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: an interface is a link to its device directory, as on a host, and is kept",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/devices/pci0000:00/0000:00:03.0/net/eth0/ifindex": "2\n",
+				"/sys/devices/virtual/net/lo/ifindex":                   "1\n",
+				"/sys/class/net/bonding_masters":                        "bond0\n",
+			},
+			links: map[string]string{
+				"/sys/class/net/eth0": "/sys/devices/pci0000:00/0000:00:03.0/net/eth0",
+				"/sys/class/net/lo":   "/sys/devices/virtual/net/lo",
+			},
+			runner: &sourcetest.Commands{Out: map[string]string{
+				"ip -o addr show": "2: eth0    inet 192.0.2.7/24 brd 192.0.2.255 scope global eth0\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				names := []string{}
+				for _, ifc := range i.Interfaces {
+					names = append(names, ifc.Name)
+				}
+				s.ElementsMatch([]string{"eth0", "lo"}, names)
+			},
+		},
+		{
 			name:    "linux: a regular file under /sys/class/net, such as bonding_masters, is not an interface",
 			variant: "linux",
 			files: map[string]string{
@@ -2267,7 +2295,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 				var c network.Collector = &network.Darwin{Exec: tt.runner.Mock(s.T())}
 				if tt.variant == "linux" {
 					c = &network.Linux{
-						FS:   sourcetest.FS(s.T(), tt.files),
+						FS:   sourcetest.Links(s.T(), sourcetest.FS(s.T(), tt.files), tt.links),
 						Exec: tt.runner.Mock(s.T()),
 					}
 				}
