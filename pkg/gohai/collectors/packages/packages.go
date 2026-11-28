@@ -20,7 +20,8 @@
 
 // Package packages reports the list of installed packages on the host.
 // Linux: reads from dpkg-query (Debian/Ubuntu) or rpm (RHEL/Fedora).
-// macOS: reads from Homebrew via `brew list --versions`.
+// macOS: reads from Homebrew via `brew list --formula --versions` and
+// `brew list --cask --versions`.
 package packages
 
 import (
