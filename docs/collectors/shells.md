@@ -145,4 +145,4 @@ same as Ohai, which lets `file_open` raise the error.
 
 - [`github.com/avfs/avfs`](https://github.com/avfs/avfs) to read `/etc/shells`.
   Production uses `osfs`. Tests use `memfs`.
-- The Go standard library `bufio` to read the lines.
+- The Go standard library `strings` to read the lines.

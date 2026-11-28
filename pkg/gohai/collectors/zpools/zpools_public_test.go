@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	osexec "os/exec"
+	"strings"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -147,6 +148,26 @@ func (s *ZpoolsPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
 					Out: map[string]string{zpoolLine: string(onePool)},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*zpools.Info)
+				s.Require().True(ok)
+				s.Equal([]zpools.Pool{
+					{Name: "tank", Size: "1.82T", Alloc: "672G", Free: "1.17T", Health: "ONLINE"},
+				}, info.Pools)
+			},
+		},
+		{
+			name:    "linux: a line over 64 KiB keeps the pools after it",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{zpoolLine: strings.Repeat("x", 70000) + "\n" +
+						string(onePool)},
 				}.Mock(
 					t,
 				)

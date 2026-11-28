@@ -31,7 +31,6 @@
 package sessions
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -171,9 +170,10 @@ func parseLoginctlSessions(
 	raw []byte,
 ) []Session {
 	out := []Session{}
-	sc := bufio.NewScanner(strings.NewReader(string(raw)))
-	for sc.Scan() {
-		fields := strings.Fields(sc.Text())
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for line := range strings.Lines(string(raw)) {
+		fields := strings.Fields(line)
 		if len(fields) < 3 {
 			continue
 		}

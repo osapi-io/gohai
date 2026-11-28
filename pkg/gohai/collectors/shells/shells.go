@@ -23,8 +23,6 @@
 package shells
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"strings"
 
@@ -86,9 +84,10 @@ func parseShells(
 	content []byte,
 ) *Info {
 	info := &Info{Paths: []string{}}
-	sc := bufio.NewScanner(bytes.NewReader(content))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
+	// strings.Lines, not a bufio.Scanner, which stops with no error at a
+	// line over 64 KiB and drops every line after it.
+	for rawLine := range strings.Lines(string(content)) {
+		line := strings.TrimSpace(rawLine)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
