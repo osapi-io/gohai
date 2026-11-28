@@ -158,6 +158,10 @@ type legacyReleaseFile struct {
 // `CentOS release 6.10 (Final)`.
 var genericReleaseRE = regexp.MustCompile(`^([A-Za-z][A-Za-z _]*?)\s+release\s+(\d[\d.]*)`)
 
+// slackwareVersionRE matches /etc/slackware-version, which has no
+// `release` word: `Slackware 15.0`.
+var slackwareVersionRE = regexp.MustCompile(`^Slackware\s+(\d[\d.]*)`)
+
 // suseReleaseVersionRE / suseReleasePatchLevelRE parse
 // /etc/SuSE-release.
 var (
@@ -186,6 +190,18 @@ func parseGenericRelease(
 	// least one whitespace-separated token after Fields.
 	first := strings.Fields(m[1])
 	return strings.ToLower(first[0]), m[2]
+}
+
+// parseSlackwareVersion returns ("slackware", "<version>") from
+// /etc/slackware-version content, as Ohai's /Slackware ([\d\.]+)/ does.
+func parseSlackwareVersion(
+	content string,
+) (string, string) {
+	m := slackwareVersionRE.FindStringSubmatch(content)
+	if m == nil {
+		return "", ""
+	}
+	return "slackware", m[1]
 }
 
 // parseSuseRelease returns ("suse", "<version>.<patchlevel>") from
@@ -220,7 +236,7 @@ var legacyReleaseFiles = []legacyReleaseFile{
 		family: "arch",
 	},
 	{path: "/etc/gentoo-release", parse: parseGenericRelease, family: "gentoo"},
-	{path: "/etc/slackware-version", parse: parseGenericRelease, family: "slackware"},
+	{path: "/etc/slackware-version", parse: parseSlackwareVersion, family: "slackware"},
 	{path: "/etc/enterprise-release", parse: parseGenericRelease, family: "rhel"},
 	{path: "/etc/exherbo-release", parse: parseGenericRelease, family: "exherbo"},
 }

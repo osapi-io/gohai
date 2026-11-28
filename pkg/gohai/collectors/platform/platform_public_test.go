@@ -402,6 +402,36 @@ func (s *PlatformPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: no os-release, legacy /etc/slackware-version",
+			variant: "linux",
+			fs: sourcetest.FS(s.T(), map[string]string{
+				"/etc/slackware-version": "Slackware 15.0\n",
+			}),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Equal(platform.Info{
+					OS: "linux", Name: "slackware", Version: "15.0",
+					Family: "slackware", CPUArchitecture: runtime.GOARCH,
+				}, *info)
+			},
+		},
+		{
+			name:    "linux: no os-release, a slackware-version with no version is skipped",
+			variant: "linux",
+			fs: sourcetest.FS(s.T(), map[string]string{
+				"/etc/slackware-version": "Slackware\n",
+			}),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*platform.Info)
+				s.Require().True(ok)
+				s.Empty(info.Name)
+				s.Empty(info.Version)
+			},
+		},
+		{
 			name:    "linux: no os-release, malformed legacy file skipped next succeeds",
 			variant: "linux",
 			fs: sourcetest.FS(s.T(), map[string]string{
