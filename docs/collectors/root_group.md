@@ -91,9 +91,9 @@ None.
 | Linux    | `/etc/passwd` gid of `root` → its name in `/etc/group` | `Etc.getgrgid(Etc.getpwnam("root").gid).name`, same two-hop pattern.                                   | **Identical.** The lookup in two steps gives the correct name, also if the primary GID of root is not 0. |
 | macOS    | The same two files                                     | The same Ruby `Etc` call                                                                               | **Identical.** The usual result is "wheel".                                                              |
 
-**Known gaps:** None. Windows support is out of scope. On Windows, Ohai does a
-WMI SID-544 lookup for the localized name of the Administrators group. gohai
-does not support Windows yet.
+On Windows, Ohai does a WMI SID-544 lookup for the localized name of the
+Administrators group. gohai does not run on Windows, so the collector has no
+such lookup.
 
 ## Backing library
 
