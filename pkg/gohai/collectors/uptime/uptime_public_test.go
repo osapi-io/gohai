@@ -164,6 +164,20 @@ func (s *UptimePublicTestSuite) TestCollect() {
 			files: map[string]string{"/proc/uptime": ""}, wantErr: "is empty",
 		},
 		{
+			name: "linux: an uptime of NaN is refused", variant: "linux",
+			files: map[string]string{"/proc/uptime": "NaN 1"}, wantErr: "is not a number",
+		},
+		{
+			name: "linux: an uptime of +Inf is refused", variant: "linux",
+			files: map[string]string{"/proc/uptime": "+Inf 1"}, wantErr: "is not a number",
+		},
+		{
+			name:    "linux: an idle of NaN is left out",
+			variant: "linux",
+			files:   map[string]string{"/proc/uptime": "65 NaN\n"},
+			want:    &uptime.Info{Seconds: 65, Human: "1m 5s"},
+		},
+		{
 			name: "linux: uptime not a number", variant: "linux",
 			files: map[string]string{"/proc/uptime": "x 1"}, wantErr: "is not a number",
 		},
@@ -182,6 +196,14 @@ func (s *UptimePublicTestSuite) TestCollect() {
 				"sysctl -n kern.boottime": "{ sec = 1999999999, usec = 0 }\n",
 			}},
 			want: &uptime.Info{Seconds: 0, BootTime: 1999999999, Human: "0s"},
+		},
+		{
+			name:    "darwin: a boot time too large for an int64 is an error",
+			variant: "darwin",
+			runner: sourcetest.Commands{Out: map[string]string{
+				"sysctl -n kern.boottime": "{ sec = 99999999999999999999, usec = 0 }\n",
+			}},
+			wantErr: "sysctl kern.boottime:",
 		},
 		{
 			name:    "darwin: sysctl fails",

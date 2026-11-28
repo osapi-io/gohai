@@ -689,6 +689,22 @@ func (s *VirtualizationPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: cgroup v2 docker path with an empty controller list",
+			variant: "linux",
+			fs: func() avfs.VFS {
+				return sourcetest.FS(s.T(), map[string]string{
+					"/proc/self/cgroup": "0::/docker/47341cd3bba14d17d3d67e6b4bd3b46f\n",
+				})
+			},
+			exec: func(t *testing.T) source.Runner { return sourcetest.Commands{}.Mock(t) },
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*virtualization.Info)
+				s.Require().True(ok)
+				s.Equal("guest", i.Systems["docker"])
+			},
+		},
+		{
 			name:    "linux: cgroup nested docker (systemd /system.slice/docker-*.scope)",
 			variant: "linux",
 			fs: func() avfs.VFS {

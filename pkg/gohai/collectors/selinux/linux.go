@@ -22,10 +22,7 @@ package selinux
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/fs"
-	osexec "os/exec"
 	"strings"
 
 	"github.com/avfs/avfs"
@@ -79,7 +76,7 @@ func (l *Linux) Collect(
 		if strings.TrimSpace(string(enforce)) == "1" {
 			info.CurrentMode = "enforcing"
 		}
-	case errors.Is(err, fs.ErrNotExist):
+	case collector.Absent(err):
 		return info, nil
 	default:
 		return nil, fmt.Errorf("read %s: %w", enforcePath, err)
@@ -90,7 +87,7 @@ func (l *Linux) Collect(
 		switch {
 		case err == nil:
 			parseSestatus(out, info)
-		case !errors.Is(err, osexec.ErrNotFound):
+		case !collector.Absent(err):
 			return nil, fmt.Errorf("sestatus: %w", err)
 		}
 	}
