@@ -162,22 +162,32 @@ func NewWith(
 }
 
 // summarize is the Info of the per-CPU entries cpus and the logical CPU
-// count: a socket for each physical id, the cores summed over the
-// entries, and the model of the first entry. A variant overlays what it
-// knows better, such as lscpu's or sysctl's counts.
+// count: a socket for each physical id, the physical cores, and the model
+// of the first entry. The cores are the distinct (physical id, core id)
+// pairs when the entries have core ids, as Linux's do, because each
+// logical CPU of a core is an entry. Otherwise they are the sum over the
+// entries. A variant overlays what it knows better, such as lscpu's or
+// sysctl's counts.
 func summarize(
 	count int,
 	cpus []CPU,
 ) *Info {
 	info := &Info{Count: count, CPUs: cpus}
 	sockets := map[string]struct{}{}
+	pairs := map[[2]string]struct{}{}
 	var cores int32
 	for _, c := range cpus {
 		sockets[c.PhysicalID] = struct{}{}
+		if c.CoreID != "" {
+			pairs[[2]string{c.PhysicalID, c.CoreID}] = struct{}{}
+		}
 		cores += c.Cores
 	}
 	info.Sockets = len(sockets)
 	info.Cores = int(cores)
+	if len(pairs) > 0 {
+		info.Cores = len(pairs)
+	}
 	if len(cpus) > 0 {
 		c := cpus[0]
 		info.ModelName, info.VendorID = c.ModelName, c.VendorID
@@ -238,6 +248,7 @@ type lscpuSummary struct {
 	biosVendorID       string
 	biosModelName      string
 	machineType        string
+	modelName          string
 	mhzMax             string
 	mhzMin             string
 	mhzDynamic         string
@@ -326,6 +337,8 @@ func parseLscpu(
 			s.biosVendorID = val
 		case key == "BIOS Model name":
 			s.biosModelName = val
+		case key == "Model name":
+			s.modelName = val
 		case key == "Machine type":
 			s.machineType = val
 		case key == "CPU max MHz":
@@ -355,8 +368,12 @@ func parseLscpu(
 			mid := strings.TrimPrefix(key, "NUMA node")
 			mid = strings.TrimSuffix(mid, " CPU(s)")
 			mid = strings.TrimSpace(mid)
+			// A node whose CPU list does not parse is left out, not given a
+			// null list.
 			if node, err := strconv.Atoi(mid); err == nil {
-				s.numaNodes[node] = parseCPURange(val)
+				if cpus := parseCPURange(val); cpus != nil {
+					s.numaNodes[node] = cpus
+				}
 			}
 		}
 	}
@@ -435,9 +452,11 @@ func parseCPURange(
 
 // applyLscpuToInfo merges a parsed lscpu summary into the Info built
 // from /proc/cpuinfo. Caches and NumaNodes are always surfaced when
-// lscpu provides them. Socket, core and thread counts are only
-// overridden on architectures where /proc/cpuinfo is known to
-// mis-count: s390x and ppc64le.
+// lscpu provides them. The model name fills one that /proc/cpuinfo does
+// not have, as on arm64. The physical cores are Socket(s) times Core(s)
+// per socket when lscpu gives both. On s390x and ppc64le, where
+// /proc/cpuinfo mis-counts, lscpu also gives the socket and logical CPU
+// counts.
 func applyLscpuToInfo(
 	info *Info,
 	s lscpuSummary,
@@ -472,6 +491,9 @@ func applyLscpuToInfo(
 	info.VirtualizationType = s.virtualizationType
 	info.HypervisorVendor = s.hypervisorVendor
 	info.DispatchingMode = s.dispatchingMode
+	if info.ModelName == "" {
+		info.ModelName = s.modelName
+	}
 	if !s.haveLscpuLayout {
 		return
 	}
@@ -510,6 +532,10 @@ func applyLscpuToInfo(
 		}
 		if s.sockets > 0 {
 			info.Sockets = s.sockets
+		}
+	default:
+		if s.sockets > 0 && s.coresPerSocket > 0 {
+			info.Cores = s.sockets * s.coresPerSocket
 		}
 	}
 }

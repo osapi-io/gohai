@@ -178,10 +178,12 @@ On Linux:
    the speed, and `topology/core_id` gives the core. The number of entries is
    `count`. If the file has no `processor` lines, the `cpuN` lines of
    `/proc/stat` give `count`. The number of different `physical id` values is
-   `sockets` on x86. The collector puts each entry into the `cpus[]` slice. Thus
-   the fields of each logical CPU stay in the output. This is important on
-   hybrid-core CPUs, where the cores are not all the same. It is the same as
-   Ohai's `cpu["0"]`, `cpu["1"]` entries.
+   `sockets` on x86. The number of different (`physical id`, `core id`) pairs is
+   `cores`, because each thread of a core is an entry of its own. The collector
+   puts each entry into the `cpus[]` slice. Thus the fields of each logical CPU
+   stay in the output. This is important on hybrid-core CPUs, where the cores
+   are not all the same. It is the same as Ohai's `cpu["0"]`, `cpu["1"]`
+   entries.
 
 2. The collector reads each file in `/sys/devices/system/cpu/vulnerabilities/`
    through the injected `avfs.VFS`. The basename is the map key. The trimmed
@@ -192,9 +194,13 @@ On Linux:
    `source.Runner` and merges these fields:
 
    - The cache size of each level (`caches.l1d` / `l1i` / `l2` / `l3`).
-   - The NUMA node → CPU index lists (`numa_nodes`).
-   - On `s390x` and `ppc64le` only, the socket, core and thread counts. These
-     replace the numbers from `/proc/cpuinfo`, which are correct only for x86.
+   - The NUMA node → CPU index lists (`numa_nodes`). A node whose CPU list does
+     not parse is left out.
+   - `Model name`, when `/proc/cpuinfo` gives none, as on arm64.
+   - `cores`, as `Socket(s)` times `Core(s) per socket`, when `lscpu` gives
+     both. arm64's `/proc/cpuinfo` has no `physical id` or `core id`.
+   - On `s390x` and `ppc64le`, the socket and logical CPU counts too. These
+     replace the numbers from `/proc/cpuinfo`, which are wrong there.
 
    If `lscpu` fails, the extension fields stay empty. The fields from
    `/proc/cpuinfo` stay correct.
