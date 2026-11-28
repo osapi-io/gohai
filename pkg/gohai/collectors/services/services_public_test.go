@@ -35,7 +35,7 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/services"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -91,7 +91,7 @@ func systemctlExecWith(
 ) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().Execute(
 		gomock.Any(),
 		"systemctl",
@@ -182,7 +182,7 @@ func launchctlExec(
 	err error,
 ) source.Runner {
 	t.Helper()
-	m := sourcemocks.NewMockRunner(gomock.NewController(t))
+	m := mocks.NewMockRunner(gomock.NewController(t))
 	m.EXPECT().Execute(gomock.Any(), "launchctl", "print", "system").Return(out, err).AnyTimes()
 
 	return m
@@ -452,7 +452,7 @@ func (s *ServicesPublicTestSuite) TestCollect() {
 			name:      "linux: a host that systemd did not boot: empty list, no systemctl",
 			variant:   "linux",
 			noSystemd: true,
-			exec:      sourcemocks.NewMockRunner(gomock.NewController(s.T())),
+			exec:      mocks.NewMockRunner(gomock.NewController(s.T())),
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
 				info, ok := got.(*services.Info)

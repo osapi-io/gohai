@@ -32,7 +32,7 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/docker"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -74,7 +74,7 @@ func buildMock(
 ) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	if versionOut != nil || versionErr != nil {
 		m.EXPECT().Execute(gomock.Any(), "docker", "version", "--format", "{{.Server.Version}}").
 			Return(versionOut, versionErr).AnyTimes()
@@ -95,7 +95,7 @@ func buildMock(
 
 // inspect makes m answer each docker inspect with out and err.
 func inspect(
-	m *sourcemocks.MockRunner,
+	m *mocks.MockRunner,
 	out []byte,
 	err error,
 ) {
@@ -232,7 +232,7 @@ func (s *DockerPublicTestSuite) TestInspect() {
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
 			ctrl := gomock.NewController(s.T())
-			m := sourcemocks.NewMockRunner(ctrl)
+			m := mocks.NewMockRunner(ctrl)
 			m.EXPECT().
 				Execute(gomock.Any(), "docker", "version", "--format", "{{.Server.Version}}").
 				Return([]byte(versionOut), nil)

@@ -35,7 +35,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 type RegistryPublicTestSuite struct {
@@ -55,8 +55,8 @@ func TestRegistryPublicTestSuite(
 func (s *RegistryPublicTestSuite) TestBuiltinCollectorsTakeSources() {
 	ctrl := gomock.NewController(s.T())
 	fs := memfs.New()
-	exec := sourcemocks.NewMockRunner(ctrl)
-	resolver := sourcemocks.NewMockResolver(ctrl)
+	exec := mocks.NewMockRunner(ctrl)
+	resolver := mocks.NewMockResolver(ctrl)
 	now := func() time.Time { return time.Unix(42, 0) }
 
 	for _, platform := range []string{family.Debian, family.Darwin} {

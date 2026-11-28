@@ -32,7 +32,7 @@ import (
 	"github.com/osapi-io/gohai/internal/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/languages"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -63,7 +63,7 @@ func buildFullMock(
 ) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "go", "version").
 		Return([]byte("go version go1.21.0 linux/amd64\n"), nil).
@@ -97,7 +97,7 @@ func buildAbsentMock(
 ) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	absent := errors.New("not found")
 	m.EXPECT().Execute(gomock.Any(), "go", "version").Return(nil, absent).AnyTimes()
 	m.EXPECT().Execute(gomock.Any(), "python3", "--version").Return(nil, absent).AnyTimes()
@@ -122,7 +122,7 @@ func buildSingleMock(
 ) source.Runner {
 	t.Helper()
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	absent := errors.New("not found")
 
 	probes := []struct{ cmd, arg string }{

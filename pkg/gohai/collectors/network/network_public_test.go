@@ -40,7 +40,7 @@ import (
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/network"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -259,7 +259,7 @@ func ipRouteExec(
 	v6 []byte, v6Err error,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
 		Return(v4, v4Err).
@@ -296,7 +296,7 @@ func ipRouteAndEthtoolFullExec(
 	driverInfo, ring, channel, coalesce, offload, pause map[string]string,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
 		Return(nil, errors.New("nope")).
@@ -352,7 +352,7 @@ func ipRouteAndIPLinkExec(
 	ipLinkOut string,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
 		Return(nil, errors.New("nope")).
@@ -379,7 +379,7 @@ func ethtoolOnlyFor(
 	name string,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, errors.New("nope")).
@@ -411,7 +411,7 @@ func driverInfoOnlyFor(
 	driver string,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, errors.New("nope")).
@@ -437,7 +437,7 @@ func noEthtool(
 	t *testing.T,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, errors.New("nope")).
@@ -462,7 +462,7 @@ func ipRouteAndEthtoolExec(
 	driverInfo map[string]string,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "ip", "-o", "-4", "route", "show", "table", "main").
 		Return(nil, errors.New("nope")).
@@ -1701,7 +1701,7 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 					// The row's mock answers route, link and ethtool; the
 					// address and neighbour reads come from the row's
 					// interfaces.
-					mock := tt.exec.(*sourcemocks.MockRunner)
+					mock := tt.exec.(*mocks.MockRunner)
 					mock.EXPECT().
 						Execute(gomock.Any(), "ip", "-o", "addr", "show").
 						Return([]byte(ipAddrOf(ifs)), nil).

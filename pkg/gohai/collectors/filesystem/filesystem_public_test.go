@@ -35,7 +35,7 @@ import (
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/filesystem"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
-	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
+	"github.com/osapi-io/gohai/pkg/gohai/source/mocks"
 )
 
 var (
@@ -120,7 +120,7 @@ func noLsblkExec(
 	t *testing.T,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(nil, errors.New("not found")).
@@ -140,7 +140,7 @@ func lsblkExec(
 	out string,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
 		Return([]byte(out), nil).
@@ -160,7 +160,7 @@ func lsblkZFSExec(
 	lsblkOut, zfsOut string,
 ) source.Runner {
 	ctrl := gomock.NewController(t)
-	m := sourcemocks.NewMockRunner(ctrl)
+	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
 		Return([]byte(lsblkOut), nil).
@@ -800,7 +800,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 				}
 				var exec source.Runner
 				if tt.exec != nil {
-					if mock, ok := tt.exec(s.T()).(*sourcemocks.MockRunner); ok && mock != nil {
+					if mock, ok := tt.exec(s.T()).(*mocks.MockRunner); ok && mock != nil {
 						// The row's mock answers lsblk and zfs; df answers
 						// come from the row's out and errs.
 						df := sourcetest.Commands{Out: tt.out, Err: tt.errs}.Mock(s.T())
