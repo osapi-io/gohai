@@ -23,6 +23,7 @@ package gpu
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -56,14 +57,17 @@ func (d *Darwin) Collect(
 		return info, nil
 	}
 	out, err := d.Exec.Execute(ctx, "system_profiler", "SPDisplaysDataType", "-json")
-	if err != nil {
+	if collector.Absent(err) {
 		return info, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read displays: %w", err)
 	}
 	var payload struct {
 		Displays []darwinDisplay `json:"SPDisplaysDataType"`
 	}
 	if err := json.Unmarshal(out, &payload); err != nil {
-		return info, nil
+		return nil, fmt.Errorf("parse system_profiler SPDisplaysDataType: %w", err)
 	}
 	for _, d := range payload.Displays {
 		info.Cards = append(info.Cards, d.toCard())

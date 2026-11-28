@@ -174,7 +174,9 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 		files   map[string]string
 		links   map[string]string
 		runner  sourcetest.Commands
+		nilExec bool
 		want    []cacertificates.Certificate
+		wantErr string
 	}{
 		{
 			name:    "when a Debian host has system and local CAs, and turns one off",
@@ -305,14 +307,26 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "when security cannot read the keychains",
+			name:    "when security fails to read a keychain, it is an error",
 			variant: "darwin",
 			runner: sourcetest.Commands{Err: map[string]error{
 				"security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain": errors.New(
 					"denied",
 				),
 			}},
-			want: []cacertificates.Certificate{},
+			wantErr: "read keychain",
+		},
+		{
+			name:    "when the Darwin variant has no Exec, there are no CAs",
+			variant: "darwin",
+			nilExec: true,
+			want:    []cacertificates.Certificate{},
+		},
+		{
+			name:    "when the host has no security command, there are no CAs",
+			variant: "darwin",
+			runner:  sourcetest.Commands{},
+			want:    []cacertificates.Certificate{},
 		},
 	}
 
@@ -327,10 +341,18 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 				}
 				c = &cacertificates.Linux{FS: fs, Layout: cacertificates.LayoutFor(tt.layout)}
 			case "darwin":
-				c = &cacertificates.Darwin{Exec: tt.runner.Mock(s.T())}
+				d := &cacertificates.Darwin{Exec: tt.runner.Mock(s.T())}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 
 			got, err := c.Collect(context.Background(), collector.PriorResults{})
+			if tt.wantErr != "" {
+				s.ErrorContains(err, tt.wantErr)
+				return
+			}
 			s.Require().NoError(err)
 			s.Equal(tt.want, got.(*cacertificates.Info).Certificates)
 		})

@@ -184,10 +184,11 @@ On macOS:
 3. If `max_capacity > 0`, the collector calculates `battery.remaining` as
    `current_capacity * 100 / max_capacity`. This is the same as Ohai's
    `(current / max * 100).to_i`.
-4. A failure in one of the three calls does not stop the other calls. A missing
-   binary, an exec error or malformed JSON in one call makes only that section
-   empty. Thus the collector stays useful on hosts where one `SP*DataType` mode
-   fails and the others succeed.
+4. A host without `system_profiler` gives an empty `Info`. A call that fails, or
+   output that does not parse as JSON, is an error for the whole collector, so a
+   caller can tell a failed read from a host that has nothing to report. A host
+   without a battery answers the power call with no battery, and that is not a
+   failure.
 
 On Linux, the collector returns an empty `Info`. Ohai's `darwin/hardware.rb` is
 for Darwin only. On Linux, the `dmi`, `cpu`, `memory`, `disk` and `filesystem`

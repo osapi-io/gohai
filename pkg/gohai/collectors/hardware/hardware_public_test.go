@@ -23,6 +23,8 @@ package hardware_test
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -296,11 +298,22 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: all three calls fail → empty Info",
+			name:    "darwin: a failed system_profiler call is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
-				return hwExec(t, nil, nil, nil,
-					errors.New("no"), errors.New("no"), errors.New("no"))
+				return hwExec(t, []byte(`{}`), nil, []byte(`{}`),
+					nil, errors.New("exit status 1"), nil)
+			},
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "read system_profiler")
+			},
+		},
+		{
+			name:    "darwin: no system_profiler → empty Info",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				absent := fmt.Errorf("exec %s: %w", "x", exec.ErrNotFound)
+				return hwExec(t, nil, nil, nil, absent, absent, absent)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -313,16 +326,13 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: malformed hardware JSON tolerated",
+			name:    "darwin: malformed hardware JSON is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte("not json"), []byte(`{}`), []byte(`{}`), nil, nil, nil)
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*hardware.Info)
-				s.Require().True(ok)
-				s.Empty(info.MachineModel)
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "parse system_profiler")
 			},
 		},
 		{
@@ -373,30 +383,23 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "darwin: malformed storage JSON tolerated",
+			name:    "darwin: malformed storage JSON is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte(`{}`), []byte("not json"), []byte(`{}`), nil, nil, nil)
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*hardware.Info)
-				s.Require().True(ok)
-				s.Empty(info.Storage)
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "parse system_profiler")
 			},
 		},
 		{
-			name:    "darwin: malformed power JSON tolerated",
+			name:    "darwin: malformed power JSON is an error",
 			variant: "darwin",
 			exec: func(t *testing.T) source.Runner {
 				return hwExec(t, []byte(`{}`), []byte(`{}`), []byte("not json"), nil, nil, nil)
 			},
-			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*hardware.Info)
-				s.Require().True(ok)
-				s.Nil(info.Battery)
-				s.Nil(info.Charger)
+			validateFunc: func(_ any, err error) {
+				s.ErrorContains(err, "parse system_profiler")
 			},
 		},
 		{

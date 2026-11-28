@@ -22,6 +22,7 @@ package cacertificates
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 
@@ -47,8 +48,9 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect lists each certificate of each keychain as PEM. A keychain that
-// `security` cannot read has no CAs. The System keychain can hold
+// Collect lists each certificate of each keychain as PEM. A host without
+// `security` has no CAs, and a keychain that `security` fails to read is
+// an error. The System keychain can hold
 // certificates that are not CAs, such as a device's own; a certificate
 // that is not a CA is left out.
 func (d *Darwin) Collect(
@@ -56,10 +58,16 @@ func (d *Darwin) Collect(
 	_ collector.PriorResults,
 ) (any, error) {
 	info := &Info{Certificates: []Certificate{}}
+	if d.Exec == nil {
+		return info, nil
+	}
 	for _, k := range keychains {
 		out, err := d.Exec.Execute(ctx, "security", "find-certificate", "-a", "-p", k.Path)
-		if err != nil {
+		if collector.Absent(err) {
 			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read keychain %s: %w", k.Path, err)
 		}
 		for _, c := range certs(out) {
 			if !c.IsCA {

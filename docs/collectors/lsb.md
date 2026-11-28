@@ -79,8 +79,8 @@ None.
 On Linux, the collector runs `lsb_release -a` through the shared
 `source.Runner`. It parses the four labelled lines of the output
 (`Distributor ID`, `Release`, `Codename`, `Description`) into the related `Info`
-fields. If the CLI is missing or fails, `Info` stays empty, and the collector
-returns no error. This is the same as Ohai, which does not panic in this case.
+fields. If the CLI is missing, `Info` stays empty, and the collector returns no
+error. A run of the CLI that fails is an error.
 
 **Why is there no fallback to the `/etc/lsb-release` file?** The previous
 implementation of gohai parsed the file directly. gohai removed that path to

@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -83,7 +84,7 @@ func (c Commands) Mock(
 				return []byte(out), nil
 			}
 
-			return nil, fmt.Errorf("exec %s: not found", line)
+			return nil, fmt.Errorf("exec %s: not found: %w", line, exec.ErrNotFound)
 		}).
 		AnyTimes()
 
