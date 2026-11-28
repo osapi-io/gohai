@@ -95,7 +95,7 @@ func (d *Darwin) list(
 	out, err := d.Exec.Execute(
 		ctx,
 		"ps",
-		ps("-o", "pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,time=,lstart=")...)
+		ps("-o", "pid=,ppid=,user=,state=,pcpu=,pmem=,rss=,time=,tty=,lstart=")...)
 	if err != nil {
 		return nil, fmt.Errorf("ps: %w", err)
 	}
@@ -129,10 +129,14 @@ func (d *Darwin) list(
 			p.RSS = kb * 1024
 			p.CPUSeconds = cpuTime(f[7])
 		}
-		if len(f) >= 13 {
+		// ps prints "??" for a process with no terminal.
+		if len(f) >= 9 && f[8] != "??" {
+			p.TTY = f[8]
+		}
+		if len(f) >= 14 {
 			if t, err := time.ParseInLocation(
 				lstartLayout,
-				strings.Join(f[8:13], " "),
+				strings.Join(f[9:14], " "),
 				time.Local,
 			); err == nil {
 				p.CreationTime = t.Unix()

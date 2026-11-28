@@ -123,6 +123,10 @@ func (l *Linux) read(
 		ppid, _ := strconv.ParseInt(f[1], 10, 32)
 		p.ParentPID = int32(ppid)
 	}
+	if len(f) > 4 {
+		nr, _ := strconv.ParseInt(f[4], 10, 64)
+		p.TTY = ttyName(nr)
+	}
 	if len(f) > 19 && boot > 0 {
 		if ticks, err := strconv.ParseInt(f[19], 10, 64); err == nil {
 			p.CreationTime = boot + ticks/clockTicks
@@ -147,6 +151,9 @@ func (l *Linux) read(
 				kb, _ := strconv.ParseInt(strings.TrimSuffix(strings.TrimSpace(v), " kB"), 10, 64)
 				p.RSS = kb * 1024
 			}
+			if v, ok := strings.CutPrefix(line, "Threads:"); ok {
+				p.Threads, _ = strconv.Atoi(strings.TrimSpace(v))
+			}
 		}
 	}
 	if total > 0 {
@@ -155,8 +162,35 @@ func (l *Linux) read(
 	if cmd, err := l.FS.ReadFile(dir + "/cmdline"); err == nil {
 		p.CmdLine = strings.TrimSpace(strings.ReplaceAll(string(cmd), "\x00", " "))
 	}
+	// Another user's fd directory is root-only, so a run that is not root
+	// leaves OpenFiles empty for it.
+	if fds, err := l.FS.ReadDir(dir + "/fd"); err == nil {
+		p.OpenFiles = len(fds)
+	}
 
 	return p, true
+}
+
+// ttyName is the name of the terminal device nr, the tty_nr field of
+// /proc/<pid>/stat: "pts/N" for a pseudo-terminal, "ttyN" for a virtual
+// console and "ttySN" for a serial port. It is empty for no terminal, and
+// for a device that is none of those.
+func ttyName(
+	nr int64,
+) string {
+	major := (nr >> 8) & 0xfff
+	minor := (nr & 0xff) | ((nr >> 12) & 0xfff00)
+	switch {
+	case nr == 0:
+		return ""
+	case major >= 136 && major <= 143:
+		return "pts/" + strconv.FormatInt((major-136)*256+minor, 10)
+	case major == 4 && minor < 64:
+		return "tty" + strconv.FormatInt(minor, 10)
+	case major == 4:
+		return "ttyS" + strconv.FormatInt(minor-64, 10)
+	}
+	return ""
 }
 
 // bootTime is the btime line of /proc/stat, or 0.
