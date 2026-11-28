@@ -19,11 +19,15 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package command provides Ohai command/ps parity: runs `ps -ef` and
-// stores its raw output lines. Ohai's command plugin simply stores the
+// stores its output lines. Ohai's command plugin simply stores the
 // ps command string; gohai goes one step further and runs it so
 // consumers get the actual process listing. Both Linux and Darwin
 // support `ps -ef`. DefaultEnabled is false, because the output is large and most
 // consumers don't need it.
+//
+// Each line keeps its columns and the program of its CMD column, and
+// drops the program's arguments. An argument can hold a password or a
+// token, and the facts are stored, sent and shown.
 package command
 
 import (
@@ -35,7 +39,8 @@ import (
 
 // Info holds the raw ps output.
 type Info struct {
-	// PS contains the raw lines from `ps -ef` including the header.
+	// PS contains the lines from `ps -ef` including the header, with
+	// the arguments of each command removed.
 	PS []string `json:"ps"`
 }
 
@@ -82,7 +87,36 @@ func parsePSOutput(
 		if line == "" {
 			continue
 		}
-		info.PS = append(info.PS, line)
+		info.PS = append(info.PS, withoutArgs(line))
 	}
 	return info
+}
+
+// psColumns is the number of `ps -ef` columns before CMD: UID, PID,
+// PPID, C, STIME, TTY and TIME. None of them holds a space.
+const psColumns = 7
+
+// withoutArgs returns line cut after the first word of its CMD column,
+// so the arguments of a process never reach the facts. A line with no
+// CMD column, or a CMD with no arguments, comes back as it is. A
+// program path that holds a space is cut at the space too, which keeps
+// less than the path but never an argument.
+func withoutArgs(
+	line string,
+) string {
+	rest := line
+	for range psColumns {
+		rest = strings.TrimLeft(rest, " \t")
+		i := strings.IndexAny(rest, " \t")
+		if i < 0 {
+			return line
+		}
+		rest = rest[i:]
+	}
+	rest = strings.TrimLeft(rest, " \t")
+	i := strings.IndexAny(rest, " \t")
+	if i < 0 {
+		return line
+	}
+	return line[:len(line)-len(rest)+i]
 }

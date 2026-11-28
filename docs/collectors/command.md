@@ -5,12 +5,18 @@
 ## Description
 
 The collector gives the same data as Ohai's `command/ps`. It runs `ps -ef` and
-keeps the raw output lines. Ohai's `command.rb` plugin stores the ps command
-string. The related `ps.rb` plugin sets that string to `"ps -ef"` on Linux and
-macOS. gohai runs the command and stores the output. Thus consumers get the
-process list and do not have to run a shell command.
+keeps the output lines, without the arguments of each command. Ohai's
+`command.rb` plugin stores the ps command string. The related `ps.rb` plugin
+sets that string to `"ps -ef"` on Linux and macOS. gohai runs the command and
+stores the output. Thus consumers get the process list and do not have to run a
+shell command.
 
 Linux and macOS both support `ps -ef`, with the same POSIX output format.
+
+Each line keeps its columns and the program of its CMD column. The collector
+removes the arguments of the program. An argument can hold a password or a
+token, and the facts are stored, sent and shown. A program path that holds a
+space is cut at the space.
 
 DefaultEnabled is `false`. The full process table can be large. Most consumers
 use the `process` collector, which gives structured data, or do not need the
@@ -18,9 +24,9 @@ table.
 
 ## Collected fields
 
-| Field | Type     | Description                                       | Schema mapping    |
-| ----- | -------- | ------------------------------------------------- | ----------------- |
-| `ps`  | []string | The raw lines from `ps -ef`, with the header row. | gohai convention. |
+| Field | Type     | Description                                                     | Schema mapping    |
+| ----- | -------- | --------------------------------------------------------------- | ----------------- |
+| `ps`  | []string | The lines from `ps -ef` with no arguments, with the header row. | gohai convention. |
 
 ## Platform support
 
