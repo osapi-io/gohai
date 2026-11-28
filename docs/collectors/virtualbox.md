@@ -50,9 +50,14 @@ inventory, use the VBoxManage API directly.
 
 ### Non-VirtualBox host or guest additions absent
 
+The collector gives no fact. The output has no `virtualbox` key, and `_status`
+shows `absent`:
+
 ```json
 {
-  "virtualbox": null
+  "_status": {
+    "virtualbox": "absent"
+  }
 }
 ```
 
