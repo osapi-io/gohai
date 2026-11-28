@@ -221,7 +221,9 @@ func ipRouteAndEthtoolFullExec(
 			}
 			out, ok := src[iface]
 			if !ok {
-				return nil, errors.New("exec ethtool: exit status 94: Cannot get driver information: Operation not supported")
+				return nil, errors.New(
+					"exec ethtool: exit status 94: Cannot get driver information: Operation not supported",
+				)
 			}
 			return []byte(out), nil
 		}).
@@ -283,7 +285,9 @@ func ethtoolOnlyFor(
 			if args[0] == "-i" {
 				return []byte("driver: igb\n"), nil
 			}
-			return nil, errors.New("exec ethtool: exit status 94: Cannot get device settings: Operation not supported")
+			return nil, errors.New(
+				"exec ethtool: exit status 94: Cannot get device settings: Operation not supported",
+			)
 		}).
 		AnyTimes()
 	return m
@@ -365,11 +369,15 @@ func ipRouteAndEthtoolExec(
 		Execute(gomock.Any(), "ethtool", gomock.Any(), gomock.Any()).
 		DoAndReturn(func(_ context.Context, _ string, args ...string) ([]byte, error) {
 			if len(args) < 2 || args[0] != "-i" {
-				return nil, errors.New("exec ethtool: exit status 94: Cannot get ring parameters: Operation not supported")
+				return nil, errors.New(
+					"exec ethtool: exit status 94: Cannot get ring parameters: Operation not supported",
+				)
 			}
 			out, ok := driverInfo[args[1]]
 			if !ok {
-				return nil, errors.New("exec ethtool: exit status 1: Cannot get driver information: Operation not supported")
+				return nil, errors.New(
+					"exec ethtool: exit status 1: Cannot get driver information: Operation not supported",
+				)
 			}
 			return []byte(out), nil
 		}).
