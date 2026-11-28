@@ -22,6 +22,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -200,6 +201,17 @@ func runCollect(
 	case "ohai", "ocsf":
 	default:
 		return fmt.Errorf("unknown format %q: must be ohai or ocsf", format)
+	}
+	if format == "ocsf" && flat {
+		return errors.New("--flat does not apply to --format ocsf")
+	}
+	if format == "ocsf" && withTimings {
+		return errors.New("--with-timings does not apply to --format ocsf")
+	}
+	for _, n := range enabled.values() {
+		if disabled.set[n] {
+			return fmt.Errorf("--collector.%[1]s and --no-collector.%[1]s cannot both be set", n)
+		}
 	}
 
 	var opts []gohai.Option
