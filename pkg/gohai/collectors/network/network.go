@@ -579,8 +579,9 @@ var (
 	vlanFlagsRE      = regexp.MustCompile(`(REORDER_HDR|GVRP|LOOSE_BINDING)`)
 )
 
-// xdpHeaderRE picks the per-interface XDP mode token from the prog
-// line; xdpAttachedRE pulls each attached program's id + tag.
+// xdpHeaderRE picks the per-interface XDP mode token from the
+// interface header line (`... mtu 1500 xdp qdisc ...`); xdpAttachedRE
+// pulls each attached program's id + tag from the `prog/<mode>` lines.
 var (
 	xdpHeaderRE   = regexp.MustCompile(`\s(xdp|xdpgeneric|xdpoffload|xdpmulti)\s`)
 	xdpAttachedRE = regexp.MustCompile(`prog/(\w+) id (\d+) tag (\w+)`)
@@ -651,6 +652,13 @@ func parseIPLinkOutput(
 		if m := ipLinkHeaderRE.FindStringSubmatch(line); m != nil {
 			currentName = m[2]
 			xdpMode = ""
+			// iproute2 prints the XDP mode token on the header line,
+			// before the prog lines that use it.
+			if xdpHeaderRE.MatchString(line) {
+				ann := &ipLinkAnnotations{}
+				out[currentName] = ann
+				parseXDPLine(line, ann, &xdpMode)
+			}
 			continue
 		}
 		if currentName == "" {
