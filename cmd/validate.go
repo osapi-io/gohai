@@ -26,6 +26,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/avfs/avfs"
+	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/spf13/cobra"
 
 	"github.com/osapi-io/gohai/internal/cli"
@@ -84,6 +86,9 @@ func runValidate(
 	return nil
 }
 
+// hostFS is the file system that validate reads --file from.
+var hostFS avfs.VFS = osfs.NewWithNoIdm()
+
 // readInput is the JSON of file, or of in when file is empty. A terminal
 // on in is no input: the user ran gohai validate with nothing piped.
 func readInput(
@@ -91,7 +96,7 @@ func readInput(
 	file string,
 ) ([]byte, error) {
 	if file != "" {
-		data, err := os.ReadFile(file)
+		data, err := hostFS.ReadFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("read file %s: %w", file, err)
 		}

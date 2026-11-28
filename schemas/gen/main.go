@@ -28,6 +28,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/invopop/jsonschema"
 
 	"github.com/osapi-io/gohai/pkg/gohai"
@@ -72,7 +73,7 @@ func main() {
 
 	data = append(data, '\n')
 
-	if err := os.WriteFile(*out, data, 0o644); err != nil {
+	if err := osfs.NewWithNoIdm().WriteFile(*out, data, 0o644); err != nil {
 		fmt.Fprintf(os.Stderr, "write %s: %v\n", *out, err)
 		os.Exit(1)
 	}

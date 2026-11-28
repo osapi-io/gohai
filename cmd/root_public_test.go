@@ -27,11 +27,11 @@ import (
 	"errors"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"testing/iotest"
 
+	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/osapi-io/gohai/cmd"
@@ -58,15 +58,18 @@ func (failWriter) Write(
 }
 
 func (s *RootPublicTestSuite) TestExecute() {
-	dir := s.T().TempDir()
-	valid := filepath.Join(dir, "valid.json")
-	invalid := filepath.Join(dir, "invalid.json")
+	fs := memfs.New()
+	dir := "/facts"
+	s.Require().NoError(fs.MkdirAll(dir, 0o700))
+	valid := fs.Join(dir, "valid.json")
+	invalid := fs.Join(dir, "invalid.json")
 	var facts bytes.Buffer
 	s.Require().Zero(cmd.Execute(context.Background(),
 		[]string{"collect", "--no-defaults", "--collector.uptime"},
 		strings.NewReader(""), &facts, io.Discard))
-	s.Require().NoError(os.WriteFile(valid, facts.Bytes(), 0o600))
-	s.Require().NoError(os.WriteFile(invalid, []byte(`{"cpu": 7}`), 0o600))
+	s.Require().NoError(fs.WriteFile(valid, facts.Bytes(), 0o600))
+	s.Require().NoError(fs.WriteFile(invalid, []byte(`{"cpu": 7}`), 0o600))
+	defer cmd.SetHostFS(fs)()
 	devNull, err := os.Open(os.DevNull)
 	s.Require().NoError(err)
 	defer func() { _ = devNull.Close() }()
@@ -224,7 +227,7 @@ func (s *RootPublicTestSuite) TestExecute() {
 		},
 		{
 			name: "validate fails a file that is missing",
-			args: []string{"validate", "--file", filepath.Join(dir, "missing.json")},
+			args: []string{"validate", "--file", fs.Join(dir, "missing.json")},
 			validateFunc: func(code int, _, errOut string) {
 				s.Equal(1, code)
 				s.Contains(errOut, "read file")
