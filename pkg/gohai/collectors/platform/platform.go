@@ -30,13 +30,13 @@ package platform
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"runtime"
 	"strings"
 
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
@@ -139,13 +139,13 @@ var minorVersionDistros = map[string]bool{
 
 // majorOnlyVersionRE matches a `VERSION_ID` like `7` or `9` with no
 // dot. That is the case that warrants the redhat-release supplement.
-var majorOnlyVersionRE = regexp.MustCompile(`^\d+$`)
+var majorOnlyVersionRE = pattern.New(`^\d+$`)
 
 // redhatReleaseVersionRE extracts the dotted version from
 // `/etc/redhat-release` lines like
 // `CentOS Linux release 7.9.2009 (Core)` or
 // `Red Hat Enterprise Linux release 9.3 (Plow)`.
-var redhatReleaseVersionRE = regexp.MustCompile(`release\s+(\d[\d.]*)`)
+var redhatReleaseVersionRE = pattern.New(`release\s+(\d[\d.]*)`)
 
 // applyRedhatReleaseSupplement inspects info.Name + info.Version and
 // supplements with /etc/redhat-release or /etc/debian_version when
@@ -183,17 +183,17 @@ type legacyReleaseFile struct {
 // genericReleaseRE matches lines like
 // `Amazon Linux release 2 (Karoo)` or
 // `CentOS release 6.10 (Final)`.
-var genericReleaseRE = regexp.MustCompile(`^([A-Za-z][A-Za-z _]*?)\s+release\s+(\d[\d.]*)`)
+var genericReleaseRE = pattern.New(`^([A-Za-z][A-Za-z _]*?)\s+release\s+(\d[\d.]*)`)
 
 // slackwareVersionRE matches /etc/slackware-version, which has no
 // `release` word: `Slackware 15.0`.
-var slackwareVersionRE = regexp.MustCompile(`^Slackware\s+(\d[\d.]*)`)
+var slackwareVersionRE = pattern.New(`^Slackware\s+(\d[\d.]*)`)
 
 // suseReleaseVersionRE / suseReleasePatchLevelRE parse
 // /etc/SuSE-release.
 var (
-	suseReleaseVersionRE    = regexp.MustCompile(`(?m)^VERSION\s*=\s*(\S+)`)
-	suseReleasePatchLevelRE = regexp.MustCompile(`(?m)^PATCHLEVEL\s*=\s*(\S+)`)
+	suseReleaseVersionRE    = pattern.New(`(?m)^VERSION\s*=\s*(\S+)`)
+	suseReleasePatchLevelRE = pattern.New(`(?m)^PATCHLEVEL\s*=\s*(\S+)`)
 )
 
 // parseGenericRelease returns the distro name and version from a

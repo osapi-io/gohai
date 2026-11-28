@@ -23,17 +23,17 @@ package uptime
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // bootSecRE is the seconds of sysctl kern.boottime:
 // "{ sec = 1767229145, usec = 0 } Thu Jan  1 00:59:05 2026".
-var bootSecRE = regexp.MustCompile(`sec = (\d+)`)
+var bootSecRE = pattern.New(`sec = (\d+)`)
 
 // Darwin collects uptime on macOS: the boot time from sysctl
 // kern.boottime, and the seconds since it by the clock. It has no idle

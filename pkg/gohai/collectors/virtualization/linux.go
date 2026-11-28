@@ -22,7 +22,6 @@ package virtualization
 
 import (
 	"context"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -30,6 +29,7 @@ import (
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
@@ -285,21 +285,21 @@ func detectViaDMI(
 // cgroupContainerRE matches Docker / LXC / containerd cgroup paths
 // that sit directly under the cgroup root (classic docker/lxc layout).
 // The controller list is empty on the cgroup v2 line, "0::/docker/<id>".
-var cgroupContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]*:/(docker|lxc|containerd)/`)
+var cgroupContainerRE = pattern.New(`(?m)^\d+:[^:]*:/(docker|lxc|containerd)/`)
 
 // cgroupNestedContainerRE matches systemd-managed and docker-ce layouts
 // where the runtime appears as a named cgroup under a parent slice:
 // `/system.slice/docker-<hash>.scope`, `/docker-ce/docker/<hash>`,
 // `/kubepods/.../docker-<hash>.scope`, etc. Mirrors Ohai's second regex
 // in linux/virtualization.rb.
-var cgroupNestedContainerRE = regexp.MustCompile(`(?m)^\d+:[^:]*:/[^/]+/(docker|lxc)-?`)
+var cgroupNestedContainerRE = pattern.New(`(?m)^\d+:[^:]*:/[^/]+/(docker|lxc)-?`)
 
 // cgroupScopeRE matches the cgroup v2 path of a container that a
 // Kubernetes node or systemd runs, such as
 // `0::/kubepods.slice/.../cri-containerd-<hash>.scope` or
 // `.../crio-<hash>.scope`. The other two regexes need the runtime as the
 // first or second part of the path, and these paths have it last.
-var cgroupScopeRE = regexp.MustCompile(
+var cgroupScopeRE = pattern.New(
 	`(?m)^\d+:[^:]*:/\S*/(cri-containerd|crio|docker)-[0-9a-f]+\.scope$`,
 )
 
@@ -485,7 +485,7 @@ func execBinaryOnPath(
 // hypervKVPHostRE matches the HostName → HostingSystemEditionId span
 // Ohai uses. The Hyper-V KVP pool file is a binary blob with embedded
 // NULs; Ohai keeps only printable bytes from the match and lowercases.
-var hypervKVPHostRE = regexp.MustCompile(`HostName([\s\S]*?)HostingSystemEditionId`)
+var hypervKVPHostRE = pattern.New(`HostName([\s\S]*?)HostingSystemEditionId`)
 
 // parseHypervKVPHostName extracts the hypervisor hostname from a
 // /var/lib/hyperv/.kvp_pool_3 blob. Matches Ohai's linux/virtualization.rb

@@ -23,13 +23,13 @@ package dns
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -48,10 +48,10 @@ func NewDarwin() *Darwin {
 }
 
 var (
-	scutilNameserverRE = regexp.MustCompile(`^nameserver\[\d+\]\s*:\s*(\S+)`)
-	scutilSearchRE     = regexp.MustCompile(`^search domain\[\d+\]\s*:\s*(\S+)`)
-	scutilIfIndexRE    = regexp.MustCompile(`^if_index\s*:\s*\d+\s*\(([^)]+)\)`)
-	scutilDomainRE     = regexp.MustCompile(`^domain\s*:`)
+	scutilNameserverRE = pattern.New(`^nameserver\[\d+\]\s*:\s*(\S+)`)
+	scutilSearchRE     = pattern.New(`^search domain\[\d+\]\s*:\s*(\S+)`)
+	scutilIfIndexRE    = pattern.New(`^if_index\s*:\s*\d+\s*\(([^)]+)\)`)
+	scutilDomainRE     = pattern.New(`^domain\s*:`)
 )
 
 // Collect returns the dns Info.

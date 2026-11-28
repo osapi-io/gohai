@@ -23,15 +23,15 @@ package shard
 import (
 	"context"
 	"encoding/json"
-	"regexp"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // platformUUIDRE is the IOPlatformUUID line of ioreg's output.
-var platformUUIDRE = regexp.MustCompile(`"IOPlatformUUID" = "([^"]+)"`)
+var platformUUIDRE = pattern.New(`"IOPlatformUUID" = "([^"]+)"`)
 
 // Darwin computes a shard seed on macOS from machinename +
 // serial (system_profiler) + IOPlatformUUID (ioreg).

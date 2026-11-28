@@ -30,16 +30,16 @@ package rpm
 import (
 	"bufio"
 	"bytes"
-	"regexp"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // macrosMarkerRE matches the `===...===` separator lines that bracket
 // the macros section in `rpm --showrc` output. Mirrors Ohai's
 // MACROS_MARKER constant.
-var macrosMarkerRE = regexp.MustCompile(`={5,}`)
+var macrosMarkerRE = pattern.New(`={5,}`)
 
 // Info holds RPM configuration data.
 type Info struct {
@@ -91,7 +91,7 @@ func NewWith(
 // nesting level, a colon and a space, the name, then a tab and the body,
 // as in "-13: _builddir\t%{_topdir}/BUILD". The level is negative for
 // built-in and file macros, and 0 or more for macros defined at run time.
-var macroLineRE = regexp.MustCompile(`^\s*-?\d+: ([^\t]+)(?:\t(.*))?$`)
+var macroLineRE = pattern.New(`^\s*-?\d+: ([^\t]+)(?:\t(.*))?$`)
 
 // parseShowrc parses the output of `rpm --showrc` and returns the macro
 // definitions. The macros live between the two `===...===` marker lines.

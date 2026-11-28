@@ -242,6 +242,10 @@ test file keeps its production file.
   registration error or a programming error. `main` reports the error and exits
   with a code that is not zero. A `recover` that stops a panic from a dependency
   is permitted. The `forbidigo` linter fails a `panic` outside a test.
+- A `Must` helper, such as `regexp.MustCompile` or `template.Must`, panics too,
+  and `forbidigo` fails it outside a test. In gohai, keep a regular expression
+  in a package variable with `pattern.New` from `internal/pattern`. A bad
+  expression then matches nothing, and a test in `pkg/gohai` fails.
 - Read and write files through [avfs], so that a test can use a file system in
   memory. This applies to tools that run at build time too: generators,
   scaffolders and the tools that write docs.

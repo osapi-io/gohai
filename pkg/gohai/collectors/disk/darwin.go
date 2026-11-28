@@ -23,20 +23,20 @@ package disk
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 var (
 	// bsdNameRE is the BSD name of a driver's media: "disk0".
-	bsdNameRE = regexp.MustCompile(`"BSD Name" = "([^"]+)"`)
+	bsdNameRE = pattern.New(`"BSD Name" = "([^"]+)"`)
 	// statRE is one counter of a driver's Statistics:
 	// "Operations (Read)"=378856037.
-	statRE = regexp.MustCompile(`"([^"]+)"=(\d+)`)
+	statRE = pattern.New(`"([^"]+)"=(\d+)`)
 )
 
 // Darwin collects I/O counters from IOKit's block storage drivers, with

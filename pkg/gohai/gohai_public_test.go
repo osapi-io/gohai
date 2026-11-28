@@ -39,6 +39,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/collector/mocks"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
@@ -298,6 +299,13 @@ func (s *GohaiPublicTestSuite) TestBuiltinCollectors() {
 			name:         "each collector has a Facts field that Facts.set fills",
 			src:          debian,
 			validateFunc: each(setsFacts),
+		},
+		{
+			name: "each pattern of each collector compiles",
+			src:  debian,
+			validateFunc: func([]collector.Collector) {
+				s.NoError(pattern.Errors())
+			},
 		},
 		{
 			name: "each collector field of Facts has a collector",

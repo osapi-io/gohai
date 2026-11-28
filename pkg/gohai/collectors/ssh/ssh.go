@@ -32,12 +32,12 @@ import (
 	"errors"
 	"fmt"
 	iofs "io/fs"
-	"regexp"
 	"strings"
 
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -528,7 +528,7 @@ func fields(
 
 // secretOptionRE is a command= or environment= option with its quoted
 // value, which sshd lets hold escaped quotes.
-var secretOptionRE = regexp.MustCompile(`(?i)\b(command|environment)="(?:[^"\\]|\\.)*"`)
+var secretOptionRE = pattern.New(`(?i)\b(command|environment)="(?:[^"\\]|\\.)*"`)
 
 // redactOptions is options with the value of each command= and
 // environment= option replaced, because a forced command or a variable

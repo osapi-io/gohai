@@ -24,10 +24,10 @@
 package hostnamectl
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -35,7 +35,7 @@ import (
 // chassis, such as "vm 🖴". It mirrors Ohai's `/[^\p{ASCII}]/u` regex, but
 // only on the chassis: a location, a deployment or a vendor name can be
 // UTF-8 text.
-var nonASCIIRe = regexp.MustCompile(`[^\x00-\x7F]+`)
+var nonASCIIRe = pattern.New(`[^\x00-\x7F]+`)
 
 // Info holds hostnamectl fields.
 type Info struct {

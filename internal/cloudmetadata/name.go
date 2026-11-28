@@ -20,11 +20,11 @@
 
 package cloudmetadata
 
-import "regexp"
+import "github.com/osapi-io/gohai/internal/pattern"
 
 // safeName matches a name that a metadata listing may hold and that is safe
 // to join into a request path: letters, digits and the characters _ . : -.
-var safeName = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
+var safeName = pattern.New(`^[A-Za-z0-9_.:-]+$`)
 
 // SafeName reports whether name, a child name from a metadata directory
 // listing, is safe to join into a request path. A trailing slash, which a

@@ -27,10 +27,10 @@
 package virtualbox
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -82,19 +82,19 @@ func NewWith(
 }
 
 // reLanguageID extracts the LanguageID value from VBoxControl output.
-var reLanguageID = regexp.MustCompile(`LanguageID, value: (\S+),`)
+var reLanguageID = pattern.New(`LanguageID, value: (\S+),`)
 
 // reVBoxVer extracts the VBoxVer value (host VirtualBox version).
-var reVBoxVer = regexp.MustCompile(`VBoxVer, value: (\S+),`)
+var reVBoxVer = pattern.New(`VBoxVer, value: (\S+),`)
 
 // reVBoxRev extracts the VBoxRev value (host VirtualBox revision).
-var reVBoxRev = regexp.MustCompile(`VBoxRev, value: (\S+),`)
+var reVBoxRev = pattern.New(`VBoxRev, value: (\S+),`)
 
 // reGuestAddVer extracts the GuestAdd/VersionExt value.
-var reGuestAddVer = regexp.MustCompile(`GuestAdd/VersionExt, value: (\S+),`)
+var reGuestAddVer = pattern.New(`GuestAdd/VersionExt, value: (\S+),`)
 
 // reGuestAddRev extracts the GuestAdd/Revision value.
-var reGuestAddRev = regexp.MustCompile(`GuestAdd/Revision, value: (\S+),`)
+var reGuestAddRev = pattern.New(`GuestAdd/Revision, value: (\S+),`)
 
 // parseVBoxControlOutput parses `VBoxControl guestproperty enumerate` output
 // into an Info struct. Mirrors Ohai's virtualbox.rb regex set for the guest

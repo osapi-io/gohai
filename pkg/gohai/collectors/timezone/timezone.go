@@ -24,13 +24,13 @@ package timezone
 
 import (
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -97,7 +97,7 @@ func clockZone(
 
 // ianaName is the shape of an IANA zone name, such as Europe/Paris, Etc/UTC
 // or UTC.
-var ianaName = regexp.MustCompile(`^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$`)
+var ianaName = pattern.New(`^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$`)
 
 // zoneinfoDir is the directory part that precedes an IANA name in a zone
 // file's path, wherever the tzdata lives: /usr/share/zoneinfo/ on glibc,
