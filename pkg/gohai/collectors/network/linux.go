@@ -437,6 +437,9 @@ func applyRoutes(
 	exec source.Runner,
 	info *Info,
 ) {
+	// The default route of a family is the one the kernel uses: the
+	// lowest metric, and the first of equal metrics.
+	defaultMetric := map[string]int{}
 	for _, fam := range []struct{ flag, family string }{
 		{"-4", "inet"},
 		{"-6", "inet6"},
@@ -451,15 +454,22 @@ func applyRoutes(
 				if !isDefaultDestination(r.Destination) {
 					continue
 				}
-				// First default-route hit wins (matches Ohai). On
-				// multipath defaults the first nexthop becomes the
-				// reported default; later nexthops still appear in
-				// Routes.
-				if fam.family == "inet" && info.DefaultInterface == "" {
+				// A typed default, such as blackhole, sends nothing out an
+				// interface. On multipath defaults the first nexthop
+				// becomes the reported default; later nexthops still
+				// appear in Routes.
+				if r.Type != "" {
+					continue
+				}
+				if m, seen := defaultMetric[fam.family]; seen && r.Metric >= m {
+					continue
+				}
+				defaultMetric[fam.family] = r.Metric
+				if fam.family == "inet" {
 					info.DefaultInterface = r.Interface
 					info.DefaultGateway = r.Gateway
 				}
-				if fam.family == "inet6" && info.DefaultInet6Interface == "" {
+				if fam.family == "inet6" {
 					info.DefaultInet6Interface = r.Interface
 					info.DefaultInet6Gateway = r.Gateway
 				}
@@ -574,17 +584,31 @@ func resolveRouteInterfacesBySource(
 	}
 }
 
+// routeTypes are the route types that `ip route` prints before the
+// destination (ip-route(8)). A unicast route has no type word.
+var routeTypes = map[string]bool{
+	"unicast": true, "local": true, "broadcast": true, "multicast": true,
+	"throw": true, "unreachable": true, "prohibit": true, "blackhole": true,
+	"nat": true, "anycast": true,
+}
+
 // parseIPRouteLine parses one `ip -o route` line into a Route. The
-// format is `<destination> [via <gateway>] [dev <iface>] [proto X]
-// [metric N] [src ADDR] [scope S] ...`. Tokens beyond what we know
-// are ignored. Caller filters empty lines, so fields[0] always
-// exists.
+// format is `[type] <destination> [via <gateway>] [dev <iface>] [proto X]
+// [metric N] [src ADDR] [scope S] ...`, where type is one of routeTypes.
+// Tokens beyond what we know are ignored. Caller filters empty lines, so
+// fields[0] always exists.
 func parseIPRouteLine(
 	line, family string,
 ) Route {
 	fields := strings.Fields(line)
-	r := Route{Destination: fields[0], Family: family}
-	for i := 1; i < len(fields); i++ {
+	r := Route{Family: family}
+	first := 0
+	if routeTypes[fields[0]] && len(fields) > 1 {
+		r.Type = fields[0]
+		first = 1
+	}
+	r.Destination = fields[first]
+	for i := first + 1; i < len(fields); i++ {
 		switch fields[i] {
 		case "via":
 			if i+1 < len(fields) {

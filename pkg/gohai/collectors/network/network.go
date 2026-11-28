@@ -191,13 +191,17 @@ type Address struct {
 // Route is one entry from the kernel routing table.
 type Route struct {
 	Destination string `json:"destination"`
-	Family      string `json:"family"`
-	Gateway     string `json:"gateway,omitempty"`
-	Interface   string `json:"interface,omitempty"`
-	Source      string `json:"source,omitempty"`
-	Scope       string `json:"scope,omitempty"`
-	Proto       string `json:"proto,omitempty"`
-	Metric      int    `json:"metric,omitempty"`
+	// Type is the route type that `ip route` prints before the
+	// destination, such as blackhole, unreachable or prohibit. It is empty
+	// for a unicast route, which has none.
+	Type      string `json:"type,omitempty"`
+	Family    string `json:"family"`
+	Gateway   string `json:"gateway,omitempty"`
+	Interface string `json:"interface,omitempty"`
+	Source    string `json:"source,omitempty"`
+	Scope     string `json:"scope,omitempty"`
+	Proto     string `json:"proto,omitempty"`
+	Metric    int    `json:"metric,omitempty"`
 }
 
 // Counters holds I/O counters for one interface.

@@ -3530,6 +3530,9 @@
         "destination": {
           "type": "string"
         },
+        "type": {
+          "type": "string"
+        },
         "family": {
           "type": "string"
         },
