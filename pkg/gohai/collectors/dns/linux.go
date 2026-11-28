@@ -50,6 +50,10 @@ func NewLinux() *Linux {
 // resolvectlLinkRE is a link line of resolvectl: "Link 2 (eth0): 10.0.0.1".
 var resolvectlLinkRE = regexp.MustCompile(`^Link \d+ \(([^)]+)\):(.*)$`)
 
+// resolvectlGlobalRE is resolvectl's line for the resolver of no link:
+// "Global: 1.1.1.1".
+var resolvectlGlobalRE = regexp.MustCompile(`^Global:(.*)$`)
+
 // Collect returns the dns Info.
 func (l *Linux) Collect(
 	ctx context.Context,
@@ -68,16 +72,31 @@ func (l *Linux) Collect(
 			continue
 		}
 		for _, line := range strings.Split(string(out), "\n") {
-			m := resolvectlLinkRE.FindStringSubmatch(strings.TrimSpace(line))
+			line = strings.TrimSpace(line)
+			if m := resolvectlGlobalRE.FindStringSubmatch(line); m != nil {
+				values := strings.Fields(m[1])
+				if len(values) == 0 {
+					continue
+				}
+				if info.Global == nil {
+					info.Global = &Resolver{}
+				}
+				if kind == "dns" {
+					info.Global.Nameservers = append(
+						info.Global.Nameservers,
+						serverAddrs(values)...)
+				} else {
+					info.Global.Domains = append(info.Global.Domains, values...)
+				}
+				continue
+			}
+			m := resolvectlLinkRE.FindStringSubmatch(line)
 			if m == nil {
 				continue
 			}
 			values := strings.Fields(m[2])
 			if kind == "dns" {
-				for i, v := range values {
-					values[i], _, _ = strings.Cut(v, "%")
-				}
-				setResolver(info, m[1], values, nil)
+				setResolver(info, m[1], serverAddrs(values), nil)
 			} else {
 				setResolver(info, m[1], nil, values)
 			}
@@ -85,4 +104,27 @@ func (l *Linux) Collect(
 	}
 
 	return info, nil
+}
+
+// serverAddrs gives the address of each resolvectl server: without its
+// "%eth0" zone, its "#name" TLS server name or its port, as in
+// "1.1.1.1:853#cloudflare-dns.com" or "[2606:4700::1111]:853".
+func serverAddrs(
+	values []string,
+) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		v, _, _ = strings.Cut(v, "#")
+		if strings.HasPrefix(v, "[") {
+			if end := strings.Index(v, "]"); end > 0 {
+				v = v[1:end]
+			}
+		} else if strings.Count(v, ":") == 1 {
+			v, _, _ = strings.Cut(v, ":")
+		}
+		v, _, _ = strings.Cut(v, "%")
+		out = append(out, v)
+	}
+
+	return out
 }
