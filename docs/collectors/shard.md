@@ -94,12 +94,17 @@ On macOS:
    same as on Linux.
 2. `serial` comes from `system_profiler SPHardwareDataType -json` through the
    shared `source.Runner`. This is the same source as Ohai's
-   `hardware["serial_number"]`. If there is an error or no data, serial stays
-   empty.
+   `hardware["serial_number"]`. If `system_profiler` is not on the host, or it
+   lists no hardware, serial stays empty.
 3. `uuid` is the `IOPlatformUUID` line of
    `ioreg -rd1 -c IOPlatformExpertDevice`. This is the same as Ohai's
-   `hardware["platform_UUID"]`. If there is an error, uuid stays empty.
-4. The collector does the same SHA-256 → 7 hex characters → integer calculation
+   `hardware["platform_UUID"]`. If `ioreg` is not on the host, or it prints no
+   `IOPlatformUUID`, uuid stays empty.
+4. A `system_profiler` or `ioreg` that is there and fails, such as a timeout, or
+   JSON that does not parse, is an error, and the collector gives no seed. A
+   seed from fewer inputs puts the host in a different shard, which is worse
+   than no seed. Ohai keeps the seed in this case.
+5. The collector does the same SHA-256 → 7 hex characters → integer calculation
    as on Linux.
 
 The algorithm is the same as Ohai's `shard.rb` in FIPS mode. It uses the same
