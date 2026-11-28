@@ -88,10 +88,10 @@ platforms, the collector returns an empty `Info`.
 
 ## Platform support
 
-| Platform | Supported                                                               |
-| -------- | ----------------------------------------------------------------------- |
-| Linux    | ❌ (use the `dmi`, `cpu`, `memory`, `disk` and `filesystem` collectors) |
-| macOS    | ✅                                                                      |
+| Platform | Supported                                                                                                   |
+| -------- | ----------------------------------------------------------------------------------------------------------- |
+| Linux    | No fact, with the status `unsupported` (use the `dmi`, `cpu`, `memory`, `disk` and `filesystem` collectors) |
+| macOS    | ✅                                                                                                          |
 
 ## Example output
 
@@ -191,9 +191,9 @@ On macOS:
    the context is cancelled, there is no fact. A host without a battery answers
    the power call with no battery, and that is not a failure.
 
-On Linux, the collector returns an empty `Info`. Ohai's `darwin/hardware.rb` is
-for Darwin only. On Linux, the `dmi`, `cpu`, `memory`, `disk` and `filesystem`
-collectors give equivalent data.
+On Linux, the collector gives no fact, with the status `unsupported`. Ohai's
+`darwin/hardware.rb` is for Darwin only. On Linux, the `dmi`, `cpu`, `memory`,
+`disk` and `filesystem` collectors give equivalent data.
 
 ### Deviations from Ohai
 

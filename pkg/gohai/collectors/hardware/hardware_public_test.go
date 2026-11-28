@@ -584,17 +584,11 @@ func (s *HardwarePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: returns empty",
+			name:    "linux: unsupported, with no fact",
 			variant: "linux",
 			validateFunc: func(got any, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*hardware.Info)
-				s.Require().True(ok)
-				s.Require().NotNil(info)
-				s.Empty(info.MachineModel)
-				s.Empty(info.Storage)
-				s.Nil(info.Battery)
-				s.Nil(info.Charger)
+				s.ErrorIs(err, collector.ErrUnsupported)
+				s.Exactly(nil, got)
 			},
 		},
 	}
