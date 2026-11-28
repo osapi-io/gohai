@@ -22,8 +22,9 @@ package interrupts
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
+	"io/fs"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
@@ -48,16 +49,14 @@ func NewLinux() *Linux {
 }
 
 // Collect reads /proc/interrupts and returns the parsed IRQ list. A
-// missing file (container without /proc) returns an empty list. Parse
-// errors on individual count fields are propagated.
+// missing file (container without /proc) returns an empty list.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
 	b, err := l.FS.ReadFile(procInterrupts)
 	if err != nil {
-		if strings.Contains(err.Error(), "no such file or directory") ||
-			strings.Contains(err.Error(), "file does not exist") {
+		if errors.Is(err, fs.ErrNotExist) {
 			return &Info{IRQs: []IRQ{}}, nil
 		}
 		return nil, fmt.Errorf("read %s: %w", procInterrupts, err)

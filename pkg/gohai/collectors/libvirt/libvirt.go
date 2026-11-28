@@ -198,8 +198,10 @@ func parseVirshDominfo(
 		case "UUID":
 			d.UUID = val
 		case "CPU(s)":
-			if n, err := strconv.Atoi(strings.Fields(val)[0]); err == nil {
-				d.VCPUs = n
+			if f := strings.Fields(val); len(f) > 0 {
+				if n, err := strconv.Atoi(f[0]); err == nil {
+					d.VCPUs = n
+				}
 			}
 		case "Max memory":
 			d.MaxMemory = val

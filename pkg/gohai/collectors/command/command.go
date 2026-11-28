@@ -27,7 +27,6 @@
 package command
 
 import (
-	"bufio"
 	"strings"
 
 	"github.com/osapi-io/gohai/pkg/gohai/source"
@@ -77,9 +76,10 @@ func parsePSOutput(
 	output string,
 ) *Info {
 	info := &Info{PS: []string{}}
-	sc := bufio.NewScanner(strings.NewReader(output))
-	for sc.Scan() {
-		line := strings.TrimRight(sc.Text(), " \t")
+	// Split, not bufio.Scanner: ps -ef prints a whole command line when
+	// stdout is not a tty, and a line can pass the Scanner's 64 KiB limit.
+	for _, raw := range strings.Split(output, "\n") {
+		line := strings.TrimRight(raw, " \t\r")
 		if line == "" {
 			continue
 		}

@@ -23,6 +23,7 @@ package command_test
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -156,6 +157,22 @@ user      1234     1  0 10:01 pts/0    00:00:00 bash
 					"root         2     0  0 10:00 ?        00:00:00 [kthreadd]",
 					"user      1234     1  0 10:01 pts/0    00:00:00 bash",
 				}, info.PS)
+			},
+		},
+		{
+			name:    "linux: a command line longer than 64 KiB keeps the processes after it",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				long := "root  9  1  0 10:00 ?  00:00:01 java " + strings.Repeat("-Dx=y ", 20000)
+				out := "UID PID PPID C STIME TTY TIME CMD\n" + long + "\nroot 10 1 0 10:00 ? 00:00:00 sshd\n"
+				return psExec(t, []byte(out), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*command.Info)
+				s.Require().True(ok)
+				s.Require().Len(info.PS, 3)
+				s.Equal("root 10 1 0 10:00 ? 00:00:00 sshd", info.PS[2])
 			},
 		},
 		{
