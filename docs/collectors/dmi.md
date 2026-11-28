@@ -20,9 +20,10 @@ compliance tools use all the fields to audit a fleet.
 
 ## Collected fields
 
-Each section is nil when that part of SMBIOS is not available. Virtual machines
-frequently have no chassis data. Minimal containers can have no DMI data. A
-consumer must check `facts.DMI.Product != nil` before it dereferences the
+On Linux, each section is always there. A field that the host does not expose,
+such as the chassis data of many virtual machines, reads `unknown`. On macOS,
+which has no SMBIOS equivalent, each section is nil. Thus a consumer that runs
+on both must check `facts.DMI.Product != nil` before it dereferences the
 section.
 
 | Field       | Type         | Description               | Schema mapping                      |

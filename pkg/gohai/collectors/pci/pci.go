@@ -19,8 +19,9 @@
 // DEALINGS IN THE SOFTWARE.
 
 // Package pci enumerates PCI devices attached to the host. On Linux
-// we wrap ghw/pci which walks /sys/bus/pci/devices and resolves
-// vendor/product/class names via ghw's bundled pci.ids database, with no
+// the collector walks /sys/bus/pci/devices and resolves
+// vendor/product/class names through internal/pcidev and its bundled
+// pci.ids database, with no
 // shell-out to `lspci` required. macOS has no sysfs PCI tree and
 // returns an empty Info.
 //

@@ -21,15 +21,15 @@ host has more than one hundred.
 
 ## Collected fields
 
-| Field                        | Type     | Description                                                                                                                                     | Schema mapping                                                               |
-| ---------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `certificates[].name`        | `string` | The name of the CA: the path of its file under its directory, with no extension, or its subject's common name when one file holds many CAs.     | No direct schema mapping. gohai treats the trust store as a gohai extension. |
-| `certificates[].path`        | `string` | The file that holds the CA, or the keychain on macOS.                                                                                           | `file.path`                                                                  |
-| `certificates[].source`      | `string` | `system` for a CA that the distribution ships, `local` for a CA that an administrator added.                                                    | No direct schema mapping.                                                    |
-| `certificates[].enabled`     | `bool`   | `false` for a system CA that the host config turns off, such as a `!` line in `/etc/ca-certificates.conf`, or for a CA that the host distrusts. | No direct schema mapping.                                                    |
-| `certificates[].subject`     | `string` | The subject of the certificate, when the file parses.                                                                                           | `certificate.subject`                                                        |
-| `certificates[].fingerprint` | `string` | The SHA-256 of the certificate's DER, in hex.                                                                                                   | `certificate.fingerprints[].value`, with `algorithm` SHA-256                 |
-| `certificates[].not_after`   | `string` | The time at which the certificate expires, in RFC 3339.                                                                                         | `certificate.expiration_time`                                                |
+| Field                        | Type     | Description                                                                                                                                                             | Schema mapping                                                               |
+| ---------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `certificates[].name`        | `string` | The name of the CA: the path of its file under its directory, with no extension, or its subject's common name when one file holds many CAs.                             | No direct schema mapping. gohai treats the trust store as a gohai extension. |
+| `certificates[].path`        | `string` | The file that holds the CA, or the keychain on macOS.                                                                                                                   | `file.path`                                                                  |
+| `certificates[].source`      | `string` | `system` for a CA that the distribution ships, `local` for a CA that an administrator added.                                                                            | No direct schema mapping.                                                    |
+| `certificates[].enabled`     | `bool`   | `false` for a system CA that the host config turns off, such as a `!` line in `/etc/ca-certificates.conf`, or for a CA that the host distrusts. Always `true` on macOS. | No direct schema mapping.                                                    |
+| `certificates[].subject`     | `string` | The subject of the certificate, when the file parses.                                                                                                                   | `certificate.subject`                                                        |
+| `certificates[].fingerprint` | `string` | The SHA-256 of the certificate's DER, in hex.                                                                                                                           | `certificate.fingerprints[].value`, with `algorithm` SHA-256                 |
+| `certificates[].not_after`   | `string` | The time at which the certificate expires, in RFC 3339.                                                                                                                 | `certificate.expiration_time`                                                |
 
 ## Platform support
 
@@ -156,6 +156,9 @@ extensions that limit the purposes of a CA, or `nss-server-distrust-after`.
    certificate of the device.
 3. A host without `security` gives no CAs. A keychain that `security` fails to
    read is an error.
+4. `enabled` is always `true` on macOS. The collector does not read the trust
+   settings (`security dump-trust-settings`), so a CA that the host distrusts
+   still shows as enabled.
 
 ## Backing library
 

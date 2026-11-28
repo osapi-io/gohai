@@ -23,7 +23,7 @@
 // vendors (cloud collectors check product.name for "Google Compute
 // Engine", "Amazon EC2", etc.), inventory hardware, and drive
 // compliance tooling. On Linux the data comes from
-// /sys/class/dmi/id/* via ghw (no root needed). macOS has no SMBIOS
+// /sys/class/dmi/id/* through the collector's FS (no root needed). macOS has no SMBIOS
 // equivalent, so the collector returns an empty Info there. The macOS
 // `hardware` collector (planned) covers that ground.
 package dmi
@@ -33,9 +33,9 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
-// Info is the DMI view consumers want. Each section is nil when that
-// part of SMBIOS isn't available (virtual machines often omit chassis
-// data; minimal containers may have no DMI at all).
+// Info is the DMI view consumers want. On Linux each section is always
+// set, and a field that the host does not expose reads "unknown". Only
+// macOS, which has no SMBIOS equivalent, gives nil sections.
 type Info struct {
 	BIOS      *BIOS      `json:"bios,omitempty"`
 	Baseboard *Baseboard `json:"baseboard,omitempty"`

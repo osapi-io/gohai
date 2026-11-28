@@ -57,7 +57,7 @@ type Info struct {
 	ModelID         string            `json:"model_id,omitempty"`
 	Stepping        int32             `json:"stepping,omitempty"`
 	Speed           float64           `json:"speed,omitempty"`      // MHz: the maximum clock when the OS gives one, else the current clock
-	CacheSize       int32             `json:"cache_size,omitempty"` // KB, summed from /proc/cpuinfo
+	CacheSize       int32             `json:"cache_size,omitempty"` // KB, of the first logical CPU in /proc/cpuinfo
 	Flags           []string          `json:"flags,omitempty"`
 	Caches          *Caches           `json:"caches,omitempty"`           // per-level sizes from lscpu (Linux)
 	NumaNodes       map[int][]int     `json:"numa_nodes,omitempty"`       // node id → CPU indices (Linux)

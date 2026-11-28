@@ -26,10 +26,9 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Linux returns an empty Info. The hardware collector is Darwin-only
-// Linux returns an empty Info. The hardware collector is Darwin-only.
-// Linux gets equivalent information from dmi (identity), cpu,
-// Matches Ohai's `darwin/hardware.rb` scope.
+// Linux returns an empty Info. The hardware collector is Darwin-only,
+// and matches Ohai's `darwin/hardware.rb` scope. Linux gets the same
+// information from the dmi (identity), cpu and memory collectors.
 type Linux struct {
 	base
 }
