@@ -43,11 +43,16 @@ func NewLinux() *Linux {
 	return &Linux{Exec: source.Commands()}
 }
 
-// Collect returns the sysconf Info.
+// Collect returns the sysconf Info. With no Exec it gives no fact, as
+// every value comes from getconf.
 func (l *Linux) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if l.Exec == nil {
+		return nil, nil
+	}
+
 	return collectSysconf(ctx, l.Exec)
 }
 

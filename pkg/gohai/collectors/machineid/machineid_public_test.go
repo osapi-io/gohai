@@ -118,6 +118,7 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 		variant string
 		files   map[string]string
 		runner  sourcetest.Commands
+		nilExec bool
 		want    *machineid.Info
 		wantErr string
 	}{
@@ -158,6 +159,10 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			want:   &machineid.Info{},
 		},
 		{
+			name: "darwin: no Exec gives no fact", variant: "darwin",
+			nilExec: true,
+		},
+		{
 			name: "darwin: ioreg fails", variant: "darwin",
 			runner:  sourcetest.Commands{Err: map[string]error{ioregLine: errors.New("boom")}},
 			wantErr: "ioreg IOPlatformExpertDevice: boom",
@@ -170,7 +175,11 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 			case "linux":
 				c = &machineid.Linux{FS: sourcetest.FS(s.T(), tt.files)}
 			case "darwin":
-				c = &machineid.Darwin{Exec: tt.runner.Mock(s.T())}
+				d := &machineid.Darwin{Exec: tt.runner.Mock(s.T())}
+				if tt.nilExec {
+					d.Exec = nil
+				}
+				c = d
 			}
 			got, err := c.Collect(context.Background(), nil)
 			if tt.wantErr != "" {
@@ -179,6 +188,11 @@ func (s *MachineIDPublicTestSuite) TestCollect() {
 				return
 			}
 			s.Require().NoError(err)
+			if tt.nilExec {
+				s.Nil(got)
+
+				return
+			}
 			s.Equal(tt.want, got)
 		})
 	}

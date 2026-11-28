@@ -119,6 +119,9 @@ func (c *Collector) Collect(
 		return nil, ctx.Err()
 	}
 	info := &Info{}
+	if c.Exec == nil {
+		return info, nil
+	}
 	out, err := c.Exec.Execute(ctx, "ip", "-o", "-4", "addr", "show")
 	if err != nil {
 		return info, nil

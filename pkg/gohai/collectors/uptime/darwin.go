@@ -51,11 +51,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands(), Now: time.Now}
 }
 
-// Collect returns uptime facts.
+// Collect returns uptime facts. With no Exec it gives no fact, as the
+// boot time comes from sysctl.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
 	out, err := d.Exec.Execute(ctx, "sysctl", "-n", "kern.boottime")
 	if err != nil {
 		return nil, fmt.Errorf("sysctl kern.boottime: %w", err)

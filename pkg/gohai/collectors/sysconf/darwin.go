@@ -42,10 +42,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{Exec: source.Commands()}
 }
 
-// Collect returns the POSIX sysconf values on macOS.
+// Collect returns the POSIX sysconf values on macOS. With no Exec it
+// gives no fact, as every value comes from getconf.
 func (d *Darwin) Collect(
 	ctx context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
+	if d.Exec == nil {
+		return nil, nil
+	}
+
 	return collectSysconf(ctx, d.Exec)
 }

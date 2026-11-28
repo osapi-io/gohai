@@ -104,8 +104,20 @@ func (s *LinodePublicTestSuite) TestCollect() {
 		prior        collector.PriorResults
 		ip           string // the output of ip -o -4 addr show
 		ipErr        error
+		nilExec      bool
 		validateFunc func(any)
 	}{
+		{
+			name:  "with no Exec, a Linode has no addresses",
+			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
+			prior: collector.PriorResults{
+				"hostname": &hostname.Info{FQDN: "myhost.members.linode.com"},
+			},
+			nilExec: true,
+			validateFunc: func(out any) {
+				s.Equal(&linode.Info{}, out)
+			},
+		},
 		{
 			name:  "FQDN contains 'linode' triggers detection without apt",
 			files: map[string]string{"/etc/apt/sources.list": ubuntuApt},
@@ -270,11 +282,14 @@ func (s *LinodePublicTestSuite) TestCollect() {
 				Return([]byte(tt.ip), tt.ipErr).
 				AnyTimes()
 
-			c := linode.NewWith(source.Sources{
+			var c collector.Collector = linode.NewWith(source.Sources{
 				FS:     sourcetest.FS(s.T(), tt.files),
 				Exec:   m,
 				Family: family.Debian,
 			})
+			if tt.nilExec {
+				c = &linode.Collector{FS: sourcetest.FS(s.T(), tt.files)}
+			}
 			out, err := c.Collect(context.Background(), tt.prior)
 			s.Require().NoError(err)
 			tt.validateFunc(out)
