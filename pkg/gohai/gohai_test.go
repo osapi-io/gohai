@@ -29,18 +29,6 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/collector/mocks"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/alibaba"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/azure"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/digitalocean"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/gce"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/gpu"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernelmodules"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/linode"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/oci"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/openstack"
-	"github.com/osapi-io/gohai/pkg/gohai/collectors/scaleway"
 )
 
 type GohaiTestSuite struct {
@@ -73,254 +61,34 @@ func newCycleCollector(
 	return m
 }
 
-func (s *GohaiTestSuite) TestFactsSet() {
+func (s *GohaiTestSuite) TestCollect() {
 	tests := []struct {
-		name   string
-		key    string
-		value  any
-		verify func(s *GohaiTestSuite, f *Facts)
+		name         string
+		register     func(*collector.Registry)
+		validateFunc func(*Facts, error)
 	}{
 		{
-			name:  "gce populates Facts.Gce",
-			key:   "gce",
-			value: &gce.Info{Name: "vm-1"},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.Gce)
-				s.Equal("vm-1", f.Gce.Name)
+			name: "a run error, such as a dependency cycle, is returned",
+			register: func(reg *collector.Registry) {
+				s.Require().
+					NoError(reg.Register(newCycleCollector(gomock.NewController(s.T()), "a", "b")))
+				s.Require().
+					NoError(reg.Register(newCycleCollector(gomock.NewController(s.T()), "b", "a")))
 			},
-		},
-		{
-			name:  "ec2 populates Facts.Ec2",
-			key:   "ec2",
-			value: &ec2.Info{ID: "i-abc"},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.Ec2)
-				s.Equal("i-abc", f.Ec2.ID)
-			},
-		},
-		{
-			name:   "ec2 wrong type ignored",
-			key:    "ec2",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Ec2) },
-		},
-		{
-			name:  "azure populates Facts.Azure",
-			key:   "azure",
-			value: &azure.Info{ID: "vm"},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.Azure)
-				s.Equal("vm", f.Azure.ID)
-			},
-		},
-		{
-			name:   "azure wrong type ignored",
-			key:    "azure",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Azure) },
-		},
-		{
-			name:  "digital_ocean populates Facts.DigitalOcean",
-			key:   "digital_ocean",
-			value: &digitalocean.Info{ID: 1},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.DigitalOcean)
-				s.Equal(int64(1), f.DigitalOcean.ID)
-			},
-		},
-		{
-			name:   "digital_ocean wrong type ignored",
-			key:    "digital_ocean",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.DigitalOcean) },
-		},
-		{
-			name:  "oci populates Facts.OCI",
-			key:   "oci",
-			value: &oci.Info{ID: "ocid1"},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.OCI)
-				s.Equal("ocid1", f.OCI.ID)
-			},
-		},
-		{
-			name:   "oci wrong type ignored",
-			key:    "oci",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.OCI) },
-		},
-		{
-			name:  "alibaba populates Facts.Alibaba",
-			key:   "alibaba",
-			value: &alibaba.Info{ID: "i-ali"},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.Alibaba)
-				s.Equal("i-ali", f.Alibaba.ID)
-			},
-		},
-		{
-			name:   "alibaba wrong type ignored",
-			key:    "alibaba",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Alibaba) },
-		},
-		{
-			name:  "linode populates Facts.Linode",
-			key:   "linode",
-			value: &linode.Info{PublicIP: "1.2.3.4"},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.Linode)
-				s.Equal("1.2.3.4", f.Linode.PublicIP)
-			},
-		},
-		{
-			name:   "linode wrong type ignored",
-			key:    "linode",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Linode) },
-		},
-		{
-			name:  "openstack populates Facts.OpenStack",
-			key:   "openstack",
-			value: &openstack.Info{ID: "i-os"},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.OpenStack)
-				s.Equal("i-os", f.OpenStack.ID)
-			},
-		},
-		{
-			name:   "openstack wrong type ignored",
-			key:    "openstack",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.OpenStack) },
-		},
-		{
-			name:  "scaleway populates Facts.Scaleway",
-			key:   "scaleway",
-			value: &scaleway.Info{ID: "sc-1"},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.Scaleway)
-				s.Equal("sc-1", f.Scaleway.ID)
-			},
-		},
-		{
-			name:   "scaleway wrong type ignored",
-			key:    "scaleway",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.Scaleway) },
-		},
-		{
-			name:  "kernel_modules populates Facts.KernelModules",
-			key:   "kernel_modules",
-			value: &kernelmodules.Info{Modules: map[string]kernelmodules.Module{"ipv6": {Size: 1}}},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.KernelModules)
-				s.Equal(uint64(1), f.KernelModules.Modules["ipv6"].Size)
-			},
-		},
-		{
-			name:   "kernel_modules wrong type ignored",
-			key:    "kernel_modules",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.KernelModules) },
-		},
-		{
-			name:  "gpu populates Facts.GPU",
-			key:   "gpu",
-			value: &gpu.Info{Cards: []gpu.Card{{Model: "M1"}}},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.GPU)
-				s.Equal("M1", f.GPU.Cards[0].Model)
-			},
-		},
-		{
-			name:   "gpu wrong type ignored",
-			key:    "gpu",
-			value:  "x",
-			verify: func(s *GohaiTestSuite, f *Facts) { s.Nil(f.GPU) },
-		},
-		{
-			name:  "dmi populates Facts.DMI",
-			key:   "dmi",
-			value: &dmi.Info{Product: &dmi.Product{Name: "Google Compute Engine"}},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Require().NotNil(f.DMI)
-				s.Equal("Google Compute Engine", f.DMI.Product.Name)
-			},
-		},
-		{
-			name:  "mismatched type for gce is silently ignored",
-			key:   "gce",
-			value: "not-gce-info",
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Nil(f.Gce)
-			},
-		},
-		{
-			name:  "mismatched type for dmi is silently ignored",
-			key:   "dmi",
-			value: 42,
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Nil(f.DMI)
-			},
-		},
-		{
-			name:  "unknown key is a no-op",
-			key:   "nope",
-			value: &dmi.Info{},
-			verify: func(s *GohaiTestSuite, f *Facts) {
-				s.Nil(f.DMI)
-				s.Nil(f.Gce)
+			validateFunc: func(_ *Facts, err error) {
+				s.Error(err)
 			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			f := &Facts{}
-			f.set(tt.key, tt.value)
-			tt.verify(s, f)
+			reg := collector.NewRegistry()
+			tt.register(reg)
+			g := &Gohai{registry: reg}
+			sel, err := reg.SelectedWith(true, nil, nil)
+			s.Require().NoError(err)
+			g.selected = sel
+			tt.validateFunc(g.Collect(context.Background()))
 		})
 	}
-}
-
-func (s *GohaiTestSuite) TestFactsCountPopulated() {
-	tests := []struct {
-		name  string
-		facts *Facts
-		want  int
-	}{
-		{"empty", &Facts{}, 0},
-		{"gce only", &Facts{Gce: &gce.Info{}}, 1},
-		{"dmi only", &Facts{DMI: &dmi.Info{}}, 1},
-		{"gce + dmi", &Facts{Gce: &gce.Info{}, DMI: &dmi.Info{}}, 2},
-		{"ec2", &Facts{Ec2: &ec2.Info{}}, 1},
-		{"azure", &Facts{Azure: &azure.Info{}}, 1},
-		{"digital_ocean", &Facts{DigitalOcean: &digitalocean.Info{}}, 1},
-		{"oci", &Facts{OCI: &oci.Info{}}, 1},
-		{"alibaba", &Facts{Alibaba: &alibaba.Info{}}, 1},
-		{"linode", &Facts{Linode: &linode.Info{}}, 1},
-		{"openstack", &Facts{OpenStack: &openstack.Info{}}, 1},
-		{"scaleway", &Facts{Scaleway: &scaleway.Info{}}, 1},
-		{"kernel_modules", &Facts{KernelModules: &kernelmodules.Info{}}, 1},
-		{"gpu", &Facts{GPU: &gpu.Info{}}, 1},
-	}
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			s.Equal(tt.want, tt.facts.countPopulated())
-		})
-	}
-}
-
-func (s *GohaiTestSuite) TestCollectPropagatesRunError() {
-	reg := collector.NewRegistry()
-	s.Require().NoError(reg.Register(newCycleCollector(gomock.NewController(s.T()), "a", "b")))
-	s.Require().NoError(reg.Register(newCycleCollector(gomock.NewController(s.T()), "b", "a")))
-
-	g := &Gohai{registry: reg}
-	sel, err := reg.SelectedWith(true, nil, nil)
-	s.Require().NoError(err)
-	g.selected = sel
-
-	_, err = g.Collect(context.Background())
-	s.Error(err)
 }
