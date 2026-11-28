@@ -26,8 +26,8 @@ import (
 	"github.com/osapi-io/gohai/internal/collector"
 )
 
-// Linux returns an empty Info. The hardware collector is Darwin-only,
-// and matches Ohai's `darwin/hardware.rb` scope. Linux gets the same
+// Linux has nothing to read. The hardware collector is Darwin-only, and
+// matches Ohai's `darwin/hardware.rb` scope. Linux gets the same
 // information from the dmi (identity), cpu and memory collectors.
 type Linux struct {
 	base
@@ -38,10 +38,11 @@ func NewLinux() *Linux {
 	return &Linux{}
 }
 
-// Collect returns an empty Info on Linux.
+// Collect returns collector.ErrUnsupported on Linux, so the status is
+// unsupported and no fact is recorded.
 func (l *Linux) Collect(
 	_ context.Context,
 	_ collector.PriorResults,
 ) (any, error) {
-	return &Info{}, nil
+	return nil, collector.ErrUnsupported
 }
