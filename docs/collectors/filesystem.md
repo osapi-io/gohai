@@ -170,9 +170,11 @@ On Linux:
    go into `unmounted[]`. Thus LUKS containers, inactive LVs and btrfs devices
    are still visible.
 4. `lsblk` can be missing, for example in minimal containers or in Alpine
-   without util-linux. Its output can also be not valid. In these cases, the
-   collector skips the `lsblk` data and reports no error. The capacity and inode
-   data from `df` stay.
+   without util-linux. It can also fail, as in a container without
+   `/sys/dev/block`, and its output can be not valid. In these cases, the
+   collector skips the `lsblk` data and reports no error: `uuid`, `label`,
+   `part_uuid`, `part_label`, `unmounted[]` and the `btrfs` data stay empty. The
+   capacity and inode data from `df` stay.
 5. **Btrfs allocation data**. For each mount with `type == "btrfs"` and a UUID,
    the collector reads `/sys/fs/btrfs/<uuid>/allocation/` through the injected
    `avfs.VFS`. It fills the `btrfs` sub-record of the mount: the byte counters
@@ -186,8 +188,11 @@ On Linux:
    It parses the tab-separated rows (dataset, property, value, source) into
    `ZFSDatasets`, with the dataset name as the key. `-p` gives byte values as
    numbers. `-H` removes the header. On a host without ZFS (the binary is
-   missing, or the run fails), the collector returns zero datasets and no error.
-   This does not depend on `lsblk`.
+   missing, or the run fails, as `zfs` does for a caller who is not root), the
+   collector returns zero datasets and no error. This does not depend on
+   `lsblk`.
+7. A cancelled or expired context is an error, also when it ends during `df`,
+   `lsblk` or `zfs`. Thus a collection that stopped never looks complete.
 
 On macOS, `mount` gives the mount table: the device, the mount point, the type
 and the options. `df -ki` gives the capacity and the inode counts of each mount

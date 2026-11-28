@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os/exec"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -99,7 +100,7 @@ func noLscpuExec(
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
 		Execute(gomock.Any(), "lscpu").
-		Return(nil, errors.New("not found")).
+		Return(nil, fmt.Errorf("lscpu: %w", exec.ErrNotFound)).
 		AnyTimes()
 	return m
 }
@@ -743,6 +744,34 @@ NUMA node0 CPU(s):   5-2
 				s.Require().True(ok)
 				s.Equal("Mitigation: PTI", i.Vulnerabilities["meltdown"])
 				s.NotContains(i.Vulnerabilities, "bad")
+			},
+		},
+		{
+			name:    "linux: a failed lscpu is an error",
+			variant: "linux",
+			cpuinfo: linuxCPUInfo,
+			fs:      newVulnFS(s, nil),
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Err: map[string]error{"lscpu": errors.New("exit status 1")},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.EqualError(err, "lscpu: exit status 1")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a cancelled context is an error",
+			variant: "linux",
+			cpuinfo: linuxCPUInfo,
+			fs:      newVulnFS(s, nil),
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{Err: map[string]error{"lscpu": context.Canceled}}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
 			},
 		},
 		{

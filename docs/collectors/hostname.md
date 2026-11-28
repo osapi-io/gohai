@@ -87,12 +87,14 @@ darwin branches of Ohai's `hostname.rb`:
    collector uses the short hostname as the FQDN.
 4. The collector splits the FQDN at the first `.` to get `domain`. `domain` is
    empty if the FQDN is the same as `name`.
-5. If the exec runner is not available, or `hostname -s` or `hostname` fails,
-   the collector uses fallbacks. On Linux, the short name is the kernel's name
-   in `/proc/sys/kernel/hostname`, up to the first `.`. `machine_name` is the
-   short name. Thus the collector also works in minimal containers that do not
-   have `util-linux-hostname`. On macOS, there is no fallback for the short
-   name, and the collector gives an error.
+5. If the exec runner is not available, or `hostname` is not on the PATH, or a
+   command prints nothing, the collector uses fallbacks. On Linux, the short
+   name is the kernel's name in `/proc/sys/kernel/hostname`, up to the first
+   `.`. `machine_name` is the short name. Thus the collector also works in
+   minimal containers that do not have `util-linux-hostname`. On macOS, there is
+   no fallback for the short name, and the collector gives an error. A
+   `hostname -s` or `hostname` that is on the PATH and fails, or a cancelled
+   context, is an error, not a fallback.
 
 The collector runs both commands through the shared `source.Runner`. Tests use
 `go.uber.org/mock` to mock the cases where the command is there, is missing, or

@@ -81,9 +81,14 @@ func (l *Linux) Collect(
 	if l.Exec == nil {
 		return info, nil
 	}
-	if out, err := l.Exec.Execute(ctx, "lscpu"); err == nil {
-		applyLscpuToInfo(info, parseLscpu(out))
+	out, err := l.Exec.Execute(ctx, "lscpu")
+	if collector.Absent(err) {
+		return info, nil
 	}
+	if err != nil {
+		return nil, fmt.Errorf("lscpu: %w", err)
+	}
+	applyLscpuToInfo(info, parseLscpu(out))
 	return info, nil
 }
 

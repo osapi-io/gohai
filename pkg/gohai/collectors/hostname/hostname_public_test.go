@@ -23,7 +23,9 @@ package hostname_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"os/exec"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -54,6 +56,9 @@ func TestHostnamePublicTestSuite(
 
 // hostnameExec returns a MockRunner that canned-answers
 // `hostname -s` and bare `hostname` separately.
+// errNotOnPath is the error of a hostname that is not on the PATH.
+var errNotOnPath = fmt.Errorf("hostname: %w", exec.ErrNotFound)
+
 func hostnameExec(
 	t *testing.T,
 	shortOut []byte, shortErr error,
@@ -258,7 +263,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "darwin: hostname -s fails, short falls back to the kernel name",
+			name:       "darwin: no hostname -s, short falls back to the kernel name",
 			variant:    "darwin",
 			files:      kernelName,
 			lookupHost: failLookupHost,
@@ -267,7 +272,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				return hostnameExec(
 					t,
 					nil,
-					errors.New("no hostname -s"),
+					errNotOnPath,
 					[]byte("Friendly Name\n"),
 					nil,
 				)
@@ -284,13 +289,13 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "darwin: both exec fail, fall back to the kernel's hostname",
+			name:       "darwin: no hostname on the PATH, fall back to the kernel's hostname",
 			variant:    "darwin",
 			files:      kernelName,
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
 			exec: func(t *testing.T) source.Runner {
-				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
+				return hostnameExec(t, nil, errNotOnPath, nil, errNotOnPath)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -304,13 +309,13 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "linux: both exec fail, fall back to the kernel's hostname",
+			name:       "linux: no hostname on the PATH, fall back to the kernel's hostname",
 			variant:    "linux",
 			files:      kernelName,
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,
 			exec: func(t *testing.T) source.Runner {
-				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
+				return hostnameExec(t, nil, errNotOnPath, nil, errNotOnPath)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -321,6 +326,48 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 					MachineName: "kernel-short",
 					FQDN:        "kernel-short",
 				}, *info)
+			},
+		},
+		{
+			name:       "linux: a failed hostname -s is an error",
+			variant:    "linux",
+			files:      kernelName,
+			lookupHost: failLookupHost,
+			lookupAddr: failLookupAddr,
+			exec: func(t *testing.T) source.Runner {
+				return hostnameExec(t, nil, errors.New("exit status 1"), []byte("box\n"), nil)
+			},
+			validateFunc: func(got any, err error) {
+				s.EqualError(err, "hostname -s: exit status 1")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:       "linux: a failed hostname is an error",
+			variant:    "linux",
+			files:      kernelName,
+			lookupHost: failLookupHost,
+			lookupAddr: failLookupAddr,
+			exec: func(t *testing.T) source.Runner {
+				return hostnameExec(t, []byte("box\n"), nil, nil, errors.New("exit status 1"))
+			},
+			validateFunc: func(got any, err error) {
+				s.EqualError(err, "hostname : exit status 1")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:       "darwin: a cancelled context is an error",
+			variant:    "darwin",
+			files:      kernelName,
+			lookupHost: failLookupHost,
+			lookupAddr: failLookupAddr,
+			exec: func(t *testing.T) source.Runner {
+				return hostnameExec(t, nil, context.Canceled, nil, context.Canceled)
+			},
+			validateFunc: func(got any, err error) {
+				s.ErrorIs(err, context.Canceled)
+				s.Exactly(nil, got)
 			},
 		},
 		{
@@ -368,7 +415,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			lookupHost: emptyLookupHost,
 			lookupAddr: emptyLookupAddr,
 			exec: func(t *testing.T) source.Runner {
-				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
+				return hostnameExec(t, nil, errNotOnPath, nil, errNotOnPath)
 			},
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
@@ -495,7 +542,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			lookupHost: func(string) ([]string, error) { return nil, errors.New("unused") },
 			lookupAddr: func(string) ([]string, error) { return nil, errors.New("unused") },
 			exec: func(t *testing.T) source.Runner {
-				return hostnameExec(t, nil, errors.New("e1"), nil, errors.New("e2"))
+				return hostnameExec(t, nil, errNotOnPath, nil, errNotOnPath)
 			},
 			validateFunc: func(got any, err error) {
 				s.Require().NoError(err)
@@ -520,7 +567,7 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 				return hostnameExec(
 					t,
 					nil,
-					errors.New("no hostname -s"),
+					errNotOnPath,
 					[]byte("Friendly Name\n"),
 					nil,
 				)
