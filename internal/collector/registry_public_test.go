@@ -23,7 +23,6 @@ package collector_test
 import (
 	"context"
 	"errors"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -251,8 +250,9 @@ func (s *RegistryPublicTestSuite) TestGet() {
 }
 
 func (s *RegistryPublicTestSuite) TestNamesInCategory() {
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "a", "cloud", false)))
-	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "b", "cloud", false)))
+	for _, n := range []string{"f", "b", "e", "a", "d"} {
+		s.Require().NoError(s.reg.Register(newCollector(s.ctrl, n, "cloud", false)))
+	}
 	s.Require().NoError(s.reg.Register(newCollector(s.ctrl, "c", "system", false)))
 
 	tests := []struct {
@@ -261,10 +261,10 @@ func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 		validateFunc func([]string)
 	}{
 		{
-			name:     "multiple collectors in category",
+			name:     "multiple collectors in category, sorted",
 			category: "cloud",
 			validateFunc: func(got []string) {
-				s.Equal([]string{"a", "b"}, got)
+				s.Equal([]string{"a", "b", "d", "e", "f"}, got)
 			},
 		},
 		{
@@ -284,10 +284,7 @@ func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got := s.reg.NamesInCategory(tt.category)
-			sort.Strings(got)
-
-			tt.validateFunc(got)
+			tt.validateFunc(s.reg.NamesInCategory(tt.category))
 		})
 	}
 }
@@ -354,11 +351,10 @@ func (s *RegistryPublicTestSuite) TestNames() {
 			},
 		},
 		{
-			name:     "returns the name of each registered collector",
-			register: []string{"b", "a"},
+			name:     "returns the name of each registered collector, sorted",
+			register: []string{"e", "b", "d", "a", "c"},
 			validateFunc: func(names []string) {
-				sort.Strings(names)
-				s.Equal([]string{"a", "b"}, names)
+				s.Equal([]string{"a", "b", "c", "d", "e"}, names)
 			},
 		},
 	}
@@ -392,7 +388,6 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 				for _, c := range got {
 					names = append(names, c.Name())
 				}
-				sort.Strings(names)
 				s.Equal([]string{"core1", "core2", "ext"}, names)
 			},
 		},
@@ -406,7 +401,6 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 				for _, c := range got {
 					names = append(names, c.Name())
 				}
-				sort.Strings(names)
 				s.Equal([]string{"core2", "ext"}, names)
 			},
 		},
@@ -420,7 +414,6 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 				for _, c := range got {
 					names = append(names, c.Name())
 				}
-				sort.Strings(names)
 				s.Equal([]string{"core1", "core2", "ext", "opt"}, names)
 			},
 		},
@@ -435,7 +428,6 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 				for _, c := range got {
 					names = append(names, c.Name())
 				}
-				sort.Strings(names)
 				s.Equal([]string{"core1", "core2", "ext"}, names)
 			},
 		},
@@ -464,7 +456,6 @@ func (s *RegistryPublicTestSuite) TestSelected() {
 				for _, c := range got {
 					names = append(names, c.Name())
 				}
-				sort.Strings(names)
 				s.Equal([]string{"core1", "opt"}, names)
 			},
 		},

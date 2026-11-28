@@ -76,7 +76,10 @@ func newCollectorListCommand(
 			"  " + path + " list --json",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE: func(c *cobra.Command, _ []string) error {
+		RunE: func(
+			c *cobra.Command,
+			_ []string,
+		) error {
 			return writeCollectorList(c.OutOrStdout(), gohai.Collectors(), asJSON)
 		},
 	}
@@ -103,7 +106,10 @@ one, and a fact that no collector reads is a change to gohai first.`,
 			"  " + path + " get --name services --json",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE: func(c *cobra.Command, _ []string) error {
+		RunE: func(
+			c *cobra.Command,
+			_ []string,
+		) error {
 			spec, ok := gohai.CollectorByName(name)
 			if !ok {
 				return fmt.Errorf("no collector named %q: %s list shows them", name, path)
@@ -130,7 +136,10 @@ func newCollectorSpecGetCommand(
 			"  " + path + " spec get --json",
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE: func(c *cobra.Command, _ []string) error {
+		RunE: func(
+			c *cobra.Command,
+			_ []string,
+		) error {
 			return writeTerms(c.OutOrStdout(), gohai.CollectorTerms(), asJSON)
 		},
 	}
@@ -156,7 +165,10 @@ func newCollectorValidateCommand(
 		Args:          cobra.NoArgs,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		RunE: func(c *cobra.Command, _ []string) error {
+		RunE: func(
+			c *cobra.Command,
+			_ []string,
+		) error {
 			return writeProblems(
 				c.OutOrStdout(),
 				gohai.CollectorProblems(gohai.Collectors()),

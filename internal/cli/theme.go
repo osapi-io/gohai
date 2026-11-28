@@ -100,7 +100,8 @@ func isTTY(
 
 func colorize(
 	w io.Writer,
-	ansi, s string,
+	ansi string,
+	s string,
 ) string {
 	if !isTTY(w) {
 		return s

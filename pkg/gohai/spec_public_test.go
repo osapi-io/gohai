@@ -64,6 +64,56 @@ func (s *SpecPublicTestSuite) TestCollectors() {
 			},
 		},
 		{
+			name: "each call returns its own deep copy of the list",
+			validateFunc: func() {
+				first := gohai.Collectors()
+				var dep, field, read int
+				for i, c := range first {
+					if len(c.Dependencies) > 0 {
+						dep = i
+					}
+					if len(c.Fields) > 0 {
+						field = i
+					}
+					if len(c.Reads) > 0 && len(c.Reads[0].Files) > 0 &&
+						len(c.Reads[0].Commands) > 0 {
+						read = i
+					}
+				}
+				name := first[0].Name
+				depName := first[dep].Dependencies[0]
+				fieldName := first[field].Fields[0].Name
+				platform := first[read].Reads[0].Platform
+				file := first[read].Reads[0].Files[0]
+				command := first[read].Reads[0].Commands[0]
+				first[0] = gohai.CollectorSpec{Name: "changed"}
+				first[dep].Dependencies[0] = "changed"
+				first[field].Fields[0].Name = "changed"
+				first[read].Reads[0].Platform = "changed"
+				first[read].Reads[0].Files[0] = "changed"
+				first[read].Reads[0].Commands[0] = "changed"
+
+				next := gohai.Collectors()
+				s.Equal(name, next[0].Name)
+				s.Equal(depName, next[dep].Dependencies[0])
+				s.Equal(fieldName, next[field].Fields[0].Name)
+				s.Equal(platform, next[read].Reads[0].Platform)
+				s.Equal(file, next[read].Reads[0].Files[0])
+				s.Equal(command, next[read].Reads[0].Commands[0])
+			},
+		},
+		{
+			name: "the list is built once, whatever the number of calls",
+			validateFunc: func() {
+				gohai.Collectors()
+				before := gohai.SpecBuilds()
+				gohai.Collectors()
+				_, _ = gohai.CollectorByName("dns")
+				gohai.Collectors()
+				s.Equal(before, gohai.SpecBuilds())
+			},
+		},
+		{
 			name: "dns: its constructor, package, fields and reads",
 			validateFunc: func() {
 				dns := byName["dns"]

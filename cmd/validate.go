@@ -62,9 +62,13 @@ Examples:
 	return cmd
 }
 
+// errNoInput is the error of validate when there is no JSON to read.
+var errNoInput = errors.New("no input: pass --file or pipe JSON to stdin")
+
 func runValidate(
 	in io.Reader,
-	out, errOut io.Writer,
+	out io.Writer,
+	errOut io.Writer,
 	file string,
 ) error {
 	input, err := readInput(in, file)
@@ -106,7 +110,7 @@ func readInput(
 
 	if f, ok := in.(*os.File); ok {
 		if info, err := f.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
-			return nil, fmt.Errorf("no input: pass --file or pipe JSON to stdin")
+			return nil, errNoInput
 		}
 	}
 
@@ -116,7 +120,7 @@ func readInput(
 	}
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf("no input: pass --file or pipe JSON to stdin")
+		return nil, errNoInput
 	}
 
 	return data, nil

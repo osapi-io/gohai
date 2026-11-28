@@ -159,7 +159,9 @@ func (c commands) Execute(
 	runCtx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
 
-	stdout := &capped{limit: c.limit}
+	// A command whose stdout passes the limit is stopped at once: its output
+	// is discarded, so it would only run on to the timeout.
+	stdout := &capped{limit: c.limit, stop: cancel}
 	stderr := &capped{limit: maxStderr}
 	cmd := exec.CommandContext(runCtx, name, args...)
 	cmd.Env = append(os.Environ(), "LC_ALL=C")
@@ -192,12 +194,14 @@ func (c commands) Execute(
 
 // capped keeps the first limit bytes written to it, and records that more
 // came. It reads all that comes, so that the command does not block on a
-// full pipe. The buffer is a field, not embedded: io.Copy would use an
-// embedded buffer's ReadFrom and pass by Write.
+// full pipe. When more comes, it calls stop, if stop is set. The buffer is
+// a field, not embedded: io.Copy would use an embedded buffer's ReadFrom and
+// pass by Write.
 type capped struct {
 	buf   bytes.Buffer
 	limit int
 	over  bool
+	stop  func()
 }
 
 // Write keeps what fits in the limit.
@@ -205,6 +209,9 @@ func (c *capped) Write(
 	p []byte,
 ) (int, error) {
 	if room := c.limit - c.buf.Len(); room < len(p) {
+		if !c.over && c.stop != nil {
+			c.stop()
+		}
 		c.over = true
 		if room > 0 {
 			c.buf.Write(p[:room])

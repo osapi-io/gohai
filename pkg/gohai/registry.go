@@ -41,7 +41,7 @@ func NewRegistry() (*PublicRegistry, error) {
 	return &PublicRegistry{reg: r}, nil
 }
 
-// Names returns all registered collector names.
+// Names returns all registered collector names, sorted.
 func (p *PublicRegistry) Names() []string {
 	return p.reg.Names()
 }

@@ -25,8 +25,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,6 +88,10 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 	// hits and gotToken record what reaches the host that a redirect names.
 	var hits int
 	var gotToken string
+	// drainURL and drainConns are the server of the non-2xx drain row, and
+	// the connections it accepted.
+	var drainURL string
+	var drainConns atomic.Int32
 
 	tests := []struct {
 		name         string
@@ -222,6 +229,34 @@ func (s *CloudMetadataPublicTestSuite) TestGet() {
 			validateFunc: func(_ []byte, err error) {
 				s.Require().Error(err)
 				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+			},
+		},
+		{
+			name: "a non-2xx body is read, so the next request reuses the connection",
+			setup: func() (string, []cloudmetadata.Option, func()) {
+				srv := httptest.NewUnstartedServer(http.HandlerFunc(
+					func(w http.ResponseWriter, _ *http.Request) {
+						http.Error(w, strings.Repeat("x", 8<<10), http.StatusNotFound)
+					},
+				))
+				srv.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+					if state == http.StateNew {
+						drainConns.Add(1)
+					}
+				}
+				srv.Start()
+				drainURL = srv.URL
+
+				return srv.URL, nil, srv.Close
+			},
+			path: "/missing",
+			validateFunc: func(_ []byte, err error) {
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+				_, err = cloudmetadata.New(drainURL).Get(context.Background(), "/missing")
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+				_, err = cloudmetadata.New(drainURL).Get(context.Background(), "/missing")
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+				s.Equal(int32(1), drainConns.Load())
 			},
 		},
 		{

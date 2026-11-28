@@ -32,10 +32,13 @@ const schemaVersion = "1.8.0"
 // FromFacts converts collector-centric Facts into an OCSF
 // inventory_info event (class_uid 5001). Standard OCSF attributes
 // map directly; gohai extension (uid 1337) attributes carry fields
-// OCSF doesn't yet cover.
+// OCSF doesn't yet cover. Nil Facts give a nil event.
 func FromFacts(
 	f *gohai.Facts,
 ) *InventoryInfo {
+	if f == nil {
+		return nil
+	}
 	event := &InventoryInfo{
 		ActivityID:  ActivityIDCollect,
 		CategoryUID: CategoryUIDDiscovery,

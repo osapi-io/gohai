@@ -25,7 +25,8 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
-	"sort"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 )
@@ -103,8 +104,8 @@ func (r *Registry) Get(
 	return c, ok
 }
 
-// NamesInCategory returns the names of every collector whose Category
-// matches cat. Returns an empty slice (never nil) when no collector
+// NamesInCategory returns the names, sorted, of every collector whose
+// Category matches cat. Returns an empty slice (never nil) when no collector
 // has that category. Callers should treat that as a user error
 // ("unknown category") rather than silently running nothing.
 func (r *Registry) NamesInCategory(
@@ -118,10 +119,12 @@ func (r *Registry) NamesInCategory(
 			out = append(out, name)
 		}
 	}
+	slices.Sort(out)
+
 	return out
 }
 
-// Names returns the names of all registered collectors.
+// Names returns the names of all registered collectors, sorted.
 func (r *Registry) Names() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -129,6 +132,8 @@ func (r *Registry) Names() []string {
 	for n := range r.collectors {
 		names = append(names, n)
 	}
+	slices.Sort(names)
+
 	return names
 }
 
@@ -136,7 +141,7 @@ func (r *Registry) Names() []string {
 // useDefaults is true, every collector with DefaultEnabled()==true is
 // included. The enable list adds names regardless of DefaultEnabled.
 // The disable list subtracts names. Unknown names in enable/disable
-// return an error.
+// return an error. The collectors are in name order.
 func (r *Registry) SelectedWith(
 	useDefaults bool,
 	enable []string,
@@ -174,6 +179,8 @@ func (r *Registry) SelectedWith(
 			out = append(out, c)
 		}
 	}
+	slices.SortFunc(out, func(a, b Collector) int { return strings.Compare(a.Name(), b.Name()) })
+
 	return out, nil
 }
 
@@ -364,7 +371,7 @@ func (r *Registry) topoLevels(
 		if len(level) == 0 {
 			return nil, errors.New("dependency cycle detected among collectors")
 		}
-		sort.Strings(level)
+		slices.Sort(level)
 		levels = append(levels, level)
 		for _, n := range level {
 			delete(indeg, n)

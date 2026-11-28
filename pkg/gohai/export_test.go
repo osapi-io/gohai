@@ -85,3 +85,8 @@ func SetBuiltinCollectorsFn(
 
 	return func() { builtinCollectorsFn = old }
 }
+
+// SpecBuilds is how many times the list of Collectors has been built.
+func SpecBuilds() int32 {
+	return specBuilds.Load()
+}

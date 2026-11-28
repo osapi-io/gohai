@@ -144,7 +144,8 @@ func New(
 // this for auth / content negotiation (Azure's "Metadata: true",
 // OCI's "Authorization: Bearer Oracle"). Multiple calls accumulate.
 func WithHeader(
-	k, v string,
+	k string,
+	v string,
 ) Option {
 	return func(c *Client) { c.headers[k] = v }
 }
@@ -263,6 +264,10 @@ func (c *Client) do(
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Read the body, up to MaxBody, so that the shared transport can
+		// reuse the connection.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, MaxBody))
+
 		return nil, fmt.Errorf(
 			"%w: unexpected status %d from %s",
 			ErrNotAvailable,

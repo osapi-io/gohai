@@ -26,6 +26,8 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/readlog"
@@ -90,8 +92,45 @@ func SpecPlatforms() []string {
 
 // Collectors are the built-in collectors, in the order that gohai runs
 // them. The reads come from running each collector on an empty host of each
-// platform, so they are always what the code does.
+// platform, so they are always what the code does. The list is built once,
+// on the first call, and each call returns its own deep copy, so a caller
+// that changes a result does not change the next one.
 func Collectors() []CollectorSpec {
+	specs := collectorSpecs()
+	out := make([]CollectorSpec, len(specs))
+	for i, c := range specs {
+		out[i] = c.clone()
+	}
+
+	return out
+}
+
+// clone is c with copies of its slices.
+func (c CollectorSpec) clone() CollectorSpec {
+	c.Dependencies = slices.Clone(c.Dependencies)
+	c.Fields = slices.Clone(c.Fields)
+	reads := make([]Reads, len(c.Reads))
+	for i, r := range c.Reads {
+		r.Files = slices.Clone(r.Files)
+		r.Commands = slices.Clone(r.Commands)
+		reads[i] = r
+	}
+	c.Reads = reads
+
+	return c
+}
+
+// collectorSpecs builds the list of Collectors once, since each build runs
+// every collector on three platforms.
+var collectorSpecs = sync.OnceValue(buildCollectorSpecs)
+
+// specBuilds counts the builds of the list of Collectors, so that a test
+// can see that it is built once.
+var specBuilds atomic.Int32
+
+// buildCollectorSpecs is the list of Collectors.
+func buildCollectorSpecs() []CollectorSpec {
+	specBuilds.Add(1)
 	fields := factFields()
 	probe, _ := readlog.Sources(family.Debian)
 	out := make([]CollectorSpec, 0, len(builtinCollectors(probe)))
@@ -161,7 +200,7 @@ func factFields() map[string][]Field {
 		for t.Kind() == reflect.Pointer {
 			t = t.Elem()
 		}
-		if t.Kind() != reflect.Struct || name == "" || name == "-" {
+		if t.Kind() != reflect.Struct || name == "-" {
 			continue
 		}
 		var fields []Field
@@ -249,7 +288,11 @@ func CollectorProblems(
 		fix[c.Rule] = c.Fix
 	}
 	var out []Problem
-	add := func(name, rule, message string) {
+	add := func(
+		name string,
+		rule string,
+		message string,
+	) {
 		out = append(out, Problem{Collector: name, Rule: rule, Message: message, Fix: fix[rule]})
 	}
 	names := map[string]bool{}
