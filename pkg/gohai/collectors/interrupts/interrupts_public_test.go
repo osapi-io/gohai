@@ -32,6 +32,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/interrupts"
 )
 
@@ -39,17 +40,6 @@ var (
 	_ collector.Collector = (*interrupts.Linux)(nil)
 	_ collector.Collector = (*interrupts.Darwin)(nil)
 )
-
-// errorFS forces a non-ErrNotExist read error.
-type errorFS struct {
-	avfs.VFS
-}
-
-func (errorFS) ReadFile(
-	string,
-) ([]byte, error) {
-	return nil, errors.New("permission denied")
-}
 
 // twoCPUInterrupts is a typical 2-CPU /proc/interrupts excerpt containing
 // numeric IRQs with full type/vector/device fields and non-numeric labels.
@@ -192,7 +182,13 @@ func (s *InterruptsPublicTestSuite) TestCollect() {
 		{
 			name:    "linux: permission denied propagates error",
 			variant: "linux",
-			setupFS: func() avfs.VFS { return errorFS{memfs.New()} },
+			setupFS: func() avfs.VFS {
+				return sourcetest.ReadError(
+					memfs.New(),
+					errors.New("permission denied"),
+					"/proc/interrupts",
+				)
+			},
 			validateFunc: func(_ any, err error) {
 				s.Error(err)
 			},

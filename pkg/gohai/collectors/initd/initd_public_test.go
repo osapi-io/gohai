@@ -22,7 +22,6 @@ package initd_test
 
 import (
 	"context"
-	"errors"
 	"io/fs"
 	"testing"
 
@@ -32,20 +31,9 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/internal/platform"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/initd"
 )
-
-// readErrorFS forces ReadFile to return a non-ErrNotExist error so the
-// "read error soft-misses" branch is exercised.
-type readErrorFS struct {
-	avfs.VFS
-}
-
-func (readErrorFS) ReadFile(
-	string,
-) ([]byte, error) {
-	return nil, errors.New("no /proc")
-}
 
 var (
 	_ collector.Collector = (*initd.Linux)(nil)
@@ -237,7 +225,7 @@ func (s *InitdPublicTestSuite) TestCollect() {
 				var vfs avfs.VFS
 				switch {
 				case tt.readErr:
-					vfs = readErrorFS{VFS: memfs.New()}
+					vfs = sourcetest.FailRead(s.T(), memfs.New(), "/proc/1/comm")
 				case tt.comm != "":
 					f := memfs.New()
 					_ = f.MkdirAll("/proc/1", 0o755)

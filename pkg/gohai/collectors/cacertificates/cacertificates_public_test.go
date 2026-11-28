@@ -130,32 +130,58 @@ func (s *CACertificatesPublicTestSuite) TestNew() {
 
 func (s *CACertificatesPublicTestSuite) TestLayoutFor() {
 	tests := []struct {
-		family    string
-		wantFirst string
-		wantConf  string
+		name         string
+		family       string
+		validateFunc func(cacertificates.Layout)
 	}{
 		{
-			family:    "debian",
-			wantFirst: "/usr/share/ca-certificates",
-			wantConf:  "/etc/ca-certificates.conf",
+			name:   "debian reads /usr/share/ca-certificates and its conf",
+			family: "debian",
+			validateFunc: func(l cacertificates.Layout) {
+				s.Equal("/usr/share/ca-certificates", l.Dirs[0].Path)
+				s.Equal("/etc/ca-certificates.conf", l.Conf)
+			},
 		},
 		{
-			family:    "alpine",
-			wantFirst: "/usr/share/ca-certificates",
-			wantConf:  "/etc/ca-certificates.conf",
+			name:   "alpine reads /usr/share/ca-certificates and its conf",
+			family: "alpine",
+			validateFunc: func(l cacertificates.Layout) {
+				s.Equal("/usr/share/ca-certificates", l.Dirs[0].Path)
+				s.Equal("/etc/ca-certificates.conf", l.Conf)
+			},
 		},
-		{family: "suse", wantFirst: "/usr/share/pki/trust"},
-		{family: "arch", wantFirst: "/usr/share/ca-certificates/trust-source"},
-		{family: "fedora", wantFirst: "/usr/share/pki/ca-trust-source"},
+		{
+			name:   "suse reads /usr/share/pki/trust and no conf",
+			family: "suse",
+			validateFunc: func(l cacertificates.Layout) {
+				s.Equal("/usr/share/pki/trust", l.Dirs[0].Path)
+				s.Empty(l.Conf)
+			},
+		},
+		{
+			name:   "arch reads /usr/share/ca-certificates/trust-source and no conf",
+			family: "arch",
+			validateFunc: func(l cacertificates.Layout) {
+				s.Equal("/usr/share/ca-certificates/trust-source", l.Dirs[0].Path)
+				s.Empty(l.Conf)
+			},
+		},
+		{
+			name:   "fedora reads /usr/share/pki/ca-trust-source and no conf",
+			family: "fedora",
+			validateFunc: func(l cacertificates.Layout) {
+				s.Equal("/usr/share/pki/ca-trust-source", l.Dirs[0].Path)
+				s.Empty(l.Conf)
+			},
+		},
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.family, func() {
+		s.Run(tt.name, func() {
 			l := cacertificates.LayoutFor(tt.family)
-			s.Equal(tt.wantFirst, l.Dirs[0].Path)
 			s.Equal(cacertificates.SourceSystem, l.Dirs[0].Source)
 			s.Equal(cacertificates.SourceLocal, l.Dirs[1].Source)
-			s.Equal(tt.wantConf, l.Conf)
+			tt.validateFunc(l)
 		})
 	}
 }
@@ -169,15 +195,14 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 	key := "-----BEGIN PRIVATE KEY-----\nbm90IGEga2V5\n-----END PRIVATE KEY-----\n"
 
 	tests := []struct {
-		name    string
-		variant string
-		layout  string
-		files   map[string]string
-		links   map[string]string
-		runner  sourcetest.Commands
-		nilExec bool
-		want    []cacertificates.Certificate
-		wantErr string
+		name         string
+		variant      string
+		layout       string
+		files        map[string]string
+		links        map[string]string
+		runner       sourcetest.Commands
+		nilExec      bool
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "when a Debian host has system and local CAs, and turns one off",
@@ -190,26 +215,33 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 				"/usr/local/share/ca-certificates/osapi-ours.crt": noCN.pem,
 				"/etc/ca-certificates.conf":                       "# comment\nmozilla/Root_CA.crt\n!mozilla/Other_CA.crt\n",
 			},
-			want: []cacertificates.Certificate{
-				{
-					Name:        "mozilla/Other_CA",
-					Path:        "/usr/share/ca-certificates/mozilla/Other_CA.crt",
-					Source:      "system",
-					Enabled:     false,
-					Subject:     "CN=Other CA,O=Test",
-					Fingerprint: other.fingerprint,
-					NotAfter:    other.notAfter,
-				},
-				{
-					Name: "mozilla/Root_CA", Path: "/usr/share/ca-certificates/mozilla/Root_CA.crt",
-					Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
-					Fingerprint: root.fingerprint, NotAfter: root.notAfter,
-				},
-				{
-					Name: "osapi-ours", Path: "/usr/local/share/ca-certificates/osapi-ours.crt",
-					Source: "local", Enabled: true, Subject: "O=No CN",
-					Fingerprint: noCN.fingerprint, NotAfter: noCN.notAfter,
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{
+					{
+						Name:        "mozilla/Other_CA",
+						Path:        "/usr/share/ca-certificates/mozilla/Other_CA.crt",
+						Source:      "system",
+						Enabled:     false,
+						Subject:     "CN=Other CA,O=Test",
+						Fingerprint: other.fingerprint,
+						NotAfter:    other.notAfter,
+					},
+					{
+						Name:        "mozilla/Root_CA",
+						Path:        "/usr/share/ca-certificates/mozilla/Root_CA.crt",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "CN=Root CA,O=Test",
+						Fingerprint: root.fingerprint,
+						NotAfter:    root.notAfter,
+					},
+					{
+						Name: "osapi-ours", Path: "/usr/local/share/ca-certificates/osapi-ours.crt",
+						Source: "local", Enabled: true, Subject: "O=No CN",
+						Fingerprint: noCN.fingerprint, NotAfter: noCN.notAfter,
+					},
+				}, got.(*cacertificates.Info).Certificates)
 			},
 		},
 		{
@@ -220,21 +252,32 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 				"/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit": "[p11-kit-object-v1]\n" + root.pem + key + corrupt + noCN.pem,
 				"/etc/pki/ca-trust/source/anchors/broken.pem":            "not PEM",
 			},
-			want: []cacertificates.Certificate{
-				{
-					Name: "Root CA", Path: "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
-					Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
-					Fingerprint: root.fingerprint, NotAfter: root.notAfter,
-				},
-				{
-					Name: "O=No CN", Path: "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
-					Source: "system", Enabled: true, Subject: "O=No CN",
-					Fingerprint: noCN.fingerprint, NotAfter: noCN.notAfter,
-				},
-				{
-					Name: "broken", Path: "/etc/pki/ca-trust/source/anchors/broken.pem",
-					Source: "local", Enabled: true,
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{
+					{
+						Name:        "Root CA",
+						Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "CN=Root CA,O=Test",
+						Fingerprint: root.fingerprint,
+						NotAfter:    root.notAfter,
+					},
+					{
+						Name:        "O=No CN",
+						Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "O=No CN",
+						Fingerprint: noCN.fingerprint,
+						NotAfter:    noCN.notAfter,
+					},
+					{
+						Name: "broken", Path: "/etc/pki/ca-trust/source/anchors/broken.pem",
+						Source: "local", Enabled: true,
+					},
+				}, got.(*cacertificates.Info).Certificates)
 			},
 		},
 		{
@@ -253,26 +296,33 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 				"/etc/pki/ca-trust/source/blocklist/README":         "not a CA",
 			},
 			links: map[string]string{"/etc/pki/ca-trust/source/blocklist/gone.pem": "/nowhere"},
-			want: []cacertificates.Certificate{
-				{
-					Name: "Root CA", Path: "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
-					Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
-					Fingerprint: root.fingerprint, NotAfter: root.notAfter,
-				},
-				{
-					Name:        "Other CA",
-					Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
-					Source:      "system",
-					Enabled:     false,
-					Subject:     "CN=Other CA,O=Test",
-					Fingerprint: other.fingerprint,
-					NotAfter:    other.notAfter,
-				},
-				{
-					Name: "ours", Path: "/etc/pki/ca-trust/source/anchors/ours.pem",
-					Source: "local", Enabled: false, Subject: "O=No CN",
-					Fingerprint: noCN.fingerprint, NotAfter: noCN.notAfter,
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{
+					{
+						Name:        "Root CA",
+						Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "CN=Root CA,O=Test",
+						Fingerprint: root.fingerprint,
+						NotAfter:    root.notAfter,
+					},
+					{
+						Name:        "Other CA",
+						Path:        "/usr/share/pki/ca-trust-source/ca-bundle.trust.p11-kit",
+						Source:      "system",
+						Enabled:     false,
+						Subject:     "CN=Other CA,O=Test",
+						Fingerprint: other.fingerprint,
+						NotAfter:    other.notAfter,
+					},
+					{
+						Name: "ours", Path: "/etc/pki/ca-trust/source/anchors/ours.pem",
+						Source: "local", Enabled: false, Subject: "O=No CN",
+						Fingerprint: noCN.fingerprint, NotAfter: noCN.notAfter,
+					},
+				}, got.(*cacertificates.Info).Certificates)
 			},
 		},
 		{
@@ -281,7 +331,10 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			layout:  "debian",
 			files:   map[string]string{"/usr/local/share/ca-certificates/README": "x"},
 			links:   map[string]string{"/usr/local/share/ca-certificates/gone.crt": "/nowhere"},
-			want:    []cacertificates.Certificate{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{}, got.(*cacertificates.Info).Certificates)
+			},
 		},
 		{
 			name:    "when macOS has roots and a local CA beside a certificate that is not a CA",
@@ -290,21 +343,24 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 				"security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain": root.pem,
 				"security find-certificate -a -p /Library/Keychains/System.keychain":                        leaf.pem + other.pem,
 			}},
-			want: []cacertificates.Certificate{
-				{
-					Name:        "Root CA",
-					Path:        "/System/Library/Keychains/SystemRootCertificates.keychain",
-					Source:      "system",
-					Enabled:     true,
-					Subject:     "CN=Root CA,O=Test",
-					Fingerprint: root.fingerprint,
-					NotAfter:    root.notAfter,
-				},
-				{
-					Name: "Other CA", Path: "/Library/Keychains/System.keychain",
-					Source: "local", Enabled: true, Subject: "CN=Other CA,O=Test",
-					Fingerprint: other.fingerprint, NotAfter: other.notAfter,
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{
+					{
+						Name:        "Root CA",
+						Path:        "/System/Library/Keychains/SystemRootCertificates.keychain",
+						Source:      "system",
+						Enabled:     true,
+						Subject:     "CN=Root CA,O=Test",
+						Fingerprint: root.fingerprint,
+						NotAfter:    root.notAfter,
+					},
+					{
+						Name: "Other CA", Path: "/Library/Keychains/System.keychain",
+						Source: "local", Enabled: true, Subject: "CN=Other CA,O=Test",
+						Fingerprint: other.fingerprint, NotAfter: other.notAfter,
+					},
+				}, got.(*cacertificates.Info).Certificates)
 			},
 		},
 		{
@@ -318,18 +374,24 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 					70_000,
 				) + "\n!mozilla/Root_CA.crt\n",
 			},
-			want: []cacertificates.Certificate{{
-				Name: "mozilla/Root_CA", Path: "/usr/share/ca-certificates/mozilla/Root_CA.crt",
-				Source: "system", Enabled: false, Subject: "CN=Root CA,O=Test",
-				Fingerprint: root.fingerprint, NotAfter: root.notAfter,
-			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{{
+					Name: "mozilla/Root_CA", Path: "/usr/share/ca-certificates/mozilla/Root_CA.crt",
+					Source: "system", Enabled: false, Subject: "CN=Root CA,O=Test",
+					Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+				}}, got.(*cacertificates.Info).Certificates)
+			},
 		},
 		{
 			name:    "when a CA directory cannot be read, it is an error",
 			variant: "linux",
 			layout:  "debian",
 			files:   map[string]string{"/usr/share": "not a directory"},
-			wantErr: "read /usr/share/ca-certificates: ",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /usr/share/ca-certificates: ")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "when a CA file cannot be read, it is an error",
@@ -339,7 +401,10 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			links: map[string]string{
 				"/usr/share/ca-certificates/mozilla/Loop.crt": "/usr/share/ca-certificates/mozilla/Loop.crt",
 			},
-			wantErr: "read /usr/share/ca-certificates/mozilla/Loop.crt: ",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /usr/share/ca-certificates/mozilla/Loop.crt: ")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "when a CA link points at nothing, the CA is left out",
@@ -349,25 +414,34 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			links: map[string]string{
 				"/usr/share/ca-certificates/mozilla/Gone.crt": "/nowhere/Gone.crt",
 			},
-			want: []cacertificates.Certificate{{
-				Name: "mozilla/Root_CA", Path: "/usr/share/ca-certificates/mozilla/Root_CA.crt",
-				Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
-				Fingerprint: root.fingerprint, NotAfter: root.notAfter,
-			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{{
+					Name: "mozilla/Root_CA", Path: "/usr/share/ca-certificates/mozilla/Root_CA.crt",
+					Source: "system", Enabled: true, Subject: "CN=Root CA,O=Test",
+					Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+				}}, got.(*cacertificates.Info).Certificates)
+			},
 		},
 		{
 			name:    "when the conf file cannot be read, it is an error",
 			variant: "linux",
 			layout:  "debian",
 			links:   map[string]string{"/etc/ca-certificates.conf": "/etc/ca-certificates.conf"},
-			wantErr: "read /etc/ca-certificates.conf: ",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/ca-certificates.conf: ")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "when a blocklist directory cannot be read, it is an error",
 			variant: "linux",
 			layout:  "rhel",
 			files:   map[string]string{"/usr/share/pki/ca-trust-source": "not a directory"},
-			wantErr: "read /usr/share/pki/ca-trust-source/blocklist: ",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /usr/share/pki/ca-trust-source/blocklist: ")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "when a blocklist file cannot be read, it is an error",
@@ -376,7 +450,10 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			links: map[string]string{
 				"/etc/pki/ca-trust/source/blocklist/bad.crt": "/etc/pki/ca-trust/source/blocklist/bad.crt",
 			},
-			wantErr: "read /etc/pki/ca-trust/source/blocklist/bad.crt: ",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/pki/ca-trust/source/blocklist/bad.crt: ")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "when a blocklist link points at nothing, it distrusts nothing",
@@ -386,11 +463,14 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 			links: map[string]string{
 				"/etc/pki/ca-trust/source/blocklist/gone.crt": "/nowhere/gone.crt",
 			},
-			want: []cacertificates.Certificate{{
-				Name: "ours", Path: "/etc/pki/ca-trust/source/anchors/ours.pem",
-				Source: "local", Enabled: true, Subject: "CN=Root CA,O=Test",
-				Fingerprint: root.fingerprint, NotAfter: root.notAfter,
-			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{{
+					Name: "ours", Path: "/etc/pki/ca-trust/source/anchors/ours.pem",
+					Source: "local", Enabled: true, Subject: "CN=Root CA,O=Test",
+					Fingerprint: root.fingerprint, NotAfter: root.notAfter,
+				}}, got.(*cacertificates.Info).Certificates)
+			},
 		},
 		{
 			name:    "when security fails to read a keychain, it is an error",
@@ -400,19 +480,28 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 					"denied",
 				),
 			}},
-			wantErr: "read keychain",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read keychain")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "when the Darwin variant has no Exec, there are no CAs",
 			variant: "darwin",
 			nilExec: true,
-			want:    []cacertificates.Certificate{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{}, got.(*cacertificates.Info).Certificates)
+			},
 		},
 		{
 			name:    "when the host has no security command, there are no CAs",
 			variant: "darwin",
 			runner:  sourcetest.Commands{},
-			want:    []cacertificates.Certificate{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal([]cacertificates.Certificate{}, got.(*cacertificates.Info).Certificates)
+			},
 		},
 	}
 
@@ -434,13 +523,7 @@ func (s *CACertificatesPublicTestSuite) TestCollect() {
 				c = d
 			}
 
-			got, err := c.Collect(context.Background(), collector.PriorResults{})
-			if tt.wantErr != "" {
-				s.ErrorContains(err, tt.wantErr)
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.want, got.(*cacertificates.Info).Certificates)
+			tt.validateFunc(c.Collect(context.Background(), collector.PriorResults{}))
 		})
 	}
 }

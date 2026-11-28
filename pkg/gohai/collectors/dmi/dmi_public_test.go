@@ -104,32 +104,34 @@ func (s *DmiPublicTestSuite) TestCollect() {
 		"/sys/class/dmi/id/product_sku":       "LENOVO_MT_21DC\n",
 	}
 	tests := []struct {
-		name    string
-		variant string
-		files   map[string]string
-		fail    []string // paths whose read fails, as for a file the host cannot read
-		want    *dmi.Info
-		wantErr string
+		name         string
+		variant      string
+		files        map[string]string
+		fail         []string // paths whose read fails, as for a file the host cannot read
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: each DMI string; an unreadable one is unknown",
 			variant: "linux",
 			files:   dmiFiles,
-			want: &dmi.Info{
-				BIOS: &dmi.BIOS{Manufacturer: "LENOVO", Ver: "N2VET36W", Date: "01/01/2024"},
-				Baseboard: &dmi.Baseboard{
-					Vendor: "LENOVO", Product: "21DC", Version: "SDK0",
-					SerialNumber: "L1HF", AssetTag: "Not Available",
-				},
-				Chassis: &dmi.Chassis{
-					Vendor: "LENOVO", Type: "10", TypeDescription: "Notebook",
-					Version: "None", SerialNumber: "PF3X", AssetTag: "No Asset",
-				},
-				Product: &dmi.Product{
-					VendorName: "LENOVO", Name: "21DC0040US", Family: "ThinkPad X1",
-					Version: "ThinkPad X1 Carbon Gen 10", SerialNumber: "unknown",
-					UUID: "4c4c4544-0042", SKU: "LENOVO_MT_21DC",
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dmi.Info{
+					BIOS: &dmi.BIOS{Manufacturer: "LENOVO", Ver: "N2VET36W", Date: "01/01/2024"},
+					Baseboard: &dmi.Baseboard{
+						Vendor: "LENOVO", Product: "21DC", Version: "SDK0",
+						SerialNumber: "L1HF", AssetTag: "Not Available",
+					},
+					Chassis: &dmi.Chassis{
+						Vendor: "LENOVO", Type: "10", TypeDescription: "Notebook",
+						Version: "None", SerialNumber: "PF3X", AssetTag: "No Asset",
+					},
+					Product: &dmi.Product{
+						VendorName: "LENOVO", Name: "21DC0040US", Family: "ThinkPad X1",
+						Version: "ThinkPad X1 Carbon Gen 10", SerialNumber: "unknown",
+						UUID: "4c4c4544-0042", SKU: "LENOVO_MT_21DC",
+					},
+				}, got)
 			},
 		},
 		{
@@ -142,42 +144,53 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				"/sys/firmware/devicetree/base/chassis-type":          "embedded\x00",
 				"/sys/firmware/devicetree/base/chosen/u-boot,version": "U-Boot 2024.01\x00",
 			},
-			want: &dmi.Info{
-				BIOS: &dmi.BIOS{Manufacturer: "U-Boot", Ver: "U-Boot 2024.01", Date: "unknown"},
-				Baseboard: &dmi.Baseboard{
-					Vendor: "raspberrypi", Product: "Raspberry Pi 4 Model B Rev 1.4",
-					Version: "unknown", SerialNumber: "10000000abcd", AssetTag: "unknown",
-				},
-				Chassis: &dmi.Chassis{
-					Vendor: "raspberrypi", Type: "34", TypeDescription: "Embedded PC",
-					Version: "Raspberry Pi 4 Model B Rev 1.4", SerialNumber: "10000000abcd",
-					AssetTag: "unknown",
-				},
-				Product: &dmi.Product{
-					VendorName: "raspberrypi", Name: "Raspberry Pi 4 Model B Rev 1.4",
-					Family: "unknown", Version: "unknown", SerialNumber: "10000000abcd",
-					UUID: "unknown", SKU: "unknown",
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dmi.Info{
+					BIOS: &dmi.BIOS{Manufacturer: "U-Boot", Ver: "U-Boot 2024.01", Date: "unknown"},
+					Baseboard: &dmi.Baseboard{
+						Vendor: "raspberrypi", Product: "Raspberry Pi 4 Model B Rev 1.4",
+						Version: "unknown", SerialNumber: "10000000abcd", AssetTag: "unknown",
+					},
+					Chassis: &dmi.Chassis{
+						Vendor: "raspberrypi", Type: "34", TypeDescription: "Embedded PC",
+						Version: "Raspberry Pi 4 Model B Rev 1.4", SerialNumber: "10000000abcd",
+						AssetTag: "unknown",
+					},
+					Product: &dmi.Product{
+						VendorName: "raspberrypi", Name: "Raspberry Pi 4 Model B Rev 1.4",
+						Family: "unknown", Version: "unknown", SerialNumber: "10000000abcd",
+						UUID: "unknown", SKU: "unknown",
+					},
+				}, got)
 			},
 		},
 		{
 			name:    "linux: a device tree with nothing but its directory",
 			variant: "linux",
 			files:   map[string]string{"/sys/firmware/devicetree/base/.keep": ""},
-			want: &dmi.Info{
-				BIOS: &dmi.BIOS{Manufacturer: "unknown", Ver: "unknown", Date: "unknown"},
-				Baseboard: &dmi.Baseboard{
-					Vendor: "unknown", Product: "unknown", Version: "unknown",
-					SerialNumber: "unknown", AssetTag: "unknown",
-				},
-				Chassis: &dmi.Chassis{
-					Vendor: "unknown", Type: "unknown", TypeDescription: "unknown",
-					Version: "unknown", SerialNumber: "unknown", AssetTag: "unknown",
-				},
-				Product: &dmi.Product{
-					VendorName: "unknown", Name: "unknown", Family: "unknown", Version: "unknown",
-					SerialNumber: "unknown", UUID: "unknown", SKU: "unknown",
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dmi.Info{
+					BIOS: &dmi.BIOS{Manufacturer: "unknown", Ver: "unknown", Date: "unknown"},
+					Baseboard: &dmi.Baseboard{
+						Vendor: "unknown", Product: "unknown", Version: "unknown",
+						SerialNumber: "unknown", AssetTag: "unknown",
+					},
+					Chassis: &dmi.Chassis{
+						Vendor: "unknown", Type: "unknown", TypeDescription: "unknown",
+						Version: "unknown", SerialNumber: "unknown", AssetTag: "unknown",
+					},
+					Product: &dmi.Product{
+						VendorName:   "unknown",
+						Name:         "unknown",
+						Family:       "unknown",
+						Version:      "unknown",
+						SerialNumber: "unknown",
+						UUID:         "unknown",
+						SKU:          "unknown",
+					},
+				}, got)
 			},
 		},
 		{
@@ -185,19 +198,28 @@ func (s *DmiPublicTestSuite) TestCollect() {
 			variant: "linux",
 			files:   dmiFiles,
 			fail:    []string{"/sys/class/dmi/id/product_serial"},
-			wantErr: "read /sys/class/dmi/id/product_serial: ",
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "read /sys/class/dmi/id/product_serial: ")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "linux: a device tree property that cannot be read is an error",
 			variant: "linux",
 			files:   map[string]string{"/sys/firmware/devicetree/base/serial-number": "1\x00"},
 			fail:    []string{"/sys/firmware/devicetree/base/model"},
-			wantErr: "read /sys/firmware/devicetree/base/model: ",
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "read /sys/firmware/devicetree/base/model: ")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "darwin: no DMI",
 			variant: "darwin",
-			want:    &dmi.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dmi.Info{}, got)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -207,15 +229,7 @@ func (s *DmiPublicTestSuite) TestCollect() {
 				fs := sourcetest.FailRead(s.T(), sourcetest.FS(s.T(), tt.files), tt.fail...)
 				c = &dmi.Linux{FS: fs}
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr != "" {
-				s.ErrorContains(err, tt.wantErr)
-				s.Exactly(nil, got)
-
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.want, got)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

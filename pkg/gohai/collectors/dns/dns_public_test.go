@@ -75,13 +75,12 @@ func (s *DNSPublicTestSuite) TestCollect() {
 	const resolvConf = "# generated\n; also a comment\nnameserver 10.0.0.2\nnameserver fd00::53\n" +
 		"domain old.example\nsearch corp.example example.com\noptions edns0 trust-ad\noptions ndots:2\nbad\n"
 	tests := []struct {
-		name    string
-		variant string
-		files   map[string]string
-		runner  sourcetest.Commands
-		nilExec bool
-		want    *dns.Info
-		wantErr string
+		name         string
+		variant      string
+		files        map[string]string
+		runner       sourcetest.Commands
+		nilExec      bool
+		validateFunc func(any, error)
 	}{
 		{
 			name:    "linux: resolv.conf and resolvectl links",
@@ -94,18 +93,21 @@ func (s *DNSPublicTestSuite) TestCollect() {
 				"resolvectl dns":    "Global: 1.1.1.1\nLink 2 (eth0): 10.0.0.1 fe80::1%eth0\nLink 3 (wg0):\n",
 				"resolvectl domain": "Global:\nLink 2 (eth0): corp.example ~.\n",
 			}},
-			want: &dns.Info{
-				Nameservers: []string{"10.0.0.2", "fd00::53"},
-				Search:      []string{"corp.example", "example.com"},
-				Options:     []string{"edns0", "trust-ad", "ndots:2"},
-				Interfaces: map[string]dns.Resolver{
-					"eth0": {
-						Nameservers: []string{"10.0.0.1", "fe80::1"},
-						Domains:     []string{"corp.example", "~."},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{
+					Nameservers: []string{"10.0.0.2", "fd00::53"},
+					Search:      []string{"corp.example", "example.com"},
+					Options:     []string{"edns0", "trust-ad", "ndots:2"},
+					Interfaces: map[string]dns.Resolver{
+						"eth0": {
+							Nameservers: []string{"10.0.0.1", "fe80::1"},
+							Domains:     []string{"corp.example", "~."},
+						},
+						"wg0": {},
 					},
-					"wg0": {},
-				},
-				Global: &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+					Global: &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+				}, got)
 			},
 		},
 		{
@@ -117,14 +119,17 @@ func (s *DNSPublicTestSuite) TestCollect() {
 					"Link 2 (eth0): 10.0.0.1:53 fe80::1%eth0\n",
 				"resolvectl domain": "Global: ~. corp.example\nLink 2 (eth0):\n",
 			}},
-			want: &dns.Info{
-				Interfaces: map[string]dns.Resolver{
-					"eth0": {Nameservers: []string{"10.0.0.1", "fe80::1"}},
-				},
-				Global: &dns.Resolver{
-					Nameservers: []string{"1.1.1.1", "2606:4700::1111"},
-					Domains:     []string{"~.", "corp.example"},
-				},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{
+					Interfaces: map[string]dns.Resolver{
+						"eth0": {Nameservers: []string{"10.0.0.1", "fe80::1"}},
+					},
+					Global: &dns.Resolver{
+						Nameservers: []string{"1.1.1.1", "2606:4700::1111"},
+						Domains:     []string{"~.", "corp.example"},
+					},
+				}, got)
 			},
 		},
 		{
@@ -134,7 +139,10 @@ func (s *DNSPublicTestSuite) TestCollect() {
 				"resolvectl dns":    errors.New("exit status 1"),
 				"resolvectl domain": errors.New("exit status 1"),
 			}},
-			want: &dns.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{}, got)
+			},
 		},
 		{
 			name:    "linux: systemd-resolved runs, but the host has no resolvectl",
@@ -143,7 +151,10 @@ func (s *DNSPublicTestSuite) TestCollect() {
 				"/etc/resolv.conf":                 "nameserver 127.0.0.53\n",
 				"/run/systemd/resolve/resolv.conf": "",
 			},
-			want: &dns.Info{Nameservers: []string{"127.0.0.53"}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{Nameservers: []string{"127.0.0.53"}}, got)
+			},
 		},
 		{
 			name:    "linux: systemd-resolved runs, and resolvectl fails",
@@ -152,26 +163,38 @@ func (s *DNSPublicTestSuite) TestCollect() {
 			runner: sourcetest.Commands{Err: map[string]error{
 				"resolvectl dns": errors.New("exit status 1"),
 			}},
-			wantErr: "read resolvectl dns",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read resolvectl dns")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "linux: a resolved runtime directory that cannot be checked is an error",
 			variant: "linux",
 			files:   map[string]string{"/run/systemd": ""},
-			wantErr: "stat /run/systemd/resolve",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "stat /run/systemd/resolve")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "linux: a resolv.conf that cannot be read is an error",
 			variant: "linux",
 			files:   map[string]string{"/etc/resolv.conf/x": ""},
-			wantErr: "read /etc/resolv.conf",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/resolv.conf")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "linux: nil Exec",
 			variant: "linux",
 			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
 			nilExec: true,
-			want:    &dns.Info{Nameservers: []string{"1.1.1.1"}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{Nameservers: []string{"1.1.1.1"}}, got)
+			},
 		},
 		{
 			name:    "darwin: scoped resolvers, the first of each interface, and the default resolver as global",
@@ -186,16 +209,19 @@ func (s *DNSPublicTestSuite) TestCollect() {
 					"DNS configuration (for scoped queries)\n\n" +
 					"resolver #1\n  nameserver[0] : 9.9.9.9\n  if_index : 14 (en0)\n"},
 			},
-			want: &dns.Info{
-				Nameservers: []string{"1.1.1.1"},
-				Interfaces: map[string]dns.Resolver{
-					"utun6": {
-						Nameservers: []string{"100.100.100.100"},
-						Domains:     []string{"ts.example"},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{
+					Nameservers: []string{"1.1.1.1"},
+					Interfaces: map[string]dns.Resolver{
+						"utun6": {
+							Nameservers: []string{"100.100.100.100"},
+							Domains:     []string{"ts.example"},
+						},
+						"en0": {Nameservers: []string{"1.1.1.1"}},
 					},
-					"en0": {Nameservers: []string{"1.1.1.1"}},
-				},
-				Global: &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+					Global: &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+				}, got)
 			},
 		},
 		{
@@ -207,9 +233,12 @@ func (s *DNSPublicTestSuite) TestCollect() {
 					"resolver #1\n  domain   : local\n  nameserver[0] : 224.0.0.251\n\n" +
 					"resolver #2\n  nameserver[0] : 1.1.1.1\n"},
 			},
-			want: &dns.Info{
-				Nameservers: []string{"1.1.1.1"},
-				Global:      &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{
+					Nameservers: []string{"1.1.1.1"},
+					Global:      &dns.Resolver{Nameservers: []string{"1.1.1.1"}},
+				}, got)
 			},
 		},
 		{
@@ -222,34 +251,49 @@ func (s *DNSPublicTestSuite) TestCollect() {
 						"resolver #1\n  nameserver[0] : 9.9.9.9\n  if_index : 14 (en0)\n",
 				},
 			},
-			want: &dns.Info{
-				Nameservers: []string{"1.1.1.1"},
-				Interfaces:  map[string]dns.Resolver{"en0": {Nameservers: []string{"9.9.9.9"}}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{
+					Nameservers: []string{"1.1.1.1"},
+					Interfaces:  map[string]dns.Resolver{"en0": {Nameservers: []string{"9.9.9.9"}}},
+				}, got)
 			},
 		},
 		{
 			name:    "darwin: scutil fails",
 			variant: "darwin",
 			runner:  sourcetest.Commands{Err: map[string]error{"scutil --dns": errors.New("boom")}},
-			wantErr: "read scutil --dns",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read scutil --dns")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "darwin: no scutil on the host",
 			variant: "darwin",
 			files:   map[string]string{"/etc/resolv.conf": "nameserver 1.1.1.1\n"},
-			want:    &dns.Info{Nameservers: []string{"1.1.1.1"}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{Nameservers: []string{"1.1.1.1"}}, got)
+			},
 		},
 		{
 			name:    "darwin: a resolv.conf that cannot be read is an error",
 			variant: "darwin",
 			files:   map[string]string{"/etc/resolv.conf/x": ""},
-			wantErr: "read /etc/resolv.conf",
+			validateFunc: func(got any, err error) {
+				s.Require().ErrorContains(err, "read /etc/resolv.conf")
+				s.Exactly(nil, got)
+			},
 		},
 		{
 			name:    "darwin: nil Exec",
 			variant: "darwin",
 			nilExec: true,
-			want:    &dns.Info{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&dns.Info{}, got)
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -270,15 +314,7 @@ func (s *DNSPublicTestSuite) TestCollect() {
 				}
 				c = d
 			}
-			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr != "" {
-				s.Require().ErrorContains(err, tt.wantErr)
-				s.Exactly(nil, got)
-
-				return
-			}
-			s.Require().NoError(err)
-			s.Equal(tt.want, got)
+			tt.validateFunc(c.Collect(context.Background(), nil))
 		})
 	}
 }

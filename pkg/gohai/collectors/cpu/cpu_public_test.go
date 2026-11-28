@@ -56,22 +56,6 @@ func TestCPUPublicTestSuite(
 	suite.Run(t, new(CPUPublicTestSuite))
 }
 
-// vulnReadErrorFS wraps memfs and forces ReadFile to error on a
-// specific path.
-type vulnReadErrorFS struct {
-	avfs.VFS
-	failPath string
-}
-
-func (v vulnReadErrorFS) ReadFile(
-	p string,
-) ([]byte, error) {
-	if p == v.failPath {
-		return nil, errors.New("read fail")
-	}
-	return v.VFS.ReadFile(p)
-}
-
 func newVulnFS(
 	s *CPUPublicTestSuite,
 	entries map[string]string,
@@ -761,12 +745,13 @@ NUMA node0 CPU(s):   5-2
 			name:    "linux: a vulnerabilities file that cannot be read is an error",
 			variant: "linux",
 			cpuinfo: linuxCPUInfo,
-			fs: vulnReadErrorFS{
-				VFS: newVulnFS(s, map[string]string{
+			fs: sourcetest.ReadError(
+				newVulnFS(s, map[string]string{
 					"meltdown": "Mitigation: PTI\n", "bad": "x",
 				}),
-				failPath: "/sys/devices/system/cpu/vulnerabilities/bad",
-			},
+				errors.New("read fail"),
+				"/sys/devices/system/cpu/vulnerabilities/bad",
+			),
 			exec: noLscpuExec,
 			validateFunc: func(got any, err error) {
 				s.EqualError(err, "read /sys/devices/system/cpu/vulnerabilities/bad: read fail")

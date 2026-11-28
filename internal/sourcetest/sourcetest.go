@@ -133,6 +133,41 @@ func FailRead(
 	return fs
 }
 
+// ReadError wraps fs so that a ReadFile of each of paths returns err, and any
+// other read goes to fs. It is for a file that the collector lists and then
+// reads, where FailRead's directory would change what the collector lists.
+func ReadError(
+	fs avfs.VFS,
+	err error,
+	paths ...string,
+) avfs.VFS {
+	fail := make(map[string]bool, len(paths))
+	for _, path := range paths {
+		fail[path] = true
+	}
+
+	return readErrorFS{VFS: fs, err: err, fail: fail}
+}
+
+// readErrorFS is the filesystem that ReadError returns.
+type readErrorFS struct {
+	avfs.VFS
+	err  error
+	fail map[string]bool
+}
+
+// ReadFile returns the error for a path that ReadError named, and reads any
+// other path from the wrapped filesystem.
+func (r readErrorFS) ReadFile(
+	name string,
+) ([]byte, error) {
+	if r.fail[name] {
+		return nil, r.err
+	}
+
+	return r.VFS.ReadFile(name)
+}
+
 // HTTP is a transport that answers each URL of bodies, such as
 // "http://169.254.169.254/latest/meta-data/instance-id", with 200 and
 // its body. Any other URL answers 404, as a metadata service does for a

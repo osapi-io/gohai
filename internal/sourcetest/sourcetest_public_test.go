@@ -128,6 +128,45 @@ func (s *SourcetestPublicTestSuite) TestFailRead() {
 	}
 }
 
+func (s *SourcetestPublicTestSuite) TestReadError() {
+	boom := errors.New("read fail")
+	tests := []struct {
+		name         string
+		paths        []string
+		read         string
+		validateFunc func([]byte, error)
+	}{
+		{
+			name:  "a read of a named path returns the error",
+			paths: []string{"/etc/os-release"},
+			read:  "/etc/os-release",
+			validateFunc: func(b []byte, err error) {
+				s.ErrorIs(err, boom)
+				s.Empty(b)
+			},
+		},
+		{
+			name:  "a path that is not named still reads",
+			paths: []string{"/proc/mdstat"},
+			read:  "/etc/os-release",
+			validateFunc: func(b []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("ID=fedora\n", string(b))
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			vfs := sourcetest.ReadError(
+				sourcetest.FS(s.T(), map[string]string{"/etc/os-release": "ID=fedora\n"}),
+				boom,
+				tt.paths...,
+			)
+			tt.validateFunc(vfs.ReadFile(tt.read))
+		})
+	}
+}
+
 func (s *SourcetestPublicTestSuite) TestCommands() {
 	cmds := sourcetest.Commands{
 		Out: map[string]string{"sysctl -n vm.loadavg": "{ 1 2 3 }", "df -kP": "partial"},
