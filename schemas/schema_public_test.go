@@ -93,27 +93,36 @@ func (s *SchemaPublicTestSuite) TestFieldMappingRows() {
 	tests := []struct {
 		name string
 		page string
-		// statedRE finds the row count that page states.
-		statedRE *regexp.Regexp
+		// stated finds the row count that page states.
+		stated       string
+		validateFunc func(m [][]byte)
 	}{
 		{
-			name:     "schemas/README.md states the row count of field-mapping.md",
-			page:     "README.md",
-			statedRE: regexp.MustCompile(`\((\d+) rows\)`),
+			name:   "schemas/README.md states the row count of field-mapping.md",
+			page:   "README.md",
+			stated: `\((\d+) rows\)`,
+			validateFunc: func(m [][]byte) {
+				s.Require().NotNil(m)
+				s.Equal(rows, string(m[1]))
+			},
 		},
 		{
-			name:     "CONTRIBUTING.md states the row count of field-mapping.md",
-			page:     repo.Join("..", "CONTRIBUTING.md"),
-			statedRE: regexp.MustCompile(`It has (\d+) rows\.`),
+			name:   "CONTRIBUTING.md states the row count of field-mapping.md",
+			page:   repo.Join("..", "CONTRIBUTING.md"),
+			stated: `It has (\d+) rows\.`,
+			validateFunc: func(m [][]byte) {
+				s.Require().NotNil(m)
+				s.Equal(rows, string(m[1]))
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
 			page, err := repo.ReadFile(tt.page)
 			s.Require().NoError(err)
-			m := tt.statedRE.FindSubmatch(page)
-			s.Require().NotNil(m)
-			s.Equal(rows, string(m[1]))
+			re, err := regexp.Compile(tt.stated)
+			s.Require().NoError(err)
+			tt.validateFunc(re.FindSubmatch(page))
 		})
 	}
 }

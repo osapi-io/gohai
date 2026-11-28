@@ -31,7 +31,7 @@ import (
 	"net/url"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -106,7 +106,7 @@ func Links(
 		paths = append(paths, path)
 	}
 	// A link inside a linked directory comes after the directory's link.
-	sort.Strings(paths)
+	slices.Sort(paths)
 	for _, path := range paths {
 		target := links[path]
 		require.NoError(t, fs.MkdirAll(filepath.Dir(path), 0o755))

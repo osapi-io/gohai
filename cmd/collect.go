@@ -25,7 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 
 	"github.com/spf13/cobra"
 
@@ -134,7 +134,7 @@ func (f *flagSet) values() []string {
 	for n := range f.set {
 		out = append(out, n)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 
 	return out
 }
@@ -162,7 +162,7 @@ func registerCollectorFlags(
 		return nil
 	}
 	names := reg.Names()
-	sort.Strings(names)
+	slices.Sort(names)
 	for _, n := range names {
 		cmd.Flags().Bool("collector."+n, false, fmt.Sprintf("Enable the %s collector", n))
 		cmd.Flags().Bool("no-collector."+n, false, fmt.Sprintf("Disable the %s collector", n))

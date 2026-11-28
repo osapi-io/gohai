@@ -36,7 +36,9 @@ const (
 
 // rgb returns a 24-bit truecolor foreground escape.
 func rgb(
-	r, g, b int,
+	r int,
+	g int,
+	b int,
 ) string {
 	return fmt.Sprintf("\033[38;2;%d;%d;%dm", r, g, b)
 }

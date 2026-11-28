@@ -79,8 +79,14 @@ type Sources struct {
 // Resolver is the name lookups that a collector makes. *net.Resolver has
 // them.
 type Resolver interface {
-	LookupHost(ctx context.Context, host string) ([]string, error)
-	LookupAddr(ctx context.Context, addr string) ([]string, error)
+	LookupHost(
+		ctx context.Context,
+		host string,
+	) ([]string, error)
+	LookupAddr(
+		ctx context.Context,
+		addr string,
+	) ([]string, error)
 }
 
 // Host is the real host: its filesystem, its programs, its clock and its
