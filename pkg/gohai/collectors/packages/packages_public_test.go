@@ -170,7 +170,8 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 	const (
 		dpkgLine = "dpkg-query -W -f=${Package}\\t${Version}\\t${Architecture}\\t${db:Status-Status}\\t${binary:Summary}\\t${Installed-Size}\\n"
 		rpmLine  = "rpm -qa --qf %{NAME}\\t%|EPOCH?{%{EPOCH}:}:{}|%{VERSION}-%{RELEASE}\\t%{ARCH}\\t%{SUMMARY}\\t%{SIZE}\\n"
-		brewLine = "brew list --versions"
+		brewLine = "brew list --formula --versions"
+		caskLine = "brew list --cask --versions"
 	)
 	dpkgOut := []byte(
 		"bash\t5.1-6\tamd64\tinstalled\tGNU Bourne Again SHell\t7164\nlibc6\t2.35-0\tamd64\tinstalled\n",
@@ -654,14 +655,121 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "darwin: a cask that brew refuses keeps the formulae",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{brewLine: "git 2.40.0\nzsh 5.9\n"},
+					Err: map[string]error{
+						caskLine: errors.New(
+							"exit status 1: Error: Refusing to load cask tap/cask/neovim-nightly from untrusted tap tap/cask",
+						),
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "untrusted tap")
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+					{
+						Name:           "zsh",
+						Version:        "5.9",
+						Versions:       []string{"5.9"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: a failed formula list keeps the casks",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{caskLine: "firefox 120.0\n"},
+					Err: map[string]error{brewLine: errors.New("exit status 1: permission denied")},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "firefox",
+						Version:        "120.0",
+						Versions:       []string{"120.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
+			name:    "darwin: formulae and casks both fail, no fact",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Err: map[string]error{
+						brewLine: errors.New("exit status 1: permission denied"),
+						caskLine: errors.New("exit status 1: untrusted tap"),
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().Error(err)
+				s.Contains(err.Error(), "permission denied")
+				s.Contains(err.Error(), "untrusted tap")
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: formulae and casks are both listed",
+			variant: "darwin",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Out: map[string]string{
+						brewLine: "git 2.40.0\n",
+						caskLine: "firefox 120.0\n",
+					},
+				}.Mock(t)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*packages.Info)
+				s.Require().True(ok)
+				s.Equal([]packages.Package{
+					{
+						Name:           "git",
+						Version:        "2.40.0",
+						Versions:       []string{"2.40.0"},
+						PackageManager: "brew",
+					},
+					{
+						Name:           "firefox",
+						Version:        "120.0",
+						Versions:       []string{"120.0"},
+						PackageManager: "brew",
+					},
+				}, info.Packages)
+			},
+		},
+		{
 			name:    "darwin: brew at the Apple silicon path, not on the PATH",
 			variant: "darwin",
 			files:   map[string]string{"/opt/homebrew/bin/brew": ""},
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
 					Out: map[string]string{
-						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
-						"id -u":                                  "501\n",
+						"/opt/homebrew/bin/brew list --formula --versions": "git 2.40.0\n",
+						"id -u": "501\n",
 					},
 				}.Mock(t)
 			},
@@ -686,8 +794,8 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
 					Out: map[string]string{
-						"/usr/local/bin/brew list --versions": "git 2.40.0\n",
-						"id -u":                               "501\n",
+						"/usr/local/bin/brew list --formula --versions": "git 2.40.0\n",
+						"id -u": "501\n",
 					},
 				}.Mock(t)
 			},
@@ -714,7 +822,7 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 					Out: map[string]string{
 						"id -u":                                "0\n",
 						"stat -L -f %u /opt/homebrew/bin/brew": "501\n",
-						"sudo -u #501 -H /opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+						"sudo -u #501 -H /opt/homebrew/bin/brew list --formula --versions": "git 2.40.0\n",
 					},
 				}.Mock(t)
 			},
@@ -765,9 +873,9 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
 					Out: map[string]string{
-						"id -u":                                  "0\n",
-						"stat -L -f %u /opt/homebrew/bin/brew":   "0\n",
-						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+						"id -u":                                "0\n",
+						"stat -L -f %u /opt/homebrew/bin/brew": "0\n",
+						"/opt/homebrew/bin/brew list --formula --versions": "git 2.40.0\n",
 					},
 				}.Mock(t)
 			},
@@ -792,8 +900,8 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
 					Out: map[string]string{
-						"id -u":                                  "0\n",
-						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+						"id -u": "0\n",
+						"/opt/homebrew/bin/brew list --formula --versions": "git 2.40.0\n",
 					},
 					Err: map[string]error{
 						"stat -L -f %u /opt/homebrew/bin/brew": errors.New("exit status 1"),
@@ -821,8 +929,8 @@ func (s *PackagesPublicTestSuite) TestCollect() {
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
 					Out: map[string]string{
-						"id -u":                                  "nobody\n",
-						"/opt/homebrew/bin/brew list --versions": "git 2.40.0\n",
+						"id -u": "nobody\n",
+						"/opt/homebrew/bin/brew list --formula --versions": "git 2.40.0\n",
 					},
 				}.Mock(t)
 			},

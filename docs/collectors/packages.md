@@ -106,11 +106,19 @@ finds:
    PATH. A launchd daemon, such as the osapi agent, has neither path on its
    PATH, so the collector does not depend on the PATH.
 2. brew refuses to run as root. When `id -u` prints `0`, the collector reads the
-   owner of the brew executable with `stat -L -f %u <brew>`. It then runs
-   `sudo -u '#<uid>' -H <brew> list --versions`, as Ohai runs brew as the brew
-   owner. When the owner is root, or `stat` fails, it runs brew as it is. A user
-   that is not root runs `<brew> list --versions`.
-3. The output format is `<name> <ver1> [<ver2> ...]`. Homebrew can have many
+   owner of the brew executable with `stat -L -f %u <brew>`. It then runs each
+   brew command as `sudo -u '#<uid>' -H <brew> ...`, as Ohai runs brew as the
+   brew owner. When the owner is root, or `stat` fails, it runs brew as it is. A
+   user that is not root runs `<brew> ...`.
+3. The collector runs two commands: `<brew> list --formula --versions` and
+   `<brew> list --cask --versions`. The formulae come first in the list, then
+   the casks. A single `brew list --versions` stops at the first cask that brew
+   refuses to load, such as a cask from a tap that is not trusted, and exits
+   with status 1. With two commands, a refused cask does not hide the formulae.
+   When one command fails, the collector keeps the packages of the other and
+   returns the error, so the status is `partial`. When both fail, there is no
+   fact, and the status is `failed`.
+4. The output format is `<name> <ver1> [<ver2> ...]`. Homebrew can have many
    versions of a package installed at the same time, and does not promise their
    order. `versions` lists each of them, and `version` is the newest. The
    collector compares two versions as Homebrew does in outline. Each version
@@ -118,7 +126,7 @@ finds:
    numbers, and a digit run is newer than a letter run. When one version is a
    prefix of the other, the longer one is newer, unless its next run is letters,
    which marks a pre-release such as `1.2.0rc1`.
-4. If Homebrew is not on the host, the collector returns an empty list, not an
+5. If Homebrew is not on the host, the collector returns an empty list, not an
    error.
 
 **Errors:** If the command is not on the host, the collector returns an empty

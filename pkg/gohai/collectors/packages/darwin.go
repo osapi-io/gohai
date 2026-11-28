@@ -22,7 +22,9 @@ package packages
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -39,7 +41,8 @@ import (
 var brewPaths = []string{"/opt/homebrew/bin/brew", "/usr/local/bin/brew"}
 
 // Darwin collects Homebrew-installed packages on macOS hosts via
-// `brew list --versions`. Embeds base for static collector metadata.
+// `brew list --formula --versions` and `brew list --cask --versions`.
+// Embeds base for static collector metadata.
 type Darwin struct {
 	base
 
@@ -52,9 +55,15 @@ func NewDarwin() *Darwin {
 	return &Darwin{FS: osfs.NewWithNoIdm(), Exec: source.Commands()}
 }
 
-// Collect runs `brew list --versions` and parses its output. Returns
-// an empty list (not an error) if Homebrew is absent, and the error if
-// brew fails. With no Exec there is no fact.
+// Collect lists the brew formulae and the brew casks, with one brew
+// call for each, and parses the output. Returns an empty list (not an
+// error) if Homebrew is absent. With no Exec there is no fact.
+//
+// The two calls are separate because brew stops a combined list at the
+// first cask that it refuses to load, such as a cask from an untrusted
+// tap, and exits 1. When one call fails, Collect keeps the packages of
+// the other and returns the error, so the status is partial. When both
+// fail, there is no fact.
 //
 // brew is the first of brewPaths that exists, else brew from the PATH.
 // brew refuses to run as root, so a root gohai runs it as the owner of
@@ -66,33 +75,45 @@ func (d *Darwin) Collect(
 	if d.Exec == nil {
 		return nil, nil
 	}
-	name, args := d.brewCommand(ctx)
-	out, err := d.Exec.Execute(ctx, name, args...)
-	if err != nil {
-		if collector.Absent(err) {
-			return &Info{Packages: []Package{}}, nil
+	name, prefix := d.brewCommand(ctx)
+	info := &Info{Packages: []Package{}}
+	read := false
+	var errs []error
+	for _, kind := range []string{"--formula", "--cask"} {
+		args := append(slices.Clone(prefix), "list", kind, "--versions")
+		out, err := d.Exec.Execute(ctx, name, args...)
+		if err != nil {
+			if !collector.Absent(err) {
+				errs = append(errs, fmt.Errorf("brew list %s: %w", kind, err))
+			}
+			continue
 		}
-		return nil, fmt.Errorf("brew list: %w", err)
+		read = true
+		info.Packages = append(info.Packages, parseBrew(string(out)).Packages...)
+	}
+	err := errors.Join(errs...)
+	if err != nil && !read {
+		return nil, err
 	}
 
-	return parseBrew(string(out)), nil
+	return info, err
 }
 
-// brewCommand returns the command line that lists the brew packages.
+// brewCommand returns the command and the arguments that come before the
+// brew subcommand: brew alone, or sudo with the user that owns brew.
 func (d *Darwin) brewCommand(
 	ctx context.Context,
 ) (string, []string) {
-	list := []string{"list", "--versions"}
 	brew := d.findBrew()
 	if brew == "brew" || d.uid(ctx, "id", "-u") != 0 {
-		return brew, list
+		return brew, nil
 	}
 	owner := d.uid(ctx, "stat", "-L", "-f", "%u", brew)
 	if owner <= 0 {
-		return brew, list
+		return brew, nil
 	}
 
-	return "sudo", append([]string{"-u", "#" + strconv.Itoa(owner), "-H", brew}, list...)
+	return "sudo", []string{"-u", "#" + strconv.Itoa(owner), "-H", brew}
 }
 
 // findBrew returns the first of brewPaths that exists, or brew, which the
@@ -128,7 +149,8 @@ func (d *Darwin) uid(
 	return n
 }
 
-// parseBrew parses `brew list --versions` output: one line for each keg,
+// parseBrew parses the output of `brew list --formula --versions` or
+// `brew list --cask --versions`: one line for each keg or cask,
 // "<name> <version> [<version> ...]". Version is the newest of the
 // installed versions, and Versions lists each of them.
 func parseBrew(
