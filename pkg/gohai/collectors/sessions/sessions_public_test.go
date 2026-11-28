@@ -48,6 +48,19 @@ const (
 	loginctlLine = "loginctl --no-pager --no-legend --no-ask-password list-sessions"
 )
 
+// exitStatusError is the error of a command that exited by itself with a
+// status, as an *exec.ExitError of a real run is.
+type exitStatusError int
+
+func (e exitStatusError) Error() string {
+	return fmt.Sprintf("exit status %d", int(e))
+}
+
+// ExitCode is the status the command exited with.
+func (e exitStatusError) ExitCode() int {
+	return int(e)
+}
+
 type SessionsPublicTestSuite struct {
 	suite.Suite
 }
@@ -266,18 +279,33 @@ func (s *SessionsPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a failed loginctl and no utmp file, the loginctl error",
+			name:    "linux: a loginctl with no systemd and no utmp file, no sessions",
 			variant: "linux",
 			exec: func(t *testing.T) source.Runner {
 				return sourcetest.Commands{
-					Err: map[string]error{loginctlLine: errors.New("exit status 1")},
+					Err: map[string]error{loginctlLine: exitStatusError(1)},
+				}.Mock(
+					t,
+				)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(&sessions.Info{LoggedIn: []sessions.Session{}}, got)
+			},
+		},
+		{
+			name:    "linux: a loginctl that timed out and no utmp file, the loginctl error",
+			variant: "linux",
+			exec: func(t *testing.T) source.Runner {
+				return sourcetest.Commands{
+					Err: map[string]error{loginctlLine: context.DeadlineExceeded},
 				}.Mock(
 					t,
 				)
 			},
 			validateFunc: func(got any, err error) {
 				s.Exactly(nil, got)
-				s.EqualError(err, "loginctl list-sessions: exit status 1")
+				s.EqualError(err, "loginctl list-sessions: context deadline exceeded")
 			},
 		},
 		{

@@ -22,6 +22,7 @@ package sessions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/avfs/avfs"
@@ -74,9 +75,26 @@ func (l *Linux) Collect(
 		return &Info{LoggedIn: ss}, nil
 	case !collector.Absent(err):
 		return nil, err
-	case loginctlErr != nil:
+	case loginctlErr != nil && !exited(loginctlErr):
+		// A loginctl that did not finish, such as a timeout, cannot say
+		// there are no sessions.
 		return nil, loginctlErr
 	default:
+		// A loginctl that exits with a status of its own has no systemd to
+		// ask, as in a container. With no utmp either, there are no login
+		// sessions.
 		return &Info{LoggedIn: []Session{}}, nil
 	}
+}
+
+// exited reports whether err is a command that ran to its end and exited
+// with a status of its own, such as loginctl with no systemd to connect
+// to. A command that a timeout or a signal killed has no exit status
+// (ExitCode is -1), so it is not one.
+func exited(
+	err error,
+) bool {
+	var status interface{ ExitCode() int }
+
+	return errors.As(err, &status) && status.ExitCode() >= 0
 }
