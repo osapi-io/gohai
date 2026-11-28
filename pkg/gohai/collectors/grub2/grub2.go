@@ -29,11 +29,10 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/osapi-io/gohai/pkg/gohai/source"
-
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // grubenvPaths lists the canonical grubenv locations in priority order.
@@ -53,8 +52,8 @@ var grubenvPaths = []string{
 type Info struct {
 	// Environment is the map of key=value pairs from the grubenv file.
 	// An empty map means the grubenv file was found but contained no
-	// parseable key=value pairs. A nil map means no grubenv file was
-	// found on any of the checked paths.
+	// parseable key=value pairs. When no checked path has a grubenv
+	// file, the collector gives no fact, so Environment is never nil.
 	Environment map[string]string `json:"environment"`
 }
 
@@ -98,7 +97,8 @@ func NewWith(
 
 // readGrubenv tries each path in grubenvPaths in order and returns the
 // parsed environment from the first file found. Returns nil when no
-// grubenv file exists on any path.
+// grubenv file exists on any path, and an empty map for a file with no
+// pair.
 func readGrubenv(
 	fs avfs.VFS,
 ) map[string]string {

@@ -412,6 +412,23 @@ func (s *DockerPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: no containers and no images give empty lists that the schema takes",
+			variant: "linux",
+			exec: buildMock(
+				s.T(),
+				[]byte(versionOut), nil,
+				[]byte(""), nil,
+				[]byte(""), nil,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*docker.Info)
+				s.Require().True(ok)
+				s.Equal([]docker.Container{}, info.Containers)
+				s.Equal([]docker.Image{}, info.Images)
+			},
+		},
+		{
 			name:    "linux: images fails, images empty",
 			variant: "linux",
 			exec: buildMock(
@@ -469,7 +486,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 					Containers: []docker.Container{
 						{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
 					},
-					Images: nil,
+					Images: []docker.Image{},
 				}, info)
 			},
 		},
@@ -496,7 +513,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 					Containers: []docker.Container{
 						{ID: "abc123", Name: "web", Image: "nginx", State: "running", Status: "Up"},
 					},
-					Images: nil,
+					Images: []docker.Image{},
 				}, info)
 			},
 		},
@@ -520,7 +537,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal(&docker.Info{
 					Version:    "24.0.5",
-					Containers: nil,
+					Containers: []docker.Container{},
 					Images: []docker.Image{
 						{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
 					},
@@ -547,7 +564,7 @@ func (s *DockerPublicTestSuite) TestCollect() {
 				s.Require().True(ok)
 				s.Equal(&docker.Info{
 					Version:    "24.0.5",
-					Containers: nil,
+					Containers: []docker.Container{},
 					Images: []docker.Image{
 						{ID: "sha256:abc", Repository: "nginx", Tag: "latest", Size: "187MB"},
 					},

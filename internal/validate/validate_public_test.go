@@ -31,6 +31,7 @@ import (
 	"github.com/osapi-io/gohai/internal/validate"
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/docker"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/hostname"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/kernel"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
@@ -118,6 +119,24 @@ func (s *ValidatePublicTestSuite) TestJSON() {
 			data: mustMarshal(s.T(), fullyPopulatedFacts()),
 			validateFunc: func(err error) {
 				s.NoError(err)
+			},
+		},
+		{
+			name: "docker with no container and no image has empty lists",
+			data: mustMarshal(s.T(), &gohai.Facts{Docker: &docker.Info{
+				Version:    "24.0.5",
+				Containers: []docker.Container{},
+				Images:     []docker.Image{},
+			}}),
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name: "docker lists that are null break the schema",
+			data: mustMarshal(s.T(), &gohai.Facts{Docker: &docker.Info{Version: "24.0.5"}}),
+			validateFunc: func(err error) {
+				s.Error(err)
 			},
 		},
 		{
