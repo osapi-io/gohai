@@ -24,6 +24,7 @@ package validate
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -31,24 +32,30 @@ import (
 	"github.com/osapi-io/gohai/schemas"
 )
 
-var schemaJSONFn = func() []byte { return schemas.SchemaJSON }
+// schemaResourceURL is the URL that the compiler gives the schema.
+const schemaResourceURL = "gohai.schema.json"
 
-var schemaResourceURL = "gohai.schema.json"
-
-// CompileSchema compiles the embedded gohai JSON Schema and returns
-// the compiled schema ready for validation.
-func CompileSchema() (*jsonschema.Schema, error) {
-	schemaDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaJSONFn()))
+// CompileSchema compiles the JSON Schema schemaJSON, such as the embedded
+// schemas.SchemaJSON, and returns it ready for validation.
+func CompileSchema(
+	schemaJSON []byte,
+) (*jsonschema.Schema, error) {
+	schemaDoc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaJSON))
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal embedded schema: %w", err)
+		return nil, fmt.Errorf("unmarshal schema: %w", err)
 	}
 
+	// AddResource fails only for a URL that is not valid or that is added
+	// two times. Compile then cannot find the schema, and its error has
+	// the error of AddResource.
 	c := jsonschema.NewCompiler()
-	if err := c.AddResource(schemaResourceURL, schemaDoc); err != nil {
-		return nil, fmt.Errorf("add schema resource: %w", err)
+	addErr := c.AddResource(schemaResourceURL, schemaDoc)
+	sch, err := c.Compile(schemaResourceURL)
+	if err != nil {
+		return nil, fmt.Errorf("compile schema: %w", errors.Join(addErr, err))
 	}
 
-	return c.Compile(schemaResourceURL)
+	return sch, nil
 }
 
 // JSON validates raw JSON bytes against the embedded gohai schema.
@@ -56,9 +63,18 @@ func CompileSchema() (*jsonschema.Schema, error) {
 func JSON(
 	data []byte,
 ) error {
-	sch, err := CompileSchema()
+	return JSONWith(schemas.SchemaJSON, data)
+}
+
+// JSONWith validates raw JSON bytes against the JSON Schema schemaJSON.
+// Returns nil if valid, or a structured validation error.
+func JSONWith(
+	schemaJSON []byte,
+	data []byte,
+) error {
+	sch, err := CompileSchema(schemaJSON)
 	if err != nil {
-		return fmt.Errorf("compile schema: %w", err)
+		return err
 	}
 
 	var instance any
