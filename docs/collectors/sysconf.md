@@ -103,7 +103,10 @@ answers each one:
 3. `getconf _NPROCESSORS_CONF` → `nprocessors_conf`
 4. `getconf _NPROCESSORS_ONLN` → `nprocessors_onln`
 
-If a run fails, or its output is not a number, the collector returns the error.
+A host with no `getconf`, such as a minimal container image, has no fact and no
+error. If one run fails, or its output is not a number, the collector keeps the
+other values and returns the error, so the status is `partial`. If all four
+fail, it returns the error and no fact.
 
 ## Backing library
 

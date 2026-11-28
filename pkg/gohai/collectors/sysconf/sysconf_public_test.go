@@ -22,6 +22,7 @@ package sysconf_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/avfs/avfs/vfs/memfs"
@@ -125,47 +126,112 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 		"getconf _NPROCESSORS_CONF": "8\n",
 		"getconf _NPROCESSORS_ONLN": "6\n",
 	}
-	with := func(key, value string) map[string]string {
-		out := map[string]string{}
-		for k, v := range all {
-			out[k] = v
-		}
-		if value == "" {
-			delete(out, key)
-		} else {
-			out[key] = value
-		}
-		return out
-	}
+	full := &sysconf.Info{ClkTck: 100, Pagesize: 4096, NprocessorsConf: 8, NprocessorsOnln: 6}
 	tests := []struct {
-		name    string
-		variant string
-		out     map[string]string
-		nilExec bool
-		wantErr string
+		name         string
+		variant      string
+		exec         sourcetest.Commands
+		nilExec      bool
+		validateFunc func(any, error)
 	}{
-		{name: "linux: the four values", variant: "linux", out: all},
-		{name: "linux: no Exec gives no fact", variant: "linux", nilExec: true},
-		{name: "darwin: no Exec gives no fact", variant: "darwin", nilExec: true},
-		{name: "darwin: the four values", variant: "darwin", out: all},
 		{
-			name: "linux: getconf fails", variant: "linux",
-			out: with("getconf PAGESIZE", ""), wantErr: "getconf PAGESIZE",
+			name:    "linux: the four values",
+			variant: "linux",
+			exec:    sourcetest.Commands{Out: all},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(full, got)
+			},
 		},
 		{
-			name:    "linux: not a number",
+			name:    "darwin: the four values",
+			variant: "darwin",
+			exec:    sourcetest.Commands{Out: all},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Equal(full, got)
+			},
+		},
+		{
+			name:    "linux: no Exec gives no fact",
 			variant: "linux",
-			out: with(
-				"getconf _NPROCESSORS_ONLN",
-				"undefined\n",
-			),
-			wantErr: "getconf _NPROCESSORS_ONLN",
+			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "darwin: no Exec gives no fact",
+			variant: "darwin",
+			nilExec: true,
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: no getconf on the host gives no fact and no error",
+			variant: "linux",
+			exec:    sourcetest.Commands{},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				s.Exactly(nil, got)
+			},
+		},
+		{
+			name:    "linux: a getconf that fails keeps the other three values",
+			variant: "linux",
+			exec: sourcetest.Commands{
+				Out: all,
+				Err: map[string]error{"getconf PAGESIZE": errors.New("signal: killed")},
+			},
+			validateFunc: func(got any, err error) {
+				s.EqualError(err, "getconf PAGESIZE: signal: killed")
+				info, ok := got.(*sysconf.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal(int64(100), info.ClkTck)
+				s.Equal(int64(0), info.Pagesize)
+				s.Equal(int64(6), info.NprocessorsOnln)
+			},
+		},
+		{
+			name:    "linux: a value that is not a number keeps the other three",
+			variant: "linux",
+			exec: sourcetest.Commands{Out: map[string]string{
+				"getconf CLK_TCK":           "100\n",
+				"getconf PAGESIZE":          "4096\n",
+				"getconf _NPROCESSORS_CONF": "8\n",
+				"getconf _NPROCESSORS_ONLN": "undefined\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "getconf _NPROCESSORS_ONLN")
+				info, ok := got.(*sysconf.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Equal(int64(8), info.NprocessorsConf)
+			},
+		},
+		{
+			name:    "linux: every getconf failing is an error and no fact",
+			variant: "linux",
+			exec: sourcetest.Commands{Err: map[string]error{
+				"getconf CLK_TCK":           errors.New("boom"),
+				"getconf PAGESIZE":          errors.New("boom"),
+				"getconf _NPROCESSORS_CONF": errors.New("boom"),
+				"getconf _NPROCESSORS_ONLN": errors.New("boom"),
+			}},
+			validateFunc: func(got any, err error) {
+				s.ErrorContains(err, "getconf CLK_TCK: boom")
+				s.ErrorContains(err, "getconf _NPROCESSORS_ONLN: boom")
+				s.Exactly(nil, got)
+			},
 		},
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			r := sourcetest.Commands{Out: tt.out}
-			var exec source.Runner = r.Mock(s.T())
+			var exec source.Runner = tt.exec.Mock(s.T())
 			if tt.nilExec {
 				exec = nil
 			}
@@ -174,21 +240,7 @@ func (s *SysconfPublicTestSuite) TestCollect() {
 				c = &sysconf.Darwin{Exec: exec}
 			}
 			got, err := c.Collect(context.Background(), nil)
-			if tt.wantErr != "" {
-				s.ErrorContains(err, tt.wantErr)
-
-				return
-			}
-			s.Require().NoError(err)
-			if tt.nilExec {
-				s.Exactly(nil, got)
-
-				return
-			}
-			s.Equal(
-				&sysconf.Info{ClkTck: 100, Pagesize: 4096, NprocessorsConf: 8, NprocessorsOnln: 6},
-				got,
-			)
+			tt.validateFunc(got, err)
 		})
 	}
 }

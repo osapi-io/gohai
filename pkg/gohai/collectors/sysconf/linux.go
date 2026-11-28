@@ -22,6 +22,7 @@ package sysconf
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -63,6 +64,8 @@ func collectSysconf(
 	exec source.Runner,
 ) (*Info, error) {
 	info := &Info{}
+	var errs []error
+	read := 0
 	for _, v := range []struct {
 		name string
 		dst  *int64
@@ -73,15 +76,28 @@ func collectSysconf(
 		{"_NPROCESSORS_ONLN", &info.NprocessorsOnln},
 	} {
 		out, err := exec.Execute(ctx, "getconf", v.name)
+		if collector.Absent(err) {
+			// No getconf on the host, such as a minimal container image.
+			return nil, nil
+		}
 		if err != nil {
-			return nil, fmt.Errorf("getconf %s: %w", v.name, err)
+			errs = append(errs, fmt.Errorf("getconf %s: %w", v.name, err))
+
+			continue
 		}
 		n, err := strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("getconf %s: %w", v.name, err)
+			errs = append(errs, fmt.Errorf("getconf %s: %w", v.name, err))
+
+			continue
 		}
 		*v.dst = n
+		read++
+	}
+	if read == 0 {
+		return nil, errors.Join(errs...)
 	}
 
-	return info, nil
+	// The values that read stay, with the error of each that did not.
+	return info, errors.Join(errs...)
 }
