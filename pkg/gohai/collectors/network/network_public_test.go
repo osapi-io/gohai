@@ -1171,6 +1171,54 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:       "a route line that starts with nexthop gives no route",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         sourcetest.FS(s.T(), nil),
+			exec: ipRouteExec(
+				s.T(),
+				[]byte(
+					"default via 10.0.0.1 dev eth0\nnexthop via 10.0.0.2 dev eth0 weight 1\n",
+				),
+				nil,
+				nil,
+				errAbsent,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Routes, 1)
+				s.Equal("default", i.Routes[0].Destination)
+				s.Equal("10.0.0.1", i.Routes[0].Gateway)
+			},
+		},
+		{
+			name:       "multipath splits on whole nexthop tokens and skips an empty one",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs:         sourcetest.FS(s.T(), nil),
+			exec: ipRouteExec(
+				s.T(),
+				[]byte(
+					"default proto static nexthop nexthop via 10.0.0.1 dev nexthop0 weight 1\n",
+				),
+				nil,
+				nil,
+				errAbsent,
+			),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Routes, 1)
+				s.Equal("default", i.Routes[0].Destination)
+				s.Equal("10.0.0.1", i.Routes[0].Gateway)
+				s.Equal("nexthop0", i.Routes[0].Interface)
+				s.Equal("static", i.Routes[0].Proto)
+			},
+		},
+		{
 			name:       "route with src but no dev: interface inferred from local address match",
 			ifsFn:      canonicalInterfaces,
 			countersFn: zeroCounters,
