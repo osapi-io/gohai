@@ -21,6 +21,7 @@
 package validate_test
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/osapi-io/gohai/internal/readlog"
 	"github.com/osapi-io/gohai/internal/validate"
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
@@ -41,6 +43,7 @@ import (
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/timezone"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/uptime"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/virtualization"
+	"github.com/osapi-io/gohai/pkg/gohai/family"
 )
 
 type ValidatePublicTestSuite struct {
@@ -117,6 +120,27 @@ func (s *ValidatePublicTestSuite) TestJSON() {
 		{
 			name: "valid fully populated facts",
 			data: mustMarshal(s.T(), fullyPopulatedFacts()),
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name: "every host collector on an empty debian host",
+			data: emptyHostFacts(s.T(), family.Debian),
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name: "every host collector on an empty rhel host",
+			data: emptyHostFacts(s.T(), family.RHEL),
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name: "every host collector on an empty darwin host",
+			data: emptyHostFacts(s.T(), family.Darwin),
 			validateFunc: func(err error) {
 				s.NoError(err)
 			},
@@ -253,6 +277,34 @@ func fullyPopulatedFacts() *gohai.Facts {
 		CollectTime:     time.Date(2026, 5, 23, 12, 0, 0, 0, time.UTC),
 		CollectDuration: 100 * time.Millisecond,
 	}
+}
+
+// emptyHostFacts runs every collector that reads the host, not a cloud
+// metadata service, on an empty host of platform, and gives the facts as
+// JSON.
+func emptyHostFacts(
+	t *testing.T,
+	platform string,
+) []byte {
+	t.Helper()
+
+	names := []string{}
+	for _, c := range gohai.Collectors() {
+		if c.Network == "" {
+			names = append(names, c.Name)
+		}
+	}
+	src, _ := readlog.Sources(platform)
+	g, err := gohai.New(gohai.WithSources(src), gohai.WithCollectors(names...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts, err := g.Collect(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return mustMarshal(t, facts)
 }
 
 func mustMarshal(

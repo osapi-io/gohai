@@ -302,8 +302,8 @@ func (s *HostnamePublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:       "darwin: both exec fail, machine_name mirrors short",
-			variant:    "darwin",
+			name:       "linux: both exec fail, fall back to the kernel's hostname",
+			variant:    "linux",
 			files:      kernelName,
 			lookupHost: failLookupHost,
 			lookupAddr: failLookupAddr,

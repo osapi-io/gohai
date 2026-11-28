@@ -340,6 +340,28 @@ func (s *BlockDevicePublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a link in /sys/block to a missing device is skipped",
+			variant: "linux",
+			setupFS: func() *memfs.MemFS {
+				f := memfs.New()
+				_ = f.MkdirAll("/sys/devices/block/sdc", 0o755)
+				_ = f.WriteFile("/sys/devices/block/sdc/size", []byte("1024\n"), fs.FileMode(0o444))
+				sourcetest.Links(s.T(), f, map[string]string{
+					"/sys/block/sdc": "/sys/devices/block/sdc",
+					"/sys/block/sdd": "/sys/devices/block/gone",
+				})
+				return f
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				info, ok := got.(*blockdevice.Info)
+				s.Require().True(ok)
+				s.Equal([]blockdevice.BlockDevice{
+					{Name: "sdc", Size: "1024"},
+				}, info.Devices)
+			},
+		},
+		{
 			name:    "darwin returns nil",
 			variant: "darwin",
 			validateFunc: func(got any, err error) {

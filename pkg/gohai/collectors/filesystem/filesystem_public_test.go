@@ -627,7 +627,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: btrfs single profile recognised + zero-byte file tolerated",
+			name:    "linux: btrfs single profile recognised, a total that is not a number is 0",
 			variant: "linux",
 			mounts:  btrfsMount,
 			exec: func(t *testing.T) source.Runner {
