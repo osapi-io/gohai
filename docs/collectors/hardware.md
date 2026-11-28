@@ -23,27 +23,27 @@ platforms, the collector returns an empty `Info`.
 
 ## Collected fields
 
-| Field                     | Type        | Description                                                                                                             | Schema mapping                      |
-| ------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| `machine_model`           | `string`    | The model identifier, for example `MacBookPro18,2` or `Macmini9,1`.                                                     | No direct schema mapping.           |
-| `machine_name`            | `string`    | The marketing name, for example `MacBook Pro` or `Mac mini`.                                                            | No direct schema mapping.           |
-| `serial_number`           | `string`    | The hardware serial.                                                                                                    | OCSF `device.hw_info.serial_number` |
-| `platform_uuid`           | `string`    | The platform UUID, from IOKit.                                                                                          | No direct schema mapping.           |
-| `provisioning_udid`       | `string`    | The Apple provisioning UDID.                                                                                            | No direct schema mapping.           |
-| `cpu_type`                | `string`    | The CPU label on Intel Macs, for example `Intel Core i7`.                                                               | OTel `host.cpu.model.name`          |
-| `chip_type`               | `string`    | The CPU label on Apple Silicon, for example `Apple M1 Pro`. Empty on Intel Macs. On Apple Silicon, `cpu_type` is empty. | OTel `host.cpu.model.name`          |
-| `current_processor_speed` | `string`    | The clock speed, as a string. Intel only. Apple Silicon does not have it.                                               | No direct schema mapping.           |
-| `number_processors`       | `string`    | Intel: `"2"`. Apple Silicon: `"proc 10:8:2"` (total:performance:efficiency).                                            | No direct schema mapping.           |
-| `packages`                | `int`       | The number of physical CPU sockets. Intel only.                                                                         | No direct schema mapping.           |
-| `l2_cache_core`           | `string`    | The L2 cache of each core. Intel only. A string with the unit.                                                          | No direct schema mapping.           |
-| `l3_cache`                | `string`    | The shared L3 cache. Intel only. A string with the unit.                                                                | No direct schema mapping.           |
-| `physical_memory`         | `string`    | The RAM size as a string, for example `"16 GB"`. The value is as `system_profiler` gives it.                            | No direct schema mapping.           |
-| `boot_rom_version`        | `string`    | The Boot ROM or UEFI version.                                                                                           | No direct schema mapping.           |
-| `os_loader_version`       | `string`    | The OS loader version on Apple Silicon. Not there on Intel.                                                             | No direct schema mapping.           |
-| `smc_version_system`      | `string`    | The SMC firmware version. Intel only, because Apple Silicon has no SMC.                                                 | No direct schema mapping.           |
-| `storage`                 | `[]Storage` | The attached logical volumes. See below.                                                                                | No direct schema mapping.           |
-| `battery`                 | `*Battery`  | The battery data. `nil` on desktop Macs that have no battery. See below.                                                | No direct schema mapping.           |
-| `charger`                 | `*Charger`  | The AC charger data, if a charger is connected. See below.                                                              | No direct schema mapping.           |
+| Field                     | Type        | Description                                                                                                                                         | Schema mapping                      |
+| ------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `machine_model`           | `string`    | The model identifier, for example `MacBookPro18,2` or `Macmini9,1`.                                                                                 | No direct schema mapping.           |
+| `machine_name`            | `string`    | The marketing name, for example `MacBook Pro` or `Mac mini`.                                                                                        | No direct schema mapping.           |
+| `serial_number`           | `string`    | The hardware serial.                                                                                                                                | OCSF `device.hw_info.serial_number` |
+| `platform_uuid`           | `string`    | The platform UUID, from IOKit.                                                                                                                      | No direct schema mapping.           |
+| `provisioning_udid`       | `string`    | The Apple provisioning UDID.                                                                                                                        | No direct schema mapping.           |
+| `cpu_type`                | `string`    | The CPU label on Intel Macs, for example `Intel Core i7`.                                                                                           | OTel `host.cpu.model.name`          |
+| `chip_type`               | `string`    | The CPU label on Apple Silicon, for example `Apple M1 Pro`. Empty on Intel Macs. On Apple Silicon, `cpu_type` is empty.                             | OTel `host.cpu.model.name`          |
+| `current_processor_speed` | `string`    | The clock speed, as a string. Intel only. Apple Silicon does not have it.                                                                           | No direct schema mapping.           |
+| `number_processors`       | `string`    | Intel: `"2"`. Apple Silicon: the string that `system_profiler` gives, for example `"proc 10:8:2:0"` on macOS 26.5. The collector does not parse it. | No direct schema mapping.           |
+| `packages`                | `int`       | The number of physical CPU sockets. Intel only.                                                                                                     | No direct schema mapping.           |
+| `l2_cache_core`           | `string`    | The L2 cache of each core. Intel only. A string with the unit.                                                                                      | No direct schema mapping.           |
+| `l3_cache`                | `string`    | The shared L3 cache. Intel only. A string with the unit.                                                                                            | No direct schema mapping.           |
+| `physical_memory`         | `string`    | The RAM size as a string, for example `"16 GB"`. The value is as `system_profiler` gives it.                                                        | No direct schema mapping.           |
+| `boot_rom_version`        | `string`    | The Boot ROM or UEFI version.                                                                                                                       | No direct schema mapping.           |
+| `os_loader_version`       | `string`    | The OS loader version on Apple Silicon. Not there on Intel.                                                                                         | No direct schema mapping.           |
+| `smc_version_system`      | `string`    | The SMC firmware version. Intel only, because Apple Silicon has no SMC.                                                                             | No direct schema mapping.           |
+| `storage`                 | `[]Storage` | The attached logical volumes. See below.                                                                                                            | No direct schema mapping.           |
+| `battery`                 | `*Battery`  | The battery data. `nil` on desktop Macs that have no battery. See below.                                                                            | No direct schema mapping.           |
+| `charger`                 | `*Charger`  | The AC charger data, if a charger is connected. See below.                                                                                          | No direct schema mapping.           |
 
 ### Storage
 
@@ -62,18 +62,18 @@ platforms, the collector returns an empty `Info`.
 
 ### Battery
 
-| Field                | Type     | Description                                                                                    |
-| -------------------- | -------- | ---------------------------------------------------------------------------------------------- |
-| `current_capacity`   | `int`    | The current charge (mAh).                                                                      |
-| `max_capacity`       | `int`    | The design capacity (mAh).                                                                     |
-| `fully_charged`      | `bool`   | True if the charger has fully charged the battery.                                             |
-| `is_charging`        | `bool`   | True if the battery receives current from the charger now.                                     |
-| `charge_cycle_count` | `int`    | The number of charge cycles in the life of the battery.                                        |
-| `health`             | `string` | The health result from Apple, for example `Good`, `Poor` or `Service Recommended`.             |
-| `serial`             | `string` | The battery serial number.                                                                     |
-| `remaining`          | `int`    | The percent of charge that remains. The collector calculates it as `current / max * 100`.      |
-| `amperage`           | `int`    | The current draw or charge rate in milliamps. A positive value shows that the battery charges. |
-| `voltage`            | `int`    | The terminal voltage in millivolts.                                                            |
+| Field                | Type     | Description                                                                                                                                                                            |
+| -------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `current_capacity`   | `int`    | The current charge (mAh). Not in the output when `system_profiler` does not give it. macOS 26.5 does not give it.                                                                      |
+| `max_capacity`       | `int`    | The design capacity (mAh). Not in the output when `system_profiler` does not give it. macOS 26.5 does not give it.                                                                     |
+| `fully_charged`      | `bool`   | True if the charger has fully charged the battery.                                                                                                                                     |
+| `is_charging`        | `bool`   | True if the battery receives current from the charger now.                                                                                                                             |
+| `charge_cycle_count` | `int`    | The number of charge cycles in the life of the battery.                                                                                                                                |
+| `health`             | `string` | The health result from Apple, for example `Good`, `Poor` or `Service Recommended`.                                                                                                     |
+| `serial`             | `string` | The battery serial number.                                                                                                                                                             |
+| `remaining`          | `int`    | The percent of charge that remains. The collector calculates it as `current / max * 100`, only when `max_capacity` is more than 0. Thus it is not in the output on macOS 26.5.         |
+| `amperage`           | `int`    | The current draw or charge rate in milliamps. A positive value shows that the battery charges. Not in the output when `system_profiler` does not give it. macOS 26.5 does not give it. |
+| `voltage`            | `int`    | The terminal voltage in millivolts. Not in the output when `system_profiler` does not give it. macOS 26.5 does not give it.                                                            |
 
 ### Charger
 
@@ -95,17 +95,21 @@ platforms, the collector returns an empty `Info`.
 
 ## Example output
 
+This is from a MacBook Pro with macOS 26.5. The identifiers are changed.
+
 ```json
 {
   "hardware": {
-    "machine_model": "MacBookPro18,2",
+    "machine_model": "MacBookPro18,1",
     "machine_name": "MacBook Pro",
     "serial_number": "F5K123ABC",
     "platform_uuid": "00000000-1111-2222-3333-444444444444",
+    "provisioning_udid": "00006000-000000000000001E",
     "chip_type": "Apple M1 Pro",
-    "number_processors": "proc 10:8:2",
+    "number_processors": "proc 10:8:2:0",
     "physical_memory": "32 GB",
-    "boot_rom_version": "10151.101.3",
+    "boot_rom_version": "18000.121.3",
+    "os_loader_version": "18000.121.3",
     "storage": [
       {
         "name": "Macintosh HD",
@@ -117,15 +121,15 @@ platforms, the collector returns an empty `Info`.
       }
     ],
     "battery": {
-      "current_capacity": 5841,
-      "max_capacity": 5841,
       "fully_charged": true,
-      "charge_cycle_count": 201,
+      "charge_cycle_count": 207,
       "health": "Good",
-      "remaining": 100
+      "serial": "F8Y0000000000000A"
     },
     "charger": {
-      "watts": "96",
+      "id": "0x1656",
+      "family": "0xe000400a",
+      "watts": "86",
       "connected": true
     }
   }
