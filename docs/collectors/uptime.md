@@ -22,7 +22,7 @@ Consumers use this to:
 | Field          | Type   | Description                                                  | Schema mapping                                                                                                |
 | -------------- | ------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | `seconds`      | uint64 | The seconds since boot.                                      | No direct schema mapping. OCSF records the times of single events. Host uptime is not a primary OCSF concept. |
-| `boot_time`    | uint64 | The Unix timestamp of boot.                                  | OCSF `device.first_seen_time` records the same idea for asset inventory.                                      |
+| `boot_time`    | uint64 | The Unix timestamp of boot. Left out when it is not known.   | OCSF `device.first_seen_time` records the same idea for asset inventory.                                      |
 | `human`        | string | The uptime as text for a person, for example `3d 4h 12m 5s`. | N/A (presentation).                                                                                           |
 | `idle_seconds` | uint64 | The total CPU idle seconds of all cores (Linux only).        | No direct schema mapping.                                                                                     |
 | `idle_human`   | string | The idle time as text for a person (Linux only).             | N/A (presentation).                                                                                           |
@@ -96,6 +96,10 @@ On Linux:
 
 1. Field 1 of `/proc/uptime` gives `seconds`. The `btime` line of `/proc/stat`
    gives `boot_time`. The collector makes `human` with `HumanDuration(seconds)`.
+   A `/proc/stat` that is not there, or that has no `btime` line, leaves
+   `boot_time` out. A `/proc/stat` that does not read, or whose `btime` is not a
+   number, keeps the other fields and returns the error, so the status is
+   `partial`.
 2. gohai also reads `/proc/uptime` through the injected `avfs.VFS`. It parses
    field 2 into `idle_seconds`. Field 2 is the total idle time of all CPUs. On
    multi-core systems, it can be more than the wall-clock uptime. The same
