@@ -10,20 +10,21 @@ the resolver has a temporary failure, the collector tries again, up to three
 times. If all tries fail, it uses the short hostname. Consumers use this data as
 a stable identity for telemetry, inventory and correlation.
 
-On macOS, the collector also reports the friendly machine name. This name comes
-from `ComputerName`, for example "John's MacBook Pro". The collector uses
-`hostname -s`. Thus the short name is always the same as the value that
-`$(hostname -s)` gives in other places on the host. This is important on Macs
-that MDM manages, because there `scutil --get HostName` can be different.
+The collector also reports `machine_name`, which is the output of `hostname`
+with no arguments. It does not read the macOS `ComputerName`, for example
+"John's MacBook Pro". The collector uses `hostname -s` for the short name. Thus
+the short name is always the same as the value that `$(hostname -s)` gives in
+other places on the host. This is important on Macs that MDM manages, because
+there `scutil --get HostName` can be different.
 
 ## Collected fields
 
-| Field          | Type   | Description                                                                                          | Schema mapping                                                                            |
-| -------------- | ------ | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `name`         | string | The short hostname, for example `web01`.                                                             | OCSF `device.hostname`. The leaf is removed because it is the same as the collector name. |
-| `fqdn`         | string | The canonical FQDN. If DNS canonicalization fails on all tries, this is the short hostname.          | `device.domain` + `.hostname`.                                                            |
-| `domain`       | string | The DNS domain: all text after the first `.` of the FQDN. Empty if the FQDN is the same as `name`.   | `device.domain`.                                                                          |
-| `machine_name` | string | The human-friendly name. On macOS, it comes from `ComputerName`. On Linux, it is the same as `name`. | No direct schema mapping.                                                                 |
+| Field          | Type   | Description                                                                                                                 | Schema mapping                                                                            |
+| -------------- | ------ | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `name`         | string | The short hostname, for example `web01`.                                                                                    | OCSF `device.hostname`. The leaf is removed because it is the same as the collector name. |
+| `fqdn`         | string | The canonical FQDN. If DNS canonicalization fails on all tries, this is the short hostname.                                 | `device.domain` + `.hostname`.                                                            |
+| `domain`       | string | The DNS domain: all text after the first `.` of the FQDN. Empty if the FQDN is the same as `name`.                          | `device.domain`.                                                                          |
+| `machine_name` | string | The output of `hostname` with no arguments. It is not the macOS `ComputerName`. On Linux, it is usually the same as `name`. | No direct schema mapping.                                                                 |
 
 ## Platform support
 
@@ -76,9 +77,10 @@ darwin branches of Ohai's `hostname.rb`:
    `$(hostname -s)` gives in other tools on the host. This is important on Macs
    that MDM manages, where `scutil --get HostName` can be different. It is also
    important on Linux hosts where a person changed `/etc/hostname` to an FQDN.
-2. `hostname` with no arguments gives `machine_name`. On stock macOS, this is
-   the friendly name from `ComputerName`. On Linux, it is usually the same as
-   the short name.
+2. `hostname` with no arguments gives `machine_name`. On macOS, this is the
+   kernel host name (`kern.hostname`), not the friendly name in `ComputerName`.
+   The collector does not run `scutil`. On Linux, it is usually the same as the
+   short name.
 3. The collector makes the FQDN canonical with `LookupHost` and then
    `LookupAddr` of the `Resolver` of its sources: the system resolver, which
    reads `/etc/hosts` and then DNS, when the caller gives none. On a temporary

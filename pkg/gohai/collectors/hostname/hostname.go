@@ -67,7 +67,7 @@ func readShortHostname(
 // Info holds hostname identification data.
 type Info struct {
 	Name        string `json:"name"`                   // short hostname (OCSF: device.hostname, with the leaf that matches the collector name removed)
-	MachineName string `json:"machine_name,omitempty"` // raw `hostname` output (macOS: ComputerName-derived friendly name)
+	MachineName string `json:"machine_name,omitempty"` // raw `hostname` output (macOS: kern.hostname, not ComputerName)
 	FQDN        string `json:"fqdn,omitempty"`         // fully qualified (e.g., "web01.example.com")
 	Domain      string `json:"domain,omitempty"`       // domain portion (e.g., "example.com")
 }

@@ -134,7 +134,8 @@ On Linux:
 1. The collector reads `/proc/sys/crypto/fips_enabled` through the injected
    `avfs.VFS`. If the trimmed content is `"1"`, `kernel.enabled` is `true`. For
    all other content, it is `false`. If the file is missing (a kernel without
-   the flag), `kernel` stays nil.
+   the flag), `kernel` is `{"enabled": false}`. `kernel` is a value, not a
+   pointer, so it is always in the output. Only `policy` can be missing.
 2. The collector reads `/etc/crypto-policies/config` through the same VFS. The
    trimmed first line is the policy name. `policy.fips_effective` is `true` when
    the name starts with `FIPS`. The check is case-sensitive, the same as the
