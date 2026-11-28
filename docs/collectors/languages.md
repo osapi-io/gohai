@@ -101,8 +101,9 @@ the two platforms:
 If a runtime's command is not on the PATH, the collector sets its field to
 `nil`, because missing runtimes are usual on minimal hosts. A command that is
 there and fails, for example with a non-zero exit code or a permission error, is
-an error, and so is a cancelled context. An absent source is an empty result,
-and a failed read is an error.
+an error. Its field stays `nil`, and the other runtimes keep their versions: the
+collector returns its facts and the error, and its status is `partial`. A
+cancelled context gives no fact and the error.
 
 ## Backing library
 

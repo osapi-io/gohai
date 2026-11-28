@@ -492,7 +492,7 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:    "linux: a runtime that runs and fails is an error",
+			name:    "linux: a runtime that fails keeps the versions of the others",
 			variant: "linux",
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
@@ -500,8 +500,10 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 				m.EXPECT().
 					Execute(gomock.Any(), "go", "version").
 					Return(nil, errors.New("exit status 2"))
+				m.EXPECT().
+					Execute(gomock.Any(), "python3", "--version").
+					Return([]byte("Python 3.12.1\n"), nil)
 				for _, p := range [][]string{
-					{"python3", "--version"},
 					{"ruby", "--version"},
 					{"node", "--version"},
 					{"java", "--version"},
@@ -512,18 +514,24 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
 				s.EqualError(err, "go version: exit status 2")
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Nil(info.Go)
+				s.Require().NotNil(info.Python)
+				s.Equal("3.12.1", *info.Python)
 			},
 		},
 		{
-			name:    "linux: a java 8 whose -version fails is an error",
+			name:    "linux: a java 8 whose -version fails is a partial result",
 			variant: "linux",
 			exec: func() source.Runner {
 				m := mocks.NewMockRunner(gomock.NewController(s.T()))
 				absent := fmt.Errorf("exec: %w", exec.ErrNotFound)
+				m.EXPECT().
+					Execute(gomock.Any(), "go", "version").
+					Return([]byte("go version go1.25.4 linux/amd64\n"), nil)
 				for _, p := range [][]string{
-					{"go", "version"},
 					{"python3", "--version"},
 					{"ruby", "--version"},
 					{"node", "--version"},
@@ -540,7 +548,13 @@ func (s *LanguagesPublicTestSuite) TestCollect() {
 				return m
 			}(),
 			validateFunc: func(got any, err error) {
-				s.Exactly(nil, got)
+				// The version read before the error stays.
+				info, ok := got.(*languages.Info)
+				s.Require().True(ok)
+				s.Require().NotNil(info)
+				s.Require().NotNil(info.Go)
+				s.Equal("1.25.4", *info.Go)
+				s.Nil(info.Java)
 				s.EqualError(err, "sh -c java -version 2>&1: exit status 1")
 			},
 		},
