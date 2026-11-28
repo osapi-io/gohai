@@ -23,11 +23,11 @@ package kernelmodules
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -74,7 +74,7 @@ func (d *Darwin) Collect(
 // hold a hyphen or an underscore, such as com.paragon-software.filesystems.ntfs.
 // The version is everything inside the parentheses, because a bundle
 // version can carry a letter, such as 1.0.0d1 or 2.1.0b3.
-var kextstatLine = regexp.MustCompile(
+var kextstatLine = pattern.New(
 	`^\s*(\d+)\s+(\d+)\s+0x[0-9a-f]+\s+0x([0-9a-f]+)\s+0x[0-9a-f]+\s+(\S+) \(([^)]+)\)`,
 )
 

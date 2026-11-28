@@ -23,13 +23,13 @@ package dns
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -53,11 +53,11 @@ func NewLinux() *Linux {
 const resolvedRuntimeDir = "/run/systemd/resolve"
 
 // resolvectlLinkRE is a link line of resolvectl: "Link 2 (eth0): 10.0.0.1".
-var resolvectlLinkRE = regexp.MustCompile(`^Link \d+ \(([^)]+)\):(.*)$`)
+var resolvectlLinkRE = pattern.New(`^Link \d+ \(([^)]+)\):(.*)$`)
 
 // resolvectlGlobalRE is resolvectl's line for the resolver of no link:
 // "Global: 1.1.1.1".
-var resolvectlGlobalRE = regexp.MustCompile(`^Global:(.*)$`)
+var resolvectlGlobalRE = pattern.New(`^Global:(.*)$`)
 
 // Collect returns the dns Info.
 func (l *Linux) Collect(

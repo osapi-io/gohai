@@ -29,11 +29,11 @@ import (
 	"compress/gzip"
 	"io"
 	"path"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/avfs/avfs"
+	"github.com/osapi-io/gohai/internal/pattern"
 )
 
 const (
@@ -57,13 +57,13 @@ var idsPaths = []string{
 }
 
 // addressRE is a PCI address: domain, bus, device and function.
-var addressRE = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]$`)
+var addressRE = pattern.New(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]$`)
 
 // modaliasRE is a PCI modalias, lower-cased: the vendor, device, subsystem
 // vendor and subsystem device in 8 hex digits each, then the class,
 // subclass and programming interface in 2 each. The IDs are the low 4
 // digits of each 8-digit field.
-var modaliasRE = regexp.MustCompile(
+var modaliasRE = pattern.New(
 	`^pci:v[0-9a-f]{4}([0-9a-f]{4})d[0-9a-f]{4}([0-9a-f]{4})` +
 		`sv[0-9a-f]{4}([0-9a-f]{4})sd[0-9a-f]{4}([0-9a-f]{4})` +
 		`bc([0-9a-f]{2})sc([0-9a-f]{2})i[0-9a-f]{2}$`,

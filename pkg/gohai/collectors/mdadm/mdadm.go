@@ -26,7 +26,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +33,7 @@ import (
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -125,7 +125,7 @@ func NewWith(
 
 // memberRE matches mdstat member entries like "sda1[0]", "sdb1[1](S)",
 // "sdc1[2](J)" and captures the device name and optional type flag.
-var memberRE = regexp.MustCompile(`^(.+)\[\d+\](?:\(([A-Z])\))?$`)
+var memberRE = pattern.New(`^(.+)\[\d+\](?:\(([A-Z])\))?$`)
 
 // parseMdstat parses /proc/mdstat content and returns a map of device name
 // to partial Array (active members and spares from the mdstat line). The
@@ -187,21 +187,21 @@ func parseMdstat(
 // line, so "Array State :" or "Resync Status :" does not match "State :".
 var (
 	// raidLevelRE matches "Raid Level : raidN" or "RAID Level : raidN".
-	raidLevelRE = regexp.MustCompile(`(?i)^\s*Raid Level\s*:\s*(\S+)`)
+	raidLevelRE = pattern.New(`(?i)^\s*Raid Level\s*:\s*(\S+)`)
 	// arrayStateRE matches "State : clean, degraded", the whole list.
-	arrayStateRE = regexp.MustCompile(`^\s*State\s*:\s*(.+?)\s*$`)
+	arrayStateRE = pattern.New(`^\s*State\s*:\s*(.+?)\s*$`)
 	// uuidRE matches "UUID : xxxxxxxx:xxxxxxxx:xxxxxxxx:xxxxxxxx".
-	uuidRE = regexp.MustCompile(`^\s*UUID\s*:\s*(\S+)`)
+	uuidRE = pattern.New(`^\s*UUID\s*:\s*(\S+)`)
 	// activeDevicesRE matches "Active Devices : N".
-	activeDevicesRE = regexp.MustCompile(`^\s*Active Devices\s*:\s*(\d+)`)
+	activeDevicesRE = pattern.New(`^\s*Active Devices\s*:\s*(\d+)`)
 	// totalDevicesRE matches "Total Devices : N".
-	totalDevicesRE = regexp.MustCompile(`^\s*Total Devices\s*:\s*(\d+)`)
+	totalDevicesRE = pattern.New(`^\s*Total Devices\s*:\s*(\d+)`)
 	// spareDevicesRE matches "Spare Devices : N".
-	spareDevicesRE = regexp.MustCompile(`^\s*Spare Devices\s*:\s*(\d+)`)
+	spareDevicesRE = pattern.New(`^\s*Spare Devices\s*:\s*(\d+)`)
 	// failedDevicesRE matches "Failed Devices : N".
-	failedDevicesRE = regexp.MustCompile(`^\s*Failed Devices\s*:\s*(\d+)`)
+	failedDevicesRE = pattern.New(`^\s*Failed Devices\s*:\s*(\d+)`)
 	// workingDevicesRE matches "Working Devices : N".
-	workingDevicesRE = regexp.MustCompile(`^\s*Working Devices\s*:\s*(\d+)`)
+	workingDevicesRE = pattern.New(`^\s*Working Devices\s*:\s*(\d+)`)
 )
 
 // applyDetail enriches an Array with fields parsed from `mdadm --detail`

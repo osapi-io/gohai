@@ -28,7 +28,6 @@ package network
 
 import (
 	"net"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -36,6 +35,7 @@ import (
 	"github.com/avfs/avfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -571,27 +571,27 @@ func ethtoolKey(
 //
 // Captures the interface index and name. Mirrors Ohai's
 // IPROUTE_INT_REGEX.
-var ipLinkHeaderRE = regexp.MustCompile(`^(\d+):\s+([^@:\s]+)`)
+var ipLinkHeaderRE = pattern.New(`^(\d+):\s+([^@:\s]+)`)
 
 // vlanIDRE matches a vlan tag with optional protocol qualifier.
 var (
-	vlanIDOnlyRE     = regexp.MustCompile(`vlan id (\d+)`)
-	vlanProtocolIDRE = regexp.MustCompile(`vlan protocol ([\w.]+) id (\d+)`)
-	vlanFlagsRE      = regexp.MustCompile(`(REORDER_HDR|GVRP|LOOSE_BINDING)`)
+	vlanIDOnlyRE     = pattern.New(`vlan id (\d+)`)
+	vlanProtocolIDRE = pattern.New(`vlan protocol ([\w.]+) id (\d+)`)
+	vlanFlagsRE      = pattern.New(`(REORDER_HDR|GVRP|LOOSE_BINDING)`)
 )
 
 // xdpHeaderRE picks the per-interface XDP mode token from the
 // interface header line (`... mtu 1500 xdp qdisc ...`); xdpAttachedRE
 // pulls each attached program's id + tag from the `prog/<mode>` lines.
 var (
-	xdpHeaderRE   = regexp.MustCompile(`\s(xdp|xdpgeneric|xdpoffload|xdpmulti)\s`)
-	xdpAttachedRE = regexp.MustCompile(`prog/(\w+) id (\d+) tag (\w+)`)
+	xdpHeaderRE   = pattern.New(`\s(xdp|xdpgeneric|xdpoffload|xdpmulti)\s`)
+	xdpAttachedRE = pattern.New(`prog/(\w+) id (\d+) tag (\w+)`)
 )
 
 // tunnelHeaderRE matches the tunnel-type qualifier `ip` prints inside
 // the iface block (after the header line). Captures the tunnel kind
 // (ip6tnl / ipip).
-var tunnelHeaderRE = regexp.MustCompile(`^\s+(ip6tnl|ipip)\b`)
+var tunnelHeaderRE = pattern.New(`^\s+(ip6tnl|ipip)\b`)
 
 // tunnelKVKeys is the set of `<word> <value>` keys Ohai pulls out of
 // the tunnel info line. Stored as a set for fast membership checks

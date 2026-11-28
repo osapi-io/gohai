@@ -23,14 +23,14 @@ package machineid
 import (
 	"context"
 	"fmt"
-	"regexp"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // platformUUIDRE is the IOPlatformUUID line of ioreg's output.
-var platformUUIDRE = regexp.MustCompile(`"IOPlatformUUID" = "([^"]+)"`)
+var platformUUIDRE = pattern.New(`"IOPlatformUUID" = "([^"]+)"`)
 
 // Darwin reads the machine ID on macOS: IOPlatformUUID, the stable
 // hardware identifier Apple gives for this, from ioreg.

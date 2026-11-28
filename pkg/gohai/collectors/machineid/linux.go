@@ -23,13 +23,13 @@ package machineid
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 )
 
 // idSource is one place Linux keeps a machine ID. valid says whether the
@@ -41,7 +41,7 @@ type idSource struct {
 
 // machineIDRE is the machine-id(5) format: 32 lower-case hex digits. It
 // rules out the `uninitialized` that systemd writes on a first-boot image.
-var machineIDRE = regexp.MustCompile(`^[0-9a-f]{32}$`)
+var machineIDRE = pattern.New(`^[0-9a-f]{32}$`)
 
 // idSources are where Linux keeps a stable machine ID, in the order Ohai
 // reads them: systemd's, then the dbus one of hosts before systemd, then

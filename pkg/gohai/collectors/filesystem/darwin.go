@@ -23,16 +23,16 @@ package filesystem
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
 // mountLineRE is a line of macOS mount: "/dev/disk3s1s1 on / (apfs,
 // sealed, local)". The device and the mountpoint can hold spaces.
-var mountLineRE = regexp.MustCompile(`^(.*) on (.*) \(([^,)]+)(?:, ([^)]*))?\)$`)
+var mountLineRE = pattern.New(`^(.*) on (.*) \(([^,)]+)(?:, ([^)]*))?\)$`)
 
 // Darwin collects mounted filesystems on macOS: the mount table from
 // mount, and the sizes and inodes from df -ki.

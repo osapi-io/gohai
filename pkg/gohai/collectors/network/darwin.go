@@ -25,12 +25,12 @@ import (
 	"errors"
 	"fmt"
 	"math/bits"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -95,7 +95,7 @@ func (d *Darwin) Collect(
 
 // ifconfigHeadRE is the first line of an interface in `ifconfig -a`:
 // "en0: flags=8863<UP,BROADCAST,RUNNING> mtu 1500 index 14".
-var ifconfigHeadRE = regexp.MustCompile(
+var ifconfigHeadRE = pattern.New(
 	`^(\S+): flags=[0-9a-f]+<([^>]*)> mtu (\d+)(?: index (\d+))?`,
 )
 
@@ -178,7 +178,7 @@ func hexMaskBits(
 }
 
 // netstatLinkRE is the network column of a link row: "<Link#14>".
-var netstatLinkRE = regexp.MustCompile(`^<Link#\d+>$`)
+var netstatLinkRE = pattern.New(`^<Link#\d+>$`)
 
 // parseNetstatLinks is the counters of the link rows of `netstat
 // -ibdnW`, by interface. A row is the name (with a "*" when the interface

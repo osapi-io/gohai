@@ -23,11 +23,11 @@ package memory
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -84,7 +84,7 @@ func (d *Darwin) Collect(
 
 // swapUsageRE is one figure of sysctl vm.swapusage:
 // "total = 3072.00M  used = 1818.81M  free = 1253.19M  (encrypted)".
-var swapUsageRE = regexp.MustCompile(`(total|used|free) = ([\d.]+)([KMG])`)
+var swapUsageRE = pattern.New(`(total|used|free) = ([\d.]+)([KMG])`)
 
 // parseSwapUsage is the swap of vm.swapusage, or nil when it has no
 // total.
@@ -110,7 +110,7 @@ func parseSwapUsage(
 // vmStatPageSize matches the first line's page-size declaration.
 // `Mach Virtual Memory Statistics: (page size of 16384 bytes)` on
 // Apple Silicon; 4096 on Intel.
-var vmStatPageSize = regexp.MustCompile(`page size of (\d+) bytes`)
+var vmStatPageSize = pattern.New(`page size of (\d+) bytes`)
 
 // applyVMStat parses `vm_stat` output into info's page buckets, and
 // derives Available, Used and UsedPercent from them and info.Total.

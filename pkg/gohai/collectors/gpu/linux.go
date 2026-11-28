@@ -24,13 +24,13 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"regexp"
 	"strings"
 
 	"github.com/avfs/avfs"
 	"github.com/avfs/avfs/vfs/osfs"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/internal/pcidev"
 )
 
@@ -38,7 +38,7 @@ import (
 const drmDir = "/sys/class/drm"
 
 // pciAddressRE is a PCI address in the path of a card's link.
-var pciAddressRE = regexp.MustCompile(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]$`)
+var pciAddressRE = pattern.New(`^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]$`)
 
 // Linux lists the graphics cards of /sys/class/drm through FS: each
 // cardN, its PCI address from where its link goes, and the vendor and

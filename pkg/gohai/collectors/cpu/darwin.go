@@ -25,11 +25,11 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/pattern"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 )
 
@@ -106,7 +106,7 @@ func (d *Darwin) Collect(
 // voltageStatesRE is the performance cores' frequency table of the pmgr
 // device in ioreg: pairs of little-endian uint32, a frequency in Hz and a
 // voltage.
-var voltageStatesRE = regexp.MustCompile(`"voltage-states5-sram" = <([0-9a-f]+)>`)
+var voltageStatesRE = pattern.New(`"voltage-states5-sram" = <([0-9a-f]+)>`)
 
 // maxPmgrFrequency is the highest frequency of the table, in MHz, or 0
 // when ioreg fails or has no table.
