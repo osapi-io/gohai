@@ -35,15 +35,15 @@ result.
 | `name`            | `string`            | The Nova `name` field.                                                                                                                           | OTel `host.name`               |
 | `project_uid`     | `string`            | The Nova project ID.                                                                                                                             | OTel `cloud.account.id`        |
 | `uuid`            | `string`            | The Nova UUID.                                                                                                                                   | No direct schema mapping.      |
-| `meta_data`       | `map[string]string` | The key-value pairs of the Nova `meta` field.                                                                                                    | No direct schema mapping.      |
 | `public_keys`     | `map[string]string` | A map of the SSH keys, from name to key.                                                                                                         | No direct schema mapping.      |
 | `launch_index`    | `int`               | The Nova launch_index. This is the position of the instance in a launch request for many instances.                                              | No direct schema mapping.      |
 | `devices`         | `[]Device`          | The list of attached block devices, from meta_data.json: type, bus, serial, path, address, tags.                                                 | No direct schema mapping.      |
 | `provider`        | `string`            | `"openstack"` or `"dreamhost"`. Old Dreamhost OpenStack images had a `dhc-user` account. The value is the same as Ohai's `openstack[:provider]`. | No direct schema mapping.      |
 
-The collector does not read two fields of meta_data.json. `network_info` holds
+The collector does not read three fields of meta_data.json. `network_info` holds
 Neutron data that is different for each deployment. `random_seed` is sensitive
-and has no inventory value.
+and has no inventory value. `meta` holds the key-value pairs that the user sets,
+which can hold secrets.
 
 ## Platform support
 
@@ -109,12 +109,12 @@ does not probe it.
 3. **Nova endpoint.** The collector reads
    `GET /openstack/latest/meta_data.json`, the Nova document with more data.
    This document gives `uuid`, `name`, `project_uid`, `hostname`,
-   `launch_index`, `meta_data`, `public_keys`, and the `devices[]` list of
-   attached block devices (type, bus, serial, path, address, tags). If the
-   EC2-compatible tree did not give `zone` or `hostname`, this document gives
-   them. The collector does not read `network_info` and `random_seed`, on
-   purpose. `network_info` is Neutron data that is different for each
-   deployment. `random_seed` is sensitive and has no inventory value.
+   `launch_index`, `public_keys`, and the `devices[]` list of attached block
+   devices (type, bus, serial, path, address, tags). If the EC2-compatible tree
+   did not give `zone` or `hostname`, this document gives them. The collector
+   does not read `network_info` and `random_seed`, on purpose. `network_info` is
+   Neutron data that is different for each deployment. `random_seed` is
+   sensitive and has no inventory value.
 4. **Provider field.** The collector reads `/etc/passwd` for a `dhc-user` entry.
    If the entry is there, the value is `"dreamhost"`. If not, the value is
    `"openstack"`. This is the same as Ohai's `openstack_provider`.

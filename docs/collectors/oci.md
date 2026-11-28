@@ -9,6 +9,9 @@ link-local server at `http://169.254.169.254/opc/v2/`. It reads three different
 JSON endpoints: `/instance`, `/vnics` and `/allVolumeAttachments`. If
 `facts.OCI != nil`, the host is an OCI instance.
 
+The collector does not keep the `metadata` key-value pairs of `/instance`. The
+user sets them, and they often hold `user_data` and `ssh_authorized_keys`.
+
 The collector does the detection only if the DMI `chassis.asset_tag` contains
 `"OracleCloud.com"`. This is the same as Ohai's `oci_chassis_asset_tag?` regex.
 Each request has the literal `Authorization: Bearer Oracle` header that OCI's
@@ -33,7 +36,6 @@ sets.
 | `account_uid`           | `string`                      | The tenancy OCID.                                                                                                                                | No direct schema mapping.      |
 | `state`                 | `string`                      | The lifecycle state, for example `RUNNING`.                                                                                                      | No direct schema mapping.      |
 | `time_created`          | `int64`                       | The creation time, in Unix milliseconds.                                                                                                         | No direct schema mapping.      |
-| `metadata`              | `map[string]string`           | The key-value pairs of the instance metadata.                                                                                                    | No direct schema mapping.      |
 | `defined_tags`          | `map[string]any`              | The OCI defined tags, in namespaces.                                                                                                             | No direct schema mapping.      |
 | `freeform_tags`         | `map[string]string`           | The OCI free-form tags.                                                                                                                          | No direct schema mapping.      |
 | `region_info`           | `*RegionInfo`                 | A subrecord that identifies the geographic location.                                                                                             | No direct schema mapping.      |

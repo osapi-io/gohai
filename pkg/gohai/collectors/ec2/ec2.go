@@ -27,13 +27,11 @@ package ec2
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"slices"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/avfs/avfs"
 
@@ -146,9 +144,6 @@ const iamInfoPath = "/meta-data/iam/info"
 // identityDocPath is the dynamic identity document.
 const identityDocPath = "/dynamic/instance-identity/document"
 
-// userDataPath is the raw user-data blob.
-const userDataPath = "/user-data/"
-
 // macsPath is the root of the per-ENI subtree.
 const macsPath = "/meta-data/network/interfaces/macs/"
 
@@ -232,10 +227,6 @@ type Info struct {
 	// IMDS. Useful for debugging and for consumers who want to know
 	// the feature level of the data they received.
 	APIVersion string `json:"api_version,omitempty"`
-
-	// UserData is the raw user-data blob. Base64-encoded when binary,
-	// plaintext otherwise, as Ohai handles it.
-	UserData string `json:"user_data,omitempty"`
 }
 
 // NetworkInterface is one ENI's metadata subtree. Each field maps
@@ -350,7 +341,8 @@ func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 //     local_ipv4s + per-ENI recursive subtree)
 //  5. IAM info (credentials scrubbed)
 //  6. Dynamic identity document
-//  7. User-data (base64 when binary)
+//
+// It does not read user-data, which often holds secrets.
 func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
@@ -432,13 +424,6 @@ func (c *Metadata) Collect(
 				info.ID = doc.InstanceID
 			}
 		}
-	}
-
-	// User-data: plaintext when UTF-8, base64 when binary (matches
-	// Ohai's Encoding::BINARY check). 404 (no user-data set) is
-	// expected and tolerated.
-	if body, err := versionedGet(userDataPath); err == nil {
-		info.UserData = encodeUserData(body)
 	}
 
 	return info, nil
@@ -643,21 +628,6 @@ func splitLines(
 		return nil
 	}
 	return out
-}
-
-// encodeUserData returns the raw user-data as plaintext when valid
-// UTF-8, or base64-encoded otherwise, as Ohai's binary check does.
-// Empty input returns empty string.
-func encodeUserData(
-	body []byte,
-) string {
-	if len(body) == 0 {
-		return ""
-	}
-	if utf8.Valid(body) {
-		return string(body)
-	}
-	return base64.StdEncoding.EncodeToString(body)
 }
 
 // fetchENIs walks /meta-data/network/interfaces/macs/, recursing

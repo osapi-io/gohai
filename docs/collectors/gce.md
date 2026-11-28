@@ -39,15 +39,12 @@ exactly as GCE gives them.
 | `region`                    | `string`             | The GCE region, from the zone, for example `us-central1`.                                               | OTel `cloud.region`                   |
 | `project_uid`               | `string`             | The GCP project ID.                                                                                     | OTel `cloud.account.id`               |
 | `numeric_project_id`        | `int64`              | The numeric GCP project ID.                                                                             | No direct schema mapping.             |
-| `project_attributes`        | `map[string]string`  | The project metadata. It usually contains `ssh-keys`, `enable-oslogin` and similar keys.                | No direct schema mapping.             |
 | `licenses`                  | `[]string`           | The GCP license IDs of the VM, for BYOL and compliance records.                                         | No direct schema mapping.             |
-| `attributes`                | `map[string]string`  | The instance metadata. It frequently contains `ssh-keys`, `startup-script` and user tags.               | No direct schema mapping.             |
 | `network_interfaces`        | `[]NetworkInterface` | The attached VNICs. Refer to the table below.                                                           | OCSF `network_interface` (per entry). |
 | `disks`                     | `[]Disk`             | The attached disks. Refer to the table below.                                                           | No direct schema mapping.             |
 | `service_accounts`          | `[]ServiceAccount`   | The service accounts of the VM. Refer to the table below.                                               | No direct schema mapping.             |
 | `virtual_clock_drift_token` | `string`             | The opaque drift token from `instance.virtualClock`. Some monitoring tools use it to find VM migration. | No direct schema mapping.             |
 | `remaining_cpu_time`        | `int64`              | The CPU seconds that remain before Spot VM preemption. Zero on standard instances.                      | No direct schema mapping.             |
-| `partner_attributes`        | `map[string]string`  | Opaque key/value pairs that partner images set (marketplace product metadata).                          | No direct schema mapping.             |
 
 ### NetworkInterface
 
@@ -126,12 +123,7 @@ VMs.
     "region": "us-central1",
     "project_uid": "my-project",
     "numeric_project_id": 987654321,
-    "project_attributes": { "ssh-keys": "admin:ssh-rsa BBBB..." },
     "licenses": ["8045211539491955793"],
-    "attributes": {
-      "ssh-keys": "user:ssh-rsa AAAA...",
-      "startup-script": "#!/bin/bash\necho hi"
-    },
     "network_interfaces": [
       {
         "ip": "10.128.0.5",
@@ -189,9 +181,6 @@ if facts.Gce != nil {
     for _, sa := range facts.Gce.ServiceAccounts {
         fmt.Println("SA:", sa.Email, sa.Scopes)
     }
-    if keys, ok := facts.Gce.Attributes["ssh-keys"]; ok {
-        fmt.Println("SSH keys from metadata:", keys)
-    }
 }
 ```
 
@@ -247,11 +236,15 @@ request.
    `scheduling.preemptible` from `"TRUE"` or `"FALSE"` to a real `bool`. It gets
    `region` from the zone: it removes the `-<letter>` suffix at the end of the
    zone. It moves `instance.virtualClock.driftToken` to the flat
-   `virtual_clock_drift_token`. It moves `instance.remainingCpuTime` and
-   `instance.partnerAttributes` to `remaining_cpu_time` and
-   `partner_attributes`. It sorts `service_accounts` by key, so the order is the
+   `virtual_clock_drift_token`. It moves `instance.remainingCpuTime` to
+   `remaining_cpu_time`. It sorts `service_accounts` by key, so the order is the
    same on each run. The collector does not keep the full tree as GCE gives it.
    All fields in the output are typed.
+8. **No metadata or partner attributes.** The collector leaves out the instance
+   and project `attributes`, and the instance `partnerAttributes`. They often
+   hold `ssh-keys`, `startup-script` and `kube-env`, and facts that a program
+   ships to a central store would give them to each reader of that store. Ohai
+   reports them; gohai does not.
 
 The method is the same as Ohai's `Ohai::Mixin::GCEMetadata`: the same URL, the
 same header, the same single recursive request, and the same full tree.

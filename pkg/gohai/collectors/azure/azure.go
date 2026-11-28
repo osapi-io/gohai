@@ -137,8 +137,6 @@ type Info struct {
 	// Free-form data.
 	Tags                     string `json:"tags,omitempty"`
 	TagsList                 []Tag  `json:"tags_list,omitempty"`
-	UserData                 string `json:"user_data,omitempty"`
-	CustomData               string `json:"custom_data,omitempty"`
 	IsHostCompatibilityLayer bool   `json:"is_host_compatibility_layer_vm,omitempty"`
 
 	// Security.
@@ -286,7 +284,6 @@ type raw struct {
 type rawCompute struct {
 	AdditionalCapabilities   *rawAdditionalCapabilities `json:"additionalCapabilities"`
 	AzEnvironment            string                     `json:"azEnvironment"`
-	CustomData               string                     `json:"customData"`
 	EvictionPolicy           string                     `json:"evictionPolicy"`
 	ExtendedLocation         *rawExtendedLocation       `json:"extendedLocation"`
 	Host                     *rawHost                   `json:"host"`
@@ -314,7 +311,6 @@ type rawCompute struct {
 	SubscriptionID           string                     `json:"subscriptionId"`
 	Tags                     string                     `json:"tags"`
 	TagsList                 []Tag                      `json:"tagsList"`
-	UserData                 string                     `json:"userData"`
 	Version                  string                     `json:"version"`
 	VMID                     string                     `json:"vmId"`
 	VMScaleSetName           string                     `json:"vmScaleSetName"`
@@ -575,8 +571,6 @@ func transform(
 		info.Plan = r.Compute.Plan
 		info.Tags = r.Compute.Tags
 		info.TagsList = r.Compute.TagsList
-		info.UserData = r.Compute.UserData
-		info.CustomData = r.Compute.CustomData
 		info.IsHostCompatibilityLayer = r.Compute.IsHostCompatibilityLayer
 
 		if r.Compute.SecurityProfile != nil {

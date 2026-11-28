@@ -22,6 +22,7 @@ package oci_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,7 +57,7 @@ const instanceResponse = `{
   "tenantId": "ocid1.tenancy.oc1..www",
   "state": "RUNNING",
   "timeCreated": 1713000000000,
-  "metadata": {"ssh_authorized_keys": "ssh-rsa AAA..."},
+  "metadata": {"ssh_authorized_keys": "ssh-rsa AAA-secret-key", "user_data": "I2Nsb3VkLWNvbmZpZw=="},
   "freeformTags": {"env": "prod"},
   "regionInfo": {"realmKey": "oc1", "regionKey": "PHX", "regionIdentifier": "us-phoenix-1"},
   "agentConfig": {"isManagementDisabled": false, "isMonitoringDisabled": false, "areAllPluginsDisabled": false},
@@ -204,6 +205,12 @@ func (s *OCIPublicTestSuite) TestCollect() {
 				s.Require().NotNil(info.LaunchOptions)
 				s.Equal("PARAVIRTUALIZED", info.LaunchOptions.BootVolumeType)
 				s.Equal("UEFI_64", info.LaunchOptions.Firmware)
+				// The instance metadata holds user_data and
+				// ssh_authorized_keys. The facts leave it out.
+				facts, err := json.Marshal(info)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "AAA-secret-key")
+				s.NotContains(string(facts), "I2Nsb3VkLWNvbmZpZw==")
 				s.True(info.LaunchOptions.IsPVEncryptionInTransitEnabled)
 				s.Require().NotNil(info.SourceDetails)
 				s.Equal("image", info.SourceDetails.SourceType)

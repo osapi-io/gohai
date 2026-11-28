@@ -22,6 +22,7 @@ package azure_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -65,7 +66,7 @@ const cannedResponse = `{
     "tags": "env:prod;owner:sre",
     "tagsList": [{"name": "env", "value": "prod"}],
     "userData": "dXNlcg==",
-    "customData": "",
+    "customData": "Y3VzdG9t",
     "isHostCompatibilityLayerVm": false,
     "plan": {"name": "p", "publisher": "pub", "product": "prod"},
     "securityProfile": {
@@ -255,6 +256,12 @@ func (s *AzurePublicTestSuite) TestCollect() {
 				s.Require().NotNil(info.ExtendedLocation)
 				s.Equal("losangeles", info.ExtendedLocation.Name)
 				s.Equal("EdgeZone", info.ExtendedLocation.Type)
+				// userData and customData often hold secrets. The facts
+				// leave them out.
+				facts, err := json.Marshal(info)
+				s.Require().NoError(err)
+				s.NotContains(string(facts), "dXNlcg==")
+				s.NotContains(string(facts), "Y3VzdG9t")
 			},
 		},
 		{

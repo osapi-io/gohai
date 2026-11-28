@@ -85,7 +85,6 @@ type Info struct {
 	AccountUID          string            `json:"account_uid,omitempty"`
 	State               string            `json:"state,omitempty"`
 	TimeCreated         int64             `json:"time_created,omitempty"`
-	Metadata            map[string]string `json:"metadata,omitempty"`
 	DefinedTags         map[string]any    `json:"defined_tags,omitempty"`
 	FreeformTags        map[string]string `json:"freeform_tags,omitempty"`
 	RegionInfo          *RegionInfo       `json:"region_info,omitempty"`
@@ -202,7 +201,6 @@ type rawInstance struct {
 	TenantID            string            `json:"tenantId"`
 	State               string            `json:"state"`
 	TimeCreated         int64             `json:"timeCreated"`
-	Metadata            map[string]string `json:"metadata"`
 	DefinedTags         map[string]any    `json:"definedTags"`
 	FreeformTags        map[string]string `json:"freeformTags"`
 	RegionInfo          *rawRegionInfo    `json:"regionInfo"`
@@ -425,7 +423,6 @@ func transformInstance(
 		AccountUID:          r.TenantID,
 		State:               r.State,
 		TimeCreated:         r.TimeCreated,
-		Metadata:            r.Metadata,
 		DefinedTags:         r.DefinedTags,
 		FreeformTags:        r.FreeformTags,
 		InstancePoolID:      r.InstancePoolID,
