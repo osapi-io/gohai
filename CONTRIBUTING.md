@@ -313,9 +313,18 @@ Write these three doubles by hand, because a generated one gives no advantage:
 
 ### File headers
 
-Start each `.go` file with the MIT license header. Copy the format from a Go
-file in the repository. In a file with a build tag, put `//go:build` on line 1,
-then a blank line, then the header.
+Start each `.go` file with the MIT license header. Copy the words of the header
+from a Go file in the repository, but not its year. In a file with a build tag,
+put `//go:build` on line 1, then a blank line, then the header.
+
+The year in the header of a file is the year that somebody created the file. A
+new file gets the current year. Do not change the year after that, also when you
+move or change the file. Do not copy the year from a different file or from
+`LICENSE`. The files of a repository have different years.
+
+`LICENSE` has the years of the project: the year of the first commit, a hyphen,
+and the current year, such as `2025-2026`. When the two years are the same, it
+has one year. Change the second year in the first change of each new year.
 
 ### Error wrapping at the module boundary
 
