@@ -22,6 +22,7 @@ package gohai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sync"
@@ -87,6 +88,7 @@ func (g *Gohai) Collect(
 		samples   map[string]CollectorTiming
 		errorsMu  sync.Mutex
 		errs      map[string]string
+		errValues map[string]error
 		statusMu  sync.Mutex
 		status    = make(map[string]Status, len(names))
 		durations = make(map[string]time.Duration, len(names))
@@ -97,8 +99,10 @@ func (g *Gohai) Collect(
 			defer errorsMu.Unlock()
 			if errs == nil {
 				errs = make(map[string]string)
+				errValues = make(map[string]error)
 			}
 			errs[name] = err.Error()
+			errValues[name] = publicError(err)
 		},
 		OnComplete: func(name string, dur time.Duration, _ error) {
 			statusMu.Lock()
@@ -122,6 +126,7 @@ func (g *Gohai) Collect(
 		CollectDuration: time.Since(start),
 		Errors:          errs,
 		Status:          status,
+		errs:            errValues,
 	}
 	if len(status) == 0 {
 		facts.Status = nil
@@ -287,4 +292,18 @@ func statusFrom(
 	default:
 		return StatusFailed
 	}
+}
+
+// publicError is err, or a *PanicError, which a caller of the SDK can name,
+// when err holds a panic. The registry's panic error is internal. For a
+// collector whose dependency panicked, the PanicError names the dependency.
+func publicError(
+	err error,
+) error {
+	var p *collector.PanicError
+	if errors.As(err, &p) {
+		return &PanicError{Collector: p.Collector, Value: p.Value, Stack: p.Stack}
+	}
+
+	return err
 }

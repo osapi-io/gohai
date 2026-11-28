@@ -183,6 +183,37 @@ type Facts struct {
 	// WithTimings(). Contains per-collector wall-clock durations, the
 	// status, and the error message of a failed or partial collector.
 	Timings *Timings `json:"_timings,omitempty"`
+
+	// errs is the error value of each collector that has one, which Err
+	// returns. It is not in the JSON, because the text is in Errors.
+	errs map[string]error
+}
+
+// Err is the error of the collector named name in the run that made these
+// Facts, or nil. Errors has its text. For a collector that panicked, or whose
+// dependency panicked, Err is a *PanicError, which holds the stack: use
+// errors.As to get it. Facts read
+// back from JSON have only Errors, so Err is nil for them.
+func (f *Facts) Err(
+	name string,
+) error {
+	return f.errs[name]
+}
+
+// PanicError is the error of a collector that panicked. gohai recovers the
+// panic, so one collector does not stop the process that runs gohai. Error is
+// the text that Facts.Errors holds, and Stack is the stack of the goroutine at
+// the panic, so that a caller can log where it was.
+type PanicError struct {
+	Collector string
+	Value     any
+	Stack     []byte
+}
+
+// Error names the collector and the panic value. The stack is in Stack, not in
+// the text, because the text goes into Facts.Errors.
+func (e *PanicError) Error() string {
+	return fmt.Sprintf("collector %s panicked: %v", e.Collector, e.Value)
 }
 
 // Timings captures the runtime observability data surfaced into Facts

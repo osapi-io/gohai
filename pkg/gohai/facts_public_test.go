@@ -21,7 +21,9 @@
 package gohai_test
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -31,8 +33,10 @@ import (
 
 	"github.com/avfs/avfs/vfs/osfs"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/mock/gomock"
 
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/collector/mocks"
 	"github.com/osapi-io/gohai/pkg/gohai"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/cpu"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/load"
@@ -397,5 +401,144 @@ func (s *FactsPublicTestSuite) TestStatus() {
 	}
 	for _, tt := range tests {
 		s.Run(tt.name, tt.validateFunc)
+	}
+}
+
+// newPanickingCollector is a collector named name, depending on deps, whose
+// Collect panics with value.
+func newPanickingCollector(
+	ctrl *gomock.Controller,
+	name string,
+	value any,
+	deps ...string,
+) *mocks.MockCollector {
+	m := mocks.NewMockCollector(ctrl)
+	m.EXPECT().Name().Return(name).AnyTimes()
+	m.EXPECT().Category().Return(collector.CategoryMisc).AnyTimes()
+	m.EXPECT().DefaultEnabled().Return(false).AnyTimes()
+	m.EXPECT().Dependencies().Return(deps).AnyTimes()
+	m.EXPECT().
+		Collect(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, collector.PriorResults) (any, error) {
+			panic(value)
+		}).
+		AnyTimes()
+
+	return m
+}
+
+func (s *FactsPublicTestSuite) TestErr() {
+	errBoom := errors.New("boom")
+	tests := []struct {
+		name         string
+		collectors   func(*gomock.Controller) []collector.Collector
+		ask          string
+		validateFunc func(facts *gohai.Facts, err error)
+	}{
+		{
+			name: "a collector that panicked has a *PanicError with its stack",
+			collectors: func(ctrl *gomock.Controller) []collector.Collector {
+				return []collector.Collector{
+					newPanickingCollector(ctrl, "crasher", "index out of range"),
+				}
+			},
+			ask: "crasher",
+			validateFunc: func(facts *gohai.Facts, err error) {
+				var p *gohai.PanicError
+				s.Require().ErrorAs(err, &p)
+				s.Equal("crasher", p.Collector)
+				s.Equal("index out of range", p.Value)
+				s.Contains(string(p.Stack), "goroutine")
+				s.Equal("collector crasher panicked: index out of range", facts.Errors["crasher"])
+				s.EqualError(err, facts.Errors["crasher"])
+			},
+		},
+		{
+			name: "a collector whose dependency panicked has the dependency's *PanicError",
+			collectors: func(ctrl *gomock.Controller) []collector.Collector {
+				return []collector.Collector{
+					newPanickingCollector(ctrl, "base", "nil map"),
+					newPanickingCollector(ctrl, "top", "never", "base"),
+				}
+			},
+			ask: "top",
+			validateFunc: func(_ *gohai.Facts, err error) {
+				var p *gohai.PanicError
+				s.Require().ErrorAs(err, &p)
+				s.Equal("base", p.Collector)
+				s.Equal("nil map", p.Value)
+			},
+		},
+		{
+			name: "a collector that failed has its own error",
+			collectors: func(ctrl *gomock.Controller) []collector.Collector {
+				return []collector.Collector{newFailingCollector(ctrl, "failer", errBoom)}
+			},
+			ask: "failer",
+			validateFunc: func(_ *gohai.Facts, err error) {
+				s.ErrorIs(err, errBoom)
+				var p *gohai.PanicError
+				s.False(errors.As(err, &p))
+			},
+		},
+		{
+			name: "a collector with no error has none",
+			collectors: func(ctrl *gomock.Controller) []collector.Collector {
+				return []collector.Collector{newCollectorGiving(ctrl, "fine", &platform.Info{})}
+			},
+			ask: "fine",
+			validateFunc: func(_ *gohai.Facts, err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name: "Facts read back from JSON have only the text",
+			collectors: func(ctrl *gomock.Controller) []collector.Collector {
+				return []collector.Collector{newPanickingCollector(ctrl, "crasher", "x")}
+			},
+			ask: "crasher",
+			validateFunc: func(facts *gohai.Facts, _ error) {
+				data, err := json.Marshal(facts)
+				s.Require().NoError(err)
+				var back gohai.Facts
+				s.Require().NoError(json.Unmarshal(data, &back))
+				s.Equal(facts.Errors, back.Errors)
+				s.NoError(back.Err("crasher"))
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			g, err := gohai.New()
+			s.Require().NoError(err)
+			for _, c := range tt.collectors(gomock.NewController(s.T())) {
+				s.Require().NoError(g.Register(c))
+				s.Require().NoError(g.Select(c.Name()))
+			}
+			facts, err := g.Collect(context.Background())
+			s.Require().NoError(err)
+			tt.validateFunc(facts, facts.Err(tt.ask))
+		})
+	}
+}
+
+func (s *FactsPublicTestSuite) TestPanicError() {
+	tests := []struct {
+		name         string
+		err          *gohai.PanicError
+		validateFunc func(text string)
+	}{
+		{
+			name: "the text names the collector and the value, not the stack",
+			err:  &gohai.PanicError{Collector: "cpu", Value: 42, Stack: []byte("goroutine 1")},
+			validateFunc: func(text string) {
+				s.Equal("collector cpu panicked: 42", text)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			tt.validateFunc(tt.err.Error())
+		})
 	}
 }
