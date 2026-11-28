@@ -1608,6 +1608,40 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:       "encapsulation: ARPHRD_PPP is PPP and ARPHRD_IEEE1394 is unknown",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: sourcetest.FS(s.T(), map[string]string{
+				"/sys/class/net/lo/type":   "512\n",
+				"/sys/class/net/eth0/type": "24\n",
+			}),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Equal("PPP", i.Interfaces[0].Encapsulation)
+				s.Empty(i.Interfaces[1].Encapsulation)
+			},
+		},
+		{
+			name:       "encapsulation: ARPHRD_SIT is 6to4 and ARPHRD_TUNNEL6 is unknown",
+			ifsFn:      canonicalInterfaces,
+			countersFn: zeroCounters,
+			fs: sourcetest.FS(s.T(), map[string]string{
+				"/sys/class/net/lo/type":   "776\n",
+				"/sys/class/net/eth0/type": "769\n",
+			}),
+			exec: ipRouteExec(s.T(), nil, errAbsent, nil, errAbsent),
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Equal("6to4", i.Interfaces[0].Encapsulation)
+				s.Empty(i.Interfaces[1].Encapsulation)
+			},
+		},
+		{
 			name: "ip route line with metric, src, scope, proto: all parsed",
 			ifsFn: func() ([]tIface, error) {
 				return []tIface{

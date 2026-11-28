@@ -50,6 +50,7 @@ Per interface:
 | `mtu`                     | int               | The maximum transmission unit, in bytes.                                                                                                                                                                                                                                                                                                    | No direct schema mapping. |
 | `mac`                     | string            | The MAC address (`"aa:bb:cc:dd:ee:ff"`). Empty for loopback.                                                                                                                                                                                                                                                                                | `network_interface.mac`.  |
 | `encapsulation`           | string            | The canonical encapsulation: `Ethernet`, `Loopback`, `PPP`, `SLIP`, `IPIP`, `6to4` or `VJSLIP`. Linux only.                                                                                                                                                                                                                                 | No direct schema mapping. |
+| `kind`                    | string            | The kind of device: `ethernet`, `bridge`, `bond`, `wifi`, `vlan`, `vxlan`, `wireguard`, `tun`, `loopback` or `virtual`. `virtual` is an Ethernet link with no device, such as a veth or a dummy. Empty for an interface that is not Ethernet and has no known kind. Linux only, from sysfs.                                                 | No direct schema mapping. |
 | `driver`                  | string            | The kernel driver of the NIC (`e1000e`, `virtio_net`, `ixgbe`). Linux only, from sysfs.                                                                                                                                                                                                                                                     | No direct schema mapping. |
 | `speed`                   | string            | The negotiated link speed (`"1000Mb/s"`, `"10Gb/s"`). Linux only, from sysfs.                                                                                                                                                                                                                                                               | No direct schema mapping. |
 | `duplex`                  | string            | The link duplex as ethtool writes it: `Full`, `Half`, or `Unknown!` for a link that is down or virtual. The speed is `Unknown!` in that case too. Linux only, from sysfs.                                                                                                                                                                   | No direct schema mapping. |
@@ -83,16 +84,17 @@ Per address:
 
 Per route:
 
-| Field         | Type   | Description                                                              | Schema mapping            |
-| ------------- | ------ | ------------------------------------------------------------------------ | ------------------------- |
-| `destination` | string | The route destination (`"default"`, `"10.0.0.0/24"`, `"::/0"`).          | No direct schema mapping. |
-| `family`      | string | `inet` or `inet6`.                                                       | No direct schema mapping. |
-| `gateway`     | string | The next-hop address.                                                    | No direct schema mapping. |
-| `interface`   | string | The egress interface. It is the same as an entry in `interfaces[].name`. | No direct schema mapping. |
-| `source`      | string | The preferred source address.                                            | No direct schema mapping. |
-| `scope`       | string | `global`, `link` or `host`, as the kernel reports it, in lowercase.      | No direct schema mapping. |
-| `proto`       | string | The routing protocol or source (`kernel`, `dhcp`, `static`, `ra`).       | No direct schema mapping. |
-| `metric`      | int    | The route metric.                                                        | No direct schema mapping. |
+| Field         | Type   | Description                                                                                                                                             | Schema mapping            |
+| ------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `destination` | string | The route destination (`"default"`, `"10.0.0.0/24"`, `"::/0"`).                                                                                         | No direct schema mapping. |
+| `type`        | string | The route type that `ip route` prints before the destination: `blackhole`, `unreachable`, `prohibit` and others. Empty for a unicast route. Linux only. | No direct schema mapping. |
+| `family`      | string | `inet` or `inet6`.                                                                                                                                      | No direct schema mapping. |
+| `gateway`     | string | The next-hop address.                                                                                                                                   | No direct schema mapping. |
+| `interface`   | string | The egress interface. It is the same as an entry in `interfaces[].name`.                                                                                | No direct schema mapping. |
+| `source`      | string | The preferred source address.                                                                                                                           | No direct schema mapping. |
+| `scope`       | string | `global`, `link` or `host`, as the kernel reports it, in lowercase.                                                                                     | No direct schema mapping. |
+| `proto`       | string | The routing protocol or source (`kernel`, `dhcp`, `static`, `ra`).                                                                                      | No direct schema mapping. |
+| `metric`      | int    | The route metric.                                                                                                                                       | No direct schema mapping. |
 
 Per neighbour:
 
@@ -281,19 +283,22 @@ On Linux:
     `expansion_rom_version`, `supports_statistics`, `supports_test`,
     `supports_eeprom_access`, `supports_register_dump`, `supports_priv_flags`).
     The collector skips interfaces that are not Ethernet (loopback, tunnels). It
-    also skips virtual interfaces, such as a veth, a bridge or a bond: an
-    interface with no `/sys/class/net/<iface>/device`. A container host can have
-    hundreds of veths, and ethtool would run six times for each one. Ohai does
-    not skip them. If the binary is missing, or the driver doesn't support the
-    query ("Operation not supported"), the field stays empty. Any other ethtool
-    failure, such as an interface that goes away during the run, is an error for
-    that interface: the collector still reads the next interfaces, and joins the
-    errors. All the ethtool runs share one time budget, and a spent budget stops
-    them on purpose; a cancelled context is an error.
+    runs `ethtool -i` for a NIC, which has `/sys/class/net/<iface>/device`, and
+    for a bridge or a bond, which has a `bridge` or `bonding` directory there.
+    For a bridge or a bond, `ethtool -i` gives the driver `bridge` or `bonding`.
+    It skips the other virtual interfaces, such as a veth or a dummy. A
+    container host can have hundreds of veths. Ohai does not skip them. The
+    tuning probes of step 08 skip a bridge and a bond. If the binary is missing,
+    or the driver doesn't support the query ("Operation not supported"), the
+    field stays empty. Any other ethtool failure, such as an interface that goes
+    away during the run, is an error for that interface: the collector still
+    reads the next interfaces, and joins the errors. All the ethtool runs share
+    one time budget, and a spent budget stops them on purpose; a cancelled
+    context is an error.
 
-08. **Ethtool tuning set.** For the same interfaces, the collector runs five
-    more ethtool probes through the executor. It parses each probe into a typed
-    sub-record under `interfaces[].ethtool`:
+08. **Ethtool tuning set.** For each NIC, the collector runs five more ethtool
+    probes through the executor. It parses each probe into a typed sub-record
+    under `interfaces[].ethtool`:
 
     - `ethtool -g <iface>` gives `ring_params` (the current and max values of
       rx, rx-mini, rx-jumbo and tx).
