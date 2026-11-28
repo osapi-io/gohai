@@ -20,7 +20,11 @@
 
 package cmd
 
-import "github.com/osapi-io/gohai/pkg/gohai"
+import (
+	"github.com/avfs/avfs"
+
+	"github.com/osapi-io/gohai/pkg/gohai"
+)
 
 // WriteProblems is writeProblems, for a list of problems: the built-in
 // collectors break no rule, so the CLI never reaches one.
@@ -56,3 +60,14 @@ var ColorFor = colorFor
 
 // Terminal is terminal, which tells a terminal file from any other writer.
 var Terminal = terminal
+
+// SetHostFS replaces the file system that validate reads, and returns the
+// function that restores it.
+func SetHostFS(
+	fs avfs.VFS,
+) func() {
+	old := hostFS
+	hostFS = fs
+
+	return func() { hostFS = old }
+}
