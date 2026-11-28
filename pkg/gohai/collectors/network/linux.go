@@ -556,30 +556,40 @@ func joinContinuationLines(
 //	    nexthop via 10.0.0.1 dev eth0 weight 1 \
 //	    nexthop via 10.0.0.2 dev eth1 weight 1
 //
-// We split on the literal `nexthop` token and emit one Route per
+// We split on each whole `nexthop` token and emit one Route per
 // nexthop, copying the destination/proto/scope/metric attributes from
-// the prefix. Single-route lines (no `nexthop`) yield exactly one
-// Route from the line as-is (after backslash → space).
+// the prefix. Single-route lines (no `nexthop` token) yield exactly one
+// Route from the line as-is. A line that starts with `nexthop` has no
+// destination to copy, so it yields no Route.
 func expandRouteLine(
 	line, family string,
 ) []Route {
-	if !strings.Contains(line, "nexthop") {
-		return []Route{parseIPRouteLine(strings.TrimSpace(line), family)}
+	fields := strings.Fields(line)
+	var cuts []int
+	for i, f := range fields {
+		if f == "nexthop" {
+			cuts = append(cuts, i)
+		}
 	}
-	idx := strings.Index(line, "nexthop")
-	prefix := strings.TrimSpace(line[:idx])
-	prefixRoute := parseIPRouteLine(prefix, family)
+	if len(cuts) == 0 {
+		return []Route{parseIPRouteLine(strings.Join(fields, " "), family)}
+	}
+	if cuts[0] == 0 {
+		return nil
+	}
+	prefixRoute := parseIPRouteLine(strings.Join(fields[:cuts[0]], " "), family)
+	cuts = append(cuts, len(fields))
 	var out []Route
-	for _, hop := range strings.Split(line[idx:], "nexthop") {
-		hop = strings.TrimSpace(hop)
-		if hop == "" {
+	for k := 0; k < len(cuts)-1; k++ {
+		hop := fields[cuts[k]+1 : cuts[k+1]]
+		if len(hop) == 0 {
 			continue
 		}
 		// Re-use parseIPRouteLine by synthesizing a route line:
 		// `<destination> nexthop tokens...`. Destination from the
 		// prefix; remaining attrs (gateway/dev/weight/...) come from
 		// the nexthop block.
-		synth := prefixRoute.Destination + " " + hop
+		synth := prefixRoute.Destination + " " + strings.Join(hop, " ")
 		hopRoute := parseIPRouteLine(synth, family)
 		// Carry forward proto / scope / metric from the prefix when
 		// the nexthop block doesn't restate them.
@@ -635,8 +645,8 @@ var routeTypes = map[string]bool{
 // parseIPRouteLine parses one `ip -o route` line into a Route. The
 // format is `[type] <destination> [via <gateway>] [dev <iface>] [proto X]
 // [metric N] [src ADDR] [scope S] ...`, where type is one of routeTypes.
-// Tokens beyond what we know are ignored. Caller filters empty lines, so
-// fields[0] always exists.
+// Tokens beyond what we know are ignored. expandRouteLine never passes
+// an empty line, so fields[0] always exists.
 func parseIPRouteLine(
 	line, family string,
 ) Route {
