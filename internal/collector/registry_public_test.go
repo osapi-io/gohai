@@ -133,6 +133,12 @@ func (s *RegistryPublicTestSuite) TestCategories() {
 	s.Contains(cats, collector.CategoryMisc)
 }
 
+// badSources is a collector with an FS field that Wire cannot set.
+type badSources struct {
+	collector.Collector
+	FS string
+}
+
 func (s *RegistryPublicTestSuite) TestRegister() {
 	tests := []struct {
 		name          string
@@ -155,6 +161,16 @@ func (s *RegistryPublicTestSuite) TestRegister() {
 			collector: newCollector(s.ctrl, "", "", true),
 			validateFunc: func(_ *collector.Registry, _ collector.Collector, err error) {
 				s.Error(err)
+			},
+		},
+		{
+			name:      "rejects a source field of another type",
+			collector: &badSources{Collector: newCollector(s.ctrl, "bad", "", true)},
+			validateFunc: func(_ *collector.Registry, _ collector.Collector, err error) {
+				s.EqualError(
+					err,
+					`collector "bad": collector_test.badSources.FS is string, not avfs.VFS`,
+				)
 			},
 		},
 		{

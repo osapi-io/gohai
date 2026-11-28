@@ -115,7 +115,9 @@ func New(
 	// once, not once for each collector.
 	cfg.sources.Family = collector.Family(cfg.sources)
 	g := &Gohai{registry: collector.NewRegistry()}
-	registerBuiltins(g.registry, cfg.sources)
+	if err := registerBuiltins(g.registry, cfg.sources); err != nil {
+		return nil, err
+	}
 
 	sel, err := selectCollectors(g.registry, cfg)
 	if err != nil {
@@ -251,18 +253,24 @@ func selectCollectors(
 }
 
 // registerBuiltins registers every built-in collector. A registration error
-// is a duplicate or empty name in builtinCollectors, a bug that would drop a
-// collector with no signal, so it panics.
+// is a duplicate or empty name, or a source field of the wrong type, in
+// builtinCollectors: a bug that would drop a collector with no signal, so the
+// caller returns it.
 func registerBuiltins(
 	reg *collector.Registry,
 	src source.Sources,
-) {
-	for _, c := range builtinCollectors(src) {
+) error {
+	for _, c := range builtinCollectorsFn(src) {
 		if err := reg.Register(c); err != nil {
-			panic(fmt.Sprintf("gohai: register built-in collector %q: %v", c.Name(), err))
+			return fmt.Errorf("register built-in collector %q: %w", c.Name(), err)
 		}
 	}
+
+	return nil
 }
+
+// builtinCollectorsFn is builtinCollectors, which a test replaces.
+var builtinCollectorsFn = builtinCollectors
 
 // builtinCollectors returns the built-in collectors to register, each
 // reading the host through src. The cloud collectors read their provider's

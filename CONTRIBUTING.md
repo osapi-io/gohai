@@ -21,10 +21,11 @@ Thank you for your contribution to gohai.
   [Keep the descriptions in sync](https://github.com/osapi-io/specs/blob/main/CONTRIBUTING.md#keep-the-descriptions-in-sync).
 - **Examine the work that exists.** Look for a pull request or an issue about
   the change. If you find one, use what it says in your work.
-- **Backward compatibility.** Make sure that your change does not stop a program
-  that uses gohai. A change that keeps compatibility is more likely to merge. If
-  your change cannot keep it, open an issue first. Then the maintainers can
-  discuss the API change before you do the work.
+- **No backward compatibility.** When a change makes something old or
+  inconsistent, change it or delete it everywhere, in the same change. Do not
+  add a deprecated flag, a field for old callers, or a shim for an old setup.
+  For a change to the API, open an issue first. Then the maintainers can discuss
+  it before you do the work.
 
 ## Prerequisites
 
@@ -136,7 +137,8 @@ just deps
   - `collector.go`. The `Collector` interface.
   - `sources.go`. `IsDarwin(src)` and `Family(src)` select a variant. `Wire`
     sets the `FS`, `Exec`, `Now` and `Resolver` fields of a variant from the
-    sources, and panics on a field with one of those names and another type.
+    sources. `CheckSources` reports a field with one of those names and another
+    type, and `Registry.Register` refuses that collector.
   - `registry.go`. `Registry`. It registers collectors, resolves the
     dependencies and runs the collectors at the same time.
   - `mocks/`. The gomock generation (`go generate`) and the committed mock.
@@ -163,6 +165,9 @@ not apply to generated files (`*.gen.go`, `*.pb.go`).
 Do not write `//nolint:revive`. It hides a problem and does not fix it. Fix the
 name or the code. When a name must be different in an API, give it an explicit
 name, such as a struct tag.
+
+Do not write an em dash, in a page or in a Go comment. The generated docs come
+from the comments, so a comment is a page too.
 
 ### Documentation
 
@@ -194,6 +199,10 @@ func FunctionName(
 }
 ```
 
+A test entry point, such as `func TestServerPublicTestSuite(t *testing.T)`, is
+the one exception. Write it on one line, as `go test` shows it. Each other
+function with parameters has the signature on more than one line.
+
 Write a function that has no parameters on one line:
 
 ```go
@@ -213,12 +222,24 @@ code that has no other place.
 `types.go` holds only type declarations: structs, interfaces, constants and
 aliases. Put a function in a file that has the name of what the function does.
 
-A test file has the name of the production file that it tests. If a test file
-becomes too large to read, split the production file first. Then each test file
-keeps its production file.
+A test file has the name of the production file that it tests: `foo.go` has
+`foo_public_test.go` and `foo_test.go`. `export_test.go` is the exception. If a
+test file becomes too large to read, split the production file first. Then each
+test file keeps its production file.
 
 ### Go patterns
 
+- Do not call `panic` in code that is not a test. Return an error, also for a
+  registration error or a programming error. `main` reports the error and exits
+  with a code that is not zero. A `recover` that stops a panic from a dependency
+  is permitted. The `forbidigo` linter fails a `panic` outside a test.
+- Read and write files through [avfs], so that a test can use a file system in
+  memory. This applies to tools that run at build time too: generators,
+  scaffolders and the tools that write docs.
+- Use NATS through [nats-client](https://github.com/osapi-io/nats-client). A
+  package may import `nats.go` or `jetstream` for their types. A call that
+  connects, creates a stream, a KV bucket or an object store, publishes or
+  subscribes goes through nats-client. nats-client itself is the exception.
 - Wrap errors with `fmt.Errorf("context: %w", err)`. Then the chain names each
   layer. `errors.Is` and `errors.As` can examine the chain.
 - Return early. Do not put the successful path inside conditions.
@@ -308,7 +329,7 @@ error.
 just test           # Run all tests (lint + unit + coverage)
 just go-unit       # Run unit tests only
 just go-unit-cov   # Generate coverage report
-go test -run TestName -v ./internal/platform/...  # Run a single test
+go test -run TestName -v ./...  # Run a single test
 ```
 
 The coverage target is 100%. `just test` fails when the total coverage is less
@@ -320,7 +341,10 @@ just go-unit-cov-check   # Report coverage and fail below the target
 ```
 
 `.github/codecov.yml` and the shared `go` justfile module both declare the
-target. Change the two together.
+target. Change the two together. Put the Codecov settings only in
+`.github/codecov.yml`. A `codecov.yml` at the root replaces it, and nothing
+fails. The `threshold` of `.github/codecov.yml` absorbs the rounding of Codecov
+only. `just go-unit-cov-check` is the exact gate at the target.
 
 `.coverignore` leaves out only code that no test is for: the generated mocks and
 `schemas/gen`, the examples, and the root `main.go`. `main.go` gives the
@@ -330,13 +354,17 @@ process's arguments, streams and signals to `cmd.Execute`, which the tests of
 
 ### Test file conventions
 
-- Public tests: `*_public_test.go`, in the `_test` package of the package. They
-  test the exported API. Write this type of test first.
-- Internal tests: `*_test.go`, in the same package. Use them only for what the
+- Public tests: `*_public_test.go`, in package `<name>_test`. They test the
+  exported API. Write this type of test first.
+- Internal tests: `*_test.go`, in package `<name>`. Use them only for what the
   exported API cannot reach.
+- A test in package `<name>_test` has a name that ends in `_public_test.go`. A
+  `*_test.go` file is always an internal test.
 - Suite names: `*_public_test.go` has `{Name}PublicTestSuite`, and `*_test.go`
   has `{Name}TestSuite`.
 - Use `testify/suite` with table-driven cases.
+- Do not write a custom assertion message. Write `s.Equal(want, got)`, not
+  `s.Equal(want, got, "expected equal")`. The name of the row tells what failed.
 - Write one suite method for each function under test. Success, errors and edge
   cases are rows in one table, not different methods.
 - `export_test.go` gives external tests access to unexported symbols, through an
@@ -359,8 +387,6 @@ These rules are specific to collectors:
 - **Replace at the boundary.** Each `TestCollect` row replaces the raw call to
   the upstream library (`hostInfoFn`, `partitionsFn`, ...). Thus the bridge
   mapping runs on each row.
-- **No custom assertion messages.** Write `s.Equal(want, got)`, not
-  `s.Equal(want, got, "expected equal")`.
 - The target is 100% test coverage on all packages.
 
 ## Quick reference
@@ -388,6 +414,10 @@ absolute paths, for example `/proc/meminfo` and `/etc/os-release`. Tests run the
 real `ReadFile` / `Open` / `Stat` code path against content in memory. This is a
 real integration test of how the collector uses the filesystem. It does not
 replace a function with a stub.
+
+The rule covers each file that gohai reads or writes, also in a tool that runs
+at build time, such as the schema generator. Do not call `os.ReadFile` or
+`os.WriteFile`.
 
 **Struct shape for each OS:**
 
@@ -646,6 +676,7 @@ vote or comment on issues, or help answer questions.
 
 Open a [Discussion] on GitHub.
 
+[avfs]: https://github.com/avfs/avfs
 [conventional commits]: https://www.conventionalcommits.org
 [discussion]: https://github.com/osapi-io/gohai/discussions
 [go]: https://go.dev

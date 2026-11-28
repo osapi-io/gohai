@@ -32,6 +32,7 @@ import (
 
 	"github.com/osapi-io/gohai/internal/collector"
 	"github.com/osapi-io/gohai/pkg/gohai"
+	"github.com/osapi-io/gohai/pkg/gohai/collectors/platform"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
 	"github.com/osapi-io/gohai/pkg/gohai/source"
 	sourcemocks "github.com/osapi-io/gohai/pkg/gohai/source/mocks"
@@ -121,25 +122,79 @@ func (s *RegistryPublicTestSuite) TestBuiltinCollectorsSetFacts() {
 	}
 }
 
-// TestRegisterBuiltinsPanicsOnADuplicate checks that a registration error
-// of a built-in collector is not dropped.
-func (s *RegistryPublicTestSuite) TestRegisterBuiltinsPanicsOnADuplicate() {
-	reg := collector.NewRegistry()
+// TestRegisterBuiltins checks that a registration error of a built-in
+// collector is returned, not dropped.
+func (s *RegistryPublicTestSuite) TestRegisterBuiltins() {
 	src := source.Sources{Family: family.Debian, FS: memfs.New()}
-	gohai.RegisterBuiltins(reg, src)
-	s.PanicsWithValue(
-		`gohai: register built-in collector "platform": collector "platform" already registered`,
-		func() { gohai.RegisterBuiltins(reg, src) },
-	)
+	tests := []struct {
+		name         string
+		registered   bool
+		validateFunc func(error)
+	}{
+		{
+			name: "registers each built-in collector",
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name:       "a duplicate is an error",
+			registered: true,
+			validateFunc: func(err error) {
+				s.EqualError(
+					err,
+					`register built-in collector "platform": collector "platform" already registered`,
+				)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			reg := collector.NewRegistry()
+			if tt.registered {
+				s.Require().NoError(gohai.RegisterBuiltins(reg, src))
+			}
+			tt.validateFunc(gohai.RegisterBuiltins(reg, src))
+		})
+	}
 }
 
 func (s *RegistryPublicTestSuite) TestNewRegistry() {
-	reg := gohai.NewRegistry()
-	s.Contains(reg.Names(), "platform")
+	tests := []struct {
+		name         string
+		builtins     func(source.Sources) []collector.Collector
+		validateFunc func(*gohai.PublicRegistry, error)
+	}{
+		{
+			name: "has the built-in collectors",
+			validateFunc: func(reg *gohai.PublicRegistry, err error) {
+				s.Require().NoError(err)
+				s.Contains(reg.Names(), "platform")
+			},
+		},
+		{
+			name: "a built-in collector that does not register is an error",
+			builtins: func(src source.Sources) []collector.Collector {
+				return []collector.Collector{platform.NewWith(src), platform.NewWith(src)}
+			},
+			validateFunc: func(_ *gohai.PublicRegistry, err error) {
+				s.ErrorContains(err, `register built-in collector "platform"`)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			if tt.builtins != nil {
+				defer gohai.SetBuiltinCollectorsFn(tt.builtins)()
+			}
+			tt.validateFunc(gohai.NewRegistry())
+		})
+	}
 }
 
 func (s *RegistryPublicTestSuite) TestNamesInCategory() {
-	reg := gohai.NewRegistry()
+	reg, err := gohai.NewRegistry()
+	s.Require().NoError(err)
 	tests := []struct {
 		name         string
 		category     string
@@ -175,7 +230,8 @@ func (s *RegistryPublicTestSuite) TestNamesInCategory() {
 }
 
 func (s *RegistryPublicTestSuite) TestCategoryOf() {
-	reg := gohai.NewRegistry()
+	reg, err := gohai.NewRegistry()
+	s.Require().NoError(err)
 	tests := []struct {
 		name         string
 		collector    string

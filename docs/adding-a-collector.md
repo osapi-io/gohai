@@ -153,9 +153,10 @@ func builtinCollectors(src source.Sources) []collector.Collector {
 
 Add the related `Facts` field and `set()` switch case in `pkg/gohai/facts.go`.
 
-`registerBuiltins` panics when a `Register` call fails, such as on a duplicate
-name. `TestBuiltinCollectorsSetFacts` in `pkg/gohai` fails when your collector
-has no `Facts` field of its name, or when `set()` has no case for it.
+`registerBuiltins` returns an error when a `Register` call fails, such as on a
+duplicate name or a source field of the wrong type, and `New` and `NewRegistry`
+return it. `TestBuiltinCollectorsSetFacts` in `pkg/gohai` fails when your
+collector has no `Facts` field of its name, or when `set()` has no case for it.
 
 ## Step 5: tests (100% coverage, one test file)
 

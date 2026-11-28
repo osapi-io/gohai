@@ -102,30 +102,106 @@ func (s *SourcesPublicTestSuite) TestWire() {
 	now := func() time.Time { return time.Unix(42, 0) }
 	exec := source.Commands()
 
-	v := collector.Wire(&variant{Name: "kept"}, source.Sources{
-		FS: fs, Exec: exec, Now: now, Family: family.Debian,
-	})
-	s.Same(fs, v.FS)
-	s.Equal(exec, v.Exec)
-	s.Equal(time.Unix(42, 0), v.Now())
-	s.Equal("kept", v.Name, "a field that is not a source is not changed")
+	tests := []struct {
+		name         string
+		c            any
+		src          source.Sources
+		validateFunc func(any)
+	}{
+		{
+			name: "when the variant has source fields, sets them and keeps the rest",
+			c:    &variant{Name: "kept"},
+			src:  source.Sources{FS: fs, Exec: exec, Now: now, Family: family.Debian},
+			validateFunc: func(got any) {
+				v := got.(*variant)
+				s.Same(fs, v.FS)
+				s.Equal(exec, v.Exec)
+				s.Equal(time.Unix(42, 0), v.Now())
+				s.Equal("kept", v.Name)
+			},
+		},
+		{
+			name: "when a source is zero, sets the real host's",
+			c:    &variant{},
+			src:  source.Sources{Family: family.Debian},
+			validateFunc: func(got any) {
+				v := got.(*variant)
+				s.NotNil(v.FS)
+				s.NotNil(v.Exec)
+				s.NotNil(v.Now)
+			},
+		},
+		{
+			name: "when the variant has no source field, leaves it unchanged",
+			c:    &bare{Name: "b"},
+			src:  source.Sources{FS: fs},
+			validateFunc: func(got any) {
+				s.Equal("b", got.(*bare).Name)
+			},
+		},
+		{
+			name: "when c is not a pointer to a struct, returns it as it is",
+			c:    bare{Name: "v"},
+			validateFunc: func(got any) {
+				s.Equal(bare{Name: "v"}, got)
+			},
+		},
+		{
+			name: "when a source field has another type, does not set it",
+			c:    &wrongType{FS: "kept"},
+			src:  source.Sources{Family: family.Debian},
+			validateFunc: func(got any) {
+				s.Equal("kept", got.(*wrongType).FS)
+			},
+		},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			tc.validateFunc(collector.Wire(tc.c, tc.src))
+		})
+	}
+}
 
-	d := collector.Wire(&variant{}, source.Sources{Family: family.Debian})
-	s.NotNil(d.FS, "a zero source is the real host's")
-	s.NotNil(d.Exec)
-	s.NotNil(d.Now)
-
-	b := collector.Wire(&bare{Name: "b"}, source.Sources{FS: fs})
-	s.Equal("b", b.Name, "a variant with no source field is unchanged")
-
-	s.Equal(bare{Name: "v"}, collector.Wire(bare{Name: "v"}, source.Sources{}),
-		"a value that is not a pointer to a struct is returned as it is")
-
-	s.PanicsWithValue(
-		"collector.Wire: collector_test.wrongType.FS is string, not avfs.VFS",
-		func() { collector.Wire(&wrongType{}, source.Sources{Family: family.Debian}) },
-		"a source field of another type would read the real host",
-	)
+func (s *SourcesPublicTestSuite) TestCheckSources() {
+	tests := []struct {
+		name         string
+		c            any
+		validateFunc func(error)
+	}{
+		{
+			name: "when the source fields have their types",
+			c:    &variant{},
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name: "when the variant has no source field",
+			c:    &bare{},
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name: "when c is not a pointer to a struct",
+			c:    bare{},
+			validateFunc: func(err error) {
+				s.NoError(err)
+			},
+		},
+		{
+			name: "when a source field has another type",
+			c:    &wrongType{},
+			validateFunc: func(err error) {
+				s.EqualError(err, "collector_test.wrongType.FS is string, not avfs.VFS")
+			},
+		},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			tc.validateFunc(collector.CheckSources(tc.c))
+		})
+	}
 }
 
 func TestSourcesPublicTestSuite(

@@ -64,6 +64,9 @@ func (r *Registry) Register(
 	if c.Name() == "" {
 		return errors.New("collector name must not be empty")
 	}
+	if err := CheckSources(c); err != nil {
+		return fmt.Errorf("collector %q: %w", c.Name(), err)
+	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
