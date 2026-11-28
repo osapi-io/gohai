@@ -110,9 +110,10 @@ On Linux:
 3. The collector skips rows with fewer than 5 tokens. A row must have 5 tokens
    to hold the address, the type, the vendor, the revision and the device. The
    collector also skips rows with an empty address in the brackets.
-4. If the binary is missing, the command fails, or the output is empty, the
-   collector returns an empty `devices` map and no error. Thus a host without
-   the util-linux `lsscsi` gives a clean result, not a missing-binary error.
+4. If the binary is missing, or the output is empty, the collector returns an
+   empty `devices` map and no error. Thus a host without `lsscsi` gives a clean
+   result, not a missing-binary error. If `lsscsi` is there and fails, the
+   collector returns the error.
 
 On macOS, the collector gives no fact, with the status `unsupported`, as each
 collector does on a platform that it does not support. macOS has no equivalent
