@@ -138,9 +138,9 @@ func parseHostnamectl(
 			if len(parts) >= 2 {
 				info.KernelRelease = parts[1]
 			}
-		case "operating_system_pretty_name", "operating_system":
+		case "operating_system":
 			info.OperatingSystemPrettyName = val
-		case "operating_system_cpe_name", "cpe_os_name":
+		case "cpe_os_name":
 			info.OperatingSystemCPEName = val
 		case "virtualization":
 			info.Virtualization = val
