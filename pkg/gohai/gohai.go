@@ -130,7 +130,9 @@ func New(
 // Collect runs all selected collectors and returns Facts. Each collector's
 // typed result is written to the matching field on Facts; collectors that
 // error or aren't selected leave their field nil, and Facts.Errors has the
-// error of each that failed. A cancelled ctx is an error. When the instance
+// error of each that failed. A cancelled ctx is an error, and Collect then
+// returns the Facts of the collectors that finished with it, so a caller with
+// a deadline keeps what was collected. Any other error returns nil Facts. When the instance
 // was built with WithTimings, per-collector durations are embedded in
 // Facts.Timings.
 func (g *Gohai) Collect(
@@ -175,9 +177,9 @@ func (g *Gohai) Collect(
 		}
 	}
 
-	results, err := g.registry.Run(ctx, names, hooks)
-	if err != nil {
-		return nil, fmt.Errorf("run collectors: %w", err)
+	results, runErr := g.registry.Run(ctx, names, hooks)
+	if runErr != nil && results == nil {
+		return nil, fmt.Errorf("run collectors: %w", runErr)
 	}
 
 	facts := &Facts{
@@ -198,6 +200,9 @@ func (g *Gohai) Collect(
 			facts.Errors = make(map[string]string)
 		}
 		facts.Errors[name] = fmt.Sprintf("gave a %T, which its Facts field does not hold", result)
+	}
+	if runErr != nil {
+		return facts, fmt.Errorf("run collectors: %w", runErr)
 	}
 	return facts, nil
 }
