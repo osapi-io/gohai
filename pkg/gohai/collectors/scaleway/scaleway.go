@@ -30,6 +30,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -181,70 +182,71 @@ type rawVolume struct {
 	ExportURI  string `json:"export_uri"`
 }
 
-// Collector fetches Scaleway's single-JSON metadata response.
-type Collector struct {
-	client *cloudmetadata.Client
+// Metadata fetches Scaleway's single-JSON metadata response.
+type Metadata struct {
+	// HTTP is the transport of the metadata reads. A nil HTTP is the
+	// shared transport.
+	HTTP http.RoundTripper
 	// FS is the filesystem that /proc/cmdline is read from.
 	FS avfs.VFS
 }
 
-var _ collector.Collector = (*Collector)(nil)
+// Collector is the public interface of the scaleway collector.
+type Collector interface {
+	collector.Collector
+}
 
-// New returns a default Collector pointed at Scaleway's metadata
-// server with Ohai-matching 6s timeout.
-func New() *Collector {
+var _ Collector = (*Metadata)(nil)
+
+// New returns the scaleway collector on the real host.
+func New() Collector {
 	return NewWith(source.Sources{})
 }
 
-// NewWith returns a Collector that reads the metadata service through
-// src.HTTP, so a fake host can answer it. A zero src.HTTP is the shared
-// transport.
+// NewWith returns the scaleway collector reading the host through src. It reads
+// the metadata service through src.HTTP, so a fake host can answer it. A
+// zero src.HTTP is the shared transport.
 func NewWith(
 	src source.Sources,
-) *Collector {
-	return collector.Wire(&Collector{
-		client: cloudmetadata.New(
-			metadataBaseURL,
-			cloudmetadata.WithTimeout(metadataTimeout),
-			cloudmetadata.WithTransport(src.HTTP),
-		),
-	}, src)
+) Collector {
+	return collector.Wire(&Metadata{}, src)
 }
 
-// NewWithClient returns a Collector backed by a caller-supplied client.
-// Tests point it at an httptest.Server.
-func NewWithClient(
-	c *cloudmetadata.Client,
-) *Collector {
-	return collector.Wire(&Collector{client: c}, source.Sources{})
+// client is the metadata client of c, which reads through c.HTTP.
+func (c *Metadata) client() *cloudmetadata.Client {
+	return cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithTimeout(metadataTimeout),
+		cloudmetadata.WithTransport(c.HTTP),
+	)
 }
 
 // Name returns "scaleway".
-func (*Collector) Name() string { return "scaleway" }
+func (*Metadata) Name() string { return "scaleway" }
 
 // Category returns "cloud".
-func (*Collector) Category() collector.Category { return collector.CategoryCloud }
+func (*Metadata) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false, because cloud collectors are opt-in.
-func (*Collector) DefaultEnabled() bool { return false }
+func (*Metadata) DefaultEnabled() bool { return false }
 
 // Dependencies returns dmi: a Scaleway instance's DMI sys_vendor is
 // Scaleway. The kernel cmdline signature of the old bootscript boot is a
 // second signal.
-func (*Collector) Dependencies() []string { return []string{"dmi"} }
+func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect checks DMI sys_vendor, then /proc/cmdline, for Scaleway, then
 // fetches the single /conf?format=json document. Returns (nil, nil) when
 // neither signal names Scaleway or the endpoint is unreachable, and the
 // context's error when the collection was cancelled.
-func (c *Collector) Collect(
+func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onScaleway(c.FS, prior) {
 		return nil, ctx.Err()
 	}
-	body, err := c.client.Get(ctx, metadataPath)
+	body, err := c.client().Get(ctx, metadataPath)
 	if err != nil {
 		// An endpoint that does not answer, or answers with a status that
 		// is not 2xx, is an absent source: no fact. Any other failure, such

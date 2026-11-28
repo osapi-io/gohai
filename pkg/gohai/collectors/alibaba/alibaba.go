@@ -31,6 +31,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -148,66 +149,69 @@ type Marketplace struct {
 	ChargeType  string `json:"charge_type,omitempty"`
 }
 
-// Collector fetches Alibaba's metadata tree via a recursive walk.
-type Collector struct {
-	client *cloudmetadata.Client
+// Metadata fetches Alibaba's metadata tree via a recursive walk.
+type Metadata struct {
+	// HTTP is the transport of the metadata reads. A nil HTTP is the
+	// shared transport.
+	HTTP http.RoundTripper
 }
 
-var _ collector.Collector = (*Collector)(nil)
+// Collector is the public interface of the alibaba collector.
+type Collector interface {
+	collector.Collector
+}
 
-// New returns a default Collector pointed at Alibaba's metadata server.
-func New() *Collector {
+var _ Collector = (*Metadata)(nil)
+
+// New returns the alibaba collector on the real host.
+func New() Collector {
 	return NewWith(source.Sources{})
 }
 
-// NewWith returns a Collector that reads the metadata service through
-// src.HTTP, so a fake host can answer it. A zero src.HTTP is the shared
-// transport.
+// NewWith returns the alibaba collector reading the host through src. It reads
+// the metadata service through src.HTTP, so a fake host can answer it. A
+// zero src.HTTP is the shared transport.
 func NewWith(
 	src source.Sources,
-) *Collector {
-	return NewWithClient(
-		cloudmetadata.New(
-			metadataBaseURL,
-			cloudmetadata.WithTimeout(metadataTimeout),
-			cloudmetadata.WithTransport(src.HTTP),
-		),
+) Collector {
+	return collector.Wire(&Metadata{}, src)
+}
+
+// client is the metadata client of c, which reads through c.HTTP.
+func (c *Metadata) client() *cloudmetadata.Client {
+	return cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithTimeout(metadataTimeout),
+		cloudmetadata.WithTransport(c.HTTP),
 	)
 }
 
-// NewWithClient returns a Collector backed by a caller-supplied client.
-func NewWithClient(
-	c *cloudmetadata.Client,
-) *Collector {
-	return &Collector{client: c}
-}
-
 // Name returns "alibaba".
-func (*Collector) Name() string { return "alibaba" }
+func (*Metadata) Name() string { return "alibaba" }
 
 // Category returns "cloud".
-func (*Collector) Category() collector.Category { return collector.CategoryCloud }
+func (*Metadata) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false, because cloud collectors are opt-in.
-func (*Collector) DefaultEnabled() bool { return false }
+func (*Metadata) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi, because Alibaba writes "Alibaba Cloud" as
 // sys_vendor. Matches Ohai's has_ali_dmi? check.
-func (*Collector) Dependencies() []string { return []string{"dmi"} }
+func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the fetch on a DMI sys_vendor match, then walks the
 // metadata tree recursively (matches Ohai's fetch_metadata). First-
 // call failure returns (nil, nil); subsequent path failures are
 // tolerated. `/user-data` is excluded from the walk to avoid
 // surfacing cloud-init scripts that may contain credentials.
-func (c *Collector) Collect(
+func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
 	if !onAlibaba(prior) {
 		return nil, ctx.Err()
 	}
-	tree, err := (&walker{client: c.client}).walk(ctx, "", 0)
+	tree, err := (&walker{client: c.client()}).walk(ctx, "", 0)
 	if err != nil {
 		// The first probe failed, so this is not Alibaba (or the endpoint is down).
 		return nil, ctx.Err()

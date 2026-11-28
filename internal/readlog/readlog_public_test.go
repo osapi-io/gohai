@@ -23,6 +23,7 @@ package readlog_test
 import (
 	"context"
 	"io/fs"
+	"net/http"
 	"os"
 	"testing"
 
@@ -96,6 +97,21 @@ func (s *ReadlogPublicTestSuite) TestSources() {
 				names, err := src.Resolver.LookupAddr(context.Background(), "1.2.3.4")
 				s.NoError(err)
 				s.Nil(names)
+			},
+		},
+		{
+			name: "the transport refuses each request, with no network",
+			validateFunc: func(src source.Sources, _ *readlog.Log) {
+				req, err := http.NewRequestWithContext(
+					context.Background(),
+					http.MethodGet,
+					"http://169.254.169.254/latest/meta-data/",
+					nil,
+				)
+				s.Require().NoError(err)
+				resp, err := src.HTTP.RoundTrip(req)
+				s.Nil(resp)
+				s.EqualError(err, "readlog: the host has no network")
 			},
 		},
 	}

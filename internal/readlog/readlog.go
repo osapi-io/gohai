@@ -20,13 +20,15 @@
 
 // Package readlog records what a collector reads from a host: each file and
 // directory it opens or looks at, and each command it runs. Sources gives a
-// collector a host with nothing on it, so a collector reads what it would
+// collector a host with nothing on it, and no network, so a collector reads what it would
 // try first on a real host, and the log says what that was.
 package readlog
 
 import (
 	"context"
+	"errors"
 	"io/fs"
+	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -95,7 +97,23 @@ func Sources(
 		Now:      func() time.Time { return time.Unix(0, 0).UTC() },
 		Family:   family,
 		Resolver: resolver{},
+		HTTP:     offline{},
 	}, l
+}
+
+// errOffline is the answer of each request to the network: the host of
+// Sources has none.
+var errOffline = errors.New("readlog: the host has no network")
+
+// offline is a transport that refuses each request, so a cloud collector
+// reads its files and gives up on its metadata service at once.
+type offline struct{}
+
+// RoundTrip refuses req.
+func (offline) RoundTrip(
+	*http.Request,
+) (*http.Response, error) {
+	return nil, errOffline
 }
 
 // resolvedRuntimeDir is the directory that systemd-resolved makes while it

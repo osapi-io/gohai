@@ -79,11 +79,15 @@ func (s *SpecPublicTestSuite) TestCollectors() {
 			},
 		},
 		{
-			name: "ec2 reads the network, and alibaba depends on dmi",
+			name: "ec2 reads the network, linode only the host, and alibaba depends on dmi",
 			validateFunc: func() {
 				ec2 := byName["ec2"]
-				s.Equal("ec2.New()", ec2.Constructor)
-				s.Contains(ec2.Network, "metadata service")
+				s.Equal("ec2.NewWith(src)", ec2.Constructor)
+				s.Equal("the metadata service of ec2, over HTTP", ec2.Network)
+				linode := byName["linode"]
+				s.Equal("linode.NewWith(src)", linode.Constructor)
+				s.Empty(linode.Network)
+				s.NotEmpty(linode.Reads[0].Files)
 				s.Equal([]string{"dmi"}, byName["alibaba"].Dependencies)
 			},
 		},

@@ -21,6 +21,7 @@
 package collector_test
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -43,6 +44,7 @@ type variant struct {
 	FS   avfs.VFS
 	Exec source.Runner
 	Now  func() time.Time
+	HTTP http.RoundTripper
 	Name string
 }
 
@@ -51,6 +53,9 @@ type bare struct{ Name string }
 
 // wrongType is a variant whose FS field is not an avfs.VFS.
 type wrongType struct{ FS string }
+
+// wrongHTTP is a variant whose HTTP field is not an http.RoundTripper.
+type wrongHTTP struct{ HTTP string }
 
 func (s *SourcesPublicTestSuite) TestIsDarwinAndFamily() {
 	orig := platform.Detect
@@ -101,6 +106,7 @@ func (s *SourcesPublicTestSuite) TestWire() {
 	fs := memfs.New()
 	now := func() time.Time { return time.Unix(42, 0) }
 	exec := source.Commands()
+	rt := http.DefaultTransport
 
 	tests := []struct {
 		name         string
@@ -111,17 +117,18 @@ func (s *SourcesPublicTestSuite) TestWire() {
 		{
 			name: "when the variant has source fields, sets them and keeps the rest",
 			c:    &variant{Name: "kept"},
-			src:  source.Sources{FS: fs, Exec: exec, Now: now, Family: family.Debian},
+			src:  source.Sources{FS: fs, Exec: exec, Now: now, HTTP: rt, Family: family.Debian},
 			validateFunc: func(got any) {
 				v := got.(*variant)
 				s.Same(fs, v.FS)
 				s.Equal(exec, v.Exec)
+				s.Equal(rt, v.HTTP)
 				s.Equal(time.Unix(42, 0), v.Now())
 				s.Equal("kept", v.Name)
 			},
 		},
 		{
-			name: "when a source is zero, sets the real host's",
+			name: "when a source is zero, sets the real host's, and HTTP stays nil",
 			c:    &variant{},
 			src:  source.Sources{Family: family.Debian},
 			validateFunc: func(got any) {
@@ -129,6 +136,7 @@ func (s *SourcesPublicTestSuite) TestWire() {
 				s.NotNil(v.FS)
 				s.NotNil(v.Exec)
 				s.NotNil(v.Now)
+				s.Nil(v.HTTP)
 			},
 		},
 		{
@@ -158,6 +166,24 @@ func (s *SourcesPublicTestSuite) TestWire() {
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
 			tc.validateFunc(collector.Wire(tc.c, tc.src))
+		})
+	}
+}
+
+func (s *SourcesPublicTestSuite) TestHasHTTP() {
+	tests := []struct {
+		name string
+		c    any
+		want bool
+	}{
+		{name: "when the variant has an HTTP transport", c: &variant{}, want: true},
+		{name: "when the variant has no HTTP field", c: &bare{}, want: false},
+		{name: "when its HTTP field has another type", c: &wrongHTTP{}, want: false},
+		{name: "when c is not a pointer to a struct", c: variant{}, want: false},
+	}
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			s.Equal(tc.want, collector.HasHTTP(tc.c))
 		})
 	}
 }

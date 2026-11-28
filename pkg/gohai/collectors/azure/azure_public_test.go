@@ -198,16 +198,16 @@ func TestAzurePublicTestSuite(
 func (s *AzurePublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		validateFunc func(*azure.Collector)
+		validateFunc func(azure.Collector)
 	}{
 		{
 			name: "New gives the azure cloud collector, opt-in, after dmi",
-			validateFunc: func(c *azure.Collector) {
+			validateFunc: func(c azure.Collector) {
 				s.Equal("azure", c.Name())
 				s.Equal(collector.CategoryCloud, c.Category())
 				s.False(c.DefaultEnabled())
 				s.Equal([]string{"dmi"}, c.Dependencies())
-				s.NotNil(c.FS)
+				s.NotNil(c.(*azure.Metadata).FS)
 			},
 		},
 	}

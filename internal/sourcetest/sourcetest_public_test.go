@@ -26,6 +26,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/avfs/avfs"
@@ -211,6 +212,51 @@ func (s *SourcetestPublicTestSuite) TestHTTP() {
 			s.Require().NoError(err)
 			defer func() { _ = resp.Body.Close() }()
 			tt.validateFunc(resp)
+		})
+	}
+}
+
+func (s *SourcetestPublicTestSuite) TestServer() {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, r.URL.Path)
+	}))
+	defer srv.Close()
+
+	tests := []struct {
+		name         string
+		base         string
+		validateFunc func(*http.Response, error)
+	}{
+		{
+			name: "sends the request to the server, with its path",
+			base: srv.URL,
+			validateFunc: func(resp *http.Response, err error) {
+				s.Require().NoError(err)
+				defer func() { _ = resp.Body.Close() }()
+				b, err := io.ReadAll(resp.Body)
+				s.Require().NoError(err)
+				s.Equal("/latest/meta-data/instance-id", string(b))
+			},
+		},
+		{
+			name: "a base that does not parse is an error",
+			base: "://bad",
+			validateFunc: func(resp *http.Response, err error) {
+				s.Nil(resp)
+				s.ErrorContains(err, "parse server URL")
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			req, err := http.NewRequestWithContext(
+				context.Background(),
+				http.MethodGet,
+				"http://169.254.169.254/latest/meta-data/instance-id",
+				nil,
+			)
+			s.Require().NoError(err)
+			tt.validateFunc(sourcetest.Server(tt.base).RoundTrip(req))
 		})
 	}
 }

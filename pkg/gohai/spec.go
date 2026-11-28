@@ -55,9 +55,9 @@ type CollectorSpec struct {
 	Fields []Field `json:"fields"`
 	// Reads are what it reads from a host of each platform.
 	Reads []Reads `json:"reads"`
-	// Network is what it reads over the network, outside source.Sources,
-	// such as the metadata service of a cloud. Empty for a collector that
-	// reads only the host.
+	// Network is what it reads over the network, through source.Sources'
+	// HTTP, such as the metadata service of a cloud. Empty for a collector
+	// that reads only the host.
 	Network string `json:"network,omitempty"`
 }
 
@@ -106,20 +106,8 @@ func Collectors() []CollectorSpec {
 			Constructor:    path.Base(pkg) + ".NewWith(src)",
 			Fields:         fields[c.Name()],
 		}
-		if c.Category() == collector.CategoryCloud {
-			// A cloud collector reads its provider's metadata service, not
-			// the host, so a run would only wait for the network.
-			spec.Constructor = path.Base(pkg) + ".New()"
+		if collector.HasHTTP(c) {
 			spec.Network = "the metadata service of " + c.Name() + ", over HTTP"
-			for _, platform := range SpecPlatforms() {
-				spec.Reads = append(
-					spec.Reads,
-					Reads{Platform: platform, Files: []string{}, Commands: []string{}},
-				)
-			}
-			out = append(out, spec)
-
-			continue
 		}
 		for _, platform := range SpecPlatforms() {
 			src, log := readlog.Sources(platform)
@@ -356,13 +344,13 @@ func CollectorTerms() []Term {
 		},
 		{
 			Name: "NewWith(src source.Sources)",
-			Does: "Builds the collector on a host of the caller's: its files, its commands, its clock, its family and its resolver. collector.Wire puts each source in the field of its type.",
-			When: "For each collector that reads the host. A test, or a program such as osapi, gives it a fake host. Read every file and run every command through src, never through os or os/exec.",
+			Does: "Builds the collector on a host of the caller's: its files, its commands, its clock, its family, its resolver and, for a cloud collector, the transport of its metadata reads. collector.Wire puts each source in the field of its type.",
+			When: "For each collector. A test, or a program such as osapi, gives it a fake host. Read every file and run every command through src, never through os or os/exec.",
 		},
 		{
 			Name: "New()",
 			Does: "Builds the collector on the real host.",
-			When: "For each collector. A cloud collector, which reads its provider's metadata service over HTTP, has only New.",
+			When: "For each collector.",
 		},
 		{
 			Name: "Facts field",

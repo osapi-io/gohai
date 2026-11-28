@@ -27,6 +27,7 @@ package digitalocean
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 
 	"github.com/osapi-io/gohai/internal/cloudmetadata"
@@ -134,58 +135,60 @@ type rawIfaceIPv6 struct {
 	Gateway   string `json:"gateway"`
 }
 
-// Collector fetches DO's single-JSON metadata response.
-type Collector struct {
-	client *cloudmetadata.Client
+// Metadata fetches DO's single-JSON metadata response.
+type Metadata struct {
+	// HTTP is the transport of the metadata reads. A nil HTTP is the
+	// shared transport.
+	HTTP http.RoundTripper
 }
 
-var _ collector.Collector = (*Collector)(nil)
+// Collector is the public interface of the digitalocean collector.
+type Collector interface {
+	collector.Collector
+}
 
-// New returns a default Collector pointed at DO's metadata server
-// with Ohai-matching 6s timeout.
-func New() *Collector {
+var _ Collector = (*Metadata)(nil)
+
+// New returns the digitalocean collector on the real host.
+func New() Collector {
 	return NewWith(source.Sources{})
 }
 
-// NewWith returns a Collector that reads the metadata service through
-// src.HTTP, so a fake host can answer it. A zero src.HTTP is the shared
-// transport.
+// NewWith returns the digitalocean collector reading the host through src. It reads
+// the metadata service through src.HTTP, so a fake host can answer it. A
+// zero src.HTTP is the shared transport.
 func NewWith(
 	src source.Sources,
-) *Collector {
-	return NewWithClient(
-		cloudmetadata.New(
-			metadataBaseURL,
-			cloudmetadata.WithTimeout(metadataTimeout),
-			cloudmetadata.WithTransport(src.HTTP),
-		),
+) Collector {
+	return collector.Wire(&Metadata{}, src)
+}
+
+// client is the metadata client of c, which reads through c.HTTP.
+func (c *Metadata) client() *cloudmetadata.Client {
+	return cloudmetadata.New(
+		metadataBaseURL,
+		cloudmetadata.WithTimeout(metadataTimeout),
+		cloudmetadata.WithTransport(c.HTTP),
 	)
 }
 
-// NewWithClient returns a Collector backed by a caller-supplied client.
-func NewWithClient(
-	c *cloudmetadata.Client,
-) *Collector {
-	return &Collector{client: c}
-}
-
 // Name returns "digital_ocean".
-func (*Collector) Name() string { return "digital_ocean" }
+func (*Metadata) Name() string { return "digital_ocean" }
 
 // Category returns "cloud".
-func (*Collector) Category() collector.Category { return collector.CategoryCloud }
+func (*Metadata) Category() collector.Category { return collector.CategoryCloud }
 
 // DefaultEnabled returns false, because cloud collectors are opt-in.
-func (*Collector) DefaultEnabled() bool { return false }
+func (*Metadata) DefaultEnabled() bool { return false }
 
 // Dependencies declares dmi for the bios_vendor pre-check. Matches
 // Ohai's has_do_dmi? gate.
-func (*Collector) Dependencies() []string { return []string{"dmi"} }
+func (*Metadata) Dependencies() []string { return []string{"dmi"} }
 
 // Collect gates the metadata fetch on a DMI bios_vendor match for
 // "DigitalOcean". Returns (nil, nil) when the signature is missing
 // or the endpoint is unreachable.
-func (c *Collector) Collect(
+func (c *Metadata) Collect(
 	ctx context.Context,
 	prior collector.PriorResults,
 ) (any, error) {
@@ -193,7 +196,7 @@ func (c *Collector) Collect(
 		return nil, ctx.Err()
 	}
 	var r raw
-	if err := c.client.GetJSON(ctx, metadataPath, &r); err != nil {
+	if err := c.client().GetJSON(ctx, metadataPath, &r); err != nil {
 		if errors.Is(err, cloudmetadata.ErrNotAvailable) {
 			return nil, ctx.Err()
 		}

@@ -33,8 +33,8 @@ import (
 	"github.com/avfs/avfs/vfs/memfs"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/osapi-io/gohai/internal/cloudmetadata"
 	"github.com/osapi-io/gohai/internal/collector"
+	"github.com/osapi-io/gohai/internal/sourcetest"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/dmi"
 	"github.com/osapi-io/gohai/pkg/gohai/collectors/ec2"
 	"github.com/osapi-io/gohai/pkg/gohai/family"
@@ -262,16 +262,16 @@ func handlerFor(
 func (s *EC2PublicTestSuite) TestNew() {
 	tests := []struct {
 		name         string
-		validateFunc func(*ec2.Collector)
+		validateFunc func(ec2.Collector)
 	}{
 		{
 			name: "New gives the ec2 cloud collector, opt-in, after dmi",
-			validateFunc: func(c *ec2.Collector) {
+			validateFunc: func(c ec2.Collector) {
 				s.Equal("ec2", c.Name())
 				s.Equal(collector.CategoryCloud, c.Category())
 				s.False(c.DefaultEnabled())
 				s.Equal([]string{"dmi"}, c.Dependencies())
-				s.NotNil(c.FS)
+				s.NotNil(c.(*ec2.Metadata).FS)
 			},
 		},
 	}
@@ -830,8 +830,8 @@ func (s *EC2PublicTestSuite) TestCollect() {
 				defer srv.Close()
 			}
 
-			client := cloudmetadata.New(srv.URL)
-			c := ec2.NewWithClient(client, source.Sources{
+			c := ec2.NewWith(source.Sources{
+				HTTP:   sourcetest.Server(srv.URL),
 				FS:     s.hostFS(tt.hypervisor),
 				Family: tt.family,
 			})
