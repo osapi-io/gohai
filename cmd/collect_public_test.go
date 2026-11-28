@@ -46,7 +46,7 @@ func (s *CollectPublicTestSuite) TestRegisterCollectorFlags() {
 		{
 			name: "collect reports a registry that cannot be built",
 			args: []string{"collect"},
-			newRegistry: func() (*gohai.PublicRegistry, error) {
+			newRegistry: func() (gohai.Registry, error) {
 				return nil, errors.New("duplicate")
 			},
 			validateFunc: func(code int, _, errOut string) {
@@ -57,7 +57,7 @@ func (s *CollectPublicTestSuite) TestRegisterCollectorFlags() {
 		{
 			name: "collect --list-collectors reports a registry that cannot be built",
 			args: []string{"collect", "--list-collectors"},
-			newRegistry: func() (*gohai.PublicRegistry, error) {
+			newRegistry: func() (gohai.Registry, error) {
 				return nil, errors.New("duplicate")
 			},
 			validateFunc: func(code int, out, errOut string) {

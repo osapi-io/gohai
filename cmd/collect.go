@@ -42,7 +42,7 @@ func newCollectCommand() *cobra.Command {
 		noDefaults     bool
 		withTimings    bool
 		categories     []string
-		reg            *gohai.PublicRegistry
+		reg            gohai.Registry
 	)
 
 	enabled := newFlagSet()
@@ -147,7 +147,7 @@ func registerCollectorFlags(
 	cmd *cobra.Command,
 	enabled *flagSet,
 	disabled *flagSet,
-) *gohai.PublicRegistry {
+) gohai.Registry {
 	reg, err := newRegistryFn()
 	if err != nil {
 		// The command is built before it runs, so it reports the error

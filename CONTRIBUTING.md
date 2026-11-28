@@ -89,7 +89,11 @@ just deps
   - `source/mocks/`. `MockRunner` and `MockResolver`, the generated doubles of
     `source.Runner` and `source.Resolver`, for gohai's tests and for a caller
     that gives gohai its sources.
-  - `registry.go`. `PublicRegistry`. The CLI uses it to list the flags.
+  - `registry.go`. `Registry`, the interface of `NewRegistry`: the sorted names
+    and the categories of the built-in collectors. The CLI uses it to list the
+    collectors and to build its flags.
+  - `spec.go`. `Collectors` and `CollectorSpec`: what each collector returns and
+    what it reads. osapi reads them.
 - **`pkg/gohai/collectors/<name>/`.** The public sub-package of each collector.
   Use the osapi pattern of one struct for each OS, with no build tags. The
   canonical reference is `pkg/gohai/collectors/shells/`.
@@ -142,6 +146,9 @@ just deps
   - `registry.go`. `Registry`. It registers collectors, resolves the
     dependencies and runs the collectors at the same time.
   - `mocks/`. The gomock generation (`go generate`) and the committed mock.
+- **`internal/spec/`.** The rules of a collector, which
+  `gohai collector validate` prints. `Checks` lists them, and `Problems` checks
+  the specs of `gohai.Collectors` against them.
 - **`internal/sourcetest/`.** The sources of a collector test. `FS` gives a
   memory filesystem that holds the given files. `Commands` holds the command
   output of a table row, and its `Mock` is the generated `MockRunner` that

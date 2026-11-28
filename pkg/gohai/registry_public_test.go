@@ -21,6 +21,7 @@
 package gohai_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -45,13 +46,20 @@ func (s *RegistryPublicTestSuite) TestNewRegistry() {
 	tests := []struct {
 		name         string
 		builtins     func(source.Sources) []collector.Collector
-		validateFunc func(*gohai.PublicRegistry, error)
+		validateFunc func(gohai.Registry, error)
 	}{
 		{
 			name: "has the built-in collectors",
-			validateFunc: func(reg *gohai.PublicRegistry, err error) {
+			validateFunc: func(reg gohai.Registry, err error) {
 				s.Require().NoError(err)
 				s.Contains(reg.Names(), "platform")
+			},
+		},
+		{
+			name: "the names of the collectors are sorted",
+			validateFunc: func(reg gohai.Registry, err error) {
+				s.Require().NoError(err)
+				s.True(slices.IsSorted(reg.Names()))
 			},
 		},
 		{
@@ -59,7 +67,7 @@ func (s *RegistryPublicTestSuite) TestNewRegistry() {
 			builtins: func(src source.Sources) []collector.Collector {
 				return []collector.Collector{platform.NewWith(src), platform.NewWith(src)}
 			},
-			validateFunc: func(_ *gohai.PublicRegistry, err error) {
+			validateFunc: func(_ gohai.Registry, err error) {
 				s.ErrorContains(err, `register built-in collector "platform"`)
 			},
 		},
