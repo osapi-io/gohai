@@ -4172,6 +4172,12 @@
         "version": {
           "type": "string"
         },
+        "versions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "architecture": {
           "type": "string"
         },
