@@ -830,6 +830,12 @@ func (l *Linux) interfaces(
 	}
 	ifs := []Interface{}
 	for _, e := range entries {
+		// An interface is a directory, or a link to one. A regular file,
+		// such as bonding_masters when the bonding module is loaded, is
+		// not an interface.
+		if e.Type().IsRegular() {
+			continue
+		}
 		name := e.Name()
 		item := Interface{Name: name, Addresses: addrs[name], Counters: counters[name]}
 		item.Number, _ = strconv.Atoi(read(name, "ifindex"))

@@ -1917,6 +1917,24 @@ func (s *NetworkPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: a regular file under /sys/class/net, such as bonding_masters, is not an interface",
+			variant: "linux",
+			files: map[string]string{
+				"/sys/class/net/eth0/ifindex":    "2\n",
+				"/sys/class/net/bonding_masters": "bond0\n",
+			},
+			runner: &sourcetest.Commands{Out: map[string]string{
+				"ip -o addr show": "2: eth0    inet 192.0.2.7/24 brd 192.0.2.255 scope global eth0\n",
+			}},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*network.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Interfaces, 1)
+				s.Equal("eth0", i.Interfaces[0].Name)
+			},
+		},
+		{
 			name:    "linux: the scope is the one that ip prints, also when an admin set it",
 			variant: "linux",
 			files: map[string]string{
