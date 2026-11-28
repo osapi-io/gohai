@@ -160,9 +160,12 @@ On Linux:
    gohai also has Ohai's `filesystem[mount][:inodes_percent_used]` field. See
    [Network mounts](#network-mounts).
 2. When `lsblk` is on the PATH, the collector runs
-   `lsblk -J -o NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL` through
-   the shared `source.Runner`. It merges the result into the mount table by
-   device path, and fills `uuid`, `label`, `part_uuid` and `part_label`.
+   `lsblk -J -p -o NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL` through
+   the shared `source.Runner`. The `-p` flag makes `NAME` the full device path,
+   such as `/dev/mapper/vg0-root` for an LVM volume. Thus the collector merges
+   the result into the mount table by device path, also for LVM, LUKS and other
+   device-mapper devices, and fills `uuid`, `label`, `part_uuid` and
+   `part_label`.
 3. The block devices that `lsblk` reports with an `FSTYPE` and no `MOUNTPOINT`
    go into `unmounted[]`. Thus LUKS containers, inactive LVs and btrfs devices
    are still visible.

@@ -114,6 +114,9 @@ func strconvBytes(
 	return string(digits)
 }
 
+// lsblkColumns is the -o list the collector passes to lsblk.
+const lsblkColumns = "NAME,UUID,LABEL,FSTYPE,MOUNTPOINT,PARTUUID,PARTLABEL"
+
 // noLsblkExec returns a mock Executor that errors on every call. It
 // simulates lsblk absent from PATH or a minimal container.
 func noLsblkExec(
@@ -122,7 +125,7 @@ func noLsblkExec(
 	ctrl := gomock.NewController(t)
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
-		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
+		Execute(gomock.Any(), "lsblk", "-J", "-p", "-o", lsblkColumns).
 		Return(nil, errors.New("not found")).
 		AnyTimes()
 	m.EXPECT().
@@ -142,7 +145,7 @@ func lsblkExec(
 	ctrl := gomock.NewController(t)
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
-		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
+		Execute(gomock.Any(), "lsblk", "-J", "-p", "-o", lsblkColumns).
 		Return([]byte(out), nil).
 		AnyTimes()
 	m.EXPECT().
@@ -162,7 +165,7 @@ func lsblkZFSExec(
 	ctrl := gomock.NewController(t)
 	m := mocks.NewMockRunner(ctrl)
 	m.EXPECT().
-		Execute(gomock.Any(), "lsblk", gomock.Any(), gomock.Any(), gomock.Any()).
+		Execute(gomock.Any(), "lsblk", "-J", "-p", "-o", lsblkColumns).
 		Return([]byte(lsblkOut), nil).
 		AnyTimes()
 	m.EXPECT().
@@ -284,9 +287,9 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			out:     baseDF,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda","fstype":null,"children":[
-						{"name":"sda1","fstype":"ext4","uuid":"root-uuid","label":"","mountpoint":"/","partuuid":"part-1","partlabel":""},
-						{"name":"sda2","fstype":"ext4","uuid":"boot-uuid","label":"EFI","mountpoint":"/boot","partuuid":"part-2","partlabel":"EFI"}
+					{"name":"/dev/sda","fstype":null,"children":[
+						{"name":"/dev/sda1","fstype":"ext4","uuid":"root-uuid","label":"","mountpoint":"/","partuuid":"part-1","partlabel":""},
+						{"name":"/dev/sda2","fstype":"ext4","uuid":"boot-uuid","label":"EFI","mountpoint":"/boot","partuuid":"part-2","partlabel":"EFI"}
 					]}
 				]}`)
 			},
@@ -310,10 +313,10 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			out:     baseDF,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda","fstype":null,"children":[
-						{"name":"sda1","fstype":"ext4","uuid":"root-uuid","label":"","mountpoint":"/","partuuid":"","partlabel":""},
-						{"name":"sda2","fstype":"ext4","uuid":"boot-uuid","label":"","mountpoint":"/boot","partuuid":"","partlabel":""},
-						{"name":"sdb1","fstype":"crypto_LUKS","uuid":"luks-uuid","label":"data","mountpoint":"","partuuid":"","partlabel":""}
+					{"name":"/dev/sda","fstype":null,"children":[
+						{"name":"/dev/sda1","fstype":"ext4","uuid":"root-uuid","label":"","mountpoint":"/","partuuid":"","partlabel":""},
+						{"name":"/dev/sda2","fstype":"ext4","uuid":"boot-uuid","label":"","mountpoint":"/boot","partuuid":"","partlabel":""},
+						{"name":"/dev/sdb1","fstype":"crypto_LUKS","uuid":"luks-uuid","label":"data","mountpoint":"","partuuid":"","partlabel":""}
 					]}
 				]}`)
 			},
@@ -330,14 +333,46 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "linux: lsblk full path matches a device-mapper mount",
+			variant: "linux",
+			mounts:  "/dev/mapper/vg0-root / ext4 rw 0 0\n",
+			out: map[string]string{
+				"df -akP": dfHead + "/dev/mapper/vg0-root 100 50 50 50% /\n",
+				"df -aiP": "Filesystem Inodes IUsed IFree IUse% Mounted on\n",
+			},
+			exec: func(t *testing.T) source.Runner {
+				return lsblkExec(t, `{"blockdevices":[
+					{"name":"/dev/sda","fstype":null,"children":[
+						{"name":"/dev/sda2","fstype":"LVM2_member","uuid":"pv-uuid","label":"","mountpoint":"","partuuid":"","partlabel":"","children":[
+							{"name":"/dev/mapper/vg0-root","fstype":"ext4","uuid":"lv-uuid","label":"root","mountpoint":"/","partuuid":"","partlabel":""},
+							{"name":"/dev/mapper/vg0-data","fstype":"xfs","uuid":"data-uuid","label":"","mountpoint":"","partuuid":"","partlabel":""}
+						]}
+					]}
+				]}`)
+			},
+			validateFunc: func(got any, err error) {
+				s.Require().NoError(err)
+				i, ok := got.(*filesystem.Info)
+				s.Require().True(ok)
+				s.Require().Len(i.Mounts, 1)
+				s.Equal("/dev/mapper/vg0-root", i.Mounts[0].Device)
+				s.Equal("lv-uuid", i.Mounts[0].UUID)
+				s.Equal("root", i.Mounts[0].Label)
+				s.Require().Len(i.Unmounted, 2)
+				s.Equal("/dev/sda2", i.Unmounted[0].Device)
+				s.Equal("/dev/mapper/vg0-data", i.Unmounted[1].Device)
+				s.Equal("data-uuid", i.Unmounted[1].UUID)
+			},
+		},
+		{
 			name:    "linux: lsblk node with empty fstype ignored (raw disk)",
 			variant: "linux",
 			mounts:  baseMounts,
 			out:     baseDF,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda","fstype":"","children":[
-						{"name":"sda1","fstype":"ext4","uuid":"u","label":"","mountpoint":"/","partuuid":"","partlabel":""}
+					{"name":"/dev/sda","fstype":"","children":[
+						{"name":"/dev/sda1","fstype":"ext4","uuid":"u","label":"","mountpoint":"/","partuuid":"","partlabel":""}
 					]}
 				]}`)
 			},
@@ -356,7 +391,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			out:     baseDF,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sdc1","fstype":"ext4","uuid":"u","label":"","mountpoint":"/mnt/foo","partuuid":"","partlabel":""}
+					{"name":"/dev/sdc1","fstype":"ext4","uuid":"u","label":"","mountpoint":"/mnt/foo","partuuid":"","partlabel":""}
 				]}`)
 			},
 			validateFunc: func(got any, err error) {
@@ -602,7 +637,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			mounts:  btrfsMount,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda1","fstype":"btrfs","uuid":"abc-123","mountpoint":"/"}
+					{"name":"/dev/sda1","fstype":"btrfs","uuid":"abc-123","mountpoint":"/"}
 				]}`)
 			},
 			fs: btrfsFS(s, "abc-123", map[string]btrfsBgFixture{
@@ -632,7 +667,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			mounts:  btrfsMount,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda1","fstype":"btrfs","uuid":"single-fs","mountpoint":"/"}
+					{"name":"/dev/sda1","fstype":"btrfs","uuid":"single-fs","mountpoint":"/"}
 				]}`)
 			},
 			fs: btrfsFS(s, "single-fs", map[string]btrfsBgFixture{
@@ -656,7 +691,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			mounts:  btrfsMount,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda1","fstype":"btrfs","uuid":"missing","mountpoint":"/"}
+					{"name":"/dev/sda1","fstype":"btrfs","uuid":"missing","mountpoint":"/"}
 				]}`)
 			},
 			fs: memfs.New(),
@@ -673,7 +708,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			mounts:  btrfsMount,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda1","fstype":"btrfs","uuid":"empty-files","mountpoint":"/"}
+					{"name":"/dev/sda1","fstype":"btrfs","uuid":"empty-files","mountpoint":"/"}
 				]}`)
 			},
 			fs: func() avfs.VFS {
@@ -702,7 +737,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			mounts:  btrfsMount,
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda1","fstype":"btrfs","uuid":"empty-bg","mountpoint":"/"}
+					{"name":"/dev/sda1","fstype":"btrfs","uuid":"empty-bg","mountpoint":"/"}
 				]}`)
 			},
 			fs: func() avfs.VFS {
@@ -723,7 +758,7 @@ func (s *FilesystemPublicTestSuite) TestCollect() {
 			mounts:  "/dev/sda1 / ext4 rw 0 0\n",
 			exec: func(t *testing.T) source.Runner {
 				return lsblkExec(t, `{"blockdevices":[
-					{"name":"sda1","fstype":"ext4","uuid":"ext-uuid","mountpoint":"/"}
+					{"name":"/dev/sda1","fstype":"ext4","uuid":"ext-uuid","mountpoint":"/"}
 				]}`)
 			},
 			fs: memfs.New(),
