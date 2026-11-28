@@ -523,6 +523,19 @@ the code examples, the file layout, the test setup and the commit template.
 The **reference implementation** is `pkg/gohai/collectors/shells/`. Copy its
 patterns exactly.
 
+### The collector contract is internal
+
+Each collector package exports a `Collector` interface that embeds
+`collector.Collector` from `internal/collector`. Its methods use
+`collector.Category` and `collector.PriorResults`, which are also internal. This
+is on purpose, and #624 records the decision.
+
+A program uses a collector. It does not implement one. Call
+`pkg.NewWith(src).Collect(ctx, nil)`, as osapi does, or `pkg.New()` for the real
+host. A program outside gohai cannot write a collector, because it cannot name
+the internal types. The planned `Extension` interface (#566) is for that use.
+Until #566 is built, a new collector goes into gohai.
+
 ### Done-definition (every collector, every time)
 
 Before you mark a collector as complete, each item below must be true:
