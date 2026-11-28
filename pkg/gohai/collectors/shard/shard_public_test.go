@@ -139,6 +139,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
+				s.Equal([]string{"machinename", "serial", "uuid"}, info.Inputs)
 
 				if defaultSeed >= 0 {
 					s.Equal(defaultSeed, info.Seed)
@@ -201,6 +202,7 @@ func (s *ShardPublicTestSuite) TestCollect() {
 				s.Require().NoError(err)
 				info, ok := got.(*shard.Info)
 				s.Require().True(ok)
+				s.Equal([]string{"machinename"}, info.Inputs)
 
 				if -1 >= 0 {
 					s.Equal(-1, info.Seed)

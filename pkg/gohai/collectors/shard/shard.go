@@ -42,6 +42,27 @@ import (
 // Info holds the derived shard seed.
 type Info struct {
 	Seed int `json:"seed"`
+	// Inputs names the sources that went into Seed: machinename, and
+	// serial and uuid when the collector could read them. DMI's serial and
+	// UUID are readable only by root on Linux, so a seed made by a
+	// non-root run has fewer inputs, and differs from a root run's on the
+	// same host. Inputs shows which one a seed is.
+	Inputs []string `json:"inputs"`
+}
+
+// newInfo is the Info of a seed made from machinename, serial and uuid.
+func newInfo(
+	machinename, serial, uuid string,
+) *Info {
+	inputs := []string{"machinename"}
+	if serial != "" {
+		inputs = append(inputs, "serial")
+	}
+	if uuid != "" {
+		inputs = append(inputs, "uuid")
+	}
+
+	return &Info{Seed: computeSeed(machinename, serial, uuid), Inputs: inputs}
 }
 
 // Collector is the public interface every shard variant satisfies.

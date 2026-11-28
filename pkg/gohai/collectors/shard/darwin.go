@@ -59,7 +59,7 @@ func (d *Darwin) Collect(
 	}
 	serial := readDarwinSerial(ctx, d.Exec)
 	uuid := readDarwinUUID(ctx, d.Exec)
-	return &Info{Seed: computeSeed(machinename, serial, uuid)}, nil
+	return newInfo(machinename, serial, uuid), nil
 }
 
 // readDarwinSerial gets the hardware serial from system_profiler,

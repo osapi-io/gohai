@@ -51,5 +51,5 @@ func (l *Linux) Collect(
 	dmiInfo, _ := collector.GetDep[*dmi.Info](prior, "dmi")
 	serial := getDMISerial(dmiInfo)
 	uuid := getDMIUUID(dmiInfo)
-	return &Info{Seed: computeSeed(machinename, serial, uuid)}, nil
+	return newInfo(machinename, serial, uuid), nil
 }

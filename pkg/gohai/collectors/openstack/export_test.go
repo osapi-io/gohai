@@ -29,3 +29,9 @@ func SetPasswdPath(
 	passwdPath = path
 	return func() { passwdPath = orig }
 }
+
+// MaxWalkDepth and MaxWalkRequests are the limits of the metadata walk.
+const (
+	MaxWalkDepth    = maxWalkDepth
+	MaxWalkRequests = maxWalkRequests
+)
