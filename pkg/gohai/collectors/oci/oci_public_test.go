@@ -157,6 +157,24 @@ func handler(
 	}
 }
 
+// failOn answers path with a 500, the instance with instance, and every
+// other path with "[]".
+func failOn(
+	path string,
+	instance string,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case path:
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/instance":
+			_, _ = w.Write([]byte(instance))
+		default:
+			_, _ = w.Write([]byte("[]"))
+		}
+	}
+}
+
 func (s *OCIPublicTestSuite) TestCollect() {
 	tests := []struct {
 		name         string
@@ -283,6 +301,14 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			},
 		},
 		{
+			name:    "a 500 on the instance is an error",
+			handler: failOn("/instance", ""),
+			validateFunc: func(got any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 500 from /instance")
+				s.Nil(got)
+			},
+		},
+		{
 			name:   "connection refused drops silently",
 			closed: true,
 			validateFunc: func(out any, _ bool, _ string, err error) {
@@ -298,27 +324,39 @@ func (s *OCIPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name:     "malformed vnics JSON keeps the instance, with no VNICs",
+			name:     "malformed vnics JSON is an error",
 			instance: instanceResponse,
 			vnics:    "not json",
 			validateFunc: func(got any, _ bool, _ string, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*oci.Info)
-				s.Require().True(ok)
-				s.NotEmpty(info.ID)
-				s.Empty(info.VNICs)
+				s.Require().ErrorContains(err, "oci: decode /vnics")
+				s.Nil(got)
 			},
 		},
 		{
-			name:     "malformed volumes JSON keeps the instance, with no volumes",
+			name:     "a 500 on /vnics is an error",
+			instance: instanceResponse,
+			handler:  failOn("/vnics", instanceResponse),
+			validateFunc: func(got any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 500 from /vnics")
+				s.Nil(got)
+			},
+		},
+		{
+			name:     "malformed volumes JSON is an error",
 			instance: instanceResponse,
 			volumes:  "not json",
 			validateFunc: func(got any, _ bool, _ string, err error) {
-				s.Require().NoError(err)
-				info, ok := got.(*oci.Info)
-				s.Require().True(ok)
-				s.NotEmpty(info.ID)
-				s.Empty(info.VolumeAttachments)
+				s.Require().ErrorContains(err, "oci: decode /allVolumeAttachments")
+				s.Nil(got)
+			},
+		},
+		{
+			name:     "a 500 on /allVolumeAttachments is an error",
+			instance: instanceResponse,
+			handler:  failOn("/allVolumeAttachments", instanceResponse),
+			validateFunc: func(got any, _ bool, _ string, err error) {
+				s.Require().EqualError(err, "oci: unexpected status 500 from /allVolumeAttachments")
+				s.Nil(got)
 			},
 		},
 		{

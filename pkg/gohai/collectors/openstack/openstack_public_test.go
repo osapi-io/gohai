@@ -154,13 +154,14 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 		handler      http.HandlerFunc
 		closed       bool
 		maxRequests  int // when non-zero, the most requests the walk may make
-		validateFunc func(any, bool)
+		validateFunc func(any, bool, error)
 	}{
 		{
 			name:     "happy path combines EC2-mirror walk + Nova doc + openstack provider",
 			tree:     metadataTree,
 			novaBody: novaDoc,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info)
@@ -189,7 +190,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			tree:        metadataTree,
 			novaBody:    novaDoc,
 			passwdLines: "root:x:0:0:root:/root:/bin/bash\nuser:x:1000:1000::/home/user:/bin/bash\n",
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("openstack", info.Provider)
@@ -200,7 +202,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			tree:        metadataTree,
 			novaBody:    novaDoc,
 			passwdLines: "root:x:0:0:root:/root:/bin/bash\ndhc-user:x:1000:1000::/home/dhc-user:/bin/bash\n",
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("dreamhost", info.Provider)
@@ -213,7 +216,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 			tree:     metadataTree,
 			novaBody: novaDoc,
-			validateFunc: func(out any, httpCalled bool) {
+			validateFunc: func(out any, httpCalled bool, err error) {
+				s.Require().NoError(err)
 				s.False(httpCalled)
 				s.Nil(out)
 			},
@@ -223,7 +227,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			prior:    collector.PriorResults{},
 			tree:     metadataTree,
 			novaBody: novaDoc,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("i-abc", info.ID)
@@ -233,7 +238,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			name:     "EC2-mirror missing but Nova doc present → still detected",
 			tree:     map[string]string{},
 			novaBody: novaDoc,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Require().NotNil(info)
@@ -245,12 +251,13 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			name:     "both EC2-mirror and Nova doc missing → drop",
 			tree:     map[string]string{},
 			novaBody: "",
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
 		{
-			name: "Nova doc malformed JSON tolerated",
+			name: "a malformed Nova doc is an error",
 			tree: metadataTree,
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/openstack/latest/meta_data.json" {
@@ -259,11 +266,58 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				}
 				canned(metadataTree, "")(w, r)
 			},
-			validateFunc: func(out any, _ bool) {
-				info, ok := out.(*openstack.Info)
-				s.Require().True(ok)
-				s.Empty(info.UUID)
-				s.Equal("i-abc", info.ID)
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().ErrorContains(err, "openstack: decode meta_data.json")
+				s.Nil(out)
+			},
+		},
+		{
+			name: "a 500 on the Nova doc is an error",
+			tree: metadataTree,
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/openstack/latest/meta_data.json" {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				canned(metadataTree, "")(w, r)
+			},
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().
+					EqualError(err, "openstack: unexpected status 500 from /openstack/latest/meta_data.json")
+				s.Nil(out)
+			},
+		},
+		{
+			name: "a 500 on the tree listing is an error",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/latest/meta-data/" {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				canned(nil, novaDoc)(w, r)
+			},
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().
+					EqualError(err, "openstack: unexpected status 500 from /latest/meta-data/")
+				s.Nil(out)
+			},
+		},
+		{
+			name: "a 500 on a leaf during the walk is an error",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/latest/meta-data/bad" {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				canned(map[string]string{
+					"/latest/meta-data/":       "ami-id\nbad",
+					"/latest/meta-data/ami-id": "ami-aaa",
+				}, novaDoc)(w, r)
+			},
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().
+					EqualError(err, "openstack: unexpected status 500 from /latest/meta-data/bad")
+				s.Nil(out)
 			},
 		},
 		{
@@ -273,7 +327,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				"/latest/meta-data/ami-id": "ami-yyy",
 			},
 			novaBody: `{"uuid": "uuid-solo", "hostname": "h"}`,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("uuid-solo", info.UUID)
@@ -282,28 +337,30 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			},
 		},
 		{
-			name: "broken subdir during walk is tolerated",
+			name: "a subdirectory that is not there (404) is skipped",
 			tree: map[string]string{
 				"/latest/meta-data/":       "ami-id\nbroken/",
 				"/latest/meta-data/ami-id": "ami-zzz",
 				// /latest/meta-data/broken/ intentionally missing → 404
 			},
 			novaBody: novaDoc,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("ami-zzz", info.ImageID)
 			},
 		},
 		{
-			name: "leaf fetch error during walk is tolerated",
+			name: "a leaf that is not there (404) is skipped",
 			tree: map[string]string{
 				"/latest/meta-data/":       "ami-id\nmissing-leaf",
 				"/latest/meta-data/ami-id": "ami-aaa",
 				// /latest/meta-data/missing-leaf intentionally absent → 404
 			},
 			novaBody: novaDoc,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("ami-aaa", info.ImageID)
@@ -313,7 +370,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			name:    "connection refused drops silently",
 			handler: func(http.ResponseWriter, *http.Request) {},
 			closed:  true,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 			},
 		},
@@ -324,7 +382,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				"/latest/meta-data/ami-id": "ami-skip",
 			},
 			novaBody: novaDoc,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("ami-skip", info.ImageID)
@@ -337,7 +396,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				"/latest/meta-data/ami-id": "ami-no-placement",
 			},
 			novaBody: novaDoc,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				info, ok := out.(*openstack.Info)
 				s.Require().True(ok)
 				s.Equal("nova", info.Zone) // from Nova doc
@@ -347,7 +407,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			name:        "a directory that lists itself stops at the depth limit",
 			handler:     endlessTree("loop/\nleaf\n"),
 			maxRequests: 2*openstack.MaxWalkDepth + 2,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				s.NotNil(out)
 			},
 		},
@@ -357,7 +418,8 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				"sub/\n" + strings.Repeat("leaf\n", openstack.MaxWalkRequests/4),
 			),
 			maxRequests: openstack.MaxWalkRequests + 2,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				s.NotNil(out)
 			},
 		},
@@ -365,14 +427,16 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 			name:        "a directory with too many leaves stops at the request limit",
 			handler:     endlessTree(strings.Repeat("leaf\n", openstack.MaxWalkRequests+50)),
 			maxRequests: openstack.MaxWalkRequests + 2,
-			validateFunc: func(out any, _ bool) {
+			validateFunc: func(out any, _ bool, err error) {
+				s.Require().NoError(err)
 				s.NotNil(out)
 			},
 		},
 		{
 			name:  "dmi with no product table is not OpenStack, and is not probed",
 			prior: collector.PriorResults{"dmi": &dmi.Info{}},
-			validateFunc: func(out any, httpCalled bool) {
+			validateFunc: func(out any, httpCalled bool, err error) {
+				s.Require().NoError(err)
 				s.Nil(out)
 				s.False(httpCalled)
 			},
@@ -415,12 +479,11 @@ func (s *OpenStackPublicTestSuite) TestCollect() {
 				prior = osPrior()
 			}
 			out, err := c.Collect(context.Background(), prior)
-			s.Require().NoError(err)
 			if tt.maxRequests > 0 {
 				s.LessOrEqual(int(requests.Load()), tt.maxRequests)
 			}
 
-			tt.validateFunc(out, httpCalled)
+			tt.validateFunc(out, httpCalled, err)
 		})
 	}
 }

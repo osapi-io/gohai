@@ -709,6 +709,79 @@ func (s *CloudMetadataPublicTestSuite) TestRawGet() {
 	}
 }
 
+func (s *CloudMetadataPublicTestSuite) TestLookup() {
+	tests := []struct {
+		name         string
+		setup        func() (baseURL string, cleanup func())
+		validateFunc func([]byte, error)
+	}{
+		{
+			name: "200 returns the body",
+			setup: func() (string, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/doc": func(w http.ResponseWriter, _ *http.Request) {
+						_, _ = w.Write([]byte("hello"))
+					},
+				})
+				return srv.URL, srv.Close
+			},
+			validateFunc: func(body []byte, err error) {
+				s.Require().NoError(err)
+				s.Equal("hello", string(body))
+			},
+		},
+		{
+			name: "404 wraps ErrNotAvailable",
+			setup: func() (string, func()) {
+				srv := newServer(nil)
+				return srv.URL, srv.Close
+			},
+			validateFunc: func(body []byte, err error) {
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+				s.Nil(body)
+			},
+		},
+		{
+			name: "500 is an error that is not ErrNotAvailable",
+			setup: func() (string, func()) {
+				srv := newServer(map[string]func(http.ResponseWriter, *http.Request){
+					"/doc": func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusInternalServerError)
+					},
+				})
+				return srv.URL, srv.Close
+			},
+			validateFunc: func(body []byte, err error) {
+				s.Require().EqualError(err, "unexpected status 500 from /doc")
+				s.NotErrorIs(err, cloudmetadata.ErrNotAvailable)
+				s.Nil(body)
+			},
+		},
+		{
+			name: "connection refused wraps ErrNotAvailable",
+			setup: func() (string, func()) {
+				srv := newServer(nil)
+				url := srv.URL
+				srv.Close()
+				return url, func() {}
+			},
+			validateFunc: func(body []byte, err error) {
+				s.Require().ErrorIs(err, cloudmetadata.ErrNotAvailable)
+				s.Nil(body)
+			},
+		},
+	}
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			baseURL, cleanup := tt.setup()
+			defer cleanup()
+
+			client := cloudmetadata.New(baseURL)
+			tt.validateFunc(client.Lookup(context.Background(), "/doc"))
+		})
+	}
+}
+
 func (s *CloudMetadataPublicTestSuite) TestPut() {
 	tests := []struct {
 		name         string

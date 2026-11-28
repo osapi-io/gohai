@@ -121,9 +121,12 @@ does not probe it.
 5. **User-Agent.** The User-Agent is `gohai`, the cloudmetadata default.
 6. **Timeout.** The timeout is 2 seconds. This is Ohai's default. Ohai lets you
    change it, but gohai uses the cloudmetadata default.
-7. **Failures.** If the EC2-compatible tree and the Nova document both fail, the
-   collector returns `(nil, nil)`. One source alone is sufficient to give an
-   Info with data.
+7. **Failures.** A document, directory or value that gets no answer or a 404 is
+   not there, and is skipped. If neither the EC2-compatible tree nor the Nova
+   document is there, the collector returns `(nil, nil)`. One source alone is
+   sufficient to give an Info with data. Any other failure is an error: an HTTP
+   500 or other non-2xx status, a Nova document that isn't valid JSON, or a
+   cancelled context.
 
 The method is the same as the recursive read of Ohai's
 `Ohai::Mixin::Ec2Metadata`, which the openstack plugin also uses. Like Ohai,
