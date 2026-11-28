@@ -105,7 +105,7 @@ func (g *Gohai) Collect(
 		OnStatus: func(name string, s collector.Status, _ error) {
 			statusMu.Lock()
 			defer statusMu.Unlock()
-			status[name] = Status(s)
+			status[name] = statusFrom(s)
 		},
 	}
 
@@ -220,3 +220,23 @@ func registerBuiltins(
 
 // builtinCollectorsFn is builtinCollectors, which a test replaces.
 var builtinCollectorsFn = builtinCollectors
+
+// statusFrom is the Status of the registry's status s. Each internal status
+// has a Status of the same value. A status that has none, which TestStatus
+// stops, is StatusFailed, so a fact never carries a status with no constant.
+func statusFrom(
+	s collector.Status,
+) Status {
+	switch s {
+	case collector.StatusOK:
+		return StatusOK
+	case collector.StatusAbsent:
+		return StatusAbsent
+	case collector.StatusUnsupported:
+		return StatusUnsupported
+	case collector.StatusPartial:
+		return StatusPartial
+	default:
+		return StatusFailed
+	}
+}

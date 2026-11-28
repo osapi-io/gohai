@@ -46,7 +46,10 @@ func Absent(
 // it is not an error of the run.
 var ErrUnsupported = errors.New("not supported on this platform")
 
-// Status is why a collector has its fact, or has none.
+// Status is why a collector has its fact, or has none. gohai.Status in
+// pkg/gohai has the same five values, because the public API cannot name this
+// internal type. gohai.TestStatus fails when the two sets differ, so add a
+// status to both.
 type Status string
 
 // The statuses of a collector after a run.
